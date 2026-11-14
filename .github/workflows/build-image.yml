@@ -54,6 +54,12 @@ on:
         type: boolean
         default: false
 
+# What a job is given unless it says more: to read the repository. The
+# jobs that push the image, attest a file or make the release name what
+# they need themselves (R206 step 9: this workflow holds the release key).
+permissions:
+  contents: read
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
@@ -353,7 +359,7 @@ jobs:
     # Every job of the run, not the image's alone: a run whose OS image failed
     # was recorded a success (B455). A skipped job (no tag, no box ticked)
     # counts as nothing either way.
-    needs: [place, lint, suites, build, upgrade, bundle, appliance, appliance-publish]
+    needs: [place, lint, suites, build, upgrade, bundle, apps, android, appliance, release]
     # Failed, canceled and skipped are exactly the outcomes worth recording.
     if: always()
     # The image is pushed by the time this runs, so nothing waits on it: with
@@ -380,7 +386,7 @@ jobs:
         # the dashboard follows for anything the web can reach, and it keeps
         # a workflow input out of a command line.
         env:
-          JOB_RESULTS: "place=${{ needs.place.result }} lint=${{ needs.lint.result }} suites=${{ needs.suites.result }} build=${{ needs.build.result }} upgrade=${{ needs.upgrade.result }} bundle=${{ needs.bundle.result }} appliance=${{ needs.appliance.result }} appliance-publish=${{ needs.appliance-publish.result }}"
+          JOB_RESULTS: "place=${{ needs.place.result }} lint=${{ needs.lint.result }} suites=${{ needs.suites.result }} build=${{ needs.build.result }} upgrade=${{ needs.upgrade.result }} bundle=${{ needs.bundle.result }} apps=${{ needs.apps.result }} android=${{ needs.android.result }} appliance=${{ needs.appliance.result }} release=${{ needs.release.result }}"
           BUILD_VERSION: ${{ needs.build.outputs.version }}
           BUILD_DIGEST: ${{ needs.build.outputs.digest }}
           BUILD_ELAPSED: ${{ needs.build.outputs.elapsed }}
@@ -464,18 +470,17 @@ jobs:
   # as aerieos-controller-X.Y.Z.tar.gz with its sha256 beside it and a
   # build attestation, which install-controller.sh --update on a bare-metal
   # install fetches and verifies in place of the tag's source archive. On a
-  # tag push alone; the release is made here when the tag has none yet.
+  # tag push alone. It makes no release: the bundle and the release's notes
+  # are handed to the last job, which makes the release once (R206 step 1).
   bundle:
-    # The release is made here, so only once the tag's checks have passed.
+    # Signed with the release key, so only once the tag's checks have passed.
     needs: [place, lint, suites]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
     permissions:
-      contents: write
+      contents: read
       id-token: write
       attestations: write
-      # To start the companion apps' builds for a release this job makes.
-      actions: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (R206)
         with:
@@ -517,20 +522,14 @@ jobs:
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be   # v2.4.0, pinned by commit (R206)
         with:
           subject-path: ${{ steps.pack.outputs.name }}
-      - name: Put it on the release
+      - name: Write the release's notes
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.pack.outputs.tag }}
-          NAME: ${{ steps.pack.outputs.name }}
         run: |
-          # A dev build's tag (vX.Y.Z-dev.N, R179) is a pre-release and never
-          # the latest: the dev channel alone takes it. Every release starts
-          # a draft, seen by the repository's own people alone, until its
-          # owner has read its notes and publishes it (the operator, 1 Nov).
           # The notes are the tree's when it has them for this version
           # (docs/release-notes/X.Y.Z.md, or X.Y.Z-dev.md for a dev build),
-          # @TAG@, @VER@ and @REPO@ filled in, so the release is published with
+          # @TAG@, @VER@ and @REPO@ filled in, so the release is made with
           # them rather than edited after. Otherwise they are the changelog's
           # own: the version's section for a release, and for a dev build only
           # what Unreleased gained since the tag before (tools/release-notes.py).
@@ -551,25 +550,52 @@ jobs:
             { sed -e "s|@TAG@|$TAG|g" -e "s|@VER@|$ver|g" -e "s|@REPO@|$GITHUB_REPOSITORY|g" docs/release-notes/downloads.md; cat notes.md; } > notes.all
             mv notes.all notes.md
           fi
-          # One release per tag, found among the drafts and made once
-          # (tools/release-attach.sh): v0.9.0-dev.4797 got two drafts when the
-          # OS job could not see this job's.
-          bash tools/release-attach.sh "$TAG" --notes notes.md "$NAME" "$NAME.sha256" > attach.log
-          cat attach.log
-          case "$(head -1 attach.log)" in *" made for "*)
-            # A release this job's own token publishes starts no workflow
-            # (GitHub's rule), so the companion apps' release builds, which
-            # a release published by a person starts, are started by name.
-            for wf in android-app.yml companion-app.yml; do
-              gh workflow run "$wf" --repo "$GITHUB_REPOSITORY" --ref "$TAG" -f tag="$TAG"
-            done ;;
-          esac
+      # A day, the shortest there is: this is how the bundle and the notes
+      # reach the last job of the same run, and nothing reads them afterwards.
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2, pinned by commit (R206)
+        with:
+          name: release-bundle
+          path: |
+            ${{ steps.pack.outputs.name }}
+            ${{ steps.pack.outputs.name }}.sha256
+            notes.md
+          if-no-files-found: error
+          retention-days: 1
+
+  # The apps a person installs (companion-app.yml) and the Android app
+  # (android-app.yml), as jobs of this run (R206 step 1): the bundle's job
+  # started each by name once it had made the release, so a tag's files came
+  # from three runs that each looked for "the release", and a run that
+  # failed was nobody's to notice. The companion's files are handed to the
+  # last job; the Android app's unsigned APK is handed to the controller,
+  # which signs it and attaches it once the release is there (releasesign.py).
+  apps:
+    needs: [place, lint, suites]
+    if: startsWith(github.ref, 'refs/tags/v')
+    uses: ./.github/workflows/companion-app.yml
+    with:
+      tag: ${{ github.ref_name }}
+      hand-on: true
+    # What the called workflow asks for, for its own run by hand, where it
+    # attaches to a release that exists; handing on writes nothing.
+    permissions:
+      contents: write
+    secrets: inherit
+
+  android:
+    needs: [place, lint, suites]
+    if: startsWith(github.ref, 'refs/tags/v')
+    uses: ./.github/workflows/android-app.yml
+    with:
+      tag: ${{ github.ref_name }}
+    permissions:
+      contents: read
 
   # The OS image (R160): built and booted by os-image.yml, which a branch
   # push touching the image also runs on its own, so a fix is proved without
   # a tag or a release (the operator, 30 Oct); a tag, a manual run with the
-  # box ticked and the weekly rebuild call it here, and appliance-publish
-  # puts what it built on the release.
+  # box ticked and the weekly rebuild call it here, and the last job puts
+  # what it built on the release.
   appliance:
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.appliance) || github.event_name == 'schedule'
     uses: ./.github/workflows/os-image.yml
@@ -577,10 +603,17 @@ jobs:
     secrets:
       AERIEOS_RELEASE_KEY: ${{ secrets.AERIEOS_RELEASE_KEY }}
 
-  appliance-publish:
-    # The OS image is built and booted beside the checks, since it takes
-    # hours and publishes nothing by itself; attaching it waits for them.
-    needs: [appliance, place, lint, suites]
+  # The release, made once, here, by the run's last job (R206 step 1): every
+  # file the run built and the notes, on one release that did not exist until
+  # all of it had passed. Four jobs in three workflows each made or looked
+  # for the tag's release before (two drafts for one tag, 2 Nov), and a
+  # draft filled up file by file over an hour. The image is pushed and
+  # started on every release's /config (upgrade), the bundle is packed, the
+  # apps are built, the OS image is built and booted, and the tag's three
+  # checks have passed, or this job does not run and there is no release.
+  # The signed Android app is the controller's to attach, once this is made.
+  release:
+    needs: [place, lint, suites, build, upgrade, bundle, apps, android, appliance]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
     permissions:
@@ -600,6 +633,13 @@ jobs:
         with:
           name: aerieos-os
           path: out
+      # The bundle with the notes, and the companion's files: every artifact
+      # this run named release-*, into one folder.
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0, pinned by commit (R206)
+        with:
+          pattern: release-*
+          path: rel
+          merge-multiple: true
       # Two files go on the release, the ISO and the USB stick's image, each
       # with its sha256 (the operator, 30 Oct): an update takes the slot, its
       # kernel and its initrd out of the ISO, and the raw disk, qcow2 and OVA
@@ -611,28 +651,43 @@ jobs:
           subject-path: |
             out/aerieos-os-*.iso
             out/aerieos-os-*.stick.raw.xz
-      - name: Put it on the release
+      - name: Make the release, with every file and the notes
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           BUNDLE: ${{ steps.attest.outputs.bundle-path }}
         run: |
+          set -euo pipefail
           tag="${GITHUB_REF_NAME}"
           # The attestation's bundle beside them, one line: an update from a
           # folder verifies the ISO with it and no network, against the
           # trusted root the image carries.
           iso="$(find out -maxdepth 1 -name 'aerieos-os-*.iso' | head -1)"
           jq -c . "$BUNDLE" > "${iso%.iso}.attestation.jsonl"
-          # On the tag's one release, drafts included (tools/release-attach.sh).
-          bash tools/release-attach.sh "$tag" out/aerieos-os-*.iso out/aerieos-os-*.iso.sha256 \
+          [ -s rel/notes.md ] || { echo "::error::the bundle's job handed on no notes"; exit 1; }
+          # A dev build's tag (vX.Y.Z-dev.N, R179) is a pre-release and never
+          # the latest: the dev channel alone takes it. Every release starts
+          # a draft, seen by the repository's own people alone; a release
+          # that is not a dev build stays one until its owner has read its
+          # notes and publishes it (the operator, 1 Nov). Made once, or found
+          # where a job of this run is run again (tools/release-attach.sh).
+          files=()
+          for f in rel/*; do
+            case "$f" in rel/notes.md) ;; *) files+=("$f") ;; esac
+          done
+          bash tools/release-attach.sh "$tag" --notes rel/notes.md "${files[@]}" \
+            out/aerieos-os-*.iso out/aerieos-os-*.iso.sha256 \
             out/aerieos-os-*.stick.raw.xz out/aerieos-os-*.stick.raw.xz.sha256 \
             "${iso%.iso}.attestation.jsonl"
       # A dev build's release goes out by itself, here, as the last thing its
       # build does, and only once every file .release-files names is on it
       # (the operator, 11 Nov): two were published by hand from the git
       # host's page minutes after their tags, and one never got its image.
-      # The image job failing skips this job, so that release stays a draft.
-      # A release that is not a dev build stays a draft for its owner to read.
+      # The one file not on it yet is the signed Android app, which the
+      # controller attaches within minutes of the release being made; this
+      # waits for it, and a release it never reaches stays a draft, the
+      # missing file named. A release that is not a dev build stays a draft
+      # for its owner to read.
       - name: A dev build's release goes out once it is whole
         if: contains(github.ref_name, '-dev.')
         shell: bash

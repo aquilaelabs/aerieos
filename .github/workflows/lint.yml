@@ -31,6 +31,11 @@ concurrency:
   group: lint-${{ github.ref }}
   cancel-in-progress: true
 
+# To read the repository, and nothing else: a pull request's, or a tag's
+# when its workflow calls this one.
+permissions:
+  contents: read
+
 jobs:
   lint:
     # The AerieOS container itself, not ubuntu-latest: self-hosted minutes

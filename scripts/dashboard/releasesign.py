@@ -15,6 +15,13 @@ tools, and attaches what comes back to the release under its name less
 its certificate's SHA-256 fingerprint. No keystore, alias or password is
 ever a GitHub secret, and the key reaches only that job on that node.
 
+The run that hands the APK over may be the one that makes the release, as
+its last job (R206 step 1): the artifact is there long before the release
+is, and the run is not over until the release has every file. So a run
+still going is read too, its APK left alone until its release exists
+(asked at every look, never a failure), and signed within one look of it.
+A run that ended is read only when it passed.
+
 What would stop a release's signing is said on the bell before the release
 (attention(): no sideload key, an app mapped to none of several, the
 project's node offline or without the jdk and build-tools), and a signing
@@ -248,16 +255,21 @@ def _download(repo, aid, token, into):
 
 
 def _waiting(project, repo, token, seen=None):
-    """[(run, artifact id, tag)] of the recent runs that passed and handed
-    over an unsigned APK; `seen`, when given, counts the runs asked about
-    and the ones skipped as known to hand over nothing (what a look says,
-    R190 step 5)."""
-    j = cilogs._get(f"/repos/{repo}/actions/runs?per_page=30&status=success", token)
+    """[(run, artifact id, tag, going)] of the recent runs that handed over
+    an unsigned APK: the ones that passed, and the ones still going
+    (`going`), whose release may not be made yet; `seen`, when given, counts
+    the runs asked about and the ones skipped as known to hand over nothing
+    (what a look says, R190 step 5)."""
+    j = cilogs._get(f"/repos/{repo}/actions/runs?per_page=50", token)
     out = []
     seen = seen if seen is not None else {}
     seen.update(asked=0, known_bare=0)
-    for r in (j.get("workflow_runs") or [])[:30]:
+    for r in (j.get("workflow_runs") or [])[:50]:
         rid = int(r.get("id") or 0)
+        # A run that ended any way but passed hands over nothing to sign.
+        going = str(r.get("status") or "completed") != "completed"
+        if not going and str(r.get("conclusion") or "success") != "success":
+            continue
         at = str(r.get("created_at") or "")
         try:
             t = calendar.timegm(time.strptime(at[:19], "%Y-%m-%dT%H:%M:%S"))
@@ -275,7 +287,7 @@ def _waiting(project, repo, token, seen=None):
             name = str(a.get("name") or "")
             tag = name[len(MARK):]
             if name.startswith(MARK) and TAG.fullmatch(tag) and not a.get("expired"):
-                out.append((rid, int(a.get("id") or 0), tag))
+                out.append((rid, int(a.get("id") or 0), tag, going))
                 found = True
         # A finished run's artifacts do not change: one that handed over
         # nothing is not asked about again (a look every few minutes for a
@@ -287,9 +299,18 @@ def _waiting(project, repo, token, seen=None):
             ended = calendar.timegm(time.strptime(str(r.get("updated_at") or "")[:19], "%Y-%m-%dT%H:%M:%S"))
         except ValueError:
             ended = 0
-        if not found and (not ended or time.time() - ended > 600):
+        # ...and one still going may hand its APK over yet.
+        if not found and not going and (not ended or time.time() - ended > 600):
             _bare.add((project, rid))
     return out
+
+
+def _has_release(repo, token, tag):
+    """Whether `tag` has a release on GitHub, a draft counted."""
+    try:
+        return bool(forgerelease._req("GET", f"{forgerelease.API}/repos/{repo}/releases/tags/{urllib.parse.quote(tag)}", token))
+    except forgerelease.Refused:
+        return False
 
 
 def _attach(project, repo, token, tag, files, lines):
@@ -399,10 +420,15 @@ def check(project, force=False):
     # step 5): "looking" alone left a missing APK unexplained.
     last = {"at": now, "error": done["error"], "asked": seen.get("asked", 0),
             "known_bare": seen.get("known_bare", 0), "runs": []}
-    for rid, aid, tag in waiting:
+    for rid, aid, tag, going in waiting:
         ran = rec["runs"].get(str(rid)) or {}
         if ran.get("state") == "signed":
             last["runs"].append({"run": rid, "tag": tag, "state": "signed before"})
+            continue
+        # The run that makes the release has not made it yet: nothing is
+        # fetched or signed, nothing has failed, and the next look asks again.
+        if going and not _has_release(repo, token, tag):
+            last["runs"].append({"run": rid, "tag": tag, "state": "its run has not made the release yet"})
             continue
         if ran.get("state") == "failed" and not force and now - int(ran.get("at") or 0) < SCAN_S:
             last["runs"].append({"run": rid, "tag": tag, "state": "failed within the hour, not tried again"})
@@ -426,8 +452,8 @@ def check(project, force=False):
         if now - int(at or 0) > EXPECT_S:
             rec["expect"].pop(tag)
             if tag not in rec["signed"]:
-                rec["failed"][tag] = {"why": f"no run handed over an unsigned APK for {tag} within "
-                                             f"{EXPECT_S // 3600} hours: did the Android workflow run for it?",
+                rec["failed"][tag] = {"why": f"no run that passed handed over an unsigned APK for {tag} within "
+                                             f"{EXPECT_S // 3600} hours: its build failed or never ran (aerie ci-log)",
                                       "at": now, "run": 0}
                 done["failed"].append(tag)
     rec["last"] = last

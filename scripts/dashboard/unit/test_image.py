@@ -362,7 +362,9 @@ class Workflow(unittest.TestCase):
         wf = workflows()
         self.assertRegex(wf, r"appliance-boot:\n    needs: appliance\n")
         # ...and, with the boot, on the checks a tag is held to (R206).
-        self.assertRegex(wf, r"appliance-publish:\n(    #[^\n]*\n)*    needs: \[appliance, place, lint, suites\]\n")
+        # The run's last job, which makes the release with every file, needs
+        # all of them (R206 step 1).
+        self.assertRegex(wf, r"\n  release:\n(    #[^\n]*\n)*    needs: \[place, lint, suites, build, upgrade, bundle, apps, android, appliance\]\n")
         self.assertIn("uses: ./.github/workflows/os-image.yml", wf)
         self.assertIn("hostfwd=tcp:127.0.0.1:7680-:7680", wf)
         self.assertIn("github.event_name == 'schedule'", wf)

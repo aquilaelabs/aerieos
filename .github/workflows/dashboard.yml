@@ -46,6 +46,11 @@ concurrency:
   group: dashboard-${{ github.ref }}
   cancel-in-progress: true
 
+# To read the repository, and nothing else: a pull request's, or a tag's
+# when its workflow calls this one.
+permissions:
+  contents: read
+
 jobs:
   dashboard:
     # A node: Playwright and Chromium are its toolchain store's, on the PATH

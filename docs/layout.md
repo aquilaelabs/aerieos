@@ -423,7 +423,8 @@ tools/aerieos-stick.py        the USB stick maker (R161 step 5): a release's sti
 tools/release-notes.py           a dev build's release notes: what the changelog's Unreleased gained since the last published release
 tools/release-sign.py            makes the release key and signs a release's SHA256SUMS on the key holder's own machine (R199): never run in CI, the repository or a controller
 tools/release-place.sh           where a release may be cut from: a dev build on its branch, a stable release or a candidate only on main (the tag's first check)
-tools/release-attach.sh          one release per tag, found among the drafts and made once, each file uploaded to it by id: what every job that attaches a file to a release calls
+tools/release-attach.sh          one release per tag, found among the drafts and made once, each file uploaded to it by id: what a tag's last job makes the release with, and a job run again by hand attaches with
+tools/release-missing.sh         the files .release-files names that a set of names lacks: one reading of the list for the last job and the rehearsal
 tools/aerieos-usb-maker.py    the stick maker in a window (R198): which release, which stick, the first boot's settings and a last page naming the stick, each step aerieos-stick.py's own; built into a Windows .exe that asks for Administrator, attached to every release
 tools/api-doc.py                 writes docs/api.md from server.py's route tables; aerie lint holds the two equal
 tools/git-hosts-doc.py           writes docs/git-hosts.md from forgeaccess.ABILITIES; aerie lint holds the two equal
@@ -492,13 +493,13 @@ docs/design-language.md          what the dashboard's surfaces owe each other: h
 .release-files                   the files every release carries, which the controller checks each release against
 .github/actionlint.yaml          this runner's labels, for workflow linting
 .github/workflows/
-  build-image.yml                GHCR publish: hosted, cached from :main, on a push to main that touches the image's inputs, the pushed image then started on each release's /config (tools/upgrade-image.sh); a tag's build and its release, made a draft
+  build-image.yml                GHCR publish: hosted, cached from :main, on a push to main that touches the image's inputs, the pushed image then started on each release's /config (tools/upgrade-image.sh); on a tag, the one run that builds everything the release carries (the image, the bundle, the apps, the OS image) behind the tag's checks, its last job making the release once with every file
   publish-release.yml            a release published: :dev, and for a stable one :latest and :MAJOR.MINOR, moved onto the version it built
   os-image.yml                   AerieOS built and booted under QEMU: called by build-image.yml to publish, and on its own for a branch push touching the image
   lint.yml                       aerie lint itself with nothing skipped, and the unit tier, on a pull request and before a release's tag publishes, on this runner
   dashboard.yml                  the dashboard's browser suites, on a pull request that changes what they test and before a release's tag publishes, on this runner
-  android-app.yml                the companion app's build
-  companion-app.yml              the Windows companion's .exe: PyInstaller on a hosted Windows runner, on a published release or by hand, attached to the release
+  android-app.yml                the companion app's build: on a push to main that touches it, as a job of a tag's run (the unsigned APK handed to the controller to sign), or by hand
+  companion-app.yml              the Windows companion's .exe, the .pyz and the VS Code extension: as a job of a tag's run, its files handed to that run's last job, or by hand for a release that exists, attached to it
   release-rehearsal.yml          every build a release's tag runs and every check it is held to, on a branch by hand or aerie version rehearse, publishing nothing
   runner-smoke-test.yml          proves this runner picks up jobs, carries its toolchain and cannot see the shielded PAT (manual)
 ```

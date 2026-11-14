@@ -7,10 +7,12 @@
 # version, for every controller on that version to fetch, check and offer
 # on its card in the Library (apps.py).
 #
-# Only when build-image.yml starts it for a tag's draft, or by hand for a release that exists: a
-# hosted Windows runner bills twice a Linux one's minutes, and a build on
-# every push kept as an artifact is what filled the account's Actions
-# storage once already (B669). Signed when the repository holds a
+# Only as a job of a tag's own run (build-image.yml calls it, and its files
+# are handed to that run's last job, which makes the release), in a
+# rehearsal, or by hand for a release that exists, where it attaches them
+# itself: a hosted Windows runner bills twice a Linux one's minutes, and a
+# build on every push kept as an artifact is what filled the account's
+# Actions storage once already (B669). Signed when the repository holds a
 # code-signing certificate (BB_WIN_CERT_PFX_B64 and BB_WIN_CERT_PASSWORD);
 # built unsigned and said so in the log where it does not.
 name: companion app
@@ -21,21 +23,28 @@ on:
       tag:
         description: "the release to attach the .exe to"
         required: true
-  # A release rehearsed (release-rehearsal.yml, R190 step 2): built with no
-  # tag, named for the branch's version, and attached to nothing.
+  # Called by a tag's run (build-image.yml, R206 step 1): named for the tag
+  # and handed on as that run's artifacts, for its last job to put on the
+  # release it makes. And a release rehearsed (release-rehearsal.yml, R190
+  # step 2): built with no tag, named for the branch's version, handed on
+  # the same way and attached to nothing.
   workflow_call:
     inputs:
       tag:
         type: string
         default: ""
+      hand-on:
+        type: boolean
+        default: false
 
 permissions:
   contents: write
 
 # One group per release, and one per branch for a push or a rehearsal: a
-# rehearsal must never cancel a release's own build.
+# rehearsal must never cancel a release's own build, and a run by hand for
+# a tag is not the tag's own run (the workflow's name is the caller's).
 concurrency:
-  group: companion-app-${{ github.event.release.tag_name || inputs.tag || github.ref }}
+  group: companion-app-${{ github.workflow }}-${{ github.event.release.tag_name || inputs.tag || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -57,19 +66,36 @@ jobs:
           python3 tools/companion-build.py --version "$v" --out "dist/aerieos-companion-$v.pyz"
           python3 tools/vscode-vsix.py --version "$v" --out "dist/aerieos-vscode-$v.vsix"
 
-      - name: Attach them to the release with their sha256
-        if: env.TAG != ''
+      - name: Write each one's sha256 beside it
+        run: |
+          set -eo pipefail
+          cd dist
+          for f in aerieos-companion-*.pyz aerieos-vscode-*.vsix; do
+            sha256sum "$f" > "$f.sha256"
+          done
+
+      - name: Attach them to the release that exists
+        if: env.TAG != '' && !inputs.hand-on
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -eo pipefail
-          cd dist
-          files=()
-          for f in aerieos-companion-*.pyz aerieos-vscode-*.vsix; do
-            sha256sum "$f" > "$f.sha256"
-            files+=("$f" "$f.sha256")
-          done
-          bash ../tools/release-attach.sh "$TAG" "${files[@]}"
+          bash tools/release-attach.sh "$TAG" dist/aerieos-companion-*.pyz dist/aerieos-companion-*.pyz.sha256 \
+            dist/aerieos-vscode-*.vsix dist/aerieos-vscode-*.vsix.sha256
+
+      # A day, the shortest there is: read by the last job of the same run.
+      - name: Hand them to the run's last job
+        if: inputs.hand-on
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2, pinned by commit (R206)
+        with:
+          name: release-apps-portable
+          path: |
+            dist/aerieos-companion-*.pyz
+            dist/aerieos-companion-*.pyz.sha256
+            dist/aerieos-vscode-*.vsix
+            dist/aerieos-vscode-*.vsix.sha256
+          if-no-files-found: error
+          retention-days: 1
 
   build:
     runs-on: windows-2025
@@ -130,15 +156,30 @@ jobs:
             //tr http://timestamp.digicert.com //td sha256 "$EXE" "$USBEXE"
           rm -f "$RUNNER_TEMP/cert.pfx"
 
-      - name: Attach it to the release with its sha256
-        if: env.TAG != ''
+      - name: Write each one's sha256 beside it
+        run: |
+          set -eo pipefail
+          for f in "$EXE" "$USBEXE"; do
+            sha256sum "$f" | sed 's|dist/||' > "$f.sha256"
+          done
+
+      - name: Attach them to the release that exists
+        if: env.TAG != '' && !inputs.hand-on
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -eo pipefail
-          files=()
-          for f in "$EXE" "$USBEXE"; do
-            sha256sum "$f" | sed 's|dist/||' > "$f.sha256"
-            files+=("$f" "$f.sha256")
-          done
-          bash tools/release-attach.sh "$TAG" "${files[@]}"
+          bash tools/release-attach.sh "$TAG" "$EXE" "$EXE.sha256" "$USBEXE" "$USBEXE.sha256"
+
+      - name: Hand them to the run's last job
+        if: inputs.hand-on
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2, pinned by commit (R206)
+        with:
+          name: release-apps-windows
+          path: |
+            dist/aerieos-companion-*.exe
+            dist/aerieos-companion-*.exe.sha256
+            dist/aerieos-usb-maker-*.exe
+            dist/aerieos-usb-maker-*.exe.sha256
+          if-no-files-found: error
+          retention-days: 1

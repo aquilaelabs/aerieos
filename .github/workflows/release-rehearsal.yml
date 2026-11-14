@@ -8,9 +8,9 @@
 # OS image built and booted (os-image.yml), the Android APK built
 # (android-app.yml), and the companion's .pyz, .exe and the VS Code
 # extension built (companion-app.yml), each with no tag, so nothing is
-# attached, signed or handed over. The last job lists what a release from
-# this commit would carry, against the release's manifest
-# (.release-files).
+# attached, signed or handed over. The last job gathers what they built as
+# a tag's last job does, and says which of the files a release must carry
+# (.release-files) a release from this commit would have and lack.
 #
 # ...and the three checks a tag is held to before anything is built to
 # publish (R206): where a release of each kind may be cut from, said for
@@ -48,11 +48,24 @@ jobs:
           git archive --format=tar --prefix="builderbot-${ver}/" HEAD | gzip -n -9 > "$name"
           tar -tzf "$name" | grep -qx "builderbot-${ver}/scripts/dashboard/server.py" \
             || { echo "::error::the bundle has no scripts/dashboard/server.py"; exit 1; }
+          sha256sum "$name" > "$name.sha256"
           ls -l "$name"
           echo "version=$ver" >> "$GITHUB_OUTPUT"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+      # Handed to the last job as a tag's bundle is (build-image.yml).
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2, pinned by commit (R206)
+        with:
+          name: release-bundle
+          path: |
+            ${{ steps.pack.outputs.name }}
+            ${{ steps.pack.outputs.name }}.sha256
+          if-no-files-found: error
+          retention-days: 1
 
   apps:
     uses: ./.github/workflows/companion-app.yml
+    with:
+      hand-on: true
     permissions:
       contents: write
     secrets: inherit
@@ -105,6 +118,18 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (B274)
+      # What a tag's last job gathers, gathered the same way: the OS image's
+      # files, and every artifact this run named release-*.
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0, pinned by commit (R206)
+        if: needs.appliance.result == 'success'
+        with:
+          name: aerieos-os
+          path: out
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0, pinned by commit (R206)
+        with:
+          pattern: release-*
+          path: rel
+          merge-multiple: true
       - name: Say what a release from this commit would carry
         shell: bash
         env:
@@ -136,10 +161,37 @@ jobs:
             echo "| A dev build from this commit | may be cut here |"
             echo "| A stable release or a candidate from this commit | ${STABLE:-not said ($PLACE)} |"
             echo
-            echo "The files the release must carry (.release-files), for ${VER:-this version}:"
-            echo
-            grep -v '^[[:space:]]*\(#\|$\)' .release-files | sed "s|@VER@|${VER:-VERSION}|g; s|^|- |"
           } >> "$GITHUB_STEP_SUMMARY"
+          # The list read as the tag's last job reads it, over the files
+          # this run built. Two are never a rehearsal's: the signed Android
+          # app, which a controller attaches to a release that exists, and
+          # the OS image's attestation, which the release's own job writes.
+          # A branch's OS image is named for its version as the image says
+          # it of itself, X.Y.Z-dev.N+commit, where every other file is named
+          # with a hyphen there; on a tag the two are one. Read as one here.
+          mkdir -p out rel
+          mapfile -t have < <(find out rel -maxdepth 1 -type f -printf '%f\n' | tr '+' '-' | sort)
+          mapfile -t lacks < <(bash tools/release-missing.sh .release-files "${VER:-VERSION}" "${have[@]}")
+          later=() missing=()
+          for f in "${lacks[@]}"; do
+            case "$f" in
+              aerieos-app-*.apk|aerieos-app-*.apk.sha256|aerieos-os-*.attestation.jsonl) later+=("$f") ;;
+              *) missing+=("$f") ;;
+            esac
+          done
+          {
+            echo "The files a release must carry (.release-files), for ${VER:-this version}:"
+            echo
+            grep -v '^[[:space:]]*\(#\|$\)' .release-files | sed "s|@VER@|${VER:-VERSION}|g" | while IFS= read -r f; do
+              case " ${later[*]} " in *" $f "*) echo "- $f: added once a release is made"; continue ;; esac
+              case " ${missing[*]} " in *" $f "*) echo "- $f: **not built here**"; continue ;; esac
+              echo "- $f: built"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::a release from here would lack ${missing[*]}"
+            exit 1
+          fi
           for r in "$BUNDLE" "$APPS" "$ANDROID" "$APPLIANCE"; do
             [ "$r" = success ] || { echo "::error::not every build passed: a release from here would be missing files"; exit 1; }
           done

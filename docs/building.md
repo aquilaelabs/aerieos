@@ -391,7 +391,10 @@ builds the release APK unsigned (no `signingConfig` for the release build
 type) and uploads it as a workflow artifact named `bb-release-apk-TAG`, kept a
 few days. The controller that made the release (Release on the version row)
 looks for that artifact every few minutes for twelve hours, and once an hour
-otherwise; it fetches it with the space's GitHub token and hands each APK
+otherwise, in the runs that passed and in the ones still going: a workflow
+that builds the APK and makes the release in one run hands the APK over
+long before its release exists, and it is left until the release is there,
+which is not a failure. It fetches it with the space's GitHub token and hands each APK
 in it to a job on the space's node, which reads its package, is handed the
 sideload key that package maps to, and signs it with its own tools (the same
 steps a sign job takes: `zipalign`, `apksigner` with the proof of a rotation,
@@ -470,8 +473,9 @@ names the channel it lands on (R190).
 **Rehearsing one.** `aerie version rehearse` runs every build a release's tag
 runs (the controller bundle packed, the OS image built and booted, the
 Android app, the companion and the VS Code extension built) on the pushed
-branch, publishing nothing, its summary listing the files the release would
-carry; a release is then tagged once. GitHub starts it only once the
+branch, publishing nothing, with the checks a tag is held to; its last job
+gathers what was built as a tag's does, and its summary says which of the
+files the release must carry were built; a release is then tagged once. GitHub starts it only once the
 repository's default branch carries `.github/workflows/release-rehearsal.yml`.
 
 **The files a release carries.** `.release-files` at the tree's root lists

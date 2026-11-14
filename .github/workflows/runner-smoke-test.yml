@@ -18,6 +18,10 @@ on:
         default: builderbot
         type: string
 
+# To read the repository, and nothing else.
+permissions:
+  contents: read
+
 jobs:
   smoke:
     runs-on: [self-hosted, "${{ inputs.runner }}"]

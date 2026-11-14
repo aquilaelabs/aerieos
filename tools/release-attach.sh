@@ -104,23 +104,16 @@ case "$tag" in
     v*-dev.*) ;;
     *) echo "release $id is not a dev build's: it stays a draft for its owner to read and publish"; exit 0 ;;
 esac
-[ -f "$whole" ] || { echo "release-attach: no list of the release's files at $whole" >&2; exit 2; }
 ver="${tag#v}"
-mapfile -t want < <(sed -e 's/[[:space:]]*$//' -e '/^[[:space:]]*#/d' -e '/^$/d' -e "s|@VER@|$ver|g" "$whole")
-[ "${#want[@]}" -gt 0 ] || { echo "release-attach: $whole names no file" >&2; exit 2; }
+here="$(cd "$(dirname "$0")" && pwd)"
+# The list read once before the wait, so one that cannot be read is said now.
+bash "$here/release-missing.sh" "$whole" "$ver" >/dev/null || exit 2
+count="$(bash "$here/release-missing.sh" "$whole" "$ver" | wc -l)"
 missing=()
 end=$(( $(date +%s) + ${RELEASE_WAIT_S:-900} ))
 while :; do
     mapfile -t have < <(gh api "repos/$repo/releases/$id/assets?per_page=100" --paginate --jq '.[].name')
-    missing=()
-    for w in "${want[@]}"; do
-        found=""
-        for h in "${have[@]}"; do
-            # shellcheck disable=SC2053  # the list's names are patterns
-            [[ "$h" == $w ]] && { found=1; break; }
-        done
-        [ -n "$found" ] || missing+=("$w")
-    done
+    mapfile -t missing < <(bash "$here/release-missing.sh" "$whole" "$ver" "${have[@]}")
     [ "${#missing[@]}" -eq 0 ] && break
     [ "$(date +%s)" -lt "$end" ] || break
     sleep "${RELEASE_POLL_S:-30}"
@@ -130,9 +123,9 @@ if [ "${#missing[@]}" -gt 0 ]; then
     exit 3
 fi
 if [ "$(gh api "repos/$repo/releases/$id" --jq '.draft')" != "true" ]; then
-    echo "release $id was published already, whole now (${#want[@]} files)"
+    echo "release $id was published already, whole now ($count files)"
     exit 0
 fi
 # The tag goes with it: GitHub drops a draft's tag patched without one.
 gh api --method PATCH "repos/$repo/releases/$id" -F draft=false -F prerelease=true -f make_latest=false -f tag_name="$tag" >/dev/null
-echo "release $id published: whole (${#want[@]} files)"
+echo "release $id published: whole ($count files)"

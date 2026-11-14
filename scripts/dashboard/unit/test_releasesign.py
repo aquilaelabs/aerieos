@@ -35,6 +35,9 @@ import signnode  # noqa: E402
 
 SEEN = []
 REL = {}
+# What the stand-in says of runs beyond its four: a tag's own run, still
+# going or ended, with the APK it handed over (R206 step 1).
+MORE = []
 FLOW = """name: android app
 on: {release: {types: [published]}}
 jobs:
@@ -78,11 +81,19 @@ class GitHub(BaseHTTPRequestHandler):
         if p.startswith("/repos/o/app/actions/runs?"):
             now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
             hour = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - 3600))
+            done = {"status": "completed", "conclusion": "success"}
             return self.answer({"workflow_runs": [
-                {"id": 22, "event": "workflow_dispatch", "created_at": now, "updated_at": now},
-                {"id": 21, "event": "release", "head_branch": "v0.7.0", "created_at": now},
-                {"id": 20, "event": "push", "head_branch": "main", "created_at": hour, "updated_at": hour},
-                {"id": 9, "event": "release", "head_branch": "v0.1.0", "created_at": "2020-01-01T00:00:00Z"}]})
+                *[{**m, "created_at": now, "updated_at": now} for m in MORE],
+                {"id": 22, "event": "workflow_dispatch", "created_at": now, "updated_at": now, **done},
+                {"id": 21, "event": "release", "head_branch": "v0.7.0", "created_at": now, **done},
+                {"id": 20, "event": "push", "head_branch": "main", "created_at": hour, "updated_at": hour, **done},
+                {"id": 19, "event": "push", "head_branch": "main", "created_at": now, "updated_at": now,
+                 "status": "completed", "conclusion": "failure"},
+                {"id": 9, "event": "release", "head_branch": "v0.1.0", "created_at": "2020-01-01T00:00:00Z", **done}]})
+        if p.startswith("/repos/o/app/actions/runs/31/artifacts"):
+            return self.answer({"artifacts": [{"id": 77, "name": "bb-release-apk-v0.8.0", "expired": False}]})
+        if p.startswith("/repos/o/app/actions/runs/19/artifacts"):
+            return self.answer({"artifacts": [{"id": 77, "name": "bb-release-apk-v0.6.0", "expired": False}]})
         if p.startswith("/repos/o/app/actions/runs/21/artifacts"):
             return self.answer({"artifacts": [{"id": 77, "name": "bb-release-apk-v0.7.0", "expired": False},
                                               {"id": 78, "name": "something-else", "expired": False}]})
@@ -97,6 +108,9 @@ class GitHub(BaseHTTPRequestHandler):
         if p.startswith("/repos/o/app/releases/tags/"):
             tag = p.rsplit("/", 1)[-1]
             return self.answer(REL[tag]) if tag in REL else self.answer({"message": "Not Found"}, 404)
+        if p.startswith("/repos/o/app/releases?"):
+            # The listed releases, where a draft is looked for by its tag.
+            return self.answer([r for r in REL.values() if r.get("tag_name")])
         return self.answer({"message": "Not Found"}, 404)
 
     def do_POST(self):
@@ -107,14 +121,20 @@ class GitHub(BaseHTTPRequestHandler):
             name = self.path.split("name=", 1)[1]
             REL["v0.7.0"]["assets"].append({"id": len(REL["v0.7.0"]["assets"]) + 100, "name": name})
             return self.answer({"id": 1, "browser_download_url": f"https://github.com/o/app/{name}"}, 201)
+        if self.path.startswith("/repos/o/app/releases/8/assets?name="):
+            name = self.path.split("name=", 1)[1]
+            rel = next(r for r in REL.values() if r["id"] == 8)
+            rel["assets"].append({"id": len(rel["assets"]) + 200, "name": name})
+            return self.answer({"id": 2, "browser_download_url": f"https://github.com/o/app/{name}"}, 201)
         return self.answer({"message": "Not Found"}, 404)
 
     def do_PATCH(self):
         n = int(self.headers.get("Content-Length") or 0)
         b = json.loads(self.rfile.read(n))
         SEEN.append(("PATCH", self.path, b))
-        REL["v0.7.0"]["body"] = b["body"]
-        return self.answer(REL["v0.7.0"])
+        rel = next(r for r in REL.values() if r["id"] == (8 if self.path.endswith("/releases/8") else 7))
+        rel["body"] = b["body"]
+        return self.answer(rel)
 
     def do_DELETE(self):
         SEEN.append(("DELETE", self.path, None))
@@ -126,7 +146,8 @@ class GitHub(BaseHTTPRequestHandler):
 
 class Base(unittest.TestCase):
     def setUp(self):
-        SEEN.clear(); REL.clear()
+        SEEN.clear(); REL.clear(); MORE.clear()
+        releasesign._bare.clear()
         REL["v0.7.0"] = {"id": 7, "html_url": "https://github.com/o/app/releases/tag/v0.7.0",
                          "body": "### Added\n\n- A thing\n\nSigned by AerieOS: an old line",
                          "assets": [{"id": 5, "name": "app-0.7.0.apk"}]}
@@ -272,7 +293,90 @@ class Signs(Base):
         releasesign.check("app")
         bad = [a for a in releasesign.attention(["app"]) if a["bad"]]
         self.assertEqual([a["tag"] for a in bad], ["v0.9.0"])
-        self.assertIn("no run handed over an unsigned APK", bad[0]["why"])
+        self.assertIn("no run that passed handed over an unsigned APK", bad[0]["why"])
+        self.assertIn("aerie ci-log", bad[0]["why"])
+
+    def test_a_run_that_failed_hands_over_nothing(self):
+        # Run 19 failed with an APK among its artifacts: never asked about.
+        releasesign.check("app")
+        self.assertFalse([p for m, p, a in SEEN if "/runs/19/" in p])
+        self.assertNotIn("v0.6.0", [r["tag"] for r in releasesign.status("app").get("last", {}).get("runs", [])])
+
+
+class OneRun(Base):
+    """The tag's own run hands the APK over and makes the release as its
+    last job (R206 step 1): the artifact is there hours before the release,
+    and the run is not over until the release is whole."""
+
+    def setUp(self):
+        super().setUp()
+        # The draft fallback knows GitHub's address from when it was read;
+        # here that address is the stand-in's.
+        self.addCleanup(setattr, forgerelease, "_BY_TAG", forgerelease._BY_TAG)
+        forgerelease._BY_TAG = re.compile(re.escape(forgerelease.API) + r"/repos/([^/?#]+/[^/?#]+)/releases/tags/([^/?#]+)")
+        # A release expected starts a look on a thread of its own: here each
+        # look is the test's, one at a time.
+        self.addCleanup(setattr, releasesign, "check_soon", releasesign.check_soon)
+        releasesign.check_soon = lambda *a, **k: False
+
+    def going(self):
+        MORE.append({"id": 31, "event": "push", "head_branch": "v0.8.0", "status": "in_progress", "conclusion": None})
+
+    def made(self, draft=True):
+        REL["v0.8.0"] = {"id": 8, "tag_name": "v0.8.0", "draft": draft, "body": "notes",
+                         "html_url": "https://github.com/o/app/releases/tag/v0.8.0", "assets": []}
+
+    def looks(self):
+        return [r for r in json.loads((self.tmp / "release-signing.json").read_text())["app"]["last"]["runs"] if r["tag"] == "v0.8.0"]
+
+    def test_a_run_still_going_is_left_until_its_release_is_made_and_is_no_failure(self):
+        self.going()
+        releasesign.expect("app", "v0.8.0")
+        for _ in (1, 2):
+            r = releasesign.check("app")
+            self.assertNotIn("v0.8.0", r["signed"] + r["failed"])
+            self.assertEqual([x["state"] for x in self.looks()], ["its run has not made the release yet"])
+        # Nothing more fetched or signed than v0.7.0's own, nothing on the
+        # bell, and still due.
+        self.assertEqual(len([1 for m, p, a in SEEN if p == "/repos/o/app/actions/artifacts/77/zip"]), 1)
+        self.assertEqual(len(self.signed), 1)
+        self.assertFalse([a for a in releasesign.attention(["app"]) if a["bad"]])
+        self.assertTrue(releasesign.due("app"))
+        self.assertEqual(json.loads((self.tmp / "release-signing.json").read_text())["app"]["failed"], {})
+
+    def test_it_is_signed_at_the_look_after_the_release_is_made_draft_or_not(self):
+        self.going()
+        releasesign.expect("app", "v0.8.0")
+        releasesign.check("app")
+        n = len(self.signed)
+        # A draft is never found by its tag: it is found among the listed.
+        self.made(draft=True)
+        was = REL.pop("v0.8.0")
+        REL["draft-of-v0.8.0"] = was
+        r = releasesign.check("app")
+        self.assertEqual(r["signed"], ["v0.8.0"], r)
+        self.assertEqual(len(self.signed), n + 1)
+        self.assertEqual(sorted(a["name"] for a in was["assets"]), ["app-0.7.0.apk", "app-0.7.0.apk.sha256"])
+        self.assertFalse(releasesign.due("app") and "v0.8.0" in json.loads(
+            (self.tmp / "release-signing.json").read_text())["app"]["expect"], "no longer expected once signed")
+        # The draft is said back a draft, with its tag (B590, B696).
+        patch = [b for m, p, b in SEEN if m == "PATCH" and p.endswith("/releases/8")][-1]
+        self.assertEqual((patch["draft"], patch["tag_name"]), (True, "v0.8.0"))
+        # Signed once: the run going on, and then ended, signs nothing again.
+        self.assertEqual(releasesign.check("app")["signed"], [])
+        MORE[0].update(status="completed", conclusion="success")
+        self.assertEqual(releasesign.check("app")["signed"], [])
+        self.assertEqual(len(self.signed), n + 1)
+
+    def test_a_run_still_going_is_asked_about_again_and_one_that_then_fails_is_dropped(self):
+        MORE.append({"id": 32, "event": "push", "head_branch": "v0.8.1", "status": "queued", "conclusion": None})
+        releasesign.check("app")
+        asked = len([p for m, p, a in SEEN if "/runs/32/artifacts" in p])
+        releasesign.check("app")
+        self.assertEqual(len([p for m, p, a in SEEN if "/runs/32/artifacts" in p]), asked + 1, "it may hand its APK over yet")
+        MORE[0].update(status="completed", conclusion="failure")
+        releasesign.check("app")
+        self.assertEqual(len([p for m, p, a in SEEN if "/runs/32/artifacts" in p]), asked + 1)
 
     def test_an_expected_release_is_looked_for_at_once_and_due_until_signed(self):
         self.assertTrue(releasesign.due("app"))        # never scanned

@@ -46,15 +46,15 @@ class Gate(unittest.TestCase):
         self.assertEqual(jobs["suites"]["uses"], "./.github/workflows/dashboard.yml")
         self.assertIn("tools/release-place.sh", runs(jobs["place"]))
         self.assertIn("origin/main", runs(jobs["place"]))
-        # The image, the release and the OS files on it.
-        for name in ("build", "bundle", "appliance-publish"):
+        # The image, and everything signed or handed on for the release.
+        for name in ("build", "bundle", "apps", "android", "release"):
             self.assertTrue(GATE <= needs(jobs[name]), f"{name} waits for {sorted(GATE - needs(jobs[name]))}")
         # A job that needs one that failed does not run by itself; the image's build says so in
         # words, since it also runs where the three are skipped (a push to main, the weekly rebuild).
         cond = jobs["build"]["if"]
         for part in ("!cancelled()", "!contains(needs.*.result, 'failure')", "!contains(needs.*.result, 'cancelled')"):
             self.assertIn(part, cond)
-        for name in ("bundle", "appliance-publish"):
+        for name in ("bundle", "apps", "android", "release"):
             self.assertEqual(jobs[name].get("if"), TAG_ONLY, f"{name}: no always() or !cancelled() to run past a failed check")
         # Every job that publishes is one of these or waits on one that is.
         for name, job in jobs.items():
@@ -63,6 +63,86 @@ class Gate(unittest.TestCase):
                 self.assertTrue(GATE <= needs(job), f"{name} publishes and does not wait for the checks")
         # ...and the run's record names each check's result.
         self.assertTrue(GATE <= needs(jobs["record"]))
+
+    def test_one_run_builds_everything_and_its_last_job_makes_the_release_once(self):
+        # Step 1: four jobs in three workflows each made or looked for the
+        # tag's release (two drafts for one tag, 2 Nov), and the bundle's job
+        # started the apps' workflows by name.
+        jobs = load("build-image.yml")["jobs"]
+        last = jobs["release"]
+        self.assertEqual(needs(last), GATE | {"build", "upgrade", "bundle", "apps", "android", "appliance"},
+                         "the release waits for everything it carries, the image started on every release's /config among it")
+        self.assertEqual(jobs["apps"]["uses"], "./.github/workflows/companion-app.yml")
+        self.assertEqual(jobs["apps"]["with"], {"tag": "${{ github.ref_name }}", "hand-on": True})
+        self.assertEqual(jobs["android"]["uses"], "./.github/workflows/android-app.yml")
+        self.assertEqual(jobs["android"]["with"], {"tag": "${{ github.ref_name }}"})
+        # One job makes the release or touches it, and none starts a workflow that would.
+        makers = [n for n, j in jobs.items() if "release-attach.sh" in runs(j) or "gh release" in runs(j)]
+        self.assertEqual(makers, ["release"])
+        for name, job in jobs.items():
+            for wf in ("android-app.yml", "companion-app.yml"):
+                self.assertNotIn(f"gh workflow run {wf}", runs(job), name)
+                self.assertNotIn('gh workflow run "$wf"', runs(job), name)
+            # ...and of the jobs with steps of their own, it alone may write
+            # the repository's releases (the apps' workflow is granted what
+            # it asks for when it is run by hand, and hands on here).
+            if name != "release" and "uses" not in job:
+                self.assertNotEqual((job.get("permissions") or {}).get("contents"), "write", name)
+        # The bundle and the notes are handed on, and the last job gathers
+        # every release-* artifact and the OS image's.
+        ups = [s["with"] for s in jobs["bundle"]["steps"] if str(s.get("uses", "")).startswith("actions/upload-artifact@")]
+        self.assertEqual([u["name"] for u in ups], ["release-bundle"])
+        self.assertIn("notes.md", ups[0]["path"])
+        self.assertEqual(ups[0]["retention-days"], 1)
+        downs = [s["with"] for s in last["steps"] if str(s.get("uses", "")).startswith("actions/download-artifact@")]
+        self.assertIn({"name": "aerieos-os", "path": "out"}, downs)
+        self.assertIn({"pattern": "release-*", "path": "rel", "merge-multiple": True}, downs)
+        text = runs(last)
+        self.assertIn('bash tools/release-attach.sh "$tag" --notes rel/notes.md', text)
+        self.assertIn("--publish-when-whole .release-files", text)
+        self.assertIn("tools", next(s for s in last["steps"] if str(s.get("uses", "")).startswith("actions/checkout@"))["with"]["sparse-checkout"])
+        # The run's record names every job's result.
+        self.assertEqual(needs(jobs["record"]), needs(last) | {"release"})
+        for n in needs(jobs["record"]):
+            self.assertIn(f"{n}=${{{{ needs.{n}.result }}}}", str(jobs["record"]["steps"]))
+
+    def test_the_apps_hand_their_files_on_or_attach_them_never_both(self):
+        wf = load("companion-app.yml")
+        self.assertEqual(wf["on"]["workflow_call"]["inputs"]["hand-on"], {"type": "boolean", "default": False})
+        names = []
+        for job in wf["jobs"].values():
+            attach = [s for s in job["steps"] if "release-attach.sh" in str(s.get("run") or "")]
+            hand = [s for s in job["steps"] if str(s.get("uses", "")).startswith("actions/upload-artifact@")]
+            self.assertEqual([s["if"] for s in attach], ["env.TAG != '' && !inputs.hand-on"])
+            self.assertEqual([s["if"] for s in hand], ["inputs.hand-on"])
+            names.append(hand[0]["with"]["name"])
+            self.assertEqual(hand[0]["with"]["retention-days"], 1)
+            self.assertIn(".sha256", hand[0]["with"]["path"])
+        self.assertEqual(sorted(names), ["release-apps-portable", "release-apps-windows"])
+        # A run by hand for a tag is not the tag's own run: neither cancels the other.
+        for name in ("companion-app.yml", "android-app.yml"):
+            self.assertIn("${{ github.workflow }}", load(name)["concurrency"]["group"], name)
+
+    def test_the_rehearsal_gathers_what_was_built_and_reads_the_list_as_the_last_job_does(self):
+        jobs = load("release-rehearsal.yml")["jobs"]
+        self.assertEqual(jobs["apps"]["with"], {"hand-on": True})
+        self.assertIn("release-bundle", str(jobs["bundle"]["steps"]))
+        m = jobs["manifest"]
+        downs = [s["with"] for s in m["steps"] if str(s.get("uses", "")).startswith("actions/download-artifact@")]
+        self.assertIn({"pattern": "release-*", "path": "rel", "merge-multiple": True}, downs)
+        self.assertIn("tools/release-missing.sh .release-files", runs(m))
+        # ...and publishes nothing: no job of it may write a release.
+        for name, job in jobs.items():
+            self.assertNotIn("release-attach.sh", runs(job), name)
+
+    def test_every_workflow_says_what_its_token_may_do(self):
+        # With none said, a job takes the repository's own default, which
+        # may be to write: three workflows said nothing.
+        for name in sorted(os.listdir(WF)):
+            if name.endswith(".yml"):
+                self.assertIsNotNone(load(name).get("permissions"), f"{name} names no default for its token")
+        for name in ("build-image.yml", "lint.yml", "dashboard.yml", "os-image.yml", "release-rehearsal.yml"):
+            self.assertEqual(load(name)["permissions"], {"contents": "read"}, name)
 
     def test_the_image_is_stamped_by_aerie_version_and_a_tag_it_disagrees_with_fails(self):
         # Step 9: the build's shell worked the version out again, and said a

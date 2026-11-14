@@ -474,8 +474,9 @@ workflow* with its *appliance* box ticked, and weekly; a branch push that
 touches the image runs it alone and publishes nothing, so a fix to the
 image is proved on a push. A release carries two of its files, the ISO and
 the stick's image, each with its sha256 and a build attestation, and only
-after the boot (`appliance-publish`); the raw disk, the qcow2 and the OVA
-stay the run's artifact.
+after the boot: the run's last job (`release`) makes the release with them
+and every other file, once all of it has passed; the raw disk, the qcow2
+and the OVA stay the run's artifact.
 The weekly run takes the day before's snapshot, builds, and says in its
 summary which system packages moved since the last release (each image
 carries its package list, `.packages`); a patch release from it is a press
