@@ -257,10 +257,16 @@ ok(inPage.length > 3 && JSON.stringify(inPage) === JSON.stringify(inServer),
   }), null, { timeout: 30000 }).catch(() => {});
   await settled();
   // From the line's start: it keeps where the tabs just opened left it.
-  await page.$eval('.dockline', l => { l.scrollLeft = 0; });
-  await settled();
-  await page.waitForFunction(() => !document.querySelector('.dockline').classList.contains('chl'), null, { timeout: 3000 }).catch(() => {});
-  const was = await page.$eval('.dockline', l => ({ chr: l.classList.contains('chr'), left: l.scrollLeft }));
+  // Put there until it stays there: one more of those terminals' redraws
+  // after the line had read as at rest took it back to the tab in front,
+  // and the check began 353px along (the gate of 14 Nov, under load).
+  let was = { chr: false, left: -1 };
+  for (let i = 0; i < 6 && was.left !== 0; i++){
+    await page.$eval('.dockline', l => { l.scrollLeft = 0; });
+    await settled();
+    await page.waitForFunction(() => !document.querySelector('.dockline').classList.contains('chl'), null, { timeout: 3000 }).catch(() => {});
+    was = await page.$eval('.dockline', l => ({ chr: l.classList.contains('chr'), left: l.scrollLeft }));
+  }
   const r = await page.$eval('.dockline', l => { const b = l.getBoundingClientRect(); return { x: b.right - 10, y: b.top + b.height / 2 }; });
   await page.mouse.click(r.x, r.y);
   await page.waitForFunction(() => document.querySelector('.dockline').scrollLeft > 60, null, { timeout: 15000 }).catch(() => {});

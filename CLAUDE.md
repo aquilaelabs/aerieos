@@ -70,7 +70,9 @@ ci-log` reads either.
   and `aerie map unused` read it. A whole run refreshes it, and preflight picks
   suites by it (`aerie map affected`).
 - **Before a push:** `aerie tests preflight`; `--dry` prints the plan,
-  `--files F...` names the files, `--base HEAD` measures the working tree.
+  `--files F...` names the files, `--base HEAD` measures the working tree. A
+  suite that fails in its run and passes run again is flaky: recorded
+  (`aerie tests flakes` counts them), and the gate fails on one it ran.
 - **What other projects' sessions report:** `aerie diag reports` lists what
   sessions elsewhere said with `aerie report`; one worth fixing is added here
   with `aerie bug add`. Nothing goes back to the reporter.

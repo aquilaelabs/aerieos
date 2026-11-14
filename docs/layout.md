@@ -90,6 +90,7 @@ scripts/
   lib/gpu.py                     `aerie gpu`: the node's NVIDIA card from where a session stands, and a turn on it for a heavy job
   lib/tidy.py                    `aerie tidy`: what a task left holding (its emulator, the card, build daemons, browsers, /tmp) given back
   lib/unitpar.py                 `aerie tests unit` across the cores: the modules dealt by their last measured seconds, one unittest process per core (R130), a module that failed run once more alone and said as flaky when it passes then
+  lib/flakes.py                  the harness's flakes on record: a line for each suite that failed in a whole run and passed run again, with the first check that failed; `aerie tests flakes` counts them and preflight fails on one it ran
   lib/roottier.py                `aerie tests root`: the root tier's runner, as root in a container alone, a skip failing it (tools/root-tier.sh, `aerie devapp test root-tier`)
   lib/bottleneck.py              what bounded a run of the dashboard suites, from its own numbers: the floor, the machine, the reruns (R130)
   lib/browser.mjs                `aerie browser`: Chrome or Firefox with an unpacked extension loaded, on its own port and profile, driven and stopped by one verb

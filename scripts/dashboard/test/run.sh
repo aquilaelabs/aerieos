@@ -15,6 +15,7 @@
 #   aerie dashboard test cards      # just cards.mjs
 #   BB_TEST_TIMING=1 ...         # seconds between results, to find the slow part
 #   BB_TEST_WORKERS=3 ...        # three suites at once, each in a world of its own
+#                                # (at most half the machine's cores; BB_TEST_SUITES_AT_ONCE=N for another number)
 #
 # One run at a time: a second one is refused while the first is alive. The
 # workers of one run are that run: they share its lock and none of anything
@@ -449,6 +450,15 @@ load_line() {
     printf '[dashboard-test] load: %s on %s cores\n' "$(cut -d' ' -f1,2 /proc/loadavg 2>/dev/null)" \
         "$(nproc 2>/dev/null || echo 1)"
 }
+# A run's flaky suites kept on record (lib/flakes.py): WORKERS, the logs
+# their first failures are read from (may be none), then the suites.
+flakes_record() {
+    local n="$1" logs="$2"; shift 2
+    [ -n "${SUITE_TIMES:-}" ] || return 0
+    # shellcheck disable=SC2086  # the logs are a list of paths with no spaces of their own
+    python3 "$DASH/../lib/flakes.py" record --file "$(dirname "$SUITE_TIMES")/flakes.tsv" --workers "$n" \
+        --load "$(cut -d' ' -f1 /proc/loadavg 2>/dev/null || echo '?')" ${logs:+--logs $logs} --suites "$@" 2>/dev/null || true
+}
 run_workers() {
     local n="$1"; shift
     local names=("$@") t f i rc=0 wrc tp tf
@@ -524,20 +534,49 @@ QUEUE
     read -r tp tf < <(cat "${logs[@]}" \
         | awk '/^[0-9]+ passed, [0-9]+ failed/ { p += $1; f += $3 } END { print p + 0, f + 0 }')
     log "workers: $tp passed, $tf failed across $n workers, ${#names[@]} suites${failed[*]:+; failed in the run: ${failed[*]}}"
-    # Once more, alone, for each suite that failed, the way a single run
-    # does it below: a worker of its own, one at a time, on a port of its
-    # own choosing, with the whole box to itself.
-    local again_failed=()
-    for t in "${failed[@]}"; do
-        if BB_TEST_WORKER=again BB_TEST_AGAIN=1 bash "$0" "$t"; then
-            flaky+=("$(basename "${t%.mjs}").mjs")
-        else
-            again_failed+=("$(basename "${t%.mjs}").mjs")
-            rc=1
-        fi
+    # Once more for each suite that failed, in a world of its own, three at
+    # a time (R228 step 19; BB_TEST_RERUNS_AT_ONCE says otherwise). One at a
+    # time, each built its world while the rest of the box sat idle: 23 of a
+    # run's 40 minutes at its worst (14 Nov). Three worlds on a machine that
+    # ran eight beside each other with nothing failed are alone as far as a
+    # suite can tell, so "flaky" still means failed under the whole run's
+    # load and passed without it. Each on a port picked for it here, since
+    # three choosing their own at one moment could choose the same; their
+    # output in the order they were asked for.
+    local again_failed=() at_once="${BB_TEST_RERUNS_AT_ONCE:-3}" j k
+    local rports=() rlogs=() rpids=()
+    case "$at_once" in ''|*[!0-9]*|0) at_once=3 ;; esac
+    if [ "${#failed[@]}" -gt 0 ]; then
+        mapfile -t rports < <(free_ports "${#failed[@]}")
+        [ "${#rports[@]}" = "${#failed[@]}" ] || die "could not find ${#failed[@]} free ports for the reruns' servers"
+        [ "${#failed[@]}" -le 1 ] || log "reruns: ${#failed[@]} suites once more, $at_once at a time, each in a world of its own"
+    fi
+    for ((j = 0; j < ${#failed[@]}; j += at_once)); do
+        for ((k = j; k < j + at_once && k < ${#failed[@]}; k++)); do
+            rlogs[k]="$S/again-$((k + 1)).log"
+            BB_TEST_WORKER=again BB_TEST_AGAIN=1 DASHBOARD_TEST_PORT="${rports[k]}" \
+                bash "$0" "${failed[k]}" > "${rlogs[k]}" 2>&1 &
+            rpids[k]=$!
+            WORKER_PIDS+=("$!")
+        done
+        for ((k = j; k < j + at_once && k < ${#failed[@]}; k++)); do
+            t="${failed[k]}"
+            stream_log "${rlogs[k]}" "${rpids[k]}"
+            if wait "${rpids[k]}"; then
+                flaky+=("$(basename "${t%.mjs}").mjs")
+            else
+                again_failed+=("$(basename "${t%.mjs}").mjs")
+                rc=1
+            fi
+        done
     done
+    WORKER_PIDS=()
     if [ "${#flaky[@]}" -gt 0 ]; then
         warn "flaky: ${flaky[*]} failed in the whole run and passed again alone"
+        # ...and remembered (R7 step 3): a line each beside the suites'
+        # timings, with the first check that failed in the run, which
+        # aerie tests flakes counts.
+        flakes_record "$n" "${logs[*]}" "${flaky[@]}"
     fi
     # ...and named, the ones that failed again: a suite that ends before its
     # first check (an uncaught timeout in its set-up) prints no FAIL line and
@@ -598,6 +637,24 @@ if [ "${BB_TEST_WORKERS:-1}" -gt 1 ] 2>/dev/null && [ -z "${BB_TEST_WORKER:-}" ]
     if [ $# -gt 0 ]; then _names=("$@"); else mapfile -t _names < <(default_suites); fi
     # No more workers than suites, and one suite is the single path below.
     _n="$BB_TEST_WORKERS"
+    # ...and no more than half the machine's cores (R228 step 19). A suite
+    # is a server, a browser and its node beside each other, so a worker a
+    # core runs the box at twice its cores and the suites time each other
+    # out. Measured on sixteen cores, a quiet machine, the whole run (14
+    # Nov): eight workers 9m16s with nothing failed; ten 14m21s, three
+    # suites failed under load and run again; sixteen 39m54s, ten of them.
+    # BB_TEST_WORKERS is what a test run here may use at most (the node's
+    # setting, every core unless it says); BB_TEST_SUITES_AT_ONCE is this
+    # harness's own number for one who knows better.
+    _half=$(( ($(nproc 2>/dev/null || echo 2) + 1) / 2 ))
+    case "${BB_TEST_SUITES_AT_ONCE:-}" in
+        ''|*[!0-9]*|0)
+            if [ "$_n" -gt "$_half" ]; then
+                log "workers: $_half, half this machine's cores, of the $_n a test run here may use: a suite is a server, a browser and its node (BB_TEST_SUITES_AT_ONCE=N for another number)"
+                _n="$_half"
+            fi ;;
+        *) _n="$BB_TEST_SUITES_AT_ONCE" ;;
+    esac
     [ "$_n" -le "${#_names[@]}" ] || _n="${#_names[@]}"
     # Beside each other the suites get the patience CI gives them: every
     # wait doubled. How many run beside each other is the node's row's
@@ -1857,6 +1914,7 @@ fi
 stop_world
 if [ "${#flaky[@]}" -gt 0 ]; then
     warn "flaky: ${flaky[*]} failed in the whole run and passed again alone"
+    flakes_record 1 "" "${flaky[@]}"
 fi
 load_line
 [ "$rc" = 0 ] && log "dashboard tests: all passed" || warn "dashboard tests: FAILURES above"

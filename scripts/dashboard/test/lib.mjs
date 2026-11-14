@@ -176,11 +176,34 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
   // What the page has in flight, for the wrapper below: a wait that runs
   // out while the page is still asking the server is a slow page, not an
   // absent element.
-  let inFlight = 0, lastDone = Date.now();
-  page.on("request", () => { inFlight++; });
-  for (const ev of ["requestfinished", "requestfailed"]) page.on(ev, () => { inFlight = Math.max(0, inFlight - 1); lastDone = Date.now(); });
+  // Each request by when it began, not a count that goes up and down: a
+  // request cut off by a reload or a navigation never says it finished or
+  // failed (measured 14 Nov: twelve in flight at a reload stayed counted
+  // for good, and cards.mjs, which reloads often, read 34 in flight on a
+  // page at rest), so a suite that reloads read as asking the server
+  // forever: every wait that ran out was given three budgets, and
+  // settled() never saw the page at rest (R228 step 19). What
+  // is still open when the page asks for a new document of its own is the
+  // old document's and is dropped; and a request that began longer ago
+  // than BUSY_MS is not a page about to answer.
+  const BUSY_MS = 20000;
+  const open = new Map();
+  let lastDone = Date.now();
+  const inFlight = () => {
+    const cut = Date.now() - BUSY_MS;
+    let n = 0;
+    for (const at of open.values()) if (at >= cut) n++;
+    return n;
+  };
+  page.on("request", r => {
+    let own = false;
+    try { own = r.isNavigationRequest() && r.frame() === page.mainFrame(); } catch (e) { /* a frame already gone */ }
+    if (own) open.clear();
+    open.set(r, Date.now());
+  });
+  for (const ev of ["requestfinished", "requestfailed"]) page.on(ev, r => { open.delete(r); lastDone = Date.now(); });
   // For settled() below: what is in flight, and when the last answer came.
-  page.inFlight = () => ({ n: inFlight, lastDone });
+  page.inFlight = () => ({ n: inFlight(), lastDone });
   for (const m of ["waitForFunction", "waitForSelector"]){
     const real = page[m].bind(page);
     page[m] = async (...args) => {
@@ -206,13 +229,13 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
       // element that never comes still fails, with its snapshot, later.
       let tries = 0;
       const budget = () => (typeof args[args.length - 1]?.timeout === "number" ? args[args.length - 1].timeout : patience(30000));
-      const busy = () => inFlight > 0 || os.loadavg()[0] >= os.cpus().length;
+      const busy = () => inFlight() > 0 || os.loadavg()[0] >= os.cpus().length;
       try {
         for (;;){
           try { return await real(...args); }
           catch (e) {
             if (!/Timeout .*exceeded/.test(String(e)) || ++tries >= 3 || !busy()) throw e;
-            console.log(`[wait] ran out after ${budget()}ms with ${inFlight} request(s) in flight and a load of ${
+            console.log(`[wait] ran out after ${budget()}ms with ${inFlight()} request(s) in flight and a load of ${
               os.loadavg()[0].toFixed(1)} on ${os.cpus().length} cores: waiting the same again (${tries} of 2)`);
           }
         }
@@ -707,10 +730,28 @@ export const nbShown = (page) =>
 export async function nbGo(page, v, scope = '.pane .nb'){
   // Found as Playwright finds it, so a scope in its own selector language
   // (version.mjs's :text-is) works here as it does in a click.
-  const el = await page.$(`${scope} .nbtabs [data-v="${v}"]`);
-  const g = el ? await el.evaluate(b => b.hidden && b.dataset.in ? b.dataset.in : '') : '';
-  if (g) await page.click(`${scope} .nbtabs .nbgroups [data-g="${g}"] >> visible=true`);
-  await page.click(`${scope} .nbtabs [data-v="${v}"] >> visible=true`);
+  const sel = `${scope} .nbtabs [data-v="${v}"]`;
+  // The view's button is in its group's row, drawn only while that group
+  // is open, and which group is open can still be changing when this is
+  // asked: rules.mjs pressed Roadmap and came straight here, the Overview
+  // row read as still open, and the press then waited a minute for a
+  // button the redraw had hidden (14 Nov, under load, twice running). So
+  // the button is looked at until it shows, its group pressed whenever it
+  // does not.
+  const until = Date.now() + patience(30000);
+  for (;;){
+    const el = await page.$(sel);
+    const st = el ? await el.evaluate(b => ({ shown: b.checkVisibility(), g: b.dataset.in || '' })).catch(() => null) : null;
+    if (st?.shown){
+      try { await page.click(`${sel} >> visible=true`, { timeout: 3000 }); return; }
+      catch (e) { if (Date.now() > until) throw e; }
+    } else if (st?.g){
+      await page.click(`${scope} .nbtabs .nbgroups [data-g="${st.g}"] >> visible=true`, { timeout: 3000 }).catch(() => {});
+    }
+    // Out of time: the plain press, whose own error says what was not there.
+    if (Date.now() > until) return page.click(`${sel} >> visible=true`);
+    await sleep(100);
+  }
 }
 export const nbTab = async (page, v) => {
   await nbGo(page, v);

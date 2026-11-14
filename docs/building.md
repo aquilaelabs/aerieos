@@ -58,7 +58,12 @@ workers** in the Sessions section of its page under Nodes, 0 for the
 machine's cores, handed to every test job there as `BB_TEST_WORKERS` for
 the space's own test command to read (`pytest -n`, `--test-concurrency`,
 `--max-workers`) and read by this harness as the most suites it runs at once
-(roadmap R81). Under that ceiling its workers take suites from one queue,
+(roadmap R81), which is never more than half the machine's cores: a suite
+is a server, a browser and its node beside each other, and on sixteen cores
+a whole run at eight workers took 9 minutes with nothing failed, at ten 14
+with three suites run again, at sixteen 40 with ten
+(`BB_TEST_SUITES_AT_ONCE=N` is the harness's own number for a run that wants
+another). Under that ceiling its workers take suites from one queue,
 longest first, each taking the next only while the machine has room (1.5 GB
 of memory free and a load under one and a half times its cores; the suites
 run at the lowest priority, so their own load does not hold the next back),
@@ -76,10 +81,16 @@ once (spaces, accounts, the stub node, the store), keeps a copy, and before
 each file stops the server and the stub agent, puts the copy back and starts
 both again, about a second and a half per file. What one file creates (a
 node, an account, a setting, a job, anything the server keeps in memory)
-cannot reach the next. A file that fails in a whole run is run once more,
-alone, in a world of its own: if it passes it is reported as **flaky**, by
+cannot reach the next. A file that fails in a whole run is run once more
+in a world of its own, without the whole run's load (three such at a time
+where several failed): if it passes it is reported as **flaky**, by
 name, above the verdict, and never folded into a pass; if it fails again it
-is a failure. The registry records the first run's timings, not the
+is a failure. Each flake is kept on record with the first check that failed
+in the run (`.bb-map/flakes.tsv`, this node's own), `aerie tests flakes` counts
+them by suite, and `aerie tests preflight` fails on one in a suite it ran: a
+gate runs the suites the change touches, so a flake there is the change's
+to settle before a push. A release's tag still counts a flaky suite as
+passed. The registry records the first run's timings, not the
 retry's.
 
 A test is keyed on **where the runner puts it** (`<file>#<ordinal>`) rather

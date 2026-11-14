@@ -449,6 +449,10 @@ aerie devapp test [ARGS]  the space's test command inside its running dev instan
                    container that is already up
 aerie tests unit      the python unit tier (scripts/dashboard/unit): the modules' rules without a server
                    or a browser, in under a second; preflight runs it before any suite
+aerie tests flakes [DAYS]  the suites that failed in a whole run and passed when run again, counted over
+                   the last 30 days (or DAYS), the most often first, each with the check that failed
+                   last; the harness records one as it names it, and aerie tests preflight fails on one
+                   in a suite it ran
 aerie tests root      the root tier (scripts/dashboard/roottier): what the root agent and the root
                    helpers do in a folder an account controls, with a link planted where root
                    works, as root in a throwaway container of the controller's image where docker
@@ -2874,6 +2878,15 @@ cmd_tests() {
             return
         fi
         python3 -m unittest discover -s "$u" -t "$u" "$@"
+        return
+    fi
+    # The flakes on record (R7 step 3): each suite that failed in a whole
+    # run and passed when run again, counted over the last thirty days (or
+    # DAYS), with the first check that failed the last time.
+    if [ "${1:-}" = flakes ]; then
+        shift
+        case "${1:-30}" in ''|*[!0-9]*) die "usage: aerie tests flakes [DAYS]" ;; esac
+        python3 "$BB_LIB/flakes.py" list --file "${BB_REPO:-$PWD}/.bb-map/flakes.tsv" --days "${1:-30}"
         return
     fi
     # The root tier (R240 step 5): what the root agent and the root helpers
@@ -6410,8 +6423,11 @@ if on_node && [ -z "${BB_RELAYED:-}" ]; then
         # to the real controller it would be a session planting findings in
         # somebody else's report directory.
         # `probe` and `keep` drive the dashboard fixture, which runs here.
+        # `flakes` reads the record the harness keeps beside the tree it ran
+        # from, and `root` runs the root tier of the tree here (in a
+        # container where docker answers): neither is the controller's.
         # `rules -h` is help, the bb beside it answers (B411).
-        "tests run"|"tests last"|"tests log"|"tests lab"|"tests probe"|"tests keep"|"tests preflight"|"tests unit"|"tests coverage"|"rules check"|"rules audit"|"rules -h"|"rules --help"|"findings sample") : ;;
+        "tests run"|"tests last"|"tests log"|"tests lab"|"tests probe"|"tests keep"|"tests preflight"|"tests unit"|"tests coverage"|"tests flakes"|"tests root"|"rules check"|"rules audit"|"rules -h"|"rules --help"|"findings sample") : ;;
         *)  # ...and that is the whole run: without the exit the dispatch
             # below ran the verb a second time HERE, against files the bundle
             # does not carry: `aerie bug` printed the controller's answer and

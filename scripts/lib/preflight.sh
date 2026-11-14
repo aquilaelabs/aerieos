@@ -243,6 +243,17 @@ cmd_tests_preflight() {
         elif BB_TEST_WAIT_LOCK="${BB_TEST_WAIT_LOCK:-1200}" bash "$here" "${suites[@]}" 2>&1 | tee -a "$rl"; then :; else rc=1; fi
     fi
     [ "${#unplaced[@]}" -eq 0 ] || rc=1
+    # A flake in a suite this gate ran fails it (R7 step 3; the operator, 14
+    # Nov). The harness calls a suite flaky when it failed in the run and
+    # passed run again, and exits 0; a gate runs the suites the change
+    # touches, so one of them flaking is the change's to settle before a
+    # push, where a release's tag still counts it as passed.
+    local flk=""
+    [ "$rl" = /dev/null ] || flk="$(python3 "$BB_LIB/flakes.py" of-log "$rl" 2>/dev/null || true)"
+    if [ -n "$flk" ]; then
+        printf '  FAIL  flaky in this gate: %s. Each failed in the run and passed when run again, and a gate runs the suites the change touches: aerie dashboard test SUITE runs one by itself, aerie tests flakes says how often each has flaked\n' "$flk" | tee -a "$rl"
+        rc=1
+    fi
     local c
     for c in "${checks[@]}"; do
         # design is uniform.mjs, already in the run when it is listed

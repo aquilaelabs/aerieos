@@ -549,6 +549,10 @@ aerie devapp test [ARGS]  the space's test command inside its running dev instan
                    container that is already up
 aerie tests unit      the python unit tier (scripts/dashboard/unit): the modules' rules without a server
                    or a browser, in under a second; preflight runs it before any suite
+aerie tests flakes [DAYS]  the suites that failed in a whole run and passed when run again, counted over
+                   the last 30 days (or DAYS), the most often first, each with the check that failed
+                   last; the harness records one as it names it, and aerie tests preflight fails on one
+                   in a suite it ran
 aerie tests root      the root tier (scripts/dashboard/roottier): what the root agent and the root
                    helpers do in a folder an account controls, with a link planted where root
                    works, as root in a throwaway container of the controller's image where docker
