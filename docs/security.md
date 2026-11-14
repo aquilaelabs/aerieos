@@ -212,6 +212,16 @@ A folder the agent makes for an account above that account's own (a
 space's top, an account's conversations folder) is still root's to make,
 and nothing is made under a link on the way.
 
+This is proved as root, where it is true or not: the root tier
+(`scripts/dashboard/roottier`, `aerie tests root`) plants a link where the
+agent downloads, syncs, writes a compose file, hands a folder over and
+reads a job's artifacts, and where the session helper keeps its grants and
+makes a worktree, and sees that a file only root reads and a folder only
+root writes are as they were. It runs as root in a throwaway container, on
+every pull request and on every release before anything is published: the
+other suites run as an ordinary account, where acting as another changes
+nothing.
+
 ## The lines the hardening closes
 
 | Step of R158 | The line it closes |

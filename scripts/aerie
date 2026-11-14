@@ -449,6 +449,11 @@ aerie devapp test [ARGS]  the space's test command inside its running dev instan
                    container that is already up
 aerie tests unit      the python unit tier (scripts/dashboard/unit): the modules' rules without a server
                    or a browser, in under a second; preflight runs it before any suite
+aerie tests root      the root tier (scripts/dashboard/roottier): what the root agent and the root
+                   helpers do in a folder an account controls, with a link planted where root
+                   works, as root in a throwaway container of the controller's image where docker
+                   answers; `aerie devapp test root-tier` runs it in the space's dev instance, and CI
+                   on every pull request and release
 aerie tests lab       the lab suites (test/lab-*.mjs) against real services rather than stand-ins.
                    Each names what it needs and skips in one line without it, so a missing service
                    is never a failure, and nothing records them: a lab run is a proof, not a timing.
@@ -2868,6 +2873,26 @@ cmd_tests() {
         fi
         python3 -m unittest discover -s "$u" -t "$u" "$@"
         return
+    fi
+    # The root tier (R240 step 5): what the root agent and the root helpers
+    # do in a folder an account controls, seen as root, which the browser
+    # harness refuses to be. As root it runs here (roottier.py refuses a
+    # machine that is not a container without --here); where docker
+    # answers, in a throwaway container of the controller's image;
+    # otherwise where it does run is said.
+    if [ "${1:-}" = root ]; then
+        shift
+        local rt="${BB_REPO:-$PWD}"
+        [ -f "$rt/scripts/lib/roottier.py" ] || die "no root tier at $rt: run this from the AerieOS checkout"
+        if [ "$(id -u)" = 0 ]; then
+            python3 "$rt/scripts/lib/roottier.py" "$@"
+            return
+        fi
+        if docker info >/dev/null 2>&1; then
+            bash "$rt/tools/root-tier.sh" --tree "$rt" "" "$@"
+            return
+        fi
+        die "the root tier runs as root in a container, and this account is neither root nor has docker: aerie devapp test root-tier runs it in this space's dev instance, as the tree it was last rebuilt from, and CI runs it on every pull request and release"
     fi
     # A covered run (roadmap R76): the suite, or the named suites, with the
     # counters in, and the map's account of what they reached after.

@@ -38,6 +38,7 @@ aerie lint                       # shellcheck, hadolint, ruff, actionlint, compo
 aerie tests unit                 # the python unit tier, scripts/dashboard/unit, under a minute
 aerie tests run                  # the dashboard's Playwright suite; aerie dashboard test FILE for one file
 aerie tests preflight            # what the branch changed, the suites that reach it, lint, voice, design: before a push
+aerie tests root                 # the root tier, as root in a throwaway container; aerie devapp test root-tier in the dev instance
 aerie tests lab                  # the lab suites, against the lab's own stack (lab/compose.yml)
 ```
 
@@ -100,7 +101,7 @@ across compose, `.env.example`, the Unraid template and the reference,
 `docs/api.md` against the routes, `docs/layout.md` against `git ls-files`,
 the agent's version against its file, and the instruction channels (this
 file, the briefing, the shipped rules). CI runs `aerie lint` itself, with
-nothing skipped (`BB_LINT_STRICT=1`), and the unit tier, on the pull
+nothing skipped (`BB_LINT_STRICT=1`), the unit tier and the root tier, on the pull
 request's merge ref and on a release's tag, where it and the browser suites
 pass before anything is published; `aerie ci-log` reads a run's output.
 

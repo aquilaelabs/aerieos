@@ -347,6 +347,16 @@ jobs:
           docker pull --quiet "$image"
           tools/upgrade-image.sh "$image"
 
+      # The image's own copy of the root tier, as root in a throwaway
+      # container of it (R240 step 5): what ships is what is proved, where
+      # the lint workflow's job proves the checkout's.
+      - name: The root tier in the image itself
+        env:
+          DIGEST: ${{ needs.build.outputs.digest }}
+        run: |
+          image="$(echo "$REGISTRY/$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')@$DIGEST"
+          tools/root-tier.sh "$image"
+
   # The build runs on a hosted runner, out of reach of the container that
   # will eventually run its image, and invisible from inside it. So this job
   # comes back to the box and writes the outcome where `aerie ci-log` reads it.

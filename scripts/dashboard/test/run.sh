@@ -33,6 +33,14 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 # Its own: the harness sources nothing of bb's, and the sentence a failed copy
 # meant to say ended as "die: command not found" (B231).
 die() { printf '[dashboard-test] ERROR: %s\n' "$*" >&2; exit 1; }
+# The root tier is the one thing here that is root's to run (R240 step 5):
+# what the root agent does in a folder an account controls. `aerie devapp test
+# root-tier` reaches it through the space's test command inside its dev
+# instance, where the exec is root, in a container.
+if [ "${1:-}" = root-tier ]; then
+    shift
+    exec python3 "$HERE/../../lib/roottier.py" "$@"
+fi
 # Never as root. The suite's premise is an unprivileged runner: the agent it
 # starts drops to the account sessions run as, which as root means an
 # account the machine may not have (inside AerieOS's own dev container,

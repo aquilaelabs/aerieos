@@ -235,3 +235,20 @@ jobs:
         if: always()
         run: |
           printf '\nresult: %s\nclosed: %s\n' "${{ job.status }}" "$(date -Is)" >> "$CI_LOG"
+
+  # The root tier (R240 step 5): what the root agent and the root helpers do
+  # in a folder an account controls, with a link planted where root works,
+  # seen as root. The two jobs above run as the runner's own account, where
+  # acting as another changes nothing, and the browser suites refuse to be
+  # root: a change that made root follow such a link passed all of them
+  # (13 Nov). In a throwaway container on a hosted runner, so nothing of
+  # the box's is root's to touch: the checkout's tier, in the published dev
+  # image, which is only where it runs.
+  root:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (B274)
+
+      - name: The root tier, as root in a container
+        run: tools/root-tier.sh --tree .

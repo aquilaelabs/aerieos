@@ -549,6 +549,11 @@ aerie devapp test [ARGS]  the space's test command inside its running dev instan
                    container that is already up
 aerie tests unit      the python unit tier (scripts/dashboard/unit): the modules' rules without a server
                    or a browser, in under a second; preflight runs it before any suite
+aerie tests root      the root tier (scripts/dashboard/roottier): what the root agent and the root
+                   helpers do in a folder an account controls, with a link planted where root
+                   works, as root in a throwaway container of the controller's image where docker
+                   answers; `aerie devapp test root-tier` runs it in the space's dev instance, and CI
+                   on every pull request and release
 aerie tests lab       the lab suites (test/lab-*.mjs) against real services rather than stand-ins.
                    Each names what it needs and skips in one line without it, so a missing service
                    is never a failure, and nothing records them: a lab run is a proof, not a timing.

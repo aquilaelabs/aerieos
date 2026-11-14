@@ -90,6 +90,7 @@ scripts/
   lib/gpu.py                     `aerie gpu`: the node's NVIDIA card from where a session stands, and a turn on it for a heavy job
   lib/tidy.py                    `aerie tidy`: what a task left holding (its emulator, the card, build daemons, browsers, /tmp) given back
   lib/unitpar.py                 `aerie tests unit` across the cores: the modules dealt by their last measured seconds, one unittest process per core (R130), a module that failed run once more alone and said as flaky when it passes then
+  lib/roottier.py                `aerie tests root`: the root tier's runner, as root in a container alone, a skip failing it (tools/root-tier.sh, `aerie devapp test root-tier`)
   lib/bottleneck.py              what bounded a run of the dashboard suites, from its own numbers: the floor, the machine, the reruns (R130)
   lib/browser.mjs                `aerie browser`: Chrome or Firefox with an unpacked extension loaded, on its own port and profile, driven and stopped by one verb
   lib/proc-verbs.py              `aerie proc`: this account's processes by a word of their command line, listed, ended or waited for, never the call's own shell
@@ -315,6 +316,7 @@ scripts/
     signin.py                    each agent's sign-in and sign-out on one node, as jobs there
     test/                        its Playwright suite: `aerie dashboard test`, isolated; device-api.json in it pins what the released companion and VS Code extension read from the controller, each field's type, and deviceapi.mjs drives it (R79)
     unit/                        its python unit tier: `aerie tests unit`, the modules' rules without a server or a browser, run first by preflight (agentpkg.py loads the node agent for it)
+    roottier/                    the root tier: what the root agent and the root helpers do in a folder an account controls, with a link planted where root works, seen as root (world.py is what its modules stand on)
   agent/builderbot-agent.py      the node agent's entry: runs the package beside it, and is the __main__.py of the zip a node runs
   agent/aerieos_agent/        the node agent, stdlib only, shipped to nodes by the dashboard as one zip
     __init__.py                  what the agent is and how it runs, and AGENT_VERSION
@@ -423,6 +425,7 @@ tools/aerieos-stick.py        the USB stick maker (R161 step 5): a release's sti
 tools/release-notes.py           a dev build's release notes: what the changelog's Unreleased gained since the last published release
 tools/release-sign.py            makes the release key and signs a release's SHA256SUMS on the key holder's own machine (R199): never run in CI, the repository or a controller
 tools/release-place.sh           where a release may be cut from: a dev build on its branch, a stable release or a candidate only on main (the tag's first check)
+tools/root-tier.sh               the root tier as root in a throwaway container of the controller's image: the image's own copy, or a checkout's with --tree (the lint workflow's root job, the image workflow's upgrade job)
 tools/release-attach.sh          one release per tag, found among the drafts and made once, each file uploaded to it by id: what a tag's last job makes the release with, and a job run again by hand attaches with
 tools/release-missing.sh         the files .release-files names that a set of names lacks: one reading of the list for the last job and the rehearsal
 tools/aerieos-usb-maker.py    the stick maker in a window (R198): which release, which stick, the first boot's settings and a last page naming the stick, each step aerieos-stick.py's own; built into a Windows .exe that asks for Administrator, attached to every release
@@ -496,7 +499,7 @@ docs/design-language.md          what the dashboard's surfaces owe each other: h
   build-image.yml                GHCR publish: hosted, cached from :main, on a push to main that touches the image's inputs, the pushed image then started on each release's /config (tools/upgrade-image.sh); on a tag, the one run that builds everything the release carries (the image, the bundle, the apps, the OS image) behind the tag's checks, its last job making the release once with every file
   publish-release.yml            a release published: :dev, and for a stable one :latest and :MAJOR.MINOR, moved onto the version it built
   os-image.yml                   AerieOS built and booted under QEMU: called by build-image.yml to publish, and on its own for a branch push touching the image
-  lint.yml                       aerie lint itself with nothing skipped, and the unit tier, on a pull request and before a release's tag publishes, on this runner
+  lint.yml                       aerie lint itself with nothing skipped, and the unit tier, on a pull request and before a release's tag publishes, on this runner; the root tier beside them, in a container on a hosted one
   dashboard.yml                  the dashboard's browser suites, on a pull request that changes what they test and before a release's tag publishes, on this runner
   android-app.yml                the companion app's build: on a push to main that touches it, as a job of a tag's run (the unsigned APK handed to the controller to sign), or by hand
   companion-app.yml              the Windows companion's .exe, the .pyz and the VS Code extension: as a job of a tag's run, its files handed to that run's last job, or by hand for a release that exists, attached to it
