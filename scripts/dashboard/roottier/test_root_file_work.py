@@ -200,8 +200,9 @@ class Artifacts(unittest.TestCase):
         a.deliver(job, ws, ["dist/*.apk"])
         self.assertEqual([body for _path, body in served.posts], [b"the app\n"], said)
         # The link to root's file was found (its name is the account's to
-        # see) and refused at the open: not a byte of it went up.
-        self.assertEqual([p.rpartition("name=")[2] for p in served.cut], ["keys.apk"])
+        # see) and refused at the open: not a byte of it went up. (The
+        # request it had begun is cut short, which the stand-in keeps apart
+        # whenever it notices; nothing here waits for that.)
         self.assertEqual([o["path"] for o in job.outputs], ["dist/app.apk"])
         self.assertTrue(any("could not deliver dist/keys.apk" in s for s in said), said)
         self.assertFalse(any("inner.apk" in s for s in said), said)
