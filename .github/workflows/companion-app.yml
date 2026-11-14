@@ -54,15 +54,31 @@ jobs:
     timeout-minutes: 10
     env:
       TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    # The version every file here is named for: the tag's, or with no tag
+    # (a rehearsal) aerie version's of this checkout. Said once, here, for
+    # the Windows job too: aerie version does not load on Windows, and a
+    # rehearsal's .exe failed asking it there (14 Nov).
+    outputs:
+      version: ${{ steps.name.outputs.v }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (B274)
         with:
           fetch-depth: 0   # a rehearsal's name is aerie version's, which counts commits
 
-      - name: Build the .pyz and the .vsix
+      - name: The version the files are named for
+        id: name
         run: |
           set -eo pipefail
           v="${TAG#v}"; [ -n "$v" ] || v="$(BB_RELAYED=1 bash scripts/aerie version --file)"
+          [ -n "$v" ] || { echo "::error::no version to name the files for"; exit 1; }
+          echo "v=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Build the .pyz and the .vsix
+        env:
+          VER: ${{ steps.name.outputs.v }}
+        run: |
+          set -eo pipefail
+          v="$VER"
           python3 tools/companion-build.py --version "$v" --out "dist/aerieos-companion-$v.pyz"
           python3 tools/vscode-vsix.py --version "$v" --out "dist/aerieos-vscode-$v.vsix"
 
@@ -98,6 +114,7 @@ jobs:
           retention-days: 1
 
   build:
+    needs: portable
     runs-on: windows-2025
     timeout-minutes: 30
     defaults:
@@ -105,16 +122,15 @@ jobs:
         shell: bash
     env:
       TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      VER: ${{ needs.portable.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (B274)
-        with:
-          fetch-depth: 0   # aerie version counts commits
 
       - name: Build the .exe
         run: |
           set -eo pipefail
           python -m pip install --disable-pip-version-check --quiet pyinstaller
-          v="${TAG#v}"; [ -n "$v" ] || v="$(BB_RELAYED=1 bash scripts/aerie version --file)"
+          v="$VER"
           printf '%s\n' "$v" > apps/windows/bbcompanion/VERSION
           printf 'from bbcompanion.__main__ import entry\nentry()\n' > "$RUNNER_TEMP/companion.py"
           python -m PyInstaller --noconfirm --onefile --windowed --name "aerieos-companion-$v" \
@@ -135,7 +151,7 @@ jobs:
       - name: Build the USB Maker
         run: |
           set -eo pipefail
-          v="${TAG#v}"; [ -n "$v" ] || v="$(BB_RELAYED=1 bash scripts/aerie version --file)"
+          v="$VER"
           python -m PyInstaller --noconfirm --onefile --windowed --uac-admin --name "aerieos-usb-maker-$v" \
             --add-data "tools/aerieos-stick.py;." --distpath dist tools/aerieos-usb-maker.py
           echo "USBEXE=dist/aerieos-usb-maker-$v.exe" >> "$GITHUB_ENV"

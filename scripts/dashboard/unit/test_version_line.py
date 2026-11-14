@@ -15,6 +15,21 @@ import version  # noqa: E402
 ENV = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@t")
 
 
+# Whoever commits or tags here is named by the test, not by the machine it
+# runs on: a CI runner's account has no git identity, and every release and
+# bump below was refused there (the rehearsal of 14 Nov).
+_WHO = mock.patch.dict(os.environ, {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t.invalid",
+                                    "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t.invalid"})
+
+
+def setUpModule():
+    _WHO.start()
+
+
+def tearDownModule():
+    _WHO.stop()
+
+
 def git(*a, cwd):
     return subprocess.run(["git", *a], cwd=cwd, check=True, capture_output=True, text=True, env=ENV).stdout
 

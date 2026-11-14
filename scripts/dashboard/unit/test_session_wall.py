@@ -75,6 +75,22 @@ class TheFile(unittest.TestCase):
 class Faults(unittest.TestCase):
     # The session account is this test's own; the job account one that is
     # in no docker group; the controller's, one more.
+    def setUp(self):
+        # ...read as being in its own group and no other, and with no account
+        # users beside it: the account a CI runner runs as is in docker's and
+        # libvirt's groups, and every test here said so before its own fault
+        # (the rehearsal of 14 Nov). A test that puts it in a group, or adds
+        # an account user, does so itself.
+        real = session._ids
+        me = pwd.getpwnam(ME)
+
+        def ids(name):
+            return (me.pw_uid, {me.pw_gid}) if name == ME else real(name)
+        for p in (mock.patch.object(session, "_ids", side_effect=ids),
+                  mock.patch.object(session.pwd, "getpwall", return_value=[])):
+            p.start()
+            self.addCleanup(p.stop)
+
     def wall(self, cover, jobs="daemon"):
         return {"ACCOUNT": "nobody", "JOBS_USER": jobs, "COVER": cover, "PORTS": [7681, 7682]}
 

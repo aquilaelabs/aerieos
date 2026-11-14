@@ -14,6 +14,21 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import version  # noqa: E402
 
 
+# Whoever commits or tags here is named by the test, not by the machine it
+# runs on: a CI runner's account has no git identity, and every release and
+# bump below was refused there (the rehearsal of 14 Nov).
+_WHO = mock.patch.dict(os.environ, {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t.invalid",
+                                    "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t.invalid"})
+
+
+def setUpModule():
+    _WHO.start()
+
+
+def tearDownModule():
+    _WHO.stop()
+
+
 def git(d, *a):
     subprocess.run(["git", "-C", str(d), *a], check=True, capture_output=True,
                    env={**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t.invalid",

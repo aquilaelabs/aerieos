@@ -18,7 +18,10 @@ class Rows(unittest.TestCase):
     def setUp(self):
         self.d = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.d, True)
-        self.logs = os.path.join(self.d, os.path.basename(ROOT))
+        # A space of the test's own naming: the verb finds the space it is
+        # run from by its place under the workspace, which a CI runner's
+        # checkout is not in (the rehearsal of 14 Nov listed nothing there).
+        self.logs = os.path.join(self.d, "cirows")
         os.makedirs(self.logs)
 
     def keep(self, name, text, age):
@@ -28,8 +31,10 @@ class Rows(unittest.TestCase):
         os.utime(p, (1_700_000_000 - age, 1_700_000_000 - age))
 
     def listed(self):
-        p = subprocess.run(["bash", AERIE, "ci-log", "--list"], cwd=ROOT, capture_output=True, text=True, check=False,
-                           env=dict(os.environ, BB_RELAYED="1", BB_CI_LOG_DIR=self.d))
+        env = {k: v for k, v in os.environ.items() if k not in ("BB_ACCOUNT_UID", "BB_PROJECT", "BB_READS", "BB_CILOG_PROJECT")}
+        p = subprocess.run(["bash", AERIE, "ci-log", "--list", "--project", "cirows"], cwd=ROOT, capture_output=True,
+                           text=True, check=False, env=dict(env, BB_RELAYED="1", BB_CI_LOG_DIR=self.d))
+        self.assertEqual(p.returncode, 0, p.stderr)
         return {ln.split()[0]: ln for ln in p.stdout.splitlines() if ln.startswith("  ")}
 
     def test_a_run_of_several_jobs_reads_as_its_worst(self):

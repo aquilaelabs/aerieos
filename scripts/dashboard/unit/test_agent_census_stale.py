@@ -28,6 +28,9 @@ class CensusStale(unittest.TestCase):
         a.running_ids = lambda: []
         a.keep_report = lambda: {}
         a.census_beating = lambda: {"driver": "absent"}
+        # The seals a real node adds to its census are the machine's own
+        # (a CI runner's node has them, a session's view does not).
+        a.token_census = lambda: None
         gate = threading.Event()
         taken = iter([{"driver": "waiting"}, {"driver": "absent"}])
 

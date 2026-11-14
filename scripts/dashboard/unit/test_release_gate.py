@@ -119,6 +119,11 @@ class Gate(unittest.TestCase):
             self.assertEqual(hand[0]["with"]["retention-days"], 1)
             self.assertIn(".sha256", hand[0]["with"]["path"])
         self.assertEqual(sorted(names), ["release-apps-portable", "release-apps-windows"])
+        # The Windows job is handed its version by the Linux one: aerie
+        # version does not load on Windows, and a rehearsal's .exe failed there.
+        self.assertEqual(wf["jobs"]["build"]["needs"], "portable")
+        self.assertEqual(wf["jobs"]["build"]["env"]["VER"], "${{ needs.portable.outputs.version }}")
+        self.assertNotIn("scripts/aerie", runs(wf["jobs"]["build"]))
         # A run by hand for a tag is not the tag's own run: neither cancels the other.
         for name in ("companion-app.yml", "android-app.yml"):
             self.assertIn("${{ github.workflow }}", load(name)["concurrency"]["group"], name)
