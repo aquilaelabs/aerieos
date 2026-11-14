@@ -17,7 +17,10 @@
 //
 // What is deliberately NOT here: per-kind content checks. Those live in each
 // kind's own suite. This file only holds the language every kind shares.
-import { URL, DIR, launch, newPage, ok, done, ready, sleep, settled, animatedDuring } from './lib.mjs';
+// (lib.mjs's quiet, a pause that is a check of absence, is quietFor here:
+// the idle block has a page of its own named quiet.)
+import { URL, DIR, launch, newPage, ok, done, ready, sleep, settled, animatedDuring, faded,
+         quiet as quietFor } from './lib.mjs';
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
@@ -400,6 +403,30 @@ async function bring(kind){
   await DRIVERS[kind].open();
   await page.waitForSelector(DRIVERS[kind].readyWhen, { timeout: 20000 });
   await settled(page, { quiet: 250 });
+}
+// The page on show has arrived: its entrance fade (docIn) is over, and what
+// it asked for has landed and been drawn, the last band with it.
+async function arrived(p = page){
+  await p.waitForFunction(() => !document.querySelector('.pane .doc.on')?.getAnimations().length,
+                          null, { timeout: 10000 }).catch(() => {});
+  await settled(p);
+}
+// Two frames on from a change to the page: what the change starts in the
+// frame after it (a breakpoint's listeners, a transition) has started.
+const frames = (p = page) => p.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+// Nothing on the page is still moving: every transition and tween that ends
+// has ended. One that runs for good (a spinner, a pulse) is not waited for.
+async function motionOver(p = page){
+  await frames(p);
+  await p.waitForFunction(() => !document.getAnimations().some(a => a.playState === 'running'
+    && Number.isFinite(a.effect?.getComputedTiming().endTime)), null, { timeout: 10000 }).catch(() => {});
+}
+// A page at the width it was just given, and drawn for it: the breakpoint's
+// listeners run in the frame after the change, then the boxes that fit
+// themselves to their width, and what either of them slides comes to rest.
+async function atWidth(p, w){
+  await p.waitForFunction(w => innerWidth === w, w, { timeout: 10000 }).catch(() => {});
+  await motionOver(p);
 }
 
 
@@ -869,7 +896,7 @@ for (const kind of kinds){
   if (!DRIVERS[kind]) continue;
   await bring(kind);
   await page.waitForSelector(DRIVERS[kind].readyWhen, { timeout: 20000 });
-  await sleep(250);   // the entrance animation settles, and the last band to arrive is part of the row
+  await arrived();   // the entrance animation settles, and the last band to arrive is part of the row
   const m = await measure(kind);
   ok(!m.err, `[${kind}] a document box exists (${m.err || 'ok'})`);
   ok((m.ragged || []).length === 0,
@@ -1244,7 +1271,8 @@ if (runs('a')) {
     const nbSel = w => `.nbview[data-view="${w}"]`;
     await page.waitForFunction(w => !![...document.querySelectorAll('.nb')].find(n => n.checkVisibility())
       ?.querySelector(`.nbview[data-view="${w}"] .nbhead`), v, { timeout: 15000 });
-    await sleep(150);
+    // ...and what the view read has landed: a foot is drawn with its section.
+    await settled(page);
     foots[v] = await page.evaluate(w => !![...document.querySelectorAll('.nb')]
       .find(n => n.checkVisibility())?.querySelector(`.nbview[data-view="${w}"] .sectbar[data-bar]`), v);
     void nbSel;
@@ -1288,7 +1316,7 @@ if (runs('b')) {
       }, w);
       if (now !== null && now === last) return;
       last = now;
-      await sleep(50);
+      await sleep(50);   // the gap between the two reads that have to agree
     }
   };
   for (const v of views){
@@ -1420,10 +1448,10 @@ ok(seenSects.size <= 1,
   }).filter(Boolean));
   const desk = await offCenter();
   await page.setViewportSize({ width: 393, height: 851 });
-  await sleep(300);
+  await atWidth(page, 393);
   const phone = await offCenter();
   await page.setViewportSize({ width: 1280, height: 900 });
-  await sleep(300);
+  await atWidth(page, 1280);
   ok(!desk.length && !phone.length, `...and each icon sits in the middle of its button, at a desk and on a phone (${JSON.stringify({ desk, phone })})`);
 }
 {
@@ -1441,10 +1469,10 @@ ok(seenSects.size <= 1,
   }));
   const desk = await frameLines();
   await page.setViewportSize({ width: 393, height: 851 });
-  await sleep(300);
+  await atWidth(page, 393);
   const phone = await frameLines();
   await page.setViewportSize({ width: 1280, height: 900 });
-  await sleep(300);
+  await atWidth(page, 1280);
   ok(!desk.length && !phone.length,
      `the header's and the dock's controls are one height each, at a desk and on a phone (${JSON.stringify({ desk, phone })})`);
 }
@@ -1509,7 +1537,7 @@ for (const kind of kinds){
   if (!DRIVERS[kind]) continue;
   await bring(kind);
   await page.waitForSelector(DRIVERS[kind].readyWhen, { timeout: 20000 }).catch(() => {});
-  await sleep(200);
+  await arrived();
   const skewed = await page.evaluate(() => {
     const surf = document.querySelector('.doc.on .doctab, .doc.on .nb');
     if (!surf) return [];
@@ -1533,7 +1561,7 @@ for (const kind of kinds){
   if (!DRIVERS[kind]) continue;
   await bring(kind);
   await page.waitForSelector(DRIVERS[kind].readyWhen, { timeout: 20000 }).catch(() => {});
-  await sleep(200);
+  await arrived();
   const alls = await page.evaluate(() => {
     const surf = document.querySelector('.doc.on .doctab, .doc.on .nb');
     if (!surf) return 0;
@@ -1568,7 +1596,7 @@ if (runs('b')) {
   // bar's, showing through a tab with no fill of its own since 17 Oct.
   await page.evaluate(() => railGo('machines', 'nodes'));
   await page.waitForSelector('.pane .bar .subnav button.on', { timeout: 10000 });
-  await sleep(300);
+  await arrived();
   // ...in both halves of each (R216): the light half writes white on the
   // same darkened accent, and its icons the same.
   for (const [t, mode] of SCHEMES.flatMap(t => [[t, ''], [t, 'light']])) {
@@ -1576,8 +1604,9 @@ if (runs('b')) {
       if (m) document.documentElement.dataset.mode = m; else delete document.documentElement.dataset.mode; }, [t, mode]);
     // Past the tab's own 150ms background transition: a dark half measured
     // 120ms after a light one read a blend of the two, and a fixed wait
-    // read one under load too (B811), so its transitions are waited out.
-    await sleep(60);
+    // read one under load too (B811), so its transitions are waited out:
+    // begun, by the frame drawn in the new scheme, and then ended, below.
+    await frames();
     const r = await page.evaluate(async () => {
       const el = document.querySelector('.pane .bar .subnav button.on');
       if (!el) return { err: 'no sub-nav on show' };
@@ -1608,7 +1637,7 @@ if (runs('b')) {
     if (r.icon !== null && !(r.icon >= AA)) bad.push(`${name} icons ${r.icon}`);
   }
   await page.evaluate(() => { delete document.documentElement.dataset.theme; delete document.documentElement.dataset.mode; });
-  await sleep(120);
+  await motionOver();
   ok(bad.length === 0,
      `the active tab's words read on its ground in all ${SCHEMES.length} schemes, dark and light${
        bad.length ? `; under ${AA}:1: ${bad.join(', ')}` : ''}`);
@@ -1709,7 +1738,11 @@ if (runs('b')) {
       (window.__aside || []).forEach(e => { e.style.visibility = ''; }); window.__aside = []; }));
     await release();
     await atRest();
-    await sleep(150);
+    // The page that went out has left the stack and nothing is still
+    // fading: the frame read next is the page at rest.
+    await page.waitForFunction(() => !document.querySelector('.pane .stack > .doc.leaving'),
+                               null, { timeout: 10000 }).catch(() => {});
+    await motionOver();
     const settled = await frame();
     const off = first.ground.some((v, i) => Math.abs(v - settled.ground[i]) > 2);
     return { ok: first.black < 0.005 && !off && held.includes('docIn'),
@@ -1793,7 +1826,7 @@ if (runs('b')) {
       return { out: (g?.getAnimations() || []).map(a => t(a).duration)[0] ?? 0, inert: !!g?.inert, ids: !!g?.querySelector('[id]'),
                in: (n?.getAnimations() || []).filter(a => a.id === 'fadein').map(a => `${t(a).duration}@${t(a).delay}`)[0] || '' };
     }, [press, ghost, fresh]);
-    await page.waitForTimeout(500);
+    await faded(page).catch(() => {});
     const left = await page.$$eval(ghost, gs => gs.length);
     // A pick opens its detail, which on a phone stands over the list: put
     // back, so the phone's pass later finds each list as it was.
@@ -1805,12 +1838,12 @@ if (runs('b')) {
   const bad = [];
   for (const t of schemes){
     await page.evaluate(th => { document.documentElement.dataset.theme = th; }, t);
-    await sleep(120);
+    await motionOver();
     const r = await arrive('notebook', 'projects');
     if (!r.ok) bad.push(`${t}: ${r.said}`);
   }
   await page.evaluate(() => { delete document.documentElement.dataset.theme; });
-  await sleep(120);
+  await motionOver();
   ok(schemes.length > 1 && bad.length === 0,
      `a notebook brought to the front opens on its scheme's ground in all ${schemes.length} schemes, never black${
        bad.length ? `: ${bad.join('; ')}` : ''}`);
@@ -1826,7 +1859,7 @@ if (runs('b')) {
     if (!DRIVERS[kind]) continue;
     await bring(kind);
     await page.waitForSelector(DRIVERS[kind].readyWhen, { timeout: 20000 });
-    await sleep(250);
+    await arrived();
     const b = await page.evaluate(() => {
       const bar = document.querySelector('.pane .doc.on .doctab > .docbarrow:not([hidden])');
       if (!bar || !bar.offsetHeight) return null;
@@ -1870,7 +1903,10 @@ await page.setViewportSize({ width: 393, height: 851 });
   const at = `.doc.on .pgrid .pcard[data-pkey="${card}"]`;
   await page.click(`${at} .pcfront [data-pedit]`);
   const mid = await page.$eval(`${at} .pcback`, e => getComputedStyle(e).transform);
-  await sleep(600);
+  // On its back and the turn over: no transition that ends still runs in it.
+  await page.waitForFunction(at => { const c = document.querySelector(at);
+    return !!c && c.classList.contains('flipped') && !c.getAnimations({ subtree: true }).some(a => a.playState === 'running'
+      && Number.isFinite(a.effect?.getComputedTiming().endTime)); }, at, { timeout: 10000 }).catch(() => {});
   const back = await page.$eval(at, c => { const r = c.querySelector('.pcback').getBoundingClientRect();
     return { flipped: c.classList.contains('flipped'), settled: getComputedStyle(c.querySelector('.pcback')).transform,
              on: r.left >= 0 && r.right <= innerWidth }; });
@@ -1878,7 +1914,9 @@ await page.setViewportSize({ width: 393, height: 851 });
      `a card turns over on a tween on a phone, its back whole on the screen (${JSON.stringify({ mid, ...back })})`);
   await page.click(`${at} .pcback [data-pedit]`);
 }
-await sleep(400);
+// The card is on its front again, its turn back over.
+await page.waitForFunction(() => !document.querySelector('.doc.on .pgrid .pcard.flipped'), null, { timeout: 10000 }).catch(() => {});
+await motionOver();
 // The same width rule at phone width, on every tab: the cap is min(--ctl-w,
 // 88%), and 88% is what bites here.
 //
@@ -1900,7 +1938,7 @@ for (const kind of kinds){
   ok(!S.err && S.wide.length === 0,
      `[${kind}] no control or row of controls spans the tab at phone width${
        S.err ? ` (${S.err})` : S.wide.length ? `: ${S.wide.join(', ')}` : ''}`);
-  await sleep(250);
+  await arrived();
   const L = await lineup();
   ok(!L.err && L.off.length === 0,
      `[${kind}] every control on a line ends at the same height at phone width${
@@ -2113,7 +2151,9 @@ for (const [kind, root, pick, head, open] of [
 for (const kind of kinds){
   if (!DRIVERS[kind]) continue;
   await bring(kind);
-  await sleep(250);
+  // A tab that was open already is only focused by bring: drawn, and at rest.
+  await page.waitForSelector(DRIVERS[kind].readyWhen, { timeout: 20000 }).catch(() => {});
+  await arrived();
   // The notebook is six views behind one tab, and each has its own layout;
   // the Tests view is the one that scrolled sideways while the Roadmap, the
   // one this check used to look at, did not.
@@ -2124,7 +2164,7 @@ for (const kind of kinds){
       await page.evaluate(w => getNotebook('alpha').view(w), v);
       await page.waitForFunction(w => document.querySelector(`.nb .nbview[data-view="${w}"]`)?.checkVisibility(),
                                  v, { timeout: 20000 });
-      await sleep(250);
+      await arrived();
     }
     const m = await sideways();
     const tag = v ? `${kind}/${v}` : kind;
@@ -2161,7 +2201,16 @@ for (const kind of kinds){
       // a tap is: a pointer click waits for the summary to be in view, and a
       // view that scrolls inside its pane kept one of them out of it.
       await page.evaluate(k => document.querySelector(`.doc.on details.sect[data-sect="${k}"] > summary`)?.click(), other);
-      await sleep(600);
+      // The one pressed is the one open, the other's slide shut over: a
+      // section sliding shut reads open until its slide ends.
+      await page.waitForFunction(k => {
+        const host = document.querySelector('.doc.on');
+        const all = [...(host?.querySelectorAll('details.sect') || [])].filter(d => d.dataset.sect && d.checkVisibility());
+        if (!all[0]) return false;
+        const mine = sectsOf(sectGroup(all[0])), open = mine.filter(d => d.open);
+        return open.length === 1 && open[0].dataset.sect === k
+          && !mine.some(d => d.getAnimations().some(a => a.id === 'fold' && a.playState === 'running'));
+      }, other, { timeout: 10000 }).catch(() => {});
       const after = await page.evaluate(k => {
         const host = document.querySelector('.doc.on');
         const all = [...(host?.querySelectorAll('details.sect') || [])].filter(d => d.dataset.sect && d.checkVisibility());
@@ -2241,7 +2290,7 @@ if (runs('c')) {
     window.fetch = (...a) => { const s = String(a[0]), u = /^\/api\/home\?light=1/.test(s) ? '/api/home?light' : s.split('?')[0];
       window.__f[u] = (window.__f[u] || 0) + 1; return f(...a); }; });
   await MARK();
-  await sleep(8000);
+  await quietFor(8000);
   const idle = await page.evaluate(() => window.__f);
   const idleMoved = await MOVED();
   // Home re-reads on the jobs token and on nothing else.
@@ -2258,10 +2307,13 @@ if (runs('c')) {
   const quiet = await newPage(browser, { viewport: { width: 1280, height: 900 } });
   await quiet.goto(URL); await ready(quiet);
   await quiet.evaluate(() => railGo('home'));
-  await sleep(5000);
+  // Left alone, and Home's own reads in by then, before the count starts.
+  await quietFor(5000);
+  await quiet.waitForFunction(() => tabOf(panes[0])?.kind !== 'home' || (homeData !== null && !homeFetching),
+                              null, { timeout: 20000 }).catch(() => {});
   await quiet.evaluate(() => { window.__f = {}; const f = window.fetch;
     window.fetch = (...a) => { const u = String(a[0]).split('?')[0]; window.__f[u] = (window.__f[u] || 0) + 1; return f(...a); }; });
-  await sleep(8000);
+  await quietFor(8000);
   const calm = await quiet.evaluate(() => window.__f);
   await quiet.close();
   ok(!calm['/api/v1/nodes'] && !calm['/api/presence'] && (calm['/api/status'] || 0) <= 1 && (calm['/api/revs'] || 0) <= 6,
@@ -2286,7 +2338,8 @@ if (runs('c')) {
         await page.evaluate(k => openTab({ kind: k, arg: '__' + k, label: k }), kind);
       await page.waitForFunction(k => tabs.some(t => t.kind === k), kind, { timeout: 10000 });
     } catch (e) { came = false; }
-    await sleep(1200);
+    // The window in which an open could ask a second time.
+    await quietFor(1200);
     const f = await page.evaluate(() => window.__f);
     if (!came){ ok(false, `[${kind}] opened for the request count (did not come up: ${Object.keys(f).join(', ') || 'no fetch at all'})`); }
     // Once for the open, and once more for each revision that moved inside
@@ -2327,7 +2380,7 @@ if (runs('c')) {
   // A desk: the page was narrowed to a phone above, where one section is
   // open by rule, and this block is the desktop's rule (every default open).
   await page.setViewportSize({ width: 1280, height: 900 });
-  await sleep(300);
+  await atWidth(page, 1280);
   await focus();
   ok(await page.$eval(sel, d => d.open), `[${kind}] a section opens by default on a desktop (${key})`);
   // A press on the summary, not `open = false`: only a fold somebody pressed
@@ -2421,7 +2474,9 @@ for (const [name, open] of Object.entries(DIALOGS)) {
   await page.evaluate(open);
   const seen = await page.waitForFunction(() => [...document.querySelectorAll('.modal')].some(m => !m.hidden),
     null, { timeout: 10000 }).then(() => true).catch(() => false);
-  await sleep(600);
+  // Its entrance over, and what it reads in and drawn.
+  await motionOver();
+  await settled(page, { quiet: 250 });
   const d = seen ? await dialogShape() : { err: 'nothing opened' };
   const id = await page.evaluate(() => [...document.querySelectorAll('.modal')].find(m => !m.hidden)?.id || '');
   if (id) opened.add(id);
@@ -2495,7 +2550,8 @@ for (const [name, open] of Object.entries(DIALOGS)) {
     await phone.evaluate(open);
     await phone.waitForFunction(() => [...document.querySelectorAll('.modal')].some(m => !m.hidden),
       null, { timeout: 10000 }).catch(() => {});
-    await sleep(600);
+    await motionOver(phone);
+    await settled(phone, { quiet: 250 });
     const d = await dialogShape(phone);
     if (d.nested) twice.push(`${name}: ${d.nested}`);
     await phone.evaluate(() => document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }));
@@ -2520,7 +2576,7 @@ if (runs('c')) {
   await phone.goto(URL); await ready(phone);
   await phone.evaluate(() => { openNotebook('alpha', 'roadmap'); });
   await phone.waitForSelector('.nb .nbview:not([hidden])', { timeout: 20000 });
-  await sleep(600);
+  await arrived(phone);
   const small = await phone.evaluate(() => [...document.querySelectorAll(
       '.dockbar button, .nb button, .mobar button')]
     .filter(e => e.offsetHeight > 0)
@@ -2535,7 +2591,7 @@ if (runs('c')) {
   ok(shortFoot === 0, `...and a dialog's buttons are the tap height (${shortFoot} short)`);
   await phone.setViewportSize({ width: 344, height: 882 });
   await phone.evaluate(() => document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }));
-  await sleep(400);
+  await atWidth(phone, 344);
   const cut = await phone.evaluate(() => [...document.querySelectorAll('.mobar > button')]
     .filter(b => b.offsetHeight > 0 && b.getBoundingClientRect().right > innerWidth + 1).map(b => b.textContent.trim()));
   ok(cut.length === 0, `...and the bar fits a fold's 344px cover${cut.length ? `: cut off ${cut.join(', ')}` : ''}`);

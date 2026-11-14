@@ -12,6 +12,11 @@
 
 cmd_tests_preflight() {
     local dry="" base="" files=() f suites=() checks=() all_dash="" own=() mapped=() named=""
+    # harness: the suites' own library or runner changed, so every suite
+    # runs; whole: the change itself reaches every suite (server.py with no
+    # covered run to place it by). touched: what the change reaches by
+    # itself, kept when every suite runs only for the harness.
+    local harness="" whole="" harness_only="" touched=()
     while [ $# -gt 0 ]; do
         case "$1" in
             --dry) dry=1; shift ;;
@@ -60,10 +65,10 @@ cmd_tests_preflight() {
     local by="" mb_ref="${mb:-HEAD}"
     for f in "${files[@]}"; do
         case "$f" in
-            scripts/dashboard/test/lib.mjs|scripts/dashboard/test/run.sh) all_dash=1 ;;
+            scripts/dashboard/test/lib.mjs|scripts/dashboard/test/run.sh) all_dash=1; harness=1 ;;
             # Named outright (--files), there are no changed lines to place
             # it by, and server.py whole is every suite (B472).
-            scripts/dashboard/server.py) [ -z "$named" ] && [ -f "${BB_REPO:-$PWD}/.bb-map/coverage.json" ] && mapped+=("$f") || all_dash=1 ;;
+            scripts/dashboard/server.py) [ -z "$named" ] && [ -f "${BB_REPO:-$PWD}/.bb-map/coverage.json" ] && mapped+=("$f") || { all_dash=1; whole=1; } ;;
             scripts/dashboard/test/*.mjs) own+=("$(basename "$f" .mjs)") ;;
             # The unit tier runs every one of these first, whatever changed;
             # handed to the map, a changed one came back as a browser suite
@@ -72,7 +77,7 @@ cmd_tests_preflight() {
             *) mapped+=("$f") ;;
         esac
     done
-    if [ -n "$all_dash" ]; then
+    if [ -n "$whole" ] || { [ -n "$all_dash" ] && [ -z "$harness" ]; }; then
         suites=(ALL)
     else
         suites=("${own[@]}")
@@ -130,6 +135,21 @@ cmd_tests_preflight() {
         done
         suites=("${kept[@]}")
     fi
+    # The harness itself changed: every suite runs, and what the change
+    # reaches by itself is kept beside that. A flake fails the gate in a
+    # suite the change touches (R7 step 3); where every suite runs only
+    # because the library or the runner under them changed, a flake in one
+    # of the others is recorded and named and does not (the operator, 14
+    # Nov: four gates in a row each flaked on a different three or four of
+    # fifty, and no harness change could be pushed until a whole run had
+    # none).
+    if [ -n "$harness" ]; then
+        if [ "${suites[*]:-}" != ALL ]; then
+            touched=("${suites[@]}")
+            harness_only=1
+        fi
+        suites=(ALL)
+    fi
     # The checks the house rules ask for before handing back.
     # design is uniform.mjs whole, about four minutes. It runs when a file
     # that carries style changed (the stylesheet lives in index.html, the
@@ -150,6 +170,7 @@ cmd_tests_preflight() {
     done
     printf '  files:   %s\n' "${files[*]}"
     printf '  suites:  %s\n' "${suites[*]:-none}"
+    [ -z "$harness_only" ] || printf '  flakes:  every suite runs because the harness changed; one fails the gate only in %s\n' "${touched[*]:-none of them (the change touches no suite by itself)}"
     printf '  checks:  %s\n' "${checks[*]}"
     # The account, when the covered run chose: which function and which
     # drawn thing named each suite, and what fell back to a file.
@@ -250,6 +271,14 @@ cmd_tests_preflight() {
     # push, where a release's tag still counts it as passed.
     local flk=""
     [ "$rl" = /dev/null ] || flk="$(python3 "$BB_LIB/flakes.py" of-log "$rl" 2>/dev/null || true)"
+    if [ -n "$flk" ] && [ -n "$harness_only" ]; then
+        local fk="" fo="" x
+        for x in $flk; do
+            case " ${touched[*]:-} " in *" $x "*) fk="$fk $x" ;; *) fo="$fo $x" ;; esac
+        done
+        [ -z "$fo" ] || printf '  NOTE  flaky, recorded and not failed:%s. Every suite ran because the harness itself changed, and the change touches none of these by itself; aerie tests flakes counts them\n' "$fo" | tee -a "$rl"
+        flk="${fk# }"
+    fi
     if [ -n "$flk" ]; then
         printf '  FAIL  flaky in this gate: %s. Each failed in the run and passed when run again, and a gate runs the suites the change touches: aerie dashboard test SUITE runs one by itself, aerie tests flakes says how often each has flaked\n' "$flk" | tee -a "$rl"
         rc=1

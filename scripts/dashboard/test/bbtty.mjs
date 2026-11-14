@@ -9,7 +9,7 @@
 // project became unstartable, its terminal reconnecting into the same error
 // every five seconds. The command goes through a launcher file now, and this is the test
 // that says so.
-import { ok, done, sleep, URL, DIR, tmuxKill, tmuxNew, tmuxFmt, takeOn, member } from './lib.mjs';
+import { ok, done, sleep, until, URL, DIR, tmuxKill, tmuxNew, tmuxFmt, takeOn, member } from './lib.mjs';
 import { execFileSync } from 'child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, chmodSync, readFileSync, existsSync, lstatSync, readlinkSync, rmSync, statSync, symlinkSync, realpathSync, readdirSync } from 'fs';
 import { tmpdir } from 'os';
@@ -139,12 +139,19 @@ const paneCmd = () => { try { return tmuxFmt('claude-alpha', '#{pane_start_comma
 // Missing is an answer, not a crash: run this against the code before the
 // launcher and every one of these should read FAIL, not stop the file.
 const launcher = () => existsSync(LAUNCHER) ? readFileSync(LAUNCHER, 'utf8') : '';
+// Whether a pane's stub has written `file` on this connection. Each stub
+// writes to one file, start after start, so the file being there says
+// nothing: bb-tty writes the launcher `run` before it makes the session,
+// and what the stub left is this session's once it is as new as that. A
+// file not there yet throws, which until() reads as not yet.
+const wrote = (file, run = LAUNCHER) =>
+  statSync(file).size > 0 && statSync(file).mtimeMs >= statSync(run).mtimeMs;
 
 // A roadmap of 40KB. Under the old code this was `command too long` and no
 // session at all: the operator's report was a pane filling with that line as
 // its terminal reconnected into it every five seconds.
 let out = connect(40000);
-await sleep(400);
+await until(() => wrote(argvOut));
 ok(!/command too long/.test(out),
    'a roadmap past tmux\'s 16KB command limit does not stop the session starting');
 ok(alive('claude-alpha'), '...the session is really there');
@@ -278,7 +285,7 @@ ok(pref.indexOf('THE HOUSE RULES') >= 0
 // less (share.py), says so, and the session still starts, with the parts
 // after it all there.
 out = connect(250000);
-await sleep(400);
+await until(() => alive('claude-alpha'));
 ok(alive('claude-alpha'), 'a roadmap past what a session should be asked to read still starts');
 ok(/the roadmap part is over its share/.test(out) && /leaves out \d+ of its \d+ open items/.test(out),
    '...whoever opened the terminal is told what it left out');
@@ -288,7 +295,7 @@ ok(/and \d+ more open\./.test(prefFile()) && prefFile().includes('the bugs block
 // The ordinary case still goes through the same path, so it is the one that
 // gets exercised rather than a fallback nobody reaches until a list grows.
 out = connect(0);
-await sleep(400);
+await until(() => alive('claude-alpha'));
 ok(alive('claude-alpha') && /project\/alpha\/claude-run\.sh$/.test(paneCmd()),
    'a space with no roadmap starts the same way');
 
@@ -302,7 +309,6 @@ writeFileSync(LOCKS, JSON.stringify({ alpha: { by: 'u_0000aaaa', admin: true } }
 const refusedAt = Date.now();
 out = connect(0);
 const refusedIn = Date.now() - refusedAt;
-await sleep(400);
 ok(/locked/.test(out) && !alive('claude-alpha'),
    'a locked space refuses a Claude session, whatever the URL asks for');
 // A refusal holds the terminal open for ten seconds so the browser can show
@@ -323,7 +329,7 @@ ok(/card's menu/.test(out) && /locked by its owner/.test(out),
 // a reason to leave somebody without a terminal (B160).
 rmSync(LOCKS, { force: true });
 out = connect(0, { FAKE_NO_PREAMBLE: '1' });
-await sleep(400);
+await until(() => alive('claude-alpha'));
 ok(/could not fetch this session's briefing/.test(out) && /starts with none/.test(out),
    'a briefing the controller did not answer for is said out loud, not passed over');
 ok(alive('claude-alpha'),
@@ -335,7 +341,6 @@ try { execFileSync('tmux', ['kill-session', '-t', 'claude-alpha'], { env: { ...p
 // the same reason as every other refusal in this file: the URL is reachable.
 rmSync(LOCKS, { force: true });
 out = connect(0, { FAKE_GIT_READY: '0' });
-await sleep(400);
 ok(/no name and email for commits/.test(out) && !alive('claude-alpha'),
    'an account with no author for its commits is refused a Claude session, and told where to set one');
 // ...and a shell, which is where git is typed.
@@ -355,7 +360,7 @@ ok(/no name and email for commits/.test(out) && !alive('claude-alpha'),
 // And unlocking really lets it back in: a gate that cannot be opened again is
 // a different bug, and one nobody notices until they need it.
 out = connect(0);
-await sleep(400);
+await until(() => alive('claude-alpha'));
 ok(alive('claude-alpha'), 'unlocking lets a session start there again');
 
 
@@ -367,7 +372,7 @@ ok(alive('claude-alpha'), 'unlocking lets a session start there again');
 writeFileSync(join(DIR, 'state', 'claude-prefs.json'), JSON.stringify(
   { users: { [SEAT]: { alpha: { model: 'sonnet', effort: 'xhigh' } } } }));
 connect(0);
-await sleep(400);
+await until(() => wrote(argvOut));
 let a = existsSync(argvOut) ? readFileSync(argvOut, 'utf8') : '';
 ok(/--model\0sonnet\0/.test(a) && /--effort\0xhigh\0/.test(a),
    "a space's model and effort reach claude as launch flags");
@@ -380,7 +385,7 @@ ok(!/--resume/.test(a),
 writeFileSync(join(DIR, 'state', 'claude-prefs.json'), JSON.stringify(
   { users: { [SEAT]: { alpha: { model: '--dangerously-skip-permissions', effort: 'max' } } } }));
 connect(0);
-await sleep(400);
+await until(() => wrote(argvOut));
 a = existsSync(argvOut) ? readFileSync(argvOut, 'utf8') : '';
 ok(!/dangerously/.test(a) && /--effort\0max\0/.test(a),
    'a model the tables do not know is dropped, and the valid half still goes');
@@ -421,7 +426,7 @@ rmSync(join(DIR, 'state', 'claude-prefs.json'), { force: true });
   const BRIEF = '- a planner for armor stats\n\n"quoted" and $HOME, as typed';
   writeFileSync(staged, BRIEF + '\n');
   connect(0, { FAKE_BRIEF: staged });
-  await sleep(400);
+  await until(() => wrote(argvOut));
   a = existsSync(argvOut) ? readFileSync(argvOut, 'utf8') : '';
   const args = a.split('\0').filter(Boolean);
   ok(args[args.length - 2] === '--' && args[args.length - 1] === BRIEF && !existsSync(staged),
@@ -437,7 +442,7 @@ rmSync(join(DIR, 'state', 'claude-prefs.json'), { force: true });
   a = existsSync(argvOut) ? readFileSync(argvOut, 'utf8') : '';
   ok(!a.includes('armor stats'), 'a respawn of that session is not handed the brief again');
   connect(0);
-  await sleep(400);
+  await until(() => wrote(argvOut));
   a = existsSync(argvOut) ? readFileSync(argvOut, 'utf8') : '';
   ok(!a.includes('armor stats') && !/\0--\0/.test(a), '...nor is the next session, with nothing staged');
 }
@@ -475,7 +480,7 @@ tmuxKill('claude-alpha');
 
   tmuxKill('shell-7'); tmuxKill(`${ownerUid}~shell-7`);
   shell(`u:${ownerUid}:sh:7:`);
-  await sleep(300);
+  await until(() => alive('shell-7'));
   ok(alive('shell-7') && !alive(`${ownerUid}~shell-7`),
      'the owner keeps the bare session name, so an upgrade renames nothing');
   ok(tmuxFmt('shell-7', '#{pane_start_path}') !== '' ,
@@ -486,7 +491,7 @@ tmuxKill('claude-alpha');
   const other = 'u_00c0ffee';
   tmuxKill(`${other}~shell-7`);
   shell(`u:${other}:sh:7:`);
-  await sleep(300);
+  await until(() => alive(`${other}~shell-7`));
   ok(alive(`${other}~shell-7`) && !alive('shell-7'),
      `a second account's shell is named for it, so the two never share one (${other}~shell-7)`);
   ok(existsSync(join(HOMEDIR, 'users', other)),
@@ -520,14 +525,14 @@ tmuxKill('claude-alpha');
 
     tmuxKill(`claude-${proj}`); tmuxKill(`${other}~claude-${proj}`);
     shell(`u:${ownerUid}:claude:${proj}:b:${boot}`);
-    await sleep(400);
+    await until(() => alive(`claude-${proj}`));
     ok(alive(`claude-${proj}`),
        'the owner opens a Claude session under the bare space name');
     ok(tmuxFmt(`claude-${proj}`, '#{pane_start_path}') === src,
        '...working in the space directory itself, as it always has');
 
     shell(`u:${other}:claude:${proj}:b:${boot}`);
-    await sleep(400);
+    await until(() => alive(`${other}~claude-${proj}`));
     ok(alive(`${other}~claude-${proj}`) && alive(`claude-${proj}`),
        'a second account opens its own alongside it: two at once, not one');
     const wt = join(DIR, 'ws', '.worktrees', proj, other);
@@ -546,6 +551,8 @@ tmuxKill('claude-alpha');
     // handed the same briefing the way each reads instructions.
     {
       const cxArgv = join(bin, 'codex-argv'), cpArgv = join(bin, 'copilot-argv');
+      // The launcher of the owner's session of an agent here, for wrote().
+      const runOf = ag => join(HOMEDIR, '.cache', 'builderbot', 'u', ownerUid, 'project', proj, `${ag}-run.sh`);
       writeFileSync(join(bin, 'codex'), `#!/usr/bin/env bash
 if [ "\${1:-}" = login ] && [ "\${2:-}" = status ]; then
   if [ -n "\${FAKE_CODEX_OUT:-}" ]; then echo "Not logged in"; exit 1; fi
@@ -580,7 +587,7 @@ sleep 60
       ok(/not signed in to ChatGPT/.test(refused) && /Library/.test(refused) && !alive(`codex-${proj}`),
          `signed out of ChatGPT, a Codex session is refused with where to sign in (${refused.trim().split('\n')[0]})`);
       shell(`u:${ownerUid}:codex:${proj}:b:${boot}`);
-      await sleep(400);
+      await until(() => wrote(cxArgv, runOf('codex')));
       ok(alive(`codex-${proj}`) && alive(`claude-${proj}`),
          'the owner opens a Codex session beside their Claude one on the same space: two agents at once');
       const cwt = join(DIR, 'ws', '.worktrees', proj, `${ownerUid}-codex`);
@@ -616,7 +623,9 @@ sleep 60
       writeFileSync(join(bin, 'codex-164'), '');
       tmuxKill(`codex-${proj}`);
       shell(`u:${ownerUid}:codex:${proj}:b:${boot}`);
-      await sleep(1500);
+      // Its launcher asks this Codex for its hooks before it starts it, for
+      // ten seconds at most (bb-codex-trust).
+      await until(() => wrote(cxArgv, runOf('codex')), 20000);
       const cx164 = existsSync(cxArgv) ? readFileSync(cxArgv, 'utf8').split('\0') : [];
       const hs = cx164.find(x => x.startsWith('hooks.state=')) || '';
       ok(cx164.includes('--no-daemon') && /pre_tool_use:0:0"=\{trusted_hash="sha256:0abc"\}/.test(hs)
@@ -625,7 +634,7 @@ sleep 60
       rmSync(join(bin, 'codex-164'));
       tmuxKill(`codex-${proj}`);
       shell(`u:${ownerUid}:codex:${proj}:b:${boot}`);
-      await sleep(400);
+      await until(() => alive(`codex-${proj}`));
       // Its guards are its own hooks (R95 step 6): AerieOS's, for every
       // event a Claude session has them on, in the account's hooks file.
       const hk = existsSync(join(HOMEDIR, '.codex', 'hooks.json')) ? JSON.parse(readFileSync(join(HOMEDIR, '.codex', 'hooks.json'), 'utf8')) : {};
@@ -644,7 +653,7 @@ sleep 60
       // to Codex's own list (R95 step 9).
       tmuxKill(`codex-${proj}`);
       shell(`u:${ownerUid}:codex:${proj}:m:gpt-5.5:e:high:b:${boot}`);
-      await sleep(400);
+      await until(() => wrote(cxArgv, runOf('codex')));
       const cx2 = existsSync(cxArgv) ? readFileSync(cxArgv, 'utf8').split('\0') : [];
       const mi = cx2.indexOf('-m');
       ok(alive(`codex-${proj}`) && mi >= 0 && cx2[mi + 1] === 'gpt-5.5' && cx2.includes('model_reasoning_effort="high"'),
@@ -670,7 +679,7 @@ sleep 60
         mkdirSync(kd, { recursive: true });
         writeFileSync(join(kd, `${sid}.jsonl`), '{"type":"session_meta","payload":{}}\n');
         shell(`u:${ownerUid}:codex:${proj}:r:${sid}:b:${boot}`);
-        await sleep(400);
+        await until(() => wrote(cxArgv, runOf('codex')));
         const rx = existsSync(cxArgv) ? readFileSync(cxArgv, 'utf8').split('\0') : [];
         const back = execFileSync('find', [join(HOMEDIR, '.codex', 'sessions'), '-name', `rollout-*-${sid}.jsonl`], { encoding: 'utf8' }).trim();
         ok(alive(`codex-${proj}`) && rx.includes('resume') && rx[rx.indexOf('resume') + 1] === sid && back,
@@ -689,7 +698,7 @@ sleep 60
       shell(`u:${ownerUid}:codex:${proj}:b:${boot}`);
       shell(`u:${ownerUid}:codex:${proj}:s:2:b:${boot}`);
       shell(`u:${ownerUid}:claude:${proj}:s:2:b:${boot}`);
-      await sleep(600);
+      await until(() => alive(`codex-${proj}`) && alive(`codex-${proj}~2`) && alive(`claude-${proj}~2`));
       const cwt2 = `${cwt}-2`, clt2 = join(DIR, 'ws', '.worktrees', proj, `${ownerUid}-2`);
       const cx2Run = join(HOMEDIR, '.cache', 'builderbot', 'u', ownerUid, 'project', proj, 'codex-2-run.sh');
       const wts = git(['worktree', 'list', '--porcelain']);
@@ -719,7 +728,7 @@ sleep 60
       const cpHead = '// User settings belong in settings.json.\n// This file is managed automatically.\n';
       writeFileSync(join(HOMEDIR, '.copilot', 'config.json'), cpHead + JSON.stringify({ lastLoggedInUser: { host: 'https://github.com', login: 'octo' } }));
       shell(`u:${ownerUid}:copilot:${proj}:b:${boot}`);
-      await sleep(400);
+      await until(() => wrote(`${cpArgv}.dirs`, runOf('copilot')));
       const cp = existsSync(cpArgv) ? readFileSync(cpArgv, 'utf8').split('\0') : [];
       const dirs = existsSync(`${cpArgv}.dirs`) ? readFileSync(`${cpArgv}.dirs`, 'utf8') : '';
       ok(alive(`copilot-${proj}`) && cp[0] === '--no-auto-update',
@@ -760,7 +769,7 @@ sleep 60
         mkdirSync(join(HOMEDIR, '.grok'), { recursive: true });
         writeFileSync(join(HOMEDIR, '.grok', 'auth.json'), JSON.stringify({ token: 'not-real' }));
         shell(`u:${ownerUid}:grok:${proj}:b:${boot}`);
-        await sleep(400);
+        await until(() => wrote(`${gkArgv}.env`, runOf('grok')));
         const gk = existsSync(gkArgv) ? readFileSync(gkArgv, 'utf8').split('\0') : [];
         const genv = existsSync(`${gkArgv}.env`) ? readFileSync(`${gkArgv}.env`, 'utf8') : '';
         const ri = gk.indexOf('--rules');
@@ -805,7 +814,7 @@ sleep 60
         writeFileSync(gmHooks, JSON.stringify({ mine: { Stop: [{ type: 'command', command: './bell.sh' }] } }));
         tmuxKill(`gemini-${proj}`);
         const gmSaid = shell(`u:${ownerUid}:gemini:${proj}:b:${boot}`, { BB_TOOLPACKS_JSON: packs });
-        await sleep(400);
+        await until(() => wrote(`${gmArgv}.env`, runOf('gemini')));
         const gm = existsSync(gmArgv) ? readFileSync(gmArgv, 'utf8').split('\0').filter(Boolean) : [];
         const gmBrief = existsSync(`${gmArgv}.env`) ? readFileSync(`${gmArgv}.env`, 'utf8') : '';
         ok(alive(`gemini-${proj}`) && gmBrief && existsSync(gmBrief) && /THE HOUSE RULES/.test(readFileSync(gmBrief, 'utf8')) && !gm.length,
@@ -857,7 +866,7 @@ sleep 60
              `a pack's agent whose pack is off for the space is refused in those words, never as not installed (${
                (offSaid.trim().split('\n').find(l => /switched off|not installed/.test(l)) || offSaid.trim().split('\n').pop() || '').slice(0, 110)})`);
           shell(`u:${ownerUid}:gemini:${proj}:b:${boot}`, env);
-          await sleep(400);
+          await until(() => alive(`gemini-${proj}`));
           ok(alive(`gemini-${proj}`), '...and switched on, it starts from the store');
           tmuxKill(`gemini-${proj}`);
           rmSync(sdk, { recursive: true, force: true });
@@ -989,7 +998,7 @@ sleep 60
   // shape that is not an id must not become a directory name.
   tmuxKill('shell-8');
   shell('u:../../etc:sh:8:');
-  await sleep(300);
+  await until(() => alive('shell-8'));
   ok(alive('shell-8') && !existsSync(join(HOMEDIR, 'users', '..', '..', 'etc', '.bashrc')),
      'an argument that is not an id is nobody, not somebody else');
   tmuxKill('shell-8');
@@ -1002,7 +1011,7 @@ sleep 60
   {
     tmuxKill(`${other}~shell-9`);
     shell(`u:${other}:sh:9:`);
-    await sleep(300);
+    await until(() => alive(`${other}~shell-9`));
     const home = (() => { try {
       return execFileSync('tmux', ['show-environment', '-t', `${other}~shell-9`, 'HOME'],
         { encoding: 'utf8', env: process.env }).trim();
@@ -1023,7 +1032,7 @@ sleep 60
     writeFileSync(join(HOMEDIR, 'users', other, '.python_history'), 'x\n');
     tmuxKill(`${other}~shell-9`);
     shell(`u:${other}:sh:9:`);
-    await sleep(300);
+    await until(() => alive(`${other}~shell-9`));
     const env = k => { try {
       return execFileSync('tmux', ['show-environment', '-t', `${other}~shell-9`, k], { encoding: 'utf8', env: process.env }).trim();
     } catch { return ''; } };
@@ -1079,7 +1088,7 @@ print(uid)`);
     mkdirSync(join(DIR, 'ws', '.claude', 'u_0badf00d', 'projects'), { recursive: true });
     tmuxKill('shell-wtproj-10'); tmuxKill(`${ownerUid}~shell-wtproj-10`);
     shell(`u:${ownerUid}:sh:10:wtproj`, node, [`tok:${ownerTok}`]);
-    await sleep(300);
+    await until(() => alive(`${ownerUid}~shell-wtproj-10`));
     ok(alive(`${ownerUid}~shell-wtproj-10`) && !alive('shell-wtproj-10'),
        'on a node the owner is prefixed like everybody else: there is no owner there');
     ok(existsSync(join(HOMEDIR, 'users', ownerUid)),
@@ -1095,13 +1104,12 @@ print(uid)`);
       const shOut = (arg, extras) => shell(arg, node, extras);
       tmuxKill(`${ownerUid}~shell-wtproj-12`); tmuxKill(`${otherUid}~shell-wtproj-12`);
       const bare = shOut(`u:${ownerUid}:sh:12:wtproj`, ['name:the.owner', 'owner:1']);
-      await sleep(200);
       ok(/was refused/.test(bare) && /without a session token/.test(bare)
          && !alive(`${ownerUid}~shell-wtproj-12`),
          `on a node, a terminal with no token is refused however much the URL claims (${bare.trim().slice(0, 90)})`);
       const claimed = shOut(`u:${ownerUid}:sh:12:wtproj`,
                             [`tok:${tok('wtproj', otherUid)}`, 'name:the.owner', 'owner:1']);
-      await sleep(300);
+      await until(() => alive(`${otherUid}~shell-wtproj-12`));
       const envOf12 = k => { try {
         return execFileSync('tmux', ['show-environment', '-t', `${otherUid}~shell-wtproj-12`, k],
           { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], env: process.env }).trim();
@@ -1146,7 +1154,7 @@ print(uid)`);
                BUILDER_HOME: HOMEDIR, DASHBOARD_STATE: join(DIR, 'state'), ...node },
       });
     } catch (e) { return `${e.stdout || ''}${e.stderr || ''}`; } })();
-    await sleep(400);
+    await until(() => alive(`${otherUid}~claude-${proj}`));
     ok(alive(`${otherUid}~claude-${proj}`),
        `on a node an account's Claude session is prefixed (${out.split('\n')[0].slice(0, 80)})`);
     const wt = join(DIR, 'ws', '.worktrees', proj, otherUid);
@@ -1181,7 +1189,7 @@ print(uid)`);
                BUILDER_HOME: HOMEDIR, DASHBOARD_STATE: join(DIR, 'state'), ...node },
       });
     } catch { /* the attach fails without a terminal */ }
-    await sleep(400);
+    await until(() => alive(`${ownerUid}~claude-${proj}`));
     ok(tmuxFmt(`${ownerUid}~claude-${proj}`, '#{pane_start_path}') === join(DIR, 'ws', proj),
        'told it is the owner, the session works in the space directory itself, as on the controller');
     const envOf = k => { try {
@@ -1241,7 +1249,7 @@ print(uid)`);
       } catch (e) { return `${e.stdout || ''}${e.stderr || ''}`; } };
       tmuxKill(`${ownerUid}~claude-${vproj}`);
       runView(`u:${ownerUid}:claude:${vproj}:b:${boot}`);
-      await sleep(400);
+      await until(() => alive(`${ownerUid}~claude-${vproj}`));
       const vcmd = tmuxFmt(`${ownerUid}~claude-${vproj}`, '#{pane_start_command}');
       const vcache = join(vhome, '.cache', 'builderbot', 'u', ownerUid, 'project', vproj);
       const envf = join(vcache, 'session.env');
@@ -1282,7 +1290,7 @@ print(uid)`);
         };
         setReads(['alpha']);
         runView(`u:${ownerUid}:claude:${vproj}:b:${boot}`);
-        await sleep(400);
+        await until(() => alive(`${ownerUid}~claude-${vproj}`));
         const rcmd = tmuxFmt(`${ownerUid}~claude-${vproj}`, '#{pane_start_command}');
         const scope = JSON.parse(readFileSync(join(vcache, 'claude-scope.json'), 'utf8'));
         const deny = scope.permissions.deny;
@@ -1305,7 +1313,7 @@ print(uid)`);
         };
         setSees(['/mnt/media', '/srv/samples']);
         runView(`u:${ownerUid}:claude:${vproj}:b:${boot}`);
-        await sleep(400);
+        await until(() => alive(`${ownerUid}~claude-${vproj}`));
         const scmd = tmuxFmt(`${ownerUid}~claude-${vproj}`, '#{pane_start_command}');
         ok(scmd.includes(` --cwd ${join(DIR, 'ws', vproj)} --sees /mnt/media --sees /srv/samples --env `),
            `a place the space is set to see goes to the helper as --sees (${scmd.slice(scmd.indexOf('--cwd'), scmd.indexOf('--cwd') + 160)})`);
@@ -1316,7 +1324,6 @@ print(uid)`);
       writeFileSync(helper, helperSrc(true), { mode: 0o755 });
       tmuxKill(`${ownerUid}~shell-${vproj}`);
       const refused = runView(`u:${ownerUid}:shell:${vproj}`);
-      await sleep(300);
       ok(/could not for this one/.test(refused) && /not this one/.test(refused) && !alive(`${ownerUid}~shell-${vproj}`),
          `...and a space shell the helper cannot plan a view for is refused with its reason, never opened without one (${refused.replace(/\s+/g, ' ').slice(0, 90)})`);
     }
@@ -1339,7 +1346,7 @@ print(uid)`);
                BUILDER_HOME: HOMEDIR, DASHBOARD_STATE: join(DIR, 'state'), ...node },
       });
     } catch { /* the attach fails without a terminal */ }
-    await sleep(300);
+    await until(() => alive(`${otherUid}~claude-${proj}`));
     const cj2 = JSON.parse(readFileSync(join(HOMEDIR, 'users', otherUid, '.claude.json'), 'utf8'));
     ok(cj2.theme === 'light' && cj2.projects?.[wt]?.hasTrustDialogAccepted === true,
        '...the theme a person set stays theirs, and the trust is put back for the tree');
@@ -1422,7 +1429,6 @@ print(uid)`);
                HOME: HOMEDIR, BUILDER_HOME: HOMEDIR, DASHBOARD_STATE: join(DIR, 'state'), ...node },
       });
     } catch { /* the attach fails without a terminal, as everywhere in this file */ }
-    await sleep(300);
     ok(!alive(`${ownerUid}~shell-wtproj-11`),
        'a token in the wrong shape is dropped, and on a node that leaves no token, so nothing opens');
     // (the name alone cannot open anything any more: it is the controller's to say)
@@ -1466,7 +1472,7 @@ print(uid)`);
                  BUILDER_HOME: HOMEDIR, DASHBOARD_STATE: join(DIR, 'state'), ...node },
         });
       } catch (e) { said = `${e.stdout || ''}${e.stderr || ''}`; /* the attach fails without a terminal */ }
-      await sleep(400);
+      await until(() => alive(`${ownerUid}~claude-${proj}`));
       const cur = join(realpathSync(bundles), 'current', 'scripts', 'dashboard');
       const hooks = scopeOf();
       ok(hooks.includes(`${cur}/bb-gate ${proj} `) && hooks.includes(`${cur}/bb-work-note ${proj} `)
@@ -1496,7 +1502,7 @@ print(uid)`);
       symlinkSync(join(HOMEDIR, '.local'), join(ah, '.local'));
       tmuxKill(`${otherUid}~shell-wtproj-14`);
       shell(`u:${otherUid}:sh:14:wtproj`, { ...node, CARGO_HOME: '/store/rust/cargo' }, [`tok:${tok('wtproj', otherUid)}`]);
-      await sleep(300);
+      await until(() => alive(`${otherUid}~shell-wtproj-14`));
       const env14 = k => { try {
         return execFileSync('tmux', ['show-environment', '-t', `${otherUid}~shell-wtproj-14`, k],
           { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], env: process.env }).trim();
@@ -1564,7 +1570,7 @@ esac
   };
   tmuxKill('ctr-alpha-app-1');
   run('ctr:alpha:main:alpha-app-1');
-  await sleep(400);
+  await until(() => /^exec -it alpha-app-1 sh -c /m.test(readFileSync(dlog, 'utf8')));
   const said = existsSync(dlog) ? readFileSync(dlog, 'utf8') : '';
   ok(alive('ctr-alpha-app-1') && /^exec -it alpha-app-1 sh -c /m.test(said),
      `a container's terminal is docker exec into it, in a session named by the container (${said.trim().split('\n').pop()})`);

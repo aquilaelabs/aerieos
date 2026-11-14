@@ -4,7 +4,7 @@
 // Everything here drives the stub docker the harness provides; the argv it
 // records IS the assertion, because the module's whole safety story is that
 // the buttons run table-lookup compose commands and nothing else.
-import { launch, newPage, ok, done, ready, sleep, patience, holdPoll, freePoll, refreshUntil, saveDialog, URL, DIR, nbShown, nbTab, openFold, nbGo, faded, projectKey } from './lib.mjs';
+import { launch, newPage, ok, done, ready, sleep, patience, holdPoll, freePoll, refreshUntil, saveDialog, URL, DIR, nbShown, nbTab, openFold, nbGo, faded, projectKey, until } from './lib.mjs';
 import { writeFileSync, readFileSync, rmSync, existsSync, mkdirSync, chmodSync, readdirSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -844,6 +844,12 @@ await dmClick('rebuild');
 ok(await page.$(`${DM} .dmlog`) === null, "the row carries the job's phase and no tail of its output");
 ok(await page.$(`${DM} [data-dm="abort"]`) !== null,
    '...with an Abort beside it, which a build never had');
+// Aborted once it is really running: pressed while the job was still in the
+// queue it was canceled before it started, which keeps nothing and says so,
+// and the check below is about a build stopped part way (the gate of 14
+// Nov, under load).
+await until(() => page.evaluate(async () => ((await (await fetch('/api/v1/jobs?project=ep.silon')).json()).jobs || [])
+  .some(j => j.state === 'running')), 30000, 250);
 await dmClick('abort');
 await page.waitForFunction(sel => {
   const e = document.querySelector(sel);
@@ -2597,6 +2603,9 @@ ok(dead.pills.length > 0 && dead.pills.every(t => /state unknown/.test(t)),
 // the queue says has ended is said on its row at once, not when the whole
 // listing has been read again (it kept "stopping..." and Abort for seconds).
 {
+  // The list in hand first: read while a re-read had it put away, this
+  // threw on a list that was not there (the gate of 14 Nov, under load).
+  await page.waitForFunction(() => !!dockerList?.instances?.length, null, { timeout: 15000 }).catch(() => {});
   const got = await page.evaluate(async () => {
     const d = (dockerList?.instances || [])[0], was = dockerList.job, realFetch = window.fetch;
     const job = { id: 'j_settle', running: true, project: d.project, instance: d.instance, action: 'rebuild', step: 'stopping' };

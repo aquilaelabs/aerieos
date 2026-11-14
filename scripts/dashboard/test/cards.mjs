@@ -4,7 +4,7 @@
 // project on several nodes, and dialogs that scroll.
 import { launch, newPage, ok, done, ready, openArchived, doctorFixture, animatedDuring, refreshUntil,
          holdPoll, freePoll, tmuxNew, tmuxKill, tmuxFmt, nbShown, URL, DIR, unfold, registerProject,
-         saveDialog, sectSave, sleep } from './lib.mjs';
+         saveDialog, sectSave, until, quiet, settled, sleep } from './lib.mjs';
 import { writeFileSync, readFileSync, existsSync, rmSync, utimesSync,
          mkdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -12,6 +12,21 @@ import { execFileSync } from 'node:child_process';
 const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 800 } });
+
+// The page at a width just set, and a frame drawn at it: what listens for
+// the phone's breakpoint runs before a frame's callbacks, so whatever it
+// draws again is drawn by then.
+const atWidth = async w => {
+  await page.waitForFunction(w => innerWidth === w, w, { timeout: 10000 });
+  await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+};
+// A card on its back (or on its front) with the turn over: neither face is
+// still on the stylesheet's tween.
+const turned = (sel, on = true) => page.waitForFunction(([s, on]) => {
+  const c = document.querySelector(s);
+  return !!c && c.classList.contains('flipped') === on
+    && ![...c.querySelectorAll(':scope > .pcface')].some(f => f.getAnimations().length);
+}, [sel, on], { timeout: 10000 }).catch(() => {});
 
 // A card's link, lock, pin and the rest are on its back on the Projects
 // page (R138): Edit turns it over first, the way a thumb does.
@@ -23,12 +38,24 @@ const pjMenu = async name => {
   await page.evaluate(n => { const c = document.querySelector(`.doc .projtab .pcard[data-row="${CSS.escape(n)}"]`);
     const fold = c?.closest('details.sect');
     if (fold && !fold.open) fold.querySelector(':scope > summary')?.click(); }, name);
-  await page.waitForTimeout(600);
+  // The fold open and its slide over, where the card is in one.
+  await page.waitForFunction(n => { const fold = document.querySelector(`.doc .projtab .pcard[data-row="${CSS.escape(n)}"]`)?.closest('details.sect');
+    return !fold || (fold.open && !fold.getAnimations().length); }, name, { timeout: 10000 }).catch(() => {});
   await page.evaluate(n => document.querySelector(`.doc .projtab .pcard[data-row="${CSS.escape(n)}"]`)?.scrollIntoView({ block: 'center' }), name);
-  await page.waitForTimeout(400);
-  await page.evaluate(n => { const c = document.querySelector(`.doc .projtab .pcard[data-row="${CSS.escape(n)}"]`);
-    if (c && !c.classList.contains('flipped')) c.querySelector('.pcfront [data-pedit]')?.click(); }, name);
-  await page.waitForTimeout(500);
+  await page.waitForFunction(n => { const r = document.querySelector(`.doc .projtab .pcard[data-row="${CSS.escape(n)}"]`)?.getBoundingClientRect();
+    return !r || !(r.width || r.height) || (r.bottom > 0 && r.top < innerHeight); }, name, { timeout: 10000 }).catch(() => {});
+  const pressed = Date.now();
+  const turning = await page.evaluate(n => { const c = document.querySelector(`.doc .projtab .pcard[data-row="${CSS.escape(n)}"]`);
+    if (c && !c.classList.contains('flipped')){ c.querySelector('.pcfront [data-pedit]')?.click(); return true; }
+    return false; }, name);
+  // On its back, the turn over: a press on the back lands on a face at rest.
+  await page.waitForFunction(n => { const c = document.querySelector(`.doc .projtab .pcard[data-row="${CSS.escape(n)}"]`);
+    return !c || (c.classList.contains('flipped') && ![...c.querySelectorAll(':scope > .pcface')].some(f => f.getAnimations().length)); }, name, { timeout: 10000 }).catch(() => {});
+  // ...and the grid's own redraw behind it: flipCard draws the cards again
+  // 450 ms after a turn, on a timer nothing on the page shows, and a box
+  // opened on the back before it would be drawn over. The one pause here
+  // that is a clock: what is left of that half second since the press.
+  if (turning) await sleep(Math.max(0, 500 - (Date.now() - pressed)));
 };await page.goto(URL);
 await ready(page);
 // The Nostromo glass (the operator, 24 Sep): a pane's bar, the dock's line
@@ -77,7 +104,7 @@ await ready(page);
   const measured = [];
   for (const w of sizes){
     await page.setViewportSize({ width: w, height: 800 });
-    await new Promise(r => setTimeout(r, 200));
+    await atWidth(w);
     measured.push(await page.evaluate(async () => {
       const h = document.querySelector('header');
       // A realistic value rather than whatever the fixture is up: the point is
@@ -95,7 +122,7 @@ await ready(page);
     }));
   }
   await page.setViewportSize({ width: 1280, height: 800 });
-  await new Promise(r => setTimeout(r, 250));
+  await atWidth(1280);
   const over = measured.filter(m => m.over > 0);
   const cut = measured.filter(m => m.clipped.length);
   // ...and the search keeps room to be typed into: six buttons a thumb wide
@@ -488,7 +515,7 @@ print(json.dumps(out))
 // width.
 {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.waitForTimeout(400);
+  await atWidth(390);
   await page.evaluate(() => openProjectsTab());
   await page.waitForSelector('.doc.on .projtab .pcard[data-row="alpha"]', { timeout: 10000 });
   const card = '.doc.on .projtab .pcard[data-row="alpha"]';
@@ -514,7 +541,10 @@ print(json.dumps(out))
     ({ t: getComputedStyle(e).transitionProperty, conn: e.isConnected, par: e.parentElement?.className, ghost: !!e.closest('.fghost') })))));
   ok(/transform/.test(turn) && !/^\[/.test(turn), `...on a tween of its transform (${turn})`);
   await page.setViewportSize({ width: 1280, height: 1000 });
-  await page.waitForTimeout(400);
+  await atWidth(1280);
+  // The turn over: measured mid-turn, the icons of a face still swinging
+  // round sit at five heights.
+  await turned(card);
   // The back's foot is one line of icons, each named (the operator, 25 Oct).
   const foot = await page.$$eval(`${card} .pcback .pcacts > button`, bs => ({
     names: bs.map(b => b.getAttribute('aria-label')), tops: new Set(bs.map(b => Math.round(b.getBoundingClientRect().top))).size }));
@@ -814,7 +844,9 @@ ok(await page.evaluate(() => document.documentElement.dataset.theme) === undefin
   ok(await page.$eval('#uiMenu [data-mode="dark"]', b => b.classList.contains('on')),
      'the gear offers Dark, Light and System, on Dark to begin with');
   await page.click('#uiMenu [data-mode="light"]');
-  await page.waitForTimeout(400);
+  // Light on, and past its crossfade, as Default's above.
+  await page.waitForFunction(() => document.documentElement.dataset.mode === 'light'
+    && !document.documentElement.classList.contains('theming'), null, { timeout: 10000 }).catch(() => {});
   ok(await page.evaluate(() => document.documentElement.dataset.mode) === 'light'
      && await pageBg() !== darkBg,
      'Light repaints the page on the press, the light half of the same scheme');
@@ -994,7 +1026,7 @@ ok(true, '...and so does a click on the page under it');
   // An administrator has Home's Getting started for this (R267, the
   // operator 18 Oct): the guide over it would be two at once, so it does
   // not open by itself for one; it is About's, on its guide.
-  await sleep(2500);
+  await quiet(2500);
   ok(await page.$eval('#aboutModal', e => e.hidden),
      'an administrator who has not read the guide is not shown it on sign-in: Home\'s Getting started is theirs');
   await page.click('#bAbout');
@@ -1153,7 +1185,7 @@ print(json.dumps({"kept": [s["title"] for s in kept], "held": held, "series": se
   await page.waitForFunction(async () => (await (await fetch('/api/status')).json()).welcome.seen === true, null, { timeout: 10000 });
   ok(true, 'closing it marks the guide read, so it does not open again');
   await page.reload(); await ready(page);
-  await new Promise(r => setTimeout(r, 800));
+  await quiet(800);
   ok(await page.$eval('#aboutModal', e => e.hidden), '...and a reload leaves it shut');
   // An image this account has not seen: the changelog, once.
   await prefs({ image_seen: 'ffffffffffffffffffffffffffffffffffffffff' });
@@ -1315,7 +1347,17 @@ await page.waitForFunction(() => !!document.querySelector('.doc .projtab details
   // The page scrolls smoothly: brought into view, then measured once it is there.
   await page.evaluate(() => [...(document.querySelector('.doc .projtab .pcard[data-row="alpha"]')?.querySelectorAll('.pcback .pcacts button') || [])]
     .pop()?.scrollIntoView({ block: 'center' }));
-  await page.waitForTimeout(700);
+  // What the check below reads, a toast looked through as it does.
+  await page.waitForFunction(() => {
+    const c = document.querySelector('.doc .projtab .pcard[data-row="alpha"]'), last = c && [...c.querySelectorAll('.pcback .pcacts button')].pop();
+    if (!last || !c.classList.contains('flipped')) return false;
+    const r = last.getBoundingClientRect(), foot = Math.min(innerHeight, document.querySelector('.pane.dock')?.getBoundingClientRect().top || innerHeight);
+    const toast = document.getElementById('toast');
+    if (toast) toast.style.visibility = 'hidden';
+    const at = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    if (toast) toast.style.visibility = '';
+    return r.bottom <= foot && (at === last || last.contains(at));
+  }, null, { timeout: 10000 }).catch(() => {});
   const seen = await page.evaluate(() => {
     const c = document.querySelector('.doc .projtab .pcard[data-row="alpha"]'), last = c && [...c.querySelectorAll('.pcback .pcacts button')].pop();
     if (!last) return { open: false };
@@ -1401,7 +1443,9 @@ ok(await page.$eval('.doc .projtab .pcard', r =>
   const shut = await cardH();
   await page.click('.doc .projtab .pcard[data-row="gamma"] [data-pgroup]');
   await page.waitForSelector('.doc .projtab .askline input', { timeout: 5000 });
-  await page.waitForTimeout(400);
+  // The box in the repositories' place, its fade in over.
+  await page.waitForFunction(() => { const c = document.querySelector('.doc .projtab .pcard[data-row="gamma"]'), box = c?.querySelector('.askline');
+    return !!box && !box.getAnimations().length && !c.querySelector('.pcback .pcrepos')?.checkVisibility(); }, null, { timeout: 10000 }).catch(() => {});
   const opened = await cardH();
   const listGone = await page.$eval('.doc .projtab .pcard[data-row="gamma"] .pcback .pcrepos', l => !l.checkVisibility());
   ok(Math.abs(opened - shut) <= 1 && listGone,
@@ -1470,13 +1514,17 @@ ok(await page.$eval('.doc .projtab .pcard', r =>
   await page.click('.doc .projtab .pcard[data-row="gamma"] [data-pgroup]');
   await page.waitForSelector('.doc .projtab .askline input', { timeout: 5000 });
   await page.click('.doc .projtab .askline [data-askno]');
-  await page.waitForTimeout(300);
+  // The box's fade and the repositories' said, then time for one more that
+  // must not come.
+  await page.waitForFunction(() => window.__fades.length >= 2, null, { timeout: 10000 }).catch(() => {});
+  await quiet(300);
   const boxFades = await page.evaluate(() => window.__fades.splice(0));
   await page.click('.doc .projtab .pcard[data-row="gamma"] .pcback [data-pedit]');
-  await page.waitForTimeout(600);
+  await turned('.doc .projtab .pcard[data-row="gamma"]', false);
   await page.click('.doc .projtab .pcard[data-row="gamma"] .pcfront [data-pmark]');
   await page.waitForFunction(() => (state.repos?.[reposOf('gamma') || 'gamma'] || {}).pinned, null, { timeout: 10000 }).catch(() => {});
-  await page.waitForTimeout(800);
+  // Time for a fade of the face that must not come, the pin's own redraw and the read after it.
+  await quiet(800);
   const markFades = await page.evaluate(() => { const f = window.__fades.splice(0); window.__unfade(); return f; });
   // A pin moves the card to the top, so it slides there rather than fading
   // (the operator, 26 Oct: a card that moves slides).
@@ -1574,7 +1622,7 @@ ok(true, 'pinning it back reads Unpin again');
   await page.evaluate(() => { refresh(); refresh(); refresh(); refresh(); refresh(); });
   for (const t1 = Date.now(); held < before + 1 && Date.now() - t1 < 20000;)
     await new Promise(r => setTimeout(r, 50));
-  await new Promise(r => setTimeout(r, 400));
+  await quiet(400);
   ok(held === before + 1,
      `polls asked while one is out do not stack (${held - before} request in flight)`);
   release();
@@ -1607,7 +1655,7 @@ ok(true, 'pinning it back reads Unpin again');
   for (const t0 = Date.now(); held < 1 && Date.now() - t0 < 10000;) await new Promise(r => setTimeout(r, 50));
   const before = held;
   await page.evaluate(() => { pollRevs(); pollRevs(); pollRevs(); pollRevs(); });
-  await new Promise(r => setTimeout(r, 2000));      // past the 1.5 s timer too
+  await quiet(2000);      // past the 1.5 s timer too
   ok(held === before,
      `revision polls asked while one is out do not stack (${held - before + 1} in flight)`);
   release();
@@ -1717,7 +1765,7 @@ ok(/Folder: \/workspace\/alpha · space #\d+/.test(await page.$eval('#rnHint', e
      `...with a jump bar naming them (${jumps.join(', ')})`);
   await page.$eval('details[data-sect="rn:claude"] > summary', s => s.click());
   await page.waitForFunction(() => !document.querySelector('details[data-sect="rn:claude"]').open, null, { timeout: 5000 }).catch(() => {});
-  await page.waitForTimeout(300);
+  await quiet(300);   // alone: time for another section to have shut with it
   ok(shut(await folds()) === 'rn:claude', `...a heading pressed shuts its own section alone (${shut(await folds())})`);
   await page.evaluate(() => { closeRename(); renameProject('alpha', 'git'); });
   const chain = await folds();
@@ -2236,22 +2284,24 @@ await page.setViewportSize({ width: 1280, height: 800 });
 {
   const A = '.doc .projtab .pcard[data-row="alpha"]', G = '.doc .projtab .pcard[data-row="gamma"]';
   if (!await page.$eval(A, c => c.classList.contains('flipped'))) await page.click(`${A} .pcfront [data-pedit]`);
-  await page.waitForTimeout(500);
+  await turned(A);
   await page.click(`${A} .pcback [data-pgroup]`);
   await page.waitForSelector(`${A} .askline input`, { timeout: 5000 });
   await page.evaluate(g => document.querySelector(g)?.scrollIntoView({ block: 'center' }), G);
   await page.click(`${G} .pcfront [data-pedit]`);
-  await page.waitForTimeout(600);
+  await page.waitForFunction(([a, g]) => !document.querySelector(a).classList.contains('flipped') && document.querySelector(g).classList.contains('flipped')
+    && !document.querySelector(`${a} .askline`) && pjEditing.size === 1, [A, G], { timeout: 10000 }).catch(() => {});
+  await turned(G);
   const one = await page.evaluate(([a, g]) => ({ alpha: document.querySelector(a).classList.contains('flipped'),
     gamma: document.querySelector(g).classList.contains('flipped'), box: !!document.querySelector(`${a} .askline`),
     open: [...pjEditing] }), [A, G]);
   ok(!one.alpha && one.gamma && !one.box && one.open.length === 1,
      `Edit on another card turns the one in Edit back, its open box canceled, so one card is on its back at a time (${JSON.stringify(one)})`);
   await page.click(`${G} .pcback [data-pedit]`);
-  await page.waitForTimeout(500);
+  await turned(G, false);
   await page.evaluate(a => document.querySelector(a)?.scrollIntoView({ block: 'center' }), A);
   await page.click(`${A} .pcfront [data-pedit]`);
-  await page.waitForTimeout(500);
+  await turned(A);
 }
 // A card that moves slides there, the rest closing up, and the page follows
 // the one pressed on (the operator, 26 Oct): the last card pinned moves up
@@ -2261,8 +2311,10 @@ await page.setViewportSize({ width: 1280, height: 800 });
   const last = await page.evaluate(() => { const g = document.querySelector('.doc .projtab #pjGrid > .pgrid');
     const cs = [...g.querySelectorAll('.pcard[data-pkey]')].filter(c => c.querySelector('.pcfront [data-pmark]:not(.on)'));
     const c = cs[cs.length - 1]; c.scrollIntoView({ block: 'end' }); return c.dataset.pkey; });
-  await page.waitForTimeout(400);
   const sel = `.doc .projtab .pcard[data-pkey="${last}"]`;
+  // The page at this height and the card's pin on the screen.
+  await page.waitForFunction(s => { const r = document.querySelector(s)?.querySelector('.pcfront [data-pmark]')?.getBoundingClientRect();
+    return innerHeight === 600 && !!r && r.top >= 0 && r.bottom <= innerHeight; }, sel, { timeout: 10000 }).catch(() => {});
   await page.click(`${sel} .pcfront [data-pmark]`);
   const r = await page.waitForFunction(s => {
     const c = document.querySelector(s); if (!c) return null;
@@ -2271,11 +2323,18 @@ await page.setViewportSize({ width: 1280, height: 800 });
     const slid = [...document.querySelectorAll('.doc .projtab .pcard')].some(x => x.getAnimations().some(a => /translate/.test(JSON.stringify(a.effect?.getKeyframes?.() || []))));
     return first ? { first, slid } : null;
   }, sel, { timeout: 10000 }).then(h => h.jsonValue()).catch(() => null);
-  await page.waitForTimeout(1200);
+  // Its slide over, since while it slides it is drawn where it left, and
+  // the page come to it where it landed.
+  await page.waitForFunction(s => { const c = document.querySelector(s);
+    if (!c || c.getAnimations().length) return false;
+    const r = c.getBoundingClientRect(), d = c.closest('.doc').getBoundingClientRect(); return r.top >= d.top - 2 && r.bottom <= d.bottom + 2; }, sel, { timeout: 10000 }).catch(() => {});
   const seen = await page.$eval(sel, c => { const r = c.getBoundingClientRect(), d = c.closest('.doc').getBoundingClientRect(); return r.top >= d.top - 2 && r.bottom <= d.bottom + 2; });
   ok(r?.first && r?.slid && seen, `a card pinned from the foot slides up among the pinned, the others with it, and the page follows it there (${JSON.stringify({ ...r, seen })})`);
   await page.click(`${sel} .pcfront [data-pmark]`);
-  await page.waitForTimeout(800);
+  // Unpinned again, and no card still sliding back.
+  await page.waitForFunction(s => { const c = document.querySelector(s);
+    return !!c && !c.querySelector('.pcfront [data-pmark].on') && ![...document.querySelectorAll('.doc .projtab .pcard')]
+      .some(x => x.getAnimations().some(a => /translate/.test(JSON.stringify(a.effect?.getKeyframes?.() || [])))); }, sel, { timeout: 10000 }).catch(() => {});
   await page.setViewportSize({ width: 1280, height: 800 });
 }
 // Leaving the page turns a card back: Projects comes back on the fronts.
@@ -2520,13 +2579,18 @@ execFileSync('rm', ['-rf', `${DIR}/ws/.trash`]);
      `changing the scheme crossfades rather than cutting to it (${swap.eased} while swapping)`);
   await page.waitForFunction(() =>
     !document.documentElement.classList.contains('theming'), null, { timeout: 5000 });
+  // The new scheme's color in, looked for rather than read the moment the
+  // class goes: what was read then was once the old color still (the gate
+  // of 14 Nov, under load), and the check now says what it read.
+  await page.waitForFunction(w => getComputedStyle(document.body).backgroundColor !== w, was, { timeout: 5000 }).catch(() => {});
   const done = await bg();
-  ok(done !== was && /^0s?/.test(await page.$eval('body', b => getComputedStyle(b).transitionDuration)),
-     '...and the transition is taken back off, so nothing else on the page drags');
+  const eased = await page.$eval('body', b => getComputedStyle(b).transitionDuration);
+  ok(done !== was && /^0s?/.test(eased),
+     `...and the transition is taken back off, so nothing else on the page drags (${was} to ${done}, ${eased})`);
   // Reduced motion gets the swap and none of the fade.
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.evaluate(() => applyTheme('default'));
-  await page.waitForTimeout(60);
+  await quiet(60);   // well inside the 320ms a crossfade that did start would still be on
   ok(await bg() === was && !(await page.evaluate(() =>
        document.documentElement.classList.contains('theming'))),
      '...and reduced motion lands on the new scheme at once');
@@ -2541,7 +2605,10 @@ execFileSync('rm', ['-rf', `${DIR}/ws/.trash`]);
 // a 2px gray square in Arial beside a page of sunk monospace fields.
 {
   await page.click('#bCards');
-  await page.waitForTimeout(400);
+  // The gear's menu come to rest, open or shut as the press left it.
+  await page.waitForFunction(() => { const m = document.getElementById('uiMenu');
+    return !m.getAnimations().length && m.hidden === (document.getElementById('bCards').getAttribute('aria-expanded') !== 'true'); },
+    null, { timeout: 10000 }).catch(() => {});
   const odd = await page.evaluate(() => {
     // Every dialog at once, so this sees the fields that live inside them.
     // What was hidden is put back hidden afterwards, ALL of it: only the
@@ -2580,7 +2647,9 @@ execFileSync('rm', ['-rf', `${DIR}/ws/.trash`]);
     .find(x => /^Terminal$/.test(x.textContent.trim())); b && b.click(); });
   // A terminal in the dock, in front (R218 step 4).
   await page.evaluate(() => { const t = tabs.find(x => x.kind === 'term'); if (t) dockShow(t.id); });
-  await page.waitForTimeout(400);
+  // The terminal the dock's, and drawn.
+  await page.waitForFunction(() => { const t = tabs.find(x => x.kind === 'term');
+    return !!t && panes[1] === t.id && [...TERMS.values()].some(r => r.el.isConnected && r.term); }, null, { timeout: 10000 }).catch(() => {});
   const foot = await page.evaluate(() => {
     const bar = document.querySelector('.mobar'), panes = document.querySelector('.panes'), col = panes?.closest('.col');
     return { band: !!bar && bar.getBoundingClientRect().height > 0,
@@ -2640,6 +2709,9 @@ execFileSync('rm', ['-rf', `${DIR}/ws/.trash`]);
   await page.click('.settingstab #logApply');
   await page.waitForFunction(() => document.querySelector('#logApply')?.textContent.trim() === 'Apply' && !('logDays' in (settingsDraft || {})),
                              { timeout: 10000 });
+  // The crop is the server's, in the request Apply sent: looked for until
+  // it is done, since the button reads Apply again a moment before.
+  await until(() => !existsSync(`${LD}/docker.log.2`), 10000);
   ok(!existsSync(`${LD}/docker.log.2`),
      'Apply crops what the new number already excludes, then and there');
   // ...the 3 saved and read back first: 30 typed over a page still holding
@@ -2837,7 +2909,9 @@ await api('/api/pin', { name: 'lx-free', pinned: false });
   await page.selectOption('#rmModel', 'sonnet');
   await page.selectOption('#rmEffort', 'high');
   await page.evaluate(() => refresh());
-  await page.waitForTimeout(600);
+  // No read still out, so the card is drawn again from the one just asked for.
+  await page.waitForFunction(() => !refreshBusy && !!document.querySelector('#rmModel') && !!document.querySelector('#rmEffort'),
+    null, { timeout: 10000 }).catch(() => {});
   ok(await page.$eval('#rmModel', e => e.value) === 'sonnet' && await page.$eval('#rmEffort', e => e.value) === 'high',
      '...and a poll redrawing the card keeps the step and the picks');
   await page.click('#resumemenu [data-start]');
@@ -2959,7 +3033,10 @@ await api('/api/pin', { name: 'lx-free', pinned: false });
     // An XL phone, 449 wide: under 420 the two fields are one column.
     await page.setViewportSize({ width: 449, height: 900 });
     await page.evaluate(() => openProjectsTab());
-    await page.waitForTimeout(600);
+    await atWidth(449);
+    // alpha's card on show with its Claude button, which the menu is hosted by.
+    await page.waitForFunction(() => [...document.querySelectorAll('.doc.on .projtab .pcard[data-row="alpha"] [data-c="alpha"]')]
+      .some(x => x.offsetParent !== null), null, { timeout: 15000 }).catch(() => {});
     const fit = await page.evaluate(() => {
       // Hosted where the page hosts it, the pane, as placeResumeMenu does.
       resumeFor = 'alpha';
@@ -2981,7 +3058,7 @@ await api('/api/pin', { name: 'lx-free', pinned: false });
       return out;
     });
     await page.setViewportSize(desk);
-    await page.waitForTimeout(300);
+    await atWidth(desk.width);
     ok(fit.model && fit.menu > 0 && fit.far <= fit.menu && fit.menu <= fit.w && fit.go > 0 && fit.go <= fit.w,
        `on a phone the Restart step stays on the screen, its Restart too (${JSON.stringify(fit)})`);
   }
@@ -3103,7 +3180,7 @@ await api('/api/pin', { name: 'lx-free', pinned: false });
   await page.waitForFunction(() => document.getElementById('rnmodal').hasAttribute('hidden'), null, { timeout: 5000 });
   await page.evaluate(() => renameProject('alpha'));
   await page.waitForFunction(s => document.querySelector(s)?.classList.contains('scrolldown'), box, { timeout: 10000 });
-  await page.waitForTimeout(200);
+  await quiet(200);   // time for it to have gone back to where it was left
   const c = await cls();
   ok(c.top === 0 && !c.up, `...and opened again it is back at its top, not where it was left (${c.top})`);
   await page.evaluate(() => closeRename());
@@ -3137,10 +3214,13 @@ for (const [addr, reads] of [['#/people/users', ['/api/users', '/api/roles']],
     seen.push({ path: u.pathname + u.search, at: Date.now() }); };
   const onRes = r => { if (r.request() === statusReq && statusAt === Infinity) statusAt = Date.now(); };
   // The page before it quiet first: what its own open asked for is its own.
-  await page.waitForTimeout(1500);
+  await settled(page, { quiet: 400, cap: 8000 });
   page.on('request', onReq); page.on('response', onRes);
   await page.reload(); await ready(page);
-  await page.waitForTimeout(1500);
+  // Each read asked for, then the page's requests at rest and nothing new
+  // asked: a second ask of one would be among them.
+  await until(() => reads.every(u => seen.some(x => x.path === u)), 15000);
+  await settled(page, { quiet: 500, cap: 8000 });
   page.off('request', onReq); page.off('response', onRes);
   const got = reads.map(u => ({ u, n: seen.filter(x => x.path === u).length, early: seen.some(x => x.path === u && x.at <= statusAt) }));
   const twice = got.filter(g => g.n > 1).map(g => g.u);

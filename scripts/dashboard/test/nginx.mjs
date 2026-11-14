@@ -430,6 +430,11 @@ ok(two.ok && two.deployed && /location \/relay\/ \{ proxy_pass http:\/\/127\.0\.
      `...and so are its env and its name (${(envSet.error || 'saved').slice(0, 50)})`);
   await page.evaluate(() => openDocker());
   await page.waitForSelector('.dmtab .row[data-inst="nginx-sandbox|main"]', { timeout: 20000 });
+  // ...and the list the row was drawn from in hand, as it is for a person
+  // who sees the row: the dialog reads who manages the container from it
+  // once, as it opens, and opened while a re-read had the list put away it
+  // found no row and never locked (B810).
+  await page.waitForFunction(() => (dockerList?.instances || []).some(d => d.project === 'nginx-sandbox' && d.instance === 'main'), null, { timeout: 20000 }).catch(() => {});
   await page.evaluate(() => openEditContainer('nginx-sandbox'));
   await page.waitForSelector('#cmodal:not([hidden])');
   // Locked once its own read has landed, which the dialog opens before: read

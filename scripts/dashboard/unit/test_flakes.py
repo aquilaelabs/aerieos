@@ -122,11 +122,29 @@ class Wired(unittest.TestCase):
     def test_the_gate_fails_on_one_and_the_tags_gate_does_not_read_them(self):
         pre = self.read("scripts", "lib", "preflight.sh")
         at = pre.index('flk="$(python3 "$BB_LIB/flakes.py" of-log "$rl"')
-        self.assertIn("rc=1", pre[at:at + 600])
-        self.assertIn("flaky in this gate", pre[at:at + 600])
+        gate = pre[at:pre.index("    local c\n", at)]
+        self.assertIn("rc=1", gate)
+        self.assertIn("flaky in this gate", gate)
         for wf in ("dashboard.yml", "build-image.yml", "lint.yml"):
             self.assertNotIn("flakes.py", self.read(".github", "workflows", wf), wf)
         self.assertIn('python3 "$BB_LIB/flakes.py" list --file "${BB_REPO:-$PWD}/.bb-map/flakes.tsv"', self.read("scripts", "aerie"))
+
+    def test_a_harness_change_fails_only_on_a_flake_the_change_itself_touches(self):
+        # The operator, 14 Nov: when every suite runs only because lib.mjs
+        # or run.sh changed, a flake in a suite the change does not touch by
+        # itself is recorded and named, and does not fail the gate.
+        pre = self.read("scripts", "lib", "preflight.sh")
+        self.assertIn("scripts/dashboard/test/lib.mjs|scripts/dashboard/test/run.sh) all_dash=1; harness=1 ;;", pre)
+        self.assertIn('touched=("${suites[@]}")', pre)
+        self.assertIn("harness_only=1", pre)
+        at = pre.index('if [ -n "$flk" ] && [ -n "$harness_only" ]; then')
+        block = pre[at:pre.index("    local c\n", at)]
+        self.assertIn('case " ${touched[*]:-} " in *" $x "*) fk="$fk $x" ;; *) fo="$fo $x" ;; esac', block)
+        self.assertIn("NOTE  flaky, recorded and not failed", block)
+        self.assertIn('flk="${fk# }"', block)
+        # server.py with nothing to place it by reaches every suite itself: strict.
+        self.assertIn("|| { all_dash=1; whole=1; } ;;", pre)
+        self.assertIn('if [ -n "$whole" ] || { [ -n "$all_dash" ] && [ -z "$harness" ]; }; then', pre)
 
     def test_the_count_is_read_on_the_machine_the_runs_were_on(self):
         # A session's verbs go to the controller unless they are named as

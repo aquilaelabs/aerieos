@@ -544,7 +544,7 @@ QUEUE
     # three choosing their own at one moment could choose the same; their
     # output in the order they were asked for.
     local again_failed=() at_once="${BB_TEST_RERUNS_AT_ONCE:-3}" j k
-    local rports=() rlogs=() rpids=()
+    local rports=() rlogs=() rpids=() beside=()
     case "$at_once" in ''|*[!0-9]*|0) at_once=3 ;; esac
     if [ "${#failed[@]}" -gt 0 ]; then
         mapfile -t rports < <(free_ports "${#failed[@]}")
@@ -565,12 +565,25 @@ QUEUE
             if wait "${rpids[k]}"; then
                 flaky+=("$(basename "${t%.mjs}").mjs")
             else
-                again_failed+=("$(basename "${t%.mjs}").mjs")
-                rc=1
+                beside+=("$t")
             fi
         done
     done
     WORKER_PIDS=()
+    # One that failed again beside two other reruns has not yet failed by
+    # itself, which is what "failed again alone" says: templates did, on a
+    # page slow to land, and passed twice running with the box to itself
+    # (14 Nov). So those are run once more, one at a time, and only one
+    # that fails then is a failure.
+    for t in "${beside[@]}"; do
+        log "$(basename "${t%.mjs}").mjs failed again beside the other reruns: once more, by itself"
+        if BB_TEST_WORKER=again BB_TEST_AGAIN=1 bash "$0" "$t"; then
+            flaky+=("$(basename "${t%.mjs}").mjs")
+        else
+            again_failed+=("$(basename "${t%.mjs}").mjs")
+            rc=1
+        fi
+    done
     if [ "${#flaky[@]}" -gt 0 ]; then
         warn "flaky: ${flaky[*]} failed in the whole run and passed again alone"
         # ...and remembered (R7 step 3): a line each beside the suites'

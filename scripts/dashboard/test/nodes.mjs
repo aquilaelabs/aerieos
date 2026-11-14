@@ -795,10 +795,16 @@ m._exec("UPDATE nodes SET agent = ? WHERE id = ?", (json.dumps(ag), "${added.id}
      `...its line holds through bursts and idle polls alike, and breaks only where the node went silent (${JSON.stringify(runsOf)})`);
   // The crosshair: focused, it says the latest sample's value and time, and
   // the arrow keys walk it back.
-  await page.focus(`${ROW} .ndcharts .chart .carea`);
-  const tip = await page.$eval(`${ROW} .ndcharts .chart .ctip`, t => ({ hidden: t.hidden, text: t.textContent }));
-  await page.keyboard.press('ArrowLeft');
-  const hair = await page.$eval(`${ROW} .ndcharts .chart .chair`, h => !h.hidden);
+  // Again when the node's next sample drew the chart anew between the
+  // focus and the key: the key then went to no chart, and the hair of the
+  // new one is not out (the gate of 14 Nov, under load).
+  let tip = { hidden: true, text: '' }, hair = false;
+  for (let i = 0; i < 5 && !hair; i++){
+    await page.focus(`${ROW} .ndcharts .chart .carea`);
+    tip = await page.$eval(`${ROW} .ndcharts .chart .ctip`, t => ({ hidden: t.hidden, text: t.textContent }));
+    await page.keyboard.press('ArrowLeft');
+    hair = await page.$eval(`${ROW} .ndcharts .chart .chair`, h => !h.hidden).catch(() => false);
+  }
   ok(!tip.hidden && /^\d+% \d{1,2}:\d{2}/.test(tip.text) && hair,
      `...and focused, its crosshair says the value and the time, the arrow keys moving it (${tip.text})`);
   await page.evaluate(() => document.activeElement?.blur());

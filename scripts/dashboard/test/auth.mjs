@@ -1078,8 +1078,11 @@ ${code}`], { encoding: 'utf8' }).trim();
   ok(await page.$eval('.userstab #ueEmail', e => e.value) === 'tab@example.invalid',
      '...and what is typed survives the roles fields being drawn again');
   await page.click('.userstab #ueSave');
-  await page.waitForFunction(async () => (await (await fetch('/api/roles')).json()).people
-    .find(p => p.name === 'tabmade')?.project_roles?.alpha?.includes('reader'), null, { timeout: 15000 });
+  // By the space's key, as the page's own fields name it: asked by its
+  // folder's name this never came true, which nothing noticed while a wait
+  // on a Promise waited for nothing.
+  await page.waitForFunction(async k => (await (await fetch('/api/roles')).json()).people
+    .find(p => p.name === 'tabmade')?.project_roles?.[k]?.includes('reader'), projectKey('alpha'), { timeout: 15000 });
   ok(true, 'its one Save puts it on alpha with a role there');
   // Only its roles changed, and the account is read again all the same: not
   // left unsaved, its header and row saying what it holds (B33).

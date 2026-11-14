@@ -137,7 +137,15 @@ await page.setViewportSize({ width: 1280, height: 1000 });
 {
   // Home links to the page about to be renamed: the rename moves the link.
   const h = await api(`/api/wiki?project=${P}&page=Home`);
+  // The view reads the wiki again when a page of it is saved, and draws
+  // itself again at the desk's width just set: both over before the box is
+  // asked for, since a redraw under it takes the box and what was typed
+  // (under load one landed between the typing and Enter, and nothing was
+  // renamed: the gate of 14 Nov).
+  const reread = page.waitForResponse(r => /\/api\/wiki\b/.test(r.url()) && r.request().method() === 'GET', { timeout: 10000 }).catch(() => {});
   await api('/api/wiki', { project: P, action: 'save', name: 'Home', text: 'See [[Build and test]].', base: h.rev });
+  await reread;
+  await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
   const nd = page.dialogs.length;
   await page.click(`${NB} #wkRename`);
   await page.waitForSelector(`${NB} .askline input`, { timeout: 5000 });

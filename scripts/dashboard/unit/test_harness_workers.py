@@ -67,6 +67,10 @@ class Reruns(unittest.TestCase):
         self.assertIn('if wait "${rpids[k]}"; then', block)
         self.assertIn("again_failed+=(", block)
         self.assertIn("rc=1", block)
+        # One that failed beside the other reruns is run once more by itself before it is a failure.
+        self.assertIn('beside+=("$t")', block)
+        self.assertIn('for t in "${beside[@]}"; do', block)
+        self.assertIn("once more, by itself", block)
         # ...and ended with the run if the run is.
         self.assertIn('WORKER_PIDS+=("$!")', block)
 
@@ -79,6 +83,18 @@ class InFlight(unittest.TestCase):
         self.assertIn("r.isNavigationRequest() && r.frame() === page.mainFrame()", lib)
         self.assertIn("if (at >= cut) n++;", lib)
         self.assertNotIn("inFlight++", lib, "a count that goes up and down never comes back from a request with no end")
+
+    def test_a_predicate_that_answers_with_a_promise_is_asked_until_it_is_true(self):
+        # Playwright takes the Promise as the answer at its first look
+        # (probed 14 Nov: one call, 23 ms, for a predicate that resolves
+        # false), so a wait on the server's answer written with an async
+        # function waited for nothing; the suites' wrapper asks it itself.
+        with open(os.path.join(HERE, "..", "test", "lib.mjs"), encoding="utf-8") as f:
+            lib = f.read()
+        self.assertIn('args[0].constructor?.name === "AsyncFunction"', lib)
+        self.assertIn("return await (promised ? asked() : real(...args));", lib)
+        self.assertIn("if (await h.evaluate(v => !!v)) return h;", lib)
+        self.assertIn('e.name = "TimeoutError";', lib)
 
 
 if __name__ == "__main__":

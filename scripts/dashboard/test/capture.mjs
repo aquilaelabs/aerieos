@@ -6,6 +6,16 @@
 import { execFileSync, spawnSync, spawn } from 'node:child_process';
 import { existsSync, readFileSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { ok, done, DIR } from './lib.mjs';
+import { createServer } from 'node:net';
+
+// A port the machine says is free, for a small server of a check's own, not
+// a number drawn between 30000 and 50000: beside seven other suites'
+// servers and browsers the draw landed on one in use, the server never came
+// up and every shot said the page did not answer (the gate of 14 Nov).
+const freePort = () => new Promise(res => {
+  const s = createServer();
+  s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => res(p)); });
+});
 
 const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const S = `${DIR}/reel`;
@@ -321,7 +331,7 @@ ok(noVid.status !== 0 && /no such video/.test(noVid.stderr || ''), 'a video that
     + `<script>setTimeout(() => { document.body.innerHTML = "<h1 style='font:48px sans-serif'>late</h1>"; }, ${ms})</script></body>`;
   writeFileSync(`${web}/index.html`, late(700));
   writeFileSync(`${web}/slow.html`, late(20000));
-  const port = 30000 + Math.floor(Math.random() * 20000);
+  const port = await freePort();
   const srv = spawn('python3', ['-m', 'http.server', String(port), '--bind', '127.0.0.1'], { cwd: web, stdio: 'ignore' });
   // Until it answers rather than a fixed 1.2 s, which a loaded box can miss.
   for (let i = 0; i < 150; i++){
@@ -360,7 +370,7 @@ class H(http.server.BaseHTTPRequestHandler):
     def log_message(self, *a): pass
 http.server.HTTPServer(("127.0.0.1", int(sys.argv[1])), H).serve_forever()
 `);
-  const port = 30000 + Math.floor(Math.random() * 20000);
+  const port = await freePort();
   const srv = spawn('python3', [`${web}/srv.py`, String(port), log], { stdio: 'ignore' });
   for (let i = 0; i < 150; i++){
     try { if ((await fetch(`http://127.0.0.1:${port}/`)).ok) break; } catch {}

@@ -778,6 +778,11 @@ ok(elsewhere.git_name === 'T. Person',
   await phone.waitForSelector('.profiletab [data-spick="may"]', { timeout: 15000 });
   await phone.click('.profiletab [data-spick="may"]');
   await phone.waitForSelector('.profiletab dl.facts:not(.pghfacts) dd', { timeout: 10000 });
+  // ...and one of them laid out: there in the page while its section was
+  // still opening, none had a height yet and nothing was measured.
+  await phone.waitForFunction(() => [...document.querySelectorAll('.profiletab dl.facts:not(.pghfacts) .fact dd')].some(d => d.offsetHeight)
+    && !document.querySelector('.profiletab')?.getAnimations({ subtree: true }).some(a => a.playState === 'running' && Number.isFinite(a.effect?.getComputedTiming().endTime)),
+    null, { timeout: 10000 }).catch(() => {});
   const xs = await phone.$$eval('.profiletab dl.facts:not(.pghfacts) .fact dd', ds => [...new Set(ds.filter(d => d.offsetHeight)
     .map(d => Math.round(d.getBoundingClientRect().left)))]);
   const over = await phone.evaluate(() => document.documentElement.scrollWidth - innerWidth);

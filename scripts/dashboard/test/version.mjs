@@ -5,7 +5,7 @@
 // allowed, and a bump must not sweep unrelated work into its commit. Both are
 // reachable through `aerie version`, which is the same module the notebook will
 // call, so testing the CLI tests the thing.
-import { launch, newPage, ready, ok, done, sleep, SLOW, tmuxCapture, DIR, URL as DURL, refreshUntil, saveDialog, takeOn, openFold, registerProject, nbGo } from './lib.mjs';
+import { launch, newPage, ready, ok, done, until, quiet, settled, SLOW, tmuxCapture, DIR, URL as DURL, refreshUntil, saveDialog, takeOn, openFold, registerProject, nbGo } from './lib.mjs';
 import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, chmodSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -1101,7 +1101,9 @@ for (let t = 0; t < 30 && !polOpts.length; t++){
   if (polOpts.length) break;
   await page.evaluate(() => openNotebook('beta'));
   await nbGo(page, 'permissions', NB).catch(() => {});
-  await sleep(300);
+  // What the next try reads; a view that never drew them is shown again.
+  await page.waitForFunction(() => [...document.querySelectorAll('#rnGateVersion option')].some(o => o.value !== 'inherit'),
+                             null, { timeout: 3000 }).catch(() => {});
 }
 ok(polOpts.join(",") === "locked,start,patch,minor,open",
    `a space with no version still offers the policy, the one that delegates `
@@ -1127,7 +1129,10 @@ async function initWith(val){
     if (okc) return;
     await page.evaluate(() => openNotebook('beta'));
     await nbGo(page, 'artifacts', NB).catch(() => {});
-    await sleep(300);
+    // What the next try needs, asked from this side: NB is a Playwright
+    // selector. A box that never shows them is shown again.
+    await until(() => page.$eval(`${NB} #verBox`, box =>
+      !!(box.querySelector(".vstart") && box.querySelector("[data-verinit]") && box.offsetParent)), 3000);
   }
   throw new Error("the init control never became usable");
 }
@@ -1160,7 +1165,7 @@ ok(await page.$(`${NB} #verBox .veradd .vdir`) !== null,
 // A starting number is arbitrary (nothing can derive it), so it is the one
 // value here that is typed. Which means it has to be checked.
 await initWith('v1.2');
-await page.waitForTimeout(400);
+await quiet(400);
 ok(!existsSync(`${B}/VERSION`), 'a malformed starting version is refused, not written');
 
 await initWith('0.2.0');
@@ -1190,14 +1195,13 @@ let paneText = "";
 // Ten seconds of 200ms polls on a quiet box, and BB_TEST_SLOW's multiple of
 // that on a busy one: this waits on a fetch the pane makes when it opens, and
 // CI runs it beside everything else this machine does (bug #13).
-for (let t = 0; t < 50 * SLOW; t++){
+await until(async () => {
   paneText = await page.$eval(`${NB} .verlogpane`, e => e.textContent).catch(() => "");
   // The pane's own words (nb-artifacts.js): "here" was never in them, so
   // this polled the whole ten seconds (twenty under BB_TEST_SLOW) every run
   // and then passed on the line below.
-  if (/no CHANGELOG\.md yet/.test(paneText)) break;
-  await sleep(200);
-}
+  return /no CHANGELOG\.md yet/.test(paneText);
+}, 10000, 200);
 ok(/no CHANGELOG\.md yet/.test(paneText),
    'the changelog pane says how to opt in when there is no file');
 // The flake this suite carried for weeks, as a rule instead. The pane used to
@@ -1206,7 +1210,9 @@ ok(/no CHANGELOG\.md yet/.test(paneText),
 // empty one back in the box, and "the changelog pane" was then whichever came
 // first in the document. Repaint under it and count.
 await page.evaluate(() => drawPanes());
-await sleep(400);
+// A repaint that asks for the version again draws the box when the answer
+// lands: counted with the page at rest, and nothing new asked for that long.
+await settled(page, { quiet: 400 });
 const panes = await page.$$eval('.verlogpane', es => es.map(e => ({
   inSheet: !!e.closest('#sheetSlot'), text: e.textContent.slice(0, 40) })));
 ok(panes.length === 1 && panes[0].inSheet && /no CHANGELOG/.test(panes[0].text),
@@ -1262,13 +1268,7 @@ ok(clog.inSheet && clog.tall && !clog.boxed,
   // section would count per band. Index the handles instead.
   const press = async (i, sel) => (await page.$$(`${NB} .clog .clrow`))[i].$eval(
     sel, el => el.click());
-  const settled = async want => {
-    for (let n = 0; n < 50 * SLOW; n++){
-      if (await shape() === want) return true;
-      await sleep(100);
-    }
-    return false;
-  };
+  const settled = want => until(async () => await shape() === want, 10000, 100);
 
   let rs = await shown();
   ok(rs.length === 4
@@ -1293,16 +1293,14 @@ ok(clog.inSheet && clog.tall && !clog.boxed,
 
   // The other half of the arrangement: the band itself moves.
   await page.$$eval(`${NB} .clog .clgroup [data-cmv="up"]`, bs => bs[bs.length - 1].click());
-  for (let n = 0; n < 50 * SLOW && (await cats()).join('|') !== 'Added|Fixed'; n++)
-    await sleep(100);
+  await until(async () => (await cats()).join('|') === 'Added|Fixed', 10000, 100);
   ok((await cats()).join('|') === 'Added|Fixed',
      `a category moves up and down the section on its own row (${(await cats()).join(', ')})`);
 
   // Rename: the entries under it follow, because the name IS where they sit.
   await page.$eval(`${NB} .clog .clname`, i => {
     i.value = 'Shipped'; i.dispatchEvent(new Event('change', { bubbles: true })); });
-  for (let n = 0; n < 50 * SLOW && !(await cats()).includes('Shipped'); n++)
-    await sleep(100);
+  await until(async () => (await shown()).filter(r => r.cat === 'Shipped').length === 2, 10000, 100);
   ok((await shown()).filter(r => r.cat === 'Shipped').length === 2,
      `renaming a category carries its entries with it (${(await cats()).join(', ')})`);
 
@@ -1310,15 +1308,12 @@ ok(clog.inSheet && clog.tall && !clog.boxed,
   const loose = await at('loose');
   await (await page.$$(`${NB} .clog .clrow`))[loose].$eval('.clcat', el => {
     el.value = 'Shipped'; el.dispatchEvent(new Event('change', { bubbles: true })); });
-  for (let n = 0; n < 50 * SLOW; n++){
-    if ((await shown()).every(r => r.cat)) break;
-    await sleep(100);
-  }
+  await until(async () => (await shown()).find(r => r.text === 'a loose note')?.cat === 'Shipped', 10000, 100);
   ok((await shown()).find(r => r.text === 'a loose note')?.cat === 'Shipped',
      `an uncategorised line is filed from its own row (${await shape()})`);
 
   await press(await at('another fix'), '[data-erm]');
-  for (let n = 0; n < 50 * SLOW && (await shown()).length !== 3; n++) await sleep(100);
+  await until(async () => (await shown()).length === 3, 10000, 100);
   ok(!(await shown()).some(r => r.text === 'another fix'),
      `a line that stopped being true is dropped from the section (${await shape()})`);
 
@@ -1330,11 +1325,8 @@ ok(clog.inSheet && clog.tall && !clog.boxed,
 
   const arranged = await shape();
   await page.click(`${NB} .clog #clSave`);
-  for (let n = 0; n < 100 * SLOW; n++){
-    const s = await page.$eval(`${NB} #clState`, e => e.textContent).catch(() => '');
-    if (/saved/.test(s)) break;
-    await sleep(100);
-  }
+  await until(async () => /saved/.test(
+    await page.$eval(`${NB} #clState`, e => e.textContent).catch(() => '')), 20000, 100);
   const written = readFileSync(CL, 'utf8');
   ok(/## Unreleased\n\n### Shipped\n\n- a new tab \(ddddddd\)\n- a loose note \(aaaaaaa\)\n\n### Fixed\n\n- pairing works again \(bbbbbbb\)\n/
        .test(written),
@@ -1394,14 +1386,24 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
   // have something long enough to wrap.
   {
     await page.setViewportSize({ width: 393, height: 851 });
-        await sleep(600);
+    // The page draws for a width in the frame after it changes: the
+    // breakpoint's listeners first, then the boxes that fit themselves to
+    // their width. Two frames on, both have run.
+    await page.waitForFunction(() => innerWidth === 393 && matchMedia('(max-width:900px)').matches,
+                               null, { timeout: 10000 }).catch(() => {});
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
     const long = 'A minor version moves the compatibility window, so every '
       + "space bound to a node is held until that node's agent is updated, "
       + "and the sessions running on it end when the bump lands";
     await page.$eval(`${NB} .clog .clrow textarea.cltext`, (ta, v) => {
       ta.value = v; ta.dispatchEvent(new Event('input', { bubbles: true }));
     }, long);
-    await sleep(300);
+    // The box has grown to the words: what the check below measures.
+    await until(() => page.$eval(`${NB} .clog .clrow textarea.cltext`, (ta, v) => {
+      const cs = getComputedStyle(ta);
+      return ta.value === v && cs.whiteSpace === 'pre-wrap' && ta.scrollHeight <= ta.clientHeight + 2
+        && Math.round(ta.getBoundingClientRect().height / (parseFloat(cs.lineHeight) || 16)) > 3;
+    }, long), 10000);
     const shape = await page.$eval(`${NB} .clog`, el => {
       const ta = el.querySelector('.clrow textarea.cltext');
       const head = el.querySelector('.clhead input.clname');
@@ -1426,7 +1428,10 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
        `a category reads as a heading, not as another field the size of an entry (${
          JSON.stringify({bold: shape.headBold, unpainted: shape.headPlain})})`);
     await page.setViewportSize({ width: 1280, height: 1000 });
-        await sleep(400);
+    // Back at a desk, and drawn for it, before the sheet is closed.
+    await page.waitForFunction(() => innerWidth === 1280 && !matchMedia('(max-width:900px)').matches,
+                               null, { timeout: 10000 }).catch(() => {});
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
   }
   await page.click(`${NB} #sheetClose`);
 }
@@ -1661,7 +1666,11 @@ ok((await page.errors).every(e => /400/.test(e)),
      `a draft says on its row what keeps it from being published, and only what the box cannot put right stops the press (${JSON.stringify(held).slice(0, 200)})`);
   await page.fill(`${LNB} #verDrafts [data-draft="v9.9.9"] textarea`, 'corrected');
   await page.click(`${LNB} #verDrafts [data-draft="v9.9.9"] [data-draftpub]`);
-  await page.waitForTimeout(1500);
+  // The press is asked, and over: the page reads the drafts again once it
+  // is answered, from the stub while the route stands, so the box holds the
+  // stub's notes once more.
+  await until(async () => asked.some(a => a.action === 'release-publish' && a.tag === 'v9.9.9' && a.notes === 'corrected')
+    && await page.$eval(`${LNB} #verDrafts [data-draft="v9.9.9"] textarea`, t => t.value === 'whole'), 20000);
   ok(asked.some(a => a.action === 'release-publish' && a.tag === 'v9.9.9' && a.notes === 'corrected'),
      `Publish sends the notes as they stand in the box (${JSON.stringify(asked).slice(0, 120)})`);
   await page.unroute('**/api/version');

@@ -230,9 +230,42 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
       let tries = 0;
       const budget = () => (typeof args[args.length - 1]?.timeout === "number" ? args[args.length - 1].timeout : patience(30000));
       const busy = () => inFlight() > 0 || os.loadavg()[0] >= os.cpus().length;
+      // A predicate that answers with a Promise (an async function, or one
+      // that returns new Promise) is not asked again by Playwright: the
+      // Promise is its answer at the first look, whatever it resolves to
+      // (measured 14 Nov: one call and 23 ms for a predicate that resolves
+      // false). Twelve waits on the server's answer and two suites' own
+      // "at rest" helpers were written that way and waited for nothing. So
+      // such a predicate is asked from here, its answer awaited each time,
+      // until it is true or the budget is spent; a page that navigates
+      // under it is asked again, as Playwright's own wait would be.
+      const promised = m === "waitForFunction" && typeof args[0] === "function"
+        && (args[0].constructor?.name === "AsyncFunction" || /new Promise|\bawait\b|\.then\(/.test(String(args[0])));
+      const asked = async () => {
+        const o = args.length >= 3 && args[2] && typeof args[2] === "object" ? args[2] : {};
+        const every = typeof o.polling === "number" ? o.polling : 100;
+        const end = Date.now() + budget();
+        for (;;){
+          let h = null;
+          try {
+            h = await page.evaluateHandle(args[0], args[1]);
+            if (await h.evaluate(v => !!v)) return h;
+          } catch (e) {
+            if (!/context was destroyed|navigation|Target .*closed|frame was detached/i.test(String(e))) throw e;
+            if (/Target .*closed/i.test(String(e))) throw e;
+          }
+          if (h) await h.dispose().catch(() => {});
+          if (Date.now() >= end){
+            const e = new Error(`page.waitForFunction: Timeout ${budget()}ms exceeded.`);
+            e.name = "TimeoutError";
+            throw e;
+          }
+          await sleep(every);
+        }
+      };
       try {
         for (;;){
-          try { return await real(...args); }
+          try { return await (promised ? asked() : real(...args)); }
           catch (e) {
             if (!/Timeout .*exceeded/.test(String(e)) || ++tries >= 3 || !busy()) throw e;
             console.log(`[wait] ran out after ${budget()}ms with ${inFlight()} request(s) in flight and a load of ${
