@@ -92,8 +92,19 @@ class Relay(unittest.TestCase):
         self.assertEqual(os.stat(self.key).st_mode & 0o777, 0o600)
         self.assertEqual(relaytls.cert(self.d), (self.crt, self.key, self.pin), "a second start reads the one it has")
         self.assertEqual(relaytls.fingerprint(os.path.join(self.d, "nothing.crt")), "")
+        # Made by itself whichever of the two a machine has, so nobody has to do anything on a node.
         with mock.patch.object(relaytls.subprocess, "run", side_effect=OSError("no openssl")):
-            self.assertEqual(relaytls.cert(os.path.join(self.d, "elsewhere")), ("", "", ""), "no openssl: no certificate, and the relay stays plain")
+            by_library = relaytls.cert(os.path.join(self.d, "library"))
+        self.assertTrue(by_library[2].startswith("sha256:"), "the cryptography library alone makes it")
+        self.assertEqual(os.stat(by_library[1]).st_mode & 0o777, 0o600)
+        relaytls.server_context(by_library[0], by_library[1])
+        with mock.patch.object(relaytls, "_made_by_library", lambda crt, key: False):
+            by_openssl = relaytls.cert(os.path.join(self.d, "openssl"))
+        self.assertTrue(by_openssl[2].startswith("sha256:"), "openssl alone makes it")
+        relaytls.server_context(by_openssl[0], by_openssl[1])
+        with mock.patch.object(relaytls, "_made_by_library", lambda crt, key: False), \
+                mock.patch.object(relaytls.subprocess, "run", side_effect=OSError("no openssl")):
+            self.assertEqual(relaytls.cert(os.path.join(self.d, "elsewhere")), ("", "", ""), "neither: no certificate, and the relay stays plain")
 
     def test_a_signed_request_is_served_over_tls_and_once(self):
         # Signed, with a value of its own: past the checks (no terminal programs here, so it says that).

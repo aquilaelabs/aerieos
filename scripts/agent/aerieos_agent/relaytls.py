@@ -6,9 +6,9 @@ connection that carries bytes between the encrypted socket and one end of
 a local pair, and the other end of the pair is what the existing code is
 handed.
 
-The node's side makes itself a certificate once (cert: openssl's command
-line, since this package is the standard library alone and ssl cannot make
-one) and says its sha256 in the hello; the controller's side refuses any
+The node's side makes itself a certificate once (cert: by the cryptography
+library where the node has it, else openssl's command line, since ssl
+cannot make one) and says its sha256 in the hello; the controller's side refuses any
 certificate but that one (connect: the pin), so nobody between them can take
 the TLS off. Shared by both ends: the controller loads this file from the
 agent's package, as it does term.py.
@@ -71,28 +71,65 @@ def fingerprint(cert_pem_path):
     return "sha256:" + hashlib.sha256(der).hexdigest()
 
 
+def _made_by_library(crt, key):
+    """The pair written by the cryptography library, which a node has for
+    sealing sign-ins: True when it did. Nothing to install, nothing to run."""
+    try:
+        import datetime
+        from cryptography import x509
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from cryptography.x509.oid import NameOID
+    except ImportError:
+        return False
+    k = ec.generate_private_key(ec.SECP256R1())
+    who = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "aerieos-node-relay")])
+    now = datetime.datetime.now(datetime.timezone.utc)
+    c = (x509.CertificateBuilder().subject_name(who).issuer_name(who).public_key(k.public_key())
+         .serial_number(x509.random_serial_number()).not_valid_before(now - datetime.timedelta(days=1))
+         .not_valid_after(now + datetime.timedelta(days=3650)).sign(k, hashes.SHA256()))
+    with open(key, "wb") as f:
+        f.write(k.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
+    with open(crt, "wb") as f:
+        f.write(c.public_bytes(serialization.Encoding.PEM))
+    return True
+
+
+def _made_by_openssl(crt, key):
+    """The pair written by openssl's command line, where the library is not on the machine."""
+    p = subprocess.run(["openssl", "req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1",
+                        "-nodes", "-days", "3650", "-subj", "/CN=aerieos-node-relay", "-keyout", key, "-out", crt],
+                       capture_output=True, timeout=60, check=False)
+    return p.returncode == 0
+
+
 def cert(folder, name="relay"):
     """The node's own certificate and key in `folder` (made once, P-256,
-    self-signed, the key 0600): (cert path, key path, fingerprint), or
-    ("", "", "") where openssl is not on the machine or would not make one,
-    and the relay stays plain."""
+    self-signed, the key 0600): (cert path, key path, fingerprint). Made by
+    itself, with nothing for a person to do: by the cryptography library a
+    node has for sealing sign-ins, else by openssl's command line. ("", "",
+    "") only on a machine with neither, where the relay stays plain."""
     crt, key = os.path.join(folder, f"{name}.crt"), os.path.join(folder, f"{name}.key")
     if not (os.path.isfile(crt) and os.path.isfile(key) and fingerprint(crt)):
         try:
             os.makedirs(folder, exist_ok=True)
             old = os.umask(0o077)
             try:
-                p = subprocess.run(["openssl", "req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1",
-                                    "-nodes", "-days", "3650", "-subj", "/CN=aerieos-node-relay",
-                                    "-keyout", key + ".new", "-out", crt + ".new"],
-                                   capture_output=True, timeout=60, check=False)
+                made = False
+                for make in (_made_by_library, _made_by_openssl):
+                    try:
+                        made = make(crt + ".new", key + ".new")
+                    except (OSError, ValueError, subprocess.SubprocessError):
+                        made = False
+                    if made:
+                        break
             finally:
                 os.umask(old)
-            if p.returncode != 0:
+            if not made:
                 return "", "", ""
             os.replace(key + ".new", key)
             os.replace(crt + ".new", crt)
-        except (OSError, subprocess.SubprocessError):
+        except OSError:
             return "", "", ""
     fp = fingerprint(crt)
     return (crt, key, fp) if fp else ("", "", "")

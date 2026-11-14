@@ -329,7 +329,9 @@ setup_ssh_agent() {
         fi
     done
 
-    added=$((added + $(/opt/aerieos/scripts/deploy-key --load 2>/dev/null || echo 0)))
+    # What the helper says of a key goes to the boot's log (it was thrown
+    # away): a plain one it sealed at this start, one it could not load.
+    added=$((added + $(/opt/aerieos/scripts/deploy-key --load || echo 0)))
 
     # ssh-agent rejects any client whose uid differs from its own (root is the
     # sole exception), so the builder user cannot talk to it directly no matter

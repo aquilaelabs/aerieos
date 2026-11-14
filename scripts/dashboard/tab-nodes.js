@@ -1182,7 +1182,7 @@ function nodeSessNetRow(n){
   const rl = n.reported?.relay;
   const relayLine = !rl ? `<div class="sub warn">Not encrypted yet: this node's agent is from before they were, and takes it up with its next update.</div>`
     : rl.tls ? `<div class="sub">Encrypted, to the certificate this node made for itself and no other. A request to it is good once.</div>`
-    : `<div class="sub warn">Not encrypted: this node could not make itself a certificate (openssl is not on it), so what is typed in a terminal here crosses the network readable.</div>`;
+    : `<div class="sub warn">Not encrypted: this node could not make itself a certificate (it has neither Python's cryptography library nor openssl), so what is typed in a terminal here crosses the network readable.</div>`;
   const ac = n.reported?.session?.accounts || {};
   const acctLine = ac.error ? `<div class="sub bad">Not in force: ${esc(ac.error)}.</div>`
     : ac.users === undefined ? ""

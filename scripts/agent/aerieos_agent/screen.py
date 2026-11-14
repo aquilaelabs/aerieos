@@ -225,8 +225,8 @@ class ScreenRelay:
         crt, key, fp = relaytls.cert(os.path.join(data, "relay"))
         if not fp:
             RELAY["tls"] = ""
-            log_once("relay-tls", "screen: no certificate could be made (is openssl on this machine?), so terminals, "
-                                  "files and VMs' screens cross the network unencrypted")
+            log_once("relay-tls", "screen: no certificate could be made (neither python's cryptography library nor openssl "
+                                  "is on this machine), so terminals, files and VMs' screens cross the network unencrypted")
             return
         try:
             self.tls = relaytls.server_context(crt, key)

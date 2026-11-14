@@ -180,6 +180,13 @@ class Boot(unittest.TestCase):
         pre = f'set -euo pipefail\n. "{SCRIPTS}/lib/common.sh"\n. "{SCRIPTS}/lib/boot.sh"\n'
         return subprocess.run(["bash", "-c", pre + body], capture_output=True, text=True, timeout=60, check=False, env=dict(os.environ, **env))
 
+    def test_what_the_helper_says_at_boot_reaches_the_log(self):
+        # The boot threw its words away, so a key it could not load, or one
+        # it had just sealed, was never said (met on the dev instance's walk).
+        with open(os.path.join(SCRIPTS, "lib", "boot.sh"), encoding="utf-8") as f:
+            line = next(ln for ln in f if "deploy-key --load" in ln and not ln.lstrip().startswith("#"))
+        self.assertNotIn("2>/dev/null", line)
+
     def test_a_key_the_install_made_and_one_from_the_environment(self):
         run, secrets, state = tempfile.mkdtemp(), tempfile.mkdtemp(), tempfile.mkdtemp()
         for d in (run, secrets, state):
