@@ -145,6 +145,10 @@ ok(/already on the Containers page/.test((await api('/api/nginx', { action: 'dep
      `the deployed page is four sections with their states, the route a record with its Edit and no Save, Remove apart, and the certificate form rolled up (${shape.sects.join(' | ')})`);
   await page.click(`${sect} [data-ngcertopen]`);
   await page.waitForFunction(s => !document.querySelector(s + ' .ngcertform').hidden, sect, { timeout: 5000 });
+  // Unrolled, its slide over: the form puts the caret in its first box as
+  // the slide ends, and on a slow machine that landed after the second box
+  // had been typed in and took the caret back from it (the gate of 14 Nov).
+  await page.waitForFunction(() => document.activeElement?.id === 'ngCert', null, { timeout: 10000 }).catch(() => {});
   const asleep = await page.$eval(`${sect} [data-ngcertsave]`, b => b.disabled);
   await page.fill(`${sect} #ngCert`, '-----BEGIN CERTIFICATE-----');
   await page.fill(`${sect} #ngKey`, '-----BEGIN PRIVATE KEY-----');
@@ -170,11 +174,32 @@ ok(/already on the Containers page/.test((await api('/api/nginx', { action: 'dep
 // rebuilds nginx; then the route list is put back as it was.
 // The hostname is made once on the shared list, then picked on the route
 // (the operator, 12 Oct).
+// A hostname half typed survives the page being read and drawn again under
+// it, the caret with it (B809): its box was drawn empty by every re-read,
+// and under load one landed between the typing and the press, so Add added
+// nothing and this waited out its time.
+await page.click(`${sect} [data-nghostnew]`);
+await page.keyboard.type('api.exam');
+await page.evaluate(() => loadNginx());
+await page.evaluate(() => { nginxRev++; drawPanes(); });
+{
+  const half = await page.$eval(`${sect} [data-nghostnew]`, b => b.value);
+  await page.evaluate(() => loadNginx());
+  const at = await page.evaluate(() => document.activeElement?.matches('[data-nghostnew]'));
+  await page.keyboard.type('ple.com');
+  const whole = await page.$eval(`${sect} [data-nghostnew]`, b => b.value);
+  ok(half === 'api.exam' && whole === 'api.example.com',
+     `a hostname being typed is still in its box after the page is read and drawn again, and typing goes on in it (${JSON.stringify({ half, at, whole })})`);
+}
 await page.fill(`${sect} [data-nghostnew]`, 'api.example.com');
 await page.click(`${sect} [data-nghostadd]`);
 await page.waitForFunction(() => (nginxHostnames || []).some(h => h.name === 'api.example.com'), null, { timeout: 15000 });
 await page.waitForSelector(`${sect} .nghost [data-nghostrm="api.example.com"]`, { timeout: 15000 });
-ok(true, 'a hostname added to the list is on it, with Delete while nothing routes it');
+// The row is drawn as the answer lands and the box emptied by the press's
+// own redraw a moment after: waited for, then read.
+await page.waitForFunction(s => document.querySelector(s + ' [data-nghostnew]')?.value === '', sect, { timeout: 5000 }).catch(() => {});
+ok(await page.$eval(`${sect} [data-nghostnew]`, b => b.value === ''),
+   'a hostname added to the list is on it, with Delete while nothing routes it, and the box is empty for the next');
 await page.click(`${sect} [data-ngadd]`);
 const fresh = `${sect} .ngform[data-i="-1"]`;
 await page.waitForSelector(fresh, { timeout: 5000 });

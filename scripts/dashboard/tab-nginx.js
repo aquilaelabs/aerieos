@@ -29,6 +29,7 @@ let nginxLatest = {};             // the registry's newest line, from the same a
 let nginxCertOpen = false;        // Add a certificate pressed: its form unrolled
 let nginxAcmeOpen = false;  // the Let's Encrypt form unrolled (R150)
 let nginxHostnames = [];          // every node's hostnames: [{name, used: [{node, path, port}]}]
+let nginxHostTyped = "";          // a hostname being typed to add, kept across a redraw as the forms are
 // The routes being edited, per node, until Save or Revert; absent while a
 // node shows what is saved.
 const nginxDraft = {};
@@ -185,7 +186,7 @@ function nginxHostLines(){
       h.used.length ? esc([...new Set(h.used.map(u => u.node))].join(", ")) : `<span class="dim">not routed yet</span>`,
       h.used.length ? "" : rmIcon(`data-nghostrm="${esc(h.name)}"`, `delete ${h.name}`)])}</div>`).join("");
   return `${rows ? tblWrap(NG_HOST_COLS, rows, "nghosts") : `<div class="field"><div class="hint">none yet</div></div>`}
-    <div class="field"><div class="actbar"><input data-nghostnew placeholder="www.example.com" aria-label="a hostname to add" autocomplete="off" spellcheck="false">
+    <div class="field"><div class="actbar"><input id="ngHostNew" data-nghostnew value="${esc(nginxHostTyped)}" placeholder="www.example.com" aria-label="a hostname to add" autocomplete="off" spellcheck="false">
       <button type="button" data-nghostadd>Add</button></div></div>`;
 }
 
@@ -468,6 +469,11 @@ function nginxReadDraft(sect, n){
   d.cert = sect.querySelector('#ngCert')?.value || "";
   d.key = sect.querySelector('#ngKey')?.value || "";
   d.certFor = sect.querySelector('[data-ng="certfor"]')?.value.trim() || "";
+  // ...and the hostname being typed to add, which is every node's list's
+  // and no node's draft: a re-read drew its box empty under the typing. The
+  // box is named (its id), so the pane gives it its caret back (typingIn).
+  const typed = sect.querySelector("[data-nghostnew]");
+  if (typed) nginxHostTyped = typed.value;
 }
 
 function wireNginxTab(root){
@@ -536,9 +542,13 @@ function wireNginxTab(root){
     nginxReadDraft(sect, n);
     busy(hostAdd, "Adding");
     await nginxAct({action: "host-add", name});
+    // On the list, the box is empty for the next; refused, what was typed stays.
+    if ((nginxHostnames || []).some(h => h.name === name)) nginxHostTyped = "";
     nginxRedraw();
   };
   if (hostNew) hostNew.onkeydown = e => { if (e.key === "Enter"){ e.preventDefault(); hostAdd.click(); } };
+  // Kept as it is typed, so a redraw from anywhere draws the box as it was.
+  if (hostNew) hostNew.oninput = () => { nginxHostTyped = hostNew.value; };
   sect.querySelectorAll("[data-nghostrm]").forEach(b => b.onclick = async () => {
     nginxReadDraft(sect, n);
     busy(b, "Deleting");
