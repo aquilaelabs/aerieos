@@ -187,6 +187,52 @@ class Boot(unittest.TestCase):
             line = next(ln for ln in f if "deploy-key --load" in ln and not ln.lstrip().startswith("#"))
         self.assertNotIn("2>/dev/null", line)
 
+    def test_the_deploy_keys_are_loaded_once_the_install_key_is_settled(self):
+        # They are sealed under it. Loaded from setup_ssh_agent, which runs
+        # before install_key_file, a new container had no key to open them
+        # with and loaded none (the dev instance, the first rebuild after
+        # its key was sealed): both boots load them after, before the hooks.
+        boot = open(os.path.join(SCRIPTS, "lib", "boot.sh"), encoding="utf-8").read()
+        agent = boot[boot.index("\nsetup_ssh_agent() {"):]
+        agent = agent[:agent.index("\n}\n")]
+        self.assertNotIn("deploy-key --load", "\n".join(ln for ln in agent.splitlines() if not ln.lstrip().startswith("#")))
+        self.assertIn("\nload_deploy_keys() {", boot)
+        for f in ("entrypoint.sh", "host-boot.sh"):
+            text = open(os.path.join(SCRIPTS, f), encoding="utf-8").read()
+            main = text[text.index("main() {"):]
+            calls = [ln.strip() for ln in main[:main.index("\n}\n")].splitlines()
+                     if ln.strip() in ("setup_ssh_agent", "install_key_file", "load_deploy_keys", "run_hooks")]
+            self.assertEqual(calls, ["setup_ssh_agent", "install_key_file", "load_deploy_keys", "run_hooks"], f)
+
+    def test_a_new_containers_boot_opens_a_sealed_key(self):
+        # The same order run for real, on a store of its own: the agent
+        # first, then the key's place written, then the keys loaded.
+        if not HAVE:
+            self.skipTest("ssh's tools and the cryptography library are needed")
+        run_dir, store, secrets = tempfile.mkdtemp(prefix="dk", dir="/tmp"), tempfile.mkdtemp(), tempfile.mkdtemp()
+        for d in (run_dir, store, secrets):
+            self.addCleanup(shutil.rmtree, d, True)
+        sock = os.path.join(run_dir, "ssh-agent.sock")
+        out = subprocess.run(["ssh-agent", "-a", sock], capture_output=True, text=True, check=True).stdout
+        self.addCleanup(subprocess.run, ["kill", out.split("SSH_AGENT_PID=")[1].split(";")[0]], check=False)
+        env = {"BB_RUN_DIR": run_dir, "BB_DEPLOY_KEY_STORE": store, "BB_SECRETS_DIR": secrets, "DASHBOARD_STATE": tempfile.mkdtemp()}
+        self.addCleanup(shutil.rmtree, env["DASHBOARD_STATE"], True)
+        helper = os.path.join(SCRIPTS, "deploy-key")
+        # A first boot settles the key; a key is made while it runs.
+        self.assertEqual(self.sh("BB_ACCOUNT=$(id -un); install_key_made", env).returncode, 0)
+        made = subprocess.run(["bash", helper, "make", "app-deploy"], capture_output=True, text=True, check=False, env=dict(os.environ, **env))
+        self.assertEqual(made.returncode, 0, made.stderr)
+        self.assertEqual(sorted(os.listdir(store)), ["app-deploy.pub", "app-deploy.sealed"])
+        # A new container: nothing of /run from before.
+        subprocess.run(["ssh-add", "-D"], capture_output=True, check=False, env=dict(os.environ, SSH_AUTH_SOCK=sock))
+        os.unlink(os.path.join(run_dir, "install-key.where"))
+        early = subprocess.run(["bash", helper, "--load"], capture_output=True, text=True, check=False, env=dict(os.environ, **env))
+        self.assertEqual(early.stdout.strip(), "0", "before the key's place is written there is nothing to open it with")
+        self.assertIn("this install's key is not here to open it", early.stderr)
+        self.assertEqual(self.sh("BB_ACCOUNT=$(id -un); install_key_made", env).returncode, 0)
+        late = subprocess.run(["bash", helper, "--load"], capture_output=True, text=True, check=False, env=dict(os.environ, **env))
+        self.assertEqual((late.stdout.strip(), late.stderr.strip()), ("1", ""))
+
     def test_a_key_the_install_made_and_one_from_the_environment(self):
         run, secrets, state = tempfile.mkdtemp(), tempfile.mkdtemp(), tempfile.mkdtemp()
         for d in (run, secrets, state):

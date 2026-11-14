@@ -329,9 +329,8 @@ setup_ssh_agent() {
         fi
     done
 
-    # What the helper says of a key goes to the boot's log (it was thrown
-    # away): a plain one it sealed at this start, one it could not load.
-    added=$((added + $(/opt/aerieos/scripts/deploy-key --load || echo 0)))
+    # The deploy keys are loaded by load_deploy_keys, after install_key_file:
+    # they are sealed under the install key, whose place is not settled yet.
 
     # ssh-agent rejects any client whose uid differs from its own (root is the
     # sole exception), so the builder user cannot talk to it directly no matter
@@ -710,6 +709,21 @@ boot_ready() {
 state_gate() {
     python3 /opt/aerieos/scripts/dashboard/stateversion.py check "${DASHBOARD_STATE:-/config}" \
         || die "${DASHBOARD_STATE:-/config} is not one this build may start on; nothing was changed"
+}
+
+# The deploy keys made or pasted in a space's settings, into the agent
+# setup_ssh_agent started: after install_key_file, since they are sealed
+# under the install key (R243) and the helper is told where that is by
+# install_key_file. Loaded from setup_ssh_agent, which runs first, a new
+# container found no key to open them with and loaded none: seen on the dev
+# instance the first time the helper's words reached the log. What the
+# helper says of a key goes to that log: a plain one it sealed at this
+# start, one it could not load.
+load_deploy_keys() {
+    local n
+    [ "$(id -u)" -eq 0 ] && [ -S "$BB_RUN_DIR/ssh-agent.sock" ] || return 0
+    n="$(/opt/aerieos/scripts/deploy-key --load || echo 0)"
+    case "$n" in ''|*[!0-9]*|0) ;; *) log "ssh-agent: ${n} deploy key(s) loaded" ;; esac
 }
 
 # Build the command the boot will exec, honoring the container CMD.
