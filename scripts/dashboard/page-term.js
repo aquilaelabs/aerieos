@@ -589,7 +589,20 @@ function termDrop(key){
   rec.gone = true;
   try{ rec.ws?.close(); }catch(e){ /* gone */ }
   rec.ro?.disconnect();
-  try{ rec.term?.dispose(); }catch(e){ /* gone */ }
+  // Disposed two frames on, not now: xterm runs a frame it had already
+  // asked for (a first draw still pending when a slow start's terminal is
+  // closed) after dispose() and reads a renderer that is gone (B802, the
+  // same "reading 'dimensions'"). Frames run in the order they were asked
+  // for, so the ones it has pending, and the one those ask for, come
+  // first; nothing new reaches it meanwhile, since it is marked gone, its
+  // socket closed and its observer off. A page that draws no frames (a
+  // hidden tab) disposes it by the clock.
+  const term = rec.term;
+  if (!term) return;
+  let done = false;
+  const drop = () => { if (done) return; done = true; try{ term.dispose(); }catch(e){ /* gone */ } };
+  requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(drop, 0)));
+  setTimeout(drop, 1000);
 }
 
 // The keys bar's keys as a keyboard sends them (R133 step 5): a table, as

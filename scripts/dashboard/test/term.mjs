@@ -313,4 +313,41 @@ ok(before === 1 && after.length === 0, `closing the tab closes its terminal (${b
      `a terminal whose grant is taken away while it is open is ended, saying why (${opened}; ${JSON.stringify(closed)})`);
 }
 
+// A terminal closed while a frame of its own is still pending (B802): xterm
+// runs the frame after dispose() and reads a renderer that is gone, which
+// the console showed as "reading 'dimensions'" whenever a terminal's start
+// was a little slow and it was closed at once. Terminals made as termMount
+// makes them and dropped by termDrop at a few delays; disposed at once, 18
+// of 60 threw.
+{
+  const before = page.errors.length;
+  await page.evaluate(async () => {
+    await xtermReady();
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    for (let i = 0; i < 60; i++){
+      const el = document.createElement('div');
+      el.style.cssText = 'position:fixed;left:0;top:0;width:600px;height:300px';
+      document.body.append(el);
+      const term = new window.Terminal({ scrollback: 5000 });
+      const fit = new window.FitAddon.FitAddon();
+      term.loadAddon(fit);
+      term.open(el);
+      try { fit.fit(); } catch (e) { /* a box with no size yet */ }
+      term.write('line\r\n'.repeat(1 + i % 40));
+      const key = `b802-${i}`;
+      TERMS.set(key, { key, el, term, fit, ws: null, ro: null });
+      const d = [0, 0, 1, 4, 8, 16, 30][i % 7];
+      if (d) await wait(d);
+      // Its slot goes before it or after it, as a closed tab's and a redrawn pane's do.
+      if (i % 2) el.remove();
+      termDrop(key);
+      if (!(i % 2)) el.remove();
+    }
+    await wait(1300);
+  });
+  const thrown = [...new Set(page.errors.slice(before))];
+  ok(thrown.length === 0 && await page.evaluate(() => ![...TERMS.keys()].some(k => k.startsWith('b802-'))),
+     `a terminal closed with a frame of its own still pending throws nothing${thrown.length ? ': ' + thrown.join(' | ').slice(0, 200) : ''}`);
+}
+
 await done(browser);
