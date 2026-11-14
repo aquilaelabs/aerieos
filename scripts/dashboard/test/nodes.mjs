@@ -4,7 +4,7 @@
 // the DOCKER_HOST mirror are seeded, work stamps the node it belongs to,
 // every mutation grows an audit row, and the page the operator sees is
 // exactly the page it was.
-import { URL, launch, newPage, ok, done, ready, sleep, DIR, tmuxNew, animatedDuring, openFold, openArchived, closeFold, patience, saveDialog, sectSave, openSection, splitPick, refreshUntil, prefsOf } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, sleep, DIR, tmuxNew, animatedDuring, openFold, openArchived, closeFold, patience, saveDialog, sectSave, openSection, splitPick, refreshUntil, prefsOf, until } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync, readFileSync } from 'node:fs';
 
@@ -64,6 +64,23 @@ const fillHeld = async (page, sel, value) => {
     await page.fill(sel, value);
     if (await page.$eval(sel, (e, v) => e.value === v, value)) return;
   }
+};
+
+// Nothing on the page is still moving: two frames on, for what a change
+// starts in the frame after it (a breakpoint's listeners, a slide), and then
+// every transition and tween that ends has ended. One that runs for good (a
+// spinner, a pulse) is not waited for.
+const motionOver = async page => {
+  await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+  await page.waitForFunction(() => !document.getAnimations().some(a => a.playState === 'running'
+    && Number.isFinite(a.effect?.getComputedTiming().endTime)), null, { timeout: 10000 }).catch(() => {});
+};
+// The page at the width it was just given, and drawn for it: crossing the
+// phone width draws again and judges every fold for the width (one open on a
+// phone, every one at a desk) in the frame after the change.
+const atWidth = async (page, w) => {
+  await page.waitForFunction(w => innerWidth === w, w, { timeout: 10000 }).catch(() => {});
+  await motionOver(page);
 };
 
 const browser = await launch();
@@ -240,12 +257,16 @@ print(json.dumps(out))
 // Door 2: every mutation through the POST funnel writes who/what/when with a
 // parameter digest, and never the parameters, which carry tokens.
 {
+  const asked = Math.floor(Date.now() / 1000);
   await page.evaluate(() => fetch('/api/bugs', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'add', project: 'alpha',
                            title: 'audit-canary-sekrit', severity: 'low' }),
   }));
-  await sleep(300);
+  // This mutation's own row, not an earlier one's: the last check is that
+  // the row does not carry what was sent.
+  await until(() => readStore('m.db.audit_tail(80)').some(r => r.action === '/api/bugs:add'
+    && r.target === 'alpha' && r.at >= asked), 10000, 200);
   const tail = readStore('m.db.audit_tail(80)');
   const row = tail.find(r => r.action === '/api/bugs:add');
   // The principal names the ACCOUNT now, not the fact that somebody was
@@ -595,8 +616,7 @@ m._exec("UPDATE nodes SET agent = ? WHERE id = ?", (json.dumps(ag), "${added.id}
   ok(on.ok && on.minutes === 1, 'a rule of one minute is accepted');
   const alive = n => { try { execFileSync('tmux', ['has-session', '-t', '=' + n], { stdio: 'ignore' }); return true; }
                        catch { return false; } };
-  let gone = false;
-  for (let i = 0; i < 40 && !gone; i++){ await sleep(300); gone = !alive('claude-idletest'); }
+  const gone = await until(() => !alive('claude-idletest'), 15000, 300);
   ok(gone && alive('shell-idletest'),
      'an idle Claude session is ended by the rule, and the shell beside it is left alone');
   const off = await set(0);
@@ -865,11 +885,8 @@ m._exec("UPDATE nodes SET agent = ? WHERE id = ?", (json.dumps(ag), "${added.id}
      `Install runner queues the system job for that runner with the node's name among the labels (${rj?.spec?.config?.labels?.join(',')})`);
   await napi('/api/v1/jobs', { action: 'cancel', id: rj.id });
   // The cancel reaches the runner's own state line on the CI runner tab.
-  for (let i = 0; i < 40; i++){
-    if (await page.evaluate(sel => !/installing now/.test(document.querySelector(sel + ' .ndrunstate')?.textContent || ''), RUN)) break;
-    await page.evaluate(() => loadNodes());
-    await page.waitForTimeout(500);
-  }
+  await nodesUntil(page, sel => !/installing now/.test(
+    document.querySelector(sel + ' .ndrunstate')?.textContent || ''), RUN).catch(() => {});
   // A failed install says so on the section, with the reason the server
   // took from its log. Drawn and read in one step, so a poll cannot repaint
   // the row from the real payload in between.
@@ -955,7 +972,9 @@ m._exec("UPDATE nodes SET agent = ? WHERE id = ?", (json.dumps(ag), "${added.id}
     const before = await page.$$eval(sects, ds => ds.map(d => d.open));
     ok(before.length > 1 && before.every(Boolean), `the Nodes page has every section open (${before})`);
     await page.$$eval(sects, ds => ds[1].querySelector(':scope > summary').click());
-    await sleep(400);
+    // A fold is shut at the end of its slide, which the press starts: over
+    // by now if there was one.
+    await motionOver(page);
     const open = await page.$$eval(sects, ds => ds.filter(d => d.open).length);
     ok(open === before.length, `...and a press on a heading at a desk folds nothing (${open} open of ${before.length})`);
   }
@@ -966,7 +985,7 @@ m._exec("UPDATE nodes SET agent = ? WHERE id = ?", (json.dumps(ag), "${added.id}
   // there.
   {
     await page.setViewportSize({ width: 393, height: 851 });
-    await sleep(300);
+    await atWidth(page, 393);
     // One at a time on a phone, so open the first before folding it.
     const key = await page.$eval(`${ROW} .ndconfbody > details.sect`, d => d.dataset.sect);
     const sel = `${ROW} .ndconfbody > details.sect[data-sect="${key}"]`;
@@ -1041,15 +1060,18 @@ m._exec("UPDATE nodes SET agent = ? WHERE id = ?", (json.dumps(ag), "${added.id}
       await page.locator(`${ROW} details.sect[data-sect="nodes:storage"]`).screenshot({ path: `${process.env.BB_SHOTS}/storage-desk.png` });
       const vp = page.viewportSize();
       await page.setViewportSize({ width: 393, height: 900 });
-      await sleep(400);
+      await atWidth(page, 393);
       await page.locator(`${ROW} details.sect[data-sect="nodes:storage"]`).screenshot({ path: `${process.env.BB_SHOTS}/storage-phone.png` });
       await page.setViewportSize(vp);
-      await sleep(300);
+      await atWidth(page, vp.width);
     }
   }
   // The heartbeat repaints the tab; the draft and the caret survive it.
+  // Repainted once the box that was typed in is no longer the page's: the
+  // repaint writes every box anew and hands the caret back as it does.
+  const typedBox = await page.$(`${ROW} .ndmount[data-i="${last}"] [data-k="path"]`);
   await page.evaluate(() => loadNodes());
-  await sleep(400);
+  await page.waitForFunction(e => !e.isConnected, typedBox, { timeout: 10000 }).catch(() => {});
   const kept = await page.$eval(`${ROW} .ndmount[data-i="${last}"] [data-k="path"]`, e => e.value);
   const caret = await page.evaluate(() => document.activeElement?.dataset?.k || document.activeElement?.tagName);
   ok(kept === '/mnt/appdata' && caret === 'store:cache',
@@ -1076,6 +1098,7 @@ m._exec("UPDATE nodes SET agent = ? WHERE id = ?", (json.dumps(ag), "${added.id}
         await fetch(base + '/api/v1/agent/result', { method: 'POST', headers: asNode,
           body: JSON.stringify({ job: j.id, state: 'succeeded', exit: 0 }) });
       }
+      // How often this stand-in for the agent asks for work, as an agent does.
       await sleep(150);
     }
   })();
@@ -1170,7 +1193,11 @@ m._exec("UPDATE nodes SET agent = ? WHERE id = ?", (json.dumps(ag), "${added.id}
     page.dialogs.length = 0;
     await page.fill(`${ROW} [data-k="store:data"]`, '/etc/builderbot');
     await page.click(`${ROW} [data-nsave]`);
-    await sleep(1500);
+    // Refused in a notice naming the folder, once the node has said what is
+    // there (the server waits twenty seconds for that): the press asks and
+    // saves nothing after it.
+    await page.waitForFunction(() => [...document.querySelectorAll('#toast .tst .tmsg')]
+      .some(m => m.textContent.includes('/etc/builderbot')), null, { timeout: 30000 }).catch(() => {});
     const still = (await napi('/api/v1/nodes')).nodes.find(n => n.id === minted.id).config.desired;
     ok(page.dialogs.length === 0 && still.stores.data !== '/etc/builderbot',
        `a store pointed into a system folder is refused, nothing asked and nothing saved (${still.stores.data || 'unset'})`);
@@ -1330,7 +1357,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
   // run, holding every later system job on this node ("one at a time").
   page.answers.push(-1);
   await page.click(`${ROW} [data-napply="storage"]`);
-  for (let i = 0; i < 40 && page.dialogs.length === 0; i++) await sleep(100);
+  await until(() => page.dialogs.length > 0, 10000, 100);
   ok(page.dialogs.length === 1 && /unmounts \/mnt\/old/.test(page.dialogs[0]),
      `Apply storage asks first when it would unmount something the node has (${page.dialogs[0]?.slice(0, 60)})`);
   for (const j of (await napi('/api/v1/jobs?active=1')).jobs)
@@ -1665,11 +1692,11 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
       // The press is answered a moment after it, in the page's modal, and
       // the lockdown job is queued then: asked for until it is there.
       let taken = null;
-      for (let i = 0; i < 40 && !taken?.spec; i++){
+      await until(async () => {
         const w = await as('work', { running: [], wait: 0 });
         taken = await w.json().catch(() => null);
-        if (!taken?.spec) await sleep(250);
-      }
+        return taken?.spec;
+      }, 15000, 250);
       ok(refused.status === 403 && taken?.spec?.apply === 'lockdown',
          `...from then it is refused all but its lockdown job (${refused.status}, ${taken?.spec?.apply})`);
       await as('result', { job: taken.id, state: 'succeeded', exit: 0 });
@@ -1699,12 +1726,10 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
        `a node reporting its door open says so, as the machine's way in, and shows Shut the door and the PC's ssh config block named for the node, with MobaXterm's way (R179) (${doorRow.cmd.replace(/\s+/g, ' ').slice(0, 90)})`);
     page.dialogs.length = 0;
     await page.click(`${ROW} .nddoor [data-nd="door"]`);
-    const doorJob = await (async () => { for (let i = 0; i < 40; i++){
+    const doorJob = (await until(async () => {
       const js = (await napi('/api/v1/jobs?active=1')).jobs || [];
-      const j = js.find(x => x.type === 'system' && x.spec?.apply === 'door');
-      if (j) return j;
-      await sleep(250);
-    } return null; })();
+      return js.find(x => x.type === 'system' && x.spec?.apply === 'door');
+    }, 15000, 250)) || null;
     ok(page.dialogs.length === 1 && /Shut the SSH door/.test(page.dialogs[0]) && doorJob && doorJob.spec.config.on === false,
        `Shut the door asks, then queues the door system job with on: false (${JSON.stringify(doorJob?.spec)})`);
     if (doorJob) await napi('/api/v1/jobs', { action: 'cancel', id: doorJob.id });
@@ -1719,11 +1744,8 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     // firewall is offered only on a hosting-only node.
     {
       const feats = (vm, fw = false) => ({ vmhost: { installed: false, kvm: true, libvirt: '10.0.0', ...vm }, firewall: { installed: fw } });
-      const featJob = async op => { for (let i = 0; i < 40; i++){
-        const j = ((await napi('/api/v1/jobs?active=1')).jobs || []).find(x => x.type === 'system' && x.spec?.apply === 'feature');
-        if (j) return j;
-        await sleep(250);
-      } return null; };
+      const featJob = async op => (await until(async () => ((await napi('/api/v1/jobs?active=1')).jobs || [])
+        .find(x => x.type === 'system' && x.spec?.apply === 'feature'), 15000, 250)) || null;
       const VM = `${ROW} .ndfeat[data-feat="vmhost"]`;
       await hello({ ...CENSUS, features: feats({}) });
       await page.evaluate(async () => { await refresh(); await loadNodes(); });
@@ -1843,7 +1865,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
   }, ROW);
   ok(skin.length >= 8 && skin.every(Boolean), `every control in the fold wears the field skin (${skin.length} checked)`);
   await page.setViewportSize({ width: 393, height: 851 });
-  await sleep(300);
+  await atWidth(page, 393);
   const phone = await page.evaluate(sel => {
     const probe = document.createElement('i'); probe.style.font = 'var(--f-field)'; document.body.append(probe);
     const field = parseFloat(getComputedStyle(probe).fontSize); probe.remove();
@@ -2114,8 +2136,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
     ok(again.job && !again.error,
        `...and a second toolchain job on one node is queued behind the first, never refused (${again.job || again.error})`);
     if (again.job) await napi('/api/v1/jobs', { action: 'cancel', id: again.job });
-    for (let i = 0; i < 60 && /queued|assigned|running/.test((await napi(`/api/v1/jobs?id=${second.job}`))?.state || ''); i++)
-      await new Promise(r => setTimeout(r, 250));
+    await until(async () => !/queued|assigned|running/.test((await napi(`/api/v1/jobs?id=${second.job}`))?.state || ''), 20000, 250);
     const look = await napi('/api/toolchains', { action: 'check', node: other.id });
     ok(look.job && !look.error, `...and a check on the other node is not held by it (${look.job || look.error})`);
     if (look.job) await napi('/api/v1/jobs', { action: 'cancel', id: look.job });
@@ -2162,11 +2183,11 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
     const j = await napi('/api/toolchains', { action: 'install', names: ['flutter', 'jdk'], node: minted.id });
     if (j.job) await napi('/api/v1/jobs', { action: 'cancel', id: j.job });
     let seen = null;
-    for (let t = 0; t < 60 && !seen; t++){
+    await until(async () => {
       const p = await (await fetch(base + '/api/toolchains?node=' + minted.id, { headers: H })).json();
       if (p.job && p.job.running === false && p.job.action) seen = p.job;
-      else await sleep(250);
-    }
+      return seen;
+    }, 20000, 250);
     // Canceled before it began anything, so jdk did not fail, it was not
     // tried (B683): only what the log shows begun can have failed.
     ok(seen && seen.action === 'install' && seen.done.includes('flutter')
@@ -2475,11 +2496,9 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
       stores: {}, network: { mode: 'dhcp' } } });
     await page.evaluate(id => { delete nodesConf[id]; loadNodes(); }, minted.id);
     let said = '';
-    for (let i = 0; i < 40; i++){
-      said = await page.$eval(`${ROW} .ndconfstate`, e => e.textContent.trim());
-      if (!/last storage apply/.test(said)) break;
-      await sleep(250);
-    }
+    await page.waitForFunction(sel => { const e = document.querySelector(sel + ' .ndconfstate');
+      return e && !/last storage apply/.test(e.textContent); }, ROW, { timeout: 15000 }).catch(() => {});
+    said = await page.$eval(`${ROW} .ndconfstate`, e => e.textContent.trim());
     ok(!/last storage apply/.test(said),
        `...and a failure the operator has saved past is not reported over the changes that replaced it (${said.slice(0, 90)})`);
   }
@@ -2514,14 +2533,26 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
   await page.click(`#bellPanel [data-bnode="${minted.id}"]`);
   await page.waitForFunction(id => nodesPick === id && document.getElementById('bellPanel').hidden
     && document.querySelector('.nodestab [data-nd="update-agent"]'), minted.id, { timeout: 10000 });
-  await sleep(700);
+  // Brought there by a scroll that glides: in view, and no longer moving.
+  await page.waitForFunction(async () => {
+    const at = () => document.querySelector('.nodestab [data-nd="update-agent"]')?.getBoundingClientRect();
+    const was = at()?.top;
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const r = at();
+    return !!r && r.top === was && r.top >= 0 && r.bottom <= innerHeight;
+  }, null, { timeout: 10000 }).catch(() => {});
   ok(await page.$eval('.nodestab [data-nd="update-agent"]', b => {
        const r = b.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; }),
      `...and its link opens the Nodes page on that node${other ? ' (from another)' : ''}, Update agent in view`);
   // The runner is on its own tab now (R121), held by the same rule there.
-  const runnerOff = await page.evaluate(async id => { openRunnerTab(id); await new Promise(r => setTimeout(r, 400));
-    const b = document.querySelector(`.runnertab .ndrow[data-node="${id}"] [data-nrunner="install"]`);
-    const was = b?.disabled; openNodesTab(); await new Promise(r => setTimeout(r, 400)); return was; }, minted.id);
+  // Each page read once it is drawn: the runner's Install, then the node's
+  // row back on the Nodes page, which is what is read next.
+  const runnerOff = await page.evaluate(async id => {
+    const drawn = async q => { for (let i = 0; i < 100 && !document.querySelector(q); i++) await new Promise(r => setTimeout(r, 100));
+      return document.querySelector(q); };
+    openRunnerTab(id);
+    const b = await drawn(`.runnertab .ndrow[data-node="${id}"] [data-nrunner="install"]`);
+    const was = b?.disabled; openNodesTab(); await drawn(`.nodestab .ndrow[data-node="${id}"] [data-napply="storage"]`); return was; }, minted.id);
   const off = await page.evaluate(sel => ({
     storage: document.querySelector(sel + ' [data-napply="storage"]')?.disabled,
     network: document.querySelector(sel + ' [data-napply="network"]')?.disabled,
@@ -2699,16 +2730,16 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
   if (process.env.BB_SHOTS){
     const sect = `${ROW} details.sect[data-sect="nodes:storage"]`;
     await page.evaluate(sel => { const d = document.querySelector(sel); if (d && !d.open) d.open = true; }, sect);
-    await sleep(400);
+    await motionOver(page);
     await page.locator(sect).screenshot({ path: `${process.env.BB_SHOTS}/storage-stale-desk.png` });
     const vp = page.viewportSize();
     await page.setViewportSize({ width: 393, height: 900 });
-    await sleep(400);
+    await atWidth(page, 393);
     await page.evaluate(sel => { const d = document.querySelector(sel); if (d && !d.open) d.open = true; }, sect);
-    await sleep(400);
+    await motionOver(page);
     await page.locator(sect).screenshot({ path: `${process.env.BB_SHOTS}/storage-stale-phone.png` });
     await page.setViewportSize(vp);
-    await sleep(300);
+    await atWidth(page, vp.width);
   }
   await napi('/api/v1/nodes', { action: 'config', id: minted.id, config: { mounts: staleMounts, stores: {}, network: { mode: 'dhcp' } } });
   await page.evaluate(id => { delete nodesConf[id]; loadNodes(); }, minted.id);
@@ -2783,8 +2814,10 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
     await openSection(page, 'nodes:advanced', `.nodestab .ndrow[data-node="${sb.id}"]`);
     await page.fill(`.nodestab .ndrow[data-node="${sb.id}"] .ndname [data-k="name"]`, 'sandbox-two');
     // A heartbeat repaints the tab; the name being typed survives it (B176).
+    // Repainted once the box that was typed in is no longer the page's.
+    const typedName = await page.$(`.nodestab .ndrow[data-node="${sb.id}"] .ndname [data-k="name"]`);
     await page.evaluate(() => loadNodes());
-    await page.waitForTimeout(300);
+    await page.waitForFunction(e => !e.isConnected, typedName, { timeout: 10000 }).catch(() => {});
     ok(await page.$eval(`.nodestab .ndrow[data-node="${sb.id}"] .ndname [data-k="name"]`, e => e.value) === 'sandbox-two',
        'a new name being typed survives the repaint a heartbeat brings');
     await page.click(`.nodestab .ndrow[data-node="${sb.id}"] [data-nd="rename"]`);
@@ -3114,7 +3147,7 @@ await page.evaluate(async () => {
   await page.evaluate(() => {
     window.__realNodeAct = nodeAct;
     nodeAct = b => b.action === 'vm-xml' && !b.name
-      ? new Promise(res => { window.__vmLand = () => res(window.__realNodeAct(b)); })
+      ? new Promise(res => { window.__vmLand = () => { const a = window.__realNodeAct(b); res(a); return a; }; })
       : window.__realNodeAct(b);
   });
   await page.click('.pane .bar #ndVm');
@@ -3123,7 +3156,9 @@ await page.evaluate(async () => {
   await page.click('.pane .bar #ndEnroll');
   await page.waitForSelector('#ndBody #ndEnName', { timeout: 10000 });
   await fillHeld(page, '#ndBody #ndEnName', 'racebox');
-  await page.evaluate(async () => { window.__vmLand(); await new Promise(r => setTimeout(r, 300)); });
+  // The answer in, and a turn of the page's timers on, by which the dialog
+  // that waited for it has done whatever it does with it.
+  await page.evaluate(async () => { await window.__vmLand(); await new Promise(r => setTimeout(r, 0)); });
   const after = await page.$eval('#ndBody', b => ({ name: b.querySelector('#ndEnName')?.value, vm: !!b.querySelector('#vmGo') }));
   ok(after.name === 'racebox' && !after.vm,
      `a VM catalog landing after its dialog closed leaves the Enroll form, and what was typed, alone (${JSON.stringify(after)})`);
@@ -3429,8 +3464,8 @@ ok(page.errors.length === 0,
     await page.click(`${sect} [data-k="gpucomp"]`);
     await page.click(`${sect} [data-k="gpuemu"]`);
     await page.click(`${sect} [data-nd="gpu-apply"]`);
-    const ej = await (async () => { for (let i = 0; i < 60; i++){ const n = (await napi('/api/v1/nodes')).nodes.find(x => x.id === shed.id);
-      const j = (n.jobs || []).find(x => x.apply === 'gpu'); if (j && !(n.config || {}).no_gpu_compute) return j; await new Promise(r => setTimeout(r, 250)); } return null; })();
+    const ej = (await until(async () => { const n = (await napi('/api/v1/nodes')).nodes.find(x => x.id === shed.id);
+      const j = (n.jobs || []).find(x => x.apply === 'gpu'); return j && !(n.config || {}).no_gpu_compute ? j : null; }, 20000, 250)) || null;
     ok(ej !== null, 'ticking both and Apply turns compute back on and queues the emulator set-up as a job on the node');
     // ...and while that job runs the box stays ticked, ghosted, rather than
     // going back to the machine's old state under "Applying".
@@ -3597,7 +3632,7 @@ ok(page.errors.length === 0,
     ok(await page.evaluate(() => tcDriverPick === 'nvidia-driver-610'), 'picking a version keeps it for Install');
     const nd = page.dialogs.length;
     await page.click(`${DRV} [data-libact="install"]`);
-    const qd = await (async () => { for (let i = 0; i < 40; i++){ const d = await napi(`/api/toolchains?node=${shed.id}`); if (d.job?.running) return d.job; await new Promise(res => setTimeout(res, 250)); } return null; })();
+    const qd = (await until(async () => { const d = await napi(`/api/toolchains?node=${shed.id}`); return d.job?.running ? d.job : null; }, 15000, 250)) || null;
     const qj = qd ? await napi(`/api/v1/jobs?id=${qd.id}`) : {};
     ok(page.dialogs.length === nd + 1 && /takes the card only when the machine restarts/.test(page.dialogs[nd] || '')
        && qj.type === 'toolchain' && JSON.stringify(qj.spec?.names) === '["nvidia-driver:nvidia-driver-610"]',
@@ -3634,7 +3669,7 @@ ok(page.errors.length === 0,
     await page.waitForSelector(`${IDRV} [data-instact="remove"]`, { timeout: 20000 });
     const nr = page.dialogs.length;
     await page.click(`${IDRV} [data-instact="remove"]`);
-    const rd = await (async () => { for (let i = 0; i < 40; i++){ const d = await napi(`/api/toolchains?node=${shed.id}`); if (d.job?.running) return d.job; await new Promise(res => setTimeout(res, 250)); } return null; })();
+    const rd = (await until(async () => { const d = await napi(`/api/toolchains?node=${shed.id}`); return d.job?.running ? d.job : null; }, 15000, 250)) || null;
     ok(page.dialogs.length === nr + 1 && /Remove NVIDIA's driver from shed2\?.*nouveau takes the card back/s.test(page.dialogs[nr] || '') && rd?.action === 'remove' && (rd.queue || []).includes('nvidia-driver'),
        `Remove asks first, naming the driver, and queues the removal (${(page.dialogs[nr] || '').slice(0, 50)})`);
     await napi('/api/v1/jobs', { action: 'cancel', id: rd?.id });
@@ -3647,7 +3682,7 @@ ok(page.errors.length === 0,
       const CTK = `.doc .librarytab .lcard[data-lrow="toolchain:${KIT}"]`;
       const ICTK = `.doc .thingtab [data-instnode="${shed.id}"][data-thing="toolchain:${KIT}"]`;
       const kitOf = async id => ((await napi(`/api/toolchains?node=${id}`)).machine || []).find(m => m.name === KIT);
-      const running = async () => { for (let i = 0; i < 40; i++){ const d = await napi(`/api/toolchains?node=${shed.id}`); if (d.job?.running) return d.job; await new Promise(res => setTimeout(res, 250)); } return null; };
+      const running = async () => (await until(async () => { const d = await napi(`/api/toolchains?node=${shed.id}`); return d.job?.running ? d.job : null; }, 15000, 250)) || null;
       const on = { ...apt, installed: '595.91.07', loaded: '595.91.07', bound: 'nvidia',
         package: 'nvidia-driver-595', pkg_version: '595.91.07-0ubuntu1', candidate: '595.91.07-0ubuntu1' };
       const none = { installed: '', candidate: '', runtime: false };
@@ -3963,7 +3998,8 @@ print(json.dumps({"held_while_ending": seen, "after": m.updating("n1"), "ok": r.
       { seq: 2, chunk: 'Claude Code 1.2.0 is what a session here runs now\n' }] }, AH);
     await napi('/api/v1/agent/result', { job: up.job, state: 'succeeded', exit: 0 }, AH);
   }
-  await sleep(300);
+  await until(async () => { const st = await napi('/api/status'), cc = st.claude_code?.nodes?.[en.id] || {};
+    return !st.projects.find(p => p.name === 'beta')?.held && cc.installed === '1.2.0' && cc.behind === false && !claudeIn(st); }, 10000, 100);
   ok(!(await napi('/api/status')).projects.find(p => p.name === 'beta')?.held, 'the hold lifts when the job ends');
   {
     const cc = (await napi('/api/status')).claude_code?.nodes?.[en.id] || {};
@@ -4090,8 +4126,9 @@ print(json.dumps({"ok": bool(r.get("ok")), "moved": m.jobs_state_rev() - before}
      `a space on an un-enrolled node keeps its name and says why Claude is off (${(row.why || '').slice(0, 70)}; row: ${row.line})`);
   const pick = async name => page.evaluate(async n => {
     openProjectSettings(n);
-    for (let i = 0; i < 60 && !document.querySelector('#rnNode option'); i++) await new Promise(r => setTimeout(r, 100));
-    await new Promise(r => setTimeout(r, 400));
+    // The form is this space's once it is opened on it, which fills the
+    // picker; until then the options are the last opening's.
+    for (let i = 0; i < 100 && !(rnFor === n && document.querySelector('#rnNode option')); i++) await new Promise(r => setTimeout(r, 100));
     const s = document.getElementById('rnNode');
     return { value: s.value, cls: s.className, italic: getComputedStyle(s).fontStyle,
              opts: [...s.options].map(o => o.textContent.trim().slice(0, 40)) };

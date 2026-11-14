@@ -4,7 +4,7 @@
 // Everything here drives the stub docker the harness provides; the argv it
 // records IS the assertion, because the module's whole safety story is that
 // the buttons run table-lookup compose commands and nothing else.
-import { launch, newPage, ok, done, ready, sleep, patience, holdPoll, freePoll, refreshUntil, saveDialog, URL, DIR, nbShown, nbTab, openFold, nbGo, faded, projectKey, until } from './lib.mjs';
+import { launch, newPage, ok, done, ready, sleep, patience, holdPoll, freePoll, refreshUntil, saveDialog, URL, DIR, nbShown, nbTab, openFold, nbGo, faded, projectKey, until, quiet, settled } from './lib.mjs';
 import { writeFileSync, readFileSync, rmSync, existsSync, mkdirSync, chmodSync, readdirSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -48,12 +48,8 @@ git('commit', '-qm', 'compose');
 // empty first, rather than sampling the row mid-settle (bug #13's shape).
 const idle = async (ms = 20000) => {
   const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
-  const end = Date.now() + ms;
-  while (Date.now() < end){
-    const r = await (await fetch(URL.replace(/\/$/, '') + '/api/v1/jobs?active=1', { headers: H })).json();
-    if (!(r.jobs || []).length) return;
-    await sleep(200);
-  }
+  await until(async () => !((await (await fetch(URL.replace(/\/$/, '') + '/api/v1/jobs?active=1', { headers: H })).json()).jobs || []).length,
+              ms, 200);
 };
 
 // A compose job still queued or running, asked of the server: the job that
@@ -97,7 +93,7 @@ async function settle(ms = 60000){
   while (quiet < 4 && Date.now() < end){
     busy = await composeBusy();
     quiet = devAsks.size || busy ? 0 : quiet + 1;
-    await sleep(250);
+    await sleep(250);   // the gap between looks: four in a row at rest is the second it is held for
   }
   if (quiet < 4) console.log(`[settle] still busy after ${ms}ms: devapp asks in flight ${
     JSON.stringify([...devAsks].map(r => (r.postData() || '').slice(0, 80)))}, compose job ${busy ? 'active' : 'none'}`);
@@ -166,16 +162,12 @@ async function pressIn(sel){
   // Pressed again when a redraw shuts it: a poll landing between the press
   // and the look drew the row again with its menu hidden, and one press
   // then waited out its budget in a loaded whole run (B713).
-  for (let i = 0; i < 40; i++){
-    const st = await page.$eval(sel, e => {
-      const m = e.closest('.actmenu');
-      if (!m || !m.hidden) return 'open';
-      e.closest('.more').querySelector(':scope > button').click();
-      return 'pressed';
-    }).catch(() => 'missing');
-    if (st === 'open') break;
-    await sleep(150);
-  }
+  await until(async () => (await page.$eval(sel, e => {
+    const m = e.closest('.actmenu');
+    if (!m || !m.hidden) return 'open';
+    e.closest('.more').querySelector(':scope > button').click();
+    return 'pressed';
+  }).catch(() => 'missing')) === 'open', 6000, 150);
   await page.click(sel);
 }
 async function dmDisabled(act){
@@ -245,7 +237,8 @@ async function dmTextUntil(re, timeout = 20000, not = false){
     if (re.test(t) !== not) return t;
     // Every refresh is a listing job on the node, in the queue the compose
     // jobs wait in: asked every half second, it pushed their order about
-    // and an Up landed after the test's Down (B477's shape).
+    // and an Up landed after the test's Down (B477's shape). So the pause
+    // is the pace of the asking, not a guess at the row.
     await sleep(2000);
   }
   throw new Error(`the manager row never ${not ? 'lost' : 'said'} ${re}: ${t.slice(0, 200)}`);
@@ -353,7 +346,9 @@ const pillIs = async (want) => {
     window.fetch = (...a) => String(a[0]).startsWith('/api/docker')
       ? new Promise(r => setTimeout(() => r(f(...a)), DM_SLOW_MS + 400)) : f(...a);
     const p = loadDocker();
-    await new Promise(r => setTimeout(r, DM_SLOW_MS + 200));
+    // Read once the word is drawn, or once nothing is on its way and it
+    // never was; the delay above is the slowness itself.
+    while (dockerFetching && !document.querySelector('.dmtab.dmstale')) await new Promise(r => setTimeout(r, 20));
     const during = { dim: !!document.querySelector('.dmtab.dmstale'),
                      faded: [...document.querySelectorAll('.dmtab .row')].some(r => getComputedStyle(r).opacity !== '1') };
     await p; window.fetch = f;
@@ -370,6 +365,8 @@ const pillIs = async (want) => {
   const kept = await page.evaluate(async () => {
     const tab = document.querySelector('.dmtab');
     tab.dataset.mark = 'kept';
+    // Both pauses are time in which a redraw would have come: the check is
+    // that none did.
     dockerRev++; drawPanes();
     await new Promise(r => setTimeout(r, 300));
     const sameRead = document.querySelector('.dmtab')?.dataset.mark === 'kept';
@@ -487,10 +484,18 @@ ok(await page.evaluate(() => {
      cLock(false);
      return ok;
    }), '...while one that runs ghosts Save and makes both boxes read-only, still scrollable');
-await page.waitForTimeout(500);              // the dialog's own opening scale
+// Measured at rest: the dialog's own opening scale over, the box with a height.
+const cAtRest = () => page.waitForFunction(() => {
+  const m = document.getElementById('cmodal'), b = m.querySelector('.box');
+  return b.getBoundingClientRect().height > 0 && !m.getAnimations({ subtree: true })
+    .some(a => a.playState === 'running' && Number.isFinite(a.effect?.getComputedTiming().endTime));
+}, null, { timeout: 10000 }).catch(() => {});
+await cAtRest();
 const ymlH = await page.$eval('#cmodal .box', b => Math.round(b.getBoundingClientRect().height));
 await page.click('#cTabEnv');
-await page.waitForTimeout(300);
+// ...and again once the Environment pane is the one on show, its slide over.
+await page.waitForFunction(() => !document.getElementById('cEnvField').hidden, null, { timeout: 10000 }).catch(() => {});
+await cAtRest();
 ok(Math.abs(await page.$eval('#cmodal .box', b => Math.round(b.getBoundingClientRect().height)) - ymlH) <= 1,
    'the container dialog keeps its size from Compose to Environment');
 ok(/missing against \.env\.example: PORT/.test(await page.$eval('#cEnvHint', e => e.textContent)),
@@ -506,7 +511,9 @@ await page.fill('#cEnv', 'PORT=9090\n');
 await saveEdit();
 // Wait for the save to land: the hint stops calling it a draft.
 await dmTextUntil(/fill in the env/, 20000, true).catch(() => {});
-await page.waitForTimeout(1200);
+// ...and the row drawn from it: Up live, saying what it will do.
+await page.waitForFunction(sel => { const b = document.querySelector(sel);
+  return !!b && !b.disabled && /builds the image first/.test(saidOf(b)); }, `${DM} [data-dm="up"]`, { timeout: 20000 }).catch(() => {});
 // The buttons map to the compose commands, no rules of this dashboard's
 // invention on top: `compose up` builds an image that is missing, so Up on a
 // never-built project does what the CLI does rather than refusing. The
@@ -827,7 +834,7 @@ await dmClick('rebuild');
     if (!said.length || said[said.length - 1].slice(said[said.length - 1].indexOf(' ') + 1) !== line)
       said.push(`${((Date.now() - t0) / 1000).toFixed(1)}s ${line}`);
     if (/building|pulling|starting|working|queued/i.test(s)){ seen = true; break; }
-    await page.waitForTimeout(250);
+    await sleep(250);   // the gap between samples
   }
   if (!seen){
     const toast = await page.$eval('#toast', e => e.textContent).catch(() => '');
@@ -1137,8 +1144,14 @@ if (live0.running || live0.exists || await pill() !== 'down') {
 // the unit tier holds problems() to naming (test_devapp_synced).
 writeFileSync(stubCfg, JSON.stringify(
   { services: { app: { build: { context: '.' }, volumes: ['./data:/data'] } } }));
-await nudge();
-await sleep(1500);
+// The row is read again when the revisions poll sees the nudge, and the
+// check is of what that read drew: nothing against the bind.
+{
+  const was = await page.evaluate(() => revs.devapp);
+  await nudge();
+  await page.waitForFunction(was => revs.devapp !== was, was, { timeout: 20000 }).catch(() => {});
+}
+await settled(page);
 const probs = await devLines("bad");
 ok(probs.length === 0 && !/will not work as written/.test(await page.$eval('#devRow', r => r.textContent)),
    `a bind into the space is one the node's synced copy has, so nothing is said against it (${probs.join(' | ').slice(0, 80)})`);
@@ -1162,10 +1175,10 @@ ok(probs.length === 0 && !/will not work as written/.test(await page.$eval('#dev
     body: JSON.stringify({ project: 'ep.silon', action: 'rebuild', ack: '' }) })).json()));
   const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
   let job = null;
-  for (let i = 0; i < 60 && r.job && !(job && ['failed', 'succeeded', 'canceled'].includes(job.state)); i++){
-    await sleep(500);
+  if (r.job) await until(async () => {
     job = await (await fetch(URL.replace(/\/$/, '') + '/api/v1/jobs?id=' + r.job, { headers: H })).json();
-  }
+    return ['failed', 'succeeded', 'canceled'].includes(job.state);
+  }, 30000, 500);
   ok(job?.state === 'failed' && /reserves the NVIDIA GPU/.test(job.error || ''),
      `...and a rebuild asked anyway is refused by its job, in the same words (${r.error || job?.state}: ${String(job?.error).slice(0, 60)})`);
 }
@@ -1200,10 +1213,10 @@ ok(page.dialogs.slice(seen).some(d => /runs privileged/.test(d)),
      `a rebuild answers with its job before the gate has read the compose (${r.job || r.error})`);
   const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
   let job = null;
-  for (let i = 0; i < 60 && !(job && ['failed', 'succeeded', 'canceled'].includes(job.state)); i++){
-    await sleep(500);
+  await until(async () => {
     job = await (await fetch(URL.replace(/\/$/, '') + '/api/v1/jobs?id=' + r.job, { headers: H })).json();
-  }
+    return ['failed', 'succeeded', 'canceled'].includes(job.state);
+  }, 30000, 500);
   ok(job?.state === 'failed' && /asks for more than its own directory/.test(job.error || ''),
      `...and the gate's refusal is the job's failure, with its words (${job?.state}: ${String(job?.error).slice(0, 60)})`);
   risky(['/:/host']);
@@ -2186,8 +2199,8 @@ ok(await page.$eval(`${DM} .sect .wport a`, a => a.getAttribute('href'))
       asked = true; answered();
     });
     await page.evaluate(rewrite);
-    await Promise.race([landed, sleep(patience(15000))]);
-    await page.evaluate(() => new Promise(f => setTimeout(f, 200)));
+    await Promise.race([landed, until(() => asked, 15000)]);
+    await quiet(200);   // time in which that answer would have been written into the fold
     const kept = await page.$$eval(`${DM} .sect .wire`, ws => ws.map(w => w.querySelectorAll('.wgrp').length + ':' + /publishes nothing/.test(w.textContent)));
     await page.unroute(route);
     ok(asked && kept.includes('2:false'), `...and keeps them when a read could not resolve the compose, never "publishes nothing" (${asked ? 'answered' : 'never asked'}: ${kept.join(' ')})`);
@@ -2243,8 +2256,12 @@ ok(await page.$eval(`${DM} .sect .wport a`, a => a.getAttribute('href'))
     writeFileSync(extra, JSON.stringify({ session: { bundle: 'from-before-the-update' } }));
     // The stub says hello when the file changes: its census carries the old
     // bundle within a poll, and the new one again once the file goes.
-    await sleep(4000);
+    // Asked once the node's record carries it, which is what the server reads.
+    await until(() => page.evaluate(async () => ((await (await fetch('/api/v1/nodes')).json()).nodes || [])
+      .some(n => n.reported?.session?.bundle === 'from-before-the-update')), 30000, 250);
     const asked = term(`ctr:ep.silon:main:${offered[0].ctr}`);
+    // The node stays behind this long with the ask waiting on it: the wait
+    // is the subject, and nothing outside the server shows it.
     await sleep(2500);
     rmSync(extra, { force: true });
     const got = await asked;
@@ -2256,15 +2273,11 @@ ok(await page.$eval(`${DM} .sect .wport a`, a => a.getAttribute('href'))
     const extra = `${DIR}/sandboxdata/census-extra.json`;
     writeFileSync(extra, JSON.stringify({ session: { ctr: false } }));
     let old = null;
-    for (const t0 = Date.now(); Date.now() - t0 < 20000; await sleep(500)){
-      old = await term(`ctr:ep.silon:main:${offered[0].ctr}`);
-      if (old.status === 403) break;
-    }
+    await until(async () => (old = await term(`ctr:ep.silon:main:${offered[0].ctr}`)).status === 403, 20000, 500);
     rmSync(extra, { force: true });
     ok(old?.status === 403 && /has not set up its container terminal yet/.test(old.error),
        `a node whose agent runs no container terminal yet says so (${(old?.error || '').slice(0, 80)})`);
-    for (const t0 = Date.now(); Date.now() - t0 < 20000; await sleep(500))
-      if ((await term(`ctr:ep.silon:main:${offered[0].ctr}`)).status === 400) break;
+    await until(async () => (await term(`ctr:ep.silon:main:${offered[0].ctr}`)).status === 400, 20000, 500);
   }
   const wrong = await term('ctr:ep.silon:main:someone-elses');
   ok(wrong.status === 403 && /someone-elses is not a running container of ep-silon/.test(wrong.error),
@@ -2899,7 +2912,7 @@ ok(true, '...and a daemon coming back needs no un-gating: the next draw is clean
   const at0 = rec().at || 0;
   await page.evaluate(() => dmAction('ep.silon', 'main', 'rebuild'));
   const t0 = Date.now();
-  while (Date.now() - t0 < 60000 && !((rec().at || 0) > at0 && rec().daemon_uid)) await sleep(250);
+  await until(() => (rec().at || 0) > at0 && rec().daemon_uid, 60000, 250);
   ok(!!rec().rev && !!rec().daemon_uid && (rec().at || 0) > at0,
      `a build records which daemon it landed on, by that daemon's own id (${
        rec().daemon_uid ? 'uid recorded' : 'no uid'} after ${Date.now() - t0}ms)`);
@@ -3170,7 +3183,8 @@ ok(both.includes('ep.silon|main') && both.includes('ep.silon|staging-two'),
       const at = r.scrollLeft;
       [...r.querySelectorAll('.chip')].pop().click();
       for (let i = 0; i < 40 && row() === r; i++) await new Promise(res => setTimeout(res, 50));
-      await new Promise(res => setTimeout(res, 300));
+      // ...and its scroll put back, which the page does once the new row is laid out.
+      for (let i = 0; i < 100 && Math.abs((row()?.scrollLeft ?? -9) - at) > 1; i++) await new Promise(res => setTimeout(res, 50));
       const now = row(), was = now.scrollLeft;
       css.remove();
       return { at, now: was, redrawn: now !== r };
@@ -3701,7 +3715,7 @@ ok(await page.$('#devSend'),
   await page.waitForFunction(() => document.querySelector('.dmtab .row[data-inst="ep.silon|ep-silon-site"]'),
                              null, { timeout: patience(20000) });
   let log = '';
-  for (let i = 0; i < 40 && !/--project-name ep-silon-site .*build/.test(log); i++){ await sleep(500); log = dockerLog(); }
+  await until(() => /--project-name ep-silon-site .*build/.test(log = dockerLog()), 20000, 500);
   const line = log.split('\n').find(l => /--project-name ep-silon-site .*build/.test(l)) || '';
   // On an agent node the file's text travels with the job and lands in its
   // own folder there: read back, it is the site's.
@@ -4165,10 +4179,10 @@ ok(await page.$('#devSend'),
     const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
     const jobEnd = async id => {
       let j = null;
-      for (let i = 0; i < 60 && id && !(j && ['failed', 'succeeded', 'canceled'].includes(j.state)); i++){
-        await sleep(500);
+      if (id) await until(async () => {
         j = await (await fetch(URL.replace(/\/$/, '') + '/api/v1/jobs?id=' + id, { headers: H })).json();
-      }
+        return ['failed', 'succeeded', 'canceled'].includes(j.state);
+      }, 30000, 500);
       return j || {};
     };
     const allowIt = async id => {
@@ -4465,12 +4479,10 @@ ok(await page.$('#devSend'),
                                 body: JSON.stringify({ project: 'ep.silon', test: c }) });
   }, cmd);
   const finished = async (jid) => {
-    for (let i = 0; i < 120; i++){
+    return await until(async () => {
       const j = await page.evaluate(async id => (await (await fetch(`/api/v1/jobs?id=${id}`)).json()), jid);
-      if (['succeeded', 'failed', 'canceled'].includes(j.state)) return j;
-      await new Promise(r => setTimeout(r, 500));
-    }
-    return { state: 'still running' };
+      return ['succeeded', 'failed', 'canceled'].includes(j.state) && j;
+    }, 60000, 500) || { state: 'still running' };
   };
   await api({ project: 'ep.silon', instance: 'main', action: 'up' });
   await refreshUntil(page, () => true, { timeout: 5000 });
@@ -4817,7 +4829,7 @@ print(json.dumps(out))
   // status poll, which read docker again, 134 requests in 30 s.
   await page.evaluate(() => { window.__dk = 0; const real = window.fetch;
     window.fetch = function(u, ...a){ if (String(u).startsWith('/api/docker')) window.__dk++; return real.call(this, u, ...a); }; });
-  await page.waitForTimeout(8000);
+  await quiet(8000);
   const dkIdle = await page.evaluate(() => window.__dk);
   // At most one: the manager's token may move once in the window (a job from
   // the checks above ending), and that one read is the re-read wanted.
@@ -4878,10 +4890,8 @@ print(json.dumps(out))
   // check's, a poll's probe) answers from the listing kept before the mark,
   // which says nothing is running there yet (B620).
   let own = await as('/api/dockerctl', { action: 'logs', container: 'helper-for-eps' });
-  for (let i = 0; i < 20 && own.status !== 200; i++) {
-    await sleep(500);
-    own = await as('/api/dockerctl', { action: 'logs', container: 'helper-for-eps' });
-  }
+  if (own.status !== 200)
+    await until(async () => (own = await as('/api/dockerctl', { action: 'logs', container: 'helper-for-eps' })).status === 200, 10000, 500);
   ok(own.status === 200 && /hello from helper-for-eps-app-1/.test(own.text || ''),
      `...and the log of its own container by the name ls prints, which is its services' (${own.status}: ${
         String(own.error || own.text).trim().slice(0, 60)})`);
@@ -5467,7 +5477,11 @@ print(json.dumps(out))`], { encoding: 'utf8' });
   ok(dep.ok === true || /already on the Containers page/.test(dep.error || ''), `nginx is deployed on the node for the row to route through (${JSON.stringify(dep).slice(0, 80)})`);
   await openManager();
   await dmEditAll();
-  for (let i = 0; i < 40 && !(await page.$(`${DM} .dmnginxroute [data-dmngadd]`)); i++){ await dmRefresh(); await dmEditAll(); await sleep(1000); }
+  await until(async () => {
+    if (await page.$(`${DM} .dmnginxroute [data-dmngadd]`)) return true;
+    await dmRefresh(); await dmEditAll();
+    return false;
+  }, 60000, 1000);
   await page.waitForSelector(`${DM} .dmnginxroute [data-dmngadd]`, { timeout: 20000 });
   const line = await page.$eval(`${DM} .dmnginxroute`, e => ({ certs: [...e.querySelectorAll('[data-dmngcert] option')].map(o => o.value),
     ports: [...e.querySelectorAll('[data-dmngport] option')].map(o => `${o.value}${o.disabled ? '!' : ''}`), add: !e.querySelector('[data-dmngadd]').disabled }));
@@ -5491,7 +5505,10 @@ print(json.dumps(out))`], { encoding: 'utf8' });
       dis: b.disabled, ro: b.readOnly, vis: b.offsetHeight > 0, wired: typeof b.oninput === 'function', val: b.value,
       row: b.closest('.row')?.dataset.inst, doc: b.closest('.doc')?.className, pane: [...document.querySelectorAll('.pane')].indexOf(b.closest('.pane')),
       inert: !!b.closest('[inert]') || document.activeElement === b, top: b.closest('dialog') === [...document.querySelectorAll('dialog[open]')].pop() }))));
-    await sleep(300);
+    // Typed again once the re-read that took the box is over: the list in
+    // hand, nothing on its way, no fading copy of the row left.
+    await page.waitForFunction(() => !!dockerList && !dockerFetching && !document.querySelector('.dmtab .fghost'),
+                               null, { timeout: 10000 }).catch(() => {});
   }
   const typed = await page.evaluate(() => JSON.stringify(dmNginxDraft));
   await page.evaluate(() => { dockerRev++; drawPanes(); });

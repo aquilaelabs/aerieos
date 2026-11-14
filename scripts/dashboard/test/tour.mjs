@@ -4,7 +4,7 @@
 // ends it and the page is not toured again, on this browser or another;
 // Skip tour with its box ticked skips every page's; Show the tours again in
 // About brings them back. A phone's is a sheet.
-import { URL, launch, newPage, ok, done, ready } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, until, quiet } from './lib.mjs';
 
 const browser = await launch();
 const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
@@ -12,7 +12,38 @@ const base = URL.replace(/\/$/, '');
 const prefs = async p => (await fetch(base + '/api/users', { method: 'POST', headers: H, body: JSON.stringify({ action: 'prefs', prefs: p }) })).json();
 await prefs({ tour_seen: [], tour_off: false, welcome_seen: true });
 
+// What the blocks that run in the page wait with. till(f) looks until f
+// answers true, fifteen seconds at most. opened(kind, open, also) opens a
+// page and waits until it is in front and drawn with nothing fading out
+// behind it (a page going out still answers to a step's selectors), and
+// until the tour its own draw asked for has come: asked for again while
+// that one's delay runs, a tour comes twice, the second time after the
+// block has ended the first. saved() waits for the answer to the account's
+// last save, which tourEnd sends without waiting for it, for as long at
+// most.
+const waits = () => {
+  const till = async (f, ms = 15000) => {
+    for (const end = Date.now() + ms; !f() && Date.now() < end;) await new Promise(r => setTimeout(r, 50));
+    return f();
+  };
+  const opened = (kind, open, also = () => true) => {
+    const had = tourAsked.has(kind);
+    open();
+    return till(() => tabOf(panes[0])?.kind === kind && !tourLoading() && !document.querySelector('.stack > .leaving') && also()
+      && (had || tourKind === kind || !tourAsked.has(kind)));
+  };
+  const real = window.fetch;
+  let save = null;
+  window.fetch = function(...a){
+    const r = real.apply(this, a);
+    if (String(a[0]?.url || a[0]).endsWith('/api/users')) save = r;
+    return r;
+  };
+  const saved = () => Promise.race([Promise.resolve(save).then(() => {}, () => {}), new Promise(r => setTimeout(r, 15000))]);
+  window.tourTest = { till, opened, saved };
+};
 const page = await newPage(browser, { tour: true, viewport: { width: 1280, height: 900 } });
+await page.addInitScript(waits);
 // Straight to Home by its address: landing on the account's saved front tab
 // (Projects) toured that page first whenever the boot outlasted the tour's
 // delay, which is right for a person and a race for this check.
@@ -26,7 +57,9 @@ const first = await page.evaluate(() => ({ step: $('tourCard').querySelector('.t
 ok(/^1 of \d+$/.test(first.step) && /Welcome to AerieOS/.test(first.say) && first.ring && !first.back && first.skip && first.box,
    `a first visit to Home opens its tour: the first step is the page's whole, no ring, no Back, Skip tour and its box (${first.step})`);
 await page.click('#tourNext');
-await page.waitForTimeout(400);           // the ring's glide to its part
+// The second step drawn, and the ring's glide to its part over.
+await page.waitForFunction(() => /^2 of/.test($('tourCard').querySelector('.tourstep').textContent)
+  && !$('tourRing').hidden && !$('tourRing').getAnimations().length, null, { timeout: 10000 }).catch(() => {});
 const second = await page.evaluate(() => {
   const r = $('tourRing').getBoundingClientRect(), rail = ($('rail') || document.querySelector('.railbar')).getBoundingClientRect();
   return { step: $('tourCard').querySelector('.tourstep').textContent, ring: !$('tourRing').hidden,
@@ -42,7 +75,7 @@ await page.waitForFunction(() => $('tourCard').hidden, null, { timeout: 5000 });
 const saved = await (await fetch(base + '/api/status', { headers: H })).json();
 ok((saved.tour?.seen || []).includes('home') && !saved.tour.off, `Done ends it, and the account keeps that Home was toured (${JSON.stringify(saved.tour)})`);
 await page.evaluate(() => drawPanes());
-await page.waitForTimeout(1200);
+await quiet(1200);
 ok(await page.$eval('#tourCard', c => c.hidden), '...so drawing Home again does not tour it again');
 
 // Another page has its own, once; Skip tour with the box skips them all.
@@ -55,14 +88,19 @@ await page.click('#tourSkip');
 const off = await (await fetch(base + '/api/status', { headers: H })).json();
 ok(off.tour?.off === true && off.tour.seen.includes('projects'), `Skip tour with its box ticked skips every page's (${JSON.stringify(off.tour)})`);
 await page.evaluate(() => openNodesTab());
-await page.waitForTimeout(1500);
+// The page drawn first, which a tour waits for, then the time one would
+// have come in.
+await page.waitForFunction(() => tabOf(panes[0])?.kind === 'nodes' && !tourLoading(), null, { timeout: 15000 }).catch(() => {});
+await quiet(1500);
 ok(await page.$eval('#tourCard', c => c.hidden), '...and a page not toured yet opens with none');
 
 // Show the tours again, from About.
 await page.evaluate(() => openAbout('guide'));
 await page.waitForSelector('#aboutModal:not([hidden]) #aboutTours', { timeout: 10000 });
 await page.click('#aboutTours');
-await page.waitForFunction(async () => true);
+// The press is a save the page sends: until the account says it.
+await until(async () => { const t = (await (await fetch(base + '/api/status', { headers: H })).json()).tour;
+  return !t?.off && !(t?.seen || []).length; }, 10000);
 const back = await (await fetch(base + '/api/status', { headers: H })).json();
 ok(!back.tour?.off && !(back.tour?.seen || []).length, `About's Show the tours again clears what was seen and the box (${JSON.stringify(back.tour)})`);
 // Close is all a person does: no reload and no redraw by hand (the
@@ -86,6 +124,7 @@ const overSetup = await page.evaluate(async () => {
   state.settings.settings.setup_done = { value: false };
   state.tour = { seen: [], off: false };     // a page not toured, so only the setup page holds it
   tourAsked.clear(); tourSoon(tabOf(panes[0])?.kind);
+  // No tour is the check: the time one would have come in, its delay being 700 ms.
   await new Promise(r => setTimeout(r, 1200));
   const shown = !$('tourCard')?.hidden;
   state.settings.settings.setup_done = was; state.tour = seen;
@@ -101,6 +140,7 @@ const overShimmer = await page.evaluate(async () => {
   const ph = document.createElement('div'); ph.className = 'loading skel';
   document.querySelector('.doc.on')?.appendChild(ph);
   tourAsked.clear(); tourSoon(tabOf(panes[0])?.kind);
+  // No tour is the check here too: the time one would have come in.
   await new Promise(r => setTimeout(r, 1200));
   const during = !$('tourCard')?.hidden;
   ph.remove(); tourSoon(tabOf(panes[0])?.kind);
@@ -118,10 +158,10 @@ ok(/9999px/.test(overShimmer.shade) && /0\.35/.test(overShimmer.shade), `...and 
 // An empty page's step about its rows shows an example of one, inert, and
 // takes it away after (the operator, 21 Oct).
 const sample = await page.evaluate(async () => {
+  const { opened, saved } = tourTest;
   const seen = state.tour;
   state.tour = { seen: [], off: false };
-  openVmsTab();
-  await new Promise(r => setTimeout(r, 1500));
+  await opened('vms', openVmsTab, () => vmsData);
   tourAsked.clear(); tourSoon('vms');
   for (let i = 0; i < 30 && !tourKind; i++) await new Promise(r => setTimeout(r, 100));
   while (tourKind && tourI < tourSteps.length - 1 && !$('tourSample')) tourGo(1);
@@ -132,7 +172,7 @@ const sample = await page.evaluate(async () => {
   out.gone = !$('tourSample');
   // tourEnd's save goes out unawaited: let it land before the next check
   // resets the account, or it lands after and marks the pages toured.
-  await new Promise(r => setTimeout(r, 1000));
+  await saved();
   state.tour = seen;
   openHome();
   return out;
@@ -146,11 +186,11 @@ ok(sample.empty && sample.shown && sample.inert && sample.example && sample.row 
 // keeps hidden does not hold the tour back (B216: Containers had none); and
 // a poll answering with the old list after Reset does not undo it (B217).
 const tours = await page.evaluate(async () => {
+  const { till, opened, saved } = tourTest;
   const seen = state.tour;
   const wait = async f => { for (let i = 0; i < 40 && !f(); i++) await new Promise(r => setTimeout(r, 100)); return f(); };
   state.tour = { seen: [], off: false };
-  openVmsTab();
-  await new Promise(r => setTimeout(r, 1500));
+  await opened('vms', openVmsTab, () => vmsData);
   tourAsked.clear(); tourSoon('vms');
   await wait(() => tourKind);
   while (tourKind && tourI < tourSteps.length - 1 && !$('tourSample')) tourGo(1);
@@ -159,10 +199,9 @@ const tours = await page.evaluate(async () => {
   const b = $('tourSample')?.getBoundingClientRect(), r = $('tourRing').getBoundingClientRect();
   const ringed = !!b && Math.abs(r.top - (b.top - 4)) < 2 && Math.abs(r.height - (b.height + 8)) < 2;
   tourEnd(false);
-  await new Promise(r => setTimeout(r, 1000));
+  await saved();
   state.tour = { seen: [], off: false };
-  openDocker();
-  await new Promise(r => setTimeout(r, 1500));
+  await opened('docker', openDocker);
   const hid = document.createElement('div');
   hid.className = 'loading skel'; hid.hidden = true;
   document.querySelector('.doc.on')?.appendChild(hid);
@@ -170,15 +209,17 @@ const tours = await page.evaluate(async () => {
   const docker = await wait(() => tourKind === 'docker');
   hid.remove();
   tourEnd(false);
-  await new Promise(r => setTimeout(r, 1000));
+  await saved();
   // A poll that left before the reset, answering after it.
   const poll = refresh();
   await tourReset();
   await poll;
-  await new Promise(r => setTimeout(r, 1500));
+  // ...and the poll asked for in its place answered too, with the tour the
+  // reset asked for come, which tourEnd below ends.
+  await till(() => !refreshBusy && !refreshAgain && (tourKind === 'docker' || !tourAsked.has('docker')));
   const kept = !tourSeen().has('vms') && !tourSeen().has('docker');
   tourEnd(false);
-  await new Promise(r => setTimeout(r, 1000));
+  await saved();
   state.tour = seen;
   openHome();
   return { back: !!back, ringed, docker, kept };
@@ -191,21 +232,22 @@ ok(tours.kept, `...and a poll with the old list after Show the tours again does 
 // example goes into the page on show, not the first kept (B223, the
 // operator, 22 Oct: a ring around an empty box on VMs after Home).
 const after = await page.evaluate(async () => {
+  const { opened, saved } = tourTest;
   const seen = state.tour;
   const wait = async f => { for (let i = 0; i < 40 && !f(); i++) await new Promise(r => setTimeout(r, 100)); return f(); };
   state.tour = { seen: ['home', 'docker'], off: false };
-  openHome(); await new Promise(r => setTimeout(r, 800));
-  openDocker(); await new Promise(r => setTimeout(r, 1200));
+  await opened('home', openHome);
+  await opened('docker', openDocker);
   tourEnd(false);
   state.tour = { seen: ['home', 'docker'], off: false };
-  openVmsTab(); await new Promise(r => setTimeout(r, 1500));
+  await opened('vms', openVmsTab, () => vmsData);
   tourAsked.clear(); tourSoon('vms');
   await wait(() => tourKind === 'vms');
   while (tourKind && tourI < tourSteps.length - 1 && !$('tourSample')) tourGo(1);
   const sm = $('tourSample');
   const out = { kept: document.querySelectorAll('#pane0 .doctab').length, inVms: !!sm?.closest('.vmtab'), shown: !!sm?.checkVisibility() };
   tourEnd(false);
-  await new Promise(r => setTimeout(r, 1000));
+  await saved();
   state.tour = seen;
   openHome();
   return out;
@@ -216,6 +258,7 @@ ok(after.kept >= 2 && after.inVms && after.shown,
 // On a phone the card is a sheet from the bottom edge.
 await prefs({ tour_seen: [], tour_off: false });
 const phone = await newPage(browser, { tour: true, viewport: { width: 393, height: 852 }, isMobile: true, hasTouch: true });
+await phone.addInitScript(waits);
 await phone.goto(URL);
 await ready(phone);
 await phone.waitForSelector('#tourCard:not([hidden])', { timeout: 15000 });
@@ -224,8 +267,9 @@ ok(sheet.sheet && sheet.bottom <= 1 && sheet.left === 0 && sheet.width === 393, 
 // ...and an empty VMs page there shows its example VM too (the operator, 21
 // Oct: the step's broad selector took the page's own notice for a row).
 const phoneSample = await phone.evaluate(async () => {
+  const { saved } = tourTest;
   tourEnd(false);
-  await new Promise(r => setTimeout(r, 1000));
+  await saved();
   state.tour = { seen: [], off: false };
   openVmsTab();
   for (let i = 0; i < 100 && (!vmsData || tourLoading()); i++) await new Promise(r => setTimeout(r, 100));
@@ -234,7 +278,7 @@ const phoneSample = await phone.evaluate(async () => {
   while (tourKind && tourI < tourSteps.length - 1) tourGo(1);
   const out = { step: tourI, shown: !!$('tourSample'), row: !!$('tourSample')?.querySelector('[data-vm-key]') };
   tourEnd(false);
-  await new Promise(r => setTimeout(r, 1000));
+  await saved();
   return out;
 });
 ok(phoneSample.shown && phoneSample.row, `...and on a phone an empty VMs page's last step shows an example VM (${JSON.stringify(phoneSample)})`);
@@ -244,26 +288,33 @@ await prefs({ tour_seen: [], tour_off: true });
 // operator, 26 Oct): the first card on the page, turned back after; and on a
 // page with none, the example card, which turns over in place.
 const flips = await page.evaluate(async () => {
-  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const { till, opened, saved } = tourTest;
   const ringOn = sel => { const r = $('tourRing').getBoundingClientRect(), t = document.querySelector(sel)?.getBoundingClientRect();
     return !!t && !$('tourRing').hidden && r.left <= t.left + 1 && r.right >= t.right - 1 && r.top <= t.top + 1 && r.bottom >= t.bottom - 1; };
-  openProjectsTab(); await sleep(1200);
-  tourAsked.clear(); tourStart('projects'); await sleep(300);
-  tourGo(1); tourGo(1); tourGo(1); await sleep(900);
+  // The tour up on its first step.
+  const up = () => till(() => tourKind === 'projects' && !$('tourCard').hidden);
+  // What ringOn measures, at rest: the ring shown (it is hidden while a card
+  // turns over), its glide over, and no card face still turning.
+  const placed = () => till(() => !$('tourRing').hidden && !$('tourRing').getAnimations().length
+    && ![...document.querySelectorAll('#pane0 .pcard > .pcface')].some(f => f.getAnimations().length));
+  await opened('projects', openProjectsTab, () => document.querySelector('#pane0 .pgrid .pcard[data-pkey]'));
+  tourAsked.clear(); tourStart('projects'); await up();
+  tourGo(1); tourGo(1); tourGo(1); await placed();
   const card = document.querySelector('#pane0 .pgrid .pcard[data-pkey]');
   const real = { steps: tourSteps.length, turned: card.classList.contains('flipped'), ringed: ringOn('#pane0 .pcard.flipped .pcback .pcrepo'),
                  sample: !!$('tourSample') };
-  tourEnd(false); await sleep(600);
+  // The save landed, and the card turned back with the turn over, or drawn again.
+  tourEnd(false); await saved(); await till(() => !card.isConnected || ![...card.querySelectorAll(':scope > .pcface')].some(f => f.getAnimations().length));
   real.back = !card.isConnected || !document.querySelector(`#pane0 .pcard[data-pkey="${card.dataset.pkey}"]`).classList.contains('flipped');
-  pjQuery = 'no-project-is-called-this'; drawProjects(state.projects); await sleep(300);
-  tourAsked.clear(); tourStart('projects'); await sleep(300);
-  tourGo(1); tourGo(1); await sleep(300);
+  pjQuery = 'no-project-is-called-this'; drawProjects(state.projects); await till(() => !document.querySelector('#pane0 .pgrid .pcard[data-pkey]'));
+  tourAsked.clear(); tourStart('projects'); await up();
+  tourGo(1); tourGo(1); await placed();
   const ex = { front: !!document.querySelector('#tourSample .pcard:not(.flipped)'), ringed: ringOn('#tourSample .pcard .pcfront') };
-  tourGo(1); await sleep(900);
+  tourGo(1); await placed();
   ex.turned = !!document.querySelector('#tourSample .pcard.flipped'); ex.ringedBack = ringOn('#tourSample .pcard .pcback .pcrepo');
-  tourGo(1); await sleep(300);
+  tourGo(1); await placed();
   ex.foot = ringOn('#tourSample .pcard .pcback .pcfoot');
-  tourEnd(false); await sleep(300);
+  tourEnd(false); await saved();
   ex.gone = !$('tourSample');
   pjQuery = ''; drawProjects(state.projects);
   return { real, ex };
@@ -316,7 +367,11 @@ for (const p of [page, phone]){
         await new Promise(r => setTimeout(r, 100));
       }
     }, [k, want]);
-    await p.waitForTimeout(600);
+    // The page left has faded out (while it does, its parts still answer to
+    // a step's selectors), and each part this page's steps are about is drawn.
+    await p.waitForFunction(([k, unshown]) => !document.querySelector('.stack > .leaving')
+      && (TOUR_STEPS[k] || []).every((s, j) => !s.at || s.sample || unshown.includes(j) || tourTarget(s.at)),
+      [k, UNSHOWN[k] || []], { timeout: 10000 }).catch(() => {});
     const miss = await p.evaluate(k => (TOUR_STEPS[k] || []).map((s, j) => s.at && !s.sample && !tourTarget(s.at) ? j : -1).filter(j => j >= 0), k);
     for (const j of miss) if (!(UNSHOWN[k] || []).includes(j)) lost.push(`${k} step ${j + 1}`);
   }
