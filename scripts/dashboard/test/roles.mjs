@@ -5,7 +5,7 @@
 // and every notebook view they can, changes the settings that are theirs, is
 // refused the ones that are not, and meets the others' changes. Console
 // errors and server errors are collected per person across the whole walk.
-import { launch, newPage, ok, done, ready, sleep, refreshUntil, URL, DIR, member, splitPick } from './lib.mjs';
+import { launch, newPage, ok, done, ready, settled, refreshUntil, URL, DIR, member, splitPick } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 
@@ -44,7 +44,7 @@ const pageFor = async (who) => {
     httpCredentials: { username: who.name, password: who.pw }, extraHTTPHeaders: { Authorization: auth } });
   page.fivexx = [];
   page.on('response', r => { if (r.status() >= 500 && !r.url().includes('/term')) page.fivexx.push(`${r.status()} ${r.url().replace(/^https?:\/\/[^/]+/, '')}`); });
-  await page.goto(URL); await ready(page); await sleep(800);
+  await page.goto(URL); await ready(page); await settled(page);
   return page;
 };
 // Through the context's own request API, with the person's credentials,
@@ -83,7 +83,7 @@ for (const who of CAST) {
   for (const proj of mine) {
     for (const v of VIEWS) {
       await page.evaluate(([p, view]) => openNotebook(p, view), [proj, v]);
-      await sleep(350);
+      await settled(page);
     }
   }
   ok(true, `${tag} opened all ${VIEWS.length} notebook views of ${mine.length ? mine.join(' and ') : 'no space'}`);
@@ -100,9 +100,9 @@ for (const who of CAST) {
   // below that matters.
   if (isAdmin) for (const fn of Object.values(ADMIN_TABS)) {
     await page.evaluate(f => window[f](), fn);
-    await sleep(500);
+    await settled(page);
   }
-  await page.evaluate(() => openProfileTab()); await sleep(500);
+  await page.evaluate(() => openProfileTab()); await settled(page);
   ok(true, `${tag} opened Profile and ${isAdmin ? 'every administration tab' : 'what a user can reach'}`);
 
   // Settings that are theirs.
@@ -323,7 +323,11 @@ for (const who of CAST) {
   const seen = await user3.page.evaluate(() => (state.projects || []).map(p => p.name));
   const notTheirs = ALL.find(n => !seen.includes(n)) || 'no-such-project';
   await user3.page.goto(URL.replace(/\/$/, '') + '/#/projects/' + notTheirs);
-  await ready(user3.page); await sleep(3000);
+  // The address is opened on the first draw that has state, which ready()
+  // has seen: what that page reads has landed, and nothing in it still says
+  // loading.
+  await ready(user3.page); await settled(user3.page);
+  await user3.page.waitForFunction(() => !document.querySelector('#pane0 .loading, #pane0 .skboot'), null, { timeout: 15000 }).catch(() => {});
   const nb = await user3.page.evaluate(p => ({ project: p, hash: location.hash, kind: tabOf(panes[0])?.kind || '',
     arg: tabOf(panes[0])?.arg || '', loading: !!document.querySelector('#pane0 .loading, #pane0 .skboot'),
     mem: !!document.querySelector(`#pane0 [data-project="${p}"]`) }), notTheirs);

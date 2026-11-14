@@ -6,7 +6,7 @@
 // assertion is a round trip through the channel, which is the thing phase 3
 // exists to prove.
 import { URL, launch, newPage, ok, done, ready, sleep, refreshUntil, DIR,
-         tmuxNew, tmuxKill, tmuxFmt, tmuxCapture, openSection } from './lib.mjs';
+         tmuxNew, tmuxKill, tmuxFmt, tmuxCapture, openSection, quiet as quietFor } from './lib.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { readFileSync, existsSync, statSync, lstatSync, readlinkSync, writeFileSync, mkdirSync, readdirSync, openSync, rmSync, appendFileSync, realpathSync, copyFileSync, cpSync, chmodSync, symlinkSync } from 'node:fs';
@@ -49,7 +49,7 @@ const api = async (path, body) => {
 const nodeById = async id => (await api('/api/v1/nodes')).nodes.find(n => n.id === id);
 const until = async (fn, ms = 15000, step = 200) => {
   const end = Date.now() + ms;
-  while (Date.now() < end){ const v = await fn(); if (v) return v; await sleep(step); }
+  while (Date.now() < end){ const v = await fn(); if (v) return v; await sleep(step); }   // the loop's own period
   return null;
 };
 
@@ -301,15 +301,18 @@ const { connect: wsConnect } = createRequire(import.meta.url)(`${REPO}/apps/vsco
 const termRun = async (arg, type, hdr, answer) => {
   const sock = await wsConnect(URL.replace(/\/$/, '').replace(/^http/, 'ws') + '/termws?arg='
     + encodeURIComponent(arg) + '&cols=120&rows=30', { headers: hdr });
-  let out = '', why = null;
-  sock.on('message', b => { out += b.toString('utf8'); });
+  let out = '', why = null, heard = 0;
+  sock.on('message', b => { out += b.toString('utf8'); heard = Date.now(); });
   sock.on('close', (code, w) => { why = w; });
-  await sleep(2500);
+  // The shell at its prompt, which no event says: something drawn and then
+  // a second with nothing more, or the terminal closed with its reason.
+  await until(() => why !== null || (heard && Date.now() - heard >= 1000), 30000, 50);
   if (type && why === null){
     sock.send(Buffer.concat([Buffer.from([0]), Buffer.from(type, 'utf8')]));
-    await sleep(2500);
     // A shell that is slow to start under a whole run's load answers late.
-    for (const t0 = Date.now(); answer && !answer.test(out) && why === null && Date.now() - t0 < 30000;) await sleep(200);
+    if (answer) await until(() => answer.test(out) || why !== null, 32500, 50);
+    // With no answer named there is nothing to wait for: what the shell says in this long is what is returned.
+    else await sleep(2500);
   }
   sock.close();
   return { out: out.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\x1b[()][0-9A-Za-z]/g, ''), why };
@@ -3168,6 +3171,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
     const dfin = dj.job ? await waitJob(dj.job) : null;
     ok(dfin?.state === 'succeeded' && /selfcheck ok/.test(dfin.log || '') && /installed sha256:/.test(dfin.log || ''),
        `it passes the start check and is installed (${dfin?.state}: ${(dfin?.log || '').trim().split('\n').pop()?.slice(0, 80)})`);
+    // The sleep is the deadline beside the exit that is waited for.
     const died = await Promise.race([gone, sleep(40000).then(() => 'still running')]);
     ok(died !== 'still running' && died !== 0, `...and dies as it starts (exit ${died})`);
     const trial1 = existsSync(`${AGENT_RUN}.trial`) ? JSON.parse(readFileSync(`${AGENT_RUN}.trial`, 'utf8')) : {};
@@ -3175,7 +3179,8 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
     let starts = 0, alive = false;
     for (; starts < 5 && !alive; starts++){
       const p = spawn('python3', [AGENT_RUN, 'run'], { env: agentEnv, stdio: ['ignore', agentOut, agentOut] });
-      const ended = await Promise.race([new Promise(res => p.once('exit', () => res(true))), sleep(8000).then(() => false)]);
+      // Up is not having exited in this long: a window, with nothing to wait for.
+      const ended = await Promise.race([new Promise(res => p.once('exit', () => res(true))), quietFor(8000).then(() => false)]);
       if (!ended){ agent = p; alive = true; }
     }
     ok(alive && starts === 3, `started again as the service would, it dies twice more and the next start stays up (${starts} starts)`);

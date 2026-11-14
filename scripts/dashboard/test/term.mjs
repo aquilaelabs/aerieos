@@ -6,7 +6,7 @@
 // session; a tab popped out opens the same terminal on a page of its own
 // (terminal.html); a closed tab's socket goes with it. Driven through the
 // page, as a person at the dock would.
-import { launch, newPage, ok, done, ready, finger, URL, DIR, member, projectKey } from './lib.mjs';
+import { launch, newPage, ok, done, ready, finger, until, quiet, URL, DIR, member, projectKey } from './lib.mjs';
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
@@ -31,14 +31,7 @@ const screen = () => page.evaluate(() => {
   for (let i = 0; i < b.length; i++) out.push(b.getLine(i)?.translateToString(true) || '');
   return out.join('\n');
 });
-const waitFor = async (re, ms = 20000) => {
-  const end = Date.now() + ms;
-  while (Date.now() < end){
-    if (re.test(await screen())) return true;
-    await new Promise(r => setTimeout(r, 200));
-  }
-  return false;
-};
+const waitFor = (re, ms = 20000) => until(async () => re.test(await screen()), ms, 200);
 
 // The text is inset from the pane's edges, and the rows still fit: the
 // last row's bottom inside the box.
@@ -98,7 +91,8 @@ ok(await waitFor(/kb-42/) && !keysAsked.length, `the keys bar's Enter goes down 
   const said = await page.evaluate(async () => (await fetch('/api/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ project: 'alpha', term_scheme: 'red' }) })).status);
   await page.evaluate(() => refresh());
-  await page.waitForTimeout(1500);
+  // Time in which the space's color would have reached the terminal.
+  await quiet(1500);
   const there = await opts();
   const padThere = await page.evaluate(() => getComputedStyle(document.querySelector('#pane1 .slot.on.ownterm')).backgroundColor);
   // A space has no colors of its own now (R223): Profile's are every space's.
@@ -168,7 +162,9 @@ ok(await waitFor(/kb-42/) && !keysAsked.length, `the keys bar's Enter goes down 
     return null;
   });
   if (at) await finger(phone, at.x, at.y, at.x, at.y, 800);
-  await phone.waitForTimeout(800);
+  await phone.waitForFunction(() => [...TERMS.values()].find(r => r.t.arg === 'sh:9:alpha')?.term.getSelection() === 'pick-me-word'
+    && document.querySelectorAll('#pane1 .slot.on .xsel .xgrip').length === 2 && !!document.querySelector('#pane1 .slot.on .xsel .xcopy'),
+    null, { timeout: 10000 }).catch(() => {});
   const picked = await phone.evaluate(() => ({ sel: [...TERMS.values()].find(r => r.t.arg === 'sh:9:alpha').term.getSelection(),
     grips: document.querySelectorAll('#pane1 .slot.on .xsel .xgrip').length, copy: !!document.querySelector('#pane1 .slot.on .xsel .xcopy') }));
   ok(at && picked.sel === 'pick-me-word' && picked.grips === 2 && picked.copy,
@@ -186,7 +182,10 @@ ok(await waitFor(/kb-42/) && !keysAsked.length, `the keys bar's Enter goes down 
 {
   const [win] = await Promise.all([page.waitForEvent('popup'), page.evaluate(id => popOut(id), id)]);
   await win.waitForSelector('.xterm', { timeout: 20000 });
-  await win.waitForTimeout(1500);
+  // Its socket open and the session's screen drawn: a key typed before
+  // the socket opens goes nowhere.
+  await win.waitForFunction(() => ws?.readyState === WebSocket.OPEN
+    && /\S/.test(document.querySelector('.xterm-rows')?.textContent || ''), null, { timeout: 20000 }).catch(() => {});
   await win.keyboard.type('echo popped-$((7*6))');
   await win.keyboard.press('Enter');
   const seen = await win.waitForFunction(() => /popped-42/.test(document.querySelector('.xterm-rows')?.textContent || ''),
@@ -215,7 +214,7 @@ ok(before === 1 && after.length === 0, `closing the tab closes its terminal (${b
   const logText = () => page.evaluate(() => { const r = [...TERMS.values()].find(r => r.t.arg === 'log:controller' && r.term);
     if (!r) return ''; const b = r.term.buffer.active, out = [];
     for (let i = 0; i < b.length; i++) out.push(b.getLine(i)?.translateToString(true) || ''); return out.join('\n'); });
-  const seen = async re => { for (let i = 0; i < 40; i++){ if (re.test(await logText())) return true; await new Promise(r => setTimeout(r, 250)); } return false; };
+  const seen = re => until(async () => re.test(await logText()), 10000, 250);
   const first = await seen(/log-follow-first/);
   appendFileSync(`${DIR}/state/logs/builderbot.log`, 'log-follow-second\n');
   const second = await seen(/log-follow-second/);
@@ -290,7 +289,10 @@ ok(before === 1 && after.length === 0, `closing the tab closes its terminal (${b
   }), `u:${ownerUid}:sh:7:alpha`);
   const termUid = JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users['w.term'].uid;
   let sessions = '';
-  try { sessions = execFileSync('tmux', ['list-sessions', '-F', '#{session_name}'], { encoding: 'utf8' }); } catch { sessions = ''; }
+  await until(() => {
+    try { sessions = execFileSync('tmux', ['list-sessions', '-F', '#{session_name}'], { encoding: 'utf8' }); } catch { sessions = ''; }
+    return sessions.split('\n').includes(`${termUid}~shell-alpha-7`);
+  });
   ok(!/own-42-terminal/.test(forged) && sessions.split('\n').includes(`${termUid}~shell-alpha-7`),
      `naming another account on a terminal's argument opens one of your own, never theirs (${forged.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\s+/g, ' ').trim().slice(-60)})`);
   const opened = await other.evaluate(() => new Promise(res => {

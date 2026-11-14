@@ -3,7 +3,7 @@
 // for what they are for. Staged behind the notebook's Save; the prompts and
 // docs/design-language.md are the server's words, which is what aerie design
 // prints. The view is passive: nothing on it reaches into a session.
-import { launch, newPage, ok, done, ready, patience, openFold, URL, DIR } from './lib.mjs';
+import { launch, newPage, ok, done, ready, patience, openFold, URL, DIR, settled, quiet } from './lib.mjs';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
@@ -35,7 +35,8 @@ const saved = async () => {
       });
   }
   await page.waitForFunction(() => !/unsaved/.test([...document.querySelectorAll('.nb .nbview[data-view="design"] :is(#dsHint, .nbsaidslot)')].map(e => e.textContent).join(' ')), null, { timeout: 20000 });
-  await page.waitForTimeout(300);
+  // The view's own re-read after a save (the file's state) answered and drawn.
+  await settled(page);
 };
 // ...and Revert, every section's that has something to throw away.
 const revertAll = async () => {
@@ -112,7 +113,7 @@ await page.mouse.move(r.x + 20, r.y + 20);
 await page.mouse.down();
 await page.mouse.move(r.x + 20 + cw * 1.2, r.y + 20, { steps: 6 });
 await page.mouse.up();
-await page.waitForTimeout(300);
+await page.waitForFunction(() => document.querySelector('.nb [data-dspage] .dsblock.on')?.style.gridColumn === '2 / span 8', null, { timeout: 10000 }).catch(() => {});
 ok(await page.$eval(`${NB} [data-dspage] .dsblock.on`, e => e.style.gridColumn) === '2 / span 8',
    'a block dragged a column to the right moves a column on the grid');
 await page.fill(`${NB} [data-dspage] [data-dsb="label"]`, 'orders per day');
@@ -310,12 +311,19 @@ ok(again.language.themes[1].light?.[0]?.hex === '#123456' && again.language.them
       return need > s.getBoundingClientRect().width + 1 ? `${s.id || s.className}: ${t}` : '';
     }).filter(Boolean));
     const was = page.viewportSize(), seen = [];
+    // Two frames on, and every tween that ends ended: what a width or an opened section moves has landed.
+    const still = async () => {
+      await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+      await page.waitForFunction(() => !document.getAnimations().some(a => a.playState === 'running'
+        && Number.isFinite(a.effect?.getComputedTiming().endTime)), null, { timeout: 10000 }).catch(() => {});
+    };
     for (const width of [1280, 360]){
       await page.setViewportSize({ width, height: 800 });
-      await page.waitForTimeout(200);
+      await page.waitForFunction(w => innerWidth === w, width, { timeout: 10000 });
+      await still();
       // Opened in place, not pressed: at 360 a toast can sit over a head.
       await page.$$eval('.nb #dsBody > details.sect', ds => ds.forEach(d => { d.open = true; }));
-      await page.waitForTimeout(200);
+      await still();
       seen.push(...(await cut()).map(x => `${width} ${x}`));
     }
     await page.setViewportSize(was);
@@ -328,7 +336,8 @@ ok(again.language.themes[1].light?.[0]?.hex === '#123456' && again.language.them
   await page.click(`${NB} [data-sect="design:rules:t0"] [data-dsruleadd]`);
   await page.waitForSelector(`${NB} [data-dsrules="t0"] .rulerow.editing .rlName`, { timeout: 5000 });
   await page.fill(`${NB} [data-dsrules="t0"] .rulerow.editing .rlText`, 'A rule that is not saved.');
-  await page.waitForTimeout(patience(800));
+  // Staged and not sent: the time in which a write would have reached the server.
+  await quiet(patience(800));
   const mid = await api(`/api/design?project=${P}`);
   ok(JSON.stringify({ l: mid.language, p: mid.pages }) === JSON.stringify({ l: before.language, p: before.pages })
      && await saveAwake(),

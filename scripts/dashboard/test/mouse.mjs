@@ -1,6 +1,6 @@
 // Desktop mouse: tab drag reorders in place with a slide, the click ending a
 // drag does not switch tabs, a plain click does, tab enter/exit animations.
-import { launch, newPage, ok, done, ready, layoutSettled, URL, animatedDuring } from './lib.mjs';
+import { launch, newPage, ok, done, ready, layoutSettled, URL, animatedDuring, settled } from './lib.mjs';
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 800 } });
@@ -25,13 +25,21 @@ ok(await page.evaluate(() => tabOf(panes[1])?.kind === 'term'), '...and its − 
   const before = await page.evaluate(() => tabs.map(t => t.id));
   await page.evaluate(() => { for (let i = 0; i < 9; i++) newShell(''); });
   await page.waitForFunction(n => document.querySelectorAll('#pane1 .dtab[data-id]').length >= n, before.length + 7, { timeout: 15000 });
-  await page.waitForTimeout(300);
+  // The line drawn with them all and scrolled to the one in front, which is what is read next.
+  await page.waitForFunction(() => { const line = document.querySelector('#pane1 .dockline'), on = line?.querySelector('.dtab.on');
+    if (!on || on.dataset.id !== panes[1]) return false;
+    const a = line.getBoundingClientRect(), b = on.getBoundingClientRect();
+    return b.left >= a.left - 1 && b.right <= a.right + 1 && line.scrollWidth > line.clientWidth; }, null, { timeout: 10000 }).catch(() => {});
   const seen = () => page.evaluate(() => { const line = document.querySelector('#pane1 .dockline'), on = line.querySelector('.dtab.on');
     const a = line.getBoundingClientRect(), b = on.getBoundingClientRect();
     return { fits: b.left >= a.left - 1 && b.right <= a.right + 1, scrolls: line.scrollWidth > line.clientWidth }; });
   const last = await seen();
   await page.evaluate(() => dockShow(tabs.filter(t => t.kind === 'term')[0].id));
-  await page.waitForTimeout(200);
+  // The first one in front on the line, and the line come to it.
+  await page.waitForFunction(() => { const line = document.querySelector('#pane1 .dockline'), on = line?.querySelector('.dtab.on');
+    if (!on || on.dataset.id !== panes[1] || panes[1] !== tabs.filter(t => t.kind === 'term')[0].id) return false;
+    const a = line.getBoundingClientRect(), b = on.getBoundingClientRect();
+    return b.left >= a.left - 1 && b.right <= a.right + 1; }, null, { timeout: 10000 }).catch(() => {});
   const first = await seen();
   ok(last.scrolls && last.fits && first.fits,
      `with more terminals than the line holds, the one in front is on it, the newest and then the first (${JSON.stringify({ last, first })})`);
@@ -45,10 +53,16 @@ await page.waitForSelector('#pane1 .slot.on.ownterm', { timeout: 10000 });
 {
   const look = () => page.evaluate(() => ({ h: Math.round($('pane1').getBoundingClientRect().height), kind: tabOf(panes[1])?.kind }));
   const press = re => page.evaluate(src => [...document.querySelectorAll('#pane1 .dtab > button')].find(b => new RegExp(src).test(b.textContent.trim()))?.click(), re);
+  // The dock on that kind and at rest: nothing in it still moving, what it asked for answered.
+  const shows = async kind => {
+    await page.waitForFunction(k => tabOf(panes[1])?.kind === k && !$('pane1').getAnimations({ subtree: true })
+      .some(a => a.playState === 'running' && Number.isFinite(a.effect?.getComputedTiming().endTime)), kind, { timeout: 10000 }).catch(() => {});
+    await settled(page);
+  };
   const shell = await look();
-  await press('^Chat'); await page.waitForTimeout(500);
+  await press('^Chat'); await shows('chat');
   const chat = await look();
-  await press('^sh'); await page.waitForTimeout(500);
+  await press('^sh'); await shows('term');
   const back = await look();
   ok(shell.kind === 'term' && chat.kind === 'chat' && back.kind === 'term' && shell.h === chat.h && back.h === shell.h,
      `the dock is one height on a shell and on Chat (${JSON.stringify({ shell, chat, back })})`);

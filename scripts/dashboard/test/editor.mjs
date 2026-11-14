@@ -7,7 +7,7 @@
 // own code, driven under a stand-in for VS Code's API against this server,
 // and its terminal, AerieOS's own on /termws.
 // No browser.
-import { ok, done, DIR, URL } from './lib.mjs';
+import { ok, done, sleep, until, DIR, URL } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, symlinkSync, existsSync, statSync, utimesSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -156,7 +156,9 @@ print("\\n".join(f"{p} {a} {t}" for p, a, t in db.execute("SELECT principal, act
      `search finds a line across the tree for an account that may read it, never in .git, and not for one that may not (${found.matches?.length} matches)`);
   const start = await as(c['ed.r'], 'alpha', 'changes', { since: 0 });
   const waiting = as(c['ed.r'], 'alpha', 'changes', { since: start.rev, wait: 15 });
-  await new Promise(r => setTimeout(r, 500));
+  // Time for the ask to reach the server and be waiting there before the
+  // file is written: nothing outside the server says that it is.
+  await sleep(500);
   writeFileSync(`${tree}/claude-wrote-this.txt`, 'new\n');
   const t0 = Date.now();
   const got = await waiting;
@@ -250,12 +252,20 @@ print("\\n".join(f"{p} {a} {t}" for p, a, t in db.execute("SELECT principal, act
   const ed = opened[0];
   ok(!errors.length && ed && /^\/alpha\//.test(ed.uri.path) && ed.selection?.active.character - ed.selection?.anchor.character === 'again'.length,
      `...Search Space Files opens the match it picked with the word selected (${errors[0] || ed?.uri.path})`);
+  // The watch follows from the revision its first answer gives: in hand
+  // once it asks again, which is the ask that waits.
+  const filesWas = Client.prototype.files;
+  let following = false;
+  Client.prototype.files = function (project, action, extra = {}) {
+    if (action === 'changes' && extra.wait) following = true;
+    return filesWas.call(this, project, action, extra);
+  };
   const w = provider.watch(uri('/'), { recursive: true, excludes: [] });
-  await new Promise(r => setTimeout(r, 1500));
+  await until(() => following, 15000);
+  Client.prototype.files = filesWas;
   writeFileSync(`${tree}/watched.txt`, 'appears\n');
   const t0 = Date.now();
-  while (!fired.flat().some(e => e.uri?.path === '/alpha/watched.txt') && Date.now() - t0 < 12000)
-    await new Promise(r => setTimeout(r, 200));
+  await until(() => fired.flat().some(e => e.uri?.path === '/alpha/watched.txt'), 12000, 200);
   w.dispose();
   ok(fired.flat().some(e => e.uri?.path === '/alpha/watched.txt' && e.type === 2),
      `...and a file a session writes is told to VS Code as created, for open editors to follow (${Date.now() - t0} ms)`);
@@ -265,23 +275,25 @@ print("\\n".join(f"{p} {a} {t}" for p, a, t in db.execute("SELECT principal, act
 {
   // Opened, written to and ended through the extension's own client; the
   // reason a terminal ends with, a refusal among them, is what it closes on.
-  const run = async (who, arg, type) => {
+  // With something to type, the shell's prompt is waited for, then `want`
+  // in what it prints; with nothing, the reason the server ends it with.
+  const run = async (who, arg, type, want) => {
     const t = new Term(who, arg);
     let out = '', why = null;
     t.on('output', s => { out += s; });
     t.on('close', w => { why = w; });
     await t.open(90, 20);
-    await new Promise(r => setTimeout(r, 1500));
+    await until(() => why !== null || (type && /[$#]/.test(out.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, ''))), 15000);
     if (type && why === null) {
       t.write(type);
-      await new Promise(r => setTimeout(r, 1500));
+      await until(() => why !== null || !want || want.test(out.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\s+/g, ' ')), 15000);
     }
     t.close();
-    await new Promise(r => setTimeout(r, 200));
+    await until(() => why !== null);
     return { out: out.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\s+/g, ' '), why };
   };
   const owner = new Client(base, await signIn(base, 'test', 'test'));
-  const sh = await run(owner, 'sh:1:alpha', 'echo walk-$((6*7))\r');
+  const sh = await run(owner, 'sh:1:alpha', 'echo walk-$((6*7))\r', /walk-42/);
   ok(/walk-42/.test(sh.out),
      `the terminal is the dashboard's, and what is typed runs (${sh.out.slice(-80)})`);
   // Another agent's session as Open Agent Session opens it (R128): the

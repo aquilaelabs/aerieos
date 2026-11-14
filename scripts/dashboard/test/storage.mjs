@@ -3,7 +3,7 @@
 // harness's fixture node is enrolled by hand with a walk in its census; the
 // tab lists it with its filesystems as meters, its stores, and its projects
 // largest first; Measure now queues the agent's storage job.
-import { URL, launch, newPage, ok, done, ready, sleep } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, until } from './lib.mjs';
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
@@ -72,12 +72,8 @@ ok(drawn.disks.join(' | ') === '/: cache store, the accounts\' homes, Docker, ar
 const stack = await page.$$eval(`${sect} .ndmeter .track`, ts => new Set(ts.map(t => Math.round(t.getBoundingClientRect().width))).size);
 ok(stack === 1, 'every meter in the stack has the same track width');
 await page.click(`.storagetab .pghead [data-stmeasure="${minted.id}"]`);
-const job = await (async () => { for (let i = 0; i < 40; i++){
-  const js = (await api('/api/v1/jobs?active=1')).jobs || [];
-  const j = js.find(x => x.type === 'storage' && x.node === minted.id);
-  if (j) return j;
-  await new Promise(r => setTimeout(r, 250));
-} return null; })();
+const job = await until(async () => ((await api('/api/v1/jobs?active=1')).jobs || [])
+  .find(x => x.type === 'storage' && x.node === minted.id), 10000, 250);
 ok(job && job.type === 'storage', `Measure now queues the agent's storage job on that node (${job?.id})`);
 // ...and the button comes back once the press is answered: the bar's markup
 // is the same after it, and a repaint that skipped it left Asking for good.
@@ -110,12 +106,8 @@ if (job) await api('/api/v1/jobs', { action: 'cancel', id: job.id });
   ok(em.rows === 2 && em.removes === 1, `the Emulator page lists the node's phones, and only the one not running has a Remove (${JSON.stringify(em)})`);
   page.answers.push(0);
   await page.click('.emutab [data-emuphone="alpha"]');
-  const avd = await (async () => { for (let i = 0; i < 40; i++){
-    const js = (await api('/api/v1/jobs?active=1')).jobs || [];
-    const j = js.find(x => x.type === 'avd-remove' && x.node === minted.id);
-    if (j) return j;
-    await new Promise(r => setTimeout(r, 250));
-  } return null; })();
+  const avd = await until(async () => ((await api('/api/v1/jobs?active=1')).jobs || [])
+    .find(x => x.type === 'avd-remove' && x.node === minted.id), 10000, 250);
   ok(avd && avd.spec?.name === 'builderbot-36' && avd.spec?.project === 'alpha',
      `Remove asks, then queues the phone's removal on that node (${JSON.stringify(avd?.spec || null)})`);
   if (avd) await api('/api/v1/jobs', { action: 'cancel', id: avd.id });
@@ -143,12 +135,15 @@ if (job) await api('/api/v1/jobs', { action: 'cancel', id: job.id });
                   sched: [...(sect?.querySelectorAll('#stArraySched option') || [])].map(o => o.value) };
     // Pressing it asks first: Check, or Check and correct.
     sect.querySelector('[data-starray="verify"]').click();
-    let dlg = null;
+    // The question is on the page as the press returns: read there, before
+    // the harness's own answer to it (lib.mjs, the first choice) is pressed.
+    let dlg = document.querySelector('.modal.askdlg:not([hidden])');
     for (let i = 0; i < 20 && !dlg; i++){ await new Promise(r => setTimeout(r, 100)); dlg = document.querySelector('.modal.askdlg:not([hidden])'); }
     out.asks = [...(dlg?.querySelectorAll('button') || [])].map(b => b.textContent.trim());
     dlg?.querySelector('button:last-child')?.click();
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-    await new Promise(r => setTimeout(r, 200));
+    // The question put away, its leaving over.
+    for (let i = 0; i < 100 && document.querySelector('.modal.askdlg:not([hidden])'); i++) await new Promise(r => setTimeout(r, 50));
     // A pool another machine made, found on the disks (R163 step 1).
     // Laid over again until it draws: the page's poll reads the list again.
     for (let i = 0; i < 20 && !(out.found || []).length; i++){
@@ -214,7 +209,9 @@ if (job) await api('/api/v1/jobs', { action: 'cancel', id: job.id });
     // The share's row and its Edit's places, at a desk and on a phone.
     const vp = page.viewportSize();
     for (const [w, name] of [[1440, 'desk'], [393, 'phone']]){
-      await page.setViewportSize({ width: w, height: 2400 }); await sleep(400);
+      await page.setViewportSize({ width: w, height: 2400 });
+      await page.waitForFunction(w => innerWidth === w, w, { timeout: 10000 });
+      await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
       await page.evaluate(async () => {
         window.__own = window.__own || ownMachine;
         ownMachine = () => ({ id: 'x', reported: { adopted: { mounts: [{ where: '/mnt/disk1' }, { where: '/mnt/cache' }, { where: '/mnt/fast' }] } } });
@@ -223,11 +220,15 @@ if (job) await api('/api/v1/jobs', { action: 'cancel', id: job.id });
           array: { mount: '/mnt/user', mounted: true, adopted: true, policy: 'adopted', data: [{ slot: 1, id: 'ata-A', mounted: true }], parity: [{ slot: 1, id: 'ata-P', mounted: true }],
                    moves: [{ share: 'TV Shows', land: 'cache', from: 'cache', to: 'array' }] },
           shares: [{ name: 'TV Shows', path: '/mnt/user/TV Shows', smb: { on: true, guest: true }, nfs: { on: false } }] });
-        storageRev++; drawPanes(); await new Promise(r => setTimeout(r, 200));
+        storageRev++; drawPanes();
+        for (let i = 0; i < 100 && !document.querySelector('.storagetab [data-stshareedit="TV Shows"]'); i++) await new Promise(r => setTimeout(r, 50));
         const d = document.querySelector('.storagetab details[data-sect="storage:shares"]'); if (d) d.open = true;
         document.querySelector('.storagetab [data-stshareedit="TV Shows"]')?.click();
       });
-      await sleep(300);
+      // The section open and at rest, its Edit's form filled.
+      await page.waitForFunction(() => { const d = document.querySelector('.storagetab details[data-sect="storage:shares"]');
+        return d && d.open && d.getBoundingClientRect().height > 0 && !d.getAnimations({ subtree: true })
+          .some(a => a.playState === 'running' && Number.isFinite(a.effect?.getComputedTiming().endTime)); }, null, { timeout: 10000 }).catch(() => {});
       await page.locator('.storagetab details[data-sect="storage:shares"]').screenshot({ path: `${process.env.BB_SHOTS}/share-moves-${name}.png` });
     }
     await page.evaluate(() => { ownMachine = window.__own; });

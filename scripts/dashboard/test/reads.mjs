@@ -4,7 +4,7 @@
 // as a field), the session token widened to the reads on every
 // request, every write refused by name, the relayed words kept to reads,
 // the grant carrying the reads for the view, and the briefing naming them.
-import { launch, newPage, ok, done, ready, refreshUntil, saveDialog, sectSave, URL, DIR, prefsOf, projectKey } from './lib.mjs';
+import { launch, newPage, ok, done, ready, settled, refreshUntil, saveDialog, sectSave, URL, DIR, prefsOf, projectKey } from './lib.mjs';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
@@ -315,21 +315,26 @@ ok(!/This space reads/.test((await api('/api/preamble?project=alpha')).text),
 // repository's settings it is drawn as the space's, its controls dead, with
 // a press to the space's own dialog; there it is live.
 {
-  const got = await page.evaluate(async () => {
-    const key = reposOf('alpha');
-    renameProject('alpha');
-    await new Promise(r => setTimeout(r, 600));
+  // The dialog draws People and Toolchains when its own reads land: each
+  // look is after them.
+  const key = await page.evaluate(() => { const key = reposOf('alpha'); renameProject('alpha'); return key; });
+  await settled(page);
+  const repo = await page.evaluate(() => {
     const lockedIn = sect => { const b = document.querySelector(`#rnmodal details[data-sect="${sect}"] > .body`);
       return { band: !!b?.querySelector('.rnspaceband [data-rnspacego]'),
                live: [...(b?.querySelectorAll('input, select') || [])].filter(x => !x.disabled && !x.closest('.rnspaceband')).length }; };
     const repo = { sees: lockedIn('rn:sees'), node: !!document.querySelector('#rnNodeSpace .rnspaceband'), nodeLive: !$('rnNode').dataset.spacelock,
                    build: [...document.querySelectorAll('#rnmodal details[data-sect="rn:build"] input')].some(x => !x.disabled) };
     document.querySelector('#rnmodal details[data-sect="rn:sees"] [data-rnspacego]')?.click();
-    await new Promise(r => setTimeout(r, 600));
+    return repo;
+  });
+  await settled(page);
+  const space = await page.evaluate(key => {
     const space = { title: $('rnTitle').textContent, bands: document.querySelectorAll('.rnspaceband').length, nodeLocked: !!$('rnNode').dataset.spacelock, key };
     $('rnmodal').hidden = true;
-    return { repo, space };
-  });
+    return space;
+  }, key);
+  const got = { repo, space };
   ok(got.repo.sees.band && got.repo.sees.live === 0 && got.repo.node && !got.repo.nodeLive && got.repo.build,
      `a repository's settings draw the space's as the space's, dead, with a press to its dialog, and its own live (${JSON.stringify(got.repo)})`);
   ok(got.space.bands === 0 && !got.space.nodeLocked && / settings$/.test(got.space.title),
@@ -338,13 +343,16 @@ ok(!/This space reads/.test((await api('/api/preamble?project=alpha')).text),
 // ...and the space's dialog says under a dial which repository sets it
 // apart (R223), and nothing where none does.
 {
-  const apart = await page.evaluate(async () => {
+  await page.evaluate(async () => {
     const H = { 'Content-Type': 'application/json' };
     await fetch('/api/prefs', { method: 'POST', headers: H, body: JSON.stringify({ project: 'alpha', scope: 'repository', report: 'deny' }) });
     for (let i = 0; i < 30 && !((state?.projects || []).find(p => p.name === 'alpha')?.prefs?.overrides || []).includes('report'); i++){
       await refresh(); await new Promise(r => setTimeout(r, 300)); }
     renameProject('alpha', 'project');
-    await new Promise(r => setTimeout(r, 500));
+  });
+  await settled(page);
+  const apart = await page.evaluate(async () => {
+    const H = { 'Content-Type': 'application/json' };
     const said = $('rnGateReport').closest('label')?.nextElementSibling?.classList.contains('rnapart')
       ? $('rnGateReport').closest('label').nextElementSibling.textContent : '';
     const others = document.querySelectorAll('#rnmodal .rnapart').length;

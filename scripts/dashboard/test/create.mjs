@@ -4,7 +4,7 @@
 // clone path is tested up to its URL allow-list: the list is the thing under
 // test, and a real clone would need GitHub on the other end.
 import { launch, newPage, ok, done, ready, URL, DIR, animatedDuring, tmuxNew, tmuxKill,
-         refreshUntil, unfold, projectKey, holdPoll, freePoll } from './lib.mjs';
+         refreshUntil, unfold, projectKey, holdPoll, freePoll, settled } from './lib.mjs';
 import { readFileSync, existsSync, mkdirSync, writeFileSync, rmSync, chmodSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -75,6 +75,13 @@ ok(await page.$eval('#bNewProjTab', b => b.textContent.includes('New space')),
 // a project with nothing in it; its card's Add repository opens the dialog
 // into it, without the node and the dials, which are the project's.
 {
+  // The settings dialog drawn and still: its opening scale over, and the
+  // reads it makes as it opens answered.
+  const rnAtRest = async () => {
+    await page.waitForFunction(() => !$('rnmodal').getAnimations({ subtree: true })
+      .some(a => a.playState === 'running' && Number.isFinite(a.effect?.getComputedTiming().endTime)), null, { timeout: 10000 }).catch(() => {});
+    await settled(page);
+  };
   // The harness answers the page's questions (lib.mjs): this one with the
   // name typed, its title kept to check.
   let asked = null;
@@ -89,7 +96,9 @@ ok(await page.$eval('#bNewProjTab', b => b.textContent.includes('New space')),
   // The page goes to it, and it wears a ring in the accent that fades
   // (the operator, 26 Oct).
   await page.waitForSelector(`${card}.pjnew`, { timeout: 5000 }).catch(() => {});
-  await page.waitForTimeout(800);
+  // The scroll to it is smooth: read once the card is inside the page's box.
+  await page.waitForFunction(c => { const el = document.querySelector(c), r = el.getBoundingClientRect(), d = el.closest('.doc').getBoundingClientRect();
+    return r.top >= d.top - 1 && r.bottom <= d.bottom + 1; }, card, { timeout: 10000 }).catch(() => {});
   const fresh = await page.$eval(card, c => { const r = c.getBoundingClientRect(), d = c.closest('.doc').getBoundingClientRect();
     return { ring: c.classList.contains('pjnew'), seen: r.top >= d.top - 1 && r.bottom <= d.bottom + 1 }; });
   ok(fresh.ring && fresh.seen, `a new space's card is scrolled into sight and wears the new ring (${JSON.stringify(fresh)})`);
@@ -124,7 +133,7 @@ ok(await page.$eval('#bNewProjTab', b => b.textContent.includes('New space')),
   ok(!await page.$(`${card} .pcback [data-bug]`), 'its back offers no Report bug: there is no tracker');
   await page.click(`${card} .pcback [data-rn]`);
   await page.waitForSelector('#rnmodal:not([hidden])', { timeout: 5000 });
-  await page.waitForTimeout(300);
+  await rnAtRest();
   const dlg = await page.evaluate(() => {
     const vis = sel => !!document.querySelector(sel)?.offsetParent;
     const box = document.querySelector('#rnmodal > .box');
@@ -151,7 +160,7 @@ ok(await page.$eval('#bNewProjTab', b => b.textContent.includes('New space')),
   await page.waitForSelector(`${alpha}.flipped .pcback [data-rn]`, { timeout: 5000 });
   await page.click(`${alpha} .pcback [data-rn]`);
   await page.waitForSelector('#rnmodal:not([hidden])', { timeout: 5000 });
-  await page.waitForTimeout(300);
+  await rnAtRest();
   const adlg = await page.evaluate(() => {
     const vis = sel => !!document.querySelector(sel)?.offsetParent;
     const box = document.querySelector('#rnmodal > .box');
@@ -182,7 +191,9 @@ ok(await page.$eval('#bNewProjTab', b => b.textContent.includes('New space')),
   // sets one apart, and the project's door draws no such choice.
   await page.evaluate(() => openNotebook('webshop', 'permissions'));
   await page.waitForFunction(() => document.querySelector('.nb[data-project="webshop"] .nbview[data-view="permissions"]:not([hidden]) #rnGateDocker option'), null, { timeout: 20000 });
-  await page.waitForTimeout(400);
+  // The dials filled for this repository, which is what is read next.
+  await page.waitForFunction(() => $('rnGateDocker').options[0]?.value === 'inherit' && $('rnGateDocker').value === 'inherit'
+    && $('rnGateRoadmap').value === 'inherit' && $('rnTestChange').value === 'inherit', null, { timeout: 10000 }).catch(() => {});
   const inh = await page.evaluate(() => ({ first: $('rnGateDocker').options[0].value, word: $('rnGateDocker').options[0].textContent,
     value: $('rnGateDocker').value, gate: $('rnGateRoadmap').value, tc: $('rnTestChange').value }));
   ok(inh.first === 'inherit' && /^as the space \(deny\)$/.test(inh.word) && inh.value === 'inherit' && inh.gate === 'inherit' && inh.tc === 'inherit',
@@ -238,10 +249,16 @@ ok(await idle() !== 'INPUT' && await idle() !== 'TEXTAREA',
    '...with the cursor in none of its fields');
 ok(await page.$eval('#pUrlField', el => el.hidden), 'local repo is the default; no URL field');
 const boxH = sel => page.$eval(sel, b => Math.round(b.getBoundingClientRect().height));
-await page.waitForTimeout(500);              // the dialog's own opening scale
+// Measured at rest: the dialog's own opening scale over, a field's slide ended, the box with a height.
+const pAtRest = () => page.waitForFunction(() => {
+  const m = document.getElementById('pmodal'), b = m.querySelector('.box');
+  return b.getBoundingClientRect().height > 0 && !m.getAnimations({ subtree: true })
+    .some(a => a.playState === 'running' && Number.isFinite(a.effect?.getComputedTiming().endTime));
+}, null, { timeout: 10000 }).catch(() => {});
+await pAtRest();
 const localH = await boxH('#pmodal .box');
 const cloneSlide = await animatedDuring(page, () => page.click('#pClone'));
-await page.waitForTimeout(300);
+await pAtRest();
 ok(Math.abs(await boxH('#pmodal .box') - localH) <= 1, `the dialog keeps its size from a new repository to a clone (${localH} then ${await boxH('#pmodal .box')})`);
 ok(await page.$eval('#pUrlField', el => !el.hidden)
    && await page.$eval('#pClone', b => b.classList.contains('on')),

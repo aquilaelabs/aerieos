@@ -5,14 +5,13 @@
 // a snapshot and Remove each a vm job; a session's aerie vm is held to its
 // project's Make VMs dial (deny refuses, ask goes to the bell, auto does it),
 // and a session never makes Windows.
-import { URL, launch, newPage, ok, done, ready, DIR } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, DIR, until } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const KEY = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGJ0ZXN0a2V5Zm9ydGhldm1tYW5hZ2VydGVzdHMx test';
-const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
@@ -73,11 +72,7 @@ ok(/ssh public key/.test(seen.text) && seen.bottom <= seen.foot,
    `a refused Make it says why where it can be read, above the dialog's foot (${JSON.stringify(seen)})`);
 await page.fill('#vmKey', KEY);
 await page.click('#vmGo');
-const job = await (async () => { for (let i = 0; i < 40; i++){
-  const j = ((await call('/api/v1/jobs?active=1')).jobs || []).find(x => x.type === 'vm');
-  if (j) return j;
-  await sleep(250);
-} return null; })();
+const job = await until(async () => ((await call('/api/v1/jobs?active=1')).jobs || []).find(x => x.type === 'vm'), 10000, 250);
 ok(job?.spec?.action === 'create' && job.spec.domain === 'bbvm-alpha-db' && job.spec.image.url.startsWith('https://cloud.debian.org/')
    && job.spec.subnet === '10.232.0.0/24' && job.node === minted.id,
    `Make it queues the node's vm job: create, its domain, the image and the space's network (${JSON.stringify({ a: job?.spec?.action, d: job?.spec?.domain, s: job?.spec?.subnet })})`);
@@ -124,9 +119,9 @@ ok(true, '...and the list goes with the next census that has none');
 
 // A Stop its system did not take (an installer with no ACPI daemon) is said
 // on the row after a while, pointing at Force stop (B308).
-const ignored = await page.evaluate(async () => {
-  vmStopAsked['alpha/db'] = Date.now() - 60000; vmsRev++; drawPanes();
-  await new Promise(r => setTimeout(r, 300));
+await page.evaluate(() => { vmStopAsked['alpha/db'] = Date.now() - 60000; vmsRev++; drawPanes(); });
+await page.waitForFunction(() => /asked to shut down/.test(document.querySelector('.vmtab [data-vm-key="alpha/db"]')?.textContent || ''), null, { timeout: 10000 }).catch(() => {});
+const ignored = await page.evaluate(() => {
   const t = document.querySelector('.vmtab [data-vm-key="alpha/db"]')?.textContent || '';
   delete vmStopAsked['alpha/db']; vmsRev++; drawPanes();
   return t;
@@ -157,7 +152,7 @@ ok(head.search && head.newVm && head.icons === 'Cards,List', `the VMs page's hea
 // Typed again if the page's own reload redrew the box under the typing.
 for (let i = 0; i < 3 && await page.evaluate(() => vmsSearch) !== 'zzz-no-such-vm'; i++){
   await page.fill('.pane .doc.on .vmtab #vmSearch', 'zzz-no-such-vm');
-  await page.waitForTimeout(300);
+  await page.waitForFunction(() => vmsSearch === 'zzz-no-such-vm', null, { timeout: 5000 }).catch(() => {});
 }
 const narrowed = await page.waitForFunction(() => !document.querySelector('.pane .doc.on .vmtab [data-vm-key="alpha/db"]') && /No VM matches/.test(document.querySelector('.pane .doc.on .vmtab')?.textContent || ''), null, { timeout: 5000 }).then(() => true, () => false);
 const said = await page.evaluate(() => ({ q: vmsSearch, live: TABKINDS.vms.live(), focus: document.activeElement?.id, text: document.querySelector('.vmtab')?.textContent.replace(/\s+/g, ' ').slice(0, 160) }));
@@ -187,21 +182,13 @@ await page.waitForSelector('.vmtab div.row[data-vm-key="alpha/db"] .dmacts', { t
 // Stop and Revert are vm jobs too; Remove asks first.
 page.dialogs.length = 0;
 await page.click('.vmtab [data-vm-key="alpha/db"] .dmacts [data-vm="stop"]:not([data-force])');
-const stop = await (async () => { for (let i = 0; i < 40; i++){
-  const j = ((await call('/api/v1/jobs?active=1')).jobs || []).find(x => x.type === 'vm' && x.spec?.action === 'stop');
-  if (j) return j;
-  await sleep(250);
-} return null; })();
+const stop = await until(async () => ((await call('/api/v1/jobs?active=1')).jobs || []).find(x => x.type === 'vm' && x.spec?.action === 'stop'), 10000, 250);
 ok(stop && !stop.spec.force, 'Stop queues a shutdown, not a pulled plug');
 await call('/api/v1/jobs', { action: 'cancel', id: stop?.id });
 await page.evaluate(async () => { await loadVms(); });
 await page.waitForSelector('.vmtab [data-vm-key="alpha/db"] .vmsnap [data-vm="revert"]', { timeout: 10000 });
 await page.click('.vmtab [data-vm-key="alpha/db"] .vmsnap [data-vm="revert"]');
-const rv = await (async () => { for (let i = 0; i < 40; i++){
-  const j = ((await call('/api/v1/jobs?active=1')).jobs || []).find(x => x.type === 'vm' && x.spec?.action === 'revert');
-  if (j) return j;
-  await sleep(250);
-} return null; })();
+const rv = await until(async () => ((await call('/api/v1/jobs?active=1')).jobs || []).find(x => x.type === 'vm' && x.spec?.action === 'revert'), 10000, 250);
 ok(page.dialogs.some(d => /Revert db to clean/.test(d)) && rv?.spec?.snapshot === 'clean',
    `Revert asks, then queues the revert to that snapshot (${rv?.spec?.snapshot})`);
 await call('/api/v1/jobs', { action: 'cancel', id: rv?.id });
@@ -274,11 +261,7 @@ ok(await page.$eval('#vmCloud', e => e.hidden) && await page.$eval('#vmFwRow', e
 await page.fill('#vmName', 'inst');
 await page.selectOption('#vmProject', 'alpha');
 await page.click('#vmGo');
-const inst = await (async () => { for (let i = 0; i < 40; i++){
-  const j = ((await call('/api/v1/jobs?active=1')).jobs || []).find(x => x.type === 'vm' && x.spec?.domain === 'bbvm-alpha-inst');
-  if (j) return j;
-  await sleep(250);
-} return null; })();
+const inst = await until(async () => ((await call('/api/v1/jobs?active=1')).jobs || []).find(x => x.type === 'vm' && x.spec?.domain === 'bbvm-alpha-inst'), 10000, 250);
 ok(inst?.spec?.installer?.iso === 'ubuntu-26.04-live-server-amd64.iso' && inst.spec.boot === 'uefi' && !inst.spec.image,
    `...and Make it queues a create from the ISO, UEFI, with no image (${JSON.stringify(inst?.spec?.installer)})`);
 
@@ -305,11 +288,7 @@ ok(hwd.pairs.join() === '0,4*,1,5' && hwd.usb && hwd.dump,
 await page.click('#vmhwmodal [data-cpus="0,4"]');
 await page.fill('#vmHwMemMax', '4');
 await page.click('#vmHwGo');
-const hwj = await (async () => { for (let i = 0; i < 40; i++){
-  const j = ((await call('/api/v1/jobs?active=1')).jobs || []).find(x => x.type === 'vm' && x.spec?.action === 'hardware');
-  if (j) return j;
-  await sleep(250);
-} return null; })();
+const hwj = await until(async () => ((await call('/api/v1/jobs?active=1')).jobs || []).find(x => x.type === 'vm' && x.spec?.action === 'hardware'), 10000, 250);
 ok(hwj && hwj.spec.hw.cpuset.length === 0 && hwj.spec.hw.mem_max_mb === 4096 && hwj.spec.hw.net === 'project',
    `Save queues the hardware job: unpinned, a 4 GB ceiling, its space's network (${JSON.stringify(hwj?.spec?.hw)})`);
 await call('/api/v1/nodes', { action: 'retire', id: minted.id });

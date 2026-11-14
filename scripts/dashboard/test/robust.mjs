@@ -6,7 +6,7 @@
 // browser would never send (wrong types, missing fields, absurd numbers),
 // because the checks are written against each field being the thing it is
 // supposed to be.
-import { launch, newPage, ok, done, ready, sleep, patience, URL } from './lib.mjs';
+import { launch, newPage, ok, done, ready, sleep, until, patience, URL } from './lib.mjs';
 
 // ---- the app's own files carry a validator --------------------------------
 // index.html IS the application, and it went out with no ETag and no cache
@@ -155,7 +155,7 @@ ok(badGet.length === 0,
 // the harness's patience as every wait does.
 const bar = patience(6000), tries = [];
 for (let i = 0; i < 3; i++){
-  if (i) await sleep(3000);
+  if (i) await sleep(3000);     // the gap between two timings is the point: a busy moment passes in it
   const t0 = Date.now();
   await page.evaluate(async () => {
     await Promise.all(Array.from({length: 8}, () => fetch('/api/status')));
@@ -183,7 +183,7 @@ await page.route('**/api/status*', r => r.abort());
 // and returns at once, so forty asks spent themselves in milliseconds and the
 // late poll then landed and cleared the light (B176, 19 Sep).
 for (const until = Date.now() + 20000; Date.now() < until
-     && await page.evaluate(async () => { await refresh(); return pollFails; }) < 2;) await sleep(100);
+     && await page.evaluate(async () => { await refresh(); return pollFails; }) < 2;) await sleep(100);     // the loop's own period
 const dead = await page.evaluate(() => ({
   red: !!document.getElementById('dot')?.classList.contains('off'),
   title: document.getElementById('dot')?.getAttribute('aria-label') || '',
@@ -208,7 +208,8 @@ ok(waiting.shapes > 0 && waiting.words.length === 0 && waiting.said === 'loading
    `before the first snapshot the page waits with shapes, not words, and still says loading to a screen reader (${JSON.stringify(waiting)})`);
 await page.evaluate(() => refresh());
 await page.evaluate(() => refresh());
-await page.waitForTimeout(300);
+await page.waitForFunction(() => { const l = [...document.querySelectorAll('main .loading')];
+  return l.length > 0 && l.every(e => /not reaching the container/.test(e.textContent)); }, null, { timeout: 10000 }).catch(() => {});
 const cold = await page.evaluate(() =>
   [...document.querySelectorAll('main .loading')].map(e => e.textContent));
 ok(cold.length > 0 && cold.every(t => /not reaching the container/.test(t)),
@@ -219,7 +220,10 @@ const coldShape = await page.evaluate(() => [...document.querySelectorAll('main 
 ok(coldShape === 0, `...a line of words where the shapes stood, nothing of them left (${coldShape} still shaped)`);
 await page.unroute('**/api/status*');
 await page.evaluate(() => refresh());
-await page.waitForTimeout(300);
+await page.waitForFunction(() => !document.getElementById('dot').classList.contains('off')
+                                 && !document.getElementById('dot').getAttribute('aria-label')
+                                 && document.getElementById('pollWhy').hidden
+                                 && pollFails === 0, null, { timeout: 10000 }).catch(() => {});
 ok(await page.evaluate(() => !document.getElementById('dot').classList.contains('off')
                              && !document.getElementById('dot').getAttribute('aria-label')
                              && document.getElementById('pollWhy').hidden
@@ -259,7 +263,10 @@ await page.evaluate(() => {
   drawDoctor = () => { throw new Error('doctor draw boom'); };
 });
 await page.evaluate(() => refresh());
-await page.waitForTimeout(300);
+await page.waitForFunction(() => /not drawn/.test(document.getElementById('doctor').textContent)
+                                 && !document.querySelector('.pgrid .loading'), null, { timeout: 10000 }).catch(() => {});
+// The draw's error is thrown again on a timer of the page's and reaches this side after it.
+await until(() => page.errors.some(t => /doctor draw boom/.test(t)), 10000);
 const partial = await page.evaluate(() => ({
   doctor: document.getElementById('doctor').textContent.trim(),
   projectsWaiting: !!document.querySelector('.pgrid .loading'),
@@ -274,7 +281,7 @@ ok(page.errors.some(t => /doctor draw boom/.test(t)),
 page.errors = [];
 await page.evaluate(() => { drawDoctor = window.__drawDoctor; });
 await page.evaluate(() => refresh());
-await page.waitForTimeout(300);
+await page.waitForFunction(() => !/not drawn/.test(document.getElementById('doctor').textContent), null, { timeout: 10000 }).catch(() => {});
 ok(await page.evaluate(() => !/not drawn/.test(document.getElementById('doctor').textContent)),
    '...and the part recovers on the next poll that draws');
 // ...and when the page trips BEFORE the draws (on the payload, not on the
@@ -283,7 +290,7 @@ ok(await page.evaluate(() => !/not drawn/.test(document.getElementById('doctor')
 // before the page's own first poll comes back: the placeholders have to be
 // on screen for the words on them to matter.
 await page.route('**/api/status*', async r => {
-  await new Promise(res => setTimeout(res, 500)); await r.continue(); });
+  await sleep(500); await r.continue(); });
 await page.reload({ waitUntil: 'domcontentloaded' });
 await page.evaluate(() => { adoptLayout = () => { throw new Error('layout boom'); }; });
 await page.evaluate(() => refresh());

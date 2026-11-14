@@ -4,7 +4,7 @@
 // `aerie roadmap`, and either can tick it off. The open items are appended to every
 // Claude session bb-tty starts, which is the whole point: something noticed
 // mid-task and left undone used to live in the conversation and die with it.
-import { launch, newPage, ok, done, ready, animatedDuring, tmuxCapture, tmuxNew, tmuxKill, nbShown, nbGone, nbTab, patience, refreshUntil, holdPoll, freePoll, URL, DIR, closePage, nbGo, projectKey } from './lib.mjs';
+import { launch, newPage, ok, done, ready, animatedDuring, tmuxCapture, tmuxNew, tmuxKill, nbShown, nbGone, nbTab, patience, refreshUntil, holdPoll, freePoll, until, quiet as quietFor, settled as pageSettled, URL, DIR, closePage, nbGo, projectKey } from './lib.mjs';
 // The add band unrolls the box in its place (R119 step 4): typing a line
 // presses Add to roadmap first, as a person does.
 const unroll = async pg => { if (await pg.$eval('#roadmapForm', f => f.hidden)) await pg.click('#roadmapShow'); };
@@ -27,7 +27,10 @@ const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
 const rowOpen = async sel => {
   await page.evaluate(s => { const row = document.querySelector(s); const acts = row?.querySelector('.rowacts');
     if (acts?.hidden) row.querySelector('.dtog')?.click(); }, sel);
-  await page.waitForTimeout(300);
+  // Its actions on show and their slide over.
+  await page.waitForFunction(s => { const row = document.querySelector(s), acts = row?.querySelector('.rowacts');
+    return !acts || (!acts.hidden && !row.getAnimations({ subtree: true })
+      .some(a => a.playState === 'running' && Number.isFinite(a.effect?.getComputedTiming().endTime))); }, sel, { timeout: 10000 }).catch(() => {});
 };
 // A row's reword box is the one right under it (row.after(box)), and every
 // fill, read and press here goes to that one rather than the first
@@ -310,7 +313,7 @@ ok((await page.$eval('#roadmapList .roadmap .go', g => saidOf(g))).includes('sav
 // dispatched rather than clicked: a real click cannot reach a disabled
 // button, and what wants proving is that even one that did lands nowhere.
 await page.dispatchEvent(`#roadmapList .roadmap[data-id="${mine.id}"] .go`, 'click');
-await page.waitForTimeout(200);
+await quietFor(200);
 ok(await page.$('.sendbox') === null,
    '...and no box opens, because there is nothing it could honestly send');
 
@@ -968,11 +971,7 @@ execFileSync('tmux', ['send-keys', '-t', 'claude-alpha', 'Enter']);
   const cap = () => execFileSync('tmux', ['capture-pane', '-p', '-J', '-t', 'claude-alpha'], { encoding: 'utf8' });
   // Given as long as any wait here on a loaded box: fifteen seconds ran out
   // in a whole eight-worker run with the shell still to get to it.
-  let off = false;
-  for (const until = Date.now() + patience(40000); !off && Date.now() < until;){
-    off = cap().split('\n').some(l => l.trim() === 'ECHO-OFF-NOW');
-    if (!off) await new Promise(r => setTimeout(r, 100));
-  }
+  const off = await until(() => cap().split('\n').some(l => l.trim() === 'ECHO-OFF-NOW'), 40000, 100);
   ok(off, 'the stand-in session has run stty -echo before the send');
 }
 // ...and the pane quiet: under a whole run's load a line sent earlier still
@@ -983,7 +982,7 @@ execFileSync('tmux', ['send-keys', '-t', 'claude-alpha', 'Enter']);
   const cap = () => execFileSync('tmux', ['capture-pane', '-p', '-t', 'claude-alpha'], { encoding: 'utf8' });
   let prev = cap();
   for (let i = 0; i < 15; i++){
-    await new Promise(r => setTimeout(r, 1000));
+    await quietFor(1000);
     const now = cap();
     if (now === prev) break;
     prev = now;
@@ -1250,7 +1249,8 @@ ok(await page.$eval(`#roadmapList .roadmap[data-id="${plainId}"][data-step="0"] 
   // fresh notebook answers every question with "nothing is open here".
   const tick = async () => {
     await page.evaluate(() => getNotebook('alpha').reload());
-    await new Promise(r => setTimeout(r, 300));
+    // The re-read has landed: time in which a draw it owed would have come.
+    await quietFor(300);
   };
   await tick(); await tick();
   ok(await page.$eval(`${rw} textarea`, t => t.value) === 'half a thought, still typing',
@@ -1891,7 +1891,7 @@ await page.waitForFunction(() => document.querySelector('.nbsheet').hidden, { ti
     if (!held){ held = true; await new Promise(r => { release = r; }); }
     await route.continue().catch(() => {});
   });
-  page.evaluate(() => notebooks.get('alpha').reload());   // held, so not awaited
+  const reread = page.evaluate(() => notebooks.get('alpha').reload()).catch(() => {});   // held, so not awaited yet
   await page.waitForFunction(() => true);
   await unroll(page); await page.fill('#roadmapText', 'typed while a reload was out');
   await page.keyboard.press('Enter');
@@ -1899,9 +1899,11 @@ await page.waitForFunction(() => document.querySelector('.nbsheet').hidden, { ti
     () => [...document.querySelectorAll('#roadmapList .roadmap .txt')]
             .some(e => e.textContent.includes('typed while a reload was out')));
   release();
-  // Long enough that a reply which was going to overwrite has done it,
-  // and that the released request has finished before the route goes.
-  await new Promise(r => setTimeout(r, patience(1500)));
+  // Until a reply which was going to overwrite has done it, and the
+  // released request has finished before the route goes: the re-read's own
+  // end, then the page's requests at rest.
+  await reread;
+  await pageSettled(page);
   await page.unroute('**/api/roadmap?*');
   ok(await page.$$eval('#roadmapList .roadmap .txt',
        es => es.some(e => e.textContent.includes('typed while a reload was out'))),

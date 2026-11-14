@@ -6,7 +6,7 @@
 // identity landing in the repo's own config through /api/prefs and coming out
 // of aerie settings, and bb_setting (the boot scripts' read) run as bash
 // against the same file.
-import { launch, newPage, ok, done, ready, saveDialog, sectSave, rnSect, splitPick, refreshUntil, openFold, URL, DIR, unfold, sleep } from './lib.mjs';
+import { launch, newPage, ok, done, ready, saveDialog, sectSave, rnSect, splitPick, refreshUntil, openFold, URL, DIR, unfold, until, settled } from './lib.mjs';
 import { readFileSync, existsSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -531,7 +531,8 @@ ok(elsewhere.git_name === 'T. Person',
   // People stays when the view is asked for again (B: the form was put back
   // and People hidden until its read landed, on every ask).
   await page.evaluate(() => openProjectSettings('alpha'));
-  await page.waitForTimeout(300);
+  // What the view reads again in place (People among it) answered.
+  await settled(page);
   const still = await page.evaluate(() => ({ people: !document.querySelector('details[data-sect="rn:people"]').hidden,
     pick: document.querySelector('.nbsettings .snav .rrow.on')?.dataset.spick }));
   ok(still.people && still.pick === 'yours', `...and asked for again it keeps People and the section picked (${JSON.stringify(still)})`);
@@ -599,12 +600,13 @@ ok(elsewhere.git_name === 'T. Person',
       await r.fulfill({ response: before });
     });
     await page.evaluate(() => { refresh(); });
-    for (let i = 0; i < 300 && !read; i++) await sleep(100);
+    await until(() => read, 30000, 100);
     // Elsewhere, after this window opened: the color (another section) and
     // the build command (this one), as a session or another window would.
     await post('/api/prefs', { project: 'alpha', color: 'teal', build: 'make theirs' });
     await rnSect(page, 'build');
     await page.fill('#rnBuildCmd', 'make mine');
+    // The delay is the case: the read out since before the other save lands after Save is pressed.
     setTimeout(release, 1500);
     const first = await sectSave(page, 'build');
     await page.unroute('**/api/status');
@@ -632,7 +634,10 @@ ok(elsewhere.git_name === 'T. Person',
     // draws, reads the nodes, and draws again.
     await page.evaluate(() => { getNotebook('alpha')?.view('roadmap'); nodesList = null; openProjectSettings('alpha'); });
     await page.waitForFunction(() => nodesList !== null, null, { timeout: 15000 });
-    await page.waitForTimeout(800);
+    // The second draw, the one that had nodes to draw, and what it asked for answered.
+    await page.waitForFunction(id => $('rnNodesMore').dataset.drawn && document.querySelector(`#rnNodesMore input[value="${id}"]`),
+      other.id, { timeout: 15000 }).catch(() => {});
+    await settled(page);
     const also = await page.evaluate(id => ({ ticked: !!document.querySelector(`#rnNodesMore input[value="${id}"]`)?.checked,
       unsaved: !document.querySelector('.snav [data-spick="runs"] .sunsaved')?.hidden }), other.id);
     ok(also.ticked && !also.unsaved,
@@ -661,7 +666,11 @@ ok(elsewhere.git_name === 'T. Person',
     const was = page.viewportSize(), apart = [];
     for (const width of [1280, 393]){
       await page.setViewportSize({ width, height: 900 });
-      await page.waitForTimeout(200);
+      // Laid out at the new width: the breakpoint's listeners run before a frame's callbacks, and what they slide has landed.
+      await page.waitForFunction(w => innerWidth === w, width, { timeout: 10000 });
+      await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+      await page.waitForFunction(() => !document.getAnimations().some(a => a.playState === 'running'
+        && Number.isFinite(a.effect?.getComputedTiming().endTime)), null, { timeout: 10000 }).catch(() => {});
       apart.push(...(await page.$$eval('#rnCaptureDays, #rnSnapDays, #rnDevKeep', is => is.map(i => {
         const a = i.getBoundingClientRect(), b = i.nextElementSibling.getBoundingClientRect();
         // On the box's line (the row lines up at the bottom) and after it.
@@ -801,6 +810,12 @@ ok(elsewhere.git_name === 'T. Person',
   for (const [open, name] of [['openSettingsTab', 'Controller settings'], ['openProfileTab', 'Profile']]){
     await phone.evaluate(f => window[f](), open);
     await phone.waitForSelector('.pane .doc.on .ssplit > .pghead', { timeout: 15000 });
+    // ...laid out, the page before it gone: in the page while it was still
+    // coming in, its head had no height and was measured as 0 against 0.
+    await phone.waitForFunction(() => {
+      const h = document.querySelector('.pane .doc.on .ssplit > .pghead');
+      return !!h && h.getBoundingClientRect().height > 0 && !document.querySelector('.pane .doc.leaving');
+    }, null, { timeout: 15000 }).catch(() => {});
     seen.push(await phone.$eval('.pane .doc.on .ssplit', s => {
       const h = s.querySelector(':scope > .pghead').getBoundingClientRect(), n = s.querySelector(':scope > .snav').getBoundingClientRect();
       return h.height > 0 && h.bottom <= n.top + 1 ? '' : `${Math.round(h.top)} vs ${Math.round(n.top)}`;

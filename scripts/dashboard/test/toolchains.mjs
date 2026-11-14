@@ -8,7 +8,7 @@
 // answers a toolchain job at once, failing it), the Installed page's rows,
 // and the tool pack dialog the Library's Add your own and a card's Edit
 // open. Then the shell libraries a session on a node reads its store with.
-import { launch, newPage, ok, done, ready, sectSave, URL, DIR } from './lib.mjs';
+import { launch, newPage, ok, done, ready, sectSave, URL, DIR, until as untilTrue } from './lib.mjs';
 import { existsSync, readFileSync } from 'node:fs';
 
 const browser = await launch();
@@ -32,10 +32,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const local = () => api('/api/toolchains');
 const waitLocal = async (until, timeout = 30000) => {
   let t = {};
-  for (const end = Date.now() + timeout; Date.now() < end; await sleep(300)){
-    t = await local();
-    if (until(t)) return t;
-  }
+  await untilTrue(async () => { t = await local(); return until(t); }, timeout, 300);
   return t;
 };
 const item = (t, n) => (t.items || []).find(i => i.name === n);
@@ -187,8 +184,9 @@ const card = (name, patch) => page.evaluate(([n, p]) => {
     Object.assign(r, { running: true, doing: 'install' }); libRev++; drawPanes();
     const read = () => document.querySelector('.doc .librarytab .lcard[data-lrow="toolchain:flutter"] .dots')?.textContent ?? null;
     const first = read();
-    await new Promise(res => setTimeout(res, 900));
-    const later = read();
+    // Until the page's timer has ticked them, ten seconds at most.
+    let later = first;
+    for (const end = Date.now() + 10000; (later = read()) === first && Date.now() < end;) await new Promise(res => setTimeout(res, 50));
     libRev++; drawPanes();                      // a redraw, mid-animation
     const after = read();
     Object.assign(r, was); libRev++; drawPanes();
@@ -379,7 +377,7 @@ const samples = [];
 for (let i = 0; i < 20; i++){
   const t = await local();
   if (t.job?.running) samples.push({ current: t.job.current, action: t.job.action });
-  await sleep(250);
+  await sleep(250);     // the sampling's own period: the job is read all through its run
 }
 ok(samples.length > 1 && samples.every(s => s.current === 'go' && s.action === 'install'),
    `a running install says which toolchain it is on and that it is installing, all through (${samples.length} samples)`);
@@ -457,11 +455,7 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
 {
   const { writeFileSync, rmSync } = await import('node:fs');
   writeFileSync(`${DIR}/sandboxdata/census-extra.json`, JSON.stringify({ store_dirs: { top: ['flutter'], android: [] } }));
-  let held = false;
-  for (let i = 0; i < 60 && !held; i++){
-    held = !!item(await api(`/api/toolchains?node=${sb.id}`), 'flutter')?.installed;
-    if (!held) await sleep(500);
-  }
+  const held = await untilTrue(async () => !!item(await api(`/api/toolchains?node=${sb.id}`), 'flutter')?.installed, 30000, 500);
   ok(held, 'the sandbox node reports flutter in its store');
   const ROW = `.installedtab [data-instnode="${sb.id}"] .irow[data-irow="toolchain:flutter"]`;
   await page.evaluate(id => { instNode = ''; inst = null; openInstalledOn(id); }, sb.id);
@@ -469,12 +463,8 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
   const label = await page.evaluate(() => inst.rows.find(r => r.kind === 'toolchain' && r.name === 'flutter')?.label || '');
   const nd = page.dialogs.length;
   await page.click(`${ROW} [data-instact="remove"]`);
-  let ran = false;
-  for (let i = 0; i < 60 && !ran; i++){
-    await sleep(500);
-    ran = await page.evaluate(() => { const ok = inst?.job?.action === 'remove' && !inst.job.running && (inst.job.failed || []).includes('flutter');
-      if (!ok) loadInstalled(); return ok; });
-  }
+  const ran = await untilTrue(() => page.evaluate(() => { const ok = inst?.job?.action === 'remove' && !inst.job.running && (inst.job.failed || []).includes('flutter');
+    if (!ok) loadInstalled(); return ok; }), 30000, 500);
   ok(page.dialogs.length === nd + 1 && !!label && page.dialogs[nd].startsWith(`Uninstall ${label} from sandbox?`),
      `Remove on an Installed row asks first, naming it as its row does (${page.dialogs.slice(nd).join(' | ') || 'nothing asked'})`);
   await page.waitForSelector(`${ROW} .sub.bad`, { timeout: 15000 }).catch(() => {});
@@ -597,11 +587,8 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
     top: [], android: ['ndk', 'build-tools', 'platforms'],
     versions: { ndk: ['30.0.16248370'], 'build-tools': ['37.0.0'], platforms: ['android-37.0'] } } }));
   let got = {};
-  for (let i = 0; i < 60; i++){
-    got = await api(`/api/toolchains?node=${sb.id}`);
-    if ((got.items || []).some(r => r.name === 'android:ndk;29.0.14206865')) break;
-    await sleep(500);
-  }
+  await untilTrue(async () => { got = await api(`/api/toolchains?node=${sb.id}`);
+    return (got.items || []).some(r => r.name === 'android:ndk;29.0.14206865'); }, 30000, 500);
   const by = Object.fromEntries((got.items || []).map(r => [r.name, r]));
   const ndk = by['android:ndk;29.0.14206865'], bt = by['android:build-tools;36.0.0'], plat = by['android:platforms;android-37'];
   ok(ndk && !ndk.installed && /^Needed by alpha \(app\/build\.gradle\.kts\)/.test(ndk.about) && /lacks it/.test(ndk.about)
@@ -856,14 +843,7 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
   // installed.
   await api('/api/prefs', { project: 'alpha', packs_on: 'hexkit' });
   writeFileSync(`${DIR}/sandboxdata/census-extra.json`, JSON.stringify({ store_dirs: { top: ['hexkit'], android: [] } }));
-  const heldBy = async want => {
-    for (let i = 0; i < 60; i++){
-      const t = await api(`/api/toolchains?node=${sb.id}`);
-      if (!!item(t, 'hexkit')?.installed === want) return true;
-      await sleep(500);
-    }
-    return false;
-  };
+  const heldBy = want => untilTrue(async () => !!item(await api(`/api/toolchains?node=${sb.id}`), 'hexkit')?.installed === want, 30000, 500);
   ok(await heldBy(true), 'the sandbox node reports the pack in its store');
   page.dialogs = [];
   await packCard('hexkit');
@@ -909,7 +889,10 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
   await toLibrary();
   await addYourOwn();
   const tpH = () => page.$eval('#tpmodal .box', b => Math.round(b.getBoundingClientRect().height));
-  await page.waitForTimeout(500);              // the dialog's own opening scale
+  // The dialog's own opening scale is over: the box is measured at rest.
+  await page.waitForFunction(() => { const m = document.getElementById('tpmodal'), b = m?.querySelector('.box');
+    return !!b && b.getBoundingClientRect().height > 0 && !m.getAnimations({ subtree: true }).some(a => a.playState === 'running'
+      && Number.isFinite(a.effect?.getComputedTiming().endTime)); }, null, { timeout: 10000 }).catch(() => {});
   const repoH = await tpH();
   await page.click('#tpmodal [data-tpfrom="paste"]');
   ok(Math.abs(await tpH() - repoH) <= 1, `the tool pack dialog keeps its size from A repository to Paste (${repoH} then ${await tpH()})`);

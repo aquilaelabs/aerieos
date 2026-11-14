@@ -3,7 +3,7 @@
 // detail and diff, and the branches with whose worktree sits on which.
 // Real git on the fixture repos, read by the checkout's server; nothing
 // here writes through the dashboard, because this step has no actions.
-import { launch, newPage, ok, done, ready, refreshUntil, tmuxNew, tmuxKill, tmuxCapture, URL, DIR, openFold, member } from './lib.mjs';
+import { launch, newPage, ok, done, ready, refreshUntil, until, quiet as quietFor, tmuxNew, tmuxKill, tmuxCapture, URL, DIR, openFold, member } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync, mkdirSync, existsSync, rmSync, readFileSync } from 'node:fs';
 
@@ -132,7 +132,7 @@ ok(await page.$eval(`${NB} .gfile[data-path="a.txt"] pre.diff`, e => /three/.tes
   page.on('request', onReq);
   writeFileSync(`${B}/other.txt`, 'another\n'); g('add', 'other.txt'); g('commit', '-qm', 'another file, for the redraw');
   await landed('another file, for the redraw');
-  await page.waitForTimeout(500);
+  await quietFor(500);
   const quiet = asked.length;
   writeFileSync(`${B}/a.txt`, 'one\ntwo\nthree\nfour\n');
   writeFileSync(`${B}/other2.txt`, 'more\n'); g('add', 'other2.txt'); g('commit', '-qm', 'a second file, for the redraw');
@@ -797,8 +797,7 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
     ok(/Create branch picked-new from/.test(offer.make) && offer.shown === 0 && offer.open,
        `...a name nobody has narrows the list to nothing and offers to create it, the menu staying open while it is typed (${JSON.stringify(offer)})`);
     await page.press(`${V} #gitPickFind`, 'Enter');
-    let made = false;
-    for (let i = 0; i < 40 && !made; i++) { made = git('rev-parse', '--abbrev-ref', 'HEAD') === 'picked-new'; if (!made) await new Promise(r => setTimeout(r, 250)); }
+    const made = await until(() => git('rev-parse', '--abbrev-ref', 'HEAD') === 'picked-new', 10000, 250);
     const said = await refreshUntil(page, () => document.querySelector('.nb .nbview[data-view="git"] #gitPicker .gbpickname')?.textContent === 'picked-new', { timeout: 15000 })
       .then(() => true, () => false);
     ok(made && said, `...Enter makes it from the commit the tree is on and switches to it, and the head row says so (${JSON.stringify({ made, said,
@@ -807,8 +806,7 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
     await page.click(`${V} #gitPicker .gbpickb`);
     await page.waitForSelector(`${V} #gitPicker .gbpickmenu:not([hidden])`, { timeout: 5000 });
     await page.click(`${V} #gitPicker [data-gitpick="${was}"]`);
-    let back = false;
-    for (let i = 0; i < 40 && !back; i++) { back = git('rev-parse', '--abbrev-ref', 'HEAD') === was; if (!back) await new Promise(r => setTimeout(r, 250)); }
+    const back = await until(() => git('rev-parse', '--abbrev-ref', 'HEAD') === was, 10000, 250);
     ok(back, `...and a press on another branch in it switches the tree back (${git('rev-parse', '--abbrev-ref', 'HEAD')})`);
     git('branch', '-D', 'picked-new');
     await refreshUntil(page, () => document.querySelector('.nb .nbview[data-view="git"] #gitPicker .gbpickname')?.textContent !== 'picked-new', { timeout: 15000 });
@@ -1144,7 +1142,9 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
     page.answers.push(q => { asked = q.text; return -1; });
     // Pressed from the page: the change sits in a section shut by default.
     await page.$eval('.nb .nbview[data-view="git"] [data-gitaskfile]', b => b.click());
-    await page.waitForTimeout(300);
+    // The question asked and answered no, then time in which a send would have gone.
+    await until(() => asked);
+    await quietFor(300);
     page.off('request', seen);
     ok(/^Send .* to beta's Claude session\?/.test(asked) && asks.length === 0,
        `Send to Claude asks first, naming the session, and sends nothing when the answer is no (${asked.split('\n')[0]}; ${asks.length} sent)`);
@@ -1341,11 +1341,7 @@ ok(strip.groups.n === 5 && strip.groups.rows === 1 && strip.groups.inside && str
   await page.evaluate(() => [...document.querySelectorAll('.nb .nbview[data-view="git"] .gbranch')]
     .find(x => x.querySelector('code')?.textContent === 'claude/w.dev')
     ?.querySelector('[data-gitmerge]').click());
-  let landed = false;
-  for (let i = 0; i < 40 && !landed; i++) {
-    try { git('merge-base', '--is-ancestor', 'claude/w.dev', main); landed = true; }
-    catch { await new Promise(r => setTimeout(r, 250)); }
-  }
+  const landed = await until(() => { git('merge-base', '--is-ancestor', 'claude/w.dev', main); return true; }, 10000, 250);
   ok(page.dialogs.some(d => /^Merge claude\/w\.dev into /.test(d) && /claude\/w\.dev is w\.dev's session's branch\./.test(d))
      && landed,
      `...and pressing it asks, naming whose, then merges (${page.dialogs.join(' | ').replace(/\n+/g, ' ')})`);

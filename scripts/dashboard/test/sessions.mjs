@@ -3,7 +3,7 @@
 // macros only on shell tabs, middle-click ends a session, findings tab
 // behavior, and the phone's bottom bar: flyout slides and swaps, the strip
 // arrows and reveal, and the remembered view.
-import { launch, newPage, ok, done, ready, sleep, tmuxNew, tmuxKill, tmuxFmt, layoutSettled, refreshUntil, URL, DIR, closePage, unfold, member } from './lib.mjs';
+import { launch, newPage, ok, done, ready, until, tmuxNew, tmuxKill, tmuxFmt, layoutSettled, refreshUntil, URL, DIR, closePage, unfold, member } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -43,16 +43,16 @@ ok(await page.evaluate(() => sessionOf(tabOf(panes[1]).arg) === 'shell-9' && doc
 // mode a page up; PgDn pages back and copy mode ends itself at the bottom.
 // Pressed once the terminal shows the session, as a person would: before
 // its client attaches, keys reach bb-tty still starting, not tmux.
-for (const t0 = Date.now(); Date.now() - t0 < 15000 && tmuxFmt('shell-9', '#{session_attached}') === '0';) await sleep(200);
+await until(() => tmuxFmt('shell-9', '#{session_attached}') !== '0', 15000, 200);
 await page.evaluate(() => sendKey('pgup'));
-await page.waitForFunction(() => true); await sleep(300);
+await page.waitForFunction(() => true); await until(() => tmuxFmt('shell-9', '#{pane_in_mode}') === '1', 10000);
 ok(tmuxFmt('shell-9', '#{pane_in_mode}') === '1', 'PgUp at a prompt enters copy mode (scrolls back)');
 // Any other key is the program's: it leaves copy mode first, where an arrow
 // moved tmux's cursor over the history and the program heard nothing (B254).
-await page.evaluate(() => sendKey('down')); await sleep(300);
+await page.evaluate(() => sendKey('down')); await until(() => tmuxFmt('shell-9', '#{pane_in_mode}') === '0', 10000);
 ok(tmuxFmt('shell-9', '#{pane_in_mode}') === '0', "...and the keys row's arrow leaves it, for the program");
-await page.evaluate(() => sendKey('pgup')); await sleep(300);
-await page.evaluate(() => sendKey('pgdn')); await sleep(300);
+await page.evaluate(() => sendKey('pgup')); await until(() => tmuxFmt('shell-9', '#{pane_in_mode}') === '1', 10000);
+await page.evaluate(() => sendKey('pgdn')); await until(() => tmuxFmt('shell-9', '#{pane_in_mode}') === '0', 10000);
 ok(tmuxFmt('shell-9', '#{pane_in_mode}') === '0', 'PgDn back at the bottom leaves copy mode by itself');
 // The hot bar (the operator, 12 Nov): at a desk, over the terminal's bottom
 // right corner and slightly translucent, the keys a terminal is most
@@ -68,9 +68,9 @@ ok(tmuxFmt('shell-9', '#{pane_in_mode}') === '0', 'PgDn back at the bottom leave
   ok(hot && hot.keys.join(' ') === 'Esc Tab ↑ ↓ ^C ^D PgUp PgDn' && !hot.folded && hot.bottom >= 0 && hot.bottom < 24 && hot.right >= 0 && hot.right < 40 && hot.inside && hot.tall
      && hot.seen > 0.6 && hot.seen < 1,
      `a shell's terminal wears its hot bar at its bottom right, slightly translucent: a shell's keys and a page back and on (${JSON.stringify(hot)})`);
-  await page.click(`${HOT} [data-hk="pgup"]`); await sleep(300);
+  await page.click(`${HOT} [data-hk="pgup"]`); await until(() => tmuxFmt('shell-9', '#{pane_in_mode}') === '1', 10000);
   const up = tmuxFmt('shell-9', '#{pane_in_mode}');
-  await page.click(`${HOT} [data-hk="down"]`); await sleep(300);
+  await page.click(`${HOT} [data-hk="down"]`); await until(() => tmuxFmt('shell-9', '#{pane_in_mode}') === '0', 10000);
   ok(up === '1' && tmuxFmt('shell-9', '#{pane_in_mode}') === '0', `its PgUp scrolls a page back and its arrow is the program's, as the keys row's are (${up})`);
   // Links: what the terminal shows, read whole where a link runs past the
   // pane's width, wrapped by the terminal or broken there by the program.
@@ -131,8 +131,9 @@ const alphaLabel = await page.evaluate(() => projLabel('alpha'));
 ok(page.dialogs[nd].includes(`Claude session on ${alphaLabel}?`) && !page.dialogs[nd].includes('claude-alpha'),
    `...the question names the space, not the tmux session (${page.dialogs[nd].split('\n')[0]})`);
 // B54: focus is not left on another row's End, where a keyboard Enter would
-// end a second session.
-await sleep(300);
+// end a second session. Read once the page has taken focus off the list,
+// which it does after the read that follows the End.
+await page.waitForFunction(() => !document.activeElement?.matches?.('[data-k]'), null, { timeout: 10000 }).catch(() => {});
 const fo = await page.evaluate(() => { const a = document.activeElement;
   return a?.matches?.('[data-k]') ? a.dataset.k : ''; });
 ok(!fo, `after End, focus is on no other row's End (${fo || 'none'})`);
@@ -329,7 +330,7 @@ const lockAnswer = page.waitForResponse(r => r.url().includes('/api/lock'), { ti
 await page.click('.pgrid .pcard[data-row="ep.silon"] [data-lock]');         // lock: asks, then the server ends the others' sessions
 const lockSaidBack = await lockAnswer;
 // The question is the page's modal, answered a moment after the press.
-for (let i = 0; i < 40 && page.dialogs.length <= ndx; i++) await sleep(100);
+await until(() => page.dialogs.length > ndx, 4000, 100);
 const gone = n => { for (let i = 0; i < 20; i++){ try { execFileSync('tmux', ['has-session', '-t', '=' + n], { stdio: 'ignore' }); } catch { return true; } execFileSync('sleep', ['0.25']); } return false; };
 const lockGone = [gone(`${lockUid}~claude-ep_silon`), gone('claude-ep_silon')];
 ok(lockSaid === 'Lock' && page.dialogs.length === ndx + 1 && /Every session here but yours ends now/.test(page.dialogs[ndx]) && /Lock ep\.silon\?/.test(page.dialogs[ndx])

@@ -7,7 +7,7 @@
 // device, a read-only person's change is refused, and a device waiting on
 // the project wakes when another changes it. The Profile page lists the
 // devices and Disconnect signs one out. No browser.
-import { ok, done, DIR, URL } from './lib.mjs';
+import { ok, done, sleep, until, DIR, URL } from './lib.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 
@@ -115,7 +115,9 @@ const b = await signin('dv.rw', people['dv.rw'], 'LAPTOP');
 const at = (await dev(a.token, 'sync', { action: 'state', project: 'alpha' })).rev;
 const t0 = Date.now();
 const waiting = dev(a.token, 'sync', { action: 'since', project: 'alpha', rev: at, wait: 15 });
-await new Promise(r => setTimeout(r, 400));
+// Time for the poll to reach the server and be waiting there before the
+// change is made: nothing outside the server says that it is.
+await sleep(400);
 await put(b.token, 'from-laptop.txt', 'the laptop\n');
 const woke = await waiting;
 ok(woke.status === 200 && (woke.changes || []).some(c => c[0] === 'from-laptop.txt') && Date.now() - t0 < 10000,
@@ -128,7 +130,8 @@ ok(woke.status === 200 && (woke.changes || []).some(c => c[0] === 'from-laptop.t
   const at2 = (await dev(b.token, 'sync', { action: 'state', project: 'alpha' })).rev;
   const t1 = Date.now();
   const waiting2 = dev(b.token, 'sync', { action: 'since', project: 'alpha', rev: at2, wait: 20 });
-  await new Promise(r => setTimeout(r, 400));
+  // As above: the poll waiting at the server before the file is written.
+  await sleep(400);
   writeFileSync(`${tree}/on-the-disk.txt`, 'written on the controller\n');
   const woke2 = await waiting2;
   ok(woke2.status === 200 && (woke2.changes || []).some(c => c[0] === 'on-the-disk.txt') && Date.now() - t1 < 12000,
@@ -157,13 +160,11 @@ ok(woke.status === 200 && (woke.changes || []).some(c => c[0] === 'from-laptop.t
   const daemon = spawn('python3', ['-m', 'bbcompanion', 'run'], { env: appEnv, stdio: 'ignore' });
   try {
     writeFileSync(`${folder}/made-on-pc.txt`, 'from the folder\n');
-    let up = false;
-    for (let i = 0; i < 60 && !up; i++) { up = existsSync(`${tree}/made-on-pc.txt`); if (!up) await new Promise(r => setTimeout(r, 500)); }
+    const up = await until(() => readFileSync(`${tree}/made-on-pc.txt`, 'utf8') === 'from the folder\n', 30000, 500);
     ok(up && readFileSync(`${tree}/made-on-pc.txt`, 'utf8') === 'from the folder\n', 'a file made in the folder goes up to the space within seconds');
     const c2 = await signin('dv.rw', people['dv.rw'], 'ELSEWHERE');
     await put(c2.token, 'made-elsewhere.txt', 'from another device\n');
-    let down = false;
-    for (let i = 0; i < 60 && !down; i++) { down = existsSync(`${folder}/made-elsewhere.txt`); if (!down) await new Promise(r => setTimeout(r, 500)); }
+    const down = await until(() => readFileSync(`${folder}/made-elsewhere.txt`, 'utf8') === 'from another device\n', 30000, 500);
     ok(down && readFileSync(`${folder}/made-elsewhere.txt`, 'utf8') === 'from another device\n',
        '...and one made elsewhere comes down into the folder within seconds, woken by its long poll');
     // A session on alpha asks for them with aerie pc, under the project's
@@ -177,7 +178,7 @@ ok(woke.status === 200 && (woke.changes || []).some(c => c[0] === 'from-laptop.t
       return { status: r.status, ...(await r.json()) };
     };
     let pcs = { pcs: [] };
-    for (let i = 0; i < 40 && !pcs.pcs?.length; i++) { pcs = await pcApi({ action: 'lent' }); if (!pcs.pcs?.length) await new Promise(r => setTimeout(r, 500)); }
+    await until(async () => { pcs = await pcApi({ action: 'lent' }); return ['build', 'log'].every(x => pcs.pcs?.[0]?.verbs?.includes(x)); }, 20000, 500);
     const denied = await pcApi({ action: 'run', verb: 'build' });
     ok(/build/.test(lent.out) && pcs.pcs?.[0]?.verbs.includes('build') && pcs.pcs[0].verbs.includes('log')
        && denied.status === 403 && /Use a lent PC/.test(denied.error || ''),
@@ -249,11 +250,7 @@ ok(otherOut.error && (await dev(b.token, 'whoami', {})).status === 200,
   await admin('/api/settings', { set: { offer_unvetted: true } });
   const started = await admin('/api/apps', { action: 'check' });
   let v = null;
-  for (let i = 0; i < 40; i++) {
-    v = await (await fetch(`${base}/api/apps`, { headers: ADMIN })).json();
-    if (!v.checking && v.checked) break;
-    await new Promise(r => setTimeout(r, 250));
-  }
+  await until(async () => { v = await (await fetch(`${base}/api/apps`, { headers: ADMIN })).json(); return !v.checking && v.checked; }, 10000, 250);
   const by = Object.fromEntries((v.apps || []).map(x => [x.name, x]));
   ok(started.ok && v.release === 'v0.4.0' && v.matched && by.android?.files.length === 1 && by.vscode?.files.length === 1,
      `Check for updates fetches each offered app from the release matching this controller (${v.release}, ${JSON.stringify((v.apps || []).map(x => [x.name, x.files.length]))})`);
@@ -278,11 +275,7 @@ ok(otherOut.error && (await dev(b.token, 'whoami', {})).status === 200,
      `an app from before the door's window is told to update, not half served (${old.status}: ${oldJ.error})`);
   // A switch moved is looked at at once: what is off goes.
   const off = await admin('/api/settings', { set: { apps_vscode: false } });
-  for (let i = 0; i < 40; i++) {
-    v = await (await fetch(`${base}/api/apps`, { headers: ADMIN })).json();
-    if (!v.checking) break;
-    await new Promise(r => setTimeout(r, 250));
-  }
+  await until(async () => { v = await (await fetch(`${base}/api/apps`, { headers: ADMIN })).json(); return !v.checking; }, 10000, 250);
   const vs = (v.apps || []).find(x => x.name === 'vscode');
   const gone = await fetch(`${base}/apps/vscode/aerieos-vscode-0.4.0.vsix`, { headers: PERSON });
   ok(!vs?.offered && !vs?.files.length && gone.status === 404,

@@ -6,7 +6,7 @@
 // in it; a dial set through one repository is the project's. The card's
 // front and back, the trash naming the project, and Put back asking where
 // when the project is gone.
-import { ok, done, DIR, URL, launch, newPage, ready } from './lib.mjs';
+import { ok, done, DIR, URL, launch, newPage, ready, quiet, sleep } from './lib.mjs';
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const base = URL.replace(/\/$/, '');
@@ -107,9 +107,16 @@ const browser = await launch();
   ok(await page.evaluate(() => tabs.length) === tabs, 'a press on the card opens nothing');
   // Edit turns it over at the size it was.
   const h0 = await page.$eval(card, c => c.getBoundingClientRect().height);
+  const pressed = Date.now();
   await page.click(`${card} .pcfront [data-pedit]`);
   await page.waitForSelector(`${card}.flipped`, { timeout: 3000 });
-  await page.waitForTimeout(500);
+  // Measured with the turn over: neither face still on its tween.
+  await page.waitForFunction(c => { const el = document.querySelector(c);
+    return !!el && el.classList.contains('flipped') && ![...el.querySelectorAll(':scope > .pcface')].some(f => f.getAnimations().length); }, card, { timeout: 10000 }).catch(() => {});
+  // ...and the grid's own redraw behind it: flipCard may draw the cards
+  // again 450 ms after a turn, on a timer nothing on the page shows. A
+  // clock: what is left of that half second since the press.
+  await sleep(Math.max(0, 500 - (Date.now() - pressed)));
   const back = await page.$eval(card, c => ({
     h: c.getBoundingClientRect().height, frontInert: c.querySelector('.pcfront').inert,
     rows: [...c.querySelectorAll('.pcback .pcrepo')].map(r => [r.querySelector('.name')?.textContent.trim(),
@@ -142,7 +149,8 @@ const browser = await launch();
     drawProjects(state.projects);
     state.projects[0].branch = was;
   });
-  await page.waitForTimeout(300);
+  // The redraw is made: this is the time in which it could have taken the box.
+  await quiet(300);
   const stayed = await page.$eval(`${card} .askline input`, i => i.value).catch(() => null);
   ok(stayed === 'half typed', `a redraw leaves a rename box open with what was typed in it (${stayed})`);
   await page.press(`${card} .askline input`, 'Escape');
@@ -151,8 +159,13 @@ const browser = await launch();
   // the answer and not the next read (held back here), sliding there with
   // the page scrolled to keep it in sight on a phone (the operator, 26 Oct).
   await page.setViewportSize({ width: 393, height: 700 });
-  await page.waitForTimeout(400);
+  // Laid out at the phone's width: the breakpoint's listeners run before a frame's callbacks, and what they move has landed.
+  await page.waitForFunction(() => innerWidth === 393, null, { timeout: 10000 });
+  await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+  await page.waitForFunction(() => !document.getAnimations().some(a => a.playState === 'running'
+    && Number.isFinite(a.effect?.getComputedTiming().endTime)), null, { timeout: 10000 }).catch(() => {});
   let held = 0;
+  // The delay is the case: the next read of the status is held back past the rename's own answer.
   await page.route('**/api/status*', async r => { held++; await new Promise(z => setTimeout(z, 6000)); r.continue().catch(() => {}); });
   const renameTo = async to => {
     await page.click(`${card} .pcback [data-prn]`);
@@ -165,7 +178,10 @@ const browser = await launch();
   const moved = await page.$eval(card, c => ({ name: c.querySelector('.pcfront .pcname .name')?.textContent, flipped: c.classList.contains('flipped'),
     last: [...c.parentElement.children].pop() === c,
     sliding: [...document.querySelectorAll('.pgrid .pcard')].some(x => x.getAnimations().some(a => a.effect?.getKeyframes?.()[0]?.transform?.startsWith('translate'))) }));
-  await page.waitForTimeout(900);
+  // Its slide over, since while it slides it is drawn where it left, and the page come to it where it landed.
+  await page.waitForFunction(c => { const el = document.querySelector(c);
+    if (!el || el.getAnimations().length) return false;
+    const r = el.getBoundingClientRect(), d = el.closest('.doc').getBoundingClientRect(); return r.top < d.bottom && r.bottom > d.top; }, card, { timeout: 10000 }).catch(() => {});
   const seen = await page.$eval(card, c => { const r = c.getBoundingClientRect(), d = c.closest('.doc').getBoundingClientRect();
     return r.top < d.bottom && r.bottom > d.top; });
   ok(moved.name === 'zz Shop & Co' && moved.flipped && moved.last && moved.sliding && seen,
@@ -306,7 +322,12 @@ ok(gone.status === 200 && !(await status()).repos[key], `an empty space is delet
   await pg.goto(URL); await ready(pg);
   const dlg = await pg.evaluate(async pl => {
     const got = moveConfirm(pl);
-    await new Promise(r => setTimeout(r, 300));
+    // The dialog shown and its opening scale over.
+    for (const end = Date.now() + 10000; Date.now() < end;){
+      await new Promise(r => setTimeout(r, 50));
+      const d = $('mvmodal');
+      if (d && !d.hidden && !d.getAnimations({ subtree: true }).some(a => a.playState === 'running' && Number.isFinite(a.effect?.getComputedTiming().endTime))) break;
+    }
     const m = $('mvmodal');
     const out = { title: $('mvTitle').textContent, boxes: [...m.querySelectorAll('[data-mvnode]')].map(i => [i.dataset.mvnode, i.checked]),
                   text: m.querySelector('.box').textContent.replace(/\s+/g, ' ') };

@@ -4,7 +4,7 @@
 // Nodes tab where an administrator sets the number. The node is one this file
 // enrolls, with the session half up and a heartbeat whose panes carry the
 // spinner a working Claude pane does; the per-file world takes it away after.
-import { URL, launch, newPage, ok, done, ready, sleep, DIR, openSection, member } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, sleep, until, DIR, openSection, member } from './lib.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -261,6 +261,8 @@ const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
 
   const first = await Promise.all([0, 1].map(i => hook(i, 'turn')));
   const third = await hook(2, 'turn');
+  // Waiters are served in the order they asked, by the clock: the fourth
+  // asks at a later time than the third.
   await sleep(20);
   const fourth = await hook(3, 'turn');
   ok(first.every(x => x.go) && third.go === false && fourth.go === false,
@@ -348,11 +350,7 @@ const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
   child.stdin.end('{"prompt":"go"}');
   const ended = new Promise(res => child.on('exit', code => res({ code, at: Date.now() })));
   // Until the queue holds it, rather than a fixed two and a half seconds.
-  let waiting = 0;
-  for (let i = 0; i < 50 && !waiting; i++){
-    waiting = (await call('/api/v1/nodes')).nodes.find(n => n.id === minted.id).turns.waiting;
-    if (!waiting) await sleep(100);
-  }
+  const waiting = await until(async () => (await call('/api/v1/nodes')).nodes.find(n => n.id === minted.id).turns.waiting, 5000, 100);
   const freed = Date.now();
   await hook(0, 'turn-done');
   const e = await Promise.race([ended, sleep(15000).then(() => ({ code: 'still waiting' }))]);
@@ -388,7 +386,10 @@ const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
   await page.fill(inp, '3');
   // A heartbeat repaints the tab; the number being typed survives it.
   await beat([{ name: `${uids[0]}~claude-alpha`, title: '◐ Work' }]);
-  await page.evaluate(() => loadNodes()); await sleep(300);
+  await page.evaluate(() => loadNodes());
+  // The repaint is the one that counts the heartbeat's working pane.
+  await page.waitForFunction(r => /^1 session working now/.test(document.querySelector(`${r} [data-nd="sess-save"]`)
+    ?.parentElement.querySelector('.state')?.textContent.trim() || ''), row, { timeout: 10000 }).catch(() => {});
   ok(await page.$eval(inp, el => el.value) === '3', '...and a number being typed survives the repaint a heartbeat brings');
   await page.click(`${row} [data-nd="sess-save"]`);
   await page.waitForFunction(r => /of 3/.test(document.querySelector(`${r} [data-nd="sess-save"]`)

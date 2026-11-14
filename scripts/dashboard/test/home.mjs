@@ -3,7 +3,7 @@
 // own rows; the last ten jobs, each opening its row on the Jobs page; the
 // pinned projects at a glance; read whole on open and light when the queue
 // moves, never on a timer of its own.
-import { URL, launch, newPage, ok, done, ready, sleep } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, sleep, quiet, settled } from './lib.mjs';
 
 const auth = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
 const base = URL.replace(/\/$/, '');
@@ -165,7 +165,8 @@ ok(await page.evaluate(() => tabOf(panes[0])?.kind === 'home' && location.hash =
   await page.keyboard.press('ArrowDown');
   const want = await page.$eval('#jumpList .jrow.on .jl', e => e.textContent);
   await page.keyboard.press('Enter');
-  await sleep(400);
+  await page.waitForFunction(() => document.getElementById('jumpList').hidden && document.getElementById('jump').value === '',
+    null, { timeout: 10000 }).catch(() => {});
   ok(await page.$eval('#jumpList', l => l.hidden) && await page.$eval('#jump', i => i.value) === '',
      `...and Enter opens the marked row (${want})`);
   await page.click('#rail [data-rail="home"]');
@@ -175,7 +176,10 @@ ok(await page.evaluate(() => tabOf(panes[0])?.kind === 'home' && location.hash =
 // ---- on a phone the cards stack and nothing scrolls sideways -----------------
 {
   await page.setViewportSize({ width: 393, height: 851 });
-  await sleep(400);
+  // The page at the new width and drawn for it: the breakpoint's listeners run
+  // before a frame's callbacks.
+  await page.waitForFunction(() => innerWidth === 393, null, { timeout: 10000 });
+  await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
   const lay = await page.evaluate(() => {
     const [a, b] = [...document.querySelectorAll('.doc.on .homegrid .hcard')].map(c => c.getBoundingClientRect());
     return { stacked: b.top >= a.bottom - 1, over: document.documentElement.scrollWidth - innerWidth,
@@ -193,19 +197,24 @@ ok(await page.evaluate(() => tabOf(panes[0])?.kind === 'home' && location.hash =
 // where the wheel would disrupt a small space, like the rail's icons, none
 // pops up). A button with room still wears it.
 {
+  // The delay is the subject: a read slow enough that a press would wear a ring.
   const slow = async r => { await sleep(1200); await r.continue().catch(() => {}); };
   const boxes = () => page.evaluate(() => [...document.querySelectorAll('#rail .ritem, .pane .bar.page .pseg button')]
     .filter(b => b.checkVisibility()).map(b => { const r = b.getBoundingClientRect(); return [r.top, r.left, r.width, r.height].map(Math.round).join(','); }).join(' '));
   const rings = () => page.evaluate(() => [...document.querySelectorAll('button.working, a.btn.working')].map(b => (b.getAttribute('aria-label') || b.textContent).trim().slice(0, 20)));
   await page.click('#rail [data-rail="home"]');
   await page.waitForSelector('.doc.on .hometiles .tile', { timeout: 20000 });
-  await sleep(600);
+  // The page at rest before its boxes are the measure: its reads landed, and
+  // every tween that ends over.
+  await settled(page);
+  await page.waitForFunction(() => !document.getAnimations().some(a => a.playState === 'running'
+    && Number.isFinite(a.effect?.getComputedTiming().endTime)), null, { timeout: 10000 }).catch(() => {});
   const before = await boxes();
   await page.route('**/api/**', slow);
   const seen = [], moved = [];
   for (const sel of ['#rail [data-rail="home"]', '.pane .bar.page .pseg button']){
     await page.click(sel);
-    for (let i = 0; i < 12; i++){ await sleep(100); seen.push(...await rings()); if (await boxes() !== before) moved.push(sel); }
+    for (let i = 0; i < 12; i++){ await quiet(100); seen.push(...await rings()); if (await boxes() !== before) moved.push(sel); }
   }
   ok(seen.length === 0, `a group on the rail and a page of the sub-nav wear no ring while their page reads (${JSON.stringify([...new Set(seen)])})`);
   ok(moved.length === 0, `...and nothing on the rail or the sub-nav moves (${JSON.stringify([...new Set(moved)])})`);
@@ -223,14 +232,17 @@ ok(await page.evaluate(() => tabOf(panes[0])?.kind === 'home' && location.hash =
   const wore = await until(async () => (await rings()).includes('Read it again'), 1500, 50);
   // ...and the same button where one more thing does not fit: its row is as wide as it is.
   await page.evaluate(() => { const b = document.getElementById('ringProbe'); b.classList.remove('working'); b.parentElement.style.cssText += ';width:auto;flex-wrap:wrap;max-width:' + b.offsetWidth + 'px'; });
-  await sleep(1500);
+  // The first press over: the slow read it started has landed, and nothing is tied to the button.
+  await page.waitForFunction(() => { const b = document.getElementById('ringProbe'); return !b.__pending && !b.dataset.pressWorking; },
+    null, { timeout: 10000 }).catch(() => {});
   await page.click('#ringProbe');
   let tight = false;
-  for (let i = 0; i < 12; i++){ await sleep(100); if ((await rings()).includes('Read it again')) tight = true; }
+  for (let i = 0; i < 12; i++){ await quiet(100); if ((await rings()).includes('Read it again')) tight = true; }
   ok(ring && wore && !tight, `...while a button with room wears it, and the same button in a row it just fits does not (${wore}, ${tight})`);
   await page.unroute('**/api/**');
   await page.evaluate(() => document.getElementById('ringProbe').parentElement.remove());
-  await sleep(1500);
+  // The reads the route still holds let go and answered.
+  await settled(page, { cap: 5000 });
 }
 
 // ---- the controller restarts under the page (R246) -------------------------
@@ -242,7 +254,7 @@ ok(await page.evaluate(() => tabOf(panes[0])?.kind === 'home' && location.hash =
 {
   await page.evaluate(() => { window.__sameLoad = true; chatDraft.suite = 'half a message'; bootSeen = 'the run before this one'; });
   await page.evaluate(() => refresh());
-  await sleep(600);
+  await page.waitForFunction(() => !document.getElementById('newBuild').hidden, null, { timeout: 10000 }).catch(() => {});
   const held = await page.evaluate(() => ({ same: window.__sameLoad === true, shown: !document.getElementById('newBuild').hidden,
     said: document.getElementById('newBuildSay').textContent, draft: chatDraft.suite }));
   ok(held.same && held.shown && /The controller was updated\. Reload to use it: a message being typed is not saved yet\./.test(held.said)

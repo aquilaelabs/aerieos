@@ -4,7 +4,7 @@
 // the account's record; the bell a short list with See all; and the
 // Notifications page, its asks answered on the row with the long part in a
 // scrolling box, its history narrowed by chips, deleted and cleared.
-import { URL, DIR, launch, newPage, ok, done, ready, sleep } from './lib.mjs';
+import { URL, DIR, launch, newPage, ok, done, ready, sleep, quiet } from './lib.mjs';
 import { writeFileSync, rmSync } from 'node:fs';
 
 const auth = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
@@ -47,7 +47,7 @@ await api('/api/notices', { action: 'clear' });
   // Held under the pointer: an info toast's four seconds stop while it is read.
   await page.evaluate(() => { document.querySelectorAll('#toast .tst').forEach(t => t.remove()); notify('read me slowly'); });
   await page.hover('#toast .tst');
-  await sleep(5000);
+  await quiet(5000);
   ok(await page.evaluate(() => [...document.querySelectorAll('#toast .tmsg')].some(t => t.textContent === 'read me slowly')),
      'a toast under the pointer stays past its time');
   await page.mouse.move(10, 10);
@@ -66,12 +66,20 @@ const xWorks = () => page.evaluate(() => {
   const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
   return hit === x || x.contains(hit);
 });
+// A toast in and at rest, and the About dialog's opening over when it is
+// open: where the toast is, and what is over its ×, are read then. A toast
+// slides up 8px as it comes in.
+const toastRests = () => page.waitForFunction(() => {
+  const moving = e => e.getAnimations({ subtree: true }).some(a => a.playState === 'running' && Number.isFinite(a.effect?.getComputedTiming().endTime));
+  const t = document.querySelector('#toast .tst');
+  return !!t && t.getBoundingClientRect().height > 0 && !moving(t) && !moving(document.getElementById('aboutModal'));
+}, null, { timeout: 10000 }).catch(() => {});
 {
   await page.evaluate(() => notify('said before a dialog'));
-  await sleep(300);
+  await toastRests();
   const before = await toastAt();
   await page.evaluate(() => { document.querySelectorAll('#toast .tst').forEach(t => t.remove()); openAbout(); notify('said over a dialog', 'warn'); });
-  await sleep(300);
+  await toastRests();
   const during = await toastAt(), pressable = await xWorks();
   await page.click('#toast .tst .tx');
   const gone = await page.waitForFunction(() => !document.querySelector('#toast .tst'), null, { timeout: 3000 }).then(() => true, () => false);
@@ -155,7 +163,12 @@ const xWorks = () => page.evaluate(() => {
     ph = { ...(ph || {}), asks: [{ id: 41, kind: 'container', name: 'web', node_name: 'sandbox', why: 'a container to try the site',
       cmd: ['container', 'new', 'web'], left: 300, asker: 'test', detail: 'services:\n' + '  web:\n    image: nginx\n'.repeat(80) }] };
     drawPanes();
-    await new Promise(r => setTimeout(r, 300));
+    // The row drawn, its section open and at rest: its box is measured there.
+    for (const end = Date.now() + 10000; Date.now() < end;){
+      const r = document.querySelector('.noticestab .ntask[data-ask="41"]'), s = r?.closest('details.sect');
+      if (r && (!s || (s.open && !s.getAnimations({ subtree: true }).some(a => a.playState === 'running' && Number.isFinite(a.effect?.getComputedTiming().endTime))))) break;
+      await new Promise(q => setTimeout(q, 50));
+    }
     const row = document.querySelector('.noticestab .ntask[data-ask="41"]');
     const onRow = !!row && !!row.querySelector('.actbar [data-ntallow="41"]') && !!row.querySelector('.actbar [data-ntdeny="41"]')
       && !row.querySelector(':scope details [data-ntallow]');
@@ -217,7 +230,7 @@ const xWorks = () => page.evaluate(() => {
   const said = await until(() => page.evaluate(() => [...document.querySelectorAll('#toast .tmsg')]
     .map(t => t.textContent).find(t => /claude-alpha/.test(t))), 15000);
   ok(said && !/no session|not yours/.test(said), `...and Resume types the line into that session (${said})`);
-  await sleep(1500);
+  await quiet(1500);
   const sends = await page.evaluate(() => [...document.querySelectorAll('#toast .tmsg')].filter(t => /claude-alpha/.test(t.textContent)).length);
   ok(sends === 1, `...once, however fast it is pressed again while the first is out (${sends} sends)`);
   // Read off the bell open again: it draws only while it is on screen, and a
@@ -236,12 +249,16 @@ const xWorks = () => page.evaluate(() => {
 {
   await page.setViewportSize({ width: 393, height: 851 });
   await page.evaluate(() => notify('on a phone'));
-  await sleep(300);
+  // The page at the phone's width and drawn for it: the breakpoint's
+  // listeners run before a frame's callbacks.
+  await page.waitForFunction(() => innerWidth === 393, null, { timeout: 10000 });
+  await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+  await toastRests();
   const r = await page.$eval('#toast .tst', t => { const b = t.getBoundingClientRect(); return { l: b.left, r: innerWidth - b.right, bottom: b.bottom,
     dock: document.querySelector('#pane1 .bar')?.getBoundingClientRect().top ?? document.getElementById('railbar').getBoundingClientRect().top }; });
   ok(r.l <= 12 && r.r <= 12 && r.bottom <= r.dock, `on a phone a toast spans the width, above the dock's line (${JSON.stringify(r)})`);
   await page.evaluate(() => { document.querySelectorAll('#toast .tst').forEach(t => t.remove()); openAbout(); notify('over a phone dialog', true); });
-  await sleep(300);
+  await toastRests();
   const pd = await page.$eval('#toast .tst', t => { const b = t.getBoundingClientRect(); return { l: b.left, r: innerWidth - b.right, bottom: b.bottom }; });
   const px = await xWorks();
   ok(pd.l <= 12 && pd.r <= 12 && Math.abs(pd.bottom - r.bottom) < 2 && px,
