@@ -136,7 +136,7 @@ jobs:
       # `git rev-list --count HEAD`, and a shallow clone answers that with 1.
       # It would not fail; every build would just silently call itself
       # .dev.1, which is worse.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (R206)
         with:
           fetch-depth: 0
 
@@ -160,12 +160,11 @@ jobs:
           sudo docker image prune -af >/dev/null
           df -h /
 
-      - uses: docker/setup-buildx-action@v4
-
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069   # v4.4.1, pinned by commit (R206)
       # For the push, and for reading the cache manifest out of :latest before
       # it: the package is private, so even the read needs the token.
       - name: Log in to GHCR
-        uses: docker/login-action@v4
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550   # v4.8.0, pinned by commit (R206)
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -179,7 +178,7 @@ jobs:
 
       - name: Derive tags
         id: meta
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302   # v6.2.0, pinned by commit (R206)
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           # Never by itself: type=semver on a stable tag would add :latest at
@@ -205,27 +204,23 @@ jobs:
         id: stamp
         run: echo "at=$(date -u +%Y-%m-%dT%H:%MZ)" >> "$GITHUB_OUTPUT"
 
-      # The ordered identity, derived the same way `aerie version` derives it in
-      # a checkout; see scripts/dashboard/version.py for why rev-list and not
-      # a run number or `git describe`'s count. Kept as shell here rather than
-      # calling into the module: this runs on a hosted runner with only the
-      # repo checked out, before any image exists to run bb from.
+      # The ordered identity, as `aerie version` says it of this checkout: the
+      # one tool every other build asks (the Android app, the companions,
+      # the rehearsal), where this workflow worked it out again in its own
+      # shell and the two disagreed on a pre-release's tag (R206 step 9). It
+      # needs python3 and git and no image. On a tag the answer is the tag's
+      # own words, and a tag the tree's VERSION does not agree with is a
+      # failure here, before anything is pushed under either name.
       - name: Derive the version
         id: ver
         run: |
-          target="$(head -1 VERSION 2>/dev/null | tr -d '[:space:]')"
-          ordinal="$(git rev-list --count HEAD)"
-          short="$(git rev-parse --short=7 HEAD)"
-          if ! printf '%s' "$target" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "::warning::no usable VERSION file; stamping the commit alone"
-            v="$short"
-          elif tag="$(git describe --tags --exact-match HEAD 2>/dev/null)"; then
-            v="${tag#v}"
-            if [ "$v" != "$target" ]; then
-              echo "::warning::tag $tag disagrees with VERSION ($target); stamping the tag, but one of them is wrong"
-            fi
-          else
-            v="${target}-dev.${ordinal}+${short}"
+          tag=""
+          [ "$GITHUB_REF_TYPE" = tag ] && tag="$GITHUB_REF_NAME"
+          v="$(BB_RELAYED=1 BB_VERSION_TAG="$tag" bash scripts/aerie version --semver)" \
+            || { echo "::error::aerie version did not say what this checkout is"; exit 1; }
+          if [ -n "$tag" ] && [ "$v" != "${tag#v}" ]; then
+            echo "::error::the tag is $tag and aerie version says $v of its commit: the tag's version and the VERSION file disagree, or the tree changed after the checkout"
+            exit 1
           fi
           echo "built $v"
           echo "v=$v" >> "$GITHUB_OUTPUT"
@@ -243,7 +238,7 @@ jobs:
           python3 tools/sign-agent.py
       - name: Build and push
         id: push
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc   # v7.4.0, pinned by commit (R206)
         with:
           context: .
           platforms: linux/amd64
@@ -330,10 +325,9 @@ jobs:
       contents: read
       packages: read
     steps:
-      - uses: actions/checkout@v7
-
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (R206)
       - name: Log in to GHCR
-        uses: docker/login-action@v4
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550   # v4.8.0, pinned by commit (R206)
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -483,7 +477,7 @@ jobs:
       # To start the companion apps' builds for a release this job makes.
       actions: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (R206)
         with:
           fetch-depth: 0
       - name: Sign the agent with the release key
@@ -520,7 +514,7 @@ jobs:
           echo "name=$name" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
       - name: Attest the bundle
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be   # v2.4.0, pinned by commit (R206)
         with:
           subject-path: ${{ steps.pack.outputs.name }}
       - name: Put it on the release
@@ -602,7 +596,7 @@ jobs:
             tools
             .release-files
           sparse-checkout-cone-mode: false
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0, pinned by commit (R206)
         with:
           name: aerieos-os
           path: out
@@ -612,7 +606,7 @@ jobs:
       # stay the boot test's and the run's artifact.
       - name: Attest the ISO and the stick
         id: attest
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be   # v2.4.0, pinned by commit (R206)
         with:
           subject-path: |
             out/aerieos-os-*.iso

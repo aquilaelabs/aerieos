@@ -64,8 +64,32 @@ class Verdicts(unittest.TestCase):
         self.assertEqual(rc, 1, "what the check prints is what lint is told")
 
     def test_every_check_is_one_the_dispatcher_knows(self):
-        self.assertEqual(set(checks.CHECKS), {"runner", "xml", "settings", "layout", "hosted", "channels", "shipped",
+        self.assertEqual(set(checks.CHECKS), {"runner", "xml", "settings", "layout", "hosted", "pinned", "channels", "shipped",
                                               "formats", "packs", "unraid", "changelog", "dupes"})
+
+    def test_an_action_named_by_a_tag_is_a_note_anywhere_and_a_failure_here(self):
+        # R206: an action at @v4 runs whatever its publisher points v4 at,
+        # in jobs that hold the release key.
+        os.makedirs(os.path.join(self.d, ".github", "workflows"))
+        sha = "3d3c42e5aac5ba805825da76410c181273ba90b1"
+        self.put(".github/workflows/a.yml", f"jobs:\n  x:\n    steps:\n      - uses: actions/checkout@{sha}   # v7.0.1\n"
+                                            "      - uses: ./.github/workflows/b.yml\n      # uses: nobody/commented@v1\n")
+        self.assertEqual(self.run_check("pinned"), (0, "  [ok]   every action is pinned by its commit\n"))
+        self.put(".github/workflows/b.yml", "jobs:\n  y:\n    steps:\n      - uses: docker/login-action@v4\n"
+                                            "      - name: named first\n        uses: actions/upload-artifact@main\n      - uses: owner/unversioned\n")
+        rc, said = self.run_check("pinned")
+        self.assertEqual(rc, 0, "a note in a project that is not this one")
+        self.assertIn("[note] b.yml:4 uses docker/login-action at v4, which its publisher can move", said)
+        self.assertIn("b.yml:6 uses actions/upload-artifact at main", said)
+        self.assertIn("b.yml:7 uses owner/unversioned at no version", said)
+        p = subprocess.run([sys.executable, TOOL, "pinned", "--strict"], cwd=self.d, capture_output=True, text=True, check=False)
+        self.assertEqual(p.returncode, 1)
+        self.assertEqual(p.stdout.count("[FAIL]"), 3)
+
+    def test_this_trees_own_workflows_are_all_pinned(self):
+        root = os.path.normpath(os.path.join(HERE, "..", "..", ".."))
+        p = subprocess.run([sys.executable, TOOL, "pinned", "--strict"], cwd=root, capture_output=True, text=True, check=False)
+        self.assertEqual((p.returncode, p.stdout.strip()), (0, "[ok]   every action is pinned by its commit"), p.stdout)
 
 
 # The word AerieOS's own rule keeps to its XML files, spelled here in two

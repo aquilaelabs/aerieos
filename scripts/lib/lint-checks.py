@@ -99,6 +99,31 @@ def hosted():
     sys.exit(1 if strict else 0)
 
 
+def pinned():
+    """Every action a workflow uses is named by its commit (R206; the audit of
+    13 Nov): `uses: owner/action@v4` runs whatever its publisher points v4 at
+    that day, in jobs that hold the release key and may write packages and
+    releases. A note in any project, a failure in this one (--strict)."""
+    strict = "--strict" in args
+    found = []
+    for f in sorted(pathlib.Path(".github/workflows").glob("*.y*ml")):
+        for i, line in enumerate(f.read_text(errors="replace").splitlines(), 1):
+            m = re.match(r"\s*-?\s*uses:\s*([^\s#]+)", line)
+            if not m or m.group(1).startswith(("./", "docker://")):
+                continue
+            name, _, ref = m.group(1).partition("@")
+            if not re.fullmatch(r"[0-9a-f]{40}", ref):
+                found.append((f"{f.name}:{i}", name, ref or "no version"))
+    if not found:
+        print("  [ok]   every action is pinned by its commit")
+        sys.exit(0)
+    tag = "[FAIL]" if strict else "[note]"
+    for where, name, ref in found:
+        print(f"  {tag} {where} uses {name} at {ref}, which its publisher can move;"
+              f" name the commit (uses: {name}@<40 hex>   # the version) so it moves only in a commit here")
+    sys.exit(1 if strict else 0)
+
+
 def xml_():
     try:
         xml.dom.minidom.parse(args[0])
@@ -485,7 +510,7 @@ def dupes():
     sys.exit(1 if bad else 0)
 
 
-CHECKS = {"runner": runner, "xml": xml_, "settings": settings, "layout": layout, "hosted": hosted,
+CHECKS = {"runner": runner, "xml": xml_, "settings": settings, "layout": layout, "hosted": hosted, "pinned": pinned,
           "channels": channels, "shipped": shipped, "formats": formats, "packs": packs, "unraid": unraid,
           "changelog": changelog, "dupes": dupes}
 

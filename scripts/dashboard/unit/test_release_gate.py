@@ -64,6 +64,22 @@ class Gate(unittest.TestCase):
         # ...and the run's record names each check's result.
         self.assertTrue(GATE <= needs(jobs["record"]))
 
+    def test_the_image_is_stamped_by_aerie_version_and_a_tag_it_disagrees_with_fails(self):
+        # Step 9: the build's shell worked the version out again, and said a
+        # release candidate's tag where the tool said a dev build.
+        build = load("build-image.yml")["jobs"]["build"]
+        step = next(s for s in build["steps"] if s.get("id") == "ver")
+        run = step["run"]
+        self.assertIn("bash scripts/aerie version --semver", run)
+        self.assertIn('BB_VERSION_TAG="$tag"', run)
+        self.assertNotIn("rev-list", run)
+        self.assertNotIn("describe", run)
+        self.assertIn('[ "$v" != "${tag#v}" ]', run)
+        self.assertIn("exit 1", run)
+        # The full history the tool counts, checked out before it.
+        first = next(s for s in build["steps"] if str(s.get("uses", "")).startswith("actions/checkout@"))
+        self.assertEqual(first["with"]["fetch-depth"], 0)
+
     def test_a_rehearsal_runs_what_a_tag_is_held_to_and_publishes_nothing(self):
         wf = load("release-rehearsal.yml")
         jobs = wf["jobs"]

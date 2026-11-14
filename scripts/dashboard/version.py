@@ -593,7 +593,7 @@ def parts(project, comp="", repo=None):
     if repo is None:
         return {"target": tgt, "error": err or no_history(project),
                 "ordinal": None, "sha": None, "tag": "", "dirty": False,
-                "describe": None, "released": False}
+                "describe": None, "released": False, "pre": ""}
     where = _sub(project, comp)
     rel = _relspec(project, where) if comp else None
     # A component counts only the commits that touched it. Still monotonic,
@@ -620,7 +620,45 @@ def parts(project, comp="", repo=None):
     return {"target": tgt, "error": err,
             "ordinal": int(ordinal) if (ordinal or "").isdigit() else None,
             "sha": repo["sha"], "tag": tag, "dirty": repo["dirty"],
-            "describe": repo["describe"], "released": bool(tag)}
+            "describe": repo["describe"], "released": bool(tag),
+            "pre": "" if tag else pre_on_head(repo["tags"], tgt, comp)}
+
+
+# A pre-release's tag as HEAD carries it: vX.Y.Z-LABEL.N, a component's with
+# its directory in front.
+_PRE_TAG = re.compile(r"v(\d{1,4}\.\d{1,5}\.\d{1,6})-([a-z][a-z0-9]{0,15})\.(\d{1,9})")
+
+
+def pre_on_head(tags, tgt, comp=""):
+    """The pre-release HEAD is tagged as, X.Y.Z-LABEL.N, or "".
+
+    A build of the tag reports the number the tag says (R217): the image's
+    workflow stamped the tag's own words while this said X.Y.Z-dev.N+sha of
+    the same commit, and a release candidate's tag read here as a dev build
+    (R206 step 9). Where HEAD carries several, the one this build was
+    started for (BB_VERSION_TAG, which a tag's workflow sets) is taken, then
+    one of this tree's own version, the newest, a named one before a dev
+    build's.
+    """
+    front = f"{comp}-" if comp else ""
+    found = []
+    for t in tags or []:
+        m = _PRE_TAG.fullmatch(t[len(front):]) if t.startswith(front) else None
+        if m:
+            ver, label, n = m.group(1), m.group(2), int(m.group(3))
+            found.append((t == os.environ.get("BB_VERSION_TAG", ""), ver == tgt, vkey(ver), label != "dev", n,
+                          f"{ver}-{label}.{n}"))
+    return max(found)[-1] if found else ""
+
+
+def _pre_pep440(pre, dirty):
+    """A pre-release's tag in Python's form: rc is its own word there, and
+    every other name is a development release, the name kept as the local
+    part where it is not dev."""
+    ver, rest = pre.split("-", 1)
+    label, n = rest.rsplit(".", 1)
+    local = [x for x in ("" if label in ("dev", "rc") else label, "dirty" if dirty else "") if x]
+    return ver + (f"rc{n}" if label == "rc" else f".dev{n}") + ("+" + ".".join(local) if local else "")
 
 
 def render(project, comp="", repo=None):
@@ -660,6 +698,17 @@ def render(project, comp="", repo=None):
                          pep440=tgt + (f"+{mark}" if mark else ""),
                          file=tgt + (f"-{mark}" if mark else ""),
                          msi=f"{a3}.{b3}.{ordinal}", quad=f"{tgt}.{ordinal}")
+        elif p.get("pre"):
+            # On a pre-release's tag: what the tag says, in the forms that
+            # can say it; the forms Windows compares are a dev build's, by
+            # the ordinal. A dirty tree on the tag is not that build, and
+            # says so as a release's does.
+            pre = p["pre"]
+            a3, b3, _c3 = pre.split("-", 1)[0].split(".")
+            forms.update(semver=pre + ("+dirty" if p["dirty"] else ""),
+                         pep440=_pre_pep440(pre, p["dirty"]),
+                         file=pre + ("-dirty" if p["dirty"] else ""),
+                         msi=f"{a3}.{b3}.{ordinal}", quad=f"{pre.split('-', 1)[0]}.{ordinal}")
         else:
             mark = ".dirty" if p["dirty"] else ""
             a3, b3, _c3 = tgt.split(".")

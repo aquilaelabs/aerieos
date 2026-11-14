@@ -41,7 +41,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 240
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (R206)
         with:
           fetch-depth: 0
       - name: The tools mkosi and the disk need
@@ -137,7 +137,7 @@ jobs:
           last="$(find last -maxdepth 1 -name 'aerieos-os-*.packages' | head -1)"
           { echo "## System packages moved since ${tag}"; echo; echo '```'; diff <(sort "$last") <(sort "$now") | grep '^[<>]' || echo "none"; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
           diff <(sort "$last") <(sort "$now") > out/packages-moved.diff || true
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2, pinned by commit (R206)
         with:
           name: aerieos-os
           path: |
@@ -163,8 +163,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 50
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (R206)
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0, pinned by commit (R206)
         with:
           name: aerieos-os
           path: out
@@ -384,7 +384,7 @@ jobs:
           tr -d '\r' < serial-iso-installed.log | sed 's/\x1b\[[0-9;=?]*[A-Za-z]//g' | grep -av '^[[:space:]]*$' | tail -n 200
           echo "the disk the ISO laid out did not reach its dashboard"
           exit 1
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2, pinned by commit (R206)
         if: always()
         with:
           name: aerieos-os-boot

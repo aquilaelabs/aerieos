@@ -4630,6 +4630,9 @@ process.exit(bad ? 1 : 0);' "$f" || jsbad+=("$f (inline)")
             local strict=""
             _lint_own_tree && strict="--strict"
             python3 "$BB_LIB/lint-checks.py" hosted $strict || rc=1
+            # An action named by a tag runs whatever its publisher moves the
+            # tag to (R206): a note in any project, a failure in this one.
+            python3 "$BB_LIB/lint-checks.py" pinned $strict || rc=1
         fi
     else
         echo "  none found"
