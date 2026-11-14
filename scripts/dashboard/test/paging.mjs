@@ -68,8 +68,14 @@ ok(await page.$eval('#bugList:visible .bug:nth-of-type(30)', e => e.open),
 
 // Redrawing keeps what was shown rather than cutting back to the first page:
 // a list that repaints under a poll must not take the reader's place.
-await page.evaluate(() => getNotebook('alpha').reloadBugs());
-await page.waitForTimeout(500);
+await page.evaluate(() => {
+  for (const r of [...document.querySelectorAll('#bugList')].find(x => x.offsetParent).querySelectorAll(':scope > .bug')) r.__before = true;
+  return getNotebook('alpha').reloadBugs();
+});
+// Drawn anew from that read: no row of the list is one from before it.
+await page.waitForFunction(() => { const l = [...document.querySelectorAll('#bugList')].find(x => x.offsetParent);
+  const rows = l ? [...l.querySelectorAll(':scope > .bug')] : [];
+  return rows.length > 0 && !rows.some(r => r.__before); }, null, { timeout: 15000 }).catch(() => {});
 st = await state();
 ok(st.shown === 40 && st.total === 40, 'a redraw keeps what had been shown');
 
@@ -154,9 +160,15 @@ for (const [what, call] of [
   ok(opened === 34, `Show more brings the rest, all 34 files (${opened} rows)`);
   // beta's SHORT list redraws, which is all a poll does on a box where
   // another project's view keeps moving.
-  await page.evaluate(() => { const n = getNotebook('beta'); n?.view('bugs'); n?.view('artifacts'); });
+  await page.evaluate(() => {
+    for (const r of document.querySelectorAll('.nb .nbview[data-view="artifacts"] [data-sect="artifacts:files"] > .body > .artrow')) r.__before = true;
+    const n = getNotebook('beta'); n?.view('bugs'); n?.view('artifacts'); });
   await page.evaluate(() => getNotebook('alpha')?.view('artifacts'));
-  await page.waitForTimeout(400);
+  // Both lists drawn anew from the reads those started: neither holds a row
+  // from before them.
+  await page.waitForFunction(() => ['alpha', 'beta'].every(p => {
+    const rows = [...document.querySelectorAll(`.nb[data-project="${p}"] .nbview[data-view="artifacts"] [data-sect="artifacts:files"] > .body > .artrow`)];
+    return rows.length > 0 && !rows.some(r => r.__before); }), null, { timeout: 20000 }).catch(() => {});
   ok(await shown() === opened,
      `...and a short list in another notebook does not turn it back (${await shown()} of ${opened})`);
   rmSync(`${DIR}/ws/alpha/dist/pagemany`, { recursive: true, force: true });

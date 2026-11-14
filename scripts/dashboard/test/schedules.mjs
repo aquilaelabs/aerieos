@@ -15,7 +15,7 @@ const api = async (path, body, h = H) => {
 };
 const until = async (fn, ms = 20000) => {
   const end = Date.now() + ms;
-  while (Date.now() < end){ const v = await fn(); if (v) return v; await sleep(250); }
+  while (Date.now() < end){ const v = await fn(); if (v) return v; await sleep(250); }   // the loop's own period
   return null;
 };
 

@@ -51,7 +51,7 @@ const proc = spawn('python3', ['-u', `${DASH}/server.py`], { stdio: ['ignore', o
 const base = `http://127.0.0.1:${port}`;
 for (let i = 0; i < patience(120); i++){
   try { if ((await fetch(`${base}/login`)).status === 200) break; } catch { /* not up yet */ }
-  await sleep(250);
+  await sleep(250);     // the loop's own period
 }
 const keys = async body => (await fetch(base + '/api/keys', { method: 'POST', headers: H, body: JSON.stringify(body) })).json();
 await fetch(base + '/api/settings', { method: 'POST', headers: H, body: JSON.stringify({ set: { setup_done: true } }) });
@@ -190,7 +190,7 @@ print(gitcreds.read_line("web"))`], { env, encoding: 'utf8' }).trim();
   for (let i = 0; i < patience(40); i++){
     purged = await keys({ action: 'mine' });
     if (!(purged.forges || []).length) break;
-    await sleep(250);
+    await sleep(250);     // the loop's own period
   }
   ok(!purged.forges.length && !purged.has, `Purge empties it after a plain confirmation, no password or code asked (${JSON.stringify(purged)})`);
   ok(page.dialogs.some(t => /Purge your key store/.test(t)), '...the confirmation it asked');

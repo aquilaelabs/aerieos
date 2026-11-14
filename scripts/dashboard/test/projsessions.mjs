@@ -3,7 +3,7 @@
 // A session is its account's (B172): nobody presses a key or types into
 // another person's, administrators included, and that still holds. Ending
 // one is the single exception, and an administrator's alone.
-import { launch, newPage, ok, done, ready, tmuxNew, tmuxKill, URL, DIR } from './lib.mjs';
+import { launch, newPage, ok, done, ready, settled, tmuxNew, tmuxKill, URL, DIR } from './lib.mjs';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
@@ -137,10 +137,12 @@ const plainPage = await newPage(browser, { viewport: { width: 1280, height: 900 
 await plainPage.goto(URL);
 await ready(plainPage);
 await plainPage.evaluate(() => renameProject('alpha'));
-await plainPage.waitForTimeout(1000);
+await plainPage.waitForFunction(() => !document.getElementById('rnmodal').hidden, null, { timeout: 15000 }).catch(() => {});
 // The section is not drawn for it (R255 step 4; the operator, 21 Oct: what
-// a role does not give is not shown), so nobody's sessions and no End.
-await plainPage.waitForTimeout(1000);
+// a role does not give is not shown), so nobody's sessions and no End:
+// read once everything the dialog asked for at its opening has landed,
+// which is when the section would have been drawn.
+await settled(plainPage, { quiet: 400, cap: 8000 });
 const plainSess = await plainPage.evaluate(() => { const f = document.getElementById('rnSessField');
   return { shown: !!f && !f.hidden, ends: f ? f.querySelectorAll('button').length : 0 }; });
 ok(!plainSess.shown && plainSess.ends === 0,

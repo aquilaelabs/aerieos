@@ -319,7 +319,10 @@ await page.waitForFunction(() => document.querySelectorAll('#bugList .bug').leng
   const cut = [];
   for (const width of [360, 393]){
     await page.setViewportSize({ width, height: 800 });
-    await page.waitForTimeout(150);
+    // The page at the new width and drawn for it: the breakpoint's listeners
+    // run before a frame's callbacks.
+    await page.waitForFunction(w => innerWidth === w, width, { timeout: 10000 });
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
     cut.push(...await page.$$eval('#bugList .bug[data-id="3"] .macts > :is(button,.more) ', bs =>
       bs.map(b => b.matches('.more') ? b.querySelector('button') : b)
         .filter(b => b && b.scrollWidth > b.clientWidth + 1).map(b => b.textContent.trim())).then(t => t.map(x => `${width}: ${x}`)));
@@ -645,7 +648,14 @@ page.errors = [];
 // once. One rule reaching one child too far.
 const sheetBox = await page.evaluate(async () => {
   document.getElementById('bugLog').click();
-  await new Promise(r => setTimeout(r, 400));
+  // The sheet open and at rest, ten seconds at most: its box is what is
+  // measured, and one still coming in has not its full size.
+  for (const end = Date.now() + 10000; Date.now() < end;){
+    const s = document.querySelector('.nbsheet:not([hidden])');
+    if (s && s.getBoundingClientRect().height && !s.getAnimations({ subtree: true })
+        .some(a => a.playState === 'running' && Number.isFinite(a.effect?.getComputedTiming().endTime))) break;
+    await new Promise(r => setTimeout(r, 50));
+  }
   const sh = document.querySelector('.nbsheet:not([hidden])');
   const r = sh.getBoundingClientRect();
   return {w: Math.round(r.width), h: Math.round(r.height), x: Math.round(r.x),
@@ -737,8 +747,10 @@ if (page.errors.length) console.log(page.errors);
   const h = (d.history = d.history || {}).alpha = d.history.alpha || [];
   while (h.length < 300) h.unshift({ at: 1, by: 'you', act: 'pad' });
   fs.writeFileSync(FILE, JSON.stringify(d));
+  // A poll already out when this one is asked for is followed by another
+  // (revsAgain), so the token is read once none is out.
   const token = async () => { await page.evaluate(() => pollRevs());
-                              await new Promise(r => setTimeout(r, 500));
+                              await page.waitForFunction(() => !revsBusy, null, { timeout: 10000 }).catch(() => {});
                               return page.evaluate(() => revs['bug:alpha']); };
   const before = await token();
   const added = await call('/api/bugs', { project: 'alpha', action: 'add', title: 'one more, past the cap',

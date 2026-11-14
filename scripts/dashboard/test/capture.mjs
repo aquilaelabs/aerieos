@@ -5,7 +5,7 @@
 // says so and this skips rather than failing for a tool it never had.
 import { execFileSync, spawnSync, spawn } from 'node:child_process';
 import { existsSync, readFileSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
-import { ok, done, DIR } from './lib.mjs';
+import { ok, done, until, DIR } from './lib.mjs';
 import { createServer } from 'node:net';
 
 // A port the machine says is free, for a small server of a check's own, not
@@ -290,7 +290,9 @@ exit 0
     env: { ...process.env, ANDROID_AVD_HOME: home, ANDROID_AVD_NAME: 'builderbot-36', PATH: `${bin}:${process.env.PATH}`,
            ANDROID_HOME: `${S}/emusdk`, BUILDERBOT_ROLE: 'node', HOME: `${S}/emuhome` } });
   const holder = spawn('flock', [`${home}/builderbot-36.avd/multiinstance.lock`, 'sleep', '600'], { detached: true, stdio: 'ignore' });
-  await new Promise(r => setTimeout(r, 400));
+  // The lock as aerie emu asks after it: taken when a try for it is refused.
+  const free = () => spawnSync('flock', ['-n', `${home}/builderbot-36.avd/multiinstance.lock`, 'true']).status === 0;
+  await until(() => !free(), 10000);
   const t0 = Date.now();
   const st = emu('status'), start = emu('start'), stop = emu('stop');
   // Its whole group: flock's sleep holds the lock too.
@@ -301,7 +303,7 @@ exit 0
   ok(start.status !== 0 && /running in another of your sessions/.test(start.stderr) && !/emulator ran/.test(start.stderr),
      `...bb emu start refuses at once, starting nothing (${start.stderr.trim().split('\n').pop().slice(0, 80)})`);
   ok(/running in another of your sessions/.test(stop.stderr), '...and aerie emu stop says whose it is to stop');
-  await new Promise(r => setTimeout(r, 200));
+  await until(free, 10000);
   ok(/no emulator is running/.test(emu('status').stdout), '...and with the lock let go, none is running');
 }
 const noSrc = reel('--name', 'x');

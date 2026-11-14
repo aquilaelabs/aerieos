@@ -119,7 +119,9 @@ await page.evaluate(() => {
   window.__show = () => { v = 'visible'; document.dispatchEvent(new Event('visibilitychange')); };
   document.dispatchEvent(new Event('visibilitychange'));
 });
-await new Promise(r => setTimeout(r, 3600));    // past the "really dropped" gate
+// Past the "really dropped" gate, by the page's own clock: hidden for more
+// than three seconds since the moment it noted.
+await page.waitForFunction(() => hiddenAt && Date.now() - hiddenAt > 3000, null, { timeout: 20000 }).catch(() => {});
 await page.evaluate(() => window.__show());
 const after = await page.waitForFunction(keys => {
   const recs = [...TERMS.values()].filter(r => r.el.isConnected);
@@ -268,8 +270,14 @@ ok(inPage.length > 3 && JSON.stringify(inPage) === JSON.stringify(inServer),
     was = await page.$eval('.dockline', l => ({ chr: l.classList.contains('chr'), left: l.scrollLeft }));
   }
   const r = await page.$eval('.dockline', l => { const b = l.getBoundingClientRect(); return { x: b.right - 10, y: b.top + b.height / 2 }; });
-  await page.mouse.click(r.x, r.y);
-  await page.waitForFunction(() => document.querySelector('.dockline').scrollLeft > 60, null, { timeout: 15000 }).catch(() => {});
+  // Pressed again when the line did not move: with fourteen terminals just
+  // opened the bar is still being drawn anew, and a press whose down and up
+  // fell either side of one of those draws is no press at all (the gate of
+  // 15 Nov: the line stayed at its start with its arrow still there).
+  for (let i = 0; i < 3; i++){
+    await page.mouse.click(r.x, r.y);
+    if (await page.waitForFunction(() => document.querySelector('.dockline').scrollLeft > 60, null, { timeout: 5000 }).then(() => true, () => false)) break;
+  }
   // Its smooth scroll come to rest, read twice the same a frame apart,
   // rather than a fixed pause a loaded gate outran (B420).
   const still = () => page.waitForFunction(() => new Promise(res => {

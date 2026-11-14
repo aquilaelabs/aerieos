@@ -9,7 +9,7 @@
 // the sign-in's job the way an agent would, posts the flow's output as that
 // job's log and reads the code coming back down. No job here ever runs on a
 // real agent, which would find the machine's real Claude Code.
-import { launch, newPage, ok, done, ready, sleep, refreshUntil, URL, DIR } from './lib.mjs';
+import { launch, newPage, ok, done, ready, until, refreshUntil, URL, DIR } from './lib.mjs';
 import { readFileSync } from 'node:fs';
 
 const BASE = URL.replace(/\/$/, '');
@@ -141,7 +141,7 @@ ok(kept.value === 'abc#de' && kept.active === 'authCode',
    `a repaint under a half-typed code keeps the text and the focus (${JSON.stringify(kept)})`);
 await page.keyboard.type('f');
 await page.keyboard.press('Enter');
-const down = await (async () => { for (let i = 0; i < 40; i++){ const r = await log(0, ''); if (r.input) return r.input; await sleep(250); } return ''; })();
+const down = await until(async () => (await log(0, '')).input, 15000, 250) || '';
 ok(down === 'abc#def', `Enter sends the code, which goes down to the node on the job's own channel (${down})`);
 // The flow ends and the node says who signed in: its heartbeat, the way an
 // agent says it after the job.
@@ -239,7 +239,7 @@ await call('/api/v1/nodes', { action: 'online', id: box.id });
   await page.click(`${CX} [data-si="out"]`);
   // The press asks first and then queues the job: taken once it is there.
   let xo = {};
-  for (let i = 0; i < 40 && !xo?.type; i++){ xo = await beat(); if (!xo?.type) await sleep(250); }
+  await until(async () => { xo = await beat(); return xo?.type; }, 15000, 250);
   ok(page.dialogs.length === n0 + 1 && /Sign out of ChatGPT on signbox\?/.test(page.dialogs[n0])
      && xo.type === 'codex-logout' && xo.spec?.uid === me,
      `Sign out asks first and is a codex-logout job there for this account (${xo.type || xo.error})`);

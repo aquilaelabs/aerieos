@@ -4,7 +4,7 @@
 // sign-in. A plain request to /termws is answered with what the socket
 // would be (a refusal and why, or that a websocket is asked for), which is
 // how most checks here ask; the socket itself is covered by term.mjs.
-import { launch, newPage, ok, done, sleep, URL, DIR, takeOn, openSection, member, splitPick, projectKey } from './lib.mjs';
+import { launch, newPage, ok, done, until, quiet, URL, DIR, takeOn, openSection, member, splitPick, projectKey } from './lib.mjs';
 import http from 'node:http';
 import { mkdirSync, writeFileSync, rmSync, readFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -774,7 +774,9 @@ print(u.remove("second"))`], { encoding: 'utf8' });
       const up = await page.evaluate(() => { const l = document.getElementById('chatlog'); l.scrollTop = 0;
                                              return { top: l.scrollTop, tall: l.scrollHeight > l.clientHeight }; });
       await page.evaluate(() => loadChat());
-      await sleep(800);
+      // The poll has landed and drawn; the status read it asks for is still
+      // to come, and this is the window in which either would snap the log.
+      await quiet(800);
       const kept = await page.evaluate(() => document.getElementById('chatlog').scrollTop);
       ok(up.tall && up.top === 0 && kept === 0, `a reader scrolled up stays where they were across a poll (${kept} ${JSON.stringify(up)})`);
       await page.evaluate(() => { const l = document.getElementById('chatlog'); l.scrollTop = l.scrollHeight; });
@@ -1935,12 +1937,11 @@ print(json.dumps(out))`], { encoding: 'utf8' }));
   // The terminal's session is made a moment after its socket opens: asked
   // again until it is there, since an ask changes nothing.
   let ask = {};
-  for (let i = 0; i < 20; i++){
+  await until(async () => {
     r = await set(owner, true);
     ask = r.status === 409 ? await r.json() : {};
-    if ((ask.sessions || []).some(x => x.who === 'maintadm')) break;
-    await sleep(500);
-  }
+    return (ask.sessions || []).some(x => x.who === 'maintadm');
+  }, 15000, 500);
   ok(ask.confirm === 'maintenance' && (ask.sessions || []).some(x => x.who === 'maintadm' && x.what === 'a terminal' && x.state === 'open' && x.project === 'alpha'),
      `the owner is asked first, with the administrator's terminal listed (${r.status} ${JSON.stringify(ask.sessions || [])})`);
   ok(!(ask.sessions || []).some(x => x.who === 'test'), "...and not the owner's own");
@@ -1951,14 +1952,14 @@ print(json.dumps(out))`], { encoding: 'utf8' }));
   ok(onSaid.ended >= 1, `...and the owner can, which ends them (${r.status} ended ${onSaid.ended})`);
   // Ended, not only shut out: off and on again lists it no more.
   let gone = false;
-  for (let i = 0; i < 20 && !gone; i++){
-    await sleep(500);
+  await until(async () => {
     await set(owner, false);
     const again = await set(owner, true);
     const j = again.status === 409 ? await again.json() : { sessions: [] };
     gone = !(j.sessions || []).some(x => x.who === 'maintadm');
     await confirmOn();
-  }
+    return gone;
+  }, 20000, 500);
   ok(gone, "...and the administrator's terminal is ended, not only kept out");
 
   r = await bare('/api/status', { headers: user });
@@ -1992,7 +1993,7 @@ print(json.dumps(out))`], { encoding: 'utf8' }));
   ok(/<div class="banner maint" id="maintband" role="status">/.test(served),
      "the page is served with the maintenance band already showing while it is on");
 
-  for (let i = 0; i < 24 && !admTerm.closed; i++) await sleep(500);
+  await until(() => admTerm.closed, 15000);
   ok(/101/.test(admTerm.status) && admTerm.closed && /101/.test(ownTerm.status) && !ownTerm.closed,
      `a terminal another account had open ends when it starts, and the owner's goes on (${JSON.stringify({ adm: [admTerm.status, admTerm.closed], own: [ownTerm.status, ownTerm.closed] })})`);
   ownTerm.sock?.destroy();

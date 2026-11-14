@@ -12,7 +12,7 @@
 //
 // Driven against synthetic frames rather than a real screen: the harness
 // runs no VM, and what is under test is the release rule.
-import { launch, newPage, ok, done, ready, URL } from './lib.mjs';
+import { launch, newPage, ok, done, ready, quiet, URL } from './lib.mjs';
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 800 } });
@@ -67,7 +67,7 @@ ok(await veilState() === 'removed', '...then takes itself out of the pane');
 await build('data:text/html,<p>opaque');
 const t1 = Date.now();
 await page.evaluate(() => unveil(document.querySelector('#veiltest iframe')));
-await page.waitForTimeout(150);
+await quiet(150);
 ok(await veilState() === 'covering', 'a frame that cannot be reached stays covered');
 await lifted();
 const held = Date.now() - t1;
@@ -79,7 +79,8 @@ await page.evaluate(() => {
   unveil(document.querySelector('#veiltest iframe'));
   document.querySelector('#veiltest').remove();
 });
-await page.waitForTimeout(600);
+// Past the clock backstop, which is when a timer left behind would fire.
+await quiet(600);
 ok(page.errors.length === 0, 'a pane replaced while covered raises nothing');
 
 // ---- a screen's tab, as the page itself opens one -------------------------

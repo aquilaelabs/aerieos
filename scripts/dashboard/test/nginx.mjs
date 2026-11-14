@@ -11,7 +11,7 @@ import { execFileSync } from 'node:child_process';
 // Poll fn until it answers something other than null, or give up.
 const until = async (fn, ms = 15000, step = 200) => {
   const end = Date.now() + ms;
-  while (Date.now() < end){ const v = await fn(); if (v !== null && v !== undefined) return v; await new Promise(r => setTimeout(r, step)); }
+  while (Date.now() < end){ const v = await fn(); if (v !== null && v !== undefined) return v; await new Promise(r => setTimeout(r, step)); }   // the loop's own period
   return null;
 };
 
@@ -240,7 +240,8 @@ await page.fill(`${sect} .ngform [data-ng="port"]`, '8083');
 // says the saved port, and the pill the rebuild the Save started, the
 // moment the Save answers, not when the read lands (B99, B65).
 {
-  const slow = async r => { if (r.request().method() === 'GET') await new Promise(f => setTimeout(f, 4000)); await r.continue().catch(() => {}); };
+  let held = 0;
+  const slow = async r => { held++; if (r.request().method() === 'GET') await new Promise(f => setTimeout(f, 4000)); await r.continue().catch(() => {}); held--; };
   await page.route('**/api/nginx', slow);
   await page.click(`${sect} .ngform [data-ngsave]`);
   // The row and the pill read in the same moment: the stub's rebuild ends
@@ -254,7 +255,7 @@ await page.fill(`${sect} .ngform [data-ng="port"]`, '8083');
      `a route's Save shows the saved port and "deployed, rebuilding" at once, before the tab is read again (${quick}, ${said})`);
   // Unrouted only once the held reads have gone on, or unroute answers
   // them itself and the handler's continue finds them handled.
-  await page.waitForTimeout(4500);
+  await until(() => held === 0 ? true : null, 30000);
   await page.unroute('**/api/nginx', slow);
 }
 await page.waitForFunction(id => (nginxList || []).find(n => n.node === id)?.routes?.some(r => r.port === 8083), sandbox.node, { timeout: 15000 });
@@ -277,7 +278,7 @@ await api('/api/nginx', { action: 'save', node: sandbox.node, routes: [...row.ro
   const gone = await api('/api/nginx', { action: 'host-remove', name: 'spare.example.com' });
   ok(gone.ok && !gone.hostnames.some(h => h.name === 'spare.example.com'), '...and one routed nowhere is');
 }
-const quietRoutes = async () => { for (let i = 0; i < 180; i++){ if (!(((await api('/api/v1/jobs?active=1')).jobs) || []).some(j => j.project === 'nginx-sandbox')) return; await new Promise(r => setTimeout(r, 500)); } };
+const quietRoutes = async () => { for (let i = 0; i < 180; i++){ if (!(((await api('/api/v1/jobs?active=1')).jobs) || []).some(j => j.project === 'nginx-sandbox')) return; await new Promise(r => setTimeout(r, 500)); } };   // the loop's own period
 await quietRoutes();
 await api('/api/nginx', { action: 'save', node: sandbox.node, routes: row.routes });
 await quietRoutes();
@@ -462,7 +463,7 @@ for (let i = 0; i < 60; i++){
   // run (B597): that job in the queue is the remove having happened here.
   queued = ((await api('/api/v1/jobs?active=1')).jobs || []).some(j => j.type === 'compose' && j.project === 'nginx-sandbox' && j.spec?.action === 'remove');
   if (!after.deployed && (gone || queued)) break;
-  await new Promise(r => setTimeout(r, 1000));
+  await new Promise(r => setTimeout(r, 1000));     // the loop's own period
 }
 ok(!after.deployed && after.routes.length === 2 && (gone || queued),
    `Remove takes the container off the Containers page, or queues its down on a quiet node, and keeps the routes here (${JSON.stringify([after.deployed, after.routes.length, gone, queued])})`);

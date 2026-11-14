@@ -5,7 +5,7 @@
 //
 // The writes run for real against the scratch home, so this also checks the
 // part that matters most: a delete takes the index line out with the file.
-import { launch, newPage, ok, done, ready, tmuxCapture, nbShown, nbGone, URL, DIR, openFold, animatedDuring, refreshUntil, closePage, patience, nbGo } from './lib.mjs';
+import { launch, newPage, ok, done, ready, tmuxCapture, nbShown, nbGone, URL, DIR, openFold, animatedDuring, refreshUntil, closePage, patience, nbGo, quiet } from './lib.mjs';
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 
 // Named as Claude Code names a tree's folder: every character that is not a
@@ -458,7 +458,7 @@ ok(read('clash.md').includes('what the operator typed'),
   await nbShown(other);
   await other.evaluate(() => refresh());
   await page.evaluate(() => refresh());
-  await page.waitForTimeout(1500);
+  await quiet(1500);     // a line that must not come: time in which it could have
   ok(!(await page.$('#nbHere')) && !/Also open|other window/.test(await page.$eval('.nb', e => e.textContent)),
      'a second window on the same notebook is not announced: no "Also open" line');
   await other.evaluate(() => notebooks.get('alpha')?.destroy());

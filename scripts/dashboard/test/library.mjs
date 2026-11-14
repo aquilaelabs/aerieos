@@ -32,12 +32,18 @@ ok(['agent', 'toolchain', 'app', 'companion'].every(k => sects.includes(k)) && s
 // (the operator, 29 Oct); the Tool packs chip still opens it, empty.
 ok(await page.evaluate(async () => {
   const keep = lib.rows;
+  // Until the page is drawn as `f` reads it, looked at every 50 ms, ten
+  // seconds at most.
+  const drawn = async f => { for (const end = Date.now() + 10000; !f() && Date.now() < end;) await new Promise(r => setTimeout(r, 50)); };
+  const pack = '.doc .librarytab .libgroup[data-libgroup="pack"]';
   lib = {...lib, rows: keep.filter(r => libGroup(r) !== 'pack'), catalog_error: 'no index'};
-  libRev++; drawPanes(); await new Promise(r => setTimeout(r, 300));
+  libRev++; drawPanes(); await drawn(() => !document.querySelector(pack));
   const gone = !document.querySelector('.doc .librarytab .libgroup[data-libgroup="pack"]');
-  libKind = 'pack'; libRev++; drawPanes(); await new Promise(r => setTimeout(r, 300));
+  libKind = 'pack'; libRev++; drawPanes(); await drawn(() => document.querySelector(pack + ' .empty'));
   const chip = !!document.querySelector('.doc .librarytab .libgroup[data-libgroup="pack"] .empty');
-  libKind = ''; lib = {...lib, rows: keep, catalog_error: ''}; libRev++; drawPanes(); await new Promise(r => setTimeout(r, 300));
+  // Every card back, which is what the checks after this count.
+  libKind = ''; lib = {...lib, rows: keep, catalog_error: ''}; libRev++; drawPanes();
+  await drawn(() => document.querySelectorAll('.doc .librarytab .lcard').length === lib.rows.filter(r => !r.wrong_platform && !r.too_new).length);
   return gone && chip;
 }), 'with no tool pack the Tool packs group is not drawn, and its chip still opens it empty');
 const shape = await page.evaluate(() => lib.rows.map(r => [r.kind, r.tier, typeof r.label, typeof r.about, typeof r.installed, typeof r.verb]));

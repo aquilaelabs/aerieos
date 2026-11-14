@@ -8,7 +8,7 @@
 // and whose system job runs the allowed command as the suite's own user:
 // this file proves the asking, the routing and the answering; the real
 // agent's own file proves the running and the guest-node refusal.
-import { launch, newPage, ok, done, ready, URL, DIR } from './lib.mjs';
+import { launch, newPage, ok, done, ready, until, URL, DIR } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync, rmSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -108,11 +108,8 @@ await page.waitForFunction(() => !document.querySelector('.ndask'), null, { time
 // Allow answers at once and the command runs on a thread, so the outcome is
 // polled the way the session polls it.
 let out;
-for (let i = 0; i < 80; i++){
-  out = await api('/api/phone', { action: 'outcome', id: asked.body.id });
-  if (out.body.state === 'done') break;
-  await new Promise(r => setTimeout(r, 250));
-}
+await until(async () => { out = await api('/api/phone', { action: 'outcome', id: asked.body.id });
+  return out.body.state === 'done'; }, 30000, 250);
 ok(out.body.state === 'done' && /root-ran-here/.test(out.body.out || ''),
    `Allow runs it on the node as a system job and the output comes back (${out.body.state}: ${(out.body.out || '').trim().split('\n').slice(-2).join(' / ')})`);
 ok(/^# root on this node, allowed by test: load the binder module/.test(out.body.out || ''),
@@ -229,12 +226,10 @@ print(u.mint_session("${proj}", uid=uid))`], { encoding: 'utf8' }).trim();
     if (unit === null) rmSync(f, { force: true });
     else writeFileSync(f, JSON.stringify({ services: { runners: [{
       installed: true, active: true, unit }] } }));
-    for (let i = 0; i < 120; i++){
+    return until(async () => {
       const n = ((await api('/api/v1/nodes')).body.nodes || []).find(x => x.id === sandbox.id);
-      if (((n?.reported?.services?.runners || [])[0]?.unit || '') === (unit || '')) return true;
-      await new Promise(r => setTimeout(r, 250));
-    }
-    return false;
+      return ((n?.reported?.services?.runners || [])[0]?.unit || '') === (unit || '');
+    }, 45000, 250);
   };
 
   ok(await census('actions.runner.example.sandbox.service'),

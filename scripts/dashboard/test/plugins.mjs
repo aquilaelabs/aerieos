@@ -74,6 +74,8 @@ ok(here && here.plugins.length === 3 && here.plugins.some(p => p.id.startsWith('
    `the heartbeat puts them on the account's profile, under the node's name (${here?.plugins.length} on ${here?.name})`);
 const store = () => JSON.parse(readFileSync(`${DIR}/state/claude-plugins.json`, 'utf8'));
 const at = store()[owner][minted.id].at;
+// A write is stamped in whole seconds: the clock has to be past this one
+// for a second write to show.
 await sleep(1100);
 await beat([{ ...mine, email: '' }]);
 ok(store()[owner][minted.id].at === at, 'the same list again is not a write: a heartbeat must not cost one');
@@ -105,7 +107,11 @@ ok(store()[owner][minted.id].at === at, 'the same list again is not a write: a h
   // Taken off the node: gone from the page.
   await beat([{ uid: owner, email: '', plugins: null, mcp: {} }]);
   await page.evaluate(id => openInstalledOn(id, 'claude'), minted.id);
-  await page.evaluate(() => loadInstalled()); await sleep(800);
+  await page.evaluate(() => loadInstalled());
+  // The page drawn from that read: the section from before the node said
+  // none is still on the page until it is.
+  await page.waitForFunction(s => { const t = (document.querySelector(`${s} .agextras`)?.closest('.agpart')?.textContent || '').replace(/\s+/g, ' ');
+    return /your plugins\s*none/.test(t) && /your MCP servers\s*none/.test(t); }, PAGE('claude-code'), { timeout: 15000 }).catch(() => {});
   await page.waitForSelector(`${PAGE('claude-code')} .agextras`, { timeout: 15000 });
   const empty = await read('claude-code');
   ok(/your plugins\s*none/.test(empty) && /your MCP servers\s*none/.test(empty),

@@ -7,7 +7,7 @@
 // offers Take back, the controllers are listed with what hangs off each and
 // what shares their IOMMU group, the Features section offers the IOMMU with
 // Install, and a session's aerie vm usb is held for a person whatever the dial.
-import { URL, launch, newPage, ok, done, ready, sleep, openSection, DIR, saveDialog, refreshUntil } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, until, openSection, DIR, saveDialog, refreshUntil } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -92,11 +92,8 @@ ok(drawn.ctls.length === 2 && /0000:00:14\.0/.test(drawn.ctls[0]) && /carries Sa
 
 // Give to a VM queues the node's usb-give job with the device named whole.
 await page.click(`${ROW} .ndusb[data-usb="0x0781:0x5583"] [data-usbgive]`);
-const job = await (async () => { for (let i = 0; i < 40; i++){
-  const j = ((await call('/api/v1/jobs?active=1')).jobs || []).find(x => x.type === 'vm' && x.spec?.action === 'usb-give');
-  if (j) return j;
-  await sleep(250);
-} return null; })();
+const job = await until(async () => ((await call('/api/v1/jobs?active=1')).jobs || [])
+  .find(x => x.type === 'vm' && x.spec?.action === 'usb-give'), 15000, 250);
 ok(job && job.spec.domain === `bbvm-alpha-${VMN}` && job.spec.usb.serial === '4C53' && job.spec.usb.port === '1-3' && job.spec.usb.name === 'SanDisk Ultra Fit',
    `Give to a VM queues the node's usb-give job, the device named by vendor, product, serial and port (${JSON.stringify(job?.spec?.usb)})`);
 const took2 = await agent('work', { running: [], wait: 0 });
@@ -120,11 +117,8 @@ await page.evaluate(id => openNodesTab(id, 'usb'), minted.id);
 await openSection(page, 'nodes:usb', ROW);
 await page.waitForSelector(`${ROW} .ndusb[data-usb="0x0781:0x5583"] [data-usbtake]`, { timeout: 15000 });
 await page.click(`${ROW} .ndusb[data-usb="0x0781:0x5583"] [data-usbtake]`);
-const back = await (async () => { for (let i = 0; i < 40; i++){
-  const j = ((await call('/api/v1/jobs?active=1')).jobs || []).find(x => x.type === 'vm' && x.spec?.action === 'usb-take');
-  if (j) return j;
-  await sleep(250);
-} return null; })();
+const back = await until(async () => ((await call('/api/v1/jobs?active=1')).jobs || [])
+  .find(x => x.type === 'vm' && x.spec?.action === 'usb-take'), 15000, 250);
 ok(back && back.spec.usb.serial === '4C53', `Take back queues the node's usb-take job for that device (${JSON.stringify(back?.spec?.usb)})`);
 const took3 = await agent('work', { running: [], wait: 0 });
 await agent('result', { job: took3.id, state: 'succeeded', exit: 0 });

@@ -1,7 +1,7 @@
 // The notebook's Artifacts view: what a project has built, from its dist/.
 // The convention IS the feature: the tab lists dist/ and nothing else, so a
 // build worth keeping has to be copied there, and an empty tab says that.
-import { launch, newPage, ok, done, ready, URL, DIR, refreshUntil, openFold, nbGo } from './lib.mjs';
+import { launch, newPage, ok, done, ready, URL, DIR, refreshUntil, openFold, nbGo, settled } from './lib.mjs';
 import { mkdirSync, writeFileSync, symlinkSync, rmSync, renameSync, existsSync, utimesSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
@@ -109,7 +109,10 @@ await page.waitForSelector('.artrow', { timeout: 15000 });
   await phone.evaluate(() => { try{ localStorage.clear(); }catch{} for (const k of Object.keys(sectOpen)) delete sectOpen[k]; });
   await phone.evaluate(() => { openNotebook("alpha", "artifacts"); });
   await phone.waitForSelector('.nb .nbview[data-view="artifacts"] details.sect[data-sect="artifacts:files"]', { timeout: 15000 });
-  await phone.waitForTimeout(500);
+  // The view's reads (the files, the version) landed, and their sections drawn.
+  await settled(phone);
+  await phone.waitForFunction(() => [...document.querySelectorAll('.nb .nbview[data-view="artifacts"] details.sect')]
+    .filter(d => d.checkVisibility() && !d.parentElement.closest('details.sect')).length > 1, null, { timeout: 15000 }).catch(() => {});
   const p = await phone.evaluate(() => [...document.querySelectorAll('.nb .nbview[data-view="artifacts"] details.sect')]
     .filter(d => d.checkVisibility() && !d.parentElement.closest('details.sect')).map(d => `${d.dataset.sect}:${d.open ? 'open' : 'shut'}`));
   ok(p.length > 1 && p.filter(x => x.endsWith(':open')).length === 1,

@@ -761,9 +761,11 @@ export async function finger(page, x, y, x2, y2, holdMs){
   const n = 10;
   for (let i = 1; i <= n; i++){
     await touch('touchMove', x + (x2 - x) * i / n, y + (y2 - y) * i / n);
-    await sleep(16);
+    await sleep(16);                                   // a finger's pace: a frame a step
   }
   await touch('touchEnd', 0, 0);
+  // The gesture's own tail: the recognizer decides what the lift was (a
+  // tap, a fling) a moment after it, and nothing on the page says when.
   await sleep(250);
   await cdp.detach();
 }
@@ -841,9 +843,19 @@ export async function unfold(page, project){
   await page.evaluate(() => { if (tabOf(panes[active])?.kind !== 'projects') openProjectsTab(); });
   const card = `.pgrid .pcard[data-row="${project}"]`;
   await page.waitForSelector(card, { timeout: 15000 });
-  if (!await page.$eval(card, c => c.classList.contains('flipped'))) await page.click(`${card} .pcfront [data-pedit]`);
+  const pressed = Date.now();
+  const turning = !await page.$eval(card, c => c.classList.contains('flipped'));
+  if (turning) await page.click(`${card} .pcfront [data-pedit]`);
   await page.waitForSelector(`${card}.flipped .pcback:not([inert])`, { timeout: 5000 });
-  await page.waitForTimeout(450);                    // the turn, so a press lands where it is drawn
+  // The turn over, so a press lands where it is drawn: neither face still
+  // on the stylesheet's tween.
+  await page.waitForFunction(sel => { const c = document.querySelector(sel);
+    return !!c && ![...c.querySelectorAll(':scope > .pcface')].some(f => f.getAnimations().length); }, card, { timeout: 10000 }).catch(() => {});
+  // ...and the grid's own redraw behind it: flipCard draws the cards again
+  // 450 ms after a turn, on a timer nothing on the page shows, and a box
+  // opened on the back before it would be drawn over. The one clock here:
+  // what is left of that half second since the press.
+  if (turning) await sleep(Math.max(0, 500 - (Date.now() - pressed)));
 }
 
 // The owner takes a project on (R135): a suite that drops a project

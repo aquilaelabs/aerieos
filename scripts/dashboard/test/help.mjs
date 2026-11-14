@@ -3,7 +3,7 @@
 // article, opens a long one on its contents box, follows a link between docs
 // in place with an address per doc, and searches them all as the bar's field
 // is typed, a result opening its doc at its section.
-import { URL, launch, newPage, ok, done, ready, sleep } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready } from './lib.mjs';
 
 const auth = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
 const base = URL.replace(/\/$/, '');
@@ -56,7 +56,10 @@ for (const [W, H] of [[1280, 900], [393, 852]]){
   // The contents box scrolls to its section.
   const before = await page.evaluate(() => document.querySelector('.doc.on').scrollTop);
   await page.click('.helptab .wktoc li:nth-child(4) a');
-  await sleep(900);
+  // Scrolled, and the smooth scroll at rest: the same place two frames apart.
+  await page.waitForFunction(b => { const d = document.querySelector('.doc.on'), a = d.scrollTop;
+    return a > b && new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(d.scrollTop === a)))); },
+    before, { timeout: 10000 }).catch(() => {});
   ok(await page.evaluate(b => document.querySelector('.doc.on').scrollTop > b, before), `${at}: a line of the contents scrolls to its section`);
   // The search, as it is typed: results in the article's place, a result
   // opening its doc at its section.

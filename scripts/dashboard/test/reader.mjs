@@ -7,7 +7,7 @@
 // refusal as an empty bin (B87); the settings page does not ask for what
 // the role cannot read (B89); the Profile's Password says what is wrong
 // under the field it is about (B90).
-import { launch, newPage, ok, done, ready, sleep, URL, DIR, nbShown, splitPick } from './lib.mjs';
+import { launch, newPage, ok, done, ready, settled, quiet, URL, DIR, nbShown, splitPick } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 
@@ -43,7 +43,8 @@ const page = await newPage(browser, { viewport: { width: 1280, height: 1000 },
   httpCredentials: { username: NAME, password: PW }, extraHTTPHeaders: { Authorization: auth } });
 const asked = [];
 page.on('request', r => asked.push(r.url().replace(/^https?:\/\/[^/]+/, '')));
-await page.goto(URL); await ready(page); await sleep(800);
+await page.goto(URL); await ready(page);
+await page.waitForFunction(() => (state.projects || []).some(p => p.name === 'alpha'), null, { timeout: 20000 }).catch(() => {});
 
 const row = await page.evaluate(() => (state.projects || []).find(p => p.name === 'alpha') || {});
 ok(/no Spaces Write on alpha/.test(row.write_why || '') && !!row.trash_why && !!row.settings_why,
@@ -78,7 +79,7 @@ const view = async (v, sel) => {
   await page.evaluate(([p, w]) => openNotebook(p, w), ['alpha', v]);
   await nbShown(page);
   if (sel) await page.waitForSelector(`.pane .nb ${sel}`, { state: 'attached', timeout: 20000 });
-  await sleep(400);
+  await settled(page);
 };
 await view('briefing', '#rlList');
 await page.waitForSelector('.pane .nb #memAdd', { state: 'attached', timeout: 20000 });
@@ -135,7 +136,8 @@ else {
 // Settings: no Delete project, and nothing asked to be refused (B89).
 const before = asked.length;
 await view('settings', '#rnDelete');
-await sleep(1500);
+// The window in which the view would have asked for what the role cannot read.
+await quiet(1500);
 const st = await page.evaluate(() => ({ del: document.querySelector('#rnDelete')?.hidden,
   snap: !document.querySelector('#rnSnapField')?.hidden, sess: !document.querySelector('#rnSessField')?.hidden,
   why: document.querySelectorAll('.deadwhy').length }));

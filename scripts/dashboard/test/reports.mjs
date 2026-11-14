@@ -172,7 +172,7 @@ page.dialogs.length = 0;
 await page.click('#setReportsClear');
 // The button counts first, then asks: the confirm is waited for in its own
 // right, so a slow count under load is a late dialog rather than a missing one.
-for (let i = 0; i < 100 && !page.dialogs.length; i++) await page.waitForTimeout(150);
+for (let i = 0; i < 100 && !page.dialogs.length; i++) await page.waitForTimeout(150);     // the loop's own period
 await page.waitForFunction(async () => (await (await fetch('/api/reports', { method: 'POST',
   headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'count' }) })).json()).all === 0,
   null, { timeout: 15000, polling: 300 });

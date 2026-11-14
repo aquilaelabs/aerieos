@@ -53,7 +53,7 @@ ok(await page.$$eval('details[data-sect^="profile:reach-"]', ds => ds.length >= 
 
 // Test: a line arrives at the receiver, and the row says sent.
 await page.click('[data-reachtest]');
-const arrived = await (async () => { const end = Date.now() + patience(15000); while (Date.now() < end){ if (got.length) return got[0]; await new Promise(r => setTimeout(r, 200)); } return null; })();
+const arrived = await (async () => { const end = Date.now() + patience(15000); while (Date.now() < end){ if (got.length) return got[0]; await new Promise(r => setTimeout(r, 200)); } return null; })();   // the loop's own period
 ok(!!arrived && /can reach you here/.test(arrived.body) && arrived.path === '/bell', `Test sends a line the receiver gets (${arrived ? arrived.body.slice(0, 60) : 'nothing'})`);
 await page.waitForFunction(() => /sent/.test(document.querySelector('details[data-sect="profile:reach-webhook"] .row[data-reach]')?.textContent || ''), null, { timeout: patience(15000) });
 ok(true, 'the row says it was sent');

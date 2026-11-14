@@ -562,7 +562,7 @@ print(users.mint_session('alpha'))`], { encoding: 'utf8' }).trim();
   let seen = null;
   for (let i = 0; i < 30 && !seen?.global; i++){
     await page.evaluate(() => pollRevs());
-    await new Promise(r => setTimeout(r, 400));
+    await new Promise(r => setTimeout(r, 400));     // the loop's own period: the page is asked to read again each time round
     seen = await page.evaluate(() => ({
       global: [...document.querySelectorAll('.nb #rlGlobal .grule .btitle')].map(e => e.textContent).includes('house-changelog'),
       edit: document.querySelectorAll('.nb #rlGlobal .rlEdit, .nb #rlGlobal .rlRm').length,

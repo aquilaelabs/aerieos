@@ -6,7 +6,7 @@
 // operator's window on all of it. Every assertion here goes through the queue
 // end to end (a job queued, placed, run, logged, ended), because the queue is
 // what this phase exists to prove.
-import { URL, launch, newPage, ok, done, ready, sleep, DIR } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, sleep, DIR, quiet } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 
 const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
@@ -22,10 +22,10 @@ const api = async (path, body) => {
 const OVER = ['succeeded', 'failed', 'canceled'];
 const until = async (fn, ms = 20000, step = 200) => {
   const end = Date.now() + ms;
-  while (Date.now() < end){ const v = await fn(); if (v) return v; await sleep(step); }
+  while (Date.now() < end){ const v = await fn(); if (v) return v; await sleep(step); }   // the loop's own period
   return null;
 };
-const job = id => api(`/api/v1/jobs?id=${id}`);
+const job =id => api(`/api/v1/jobs?id=${id}`);
 // The store outlives a suite within one run, so the tab can carry another
 // suite's rows: an agent's, on a node with another name. The row checks
 // below are about the jobs THIS file queued.
@@ -89,7 +89,7 @@ const settled = id => until(async () => { const j = await job(id); return OVER.i
   const running = await until(async () => { const j = await job(a.job); return j.state === 'running' ? j : null; });
   ok(running !== null, 'a long job reaches running');
   const b = await exec({ id: 'local', argv: ['true'] });
-  await sleep(600);
+  await quiet(600);     // a start that must not come: time in which it could have
   const waiting = await job(b.job);
   ok(waiting.state === 'queued', 'a second job on the same node waits: concurrency is counted from the rows');
   const hz = await (await fetch(base + '/api/v1/healthz')).json();
