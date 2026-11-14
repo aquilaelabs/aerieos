@@ -456,7 +456,9 @@ aerie tests root      the root tier (scripts/dashboard/roottier): what the root 
                    on every pull request and release
 aerie tests lab       the lab suites (test/lab-*.mjs) against real services rather than stand-ins.
                    Each names what it needs and skips in one line without it, so a missing service
-                   is never a failure, and nothing records them: a lab run is a proof, not a timing.
+                   is never a failure. Each subject a suite walks whole (a system, a git host) is
+                   written, dated, into scripts/dashboard/lab-record.json, which the vetted lines
+                   are read from: commit it with the work.
                    Two services are known. A Gitea: the `gitea` service of AerieOS's own dev
                    stack, under its compose file's `lab` profile, brought up from the Containers page
                    like any space's stack (`BB_LAB_GITEA`, the local one by default), and
@@ -2962,12 +2964,24 @@ cmd_tests() {
         local f
         for f in "$tdir"/lab-*.mjs; do [ -e "$f" ] && labs+=("$(basename "$f" .mjs)"); done
         [ "${#labs[@]}" -gt 0 ] || die "no lab suites (test/lab-*.mjs) in this checkout"
-        local rc=0
-        bash "$tdir/run.sh" "${labs[@]}" || rc=$?
+        # What the run says, kept beside it: a suite prints one RECORD line
+        # for each subject it walked with nothing failed (lib.mjs record()),
+        # and the lab's own record is written from them (R3 step 8), in the
+        # tree, where the vetted lines are read from and a commit carries it.
+        local rc=0 said
+        said="$(mktemp)"
+        bash "$tdir/run.sh" "${labs[@]}" 2>&1 | tee "$said"
+        rc="${PIPESTATUS[0]}"
         if [ -n "$ok_forgejo" ]; then
             echo "lab: the forge suite again, against Forgejo at $ok_forgejo"
-            BB_LAB_GITEA="$ok_forgejo" BB_LAB_FORGE=forgejo bash "$tdir/run.sh" lab-forge || rc=$?
+            BB_LAB_GITEA="$ok_forgejo" BB_LAB_FORGE=forgejo bash "$tdir/run.sh" lab-forge 2>&1 | tee -a "$said"
+            [ "${PIPESTATUS[0]}" -eq 0 ] || rc=1
         fi
+        if [ -f "$tdir/../labrecord.py" ]; then
+            python3 "$tdir/../labrecord.py" add --from "$said" --build "$(cmd_version --semver 2>/dev/null || true)" \
+                --file "$tdir/../lab-record.json" || true
+        fi
+        rm -f "$said"
         return "$rc"
     fi
     local proj="${BB_TESTS_PROJECT:-}"

@@ -19,7 +19,7 @@
 // What it does to the node is deliberately the smallest real thing: a
 // toolchain CHECK, which asks each upstream what it has and writes nothing to
 // the store. Nothing here installs, removes or starts anything.
-import { ok, done } from './lib.mjs';
+import { ok, done, record } from './lib.mjs';
 
 const CTL = (process.env.BB_LAB_CONTROLLER || '').replace(/\/$/, '');
 const CRED = process.env.BB_LAB_TOKEN || '';
@@ -131,4 +131,6 @@ if (!others.length){
   }
 }
 
+// Walked whole: a line for the lab's record, under what the node says it is.
+record('lab-node', String(node.name || WANT).replace(/[^A-Za-z0-9._-]+/g, '-'), rep.os || `${rep.system}/${rep.arch}`);
 await done(null);

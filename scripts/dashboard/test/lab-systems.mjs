@@ -16,7 +16,7 @@
 // Skipped in one line without them, like every lab suite. Slow by nature:
 // each system boots, provisions itself and walks for ten to twenty minutes.
 import { get } from 'node:http';
-import { ok, done, sleep } from './lib.mjs';
+import { ok, done, sleep, failed, record } from './lib.mjs';
 
 const CTL = (process.env.BB_LAB_CONTROLLER || '').replace(/\/$/, '');
 const CRED = process.env.BB_LAB_TOKEN || '';
@@ -60,6 +60,8 @@ const exec = async (nid, argv) => {
 };
 
 for (const os of SYSTEMS){
+  const before = failed();
+  let said = '';
   const name = `lab-${os.replace(/[^a-z0-9]+/g, '-')}`.slice(0, 31).replace(/-+$/, '');
   const made = await api('/api/vms', { action: 'new', project: PROJECT, name, os, vcpus: 2, mem_mb: 2560, disk_gb: 16,
                                        keys: [KEY], node: host.id, node_agent: true, ctl: CTL });
@@ -88,6 +90,7 @@ for (const os of SYSTEMS){
   }
   if (row){
     const nid = row.id;
+    said = String(row.reported?.os || row.os || '');
     // Toolchains in and out.
     for (const [action, want] of [['install', true], ['remove', false]]){
       await api('/api/toolchains', { action, names: ['node'], node: nid });
@@ -175,5 +178,8 @@ for (const os of SYSTEMS){
   }
   await api('/api/vms', { action: 'remove', project: PROJECT, name });
   await wait(async () => !((await api('/api/vms')).vms || []).some(v => v.name === name), 10 * 60000);
+  // Walked whole, with nothing failed: a line for the lab's record, under
+  // what the machine said it was.
+  if (said) record('lab-systems', os, said, before);
 }
 await done(null);

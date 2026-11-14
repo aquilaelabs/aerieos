@@ -556,7 +556,9 @@ aerie tests root      the root tier (scripts/dashboard/roottier): what the root 
                    on every pull request and release
 aerie tests lab       the lab suites (test/lab-*.mjs) against real services rather than stand-ins.
                    Each names what it needs and skips in one line without it, so a missing service
-                   is never a failure, and nothing records them: a lab run is a proof, not a timing.
+                   is never a failure. Each subject a suite walks whole (a system, a git host) is
+                   written, dated, into scripts/dashboard/lab-record.json, which the vetted lines
+                   are read from: commit it with the work.
                    Two services are known. A Gitea: the `gitea` service of AerieOS's own dev
                    stack, under its compose file's `lab` profile, brought up from the Containers page
                    like any space's stack (`BB_LAB_GITEA`, the local one by default), and

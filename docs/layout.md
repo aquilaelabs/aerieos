@@ -310,6 +310,8 @@ scripts/
     layout.py                    what the page keeps here: each account's tabs and panes, the dock's terminals among them
     bellseen.py                  what each account has dismissed from its bell: an update to one version, until a newer one is out
     migrations/                  numbered schema files for /config/builderbot.db, applied at boot
+    labrecord.py                 the lab's own record: what each lab suite walked, on what and when, written by `aerie tests lab` into lab-record.json beside it, which a system's vetted line is read from
+    lab-record.json              that record: the newest walks of each suite and subject, dated, with the build each ran against
     testreg.py                   the test registry: what each test protects, and
                                  what a run measured it costing
     notify.py                    getting a line into a running session, and knowing it landed

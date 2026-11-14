@@ -37,6 +37,18 @@ export const ok = (cond, name) => {
   console.log((cond ? 'PASS' : 'FAIL') + '  ' + gap + name);
   cond ? pass++ : fail++;
 };
+// What a lab suite walked, for the lab's own record (R3 step 8): one line
+// for a subject (a system, a git host) and what it said it was, printed only
+// when nothing has failed since `since` (failed(), read before the
+// subject's first check). `aerie tests lab` reads these lines off the run and
+// keeps each, dated, in scripts/dashboard/lab-record.json, which the vetted
+// lines are read from.
+export const failed = () => fail;
+export const record = (suite, subject, said, since = 0) => {
+  if (fail > since) return false;
+  console.log(`RECORD  suite=${suite} subject=${subject} said=${String(said || '').replace(/\s+/g, ' ').trim().slice(0, 200)}`);
+  return true;
+};
 // The browser is optional: not every file here drives a page. version.mjs
 // exercises a module through the CLI that shares it, and still wants the
 // same pass/fail tally and exit code as the browser files.
