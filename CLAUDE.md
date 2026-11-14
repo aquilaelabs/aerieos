@@ -99,8 +99,10 @@ against `docs/reference.md` (written by `tools/bb-ref.sh`), the settings
 across compose, `.env.example`, the Unraid template and the reference,
 `docs/api.md` against the routes, `docs/layout.md` against `git ls-files`,
 the agent's version against its file, and the instruction channels (this
-file, the briefing, the shipped rules). CI runs on the pull request's merge
-ref and nowhere else; `aerie ci-log` reads a run's output.
+file, the briefing, the shipped rules). CI runs `aerie lint` itself, with
+nothing skipped (`BB_LINT_STRICT=1`), and the unit tier, on the pull
+request's merge ref and on a release's tag, where it and the browser suites
+pass before anything is published; `aerie ci-log` reads a run's output.
 
 ## Layout and conventions
 

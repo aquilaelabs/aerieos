@@ -11,6 +11,11 @@
 # attached, signed or handed over. The last job lists what a release from
 # this commit would carry, against the release's manifest
 # (.release-files).
+#
+# ...and the three checks a tag is held to before anything is built to
+# publish (R206): where a release of each kind may be cut from, said for
+# this commit and never refused here; aerie lint with the unit tier; and
+# every browser suite. Green here is what a tag on this commit would meet.
 name: release rehearsal
 
 on:
@@ -62,8 +67,40 @@ jobs:
     permissions:
       contents: read
 
+  # What tools/release-place.sh would say of a tag here, by kind: a dev build
+  # may be cut from this commit wherever it is; a stable release or a release
+  # candidate only when it is on main. Said, never failed: a rehearsal runs
+  # on the branch a release is being made ready on.
+  place:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      stable: ${{ steps.say.outputs.stable }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (B274)
+        with:
+          fetch-depth: 0
+      - name: Where a tag on this commit may be cut
+        id: say
+        shell: bash
+        run: |
+          git fetch --no-tags origin '+refs/heads/main:refs/remotes/origin/main'
+          base="$(head -1 VERSION | tr -d '[:space:]')"
+          bash tools/release-place.sh "v${base}-dev.1" "$GITHUB_SHA" origin/main
+          if bash tools/release-place.sh "v${base}" "$GITHUB_SHA" origin/main; then
+            echo "stable=may be cut here" >> "$GITHUB_OUTPUT"
+          else
+            echo "stable=not from this commit, which is not on main" >> "$GITHUB_OUTPUT"
+          fi
+
+  lint:
+    uses: ./.github/workflows/lint.yml
+
+  suites:
+    uses: ./.github/workflows/dashboard.yml
+
   manifest:
-    needs: [bundle, apps, android, appliance]
+    needs: [bundle, apps, android, appliance, place, lint, suites]
     if: always()
     runs-on: ubuntu-24.04
     steps:
@@ -76,6 +113,10 @@ jobs:
           APPS: ${{ needs.apps.result }}
           ANDROID: ${{ needs.android.result }}
           APPLIANCE: ${{ needs.appliance.result }}
+          LINT: ${{ needs.lint.result }}
+          SUITES: ${{ needs.suites.result }}
+          PLACE: ${{ needs.place.result }}
+          STABLE: ${{ needs.place.outputs.stable }}
         run: |
           set -eo pipefail
           {
@@ -88,6 +129,13 @@ jobs:
             echo "| Android APK (signed by the controller after a release) | $ANDROID |"
             echo "| AerieOS (built and booted) | $APPLIANCE |"
             echo
+            echo "| What a tag is held to | Result |"
+            echo "| --- | --- |"
+            echo "| aerie lint and the unit tier | $LINT |"
+            echo "| The browser suites | $SUITES |"
+            echo "| A dev build from this commit | may be cut here |"
+            echo "| A stable release or a candidate from this commit | ${STABLE:-not said ($PLACE)} |"
+            echo
             echo "The files the release must carry (.release-files), for ${VER:-this version}:"
             echo
             grep -v '^[[:space:]]*\(#\|$\)' .release-files | sed "s|@VER@|${VER:-VERSION}|g; s|^|- |"
@@ -95,4 +143,7 @@ jobs:
           for r in "$BUNDLE" "$APPS" "$ANDROID" "$APPLIANCE"; do
             [ "$r" = success ] || { echo "::error::not every build passed: a release from here would be missing files"; exit 1; }
           done
-          echo "every build passed: a tag on this commit carries the whole release"
+          for r in "$LINT" "$SUITES" "$PLACE"; do
+            [ "$r" = success ] || { echo "::error::not every check passed: a tag on this commit would publish nothing"; exit 1; }
+          done
+          echo "every build and every check passed: a tag on this commit carries the whole release"

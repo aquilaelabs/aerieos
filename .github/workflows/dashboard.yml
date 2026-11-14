@@ -20,10 +20,25 @@ on:
     # Replaces the git-diff test the old step did by hand. Same intent (only
     # worth running when it could have changed), expressed where GitHub can
     # act on it, so the job is never queued rather than started and skipped.
+    #
+    # What the suites test, all of it (R206; the audit of 13 Nov): they start
+    # the node's agent, run aerie and the root helpers and read the image's
+    # own files, and a change to any of those ran no suite.
     paths:
       - "scripts/dashboard/**"
+      - "scripts/agent/**"
+      - "scripts/lib/**"
+      - "scripts/aerie"
+      - "scripts/bb"
+      - "nodes/**"
+      - "config/**"
+      - "apps/vscode/**"
+      - "Dockerfile"
       - ".github/workflows/dashboard.yml"
   workflow_dispatch:
+  # ...and for a release's tag, called by build-image.yml before anything is
+  # built to publish: nothing is published that the suites have not passed.
+  workflow_call:
 
 # A superseded push's result is worthless, so cancel it rather than make the
 # (single) self-hosted runner work through the backlog serially.
@@ -48,6 +63,9 @@ jobs:
     # and a manual run, go on as before.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, bb-sandbox]
+    # A run that hangs is ended, not left holding the one runner: the whole
+    # set and its second try are under an hour on this machine.
+    timeout-minutes: 120
     # `bash` rather than the default `bash -e`, because that one difference is
     # pipefail, and the run below is piped into tee. Without it the tee's exit
     # status is the step's, and a failing suite would report success.
@@ -55,7 +73,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (B274)
 
       - name: Open a log this container can read afterwards
         # The same archive lint.yml keeps, and for the same reason: the runner
@@ -81,14 +99,21 @@ jobs:
           log="$dir/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.log"
           echo "CI_LOG=$log" >> "$GITHUB_ENV"
           echo "CI_LOG_DIR=$dir" >> "$GITHUB_ENV"
-          {
-            echo "# ${GITHUB_WORKFLOW} on ${GITHUB_REPOSITORY}"
-            echo "run:    ${GITHUB_RUN_ID} attempt ${GITHUB_RUN_ATTEMPT}"
-            echo "event:  ${GITHUB_EVENT_NAME}  ref: ${GITHUB_REF}"
-            echo "commit: ${GITHUB_SHA}"
-            echo "opened: $(date -Is)"
-            echo
-          } > "$log"
+          # One log a run: its first job writes the head `aerie ci-log` names
+          # the run by, and each job after it (a tag's run has the lint, the
+          # unit tier and the browser suites) adds its own part under it.
+          if [ -s "$log" ]; then
+            printf '\n== %s ==\n' "${GITHUB_JOB}" >> "$log"
+          else
+            {
+              echo "# ${GITHUB_WORKFLOW} on ${GITHUB_REPOSITORY}"
+              echo "run:    ${GITHUB_RUN_ID} attempt ${GITHUB_RUN_ATTEMPT}"
+              echo "event:  ${GITHUB_EVENT_NAME}  ref: ${GITHUB_REF}"
+              echo "commit: ${GITHUB_SHA}"
+              echo "opened: $(date -Is)"
+              echo
+            } > "$log"
+          fi
 
       - name: Dashboard browser tests
         # An isolated instance on a spare port with a private tmux server and a

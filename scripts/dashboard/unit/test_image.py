@@ -361,7 +361,8 @@ class Workflow(unittest.TestCase):
         # snapshot and keeps the package diff.
         wf = workflows()
         self.assertRegex(wf, r"appliance-boot:\n    needs: appliance\n")
-        self.assertRegex(wf, r"appliance-publish:\n    needs: appliance\n")
+        # ...and, with the boot, on the checks a tag is held to (R206).
+        self.assertRegex(wf, r"appliance-publish:\n(    #[^\n]*\n)*    needs: \[appliance, place, lint, suites\]\n")
         self.assertIn("uses: ./.github/workflows/os-image.yml", wf)
         self.assertIn("hostfwd=tcp:127.0.0.1:7680-:7680", wf)
         self.assertIn("github.event_name == 'schedule'", wf)

@@ -11,9 +11,19 @@ name: lint
 # is not linted. That is deliberate (work here lands on a branch and merges
 # through a PR), and `aerie lint` in the container is the same set of tools if
 # something ever does need checking by hand.
+#
+# ...and for a release's tag, called by build-image.yml before anything is
+# built to publish (R206: nothing is published that this has not passed).
+#
+# What it runs is `aerie lint` itself, the checkout's, with nothing skipped,
+# and the python unit tier. It ran its own copy of seven of aerie lint's
+# checks (the audit of 13 Nov), so the docs checks, the layout, the pack
+# formats and the rest held only where somebody ran them by hand, and no
+# workflow ran the unit tier at all.
 on:
   pull_request:
   workflow_dispatch:
+  workflow_call:
 
 # A superseded push's lint result is worthless, so cancel it rather than make
 # the (single) self-hosted runner work through the backlog serially.
@@ -54,7 +64,12 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v7
+      # Whole, with the tags: the agent's version is measured from the commit
+      # that last moved it, and the shipped migrations against the newest
+      # release's tag.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (B274)
+        with:
+          fetch-depth: 0
 
       - name: Open a log this container can read afterwards
         # The runner streams a step's console output to GitHub and keeps none
@@ -85,14 +100,21 @@ jobs:
           log="$dir/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.log"
           echo "CI_LOG=$log" >> "$GITHUB_ENV"
           echo "CI_LOG_DIR=$dir" >> "$GITHUB_ENV"
-          {
-            echo "# ${GITHUB_WORKFLOW} on ${GITHUB_REPOSITORY}"
-            echo "run:    ${GITHUB_RUN_ID} attempt ${GITHUB_RUN_ATTEMPT}"
-            echo "event:  ${GITHUB_EVENT_NAME}  ref: ${GITHUB_REF}"
-            echo "commit: ${GITHUB_SHA}"
-            echo "opened: $(date -Is)"
-            echo
-          } > "$log"
+          # One log a run: its first job writes the head `aerie ci-log` names
+          # the run by, and each job after it (a tag's run has the lint, the
+          # unit tier and the browser suites) adds its own part under it.
+          if [ -s "$log" ]; then
+            printf '\n== %s ==\n' "${GITHUB_JOB}" >> "$log"
+          else
+            {
+              echo "# ${GITHUB_WORKFLOW} on ${GITHUB_REPOSITORY}"
+              echo "run:    ${GITHUB_RUN_ID} attempt ${GITHUB_RUN_ATTEMPT}"
+              echo "event:  ${GITHUB_EVENT_NAME}  ref: ${GITHUB_REF}"
+              echo "commit: ${GITHUB_SHA}"
+              echo "opened: $(date -Is)"
+              echo
+            } > "$log"
+          fi
 
       - name: Ensure linters
         # The container the runner lives in can lag this repo: the PR that
@@ -131,96 +153,22 @@ jobs:
           actionlint --version
           ruff --version
 
-      - name: Shell scripts
+      - name: What the checks compare against
+        # main, for the agent's version, and the release tags, for the
+        # migrations that shipped: a pull request's checkout has neither.
         run: |
-          # Selected by shebang rather than by name. The list used to be a
-          # hand-maintained enumeration of extensions and filenames, which
-          # fails in the one direction that matters: an extensionless script
-          # added later is simply never checked, and nothing says so. That is
-          # how scripts/dashboard/bb-tty, which validates a browser-supplied
-          # argument, went unlinted. A shebang cannot be forgotten.
-          # The whole repository by its first line, and the scripts that live
-          # inside quoted heredocs (bb-sandbox in the provisioner), which is
-          # the selection aerie lint makes, so the two agree about what a clean
-          # tree is (B145).
-          mapfile -t tracked < <(git ls-files)
-          files=()
-          for f in "${tracked[@]}"; do
-            if [ -f "$f" ] && head -c 64 "$f" | head -1 | grep -qE '^#!.*\b(ba)?sh\b'; then
-              files+=("$f")
-            fi
-          done
-          mkdir -p "$RUNNER_TEMP/embedded-shell"
-          mapfile -t -O "${#files[@]}" files < <(python3 scripts/lib/embedded.py shell "$RUNNER_TEMP/embedded-shell" "${files[@]}")
-          printf 'checking %s\n' "${files[@]}"
-          shellcheck -x -S warning "${files[@]}" 2>&1 | tee -a "$CI_LOG"
+          git fetch --no-tags --depth=1 origin main 2>&1 | tee -a "$CI_LOG" || true
+          git fetch --tags --force origin 2>&1 | tee -a "$CI_LOG" || true
 
-      - name: Dockerfile
-        # Ignores live in .hadolint.yaml, which hadolint picks up on its own:
-        # one config for this job and for `aerie lint`, so the two can never
-        # disagree about what a clean Dockerfile is.
-        run: hadolint Dockerfile 2>&1 | tee -a "$CI_LOG"
-
-      - name: Agent version moves with its file
-        # A node compares the agent FILE and the Nodes tab names its NUMBER,
-        # so the file may not change against main without AGENT_VERSION's
-        # patch moving (B221). The same script `aerie lint` runs; main is
-        # fetched shallowly because the checkout above is one commit deep.
-        run: |
-          git fetch --no-tags --depth=1 origin main 2>&1 | tee -a "$CI_LOG"
-          sh tools/agent-version.sh 2>&1 | tee -a "$CI_LOG"
-
-      - name: Shipped migrations unchanged
-        # What a release has run on an install's /config is never edited
-        # (R79): every migration at the newest v* tag, byte-for-byte, the
-        # check aerie lint runs. The release tags are fetched because the
-        # checkout above carries none, and without them this passes by
-        # omission. A repository with no release yet (a fork, a fresh one)
-        # has nothing to fetch, and a glob that matches nothing fails the
-        # fetch (B115), so it is fetched only when ls-remote lists one.
-        run: |
-          if git ls-remote --tags --exit-code origin 'refs/tags/v*' >/dev/null; then
-            git fetch --no-tags --depth=1 origin '+refs/tags/v*:refs/tags/v*' 2>&1 | tee -a "$CI_LOG"
-          fi
-          python3 scripts/lib/lint-checks.py shipped 2>&1 | tee -a "$CI_LOG"
-
-      - name: Python
-        # The dashboard, the agent, the library and the hook scripts: by
-        # extension and by shebang, the same selection aerie lint makes. The
-        # rules are ruff.toml's at the root; the agent's own pins it to the
-        # python a Rocky node carries.
-        # And the python a shell script feeds to python3 from a quoted heredoc
-        # (scripts/aerie does it dozens of times), extracted with its line numbers
-        # kept. Its own run, with the root's config named: the copies sit
-        # outside the checkout, where ruff would find no config of its own.
-        run: |
-          mapfile -t files < <({ find scripts -type f -name '*.py'; find scripts -type f -exec grep -lE '^#!.*\bpython3?\b' {} +; } | sort -u)
-          printf 'checking %s\n' "${files[@]}"
-          ruff check "${files[@]}" 2>&1 | tee -a "$CI_LOG"
-          mapfile -t tracked < <(git ls-files)
-          mkdir -p "$RUNNER_TEMP/embedded"
-          mapfile -t embedded < <(python3 scripts/lib/embedded.py python "$RUNNER_TEMP/embedded" "${tracked[@]}")
-          printf 'checking %s\n' "${embedded[@]}"
-          ruff check --config ruff.toml "${embedded[@]}" 2>&1 | tee -a "$CI_LOG"
-
-      - name: Workflows
-        # The runner labels a runs-on may target live in .github/actionlint.yaml,
-        # shared with `aerie lint`.
-        run: actionlint -color 2>&1 | tee -a "$CI_LOG"
-
-      - name: Compose file and Unraid template
-        run: |
-          # --env-file rather than cp .env.example .env: config is daemonless
-          # and this leaves no .env behind in the runner's work directory.
-          {
-            docker compose --env-file .env.example config -q
-            echo "compose file is valid"
-            python3 - <<'EOF'
-          import xml.dom.minidom
-          xml.dom.minidom.parse("platforms/unraid/aerie-workshop.xml")
-          print("unraid template is well-formed")
-          EOF
-          } 2>&1 | tee -a "$CI_LOG"
+      - name: aerie lint
+        # The checkout's own, on this runner and not relayed to a controller
+        # (BB_RELAYED), with a missing tool a failure and never a skip
+        # (BB_LINT_STRICT): one set of checks, the one a session runs before
+        # it pushes, so passing there is passing here.
+        env:
+          BB_RELAYED: "1"
+          BB_LINT_STRICT: "1"
+        run: bash scripts/aerie lint 2>&1 | tee -a "$CI_LOG"
 
       - name: Close the log
         if: always()
@@ -233,3 +181,52 @@ jobs:
             >> "$CI_LOG"
           find "$CI_LOG_DIR" -maxdepth 1 -name '*.log' -printf '%T@ %p\n' \
             | sort -rn | tail -n +61 | cut -d' ' -f2- | xargs -r rm -f
+
+
+  # The python unit tier (scripts/dashboard/unit): the modules' rules with no
+  # server and no browser, under a minute. No workflow ran it: it held where
+  # a session ran aerie tests unit before a push, and nowhere else.
+  unit:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, bb-sandbox]
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (B274)
+        with:
+          fetch-depth: 0
+
+      - name: Open a log this container can read afterwards
+        run: |
+          dir="${BB_CI_LOG_DIR:-}"
+          if [ -z "$dir" ]; then
+            if [ -w /config ]; then dir=/config/ci-logs; else dir="$HOME/ci-logs"; fi
+          fi
+          dir="$dir/${GITHUB_REPOSITORY##*/}"
+          mkdir -p "$dir"
+          log="$dir/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.log"
+          echo "CI_LOG=$log" >> "$GITHUB_ENV"
+          if [ -s "$log" ]; then
+            printf '\n== %s ==\n' "${GITHUB_JOB}" >> "$log"
+          else
+            {
+              echo "# ${GITHUB_WORKFLOW} on ${GITHUB_REPOSITORY}"
+              echo "run:    ${GITHUB_RUN_ID} attempt ${GITHUB_RUN_ATTEMPT}"
+              echo "event:  ${GITHUB_EVENT_NAME}  ref: ${GITHUB_REF}"
+              echo "commit: ${GITHUB_SHA}"
+              echo "opened: $(date -Is)"
+              echo
+            } > "$log"
+          fi
+
+      - name: The unit tier
+        env:
+          BB_RELAYED: "1"
+        run: bash scripts/aerie tests unit 2>&1 | tee -a "$CI_LOG"
+
+      - name: Close the log
+        if: always()
+        run: |
+          printf '\nresult: %s\nclosed: %s\n' "${{ job.status }}" "$(date -Is)" >> "$CI_LOG"

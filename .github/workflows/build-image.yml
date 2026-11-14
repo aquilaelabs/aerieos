@@ -59,7 +59,42 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  # A release's tag is held to three things before anything is built to
+  # publish (R206, the operator, 14 Nov): it is cut from where its kind may be
+  # (place), `aerie lint` and the unit tier pass (lint), and every browser
+  # suite passes (suites). A tag ran none of them: the image was pushed and
+  # the release made side by side, on whatever commit the tag named. Each is
+  # skipped on a push to main, the weekly rebuild and a dispatch, which
+  # publish no release, and the jobs below take skipped as passed.
+  place:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (B274)
+        with:
+          fetch-depth: 0
+      - name: The tag is cut from where its kind may be
+        # A dev build on the branch it was built on; a stable release or a
+        # release candidate only on a commit that is on main.
+        run: |
+          git fetch --no-tags origin '+refs/heads/main:refs/remotes/origin/main'
+          bash tools/release-place.sh "$GITHUB_REF_NAME" "$GITHUB_SHA" origin/main
+
+  lint:
+    if: startsWith(github.ref, 'refs/tags/v')
+    uses: ./.github/workflows/lint.yml
+
+  suites:
+    if: startsWith(github.ref, 'refs/tags/v')
+    uses: ./.github/workflows/dashboard.yml
+
   build:
+    # After the tag's three checks, or at once where they do not apply.
+    needs: [place, lint, suites]
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
     # A pinned image, never ubuntu-latest: GitHub repoints that label at a new
     # release on its own date (Ubuntu 26 from 19 Oct 2026), and aerie lint fails
     # on it here so the pin moves only in a commit (R116).
@@ -324,7 +359,7 @@ jobs:
     # Every job of the run, not the image's alone: a run whose OS image failed
     # was recorded a success (B455). A skipped job (no tag, no box ticked)
     # counts as nothing either way.
-    needs: [build, upgrade, bundle, appliance, appliance-publish]
+    needs: [place, lint, suites, build, upgrade, bundle, appliance, appliance-publish]
     # Failed, canceled and skipped are exactly the outcomes worth recording.
     if: always()
     # The image is pushed by the time this runs, so nothing waits on it: with
@@ -351,7 +386,7 @@ jobs:
         # the dashboard follows for anything the web can reach, and it keeps
         # a workflow input out of a command line.
         env:
-          JOB_RESULTS: "build=${{ needs.build.result }} upgrade=${{ needs.upgrade.result }} bundle=${{ needs.bundle.result }} appliance=${{ needs.appliance.result }} appliance-publish=${{ needs.appliance-publish.result }}"
+          JOB_RESULTS: "place=${{ needs.place.result }} lint=${{ needs.lint.result }} suites=${{ needs.suites.result }} build=${{ needs.build.result }} upgrade=${{ needs.upgrade.result }} bundle=${{ needs.bundle.result }} appliance=${{ needs.appliance.result }} appliance-publish=${{ needs.appliance-publish.result }}"
           BUILD_VERSION: ${{ needs.build.outputs.version }}
           BUILD_DIGEST: ${{ needs.build.outputs.digest }}
           BUILD_ELAPSED: ${{ needs.build.outputs.elapsed }}
@@ -396,13 +431,21 @@ jobs:
 
           # The same header the lint workflow writes, because `aerie ci-log` reads
           # both out of this directory and tells them apart by the first line.
+          # ...under what a tag's lint, unit tier and suites wrote there in
+          # this same run, never over it.
+          if [ -s "$log" ]; then
+            printf '\n== the run ==\n' >> "$log"
+          else
+            {
+              echo "# ${GITHUB_WORKFLOW} on ${GITHUB_REPOSITORY}"
+              echo "run:    ${GITHUB_RUN_ID} attempt ${GITHUB_RUN_ATTEMPT}"
+              echo "event:  ${GITHUB_EVENT_NAME}  ref: ${GITHUB_REF}"
+              echo "commit: ${GITHUB_SHA}"
+              echo "opened: $(date -Is)"
+              echo
+            } > "$log"
+          fi
           {
-            echo "# ${GITHUB_WORKFLOW} on ${GITHUB_REPOSITORY}"
-            echo "run:    ${GITHUB_RUN_ID} attempt ${GITHUB_RUN_ATTEMPT}"
-            echo "event:  ${GITHUB_EVENT_NAME}  ref: ${GITHUB_REF}"
-            echo "commit: ${GITHUB_SHA}"
-            echo "opened: $(date -Is)"
-            echo
             echo "version: ${BUILD_VERSION:--}"
             echo "digest:  ${BUILD_DIGEST:-not pushed}"
             echo "took:    ${took}"
@@ -415,7 +458,7 @@ jobs:
             for jr in $JOB_RESULTS; do printf 'job %s: %s\n' "${jr%%=*}" "${jr#*=}"; done
             printf 'result: %s\n' "$result"
             printf 'closed: %s\n' "$(date -Is)"
-          } > "$log"
+          } >> "$log"
           cat "$log"
 
           # Twenty kept, the same as the lint workflow's, and counted over the
@@ -429,6 +472,8 @@ jobs:
   # install fetches and verifies in place of the tag's source archive. On a
   # tag push alone; the release is made here when the tag has none yet.
   bundle:
+    # The release is made here, so only once the tag's checks have passed.
+    needs: [place, lint, suites]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
     permissions:
@@ -539,7 +584,9 @@ jobs:
       AERIEOS_RELEASE_KEY: ${{ secrets.AERIEOS_RELEASE_KEY }}
 
   appliance-publish:
-    needs: appliance
+    # The OS image is built and booted beside the checks, since it takes
+    # hours and publishes nothing by itself; attaching it waits for them.
+    needs: [appliance, place, lint, suites]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
     permissions:
