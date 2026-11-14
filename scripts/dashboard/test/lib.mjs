@@ -506,6 +506,25 @@ export async function animatedDuring(page, act){
 // about the code, and then an hour proving that.
 export const SLOW = Number(process.env.BB_TEST_SLOW || 1) || 1;
 export const patience = ms => Math.round(ms * SLOW);
+// Until `fn` answers something true, looked at every `every` ms, for `ms`
+// at most (stretched as every wait here is): what a fixed sleep was a guess
+// at (R7 step 4). It answers what `fn` last did, so the check after it
+// reads the thing that was waited for and fails in its own words when it
+// never came. For the page itself, page.waitForFunction; this is for what
+// a suite reads from outside it: a file, a tmux session, a job's row.
+export const until = async (fn, ms = 5000, every = 50) => {
+  const end = Date.now() + patience(ms);
+  for (;;){
+    let got;
+    try { got = await fn(); } catch (e) { got = false; }
+    if (got || Date.now() >= end) return got;
+    await sleep(every);
+  }
+};
+// A pause on purpose, for a check that something did NOT happen: there is
+// no event to wait for, only time in which it could have. Named apart from
+// sleep so that what is left of the fixed pauses says it is one of these.
+export const quiet = ms => sleep(ms);
 
 // A project's settings save a section at a time (the operator, 10 Oct):
 // each section's bar has Save, or with a session of this account running and
