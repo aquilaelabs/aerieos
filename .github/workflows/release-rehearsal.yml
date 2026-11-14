@@ -46,7 +46,11 @@ jobs:
           ver="$(BB_RELAYED=1 bash scripts/aerie version --file)"
           name="aerieos-controller-${ver}.tar.gz"
           git archive --format=tar --prefix="builderbot-${ver}/" HEAD | gzip -n -9 > "$name"
-          tar -tzf "$name" | grep -qx "builderbot-${ver}/scripts/dashboard/server.py" \
+          # Listed to a file and read from it: grep stopping at its first match
+          # ended tar mid-list, and with pipefail that read as no match (the
+          # rehearsal of 14 Nov failed here on a bundle that was whole).
+          tar -tzf "$name" > bundle.names
+          grep -qx "builderbot-${ver}/scripts/dashboard/server.py" bundle.names \
             || { echo "::error::the bundle has no scripts/dashboard/server.py"; exit 1; }
           sha256sum "$name" > "$name.sha256"
           ls -l "$name"
