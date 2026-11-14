@@ -44,6 +44,7 @@
 - A session on a node enrolled by a public hostname reaches its controller, and a terminal opens there: `aerie` in the session and the terminal's own check refused the hostname's certificate (b49f127)
 - A repository whose daily snapshots were switched off before that switch was removed is no longer left off with nothing to turn it back on: it keeps 0 days, which the days field shows and changes. A person's terminal colors for one space, which nothing read any more, are no longer stored. The step that was to do both in the last release read a file by the wrong name and changed nothing. Upgrading: `/config` moves to state 22, so a build from before this one no longer starts on it; a repository that had the switch off shows Snapshots kept for 0 days, and its snapshots stay (8a8f0b4)
 - An audit entry or a job whose new id was already taken is written under another; it was dropped, the job with an error (8a8f0b4)
+- A hostname being typed on the nginx page is no longer wiped when the page re-reads (e688169)
 
 ## 0.9.0-dev.5341: 2026-11-12
 
