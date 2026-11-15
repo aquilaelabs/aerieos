@@ -39,7 +39,11 @@ const PAGES = [
   ['roles', '#/people/roles', 'rolesData = null; renderRolesInto(0)'],
   ['profile', '#/settings', 'profile = null; renderProfileInto(0)'],
   ['notices', '#/notifications', 'noticesData = null; noticesFetching = true; renderNoticesInto(0)'],
-  ['containers', '#/containers', 'dockerList = null; for (const k in dockerSeen) delete dockerSeen[k]; renderDockerInto(0)'],
+  // Landed means the daemon answered: one that did not (a slow one, under
+  // load) leaves the page honestly drawing its rows grayed with no tiles,
+  // which is another page than the one its template stands in for.
+  ['containers', '#/containers', 'dockerList = null; for (const k in dockerSeen) delete dockerSeen[k]; renderDockerInto(0)', [],
+   '!!dockerList && !dmBlind()'],
   ['analysis', '#/projects/findings', 'findings = {loading: true}; renderFindingsInto(0)'],
 ];
 // A notebook view's template is what a project not yet read shows: the view
@@ -196,10 +200,20 @@ for (const [W, H] of [[1280, 1000], [393, 852]]){
   await page.goto(URL);
   await ready(page);
   const where = W < 900 ? 'on a phone' : 'at a desk';
-  for (const [name, hash, reset, skip] of PAGES){
+  for (const [name, hash, reset, skip, landed] of PAGES){
     await page.evaluate(h => { location.hash = h; }, hash);
     await page.waitForFunction(w => { const l = [...document.querySelectorAll('.pane .doc.on')].find(e => e.checkVisibility({ visibilityProperty: true, opacityProperty: true }));
       return l && l.children.length && !l.querySelector(w); }, WAITING, { timeout: 15000 }).catch(() => {});
+    // ...and, where a page says what landed is, that: read again by its
+    // own polls until it is so.
+    if (landed){
+      const came = await page.waitForFunction(js => { try { return !!(0, eval)(js); } catch (e) { return false; } }, landed, { timeout: 30000 }).then(() => true, () => false);
+      // Said when it never did, with what the page knew: the comparison
+      // below then fails on a page that is not the one its template is for,
+      // and this is the line that says which page it was.
+      if (!came) console.log(`NOTE  ${name} had not landed ${where}: ${await page.evaluate(() => { try {
+        return JSON.stringify({ list: !!dockerList, blind: dockerList?.blind, error: String(dockerList?.error || '').slice(0, 160), poll: dmPollSays() }); } catch (e) { return String(e); } })}`);
+    }
     const got = await settled(page, '.pane .doc.on');
     const release = await hold(page);
     // ...and what renderGuarded does after every draw, which the reset's
