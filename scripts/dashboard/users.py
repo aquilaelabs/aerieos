@@ -730,6 +730,13 @@ def may_instance(u, action, instance="", name=""):
     return f"your roles give no {label} {lvl} on {name or instance}: an administrator gives one on the Users page"
 
 
+# What a session may ask for at all, each still bounded by the account
+# behind it (_session_account_why) and by its space's dials where the route
+# reads them: reading its space and the ones it reads, working in it, and
+# the relayed verbs. Everything else is a person's, said by name above
+# where there are words for it and in one sentence where there are not.
+SESSION_MAY = ("read", "work", "write", "bb")
+
 # The actions a session is refused whoever its account is, with what each
 # reaches, for the refusal.
 PERSON_ONLY = {
@@ -857,6 +864,12 @@ def may(u, action, project=None):
     # may settings are what hold it.
     if not (u or {}).get("session"):
         return _roles_why(action, project)
+    # A session's own short list (R227 step 4): what one may ask for at all,
+    # each then held to the account behind it. It used to be everything the
+    # lines above did not name, so an action added tomorrow was a session's
+    # until somebody remembered it was not.
+    if action not in SESSION_MAY:
+        return f"that is a person's to do, not a session's ({action}): a session works on its own space, through aerie"
     return _session_account_why(u, action, project if project is not None else u.get("session"))
 
 
