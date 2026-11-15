@@ -125,31 +125,13 @@ jobs:
         # scratch state dir; nothing it does can reach the live dashboard this
         # runner's container is also serving.
         #
-        # Retried once, and only once, because of what this suite's failures
-        # actually are. It drives a real browser against a page that repaints on
-        # a poll, on a runner sharing its box with the live dashboard, any
-        # session and any image build, so a file times out under load and
-        # passes alone, every time, which is bug #13. A run that fails twice in
-        # a row is worth reading; a run that fails once is worth running again,
-        # and mailing somebody about the first one teaches them to ignore the
-        # mail. The second attempt is logged separately, so a genuine
-        # regression still shows both.
-        env:
-          # This runner shares its box with the live dashboard, any session and
-          # any image build, so every wait in the suite is competing for CPU
-          # that a quiet run has to itself. Doubling them costs seconds on a
-          # green run and removes the commonest way this goes red for reasons
-          # that are not the code (bug #13).
-          BB_TEST_SLOW: "2"
+        # Once, with nothing doubled (R7 step 7). It ran with every wait
+        # doubled and, when it failed, the whole suite a second time: the
+        # harness itself runs a suite that failed once more by itself, which
+        # is what tells a flake from a failure, and a second whole run only
+        # made a real failure take twice as long to say.
         run: |
           set -o pipefail
-          if bash scripts/dashboard/test/run.sh 2>&1 | tee -a "$CI_LOG"; then
-            exit 0
-          fi
-          echo | tee -a "$CI_LOG"
-          echo "== first attempt failed, running once more ==" | tee -a "$CI_LOG"
-          echo "   (this suite is timing-sensitive on a shared box; see bug #13)" \
-            | tee -a "$CI_LOG"
           bash scripts/dashboard/test/run.sh 2>&1 | tee -a "$CI_LOG"
 
       - name: Close the log

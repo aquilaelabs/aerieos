@@ -669,13 +669,12 @@ if [ "${BB_TEST_WORKERS:-1}" -gt 1 ] 2>/dev/null && [ -z "${BB_TEST_WORKER:-}" ]
         *) _n="$BB_TEST_SUITES_AT_ONCE" ;;
     esac
     [ "$_n" -le "${#_names[@]}" ] || _n="${#_names[@]}"
-    # Beside each other the suites get the patience CI gives them: every
-    # wait doubled. How many run beside each other is the node's row's
-    # (BB_TEST_WORKERS), not this file's to cap: four on four cores ran a
-    # suite a third slower than alone and timed out a dozen checks a day
-    # that passed alone every time (26 and 27 Sep), which is a fact about
-    # the waits, and lib.mjs's wrapper gives a slow page more time.
-    [ "$_n" -le 1 ] || export BB_TEST_SLOW="${BB_TEST_SLOW:-2}"
+    # Beside each other the suites wait as they do alone (R7 step 7): every
+    # wait was doubled here (BB_TEST_SLOW=2), from when four on four cores
+    # timed out a dozen checks a day that passed alone (26 and 27 Sep). At
+    # half the cores, with the suites waiting on what they check, a whole
+    # run with nothing doubled flaked no more than one with (15 Nov).
+    # BB_TEST_SLOW is still read, for a machine that wants every wait longer.
     [ "$_n" -le 1 ] || run_workers "$_n" "${_names[@]}"
 fi
 # Every tmux call from here on (ours and the server's) talks to a private

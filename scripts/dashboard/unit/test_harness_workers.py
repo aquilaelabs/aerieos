@@ -97,6 +97,40 @@ class InFlight(unittest.TestCase):
         self.assertIn('e.name = "TimeoutError";', lib)
 
 
+class Layers(unittest.TestCase):
+    """What absorbed a flake came off once the suites waited on what they
+    check (R7 step 7): a wait's two spare budgets, every wait doubled for a
+    run with workers and in CI, the three seconds of console errors let
+    through after a network change, and CI's second whole run. Measured
+    first: a whole run with one budget and nothing doubled flaked no more
+    than one with them."""
+
+    def read(self, *rel):
+        with open(os.path.join(HERE, "..", "..", "..", *rel), encoding="utf-8") as f:
+            return f.read()
+
+    def test_a_wait_has_one_budget(self):
+        lib = self.read("scripts", "dashboard", "test", "lib.mjs")
+        self.assertNotIn("waiting the same again", lib)
+        self.assertNotIn("BUDGETS", lib)
+        self.assertIn("return await (promised ? asked() : real(...args));", lib)
+
+    def test_only_the_cut_itself_is_let_through_after_a_network_change(self):
+        lib = self.read("scripts", "dashboard", "test", "lib.mjs")
+        self.assertIn("const cutByNet = text => /ERR_NETWORK_CHANGED/.test(text);", lib)
+        self.assertNotIn("netChanged", lib)
+
+    def test_nothing_is_doubled_for_workers_or_in_ci_and_ci_runs_once(self):
+        run = self.read("scripts", "dashboard", "test", "run.sh")
+        # A counted page is a slower page: the one doubling with a reason of its own stays.
+        self.assertEqual(run.count('export BB_TEST_SLOW="${BB_TEST_SLOW:-2}"'), 1)
+        self.assertIn("A counted page is a slower page", run[:run.index('export BB_TEST_SLOW="${BB_TEST_SLOW:-2}"')][-300:])
+        wf = self.read(".github", "workflows", "dashboard.yml")
+        self.assertNotIn("BB_TEST_SLOW", wf.replace("BB_TEST_SLOW=2", "").replace("doubled", ""))
+        self.assertEqual(wf.count("bash scripts/dashboard/test/run.sh"), 1)
+        self.assertNotIn("first attempt failed", wf)
+
+
 class Sections(unittest.TestCase):
     """A suite is a run of parts, and one that throws is one failure, not
     the end of the file (R7 step 6): a wait that ran out ended the suite

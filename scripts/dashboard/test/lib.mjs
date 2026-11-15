@@ -236,16 +236,15 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
       const last = args[args.length - 1];
       if (last && typeof last === "object" && typeof last.timeout === "number")
         args[args.length - 1] = { ...last, timeout: patience(last.timeout) };
-      // A timeout is only a timeout on a page that is at rest on a box
-      // that is not saturated. Four workers on four cores timed out a
-      // dozen checks a day that passed alone every time (27 Sep): the
-      // redraw came, after the budget. So a wait that runs out while the
-      // page has requests in flight, or while the load average is at the
-      // core count, gets the same budget again, three times at most; an
-      // element that never comes still fails, with its snapshot, later.
-      let tries = 0;
+      // A wait has one budget (R7 step 7). It had three: one that ran out
+      // while the page had requests in flight, or while the machine's load
+      // was at its cores, was given the same time twice more, since four
+      // workers on four cores timed out a dozen checks a day (27 Sep). The
+      // suites wait on what they check now and run at half the cores, and a
+      // whole run with one budget and no doubling flaked no more than one
+      // with three (15 Nov); what the spare budgets did by then was make a
+      // wait that could never come true cost three times as long.
       const budget = () => (typeof args[args.length - 1]?.timeout === "number" ? args[args.length - 1].timeout : patience(30000));
-      const busy = () => inFlight() > 0 || os.loadavg()[0] >= os.cpus().length;
       // A predicate that answers with a Promise (an async function, or one
       // that returns new Promise) is not asked again by Playwright: the
       // Promise is its answer at the first look, whatever it resolves to
@@ -280,14 +279,7 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
         }
       };
       try {
-        for (;;){
-          try { return await (promised ? asked() : real(...args)); }
-          catch (e) {
-            if (!/Timeout .*exceeded/.test(String(e)) || ++tries >= 3 || !busy()) throw e;
-            console.log(`[wait] ran out after ${budget()}ms with ${inFlight()} request(s) in flight and a load of ${
-              os.loadavg()[0].toFixed(1)} on ${os.cpus().length} cores: waiting the same again (${tries} of 2)`);
-          }
-        }
+        return await (promised ? asked() : real(...args));
       } catch (e) {
         // A timeout here says what was waited for and nothing about WHY it
         // never came, which is how the same few files have been rewaited
@@ -347,18 +339,19 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
   // ERR_NETWORK_CHANGED. That is this machine, not the page: what it cut
   // is not an error of the page's, and a page whose script or document it
   // cut never ran that script, so it is loaded again, a few times at most.
-  let netChanged = 0, netReloads = 0;
+  let netReloads = 0;
   page.on('requestfailed', r => {
     if (!/ERR_NETWORK_CHANGED/.test(r.failure()?.errorText || '')) return;
-    netChanged = Date.now();
     if (['document', 'script', 'stylesheet'].includes(r.resourceType()) && netReloads < 3){
       netReloads++;
       console.log(`[net] a network change on this box cut ${r.url().replace(/^https?:\/\/[^/]+/, '')}: loading the page again (${netReloads} of 3)`);
       page.reload().catch(() => {});
     }
   });
-  const cutByNet = text => /ERR_NETWORK_CHANGED/.test(text)
-    || (Date.now() - netChanged < 3000 && /Failed to fetch|NetworkError/.test(text));
+  // Only what names the cut itself: the three seconds after one in which a
+  // failed fetch or a name not defined was let through as its doing came
+  // off with the other layers (R7 step 7).
+  const cutByNet = text => /ERR_NETWORK_CHANGED/.test(text);
   page.on('console', m => {
     if (m.type() !== 'error') return;
     const url = m.location()?.url || '';
@@ -368,7 +361,7 @@ export async function newPage(browser, { tour = false, ...opts } = {}){
   // ...and a name the cut script would have defined, missed right after it.
   page.on('pageerror', e => {
     const t = String(e);
-    if (cutByNet(t) || (Date.now() - netChanged < 3000 && /ReferenceError: .* is not defined/.test(t))) return;
+    if (cutByNet(t)) return;
     page.errors.push(t);
   });
   page.on('dialog', d => { page.dialogs.push(d.message()); d.accept(); });
