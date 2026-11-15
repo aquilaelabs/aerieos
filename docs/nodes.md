@@ -1788,7 +1788,8 @@ agent refuses it without the stamp like storage and network. It is not
 sudo: there is no second command without a second question, and nothing
 pretends. A machine's own console can refuse them all (`sudo aerieos-agent
 root-asks off`, kept in node.json as the console's word like the release
-key's pin and reported as `root_off`): the agent then fails `apply: root`
+key's pin and reported as `root_off`, the running agent saying hello at its
+next turn when the console's word changes): the agent then fails `apply: root`
 with 77 before anything runs, and the controller refuses the ask, a
 schedule as root and `root_wait` with the sentence `nodes.root_off` says,
 so nobody is asked to allow what the node would refuse. A node can be LOCKED (`config.lock`, the Lock under Advanced,

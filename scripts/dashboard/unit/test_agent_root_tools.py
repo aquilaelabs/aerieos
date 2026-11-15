@@ -174,6 +174,21 @@ class RootAsks(unittest.TestCase):
             cli.cmd_root_asks(["on"])
         self.assertNotIn("root_off", self.state())
 
+    def test_the_running_agent_tells_the_controller_at_its_next_turn(self):
+        # The controller holds a root ask by the census, so a press at the
+        # console is told at the agent's next turn and not at its next hello.
+        from aerieos_agent import agent
+        a = agent.Agent.__new__(agent.Agent)
+        self.assertFalse(a.console_moved(), "the first look is no change")
+        self.assertFalse(a.console_moved())
+        with mock.patch("builtins.print"):
+            cli.cmd_root_asks(["off"])
+        self.assertTrue(a.console_moved(), "a press at the console")
+        self.assertFalse(a.console_moved(), "...told once")
+        with mock.patch("builtins.print"):
+            cli.cmd_root_asks(["on"])
+        self.assertTrue(a.console_moved())
+
     def test_only_on_or_off(self):
         with self.assertRaises(SystemExit):
             cli.cmd_root_asks(["maybe"])

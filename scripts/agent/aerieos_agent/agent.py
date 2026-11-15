@@ -15,7 +15,7 @@ from .coverage import _COV_OUT, _cov_write
 from .base import BEAT_S, RUNNER_DIAG_KEEP, SESSION_WALL, TRIAL_S, cap_file, log, log_once, own_digest, own_path, prune_dir
 from .base import back_note, selfcheck, trial_begin, trial_give_way, trial_note, trial_passed
 from .controller import Controller
-from .stores import load_state, save_state, use_scope
+from .stores import console_said, load_state, save_state, use_scope
 from .toolchains import share_images
 from .sessnet import SessionNet
 from .runners import RunnersMixin, runner_dirs
@@ -733,6 +733,18 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
                 j.cancel_said = True
             j.cancel()
 
+    def console_moved(self):
+        """Whether what this machine's console said (the release key,
+        unsigned builds, root commands) changed since the last turn. It is
+        the census's, and the controller holds a root ask by it before a
+        person is asked, so a change is told at the next turn rather than at
+        the next hello up to ten minutes on (R227 step 2). A file of a few
+        hundred bytes, read once a turn; the first read is no change."""
+        said_here = console_said()
+        moved = said_here != getattr(self, "console_was", said_here)
+        self.console_was = said_here
+        return moved
+
     def loop(self):
         delay = wdelay = 1
         # An update on trial gets TRIAL_S to reach its controller (R241).
@@ -816,6 +828,8 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
                     if ms >= 20:
                         _turn[name] = _turn.get(name, 0) + ms
             turn_t0 = time.monotonic()
+            if self.console_moved():
+                self.hello_at = 0
             # The monotonic clock: a clock step killed a running job as timed
             # out and stopped hello for the size of the step (B286). Zero
             # means due now, whichever clock.
