@@ -34,6 +34,7 @@
 - The configuration's backup carries the install key, sealed under the backup password with the rest, so the password alone restores a copy whole, its sign-ins and tokens included. Copies written before are marked without the install key in Backup copies and on the first-run restore page. (ff55bda)
 - A node that pinned the release key keeps the tools root installs from the bundle (the machine's helper, the session's, the one that cuts a pack's install off the network) only when the release signed them, as it takes an agent update: otherwise root goes on with the copy it has and the job says why. A machine whose console allows unsigned builds takes them from a branch's build as before. (ff55bda)
 - The Containers and Nodes pages keep what you are doing when they update: text you are typing (its cursor and an input method's composition too), a section you opened or closed, and a container's settings dialog stay as they were, where an update used to draw the page again over them. A button you pressed is still given back once the update lands. (c60f33c)
+- The VMs, Files, nginx and Library pages, a space's Git branch picker and its Sessions list, and the first-run page keep what you are typing when they update, its cursor where you left it and a word an input method is still composing included; Files' filter no longer moves the cursor to the end on each key, and a search filters once a composed word is chosen. (b73b098)
 
 ### Fixed
 
