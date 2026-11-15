@@ -6,7 +6,7 @@
 // log this file writes itself. What is faked: the run log. Nothing here runs
 // a suite: a test that ran the suite to test the thing that reads the suite
 // would be the slowest test in the suite.
-import { launch, newPage, ok, done, ready, nbShown, nbTab, URL, DIR } from './lib.mjs';
+import { launch, newPage, ok, done, ready, nbShown, nbTab, URL, DIR, section } from './lib.mjs';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync,
          cpSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -176,7 +176,7 @@ ok(/gone\s+slow\.mjs#\d+\s+a token with a space/.test(bb('drift')),
 // them is a rename, and an assertion inserted ABOVE such a name shifts it.
 // Pairing the leftovers in list order got that wrong and lost the
 // description; they are paired by how much of the wording survived.
-{
+await section("A name that carries a uid or a port changes on every run, so every one of", async () => {
   const was = [['drift.mjs', 'the picker opens', 0.2],
                ['drift.mjs', 'the owner has a minted id (u_616f379c)', 0.3],
                ['drift.mjs', 'and the last one', 0.4]];
@@ -195,13 +195,13 @@ ok(/gone\s+slow\.mjs#\d+\s+a token with a space/.test(bb('drift')),
   ok(Object.values(rows).some(t => /u_920b520a/.test(t.name || '')
        && t.protects === 'the owner is minted, not assumed'),
      '...and the description stays on the row whose words survived');
-}
+});
 
 // Bug B121: THREE assertions inserted above a run of such names, with two
 // neighbors of similar wording among them. Pairing by likeness within two
 // ordinals could not reach a test moved by three, and gave the description
 // to the neighbor whose words were closest instead.
-{
+await section("Bug B121: THREE assertions inserted above a run of such names, with two", async () => {
   const was = [['b121.mjs', 'the picker opens', 0.2],
                ['b121.mjs', 'docker work is stamped with the node id (n_5659a7c)', 0.3],
                ['b121.mjs', 'hyperv renders its own kind (h_1a2b3c)', 0.1],
@@ -228,7 +228,7 @@ ok(/gone\s+slow\.mjs#\d+\s+a token with a space/.test(bb('drift')),
      && rows['b121.mjs#6']?.protects === 'hyperv, not vmware'
      && !rows['b121.mjs#7']?.protects,
      '...and each description followed its own test three ordinals down, not the neighbor with the closest words');
-}
+});
 
 // Ingesting one file's log must not report every other file as deleted.
 writeFileSync(`${DIR}/run-part.log`, runlog([['fast.mjs', 'the picker opens', 0.2]]));
@@ -263,7 +263,7 @@ ok(await page.$('#tstFolds details[data-sect="tests:suites"]') !== null
 // The drift fold counts what drifted, not how many rows it can show. The
 // lists are capped at 200 and a first ingest is every test in the project,
 // so a heading of "200" would be reporting where the list stops.
-{
+await section("The drift fold counts what drifted, not how many rows it can show", async () => {
   const many = Array.from({ length: 260 }, (_, i) =>
     ['wide.mjs', `an assertion number ${i}`, 0.01]);
   writeFileSync(`${DIR}/run-wide.log`, runlog(many));
@@ -280,7 +280,7 @@ ok(await page.$('#tstFolds details[data-sect="tests:suites"]') !== null
   const rep = bb('drift');
   ok(/260 differences/.test(rep) && /and 60 more/.test(rep),
      '...and the report on the terminal counts the same way');
-}
+});
 
 // Describing one writes through, like a bug report: there is nothing to stage
 // about a sentence describing a thing that already exists.
@@ -336,7 +336,7 @@ ok(await page.$eval(`${box} .tstP`, e => e.value)
 // The same mark from the row: the checkbox is offered only on a test that
 // sits on a boundary, and saving with it ticked writes the reason and turns
 // the warning pill into a quiet one.
-{
+await section("The same mark from the row", async () => {
   // A fresh flagged row, ingested now: the earlier rows have been through
   // renames and re-timings by this point, and this one sorts to the top.
   writeFileSync(LOG, runlog([['wait.mjs', 'a boot that really takes thirty seconds', 30.0]]));
@@ -381,7 +381,7 @@ ok(await page.$eval(`${box} .tstP`, e => e.value)
   await page.waitForFunction(s => !document.querySelector(s), row, { timeout: 10000 });
   ok(true, '...and "flagged only" no longer lists it');
   await page.click('#tstFlagged');
-}
+});
 
 // ---- filling in a registry that already has a suite in it -----------------
 // The per-test verb takes the file lock and rewrites the store on every call,
@@ -412,7 +412,7 @@ ok(after['slow.mjs#3'].protects === 'the daemon answers, and says which one'
 // compares is a count. Counting the run history was wrong: that list is capped
 // at KEEP_RUNS, so from the twentieth ingest onward the number never changed
 // again and an open tab stopped noticing runs entirely.
-{
+await section("The tab re-reads when the poll says the registry moved, and what the poll", async () => {
   const st = JSON.parse(readFileSync(FILE, 'utf8'));
   const p = st.projects.alpha;
   while (p.runs.length < 20) p.runs.push({ ...p.runs[0] });
@@ -434,19 +434,19 @@ ok(after['slow.mjs#3'].protects === 'the daemon answers, and says which one'
     'fast.mjs#1': { protects: 'the picker opens on the first paint' } }));
   bb('describe', '--from', `${DIR}/desc2.json`);
   ok(read().rev > before, 'a bulk fill moves it too, having changed what the tab draws');
-}
+});
 
 // The run's output is the shell's, not a box on a row. `aerie tests log`
 // prints what the last run wrote beside the project, and the Tests view's
 // button sends `aerie tests log -f` into the project's shell (the macro the
 // server holds under that name).
-{
+await section("The run's output is the shell's, not a box on a row", async () => {
   writeFileSync(`${DIR}/ws/alpha/.bb-test-run.log`, 'PASS  [+0.1s] a line the run wrote\n3 passed, 0 failed in 1.0s\n');
   const shown = bb('log');
   ok(/a line the run wrote/.test(shown) && /3 passed/.test(shown), 'aerie tests log prints the last run\'s output whole');
   ok(await page.$eval('.pane .nb [data-view="tests"] #tstOut', b => !b.hidden && /run's output/.test(b.textContent)),
      'the Tests view carries Open the run\'s output beside its summary');
-}
+});
 
 // B201: a write that lands WHILE the panel's read is out is not marked as
 // seen. The panel used to record the page's token as of when its answer
@@ -455,7 +455,7 @@ ok(after['slow.mjs#3'].protects === 'the daemon answers, and says which one'
 // the write made never showed until something else moved the token. Forced
 // here: the answer is fetched BEFORE the ingest and handed to the panel after
 // the token has moved, which is what a slow answer under a fast poll is.
-{
+await section("B201: a write that lands WHILE the panel's read is out is not marked as", async () => {
   const staged = await page.evaluate(async () => {
     const f = window.fetch;
     const early = await f('/api/tests?project=alpha');
@@ -482,7 +482,7 @@ ok(after['slow.mjs#3'].protects === 'the daemon answers, and says which one'
   try { await page.waitForSelector('#tstList .tst[data-key="race.mjs#1"]', { timeout: 10000 }); shown = true; }
   catch (e) {}
   ok(shown, 'a run ingested while the panel was reading shows on the next poll, not never');
-}
+});
 
 // `aerie tests run` is the loop this file's subject was missing: run the
 // project's own test command, time it, record it, so the registry stops
@@ -492,7 +492,7 @@ ok(after['slow.mjs#3'].protects === 'the daemon answers, and says which one'
 // happened is not recorded, and says so once rather than twice. The run
 // itself is `aerie test`, which the job suites already drive, and pointing this
 // one at a real suite would be a suite inside a suite.
-{
+await section("`aerie tests run` is the loop this file's subject was missing", async () => {
   let out = '';
   try {
     out = execFileSync(BB, ['tests', 'run'], { env: { ...process.env,
@@ -513,7 +513,7 @@ ok(after['slow.mjs#3'].protects === 'the daemon answers, and says which one'
      'a run that could not start records nothing, and says so');
   ok(!/looks like a test run/.test(out),
      '...once: the ingest is not asked to explain a log that was never written');
-}
+});
 
 // The bundle a node gets carries bb and its library and none of the
 // dashboard's python, because every tests verb but one is relayed to the
@@ -521,7 +521,7 @@ ok(after['slow.mjs#3'].protects === 'the daemon answers, and says which one'
 // the toolchain and the tree are, and relays only the ingest afterwards. The
 // module check sat above that branch, so the one verb that has to work on a
 // node was the one verb that could not.
-{
+await section("The bundle a node gets carries bb and its library and none of the", async () => {
   const B = `${DIR}/bundleish`;
   rmSync(B, { recursive: true, force: true });
   mkdirSync(`${B}/scripts`, { recursive: true });
@@ -542,7 +542,7 @@ ok(after['slow.mjs#3'].protects === 'the daemon answers, and says which one'
        out.trim().split('\n')[0] || 'no output'})`);
   ok(/nothing timed, so nothing recorded/.test(out),
      '...reaching the same place a controller run reaches');
-}
+});
 
 // Ingesting is the CLI's and deliberately not an endpoint. It WAS one, and
 // it could never have worked: every body this server takes is capped at 64kB

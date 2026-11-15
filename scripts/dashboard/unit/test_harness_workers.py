@@ -97,5 +97,44 @@ class InFlight(unittest.TestCase):
         self.assertIn('e.name = "TimeoutError";', lib)
 
 
+class Sections(unittest.TestCase):
+    """A suite is a run of parts, and one that throws is one failure, not
+    the end of the file (R7 step 6): a wait that ran out ended the suite
+    there with no total, and everything after it went unrun and unsaid."""
+
+    TESTS = os.path.join(HERE, "..", "test")
+
+    def test_the_helper_says_the_part_and_where_and_counts_one_failure(self):
+        with open(os.path.join(self.TESTS, "lib.mjs"), encoding="utf-8") as f:
+            lib = f.read()
+        at = lib.index("export const section = async (name, fn) => {")
+        body = lib[at:lib.index("\n};\n", at)]
+        self.assertIn("try { await fn(); }", body)
+        self.assertIn("console.log(`FAIL  ${name}: this part stopped", body)
+        self.assertIn("fail++;", body)
+        self.assertNotIn("throw", body, "it carries on: the next part still runs")
+
+    def test_no_suite_keeps_a_bare_block_a_throw_would_end_the_file_in(self):
+        left = []
+        for name in sorted(os.listdir(self.TESTS)):
+            # The lab's suites run against real services and are not in a
+            # gate; templates is as it was; codemap-parsers holds other
+            # languages' source in its strings, a brace at a line's start
+            # among it (a C function's body was wrapped as a part once).
+            if not name.endswith(".mjs") or name.startswith(("lab-", "_")) \
+                    or name in ("lib.mjs", "surface.mjs", "templates.mjs", "codemap-parsers.mjs"):
+                continue
+            with open(os.path.join(self.TESTS, name), encoding="utf-8") as f:
+                lines = f.read().split("\n")
+            if any(line == "{" for line in lines):
+                left.append(name)
+            wrapped = sum(1 for line in lines if line.startswith("await section("))
+            closed = sum(1 for line in lines if line == "});")
+            self.assertGreaterEqual(closed, wrapped, name)
+            if wrapped:
+                self.assertRegex("\n".join(lines), r"import \{[^}]*\bsection\b[^}]*\} from './lib.mjs';", name)
+        self.assertEqual(left, [])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -7,7 +7,7 @@
 // way to update, and the controller says the version it speaks for an app
 // newer than it to say so. The Android app's surface is
 // apps/android/api-surface.json, held by test/appapi.mjs. No browser.
-import { ok, done, DIR, URL, pinBreaks as breaks, OWNER as ADMIN, asSession } from './lib.mjs';
+import { ok, done, DIR, URL, pinBreaks as breaks, OWNER as ADMIN, asSession, section } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -166,17 +166,17 @@ ok(pins.apps.android?.contract && existsSync(`${REPO}/${pins.apps.android.contra
 // ---- the checker refuses what it should ------------------------------------------------------
 // A removed field, a changed type and a row's changed type each fail, so a
 // pass above means the fields were looked at.
-{
+await section("the checker refuses what it should", async () => {
   const reads = { a: 'number', 'b?': 'string', 'rows[].x': 'string', 'tup[]': ['string', 'number'] };
   const good = { a: 1, rows: [{ x: 'y' }], tup: [['p', 2]] };
   ok(breaks(good, reads, 't').length === 0 && breaks({ ...good, a: undefined }, reads, 't').length === 1
      && breaks({ ...good, a: '1' }, reads, 't').length === 1 && breaks({ ...good, b: 3 }, reads, 't').length === 1
      && breaks({ ...good, rows: [{ x: 1 }] }, reads, 't').length === 1 && breaks({ ...good, tup: [['p', 'q']] }, reads, 't').length === 1,
      'the pin check fails on a field gone, a type changed, and a row\'s field or column changed');
-}
+});
 
 // ---- the handshake: each side says its version -------------------------------------------------
-{
+await section("the handshake", async () => {
   // An app from before the door's window is refused with the way to update,
   // by its name; what it would update from still answers.
   const old = await dev('projects', {}, { headers: { 'X-BB-Door': '0', 'X-BB-App': 'companion/0.0.1' } });
@@ -201,6 +201,6 @@ ok(pins.apps.android?.contract && existsSync(`${REPO}/${pins.apps.android.contra
   ok(mine.tooOld === '' && /needs 1: update AerieOS on the controller/.test(client.controllerTooOld({ api: 0 }))
      && client.controllerTooOld({ api: client.API }) === '',
      'the extension says plainly when its controller is too old for it, and nothing when it is not');
-}
+});
 
 await done();

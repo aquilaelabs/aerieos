@@ -8,7 +8,7 @@
 // answers a toolchain job at once, failing it), the Installed page's rows,
 // and the tool pack dialog the Library's Add your own and a card's Edit
 // open. Then the shell libraries a session on a node reads its store with.
-import { launch, newPage, ok, done, ready, sectSave, URL, DIR, until as untilTrue } from './lib.mjs';
+import { launch, newPage, ok, done, ready, sectSave, URL, DIR, until as untilTrue, section } from './lib.mjs';
 import { existsSync, readFileSync } from 'node:fs';
 
 const browser = await launch();
@@ -87,7 +87,7 @@ ok(pw?.layout?.env?.NODE_PATH === 'node_modules' && /npm install/.test(pw?.sourc
 // two recipes claim one, and neither that case nor the dispatch carries a
 // duplicate label, since a bash case takes the first match and hides a
 // second in silence.
-{
+await section("A recipe that gives a session commands says under which name", async () => {
   const bb = readFileSync(`${import.meta.dirname}/../../aerie`, 'utf8');
   const labels = [...bb.matchAll(/^    ([a-z][a-z0-9|-]*)\)\s+(?:shift; )?cmd_/gm)]
     .flatMap(m => m[1].split('|'));
@@ -106,14 +106,14 @@ ok(pw?.layout?.env?.NODE_PATH === 'node_modules' && /npm install/.test(pw?.sourc
     claimed.set(t.tool, t.name);
   }
   ok(missing.length === 0, `every tool a recipe declares is in bb's tool case, and one recipe's only (${missing.join('; ') || 'all agree'})`);
-}
+});
 
 // ---- the Library's toolchain cards, on the sandbox node --------------------
 // A card's Details says which tool installing it adds to a session, and
 // what installing it is under: an agreement Install accepts (Google's
 // Android SDK terms, linked: the acceptance is the operator's, not a
 // script's), else the licenses (the operator, 7 Oct).
-{
+await section("the Library's toolchain cards, on the sandbox node", async () => {
   const said = await page.evaluate(() => {
     const keys = lib.rows.filter(r => r.kind === 'toolchain' && !r.machine && !r.wrong_platform).map(r => `toolchain:${r.name}`);
     // What each entry's page says (R183), from the same libDetail.
@@ -136,7 +136,7 @@ ok(pw?.layout?.env?.NODE_PATH === 'node_modules' && /npm install/.test(pw?.sourc
   const bare = said.filter(s => !s.terms);
   ok(said.length > android.length && !bare.length,
      `...and every other toolchain card names its terms (${bare.map(s => s.name).join(', ') || 'none without'})`);
-}
+});
 
 // What a card says of where it stands, planted on a row and put back in the
 // same evaluate: the page re-reads on the toolchains and nodes revisions,
@@ -155,7 +155,7 @@ const card = (name, patch) => page.evaluate(([n, p]) => {
   Object.assign(r, was); libRev++; drawPanes();
   return out;
 }, [name, patch]);
-{
+await section("One word and an ellipsis for the whole of a job", async () => {
   // One word and an ellipsis for the whole of a job: no percentage read out
   // of the output (every recipe meters differently, several mislead), no bar,
   // and no verb on the card while it is being written.
@@ -194,9 +194,9 @@ const card = (name, patch) => page.evaluate(([n, p]) => {
   });
   ok(dots.later !== null && dots.later !== dots.first && dots.after === dots.later,
      `...and the card's ellipsis animates, and a redraw does not reset it (${JSON.stringify(dots)})`);
-}
+});
 // What a job said failed, under the card it failed on and no other.
-{
+await section("What a job said failed, under the card it failed on and no other", async () => {
   const bad = await page.evaluate(() => {
     const was = lib.job;
     lib.job = { ...(was || {}), running: false, errors: { flutter: 'could not download file · install failed (exit 1)' } };
@@ -208,11 +208,11 @@ const card = (name, patch) => page.evaluate(([n, p]) => {
   });
   ok(/could not download file/.test(bad.text) && bad.n === 1,
      `a failure is said under the card that failed, and no other card wears it (${bad.text})`);
-}
+});
 // One operation at a time (the server answers a second with a 409), so the
 // verbs go dead while one runs rather than letting a press earn an error.
 // Abort is the one control that has to work while a job runs.
-{
+await section("One operation at a time", async () => {
   const g = await page.evaluate(() => {
     const was = lib.job;
     lib.job = { ...(was || {}), running: true, action: 'install', current: 'swift' };
@@ -258,9 +258,9 @@ const card = (name, patch) => page.evaluate(([n, p]) => {
     return { none, some };
   });
   ok(!when.none && when.some, 'the head says when versions were last checked, and nothing while they never were');
-}
+});
 // A retired node's directory on the store is offered with Remove (R196).
-{
+await section("A retired node's directory on the store is offered with Remove", async () => {
   const seen = await page.evaluate(() => {
     const was = lib.cleanable;
     lib.cleanable = [{ dir: 'n_0ldd0ne1', what: "gone's, a node since retired" }]; libRev++; drawPanes();
@@ -271,7 +271,7 @@ const card = (name, patch) => page.evaluate(([n, p]) => {
   });
   ok(/Remove takes\W*n_0ldd0ne1 \(gone's, a node since retired\)/.test(seen.head) && seen.rm,
      `a retired node's directory on the store is in the head's Remove takes, with Remove in the bar (R196) (${seen.head.slice(-70)})`);
-}
+});
 
 // ---- install two on the controller's store, watch them land ----------------
 // More than two land: android:emulator is installed BY sdkmanager, which
@@ -331,7 +331,7 @@ ok(stored.local && typeof stored.local.key === 'string' && stored.local.key,
 ok(stored.catalog && stored.local.key.startsWith(stored.catalog),
    `...and the catalog's digest is in that key, so editing a recipe drops it (${
       stored.catalog})`);
-{
+await section("The module's own view of it, which is where the decision is made", async () => {
   // The module's own view of it, which is where the decision is made: an
   // answer stored against a different catalog is not an answer any more, and
   // zeroing the date is what sends the weekly loop looking again.
@@ -354,7 +354,7 @@ print(json.dumps({"at": m._tc_checked, "local": bool(m._tc_local.get("versions")
     + 'm._tc_checked = v[1]'));
   ok(moved.at === 0,
      '...and an edited catalog resets it, because the answers describe recipes');
-}
+});
 // Update runs like an install: a job, on what is already installed.
 await tcInstall(['flutter']);
 tc = await waitLocal(t => t.job?.action === 'install' && !t.job.running && (t.job.done || []).includes('flutter'));
@@ -362,11 +362,11 @@ ok((tc.job.done || []).includes('flutter') && !(tc.job.failed || []).length,
    'Install on a toolchain that is already installed updates it');
 // The catalog says which recipes update in place (bug #43), not a list in
 // the server: a tarball recipe is removed and installed again instead.
-{
+await section("The catalog says which recipes update in place", async () => {
   const seen = tc.items.filter(i => i.updatable).map(i => i.name).sort();
   ok(seen.includes('flutter') && seen.includes('playwright') && !seen.includes('go') && !seen.includes('jdk'),
      `the catalog says which recipes update in place (${seen.join(', ')})`);
-}
+});
 
 // ---- a long job, through the real path ---------------------------------
 // The stub's `go` install draws a carriage-return progress bar over several
@@ -434,7 +434,7 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
 // A toolchain that needs another says so, and so does the one that is
 // needed: the Library's card says what comes with it, the Installed page's
 // row what needs it.
-{
+await section("what needs what", async () => {
   const ndk = item(tc, 'android:ndk'), jdk = item(tc, 'jdk');
   ok(ndk?.needs?.includes('android-tools') && jdk?.needed_by?.includes('android-tools'),
      `the store says what each toolchain needs and what needs it (${ndk?.needs} | ${jdk?.needed_by})`);
@@ -445,14 +445,14 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
   ok(/Needs android-tools, installed with it/.test(said.lib),
      `a toolchain's card says what it needs, installed with it (${ndk?.label})`);
   ok(/Needed by android-tools/.test(said.inst), `...and the one it needs says on its Installed row what needs it (${jdk?.label})`);
-}
+});
 
 // ---- Remove on the Installed page --------------------------------------------
 // The sandbox's store is what its census says it holds; a toolchain there is
 // an Installed row with Remove, which asks first by the name its row shows
 // (B65), runs the job on the node, and says under the row what the job said
 // failed (the stub fails every toolchain job).
-{
+await section("Remove on the Installed page", async () => {
   const { writeFileSync, rmSync } = await import('node:fs');
   writeFileSync(`${DIR}/sandboxdata/census-extra.json`, JSON.stringify({ store_dirs: { top: ['flutter'], android: [] } }));
   const held = await untilTrue(async () => !!item(await api(`/api/toolchains?node=${sb.id}`), 'flutter')?.installed, 30000, 500);
@@ -472,7 +472,7 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
   ok(ran && /remove failed on the node/.test(why),
      `...runs the remove job on the node, and says under the row what failed (${why || 'nothing said'})`);
   rmSync(`${DIR}/sandboxdata/census-extra.json`, { force: true });
-}
+});
 
 // ---- the two meanings of SDK_ROOT (B89) ----------------------------------
 // On the controller SDK_ROOT is the STORE and bb appends this machine's
@@ -483,7 +483,7 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
 // does not exist) and every toolchain on that node read as not installed
 // while it sat there. Shell-level, because that is where the answer is
 // decided and where both machines ask for it.
-{
+await section("the two meanings of SDK_ROOT", async () => {
   const { execFileSync } = await import('node:child_process');
   const { mkdtempSync, mkdirSync } = await import('node:fs');
   const { tmpdir } = await import('node:os');
@@ -570,14 +570,14 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
      `...and whether a container there can be given the card, by the container toolkit's own tool (${nokit.slice(0, 20)} | ${haskit.slice(0, 14)})`);
   wf(`${devd}/vendor`, '0x1234\n');
   ok(nv('', '', '') === '' && kit() === '', '...and nothing at all on a machine with no NVIDIA card');
-}
+});
 
 // ---- the versions a project pins are cards on its node's Library (B712) ------
 // A store remade at the newest versions only stranded a project pinning
 // NDK 29 and build-tools 36: nothing to install. The pins are read off the
 // project's Gradle files, each a row named for the project, the store's own
 // listing saying whether it is held.
-{
+await section("the versions a project pins are cards on its node's Library", async () => {
   const { writeFileSync, mkdirSync, rmSync } = await import('node:fs');
   await api('/api/prefs', { project: 'alpha', node: sb.id });
   mkdirSync(`${DIR}/ws/alpha/app`, { recursive: true });
@@ -622,7 +622,7 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
   rmSync(`${DIR}/ws/alpha/app`, { recursive: true, force: true });
   rmSync(`${DIR}/sandboxdata/census-extra.json`, { force: true });
   await api('/api/prefs', { project: 'alpha', node: '' });
-}
+});
 
 // ---- tool packs (R77) ------------------------------------------------------
 // An administrator looks at a pack by its repository, reads what it would
@@ -630,7 +630,7 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
 // cards as sideloaded, and removes it. The repository is on disk, which the
 // harness lets the server fetch (BB_TOOLPACKS_FILE_URLS). The dialog opens
 // from the Library's Add your own and from a pack card's Edit.
-{
+await section("tool packs (R77)", async () => {
   const { execFileSync } = await import('node:child_process');
   const { mkdirSync, writeFileSync } = await import('node:fs');
   const repo = `${DIR}/packrepo`;
@@ -956,7 +956,7 @@ ok(await post({ action: 'sudo', names: ['flutter'] }) === 400, 'an unknown actio
     await page.waitForFunction(x => !(toolchains?.items || []).some(i => i.name === x), n, { timeout: 20000 });
   }
   ok(true, 'a pack made here is removed from its card\'s Edit like any other');
-}
+});
 
 // 400s and 409s are asked for on purpose above; the browser logs a failed
 // fetch either way.

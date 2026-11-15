@@ -20,7 +20,7 @@
 // (lib.mjs's quiet, a pause that is a check of absence, is quietFor here:
 // the idle block has a page of its own named quiet.)
 import { URL, DIR, launch, newPage, ok, done, ready, sleep, settled, animatedDuring, faded,
-         quiet as quietFor } from './lib.mjs';
+         quiet as quietFor, section } from './lib.mjs';
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
@@ -1059,7 +1059,7 @@ if (runs('a')) {
 // `.empty` when there is nothing, inside the list. Read off the SOURCE, since
 // an empty state is only on screen when the data happens to be empty, and the
 // fixtures are not. Five classes were doing these two jobs (R70 step 3).
-{
+await section("one loading line and one empty state", async () => {
   const { readdirSync, readFileSync } = await import('node:fs');
   // Not `new URL`: URL in this file is the dashboard's address, from lib.mjs.
   const here = (await import('node:path')).resolve(import.meta.dirname, '..') + '/';
@@ -1075,7 +1075,7 @@ if (runs('a')) {
   }
   ok(off.length === 0, `a loading line is .loading and an empty state is .empty, in every script${
     off.length ? ': ' + off.join('; ') : ''}`);
-}
+});
 }
 
 if (runs('a')) {
@@ -1084,7 +1084,7 @@ if (runs('a')) {
 // is the default scheme leaking into the other eleven (a danger edge typed
 // six times, text on a filled accent in the default's --bg), and a radius
 // typed as a number is one a scheme cannot square. Read off the stylesheet.
-{
+await section("colors and corners are tokens", async () => {
   const { readFileSync } = await import('node:fs');
   const path = await import('node:path');
   const html = readFileSync(path.resolve(import.meta.dirname, '..', 'index.html'), 'utf8');
@@ -1102,7 +1102,7 @@ if (runs('a')) {
     if (/border-radius:(8|6|4|10)px/.test(t)) off.push(`${i + 1}: ${t.trim().slice(0, 60)}`);
   });
   ok(off.length === 0, `no hex color and no numbered corner outside the scheme blocks (${off.length ? off.slice(0, 4).join('; ') : 'none'})`);
-}
+});
 }
 
 if (runs('a')) {
@@ -1219,7 +1219,7 @@ if (runs('a')) {
 // to a section is the first band inside it, above the list. Never at the
 // foot, where a phone scrolled past every row to find it. Measured on each
 // view that has one, against its head row and the first row of its list.
-{
+await section("adding goes at the top", async () => {
   await bring('notebook');
   const misplaced = [];
   for (const v of ['roadmap', 'bugs', 'briefing', 'signing', 'wiki']){
@@ -1281,7 +1281,7 @@ if (runs('a')) {
   // fixture's alpha, with no commits, cannot (version.mjs holds that one).
   ok(foots.roadmap && foots.briefing && foots.design && foots.signing && !foots.bugs && !foots.analysis && !foots.tests && !foots.git,
      `a section's own Save and Revert are on the views that stage and on no other (the operator, 5 Oct: there is no foot) (${JSON.stringify(foots)})`);
-}
+});
 }
 
 if (runs('b')) {
@@ -1291,7 +1291,7 @@ if (runs('b')) {
 // one height whichever tab is open. Measured rather than read from the
 // markup, because the Briefing tab once put a section above its head and
 // every other rule here still passed.
-{
+await section("the notebook's head row", async () => {
   await bring('notebook');
   await page.waitForSelector('.nb .nbview:not([hidden]) .field', { timeout: 20000 });
   const views = await page.$$eval('.nb .nbview', vs => vs.map(v => v.dataset.view));
@@ -1397,10 +1397,10 @@ if (runs('b')) {
   ok(glance.length === 0,
      `...and under it the glance: tiles in the tiles' shape, then a status line, then one band of chips, and no loose Save row (R109)${
        glance.length ? `; not: ${glance.join('; ')}` : ''}`);
-}
+});
 ok(seenSects.size <= 1,
    `a section heading wears one skin everywhere (${JSON.stringify([...seenSects])})`);
-{
+await section("B495: a password manager offers itself only where a password or an", async () => {
   // B495: a password manager offers itself only where a password or an
   // account is asked for; every other field on the page says so, drawn
   // late or not.
@@ -1427,8 +1427,8 @@ ok(seenSects.size <= 1,
       || said.some(v => /ssh(rsa|ed25519|dss)|ecdsasha2/.test(v));
   }).map(e => e.id || e.className));
   ok(sshy.length === 0, `...and no text box reads to Bitwarden as an SSH public key (${JSON.stringify(sshy)})`);
-}
-{
+});
+await section("The header's buttons are one box", async () => {
   // The header's buttons are one box (the operator, 5 Oct): the bell stood
   // taller and wider than the bug, gear and sign-out beside it on a desk.
   const hb = await page.$$eval('header > button', bs => bs.filter(b => b.offsetParent).map(b => {
@@ -1453,8 +1453,8 @@ ok(seenSects.size <= 1,
   await page.setViewportSize({ width: 1280, height: 900 });
   await atWidth(page, 1280);
   ok(!desk.length && !phone.length, `...and each icon sits in the middle of its button, at a desk and on a phone (${JSON.stringify({ desk, phone })})`);
-}
-{
+});
+await section("The frame's lines of controls are one height each, as a page's are", async () => {
   // The frame's lines of controls are one height each, as a page's are
   // (B142): the header's search stood 32px beside 38px buttons, and the
   // dock's + and its pull 30px beside 34px tabs, at every width.
@@ -1475,14 +1475,14 @@ ok(seenSects.size <= 1,
   await atWidth(page, 1280);
   ok(!desk.length && !phone.length,
      `the header's and the dock's controls are one height each, at a desk and on a phone (${JSON.stringify({ desk, phone })})`);
-}
+});
 ok(seenReds.size <= 1,
    `a verb that cannot be undone is the same color everywhere (${JSON.stringify([...seenReds])})`);
 
 // The fence inside the one page: a renderer that throws must break its own
 // tab and nothing else: before renderGuarded, one bug in one kind's render
 // took drawPanes down, and with it the poll, the strip and every terminal.
-{
+await section("The fence inside the one page", async () => {
   // Opened here, not only found: part b runs without part a's walk, which
   // is what opened it in the whole file (R130).
   await bring('findings');
@@ -1521,7 +1521,7 @@ ok(seenReds.size <= 1,
   // Not waited for: the Docker tab is in front now, so the Analysis tab does
   // not draw until the loop below brings it, and a wait for its rows sat out
   // its whole timeout.
-}
+});
 
 // A stacked box may not be aligned across its own axis, on every tab, at
 // DESKTOP width, which is where it shows.
@@ -1586,7 +1586,7 @@ if (runs('b')) {
 // Read off the rendered pixels through a canvas rather than computed from the
 // tokens: --accent-deep is a relative color now, and the point is what the
 // engine actually paints.
-{
+await section("what reads on a filled accent surface, on every scheme", async () => {
   const SCHEMES = ['default', 'nostromo', 'slate', 'carbon', 'nocturne', 'moss',
                    'ember', 'abyss', 'plum', 'rust', 'ice', 'sepia'];
   const AA = 4.5;
@@ -1641,7 +1641,7 @@ if (runs('b')) {
   ok(bad.length === 0,
      `the active tab's words read on its ground in all ${SCHEMES.length} schemes, dark and light${
        bad.length ? `; under ${AA}:1: ${bad.join(', ')}` : ''}`);
-}
+});
 }
 
 if (runs('b')) {
@@ -1656,7 +1656,7 @@ if (runs('b')) {
 // frame has to be the ground the settled tab stands on (its commonest
 // color) with no black in it. Every kind in one scheme, the notebook in
 // every scheme, the schemes read off the page's own list.
-{
+await section("a document arrives on its own ground, on every scheme", async () => {
   const frame = async () => {
     const box = await page.$eval('.pane .doc.on', e => {
       const r = e.closest('.stack').getBoundingClientRect();
@@ -1847,13 +1847,13 @@ if (runs('b')) {
   ok(schemes.length > 1 && bad.length === 0,
      `a notebook brought to the front opens on its scheme's ground in all ${schemes.length} schemes, never black${
        bad.length ? `: ${bad.join('; ')}` : ''}`);
-}
+});
 
 // Every page's bar is one control high, whatever it holds, and a picker's
 // word sits on its line, to its left (the operator, 19 Oct: a picker's word
 // above it, a count alone and a count beside a button each made a bar of
 // its own height, and the content under each started somewhere else).
-{
+await section("Every page's bar is one control high, whatever it holds, and a picker's", async () => {
   const bars = {};
   for (const kind of kinds){
     if (!DRIVERS[kind]) continue;
@@ -1873,7 +1873,7 @@ if (runs('b')) {
   ok(hs.length === 1, `every page's bar is one height, whatever it holds (${JSON.stringify(Object.fromEntries(Object.entries(bars).map(([k, b]) => [k, b.h])))})`);
   const above = Object.entries(bars).filter(([, b]) => !b.inline).map(([k]) => k);
   ok(above.length === 0, `...and a picker's word sits on its line, to its left${above.length ? `; above it: ${above.join(', ')}` : ''}`);
-}
+});
 
 // The same page, held to the same rules at phone width: nothing may scroll
 // the page sideways, and every text control is 16px so iOS does not zoom a
@@ -1881,7 +1881,7 @@ if (runs('b')) {
 // A modal leaves the way it arrived. The arrival is the stylesheet's; the
 // leaving is one observer on the hidden attribute, so this is what proves
 // every dialog on the page, including one added later, goes out with it.
-{
+await section("The same page, held to the same rules at phone width", async () => {
   await page.click('#bAbout');
   await page.waitForSelector('#aboutModal:not([hidden])');
   const left = await animatedDuring(page, async () => {
@@ -1890,11 +1890,11 @@ if (runs('b')) {
   });
   ok(left.some(k => /aboutModal/.test(k)),
      `a modal leaves with a tween rather than vanishing (${left.join(', ') || 'nothing animated'})`);
-}
+});
 await page.setViewportSize({ width: 393, height: 851 });
 // A card turns over to its controls on a tween (R138): Edit, and the back
 // is on the screen whole, at a phone's width as at a desk's.
-{
+await section("A card turns over to its controls on a tween", async () => {
   // The page on show's: the first card anywhere could be a page out of
   // sight's, never visible, and the wait ran out on it in a whole run.
   await page.evaluate(() => openProjectsTab());
@@ -1913,7 +1913,7 @@ await page.setViewportSize({ width: 393, height: 851 });
   ok(back.flipped && back.on && mid !== back.settled && /^(none|matrix\(1, 0, 0, 1, 0, 0\))$/.test(back.settled),
      `a card turns over on a tween on a phone, its back whole on the screen (${JSON.stringify({ mid, ...back })})`);
   await page.click(`${at} .pcback [data-pedit]`);
-}
+});
 // The card is on its front again, its turn back over.
 await page.waitForFunction(() => !document.querySelector('.doc.on .pgrid .pcard.flipped'), null, { timeout: 10000 }).catch(() => {});
 await motionOver();
@@ -2003,7 +2003,7 @@ await page.setViewportSize({ width: 393, height: 851 });
 // Each of these was in the order somebody wrote it in. The exceptions are
 // named rather than discovered: Default leads the schemes, and the catch-all
 // trails the git hosts.
-{
+await section("a list of choices is alphabetical", async () => {
   const lists = await page.evaluate(async () => {
     const out = {};
     out.themes = THEMES.map(t => t[1]);
@@ -2033,14 +2033,14 @@ await page.setViewportSize({ width: 393, height: 851 });
   if (lists.hypervisors.length)
     ok(sorted(lists.hypervisors),
        `the hypervisors are alphabetical (${lists.hypervisors.join(', ')})`);
-}
+});
 
 // The Tests view needs rows to be measured on, and one of them a continuation
 // (a "..." name whose "follows:" line is drawn under it), because that line
 // is exactly what scrolled the tab sideways once (a 100% flex basis plus a
 // margin, unable to shrink). A registry the fixture does not carry, so a
 // two-line run is ingested here; the file reset takes it away again.
-{
+await section("The Tests view needs rows to be measured on, and one of them a continuation", async () => {
   const { writeFileSync } = await import('node:fs');
   const { execFileSync } = await import('node:child_process');
   const { fileURLToPath } = await import('node:url');
@@ -2053,7 +2053,7 @@ await page.setViewportSize({ width: 393, height: 851 });
   execFileSync(join(HERE, '..', '..', 'aerie'), ['tests', 'ingest', '.bb-test-run.log'],
     { cwd: `${DIR}/ws/alpha`, env: { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '',
       DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws`, BB_PROJECT: 'alpha' } });
-}
+});
 // Measured on the document AND on the document box, because the box scrolls
 // on its own: the page reported no overflow while the Tests tab scrolled
 // sideways inside its pane. The widest offender is named, so the failure
@@ -2232,7 +2232,7 @@ if (runs('c')) {
 // still names the old one, so every name the document uses is checked to be
 // real on the page, and every helper the framework exposes is checked to be
 // in the document: a rename without a rewrite fails here by name.
-{
+await section("the document and the framework are one thing", async () => {
   const { readFileSync } = await import('node:fs');
   const { fileURLToPath } = await import('node:url');
   const { dirname, join } = await import('node:path');
@@ -2251,7 +2251,7 @@ if (runs('c')) {
   const undocumented = classes.filter(c => !new RegExp(`\\b${c}\\b`).test(doc));
   ok(undocumented.length === 0,
      `...and names the classes the page is measured on${undocumented.length ? `; not: ${undocumented.join(', ')}` : ''}`);
-}
+});
 }
 
 if (runs('c')) {
@@ -2263,7 +2263,7 @@ if (runs('c')) {
 // opening a tab asks each endpoint at most once, whichever kind it is. The
 // polls, the layout save an open makes, and the node list a picker fills
 // are the allowed noise.
-{
+await section("a quiet page is quiet, and a tab opens once", async () => {
   const POLLS = new Set(['/api/status', '/api/revs', '/api/presence', '/api/layout', '/api/v1/nodes', '/api/live']);
   await page.evaluate(() => { for (const t of [...tabs]) if (t.kind !== 'term') dropTab(t.id); });
   // With every page put away the page lands on Home, the landing page, whose
@@ -2351,7 +2351,7 @@ if (runs('c')) {
     await page.evaluate(k => { for (const t of [...tabs]) if (t.kind === k) dropTab(t.id); }, kind);
   }
   await page.evaluate(() => { for (const t of [...tabs]) if (t.kind !== 'term') dropTab(t.id); });
-}
+});
 }
 
 if (runs('c')) {
@@ -2364,7 +2364,7 @@ if (runs('c')) {
 // (the Docker manager redraws as its rows land) replaces the element
 // between the find and the close, and a close on a detached fold records
 // nothing, which read as the rule failing when only the sample had moved.
-{
+await section("a fold lasts for the page, and a reload starts it from the default", async () => {
   const kind = 'nodes', key = 'nodes:health';
   const sel = `.doc.on details.sect[data-sect="${key}"]`;
   // Opened if it is not there: the request-count block above closes every
@@ -2392,19 +2392,19 @@ if (runs('c')) {
   await focus();
   ok(await page.$eval(sel, d => d.open),
      `[${kind}] ...and a reload starts it from its default, open on a desktop`);
-}
+});
 }
 
 if (runs('c')) {
 // ---- hidden means hidden (design language, Sections and action bars) -----
 // Every element carrying the attribute is out of the layout, whatever class
 // it wears. A class with a display once beat it: a fold that never closed.
-{
+await section("hidden means hidden", async () => {
   const shown = await page.evaluate(() => [...document.querySelectorAll('[hidden]')]
     .filter(e => getComputedStyle(e).display !== 'none')
     .map(e => e.id || e.className || e.tagName).slice(0, 5));
   ok(shown.length === 0, `nothing carrying hidden is displayed${shown.length ? ': ' + shown.join(', ') : ''}`);
-}
+});
 }
 
 if (runs('c')) {
@@ -2542,7 +2542,7 @@ for (const [name, open] of Object.entries(DIALOGS)) {
 }
 // ...and again on a small phone, where the room runs out first: every dialog
 // still scrolls in one place.
-{
+await section("and again on a small phone, where the room runs out first", async () => {
   const phone = await newPage(browser, { viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true });
   await phone.goto(URL); await ready(phone);
   const twice = [];
@@ -2558,20 +2558,20 @@ for (const [name, open] of Object.entries(DIALOGS)) {
   }
   ok(twice.length === 0, `on a 360px phone every dialog scrolls in one place${twice.length ? ': ' + twice.join(' | ') : ''}`);
   await phone.close();
-}
-{
+});
+await section("every dialog in the page is measured", async () => {
   const all = await page.evaluate(() => [...document.querySelectorAll('.modal[id]')].map(m => m.id));
   const undriven = all.filter(x => !opened.has(x));
   ok(undriven.length === 0, `every dialog in the page is measured${undriven.length
     ? `: no driver opens ${undriven.join(', ')} (add one to DIALOGS in uniform.mjs)` : ''}`);
-}
+});
 }
 
 if (runs('c')) {
 // ---- a finger, not a pointer (design language, Both sizes) ---------------
 // On a touch phone the controls a thumb meets are a thumb's size, and a bar
 // that spans the screen fits it even on a fold's 344px cover.
-{
+await section("a finger, not a pointer", async () => {
   const phone = await newPage(browser, { viewport: { width: 375, height: 667 }, isMobile: true, hasTouch: true });
   await phone.goto(URL); await ready(phone);
   await phone.evaluate(() => { openNotebook('alpha', 'roadmap'); });
@@ -2601,7 +2601,7 @@ if (runs('c')) {
     over: [...document.querySelectorAll('header > *')].filter(e => e.offsetWidth > 0 && e.getBoundingClientRect().right > innerWidth + 0.5).map(e => e.id || e.className) }));
   ok(top.jump >= 80 && top.over.length === 0, `...and the top bar's search is at least 80px wide at 344, the header inside the screen (${JSON.stringify(top)})`);
   await phone.context().close();
-}
+});
 }
 
 ok(page.errors.length === 0,

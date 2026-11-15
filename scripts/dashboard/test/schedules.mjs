@@ -3,7 +3,7 @@
 // words, Run now runs it once as a job whose log is on the Jobs page, and
 // Turn off and Remove do what they say. A session's token and an account
 // without the Schedules area are refused, whatever they ask.
-import { launch, newPage, ok, done, ready, sleep, URL, DIR, member, OWNER as H, asUser, asSession } from './lib.mjs';
+import { launch, newPage, ok, done, ready, sleep, URL, DIR, member, OWNER as H, asUser, asSession, section } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 
 const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
@@ -119,7 +119,7 @@ ok(!!gone && (await api('/api/schedules', { action: 'remove', id: 'scan' })).sta
 
 // A session's token is refused, reading or writing; so is an account
 // without the Schedules area.
-{
+await section("A session's token is refused, reading or writing", async () => {
   const tok = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', 'test'],
     { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
   const SH = asSession(tok);
@@ -139,6 +139,6 @@ ok(!!gone && (await api('/api/schedules', { action: 'remove', id: 'scan' })).sta
   const UH = asUser('w.sched', 'w.sched-pass-1');
   const plain = await api('/api/schedules', undefined, UH);
   ok(plain.status === 403, `an account without the Schedules area is refused (${plain.status} ${plain.body.error || ''})`);
-}
+});
 
 await done(browser);

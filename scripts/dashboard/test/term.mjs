@@ -6,7 +6,7 @@
 // session; a tab popped out opens the same terminal on a page of its own
 // (terminal.html); a closed tab's socket goes with it. Driven through the
 // page, as a person at the dock would.
-import { launch, newPage, ok, done, ready, finger, until, quiet, URL, DIR, member, projectKey, OWNER } from './lib.mjs';
+import { launch, newPage, ok, done, ready, finger, until, quiet, URL, DIR, member, projectKey, OWNER, section } from './lib.mjs';
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
@@ -75,7 +75,7 @@ ok(await waitFor(/kb-42/) && !keysAsked.length, `the keys bar's Enter goes down 
 // The look is the person's (step 10): their Profile's size, cursor and
 // colors reach the open terminal; a project's colors in their own settings
 // for it win there.
-{
+await section("The look is the person's", async () => {
   const opts = () => page.evaluate(() => { const r = [...TERMS.values()].find(r => r.t.arg === 'sh:7:alpha' && r.term);
     return { size: r.term.options.fontSize, cursor: r.term.options.cursorStyle, bg: r.term.options.theme.background }; });
   const own = async prefs => page.evaluate(async prefs => {
@@ -102,12 +102,12 @@ ok(await waitFor(/kb-42/) && !keysAsked.length, `the keys bar's Enter goes down 
      `a terminal takes its person's look from Profile, whatever a space once said (${JSON.stringify(mine)} then ${JSON.stringify(there)}; ${said})`);
   await page.evaluate(async () => fetch('/api/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ project: 'alpha', term_scheme: '' }) }));
-}
+});
 
 // On a phone (step 11): a finger dragged down scrolls back through a
 // shell's history, by the line, in tmux's copy mode; a press held on a word
 // selects it, with grips and Copy; Copy puts it on the clipboard.
-{
+await section("On a phone (step 11)", async () => {
   const phone = await newPage(browser, { viewport: { width: 393, height: 800 }, hasTouch: true, isMobile: true });
   await phone.goto(URL);
   await ready(phone);
@@ -175,11 +175,11 @@ ok(await waitFor(/kb-42/) && !keysAsked.length, `the keys bar's Enter goes down 
   ok(clip === 'pick-me-word' && gone, `Copy puts the word on the clipboard and puts the selection away (${clip})`);
   await phone.evaluate(() => dropTab(tabs.find(t => t.arg === 'sh:9:alpha').id));
   await phone.close();
-}
+});
 
 // Popped out (R8): the same terminal on a page of its own, terminal.html on
 // /termws, the tmux session the tab had; Reattach brings it back.
-{
+await section("Popped out (R8)", async () => {
   const [win] = await Promise.all([page.waitForEvent('popup'), page.evaluate(id => popOut(id), id)]);
   await win.waitForSelector('.xterm', { timeout: 20000 });
   // Its socket open and the session's screen drawn: a key typed before
@@ -196,7 +196,7 @@ ok(await waitFor(/kb-42/) && !keysAsked.length, `the keys bar's Enter goes down 
   await page.evaluate(id => reattachTab(id), id);
   await page.waitForSelector('#pane1 .slot.on.ownterm .xterm', { timeout: 20000 });
   ok(win.isClosed() || await win.evaluate(() => true).catch(() => true), '...and Reattach brings it back into the dock');
-}
+});
 
 // The socket and the shell are one: closing the tab closes the socket.
 const before = await page.evaluate(() => [...TERMS.values()].filter(r => r.t.arg === 'sh:7:alpha').length);
@@ -206,7 +206,7 @@ const after = await page.evaluate(() => [...TERMS.values()].filter(r => r.t.arg 
 ok(before === 1 && after.length === 0, `closing the tab closes its terminal (${before}: ${JSON.stringify(after)})`);
 
 // A log in the dock (R133 step 12): the page's own terminal, read-only, following the controller's log as it is written.
-{
+await section("A log in the dock", async () => {
   mkdirSync(`${DIR}/state/logs`, { recursive: true });
   appendFileSync(`${DIR}/state/logs/builderbot.log`, 'log-follow-first\n');
   await page.evaluate(() => openLogTab('log:controller', 'Log: the controller'));
@@ -250,12 +250,12 @@ ok(before === 1 && after.length === 0, `closing the tab closes its terminal (${b
   ok(/no such container/.test(await page.evaluate(() => [...TERMS.values()].find(r => r.t.arg === 'log:dm::bad name')?.ended || '')),
      '...and a name that is no container is refused, saying so');
   await page.evaluate(() => dropTab(tabs.find(t => t.arg === 'log:dm::bad name').id));
-}
+});
 
 // A grant taken away ends the terminal it opened (R133 step 9): an account
 // on alpha opens a shell there, is taken off alpha, and within the server's
 // re-check (every few seconds) its socket closes, saying why.
-{
+await section("A grant taken away ends the terminal it opened", async () => {
   const h = OWNER;
   const base = URL.replace(/\/$/, '');
   await fetch(`${base}/api/users`, { method: 'POST', headers: h,
@@ -313,7 +313,7 @@ ok(before === 1 && after.length === 0, `closing the tab closes its terminal (${b
   await ctx.close();
   ok(opened === 'open' && closed && closed.reason,
      `a terminal whose grant is taken away while it is open is ended, saying why (${opened}; ${JSON.stringify(closed)})`);
-}
+});
 
 // A terminal closed while a frame of its own is still pending (B802): xterm
 // runs the frame after dispose() and reads a renderer that is gone, which
@@ -321,7 +321,7 @@ ok(before === 1 && after.length === 0, `closing the tab closes its terminal (${b
 // was a little slow and it was closed at once. Terminals made as termMount
 // makes them and dropped by termDrop at a few delays; disposed at once, 18
 // of 60 threw.
-{
+await section("A terminal closed while a frame of its own is still pending", async () => {
   const before = page.errors.length;
   await page.evaluate(async () => {
     await xtermReady();
@@ -350,6 +350,6 @@ ok(before === 1 && after.length === 0, `closing the tab closes its terminal (${b
   const thrown = [...new Set(page.errors.slice(before))];
   ok(thrown.length === 0 && await page.evaluate(() => ![...TERMS.keys()].some(k => k.startsWith('b802-'))),
      `a terminal closed with a frame of its own still pending throws nothing${thrown.length ? ': ' + thrown.join(' | ').slice(0, 200) : ''}`);
-}
+});
 
 await done(browser);

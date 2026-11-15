@@ -3,7 +3,7 @@
 // detail and diff, and the branches with whose worktree sits on which.
 // Real git on the fixture repos, read by the checkout's server; nothing
 // here writes through the dashboard, because this step has no actions.
-import { launch, newPage, ok, done, ready, refreshUntil, until, quiet as quietFor, tmuxNew, tmuxKill, tmuxCapture, URL, DIR, openFold, member, OWNER, asUser, asSession, mint } from './lib.mjs';
+import { launch, newPage, ok, done, ready, refreshUntil, until, quiet as quietFor, tmuxNew, tmuxKill, tmuxCapture, URL, DIR, openFold, member, OWNER, asUser, asSession, mint, section } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync, mkdirSync, existsSync, rmSync, readFileSync } from 'node:fs';
 
@@ -31,14 +31,14 @@ git('branch', 'claude/no-such-account');
 // root commit made with plumbing: --date-order never lists a child before
 // its parent, so an old commit on top of today's would still sort first,
 // and a checkout would fight the uncommitted a.txt above.
-{
+await section("and a branch whose last commit is three days old, because every row of", async () => {
   const three = `${Math.floor(Date.now() / 1000) - 3 * 86400} +0000`;
   const blob = execFileSync('git', ['-C', B, 'hash-object', '-w', '--stdin'], { input: 'old\n', encoding: 'utf8' }).trim();
   const tree = execFileSync('git', ['-C', B, 'mktree'], { input: `100644 blob ${blob}\told.txt\n`, encoding: 'utf8' }).trim();
   const old = execFileSync('git', ['-C', B, 'commit-tree', tree, '-m', 'Old work'], { encoding: 'utf8',
     env: { ...process.env, GIT_AUTHOR_DATE: three, GIT_COMMITTER_DATE: three } }).trim();
   git('branch', 'old-work', old);
-}
+});
 writeFileSync(`${B}/a.txt`, 'one\ntwo\nthree\n');
 writeFileSync(`${B}/new.txt`, 'brand new\n');
 
@@ -123,7 +123,7 @@ ok(await page.$eval(`${NB} .gfile[data-path="a.txt"] pre.diff`, e => /three/.tes
 // hundred reads in a few minutes on the controller). The view redraws when
 // a commit lands: one of another file asks nothing of this one; one after
 // this file changed asks once.
-{
+await section("An open diff is read once, not on every redraw of the view", async () => {
   const g = (...a) => execFileSync('git', ['-C', B, '-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', ...a]);
   const landed = subject => page.waitForFunction(([sel, s]) => (document.querySelector(sel)?.textContent || '').includes(s),
     [NB, subject], { timeout: 30000 });
@@ -147,7 +147,7 @@ ok(await page.$eval(`${NB} .gfile[data-path="a.txt"] pre.diff`, e => /three/.tes
   g('reset', '-q', '--soft', 'HEAD~2'); g('reset', '-q', '--', 'other.txt', 'other2.txt');
   rmSync(`${B}/other.txt`); rmSync(`${B}/other2.txt`);
   writeFileSync(`${B}/a.txt`, 'one\ntwo\nthree\n');
-}
+});
 // One section open at a time (the operator, 5 Oct): History is opened.
 await openFold(page, `${NB} [data-sect="git:history"]`);
 const graph = await page.$eval(`${NB} .gitgraph`, g => ({
@@ -209,7 +209,7 @@ ok(true, 'a commit made outside the dashboard arrives on the view by itself');
 // the acting account's author; the network ones against a bare repository
 // standing in for GitHub, with push rights granted the way the clone dialog
 // grants them. An account's, never a session's, and not on a locked project.
-{
+await section("the actions (step 2)", async () => {
   const H = OWNER;
   const act = async (action, args, headers = H) => {
     const r = await fetch(URL.replace(/\/$/, '') + '/api/git', { method: 'POST', headers,
@@ -804,14 +804,14 @@ print(json.dumps(g._done(said, "fetched", ${JSON.stringify(`${DIR}/ws/beta`)})))
     git('branch', '-D', 'picked-new');
     await refreshUntil(page, () => document.querySelector('.nb .nbview[data-view="git"] #gitPicker .gbpickname')?.textContent !== 'picked-new', { timeout: 15000 });
   }
-}
+});
 
 // ---- step 3: the policy, and Send to Claude --------------------------------
 // What a session may send to the remote is the project's to say, on the Git
 // view, and the controller's to enforce where the push runs: the relay. A
 // commit, a change or a branch is handed to the session as one line naming
 // it and the ask, typed into the session the way a roadmap step arrives.
-{
+await section("step 3: the policy, and Send to Claude", async () => {
   const H = OWNER;
   const post = async (path, body, headers = H) => {
     const r = await fetch(URL.replace(/\/$/, '') + path, { method: 'POST', headers, body: JSON.stringify(body) });
@@ -1212,7 +1212,7 @@ print(json.dumps(g._done(said, "fetched", ${JSON.stringify(`${DIR}/ws/beta`)})))
      `leaving Permissions hands Agents may back to the form, which Settings does not list (${JSON.stringify(home)})`);
   await page.evaluate(() => openNotebook('beta', 'git'));
   execFileSync('git', ['-C', B, 'checkout', '-q', '--', 'a.txt']);
-}
+});
 
 // ---- the strip on a phone -------------------------------------------------
 // Five groups in one row (R259, the operator 16 Oct: eleven tabs were too
@@ -1232,7 +1232,7 @@ ok(strip.groups.n === 5 && strip.groups.rows === 1 && strip.groups.inside && str
 
 // Back goes back (R256 step 3): a view switched to is a history entry, and
 // a node page's address names the node it shows.
-{
+await section("Back goes back", async () => {
   await page.setViewportSize({ width: 1280, height: 900 });
   const before = await page.evaluate(() => location.hash);
   await page.click('.pane .nb .nbgroups [data-g="plan"] >> visible=true');
@@ -1246,12 +1246,12 @@ ok(strip.groups.n === 5 && strip.groups.rows === 1 && strip.groups.inside && str
   await page.waitForFunction(() => /^#\/build\/library\/[^/]+$/.test(location.hash), null, { timeout: 15000 });
   const tc = await page.evaluate(() => ({ hash: location.hash, node: libNode }));
   ok(tc.hash.endsWith('/' + encodeURIComponent(tc.node)), `a node page's address names its node (${tc.hash})`);
-}
+});
 
 // aerie projects lists what the dashboard lists: a directory carrying .bbignore
 // (the fixture's toolchain store) is not a project, and a worktree, whose .git
 // is a file naming its repository, is one and has a branch (B122).
-{
+await section("aerie projects lists what the dashboard lists", async () => {
   git('worktree', 'add', '-q', `${DIR}/ws/beta-wt`, '-b', 'wtcheck');
   const listed = execFileSync('bash', [`${REPO}/scripts/aerie`, 'projects'],
     { encoding: 'utf8', env: { ...process.env, WORKSPACE: `${DIR}/ws`, DASHBOARD_STATE: `${DIR}/state` } });
@@ -1259,7 +1259,7 @@ ok(strip.groups.n === 5 && strip.groups.rows === 1 && strip.groups.inside && str
      `aerie spaces skips a .bbignore directory and names a worktree's branch (${listed.split('\n').filter(l => /beta-wt|toolstore/.test(l)).join(' | ') || 'neither line'})`);
   git('worktree', 'remove', '--force', `${DIR}/ws/beta-wt`);
   git('branch', '-D', 'wtcheck');
-}
+});
 
 // ---- a branch is its session's: its account's, or an administrator's ------
 // The operator's rule of 24 Sep. A branch checked out in another account's
@@ -1268,7 +1268,7 @@ ok(strip.groups.n === 5 && strip.groups.rows === 1 && strip.groups.inside && str
 // administrator may merge it, asked every time with the owner named, and
 // never while that account's Claude session there is working. Before the
 // fallback check below, so these writes are held to it too.
-{
+await section("a branch is its session's", async () => {
   const H2 = OWNER;
   const PEER = asUser('w.peer', 'w.peer-pass-1');
   const post = async (body, h = H2) => { const r = await fetch(URL.replace(/\/$/, '') + '/api/git',
@@ -1381,7 +1381,7 @@ ok(strip.groups.n === 5 && strip.groups.rows === 1 && strip.groups.inside && str
   git('branch', '-D', 'claude/w.dev');
   rmSync(`${B}/owner-note.txt`, { force: true });
   page.errors = [];                     // the 403s and the 409 above are refusals by design
-}
+});
 
 // B153's protection degrades QUIETLY by design: where the controller cannot
 // build a git dir of its own it falls back to the tree, because a Git view
@@ -1390,20 +1390,20 @@ ok(strip.groups.n === 5 && strip.groups.rows === 1 && strip.groups.inside && str
 // the tree's hooks, so a transient failure turns every guarantee above into a
 // coin toss, and the only trace is a line in the log. Read it here, which is
 // how a hook firing in the container was told from a test being wrong (R65).
-{
+await section("B153's protection degrades QUIETLY by design", async () => {
   const log = (() => { try { return readFileSync(`${DIR}/server.log`, 'utf8'); }
                        catch { return ''; } })();
   const fell = log.split('\n').filter(l => /falling back to the tree/.test(l));
   ok(fell.length === 0,
      `the controller never fell back to running git in the tree (${
        fell.length ? fell[0].slice(0, 400) : 'no fallback'})`);
-}
+});
 // ---- a project with no repository gets one from the view ----------------
 // gamma is the fixture's directory-only project. It could be adopted,
 // listed and opened, and its Git view said "nothing to show" with no way
 // on: no version, no dist/, no push, and a session told not to decide that
 // for the person. Init is that way, from the API and from the row.
-{
+await section("a project with no repository gets one from the view", async () => {
   const H2 = OWNER;
   const g = async (action) => { const r = await fetch(URL.replace(/\/$/, '') + '/api/git',
     { method: 'POST', headers: H2, body: JSON.stringify({ project: 'gamma', action, args: {} }) });
@@ -1444,12 +1444,12 @@ ok(strip.groups.n === 5 && strip.groups.rows === 1 && strip.groups.inside && str
   // design, and the browser logs every one as a failed resource. Cleared,
   // so the check below is about the page.
   page.errors = [];
-}
+});
 
 ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + page.errors.join(' | ') : ''}`);
 // B164: a repository with no main and no master. Merge into main cannot
 // mean anything there, and the refusal said "or on :" with the name empty.
-{
+await section("B164: a repository with no main and no master", async () => {
   const said = execFileSync('python3', ['-c', `
 import importlib.util, json, os, subprocess, tempfile
 spec = importlib.util.spec_from_file_location("git", "${REPO}/scripts/dashboard/git.py")
@@ -1466,13 +1466,13 @@ print(json.dumps(g.act(repo, "merge", {"name": "trunk", "into": "main"})))`], { 
   const r = JSON.parse(said.split('\n').pop());   // the module may print a line of its own first
   ok(/no main or master branch/.test(r.error || '') && !/or on :/.test(r.error || '') && !/Switch to/.test(r.error || ''),
      `with no main or master, the merge refusal says so rather than naming an empty branch (${r.error})`);
-}
+});
 
 // ---- the CI watch (R117) ------------------------------------------------------
 // What the daily look found, planted where ciwatch keeps it: a CI section on
 // the Git view saying it in rows, a bell row while main is red, and Check now
 // replacing it with a fresh look (beta has no workflows, and it says so).
-{
+await section("the CI watch", async () => {
   mkdirSync(`${DIR}/state/ciwatch`, { recursive: true });
   writeFileSync(`${DIR}/state/ciwatch/beta.json`, JSON.stringify({
     format: 3, at: Math.floor(Date.now() / 1000) - 3600, repo: 'o/beta', workflows: 1,
@@ -1568,6 +1568,6 @@ print(json.dumps(g.act(repo, "merge", {"name": "trunk", "into": "main"})))`], { 
   await page.waitForFunction(() => !(state?.ci_red || []).length, null, { timeout: 15000 });
   ok(true, '...and the bell row leaves with the red run');
   rmSync(`${DIR}/state/ciwatch/beta.json`, { force: true });
-}
+});
 
 await done(browser);

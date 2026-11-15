@@ -8,7 +8,7 @@
 // The harness's stub docker answers `compose config` and the build job, the
 // way devapp.mjs's New container tests use it, so this file proves the
 // asking, the routing, the reading and the answering.
-import { launch, newPage, ok, done, ready, URL, DIR, call as api, asUser, OWNER as owner, asSession } from './lib.mjs';
+import { launch, newPage, ok, done, ready, URL, DIR, call as api, asUser, OWNER as owner, asSession, section } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync, rmSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -80,7 +80,7 @@ ok(/container sonarr-for-alpha on sandbox/.test(bell.text) && /a sonarr to test/
 // Approve is read at a glance: its text against its own fill at the
 // contrast body text needs (WCAG's 4.5), in every theme (the operator, 5 Oct:
 // green on amber).
-{
+await section("Approve is read at a glance", async () => {
   const low = await page.evaluate(async () => {
     const lum = c => { const [r, g, b] = c.match(/[\d.]+/g).slice(0, 3).map(v => v / 255)
       .map(v => v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
@@ -103,7 +103,7 @@ ok(/container sonarr-for-alpha on sandbox/.test(bell.text) && /a sonarr to test/
     return { out, n: themes.size };
   });
   ok(low.n > 1 && low.out.length === 0, `Approve's text stands out from its fill in each of the ${low.n} themes (${low.out.join(', ') || 'all at 4.5 or more'})`);
-}
+});
 
 // ---- Allow: registered through the Docker tab's own path, then built -------
 const allowed = await api('/api/phone', { action: 'allow', id: asked.body.id });
@@ -117,7 +117,7 @@ ok((await api('/api/docker')).body.instances.some(i => i.project === 'sonarr-for
 // ---- a session's ask belongs to its own project -------------------------------
 // So the session that asked can see what it asked for once it exists, and
 // work on it as its project's settings allow (the operator, 24 Sep).
-{
+await section("a session's ask belongs to its own project", async () => {
   const tok = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', 'test'],
     { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
   // The dial at ask: the fixture's default is deny, and a session's is
@@ -152,7 +152,7 @@ ok((await api('/api/docker')).body.instances.some(i => i.project === 'sonarr-for
   const askedStill = await ask({ name: 'sonarr-asked', project: '' }, S);
   ok(askedStill.body.id > 0, '...and at ask it is asked');
   await api('/api/phone', { action: 'deny', id: askedStill.body.id });
-}
+});
 
 // ---- Deny: reported to the session, nothing made -------------------------------
 const again = await ask({ name: 'sonarr-denied' });
@@ -180,7 +180,7 @@ ok(dup.status === 400 && /sonarr-for-alpha already exists here/.test(dup.body.er
 // build: . and asked for it this way, and the build ran in an empty
 // directory (B329). Refused before the bell, and by create and Edit, with
 // the way a project's own code goes in.
-{
+await section("a build from nowhere is refused before anybody is asked", async () => {
   const BUILT = 'services:\n  app:\n    build: .\n    ports:\n      - "8080:80"\n';
   const r = await ask({ name: 'd2-armor-web', compose: BUILT });
   const asks = (await api('/api/phone')).body.asks || [];
@@ -207,11 +207,11 @@ ok(dup.status === 400 && /sonarr-for-alpha already exists here/.test(dup.body.er
   const kept = await api('/api/container', { action: 'read', name: 'd2-armor-abs' });
   ok(/builds app from a relative path/.test(ed.body.error || '') && /\/srv\/app/.test(kept.body.compose || ''),
      `...and Edit refuses the same change, keeping the file it had (${(ed.body.error || '').slice(0, 50)})`);
-}
+});
 // What counts as relative is compose's own answer, measured against the real
 // compose where the node has one: every way of writing a path that moves with
 // the project directory, and none of the ways that do not.
-{
+await section("What counts as relative is compose's own answer, measured against the real", async () => {
   const real = ['/usr/bin/docker', '/usr/local/bin/docker'].find(f => existsSync(f));
   if (!real) ok(true, 'skipped: no docker CLI here to ask compose what is relative');
   else {
@@ -236,12 +236,12 @@ print(json.dumps({k: containers.relative_builds(v) for k, v in cases.items()}))
     ok(JSON.stringify(rel.sort()) === JSON.stringify(['context', 'default', 'dot', 'envfile', 'up', 'var']),
        `compose's own answer: relative for . ./web .. the default context and a variable, not for an absolute path, a URL, an inline Dockerfile or an image (${JSON.stringify(said)})`);
   }
-}
+});
 
 // ---- the jump bar finds a container on any node (B26) -----------------------
 // Each named by its node, and picking one opens Containers on that node with
 // its search narrowed to it.
-{
+await section("the jump bar finds a container on any node", async () => {
   const rows = await page.evaluate(() => {
     const wasNodes = nodesList;
     nodesList = [...(nodesList || []), { id: 'n_jumpa', name: 'jumpa', kind: 'agent' }, { id: 'n_jumpb', name: 'jumpb', kind: 'agent' }];
@@ -260,7 +260,7 @@ print(json.dumps({k: containers.relative_builds(v) for k, v in cases.items()}))
   ok(at.node === sandbox.id && at.search === 'zz-picked' && at.kind === 'docker',
      `...and a pick opens Containers on its node, narrowed to it (${JSON.stringify(at)})`);
   await page.evaluate(() => { dmSearch = ''; dockerRev++; drawPanes(); });
-}
+});
 
 ok(page.errors.length === 0, 'zero console errors');
 await done(browser);

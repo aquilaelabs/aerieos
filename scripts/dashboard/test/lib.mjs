@@ -49,6 +49,22 @@ export const record = (suite, subject, said, since = 0) => {
   console.log(`RECORD  suite=${suite} subject=${subject} said=${String(said || '').replace(/\s+/g, ' ').trim().slice(0, 200)}`);
   return true;
 };
+// A part of a suite, run so that what throws inside it is one FAIL under
+// its name and the file goes on to its next part (R7 step 6). A suite is a
+// run of blocks, each about one thing; a wait that ran out or a press on
+// something that was not there threw, the file ended there with no total,
+// and everything after it in the file went unrun and unsaid: the next
+// reader fixed the first failure to find the second. What was thrown is
+// said with where in the suite it was, and counts as one failure.
+export const section = async (name, fn) => {
+  try { await fn(); }
+  catch (e) {
+    const where = /([\w.-]+\.mjs):(\d+):\d+/.exec(String(e?.stack || '').split('\n').slice(1).join('\n'));
+    console.log(`FAIL  ${name}: this part stopped${where ? ` at ${where[1]}:${where[2]}` : ''} (${
+      String(e?.message || e).split('\n')[0].slice(0, 220)})`);
+    fail++;
+  }
+};
 // The browser is optional: not every file here drives a page. version.mjs
 // exercises a module through the CLI that shares it, and still wants the
 // same pass/fail tally and exit code as the browser files.

@@ -6,7 +6,7 @@
 // browser would never send (wrong types, missing fields, absurd numbers),
 // because the checks are written against each field being the thing it is
 // supposed to be.
-import { launch, newPage, ok, done, ready, sleep, until, patience, URL, OWNER as H } from './lib.mjs';
+import { launch, newPage, ok, done, ready, sleep, until, patience, URL, OWNER as H, section } from './lib.mjs';
 
 // ---- the app's own files carry a validator --------------------------------
 // index.html IS the application, and it went out with no ETag and no cache
@@ -30,7 +30,7 @@ const get = (path, extra = {}) => new Promise((resolve, reject) => {
       text: Buffer.concat(chunks).toString('utf8') }));
   }).on('error', reject);
 });
-{
+await section("and an unchanged", async () => {
   for (const path of ['/', '/tab-nodes.js']){
     const r = await get(path);
     ok(r.status === 200 && !!r.tag && /no-cache/.test(r.cache),
@@ -38,12 +38,12 @@ const get = (path, extra = {}) => new Promise((resolve, reject) => {
     const again = await get(path, { 'If-None-Match': r.tag });
     ok(again.status === 304, `...and an unchanged ${path} comes back 304 (${again.status})`);
   }
-}
+});
 // The page names each of its scripts with that script's version, and its
 // own tag covers them: a phone left on the page across an update reloaded
 // into the old Global rules dialog, and a URL that moves with the file
 // cannot be answered from a copy made before it.
-{
+await section("The page names each of its scripts with that script's version, and its", async () => {
   const g0 = await get('/');
   // ...and names its integrity after the version (R158 step 4).
   const v = g0.text.match(/<script data-cfasync="false" src="nb-history\.js\?v=([0-9a-f]+-[0-9a-f]+)" integrity="sha384-[A-Za-z0-9+/=]+">/);
@@ -75,7 +75,7 @@ const get = (path, extra = {}) => new Promise((resolve, reject) => {
   const held = await get('/nb-history.js?v=' + (v1 ? v1[1] : ''), { 'If-None-Match': js.tag });
   ok(held.status === 304 && /immutable/.test(held.cache), `...and an unchanged one comes back 304 (${held.status})`);
   ok(!/immutable/.test(g1.cache) && /no-cache/.test(g1.cache), `the page itself is always asked about (${g1.cache})`);
-}
+});
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 800 } });
@@ -235,7 +235,7 @@ ok(await page.evaluate(() => !document.getElementById('dot').classList.contains(
 // its list beside the picked account's settings, their labels drawn and the
 // values shimmering, inert so nothing is typed into a form the real one
 // replaces.
-{
+await section("a page waits as itself", async () => {
   await page.evaluate(() => { location.hash = '#/people/users'; });
   await page.waitForFunction(() => tabOf(panes[0])?.kind === 'users' && document.querySelector('.doc.on .userstab [data-upick]'), null, { timeout: 15000 });
   await page.route('**/api/users*', () => {});
@@ -250,7 +250,7 @@ ok(await page.evaluate(() => !document.getElementById('dot').classList.contains(
   await page.evaluate(() => { usersList = null; loadUsers(); });
   await page.waitForFunction(() => !document.querySelector('.doc.on .skt') && document.querySelector('.doc.on .userstab [data-upick]'), null, { timeout: 15000 });
   ok(true, '...and the real page replaces it once they land');
-}
+});
 
 // ---- one part's draw failing must not strand the rest (bug #44) ----
 // The other shape of the same report: the container answered, one draw threw

@@ -16,7 +16,7 @@
 // sixth rode this one. Both are the same failure (a view whose clock nobody
 // chose), and neither shows up as a broken test anywhere else, because the
 // page is not wrong afterwards, only late.
-import { URL, launch, newPage, ok, done, ready, sleep, patience } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, sleep, patience, section } from './lib.mjs';
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 1000 } });
@@ -40,7 +40,7 @@ const OWN = ['boot'];
 // The request trace (R75 step 4): what the server was asked, by endpoint,
 // with query keys and never values. Read by an admin here; a session may
 // too; anybody else may not.
-{
+await section("The request trace", async () => {
   const tr = await page.evaluate(async () => (await fetch('/api/trace?since=0')).json());
   const paths = (tr.rows || []).map(r => r.path);
   ok(tr.total > 0 && paths.some(p => p.startsWith('/api/revs')) && paths.some(p => p === '/api/status'),
@@ -55,7 +55,7 @@ const OWN = ['boot'];
      && Array.isArray(tr.slow),
      `...and how long each took, worst and average, with the slowest requests named (${
         Math.max(0, ...(tr.rows || []).map(r => r.ms_max))}ms at most)`);
-}
+});
 
 const bare = { watched: await watched(), served: await served() };
 let orphan = bare.watched.filter(k => !bare.served.includes(k));

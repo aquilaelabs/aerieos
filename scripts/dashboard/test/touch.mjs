@@ -1,6 +1,6 @@
 // Real touch through Chromium's gesture recognizer: the dock's line under a
 // finger, and pull to refresh.
-import { launch, newPage, ok, done, finger, settled, URL } from './lib.mjs';
+import { launch, newPage, ok, done, finger, settled, URL, section } from './lib.mjs';
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 400, height: 700 }, hasTouch: true, isMobile: true });
@@ -79,7 +79,7 @@ ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + p
 // The page scrolls inside its panes, so a phone browser's own pull never
 // fires; the page's does: a drag down from the top re-reads the dashboard,
 // and the header has no ↻ beside it any more (the operator, 2 Oct).
-{
+await section("pull to refresh", async () => {
   ok(!(await page.$('header button[aria-label="refresh now"], #hdr button[aria-label="refresh now"]')),
      'the header carries no refresh button');
   // Counted at the pull itself: the poll calls refresh() on its own clock.
@@ -136,13 +136,13 @@ ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + p
   await finger(page, 200, ty, 200, ty + 140);
   ok(await page.evaluate(() => window.__pulls) === 0, 'a drag down that starts on a terminal scrolls the terminal, not the page');
   await page.evaluate(() => document.getElementById('pullterm')?.remove());
-}
+});
 
 // A dock tab held and dragged takes a new place on the line (the strip's
 // gesture, kept when the dock took its place: the operator, 17 Oct), and a
 // quick swipe across the line scrolls it rather than picking a tab up. Each
 // terminal's tab carries Close beside minimize.
-{
+await section("A dock tab held and dragged takes a new place on the line", async () => {
   await page.evaluate(() => { location.hash = '#/home'; dockToggle(false); });
   await page.waitForFunction(() => document.querySelectorAll('#pane1 .dtab[data-id]').length >= 2);
   // The line keeps the newest terminal in view; its first two tabs are what
@@ -190,6 +190,6 @@ ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + p
   const after2 = await order();
   ok(await first() && after2[0] === before2[1],
      `...and a terminal dragged past it lands first among the terminals, Chat still at the start (${after2.slice(0, 2)})`);
-}
+});
 
 await done(browser);

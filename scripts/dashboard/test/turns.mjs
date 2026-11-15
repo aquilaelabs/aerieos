@@ -4,7 +4,7 @@
 // Nodes tab where an administrator sets the number. The node is one this file
 // enrolls, with the session half up and a heartbeat whose panes carry the
 // spinner a working Claude pane does; the per-file world takes it away after.
-import { URL, launch, newPage, ok, done, ready, sleep, until, DIR, openSection, member, OWNER as ADMIN, asUser, asSession as bearer, usersPy } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, sleep, until, DIR, openSection, member, OWNER as ADMIN, asUser, asSession as bearer, usersPy, section } from './lib.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -27,7 +27,7 @@ if hasattr(m, "configure") and ${JSON.stringify(mod)} == "users.py":
 ${code}`], { encoding: 'utf8' }).trim().split('\n').pop();
 
 // ---- the rule on its own --------------------------------------------------
-{
+await section("the rule on its own", async () => {
   const r = JSON.parse(py('turns.py', `
 out = {}
 now = time.time()
@@ -76,7 +76,7 @@ print(json.dumps(out))`));
   ok(r.other === true, "another node's sessions do not count against this one");
   ok(JSON.stringify(r.limits) === '[0,3,5,64,null,null,null,null]',
      `a limit is a whole number from 0 to 64 (${r.limits})`);
-}
+});
 
 // ---- through the server ---------------------------------------------------
 // A node of this file's own, running sessions, bound to alpha; four people on
@@ -110,7 +110,7 @@ const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
 // A session told the controller moved (R83): the build it began on is
 // kept per session at `started`, and the first `seen` after the build has
 // changed carries one line naming both and where to read, once.
-{
+await section("A session told the controller moved", async () => {
   const sess = body => call('/api/v1/hook', { kind: 'seen', ...body }, bearer(toks[1]));
   const began = await call('/api/v1/hook', { kind: 'started', node: 'nodeA' }, bearer(toks[1]));
   const quiet = await sess({ node: 'nodeA' });
@@ -223,8 +223,8 @@ const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
   ok(!/diagnostics/.test(plain.line || ''),
      `...and a plain account's session on the same space is told nothing (${(plain.line || 'no line').slice(0, 60)})`);
   await call('/api/prefs', { project: 'alpha', diag: false });
-}
-{
+});
+await section("with no limit set, four prompts at once all go", async () => {
   const free = await Promise.all([0, 1, 2, 3].map(i => hook(i, 'turn')));
   ok(free.every(r => r.status === 200 && r.go === true), 'with no limit set, four prompts at once all go');
   await Promise.all([0, 1, 2, 3].map(i => hook(i, 'turn-done')));
@@ -293,13 +293,13 @@ const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
   ok(goes.go === true, '...and it goes once a pane is waiting at its prompt again');
   await hook(3, 'turn-done');
   await beat([]);
-}
+});
 
 // ---- a session on Claude Code's own permission prompt (B52) -----------------
 // Its pane title reads as waiting, like an idle one; the Notification hook
 // (bb-gate --asking, fed Claude Code's JSON) marks it asking, with Claude's
 // words, until its turn ends.
-{
+await section("a session on Claude Code's own permission prompt", async () => {
   const name = `${uids[0]}~claude-alpha`;
   await beat([{ name, title: '✳ Refactor the parser' }]);
   const rowOf = async () => ((await call('/api/status')).sessions || [])
@@ -315,13 +315,13 @@ const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
      && /needs your permission to use Bash/.test(asking.task || '') && after.state === 'waiting',
      `a session on its permission prompt reads as asking, with Claude's words, until its turn ends (${before.state}, ${asking.state}: ${asking.task}, ${after.state})`);
   await beat([]);
-}
+});
 
 // ---- bb-gate, the hook itself ----------------------------------------------
 // The limit at one and somebody working: the prompt waits, and is refused
 // with a sentence when its wait runs out; given a longer wait, it goes the
 // moment the other turn ends.
-{
+await section("bb-gate, the hook itself", async () => {
   await call('/api/v1/nodes', { action: 'turns', id: minted.id, limit: 1 });
   await hook(0, 'turn');
   const cache = join(DIR, 'turncache'); mkdirSync(cache, { recursive: true });
@@ -362,10 +362,10 @@ const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
   gone.stdin.end('{"prompt":"go"}');
   const g = await Promise.race([new Promise(res => gone.on('exit', res)), sleep(15000).then(() => 'hung')]);
   ok(g === 0, `a controller that does not answer never holds a prompt (${g})`);
-}
+});
 
 // ---- the Nodes tab --------------------------------------------------------
-{
+await section("the Nodes tab", async () => {
   const browser = await launch();
   const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
   await page.goto(URL); await ready(page);
@@ -396,6 +396,6 @@ const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
   ok(rec.config?.turns === 3, 'the limit is on the node\'s record');
   ok(page.errors.length === 0, `no console errors${page.errors.length ? ': ' + page.errors.slice(0, 2).join(' | ') : ''}`);
   await browser.close();
-}
+});
 
 await done();

@@ -1,6 +1,6 @@
 // Desktop mouse: tab drag reorders in place with a slide, the click ending a
 // drag does not switch tabs, a plain click does, tab enter/exit animations.
-import { launch, newPage, ok, done, ready, layoutSettled, URL, animatedDuring, settled } from './lib.mjs';
+import { launch, newPage, ok, done, ready, layoutSettled, URL, animatedDuring, settled, section } from './lib.mjs';
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 800 } });
@@ -21,7 +21,7 @@ await page.waitForFunction(id => !tabs.some(t => t.id === id), ids0[1], { timeou
 ok(await page.evaluate(() => tabOf(panes[1])?.kind === 'term'), '...and its − puts it away, the next terminal taking the dock');
 // More terminals than the line holds: the one in front is brought into view
 // on it, at either end (B740).
-{
+await section("More terminals than the line holds", async () => {
   const before = await page.evaluate(() => tabs.map(t => t.id));
   await page.evaluate(() => { for (let i = 0; i < 9; i++) newShell(''); });
   await page.waitForFunction(n => document.querySelectorAll('#pane1 .dtab[data-id]').length >= n, before.length + 7, { timeout: 15000 });
@@ -45,12 +45,12 @@ ok(await page.evaluate(() => tabOf(panes[1])?.kind === 'term'), '...and its − 
      `with more terminals than the line holds, the one in front is on it, the newest and then the first (${JSON.stringify({ last, first })})`);
   await page.evaluate(was => { tabs.filter(t => !was.includes(t.id)).forEach(t => hideTab(t.id)); }, before);
   await page.waitForFunction(n => tabs.length === n, before.length, { timeout: 10000 });
-}
+});
 await page.evaluate(() => dockToggle(true));
 await page.waitForSelector('#pane1 .slot.on.ownterm', { timeout: 10000 });
 // The dock keeps its height between a shell, whose Commands bar sits under
 // the panes, and Chat, which has none (the operator, 26 Oct).
-{
+await section("The dock keeps its height between a shell, whose Commands bar sits under", async () => {
   const look = () => page.evaluate(() => ({ h: Math.round($('pane1').getBoundingClientRect().height), kind: tabOf(panes[1])?.kind }));
   const press = re => page.evaluate(src => [...document.querySelectorAll('#pane1 .dtab > button')].find(b => new RegExp(src).test(b.textContent.trim()))?.click(), re);
   // The dock on that kind and at rest: nothing in it still moving, what it asked for answered.
@@ -66,7 +66,7 @@ await page.waitForSelector('#pane1 .slot.on.ownterm', { timeout: 10000 });
   const back = await look();
   ok(shell.kind === 'term' && chat.kind === 'chat' && back.kind === 'term' && shell.h === chat.h && back.h === shell.h,
      `the dock is one height on a shell and on Chat (${JSON.stringify({ shell, chat, back })})`);
-}
+});
 // The slot carries the terminal's own color, so there is no white between
 // a tab switch and xterm's first paint.
 ok(await page.$eval('#pane1 .slot.on.ownterm', el => {

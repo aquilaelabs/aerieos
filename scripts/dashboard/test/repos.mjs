@@ -6,7 +6,7 @@
 // in it; a dial set through one repository is the project's. The card's
 // front and back, the trash naming the project, and Put back asking where
 // when the project is gone.
-import { ok, done, DIR, URL, launch, newPage, ready, quiet, sleep, OWNER as ADMIN } from './lib.mjs';
+import { ok, done, DIR, URL, launch, newPage, ready, quiet, sleep, OWNER as ADMIN, section } from './lib.mjs';
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const base = URL.replace(/\/$/, '');
@@ -76,7 +76,7 @@ ok(made.status === 200 && JSON.stringify(reposFile()[key]?.members) === '["gamma
    `Add repository makes one inside the space (${made.status} ${made.error || ''} ${JSON.stringify(reposFile()[key])})`);
 
 const browser = await launch();
-{
+await section("The old address still opens the page, which says its own address", async () => {
   const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
   await page.goto(URL + '#/projects');
   await ready(page);
@@ -252,7 +252,7 @@ const browser = await launch();
   await page.evaluate(k => setProjectPinned(k, false), key);
   await page.screenshot({ path: `${DIR}/repos-card.png` }).catch(() => {});
   await page.close();
-}
+});
 
 // One session for the project, on its first repository.
 const t = await fetch(base + '/termws?arg=' + encodeURIComponent('claude:ep.silon'), { headers: ADMIN });
@@ -304,7 +304,7 @@ ok(gone.status === 200 && !(await status()).repos[key], `an empty space is delet
 // Before a move, what it changes (the operator, 26 Oct): the nodes the
 // project it leaves has and the one it goes to has not, the dev instances on
 // them, offered to bring along, ticked; a move with them ticked adds them.
-{
+await section("Before a move, what it changes", async () => {
   const nid = (((await (await fetch(base + '/api/v1/nodes', { headers: ADMIN })).json()).nodes || []).find(n => n.kind === 'agent') || {}).id;
   const gammaNodes = prefsFile()[gammaWas]?.nodes || [];
   await post('/api/prefs', { project: 'gamma', nodes: [nid] });
@@ -359,7 +359,7 @@ ok(gone.status === 200 && !(await status()).repos[key], `an empty space is delet
   await post('/api/repos', { action: 'move', name: 'gamma', to: gammaWas });
   await post('/api/prefs', { project: 'gamma', nodes: gammaNodes });
   await post('/api/repos', { action: 'delete', key: p2.key });
-}
+});
 const ask = await post('/api/trash-restore', { name: 'shopweb' });
 ok(ask.status === 409 && ask.pick && /Shop, which is deleted/.test(ask.error || ''), `Put back asks where when its space is gone (${ask.error})`);
 const back = await post('/api/trash-restore', { name: 'shopweb', project: gammaWas });

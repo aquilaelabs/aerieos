@@ -3,7 +3,7 @@
 // harness's fixture node is enrolled by hand with a walk in its census; the
 // tab lists it with its filesystems as meters, its stores, and its projects
 // largest first; Measure now queues the agent's storage job.
-import { URL, launch, newPage, ok, done, ready, until, api } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, until, api, section } from './lib.mjs';
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
@@ -85,7 +85,7 @@ if (job) await api('/api/v1/jobs', { action: 'cancel', id: job.id });
 // (the operator, 23 Oct): its phones are listed here with a link to the
 // Emulator page, where each has its Remove, refused while one runs; no
 // prune and no clear is pressed here.
-{
+await section("The page measures, and each thing is freed on the page that manages it", async () => {
   const seen = await page.evaluate(() => {
     const s = document.querySelector('.storagetab details[data-sect="storage:phones"]');
     return { rows: [...(s?.querySelectorAll('.stphone') || [])].map(r => r.textContent.replace(/\s+/g, ' ').trim()),
@@ -110,10 +110,10 @@ if (job) await api('/api/v1/jobs', { action: 'cancel', id: job.id });
   if (avd) await api('/api/v1/jobs', { action: 'cancel', id: avd.id });
   const refused = await api('/api/emulator', { action: 'phone-remove', node: minted.id, project: 'alpha', uid: '', name: 'builderbot-35' });
   ok(/running/.test(refused.error || ''), `a running phone is refused by the server too (${refused.error})`);
-}
+});
 // The array's parity check (R163 step 15): offered where the machine's
 // agent has it, its progress on the running pill, its result a fact.
-{
+await section("The array's parity check", async () => {
   const got = await page.evaluate(async () => {
     // Laid over the record each time: the page's poll reads the list again.
     const ARR = { mount: '/mnt/array', mounted: true, policy: 'mfs', data: [{ slot: 1, id: 'ata-A', mounted: true, size_mb: 10, used_mb: 1 }], parity: [{ slot: 1, id: 'ata-P', mounted: true }],
@@ -166,11 +166,11 @@ if (job) await api('/api/v1/jobs', { action: 'cancel', id: job.id });
   ok(got.older, 'an agent from before Check parity is not offered it');
   ok(got.asks.includes('Check') && got.asks.includes('Check and correct'), `Check parity asks: Check, or Check and correct (${JSON.stringify(got.asks)})`);
   ok(JSON.stringify(got.found) === '["tank:true"]', `a pool another machine made is listed with Import (${JSON.stringify(got.found)})`);
-}
+});
 // Each share's places on an array taken over (R163): where its new files
 // land and the mover's from and to, said on its row, filled by its Edit,
 // and sent beside the share on Save.
-{
+await section("Each share's places on an array taken over", async () => {
   const got = await page.evaluate(async () => {
     const keepOwn = ownMachine, keepPost = postJSON, posted = [];
     ownMachine = () => ({ id: 'x', reported: { adopted: { mounts: [{ where: '/mnt/disk1' }, { where: '/mnt/cache' }, { where: '/mnt/fast' }] } } });
@@ -235,7 +235,7 @@ if (job) await api('/api/v1/jobs', { action: 'cancel', id: job.id });
   ok(got.posted?.length === 2 && got.posted[0].action === 'storage-share' && got.posted[0].path === '/mnt/user/TV Shows'
      && JSON.stringify(got.posted[1]) === JSON.stringify({ action: 'storage-array', id: got.posted[1].id, array: 'moves', moves: [{ share: 'TV Shows', land: 'fast', from: 'fast', to: 'array' }] }),
      `Save sends the share, then its places (${JSON.stringify(got.posted)})`);
-}
+});
 await api('/api/v1/nodes', { action: 'retire', id: minted.id });
 
 await done(browser);

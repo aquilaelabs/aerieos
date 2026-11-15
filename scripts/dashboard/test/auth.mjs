@@ -5,7 +5,7 @@
 // would be (a refusal and why, or that a websocket is asked for), which is
 // how most checks here ask; the socket itself is covered by term.mjs.
 import { launch, newPage, ok, done, until, quiet, URL, DIR, takeOn, openSection, member, splitPick, projectKey,
-         asUser, OWNER, asSession, usersPy, mint } from './lib.mjs';
+         asUser, OWNER, asSession, usersPy, mint, section } from './lib.mjs';
 import http from 'node:http';
 import { mkdirSync, writeFileSync, rmSync, readFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -54,25 +54,25 @@ r = await bare('/terminal?arg=shell');
 ok(r.status === 302 && r.headers.get('location').startsWith('/login'),
    'the terminal is behind the same sign-in');
 r = await bare('/login');
-{
+await section("the login page is the one open door", async () => {
   const html = await r.text();
   ok(r.status === 200 && html.includes('Sign in'), 'the login page is the one open door');
   // ...in AerieOS's own colors: nobody is signed in, so no scheme a person
   // picked is worn there (the operator, 17 Oct).
   ok(html.includes('--bg:#0b1322') && !html.includes('bb.theme'),
      '...wearing the Default scheme and never the scheme this browser kept');
-}
+});
 
 // Wrong credentials re-render the form with the reason; right ones mint the
 // cookie and land where the visitor was headed.
 r = await bare('/login', { method: 'POST',
   headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
   body: 'username=test&password=nope&next=/' });
-{
+await section("a bad password re-renders the form, saying so", async () => {
   const said = r.status === 200 ? await r.text() : '';
   ok(said.includes('Wrong username or password'), 'a bad password re-renders the form, saying so');
   ok(/name="username" value="test"/.test(said), '...with the username still typed in it (B38)');
-}
+});
 r = await bare('/login', { method: 'POST',
   headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
   body: 'username=test&password=test&next=/' });
@@ -183,7 +183,7 @@ await ctx2.close();
 // owner's password and could not put it back, because `test` is under the
 // eight-character floor the store enforces, which would have taken the
 // harness credential away from every file that runs after this one.
-{
+await section("accounts, not one env var", async () => {
   const { readFileSync, existsSync } = await import('node:fs');
   const { execFileSync } = await import('node:child_process');
   const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
@@ -236,7 +236,7 @@ print(u.remove("alt"))`], { encoding: 'utf8' });
      'deleting an account ends its sessions too');
   ok(read().users.test && !read().users.alt,
      '...and the owner is untouched by all of it');
-}
+});
 
 // ---- the first run --------------------------------------------------------
 // Nobody owns a fresh container, and that used to be a refusal: the owner came
@@ -247,7 +247,7 @@ print(u.remove("alt"))`], { encoding: 'utf8' });
 //
 // Driven against a store of its own rather than this server's, which already
 // has an owner: the whole property is what happens when there is none.
-{
+await section("the first run", async () => {
   const { execFileSync } = await import('node:child_process');
   const { mkdtempSync, readFileSync, existsSync } = await import('node:fs');
   const { tmpdir } = await import('node:os');
@@ -293,7 +293,7 @@ ${code}`], { encoding: 'utf8' });
      'the first-run form is refused once somebody has claimed the container');
   ok((await bare('/api/status')).status === 401,
      '...and everything else still wants a sign-in, as it did before');
-}
+});
 
 // ---- a strip each (roadmap #25) --------------------------------------------
 // The tab layout was ONE file for the whole box: written by whichever browser
@@ -301,7 +301,7 @@ ${code}`], { encoding: 'utf8' });
 // moment there are two: you would watch somebody else's tabs open in front
 // of you. It is keyed by the account's minted id now, and the id is minted
 // rather than the name because the owner is renameable on purpose.
-{
+await section("a strip each", async () => {
   const { readFileSync } = await import('node:fs');
   const { execFileSync } = await import('node:child_process');
   const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
@@ -838,13 +838,13 @@ spec = importlib.util.spec_from_file_location("users", "${REPO}/scripts/dashboar
 u = importlib.util.module_from_spec(spec); spec.loader.exec_module(u)
 u.configure(state="${DIR}/state", write_json=lambda p, d: open(p, "w").write(json.dumps(d)))
 print(u.remove("renamed"))`], { encoding: 'utf8' });
-}
+});
 
 // ---- what a `user` sees, and does not (roadmap #22 step 2) --------------
 // The property the whole scheme leans on: a project somebody was not given is
 // ABSENT, not refused, so the existence check and the permission check are
 // the same check, and comparing error messages tells you nothing.
-{
+await section("what a `user` sees, and does not", async () => {
   const { readFileSync } = await import('node:fs');
   const { execFileSync } = await import('node:child_process');
   const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
@@ -940,12 +940,12 @@ ${code}`], { encoding: 'utf8' }).trim();
        Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') } })).status === 200,
      'none of it touches the owner');
   py('print(u.remove("lim"))');
-}
+});
 
 // ---- the Users tab (roadmap #22 step 3) ---------------------------------
 // The surface accounts are actually managed from; aerie users is the way back in
 // when this cannot be reached, not the way in generally.
-{
+await section("the Users tab", async () => {
   await page.evaluate(() => { const c = document.getElementById('cardTools');
     if (c?.classList.contains('closed')) c.querySelector('h2').click(); });
   await page.evaluate(() => openUsersTab());
@@ -1131,13 +1131,13 @@ ${code}`], { encoding: 'utf8' }).trim();
     '.userstab [data-upick="tabmade"]'), null, { timeout: 15000 });
   ok((await as('/api/status')).status === 401,
      'Remove ends it: the account it made can no longer sign in');
-}
+});
 
 // ---- what a session holds (roadmap #22 step 4, bug #16) -----------------
 // A Claude session used to inherit DASHBOARD_AUTH, so "only the operator may
 // install a toolchain" was a rule the code asked nicely about. It gets a token
 // scoped to its own project instead.
-{
+await section("what a session holds", async () => {
   const tok = mint('alpha');
   const as = (path, opts = {}) => bare(path, { ...opts,
     headers: { Authorization: 'Bearer ' + tok, ...(opts.headers || {}) } });
@@ -1244,14 +1244,14 @@ ${code}`], { encoding: 'utf8' }).trim();
   ok((await bare('/api/status', { headers: {
        Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') } })).status === 200,
      'none of which touches the owner');
-}
+});
 
 // ---- the Profile tab: an account's own settings -----------------------
 // Anybody signed in, about themselves only: name and email, the git identity
 // their commits carry, and a password change that asks for the current one
 // first: a browser left signed in is not enough to lock its owner out. The
 // throwaway account, because the suite's own credential must keep working.
-{
+await section("the Profile tab", async () => {
   // Made here: the tabmade account above was removed by the flow that tests
   // removing one.
   await page.evaluate(async () => (await fetch('/api/users', { method: 'POST',
@@ -1815,7 +1815,7 @@ ${code}`], { encoding: 'utf8' }).trim();
   await page.evaluate(async () => (await fetch('/api/users', { method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'remove', name: 'profiled' }) })).json());
-}
+});
 
 ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + page.errors.join(' | ') : ''}`);
 // ---- the route tables ------------------------------------------------------
@@ -1824,7 +1824,7 @@ ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + p
 // /api/pin and /api/project-pin were that once, found only because the two
 // handlers also shared a name. Read from both tables (R60), with each method
 // they name checked to exist, since a typo there is a 500 on first use.
-{
+await section("the route tables", async () => {
   const got = JSON.parse(execFileSync('python3', ['-c', `
 import ast, json, re
 src = open(${JSON.stringify(new globalThis.URL('../server.py', import.meta.url).pathname)}).read()
@@ -1857,14 +1857,14 @@ print(json.dumps(out))`], { encoding: 'utf8' }));
     ok(t.missing.length === 0,
        `...and every method ${table} names is one the handler has (${t.missing.join(', ') || 'all there'})`);
   }
-}
+});
 
 
 // ---- maintenance mode: the owner alone, until it is off --------------------
 // Every door another account comes in by is shut with the same sentence:
 // the page (its cookie kept for after), the API, a sign-in, a session's
 // token and the phone app's. The switch is the owner's and not an admin's.
-{
+await section("maintenance mode", async () => {
   const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
   const env = { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` };
   const users = (args, input) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', ...args], { input, encoding: 'utf8', env });
@@ -1978,7 +1978,7 @@ print(json.dumps(out))`], { encoding: 'utf8' }));
     .then(() => true, () => false).then(v => ok(v, '...and the band goes'));
   ok(/id="maintband" role="status" hidden>/.test((await bigGet('/', owner)).body.toString()),
      '...and the page is served with it hidden again');
-}
+});
 
 // A terminal's socket opens from this dashboard's own page and no other
 // (B312): the sign-in cookie was SameSite=Lax, which a browser still sent
@@ -1986,7 +1986,7 @@ print(json.dumps(out))`], { encoding: 'utf8' }));
 // R158 step 4, and the Origin check stands either way). A socket from
 // another origin is refused before anything is relayed; one from this
 // origin, or from a tool that sends no Origin, gets past that check.
-{
+await section("A terminal's socket opens from this dashboard's own page and no other", async () => {
   const u = new globalThis.URL(URL);
   const ask = (path, origin) => new Promise(resolve => {
     const headers = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'),
@@ -2006,6 +2006,6 @@ print(json.dumps(out))`], { encoding: 'utf8' }));
     got[path] = [await ask(path, evil), await ask(path, `${u.protocol}//${u.host}`), await ask(path, '')];
   ok(Object.values(got).every(([x, same, none]) => x === 403 && same !== 403 && none !== 403),
      `a terminal's or a screen's socket from another origin is refused, and this origin's is not (${JSON.stringify(got)})`);
-}
+});
 
 await done(browser);

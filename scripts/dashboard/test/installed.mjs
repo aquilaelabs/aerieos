@@ -4,7 +4,7 @@
 // path and system packages, a service's Configure from its config block
 // (the model router's providers, endpoints, Ollama and projects, saved to
 // the router's own record), and Remove.
-import { launch, newPage, ok, done, ready, URL } from './lib.mjs';
+import { launch, newPage, ok, done, ready, URL, section } from './lib.mjs';
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
@@ -31,7 +31,7 @@ ok(await page.$$eval('.doc .installedtab [data-instact="install"]', bs => bs.eve
    'nothing installs from here but a configured service: the Library installs');
 
 // ---- an agent's page: its sign-in (R181 step 2) -------------------------
-{
+await section("an agent's page", async () => {
   const CL = '.doc .installedtab .irow[data-irow="agent:claude-code"]';
   ok(await page.$eval(CL, r => !r.querySelector('.idetail') && r.querySelector('[data-instopen]')?.textContent.trim() === 'Open'),
      'a row is a row: Open beside its name, nothing opened in place');
@@ -46,10 +46,10 @@ ok(await page.$$eval('.doc .installedtab [data-instact="install"]', bs => bs.eve
   await page.click('.pane .bar [data-shellback]');
   await page.waitForFunction(() => tabOf(panes[0])?.kind === 'installed', null, { timeout: 10000 });
   ok(true, '...and Back returns to the Installed page');
-}
+});
 
 // ---- the model router's page: Configure, saved to its own record ----------
-{
+await section("the model router's page", async () => {
   const RTROW = '.doc .installedtab .irow[data-irow="service:model-router"]';
   const RT = '.doc .thingtab';
   ok(await page.$(RTROW) !== null && await page.$eval(RTROW, r => r.querySelector('[data-instact="install"]')?.disabled === true
@@ -82,10 +82,10 @@ ok(await page.$$eval('.doc .installedtab [data-instact="install"]', bs => bs.eve
   await page.waitForFunction(() => lib && Array.isArray(lib.rows), null, { timeout: 20000 });
   ok(await page.$eval('.doc .librarytab .lcard[data-lrow="service:model-router"]', c => !c.querySelector('[data-libact="install"]').disabled && !c.querySelector('.lcform')),
      'the Library\'s card for it offers Install now and draws no Configure of its own');
-}
+});
 
 // ---- a pack that brings a coding agent sits with the agents ---------------
-{
+await section("a pack that brings a coding agent sits with the agents", async () => {
   await page.evaluate(() => openInstalledTab());
   await page.waitForFunction(() => inst && !inst.nonode && Array.isArray(inst.rows)
     && !!document.querySelector('.doc.on .installedtab details.sect[data-sect="installed:agent"]'), null, { timeout: 20000 });
@@ -135,7 +135,7 @@ ok(await page.$$eval('.doc .installedtab [data-instact="install"]', bs => bs.eve
   ok(got.agents && !got.packs, 'a pack that brings a coding agent is a row under Coding agents, not under Tool packs');
   ok(/Kite signs in with an Example account in its own terminal: start a Kite session/.test(got.says) && got.plain === '' && got.away === '',
      `its page says where it signs in, which a plain pack's page and one not installed do not (${got.says.slice(0, 140)})`);
-}
+});
 
 // ---- no node ---------------------------------------------------------------
 await page.evaluate(() => { openInstalledTab(); nodesList = []; instNode = ''; inst = null; loadInstalled(); });
@@ -150,7 +150,7 @@ await page.waitForSelector('.pane .bar #ndPick', { timeout: 20000 });
 // downloads from somewhere else had no paper trail): the manifest commit the
 // copy came from, when, how many files and how big, one hash over them all,
 // and each thing the receipt shows that a person would act on.
-{
+await section("an install's receipt", async () => {
   const said = await page.evaluate(() => {
     const host = document.createElement('div');
     const at = Date.UTC(2026, 10, 13, 5, 0, 0) / 1000;
@@ -187,6 +187,6 @@ await page.waitForSelector('.pane .bar #ndPick', { timeout: 20000 });
   ok(/^It declares what it downloads, each held to its sha256 before its steps run with no network: dl\/hexkit\.tgz from https:\/\/example\.com\/hexkit\.tgz \(abababababab\)\.$/.test(said.seen[0])
      && /^It declares no downloads: what its install steps fetch is not checked/.test(said.seen[1]) && said.seen[2] === '',
      `...and Look says what it declares it downloads, or that it declares none, before it is added (${JSON.stringify(said.seen)})`);
-}
+});
 
 await done(browser);

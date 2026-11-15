@@ -3,10 +3,10 @@
 // article, opens a long one on its contents box, follows a link between docs
 // in place with an address per doc, and searches them all as the bar's field
 // is typed, a result opening its doc at its section.
-import { URL, launch, newPage, ok, done, ready, api as get } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, api as get, section } from './lib.mjs';
 
 // ---- the server's half ------------------------------------------------------
-{
+await section("the server's half", async () => {
   const idx = await get('/api/help');
   const names = (idx.groups || []).flatMap(g => g.docs.map(d => d.name));
   ok(idx.home === 'README' && idx.groups?.length >= 3 && names.includes('install') && names.includes('how-it-works'),
@@ -20,7 +20,7 @@ import { URL, launch, newPage, ok, done, ready, api as get } from './lib.mjs';
   // the words the whole line held; each still shows one.
   ok(hits.results?.length > 0 && hits.results.every(r => r.doc && r.title && /session|token/i.test(r.text)),
      `a search finds the lines that say every word, each with its doc (${hits.results?.length})`);
-}
+});
 
 const browser = await launch();
 for (const [W, H] of [[1280, 900], [393, 852]]){

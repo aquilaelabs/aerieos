@@ -4,7 +4,7 @@
 // project on several nodes, and dialogs that scroll.
 import { launch, newPage, ok, done, ready, openArchived, doctorFixture, animatedDuring, refreshUntil,
          holdPoll, freePoll, tmuxNew, tmuxKill, tmuxFmt, nbShown, URL, DIR, unfold, registerProject,
-         saveDialog, sectSave, until, quiet, settled, sleep, OWNER } from './lib.mjs';
+         saveDialog, sectSave, until, quiet, settled, sleep, OWNER, section } from './lib.mjs';
 import { writeFileSync, readFileSync, existsSync, rmSync, utimesSync,
          mkdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -63,7 +63,7 @@ await ready(page);
 // it is the hull that shows through. The ground is the stack's and the
 // document box paints none, so the document fading in does not take the
 // glass with it (27 Sep).
-{
+await section("The Nostromo glass", async () => {
   await page.evaluate(() => document.documentElement.dataset.theme = 'nostromo');
   const glass = await page.evaluate(() => {
     const alpha = c => {
@@ -89,7 +89,7 @@ await ready(page);
      && (glass.bar === 'no bar' || glass.bar === glass.dock) && glass.pane === 'rgba(0, 0, 0, 0)',
      `the bars, the dock and the ground wear one glass, over a pane left open (${JSON.stringify(glass)})`);
   await page.evaluate(() => { delete document.documentElement.dataset.theme; });
-}
+});
 
 // The header fits, at every width a phone comes in. It did not: measured at
 // 320px it wanted 369px and overflowed by 57, and the uptime (the only item
@@ -99,7 +99,7 @@ await ready(page);
 // Both halves are asserted, because they fail separately: a header that does
 // not overflow can still contain something ellipsised, and that is what the
 // operator saw.
-{
+await section("The header fits, at every width a phone comes in", async () => {
   const sizes = [320, 344, 360, 390, 412, 430, 768];
   const measured = [];
   for (const w of sizes){
@@ -160,13 +160,13 @@ await ready(page);
   ok(cut.length === 0,
      `...with nothing inside it ellipsised${
        cut.length ? `: ${cut.map(m => `${m.clipped.join('/')} at ${m.w}`).join(', ')}` : ''}`);
-}
+});
 
 // ---- the doctor: a dot in the top bar, its checks in a panel (R218 step 3) ----
 // The column of cards went: the dot wears the worst check's color, and its
 // panel lists problems as lines in their level's color, each with the rest
 // of what the check said under it, and passing checks as chips.
-{
+await section("the doctor: a dot in the top bar, its checks in a panel", async () => {
   await page.waitForFunction(() => document.getElementById('docDot').className.includes('ok'), null, { timeout: 15000 });
   const dd = await page.$eval('#bDocDot', b => ({ said: b.getAttribute('aria-label'), w: b.offsetWidth, top: !!b.closest('header') }));
   ok(/all 3 ok/.test(dd.said) && dd.w > 0 && dd.top,
@@ -241,7 +241,7 @@ await ready(page);
   doctorFixture('ok');
   await page.evaluate(() => document.getElementById('bDoctor').click());
   await page.waitForFunction(() => document.getElementById('docDot').className.includes('ok'), null, { timeout: 15000 });
-}
+});
 
 // The Analysis tab: the findings, browsable. The sidebar card is gone, since
 // its rows were only doors into each notebook, a summary nothing could be
@@ -311,7 +311,7 @@ await refreshUntil(page, () => !(state?.reports_ages || []).some(r => r.stale),
 // the same filter bar was styled in a notebook and browser-default here. The
 // skin is element-global now; this pins the agreement to a known-styled modal
 // field so the next new tab cannot ship native controls unnoticed.
-{
+await section("The tab's controls carry the house field skin", async () => {
   const skin = el => { const c = getComputedStyle(el);
     return [c.backgroundColor, c.borderTopLeftRadius, c.borderTopColor, c.fontFamily].join('|'); };
   const pair = await page.evaluate(`(() => { const skin = ${skin};
@@ -319,12 +319,12 @@ await refreshUntil(page, () => !(state?.reports_ages || []).some(r => r.stale),
             skin(document.getElementById('pName'))]; })()`);
   ok(pair[0] === pair[1],
      'the Analysis tab\'s filter field wears the same skin as every other field');
-}
+});
 // Every band of the tab starts at the same x. It shipped with four different
 // left edges: the filter bar flush against the edge (its padding rule named
 // an id the markup never had), the rules at 11px, the headings and the footer
 // at 14, which is what a retyped inset looks like from a phone.
-{
+await section("Every band of the tab starts at the same x", async () => {
   const xs = await page.evaluate(() => {
     // The content edge, not the box: every band is full width and it is the
     // inset that has to agree.
@@ -341,11 +341,11 @@ await refreshUntil(page, () => !(state?.reports_ages || []).some(r => r.stale),
   ok(new Set(Object.values(xs)).size === 1 && !Object.values(xs).includes(null),
      'the tab\'s filter bar, headings, rules and footer all start at one x: '
      + JSON.stringify(xs));
-}
+});
 // `aerie findings sample`: the report a box with no scanner can still work on.
 // Every surface above ghosts or empties without one, and a development stack
 // has no scanner by design, so this is how they are exercised at all.
-{
+await section("`aerie findings sample`", async () => {
   const bb = (...a) => {
     try {
       return { code: 0, out: execFileSync('bash', [`${REPO}/scripts/aerie`, 'findings', ...a],
@@ -404,14 +404,14 @@ await refreshUntil(page, () => !(state?.reports_ages || []).some(r => r.stale),
   ok(/in alpha/.test(loud) && !/--all/.test(loud),
      `...and one with findings is not told to run --all, which the relay refuses (${
        (loud.split('\n').find(l => l.startsWith('# ')) || '').slice(0, 50)})`);
-}
+});
 // Nothing readable in /reports and the way in says so: three ways to have
 // nothing (no mount, nothing in it, nothing that parses) and one sentence for
 // which, said when Analysis is pressed. A tab already open on it is closed once, when the page
 // first learns: a layout restored from last session can carry an Analysis tab
 // for a scanner that has since been unmounted, and one that stays only to say
 // "nothing here" is a tab somebody has to close by hand.
-{
+await section("Nothing readable in /reports and the way in says so", async () => {
   const keep = readFileSync(`${DIR}/reports/test.sarif`);
   rmSync(`${DIR}/reports`, { recursive: true, force: true });
   await refreshUntil(page, () => state?.reports_ok === false, { timeout: 20000 });
@@ -479,13 +479,13 @@ print(json.dumps(out))
   }
   await page.evaluate(() => openFindingsTab());
   await page.waitForSelector('.fxtab #fxProject', { timeout: 15000 });
-}
+});
 // Two projects whose names shorten to one slug are one dev instance: the same
 // compose project, env file and data directory, driven by two rows that know
 // nothing about each other. Nothing owns the moment a directory appears under
 // /workspace, so it cannot be refused; this list is the only place that sees
 // every name at once, which makes it the only place that can say so.
-{
+await section("Two projects whose names shorten to one slug are one dev instance", async () => {
   // Not empty: an empty directory is a mount point waiting for content and is
   // never listed at all.
   mkdirSync(`${DIR}/ws/My.App`, { recursive: true });
@@ -508,12 +508,12 @@ print(json.dumps(out))
   rmSync(`${DIR}/ws/my-app`, { recursive: true, force: true });
   await refreshUntil(page, () => !(state?.projects || []).some(p => p.name === 'my-app'),
                      { timeout: 20000 });
-}
+});
 // ---- a project's card on the Projects page, at a phone and at a desk ------
 // A project is a card on the Projects page (R138): its front the agent, Add
 // repository and Edit, no menu; Edit turns it over to the rest, at every
 // width.
-{
+await section("a project's card on the Projects page, at a phone and at a desk", async () => {
   await page.setViewportSize({ width: 390, height: 844 });
   await atWidth(390);
   await page.evaluate(() => openProjectsTab());
@@ -582,7 +582,7 @@ print(json.dumps(out))
   ok(true, '...and pressing it unpins the space');
   await page.evaluate(() => setProjectPinned('alpha', true));
   await page.waitForFunction(() => document.querySelector('.doc.on .projtab .pcard[data-row="alpha"] .pcfront [data-pmark]')?.getAttribute('aria-pressed') === 'true', null, { timeout: 15000 });
-}
+});
 
 // ---- the card's notice: why nobody can be here, and who is ------------
 // The card on the Projects page says WHO is here as its state (the dot and a
@@ -593,7 +593,7 @@ print(json.dumps(out))
 // Planted rather than arranged: the fixture has no node, and the four refusals
 // worth drawing (offline, no session half, no copy yet, taken off its copy) are
 // nodes.mjs's to produce. This is about what the CARD does with one.
-{
+await section("the card's notice", async () => {
   await holdPoll(page);
   await page.evaluate(() => openProjectsTab());
   await page.waitForSelector('.pgrid .pcard[data-row="alpha"]', { timeout: 10000 });
@@ -717,7 +717,7 @@ print(json.dumps(out))
      `...and your own session starting reads the status read at once, while nothing moving reads nothing (${JSON.stringify(reads)})`);
   await page.evaluate(w => { state.claude_with = w; state.claude_busy = {}; drawProjects(state.projects); }, were);
   await freePoll(page);
-}
+});
 
 await page.evaluate(() => { const t = tabs.find(x => x.kind === 'findings');
                             if (t) hideTab(t.id); });
@@ -835,7 +835,7 @@ ok(await page.evaluate(() => document.documentElement.dataset.theme) === undefin
 // The scheme's other half (R216): Dark, Light or System beside the swatches,
 // applied on the press like a scheme, kept in the browser and on the
 // account, and the swatches show the half that is on.
-{
+await section("The scheme's other half", async () => {
   const pageBg = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
   // Past the crossfade Default's pick above started (320ms of html.theming):
   // read mid-swap, the color to come back to was one no theme paints.
@@ -911,7 +911,7 @@ ok(await page.evaluate(() => document.documentElement.dataset.theme) === undefin
      '...and Dark puts it back, carrying no attribute at all');
   ok(swLight !== await page.$eval('#uiMenu .sw[data-theme="moss"]', b => getComputedStyle(b).backgroundColor),
      '...the swatches having shown the light half while it was on');
-}
+});
 
 // Escape shuts it, like the bell panel it sits beside.
 await page.keyboard.press('Escape');
@@ -970,7 +970,7 @@ ok(true, '...and so does a click on the page under it');
 // One place for a dialog and the keyboard (R88): focus goes in as it opens,
 // Tab and Shift+Tab go round inside it, Escape closes the one on top, and
 // the focus comes back to what opened it.
-{
+await section("One place for a dialog and the keyboard", async () => {
   await page.focus('#bAbout');
   await page.keyboard.press('Enter');
   await page.waitForSelector('#aboutModal:not([hidden])');
@@ -1011,13 +1011,13 @@ ok(true, '...and so does a click on the page under it');
     cur: panes[1] }));
   ok(tabs.list === 'tablist' && tabs.on.length === 1 && tabs.on[0] === tabs.cur,
      `the dock's line is a tablist, with the terminal showing marked selected (${JSON.stringify(tabs)})`);
-}
+});
 // ---- the welcome panel: a guide and the changelog behind one switch -------------
 // The same popup opens itself twice in an account's life: on the guide the
 // first time the account signs in, and on the changelog once after every
 // image update. Closing it is the acknowledgement. The fixture owner is
 // seeded as having read both, or every file here would open under it.
-{
+await section("the welcome panel", async () => {
   const prefs = async p => (await fetch(URL + 'api/users', { method: 'POST',
     headers: OWNER,
     body: JSON.stringify({ action: 'prefs', prefs: p }) })).json();
@@ -1197,7 +1197,7 @@ print(json.dumps({"kept": [s["title"] for s in kept], "held": held, "series": se
   await page.waitForSelector('#aboutModal', { state: 'hidden' });
   await page.waitForFunction(async () => (await (await fetch('/api/status')).json()).welcome.image_seen === 'abc1234def5678901234567890abcdef12345678', null, { timeout: 10000 });
   ok(true, '...and closing it acknowledges this image, so the next update is the next time');
-}
+});
 // An image built before versions existed still has a commit, and the header
 // falls back to it rather than going blank.
 ok(await page.evaluate(() => { drawBuild({ rev: 'deadbee1234', built: '' });
@@ -1341,7 +1341,7 @@ await page.waitForFunction(() => !!document.querySelector('.doc .projtab details
 // Turned over inside the fold, its back is whole on the screen: every
 // control of it above the dock's line and nothing over it, the dock shut
 // as a person pulls it down to work on the page.
-{
+await section("Turned over inside the fold, its back is whole on the screen", async () => {
   await page.evaluate(() => dockToggle(false));
   await pjMenu('alpha');
   // The page scrolls smoothly: brought into view, then measured once it is there.
@@ -1374,7 +1374,7 @@ await page.waitForFunction(() => !!document.querySelector('.doc .projtab details
   ok(seen.open && seen.bottom <= seen.foot && seen.top,
      `...and Edit turns it over in the fold, its last control on screen and nothing over it (${JSON.stringify(seen)})`);
   await page.evaluate(() => flipCard(reposOf('alpha')));
-}
+});
 await page.evaluate(() => setArchived('alpha', false));
 // Unlocking is what is under test, so it is the LOCK that has to stop being
 // the reason. The button stays dead here for a different one (alpha has no
@@ -1411,7 +1411,7 @@ ok(await page.$eval('.doc .projtab .pcard', r =>
 // Groups (the operator, 18 Oct): a label of this account's that keeps
 // projects together on the page, set from a card's menu in a box under its
 // name, the groups made already offered; an empty answer takes it out.
-{
+await section("Groups (the operator, 18 Oct)", async () => {
   const group = async (name, to) => {
     await pjMenu(name);
     await page.click(`.doc .projtab .pcard[data-row="${name}"] [data-pgroup]`);
@@ -1558,7 +1558,7 @@ ok(await page.$eval('.doc .projtab .pcard', r =>
     !!document.querySelector('.doc .projtab #pjGrid > .pgrid .pcard[data-row="beta"]'), null, { timeout: 15000 });
   ok(g.head === 'Clients 1' && g.cards.join() === 'beta' && offered.includes('Clients'),
      `Group puts a space under its group's name on the page, the next ask offering the groups made, and an empty answer takes it back out (${JSON.stringify({ ...g, offered })})`);
-}
+});
 
 // Unpinning takes a project off the sidebar and leaves it on the tab, whole.
 await page.evaluate(() => setProjectPinned('alpha', false));
@@ -1571,7 +1571,7 @@ ok(await page.$eval('.doc .projtab .pcard[data-row="alpha"]',
      r => !!r.querySelector('[data-c]') && !!r.querySelector('[data-open]')),
    '...still carrying every control, which is the whole promise of the pin');
 // The pinned first on the page, each part by name (the operator, 18 Oct).
-{
+await section("The pinned first on the page, each part by name", async () => {
   const order = await page.evaluate(() => [...document.querySelectorAll('.doc .projtab #pjGrid > .pgrid .pcard')]
     .map(c => { const p = state.repos[c.dataset.pkey]; return { n: p.name, pin: !!p.pinned }; }));
   const firstLoose = order.findIndex(o => !o.pin);
@@ -1579,7 +1579,7 @@ ok(await page.$eval('.doc .projtab .pcard[data-row="alpha"]',
   ok(firstLoose > 0 && order.slice(firstLoose).every(o => !o.pin)
      && sorted(order.slice(0, firstLoose)) && sorted(order.slice(firstLoose)),
      `the pinned spaces come first, each part by name (${order.map(o => `${o.n}${o.pin ? '*' : ''}`).join(', ')})`);
-}
+});
 // The tab is a document, not a card adrift in one. It used to draw itself
 // inside .card, rounded, bordered and floating on a darker gutter, while the
 // notebook in the pane beside it filled the pane. One language.
@@ -1596,7 +1596,7 @@ ok(true, 'pinning it back reads Unpin again');
 // refreshes inside four seconds on top of the fifteen-second loop. Stacked,
 // each one makes the next slower, which is the shape the stuck-on-"loading…"
 // report had. Held open with a route so the overlap is deterministic.
-{
+await section("polls do not stack", async () => {
   // No read out to begin with: the pin pressed just before this asks for
   // one it does not wait for, and five asks joining that one, as they
   // rightly do, leave none to remember.
@@ -1636,11 +1636,11 @@ ok(true, 'pinning it back reads Unpin again');
      `...and the asking is remembered, not dropped: one more goes when it lands (${
         held - before} in ${Date.now() - t0}ms)`);
   await page.unroute('**/api/status*');
-}
+});
 // ...and the revisions poll the same (R88): the timer, a tab coming back and
 // a menu let go each start one, and stacked an older reply landing second
 // set the page's revisions back and fired every watch again.
-{
+await section("and the revisions poll the same", async () => {
   let release, held = 0;
   await page.route('**/api/revs*', async route => {
     held++;
@@ -1663,7 +1663,7 @@ ok(true, 'pinning it back reads Unpin again');
   while (held < before + 1 && Date.now() - t0 < 15000) await new Promise(r => setTimeout(r, 50));
   ok(held >= before + 1, `...and one more goes when it lands (${held - before} after ${Date.now() - t0}ms)`);
   await page.unroute('**/api/revs*');
-}
+});
 
 
 ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + page.errors.join(' | ') : ''}`);
@@ -1749,7 +1749,7 @@ ok(await page.$eval('#rnName', el => el.value) === 'alpha',
    'the rename dialog opens on the current name');
 ok(/Folder: \/workspace\/alpha · space #\d+/.test(await page.$eval('#rnHint', e => e.textContent)),
    'the settings say the folder the space lives in, and its id, under the name');
-{
+await section("Sections, every one open by default at every width, with a jump bar", async () => {
   // Sections, every one open by default at every width, with a jump bar
   // over them (the operator, 8 Oct: too much was hidden in folds). One shut
   // stays shut for the page's life; the chain's door shows the repository's
@@ -1785,7 +1785,7 @@ ok(/Folder: \/workspace\/alpha · space #\d+/.test(await page.$eval('#rnHint', e
   await phone.waitForSelector('#rnmodal:not([hidden])');
   ok(!shut(await folds(phone)), `on a phone every section is open too (${shut(await folds(phone)) || 'none shut'})`);
   await phone.close();
-}
+});
 ok(await page.evaluate(() => document.activeElement?.tagName) !== 'INPUT',
    '...with the keyboard down, like every other dialog here');
 ok(await page.$eval('#rnTokenField', el => el.hidden)
@@ -1828,7 +1828,7 @@ await page.click('#rnCancel');
 // the settings: a section per key with a row per route, a picked keystore
 // staged until its section's Save, its password asked for before anything
 // is sent, and a key the server will not keep refused with nothing kept.
-{
+await section("Its Android signing keys", async () => {
   const V = '.pane .nb .nbview[data-view="signing"]';
   const lastBad = () => page.evaluate(() => [...document.querySelectorAll('#toast .tst.bad .tmsg')].pop()?.textContent || '');
   const keySave = async () => {
@@ -1953,7 +1953,7 @@ await page.click('#rnCancel');
   // Back to the Projects page, where the rest of this file presses.
   await page.evaluate(() => openProjectsTab());
   await page.waitForSelector('.doc .projtab .pcard[data-row="alpha"]', { timeout: 15000 });
-}
+});
 
 // An invitation waiting on this account sits in the bell with its answer,
 // above the page's own notes, like every other thing waiting on you.
@@ -2036,7 +2036,7 @@ await page.evaluate(() => { rnBarSay('repo', ''); rnBars(); });
 // dry-run push and draws what is missing in red under the button, a list
 // when it is more than one thing; the server's half is unit/test_auth_test.py,
 // so its answer is set here and the draw is what is read.
-{
+await section("Test (the operator, 7 Oct)", async () => {
   ok(!await page.$eval('#rnTestField', e => e.hidden), 'the chain\'s door offers Test for a space with a remote');
   let asked = null;
   const answer = { using: 'its deploy key', mode: 'ssh', read: true, push: false,
@@ -2063,7 +2063,7 @@ await page.evaluate(() => { rnBarSay('repo', ''); rnBars(); });
   ok(await page.$eval('#rnTestOut', e => !e.classList.contains('bad')),
      '...and a credential with everything says it can read and push');
   await page.unroute('**/api/project-auth');
-}
+});
 
 // The remaining states need a project holding both credentials, which no
 // fixture here does, so the answer the dialog was given is set directly and
@@ -2127,7 +2127,7 @@ ok(v.onNone && !v.bad,
 // has no node here, so turning it on is refused in the dialog by name; an
 // account's access saves on its own, and reads back on the next open.
 await page.click('#rnCancel');
-{
+await section("The editor's and the apps' door is on unless a project closed it", async () => {
   await page.evaluate(n => renameProject(n), 'alpha');
   await page.waitForSelector('#rnmodal:not([hidden])');
   await page.waitForSelector('#rnFtpField:not([hidden])', { timeout: 10000 });
@@ -2172,7 +2172,7 @@ await page.click('#rnCancel');
   ok(set.status === 200 && back.body.on === false && back.body.people.find(p => p.uid === uid)?.access === 'r',
      `...and an account's access is kept while it is off (${JSON.stringify(back.body.people)})`);
   await api('/api/project-ftp', { action: 'set', project: 'alpha', access: { [uid]: '' } });
-}
+});
 
 // What Claude runs on here, back through the gear. Per project, and applied
 // when a session starts rather than typed into a running one, so the dialog's
@@ -2190,7 +2190,7 @@ ok(await page.$$eval('.rnbar', bs => bs.length >= 5 && bs.every(b => b.querySele
 // being found. It asks first, and a declined ask moves nothing.
 ok(!await page.$eval('#rnDelete', e => e.hidden) && /Delete space/.test(await page.$eval('#rnDelete', e => e.textContent)),
    'the settings dialog offers Delete space at its foot');
-{
+await section("which asks, names the bin, and moves nothing when declined", async () => {
   let asked = '';
   page.answers.push(q => { asked = q.text; return -1; });
   await page.click('#rnDelete');
@@ -2200,7 +2200,7 @@ ok(!await page.$eval('#rnDelete', e => e.hidden) && /Delete space/.test(await pa
      '...which asks, names the bin, and moves nothing when declined');
   await page.evaluate(n => renameProject(n), 'alpha');   // the settings form (the row's gear went in R119 step 3)
   await page.waitForSelector('#rnmodal:not([hidden])');
-}
+});
 await page.selectOption('#rnAsks', 'fewer');
 ok(!await page.$eval('#rnAsks', e => e.disabled) && !(await page.$('#rnModel')) && !(await page.$('#rnEffort'))
    && /next time Claude starts/.test(await page.$eval('#rnPrefHint', e => e.textContent))
@@ -2281,7 +2281,7 @@ for (const w of [1280, 393]){
 await page.setViewportSize({ width: 1280, height: 800 });
 // One card on its back at a time (the operator, 26 Oct): Edit on another
 // turns this one back, a box open on it canceled.
-{
+await section("One card on its back at a time", async () => {
   const A = '.doc .projtab .pcard[data-row="alpha"]', G = '.doc .projtab .pcard[data-row="gamma"]';
   if (!await page.$eval(A, c => c.classList.contains('flipped'))) await page.click(`${A} .pcfront [data-pedit]`);
   await turned(A);
@@ -2302,11 +2302,11 @@ await page.setViewportSize({ width: 1280, height: 800 });
   await page.evaluate(a => document.querySelector(a)?.scrollIntoView({ block: 'center' }), A);
   await page.click(`${A} .pcfront [data-pedit]`);
   await turned(A);
-}
+});
 // A card that moves slides there, the rest closing up, and the page follows
 // the one pressed on (the operator, 26 Oct): the last card pinned moves up
 // among the pinned, slid there and in sight.
-{
+await section("A card that moves slides there, the rest closing up, and the page follows", async () => {
   await page.setViewportSize({ width: 1280, height: 600 });
   const last = await page.evaluate(() => { const g = document.querySelector('.doc .projtab #pjGrid > .pgrid');
     const cs = [...g.querySelectorAll('.pcard[data-pkey]')].filter(c => c.querySelector('.pcfront [data-pmark]:not(.on)'));
@@ -2336,7 +2336,7 @@ await page.setViewportSize({ width: 1280, height: 800 });
     return !!c && !c.querySelector('.pcfront [data-pmark].on') && ![...document.querySelectorAll('.doc .projtab .pcard')]
       .some(x => x.getAnimations().some(a => /translate/.test(JSON.stringify(a.effect?.getKeyframes?.() || [])))); }, sel, { timeout: 10000 }).catch(() => {});
   await page.setViewportSize({ width: 1280, height: 800 });
-}
+});
 // Leaving the page turns a card back: Projects comes back on the fronts.
 ok(await page.$eval('.doc .projtab [data-row="alpha"]', c => c.classList.contains('flipped')), 'the card is on its back before the page is left');
 await page.evaluate(() => { location.hash = '#/jobs'; });
@@ -2382,7 +2382,7 @@ await page.click('#rnCancel');
 // somebody who wanted the setting kept and their conversation left alone got
 // neither, and restarting the session by hand afterwards changed nothing,
 // because there was nothing stored to read (B88).
-{
+await section("Saving and interrupting are two decisions, and only one of them is asked", async () => {
   tmuxNew('claude-alpha', `${DIR}/ws/alpha`);
   await refreshUntil(page, () => liveSessions().has(myClaude('alpha')),
                      { timeout: 20000 });
@@ -2449,7 +2449,7 @@ await page.click('#rnCancel');
   await page.evaluate(n => renameProject(n), 'alpha');   // the settings form (the row's gear went in R119 step 3)
   await page.waitForSelector('#rnmodal:not([hidden])');
   await page.click('#rnCancel');
-}
+});
 
 // Ghosted where no session can start: a project locked against this account,
 // which for its owner is an administrator's lock (R119). Unlike the credential
@@ -2557,7 +2557,7 @@ execFileSync('rm', ['-rf', `${DIR}/ws/.trash`]);
 // one on every element would be the easy version and the wrong one: it would
 // slow every hover and every state light on the page to make one rare action
 // look nicer.
-{
+await section("the theme crossfades", async () => {
   // What "crossfades" means, asserted without racing the 320ms window: the
   // swap turns a color transition ON for its duration. Sampling the color
   // partway through needed the evaluate to land inside that window, which a
@@ -2595,7 +2595,7 @@ execFileSync('rm', ['-rf', `${DIR}/ws/.trash`]);
        document.documentElement.classList.contains('theming'))),
      '...and reduced motion lands on the new scheme at once');
   await page.emulateMedia({ reducedMotion: null });
-}
+});
 
 // ---- one field skin, everywhere ----------------------------------------
 // Every text control on the page shares its ground, edge and radius from one
@@ -2603,7 +2603,7 @@ execFileSync('rm', ['-rf', `${DIR}/ws/.trash`]);
 // whole contract. A field in a context the rule does not list silently wears
 // the BROWSER's default instead, which is how the log-retention box ended up
 // a 2px gray square in Arial beside a page of sunk monospace fields.
-{
+await section("one field skin, everywhere", async () => {
   await page.click('#bCards');
   // The gear's menu come to rest, open or shut as the press left it.
   await page.waitForFunction(() => { const m = document.getElementById('uiMenu');
@@ -2635,14 +2635,14 @@ execFileSync('rm', ['-rf', `${DIR}/ws/.trash`]);
     return bad;
   });
   ok(odd.length === 0, `every text field wears the one skin (${odd.join(' | ') || 'all'})`);
-}
+});
 
 // ---- one frame ---------------------------------------------------------
 // At a desk the terminal's frame ends at its panes: the band that stood
 // under them held Commands alone, which is gone (the operator, 12 Nov), and
 // the terminal's keys float over it. A band drawn there again, or a gap
 // left where it was, is what this measures.
-{
+await section("one frame", async () => {
   await page.evaluate(() => { const b = [...document.querySelectorAll('button')]
     .find(x => /^Terminal$/.test(x.textContent.trim())); b && b.click(); });
   // A terminal in the dock, in front (R218 step 4).
@@ -2656,12 +2656,12 @@ execFileSync('rm', ['-rf', `${DIR}/ws/.trash`]);
              gap: panes && col ? Math.round(col.getBoundingClientRect().bottom - panes.getBoundingClientRect().bottom) : null }; });
   ok(!foot.band && foot.gap !== null && Math.abs(foot.gap) <= 1,
      `a desk's terminal has no band under it: its frame ends at its panes (${JSON.stringify(foot)})`);
-}
+});
 
 // ---- the logs, in the gear menu ---------------------------------------
 // The retention policy is days, not boots: a count is the wrong unit for "was
 // that this week?", and a crash loop can burn five generations in a minute.
-{
+await section("the logs, in the gear menu", async () => {
   const LD = `${DIR}/state/logs`;
   execFileSync('mkdir', ['-p', LD]);
   const old = Date.now() / 1000 - 90 * 86400;
@@ -2779,7 +2779,7 @@ print(json.dumps({"names": z.namelist(), "diag": json.loads(z.read("diagnostics.
   ok(dg.status === 200 && dg.ct === 'application/zip' && /builderbot-diagnostics-\d{8}-\d{4}\.zip/.test(dg.cd || '')
      && 'controller' in inZip.diag && Array.isArray(inZip.diag.reports) && dg.link,
      `the diagnostics download beside them as a zip, diagnostics.json with the reports in it (${dg.cd}; ${inZip.names.join(', ')})`);
-}
+});
 
 // The command pin and the project pin are different features that spent an
 // afternoon sharing four names (/api/pin, _pin, PINS_FILE and setPinned), and
@@ -2810,7 +2810,7 @@ await api('/api/pin', { name: 'lx-free', pinned: false });
 // session cannot start. A pick opens the terminal on that node, named on
 // the tab and stamped with that node's boot. Planted on the row, since the
 // fixture has one node.
-{
+await section("a project on several nodes", async () => {
   // The poll held: the rows are planted, and a poll landing between the
   // plant and the read put the server's rows back, which have one node.
   await holdPoll(page);
@@ -3131,7 +3131,7 @@ await api('/api/pin', { name: 'lx-free', pinned: false });
     state.sessions = (state.sessions || []).filter(s => s.name !== myClaude('alpha')); drawPanes(); });
   await freePoll(page);
   page.errors = [];
-}
+});
 // ---- a dialog that scrolls says so, and opens at its top -------------------
 // On a short screen the project's settings dialog is taller than the room:
 // its title and its buttons stay put with their hairlines while what is
@@ -3139,7 +3139,7 @@ await api('/api/pin', { name: 'lx-free', pinned: false });
 // knows which edge has more (the classes a list's hairline follows); and
 // closed and opened again it is back at its top, however far down it was
 // (the operator, 30 Sep).
-{
+await section("a dialog that scrolls says so, and opens at its top", async () => {
   await page.setViewportSize({ width: 420, height: 560 });
   const box = '#rnmodal > .box';
   const cls = () => page.$eval(box, b => ({ up: b.classList.contains('scrollup'), down: b.classList.contains('scrolldown'),
@@ -3185,7 +3185,7 @@ await api('/api/pin', { name: 'lx-free', pinned: false });
   ok(c.top === 0 && !c.up, `...and opened again it is back at its top, not where it was left (${c.top})`);
   await page.evaluate(() => closeRename());
   await page.setViewportSize({ width: 1280, height: 900 });
-}
+});
 // A reload reads the page the address names beside the status read (the
 // operator, 18 Oct: it showed the boot's placeholder, then the page's own
 // while only then asking for its data): its reads start before the status

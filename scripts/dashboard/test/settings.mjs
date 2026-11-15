@@ -6,7 +6,7 @@
 // identity landing in the repo's own config through /api/prefs and coming out
 // of aerie settings, and bb_setting (the boot scripts' read) run as bash
 // against the same file.
-import { launch, newPage, ok, done, ready, saveDialog, sectSave, rnSect, splitPick, refreshUntil, openFold, URL, DIR, unfold, until, settled, OWNER } from './lib.mjs';
+import { launch, newPage, ok, done, ready, saveDialog, sectSave, rnSect, splitPick, refreshUntil, openFold, URL, DIR, unfold, until, settled, OWNER, section } from './lib.mjs';
 import { readFileSync, existsSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -77,7 +77,7 @@ ok(await page.$eval('#resetmodal', m => m.hidden), '...and Keep it closes it wit
 const noword = await post('/api/reset', { confirm: 'yes' });
 ok(noword.status === 400 && /type reset to confirm; nothing was changed/.test(noword.body.error || ''),
    `the endpoint refuses anything but the word (${noword.body.error})`);
-{
+await section("+ r.dest +", async () => {
   const { execFileSync } = await import('node:child_process');
   const out = execFileSync('python3', ['-c', `
 import importlib.util, json, os, tempfile
@@ -96,12 +96,12 @@ print(json.dumps({"left": sorted(p.name for p in d.iterdir()), "moved": sorted(p
   ok(r.moved.join() === 'logs,users.json' && r.left.join() === '.reset-20260101-000000,' + r.dest + ',runner-tokens'
      && r.old_kept && /^\.reset-\d{8}-\d{6}$/.test(r.dest) && r.kept.join() === 'runner-tokens',
      `the reset moves everything into a dated directory beside it, leaves earlier resets and the root-only token store alone, and says what it kept (${JSON.stringify(r)})`);
-}
+});
 const groups = await page.$$eval('.settingstab [data-group]', gs => gs.map(g => g.dataset.group));
 // No Update window here: the fixture is the container edition, which cannot apply a release to itself (B648).
 ok(groups.join('|') === 'Logs|Idle sessions|Storage|Update checks|Vetted catalog|Apps|Mail|Room on the nodes|Backup|Backup copies|Maintenance|Move|Reset',
    `the tab's groups are the ones that survived the question "does this need to exist": the logs, the idle rule, where what grows is kept (the operator, 10 Oct), how often each update check runs (R176), the vetted catalog's address and its mirror (R169), the apps offered (R272), the mail server the bell goes out through (R149), the room a node keeps (R110), the terminal tabs open in (R133), maintenance mode (the owner's), and the reset (${groups.join(', ')})`);
-{
+await section("The room a node keeps", async () => {
   // The room a node keeps (R110 steps 1 and 5): whole numbers held to their
   // range by the server, the browser's own min and max beside them.
   const room = await page.$eval('[data-group="Room on the nodes"]', g => [...g.querySelectorAll('input[type=number]')]
@@ -114,8 +114,8 @@ ok(groups.join('|') === 'Logs|Idle sessions|Storage|Update checks|Vetted catalog
   ok(room === 'room_floor_gb=10:1-1000 room_mem_pct=92:50-99 container_mem_gb=0:0-1024' && good.ok
      && /whole number from 50 to 99/.test(bad.error || ''),
      `Room on the nodes is three numbers with their ranges, saved in range and refused out of it (${room}; ${JSON.stringify(bad)})`);
-}
-{
+});
+await section("The vetted catalog", async () => {
   // The vetted catalog (R169 step 6, B444): its address, saved as an
   // address where every text was held to a hostname (B445), and a mirror
   // imported from the page only when its index is the maintainers'.
@@ -144,11 +144,11 @@ ok(groups.join('|') === 'Logs|Idle sessions|Storage|Update checks|Vetted catalog
      `a mirror whose index another key signed is refused on Import, said, and nothing is held (${toast})`);
   rmSync(`${DIR}/mirror-src`, { recursive: true, force: true });
   rmSync(arc, { force: true });
-}
+});
 // Sections, and a page of settings (the operator, 16 Oct): a list of them
 // beside the one picked, each row saying what is in it, and Revert beside
 // each Apply putting the section's fields back to what is saved.
-{
+await section("Sections, and a page of settings", async () => {
   const sects = await page.$$eval('.settingstab details.sect', ds => ds.map(d => d.querySelector('summary .t').textContent));
   const rows = await page.$$eval('.settingstab .snav [data-spick]', bs => bs.map(b => ({ k: b.dataset.spick, said: b.querySelector('.rtags .dim')?.textContent || '' })));
   ok(sects.length >= 6 && rows.length === sects.length && rows.every(r => r.said),
@@ -183,12 +183,12 @@ ok(groups.join('|') === 'Logs|Idle sessions|Storage|Update checks|Vetted catalog
   await splitPick(page, 'tunnel');
   ok(await page.$eval('.networktab [data-group="Reach from outside"] .setsteps', ol => ol.querySelectorAll('li').length === 4 && /localhost:\d+/.test(ol.textContent)),
      'the Reach from outside section carries its own setup steps, with the controller\'s port in them, on the Network page');
-}
+});
 
 // The home tunnel (R176): a hostname, two secrets never shown back, and the
 // controller running cloudflared itself (the harness's stub) from them, with
 // the group's line reading the process. The token is nowhere in the page.
-{
+await section("The home tunnel", async () => {
   const G = '.networktab [data-group="Reach from outside"]';
   await page.evaluate(() => openNetworkTab());
   await page.waitForSelector('.networktab .snav .rrow', { timeout: 15000 });
@@ -242,7 +242,7 @@ ok(groups.join('|') === 'Logs|Idle sessions|Storage|Update checks|Vetted catalog
   await page.waitForFunction(sel => /off: paste a tunnel token/.test(document.querySelector(sel + ' .actbar .state')?.textContent || ''), G, { timeout: 20000 });
   ok(true, '...and taking the token off stops the tunnel');
   await post('/api/settings', { set: { tunnel_host: '' } });
-}
+});
 // Gone on 7 Oct (the operator): a node's Claude Code is updated when Update
 // is pressed, and never before a session starts.
 ok(await page.$('.settingstab [data-set="claude_autoupdate"]') === null,
@@ -327,7 +327,7 @@ const bare = JSON.parse(execFileSync('bash', [join(HERE, '..', '..', 'aerie'), '
 ok(bare.git_name === 'T. Person', '...for a shell with no project too');
 // The projects this one reads (prefs.reads) show in aerie settings, so a
 // session knows its own list without the briefing.
-{
+await section("The projects this one reads", async () => {
   const envs = { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws`, BB_PROJECT: 'alpha', BB_ACCOUNT_UID: owner };
   await page.evaluate(async () => (await (await fetch('/api/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ project: 'alpha', reads: ['beta'] }) })).json()));
@@ -337,7 +337,7 @@ ok(bare.git_name === 'T. Person', '...for a shell with no project too');
      `aerie settings names the spaces this one reads, as text and as JSON (${(text.match(/^  reads.*$/m) || [''])[0]})`);
   await page.evaluate(async () => (await (await fetch('/api/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ project: 'alpha', reads: [] }) })).json()));
-}
+});
 await page.evaluate(n => renameProject(n), 'alpha');   // the settings form (the row's gear went in R119 step 3)
 await page.waitForSelector('#rnmodal:not([hidden])');
 // The dialog asks again (17 Sep), but for a different thing: the old field
@@ -368,7 +368,7 @@ ok(elsewhere.git_name === 'T. Person',
 // project's own rules on the Briefing, each with a switch for THIS project,
 // and an administrator adds and edits them there for every project. A rule
 // typed in one project's notebook comes back out of every project's preamble.
-{
+await section("global rules", async () => {
   const auth = OWNER;
   const pre = async p => (await (await fetch(URL.replace(/\/$/, '') + `/api/preamble?project=${p}`, { headers: auth })).json()).text || '';
   const globals = async () => ((await (await fetch(URL.replace(/\/$/, '') + '/api/global-rules', { headers: auth })).json()).rules || []);
@@ -429,7 +429,7 @@ ok(elsewhere.git_name === 'T. Person',
     body: JSON.stringify({ action: 'save', rules: [], disabled: [] }) });
   await fetch(URL.replace(/\/$/, '') + '/api/rules', { method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' },
     body: JSON.stringify({ project: 'alpha', action: 'save', rules: (await (await fetch(URL.replace(/\/$/, '') + '/api/rules?project=alpha', { headers: auth })).json()).rules, globals_off: [] }) });
-}
+});
 
 // ---- the time zone is this browser's (the gear, R218 step 31) ------------
 // A cookie, not the account: a phone abroad and the desk at home each keep
@@ -437,7 +437,7 @@ ok(elsewhere.git_name === 'T. Person',
 // zone moves them all, and "This device's own" takes the cookie away again.
 // It sits in the gear beside the scheme, the other choice that is this
 // browser's, and Profile no longer lists it.
-{
+await section("the time zone is this browser's", async () => {
   await page.evaluate(() => openProfileTab());
   await page.waitForSelector('.profiletab .snav [data-spick]', { timeout: 15000 });
   ok(await page.$('.profiletab .snav [data-spick="browser"]') === null && await page.$('.profiletab #pfTZ') === null,
@@ -468,13 +468,13 @@ ok(elsewhere.git_name === 'T. Person',
   await page.evaluate(() => { document.cookie = 'bb_tz=Not%2FAZone; path=/'; });
   ok(await page.evaluate(() => userTZ() === ''), 'a zone this browser does not know is ignored, not trusted');
   await page.evaluate(() => { setUserTZ(''); toggleUiMenu(false); });
-}
+});
 
 // ---- a project's settings live in its notebook (R119 step 3) ---------------
 // The row's gear went, and the form is the notebook's Settings view: the
 // same form, moved there while the view is on screen, each section saving
 // itself, and back to the dialog when another view is picked.
-{
+await section("a project's settings live in its notebook", async () => {
   await page.evaluate(() => { document.querySelectorAll('.modal:not(.inline)').forEach(m => { m.hidden = true; }); });
   // The sidebar's row carries no gear; the Projects page's card offers
   // Settings in its menu by design (R218 step 3), not as a button on its
@@ -648,13 +648,13 @@ ok(elsewhere.git_name === 'T. Person',
   await page.evaluate(() => getNotebook('alpha').view('roadmap'));
   ok(await page.evaluate(() => !!document.querySelector('#rnmodal > .box') && $('rnmodal').hidden),
      '...and picking another view puts the form back where the dialog keeps it');
-}
+});
 
 // ---- a project's daily snapshots (R165) ------------------------------------------
 // In the project's settings: how many days are kept, and a Snapshots fold
 // listing each day with Restore; a restore of one file puts it back, and the
 // line it leaves names the snapshot taken first, which undoes it.
-{
+await section("a project's daily snapshots", async () => {
   await page.evaluate(() => { document.querySelectorAll('.modal:not(.inline)').forEach(m => { m.hidden = true; }); openProjectSettings('alpha'); });
   await page.waitForSelector('#rnSnapDays', { state: 'attached', timeout: 15000 });
   ok(await page.$eval('#rnSnapDays', i => i.value) === '14', 'a space keeps 14 days of snapshots unless set otherwise');
@@ -734,14 +734,14 @@ ok(elsewhere.git_name === 'T. Person',
   const anon = (await fetch(URL.replace(/\/$/, '') + '/api/snapshots?project=alpha')).status;
   ok(anon === 401 || anon === 403, `...and nothing is listed to a caller who is not signed in (${anon})`);
   rmSync(`${DIR}/ws/alpha/snapped.txt`, { force: true });
-}
+});
 
 // ---- where the controller keeps what grows (paths.py, the operator, 10 Oct) ----
 // Each kind on its own line of the Storage section with the path in use;
 // Apply moves what is there to the new path and switches once it is all
 // there; a path in the projects or one with something in it is refused in
 // words; and the default comes back with what was moved.
-{
+await section("where the controller keeps what grows", async () => {
   await page.evaluate(() => { document.querySelectorAll('.modal:not(.inline)').forEach(m => { m.hidden = true; }); openSettingsTab(); });
   await page.waitForSelector('.settingstab .snav [data-spick="paths"]', { timeout: 15000 }); await splitPick(page, 'paths');
   await page.waitForSelector('.settingstab [data-group="Storage"] input[data-path="gitview"]', { timeout: 15000 });
@@ -774,12 +774,12 @@ ok(elsewhere.git_name === 'T. Person',
                              `${DIR}/state/gitview`, { timeout: 20000 });
   ok(back.status === 200 && existsSync(`${DIR}/state/gitview/marker/f`),
      '...and an empty path puts it back at its default, with what is there');
-}
+});
 
 // ---- Profile's What you may do on a phone (B76) -------------------------------
 // One column of facts, every value starting at one line: each began where
 // its own label ended, two ragged columns.
-{
+await section("Profile's What you may do on a phone", async () => {
   const phone = await newPage(browser, { viewport: { width: 360, height: 780 }, isMobile: true, hasTouch: true });
   await phone.goto(URL);
   await ready(phone);
@@ -798,11 +798,11 @@ ok(elsewhere.git_name === 'T. Person',
   if (process.env.BB_SHOT_DIR) await phone.screenshot({ path: `${process.env.BB_SHOT_DIR}/profile-may-360.png` });
   ok(xs.length === 1 && over <= 0, `on a phone What you may do lines its values up in one column (starts at ${xs.join('/')})`);
   await phone.close();
-}
+});
 
 // ---- a split page's head on a phone (B370) ----------------------------------
 // The page's head is on top, as at a desk, not under the list of sections.
-{
+await section("a split page's head on a phone", async () => {
   const phone = await newPage(browser, { viewport: { width: 393, height: 852 }, isMobile: true, hasTouch: true });
   await phone.goto(URL);
   await ready(phone);
@@ -823,6 +823,6 @@ ok(elsewhere.git_name === 'T. Person',
   }
   ok(seen.every(x => !x), `on a phone a settings page's head is above its sections (${seen.filter(Boolean).join(', ') || 'both'})`);
   await phone.close();
-}
+});
 
 await done(browser);

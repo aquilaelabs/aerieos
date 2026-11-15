@@ -9,7 +9,7 @@
 // project became unstartable, its terminal reconnecting into the same error
 // every five seconds. The command goes through a launcher file now, and this is the test
 // that says so.
-import { ok, done, sleep, until, URL, DIR, tmuxKill, tmuxNew, tmuxFmt, takeOn, member } from './lib.mjs';
+import { ok, done, sleep, until, URL, DIR, tmuxKill, tmuxNew, tmuxFmt, takeOn, member, section } from './lib.mjs';
 import { execFileSync } from 'child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, chmodSync, readFileSync, existsSync, lstatSync, readlinkSync, rmSync, statSync, symlinkSync, realpathSync, readdirSync } from 'fs';
 import { tmpdir } from 'os';
@@ -158,7 +158,7 @@ ok(alive('claude-alpha'), '...the session is really there');
 // A tab coming back to a session already running attaches at once: the
 // sign-in checks, the briefing and the launcher are for starting one, and
 // cost every reload of a running Claude tab about two seconds (6 Oct).
-{
+await section("A tab coming back to a session already running attaches at once", async () => {
   const authLog = join(DIR, 'auth.log');
   rmSync(authLog, { force: true });
   const before = launcher();
@@ -170,7 +170,7 @@ ok(alive('claude-alpha'), '...the session is really there');
   } catch { /* attach needs a terminal, which this is not: it fails AT the attach */ }
   ok(!existsSync(authLog) && alive('claude-alpha') && launcher() === before,
      'a tab coming back to a running Claude session attaches at once: no sign-in check, no briefing, no launcher written');
-}
+});
 // The account's commit identity rides into the session as git's environment
 // (GIT_AUTHOR_* and GIT_COMMITTER_*, which outrank any user.name a
 // repository carries) from aerie settings --json, which the stub answers.
@@ -220,7 +220,7 @@ ok(/^bbs_/.test(tokWritten) && (statSync(TOKFILE).mode & 0o077) === 0,
      tokWritten.slice(0, 12)}…)`);
 ok(launcher().includes(tokWritten),
    '...and it is the same one the launcher exports, not a second grant');
-{
+await section("What bb does with it", async () => {
   // What bb does with it: a BB_TOKEN that has expired falls through to this
   // file, and a live one is left alone.
   const BBBIN = new globalThis.URL('../../aerie', import.meta.url).pathname;
@@ -261,7 +261,7 @@ ok(launcher().includes(tokWritten),
        { encoding: 'utf8', env: { ...process.env, HOME: keepHome, BB_PROJECT: 'alpha',
                                   BB_TOKEN: dead } }).trim() === fresh,
      '...and a session whose own token has died reaches for exactly that');
-}
+});
 const argv = existsSync(argvOut) ? readFileSync(argvOut, 'utf8') : '';
 // In a FILE now, not in the argument: --append-system-prompt-file has no
 // MAX_ARG_STRLEN to run into, so what a project keeps is what its sessions
@@ -344,7 +344,7 @@ out = connect(0, { FAKE_GIT_READY: '0' });
 ok(/no name and email for commits/.test(out) && !alive('claude-alpha'),
    'an account with no author for its commits is refused a Claude session, and told where to set one');
 // ...and a shell, which is where git is typed.
-{
+await section("and a shell, which is where git is typed", async () => {
   try { execFileSync('tmux', ['kill-session', '-t', 'shell-1'], { env: { ...process.env, TMUX: '' } }); } catch { /* none */ }
   let shOut;
   try {
@@ -355,7 +355,7 @@ ok(/no name and email for commits/.test(out) && !alive('claude-alpha'),
   } catch (e) { shOut = `${e.stdout || ''}${e.stderr || ''}`; }
   ok(/a shell does not start/.test(shOut) && !alive('shell-1'),
      'an account with no author is refused a shell too, in the same words');
-}
+});
 
 // And unlocking really lets it back in: a gate that cannot be opened again is
 // a different bug, and one nobody notices until they need it.
@@ -421,7 +421,7 @@ rmSync(join(DIR, 'state', 'claude-prefs.json'), { force: true });
 // leaves it beside the launcher, whose first exec gives it to claude as the
 // first prompt, after `--` since a brief can open with a dash, and removes it.
 // A respawn onto a changed model never sends it again (brief.py).
-{
+await section("a new project's brief, handed to its first session once", async () => {
   const staged = join(DIR, 'brief-staged');
   const BRIEF = '- a planner for armor stats\n\n"quoted" and $HOME, as typed';
   writeFileSync(staged, BRIEF + '\n');
@@ -445,7 +445,7 @@ rmSync(join(DIR, 'state', 'claude-prefs.json'), { force: true });
   await until(() => wrote(argvOut));
   a = existsSync(argvOut) ? readFileSync(argvOut, 'utf8') : '';
   ok(!a.includes('armor stats') && !/\0--\0/.test(a), '...nor is the next session, with nothing staged');
-}
+});
 
 tmuxKill('claude-alpha');
 // ---- a home and a shell of one's own (roadmap #26) --------------------------
@@ -458,7 +458,7 @@ tmuxKill('claude-alpha');
 // is every box until somebody adds a second account, and an upgrade that
 // renamed everything under them would be a cost paid by everyone for a case
 // most installs never reach.
-{
+await section("a home and a shell of one's own", async () => {
   const HOMEDIR = join(DIR, 'home');
   const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
   const shell = (arg, extra = {}, more = []) => {
@@ -1540,7 +1540,7 @@ d["users"].pop("wt.user", None)
 d["users"].pop("plain.user", None)
 u._save(d)`);
   }
-}
+});
 
 
 // ---- a container's shell (R218 step 4) ----------------------------------------
@@ -1549,7 +1549,7 @@ u._save(d)`);
 // the proxy checked (on a node it is tty-grant's answer, never the URL's). A
 // name in any other shape, or one docker cannot inspect, opens nothing and
 // says why.
-{
+await section("a container's shell", async () => {
   const dbin = mkdtempSync(join(tmpdir(), 'bbtty-docker-'));
   const dlog = join(dbin, 'log');
   writeFileSync(join(dbin, 'docker'), `#!/usr/bin/env bash
@@ -1600,6 +1600,6 @@ esac
      `...and on a node opens nothing without the controller's grant (${bare.trim().slice(0, 70)})`);
   tmuxKill('ctr-alpha-app-1');
   rmSync(dbin, { recursive: true, force: true });
-}
+});
 
 await done();

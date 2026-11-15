@@ -7,7 +7,7 @@
 // exists to prove.
 import { URL, launch, newPage, ok, done, ready, sleep, refreshUntil, DIR,
          tmuxNew, tmuxKill, tmuxFmt, tmuxCapture, openSection, quiet as quietFor,
-         api, OWNER, asSession, mint } from './lib.mjs';
+         api, OWNER, asSession, mint, section } from './lib.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { readFileSync, existsSync, statSync, lstatSync, readlinkSync, writeFileSync, mkdirSync, readdirSync, openSync, rmSync, appendFileSync, realpathSync, copyFileSync, cpSync, chmodSync, symlinkSync } from 'node:fs';
@@ -60,16 +60,16 @@ PK = `${DIR}/agenttoolchains/${SCOPE}`;
 let nodeBoot = '';
 ok(minted.ok && /^bbe_[A-Za-z0-9_-]{20,}$/.test(minted.token) && /^n_/.test(minted.id),
    `Enroll node mints a bbe_ token bound to a new node id (${minted.id})`);
-{
+await section("the row exists first, as pending: the token can only become that node", async () => {
   const n = await nodeById(minted.id);
   ok(n && n.kind === 'agent' && n.state === 'pending' && n.live === false,
      'the row exists first, as pending: the token can only become that node');
   const list = await api('/api/v1/nodes');
   ok(!list.nodes.some(x => JSON.stringify(x).includes(minted.token.slice(4))),
      'the token itself is never on a row: only its hash is stored');
-}
+});
 // ...and the download the provisioner does, with the enroll token
-{
+await section("and the download the provisioner does, with the enroll token", async () => {
   const r = await fetch(URL.replace(/\/$/, '') + '/api/v1/agent/download',
     { headers: { Authorization: 'Bearer ' + minted.token } });
   const body = Buffer.from(await r.arrayBuffer());
@@ -79,7 +79,7 @@ ok(minted.ok && /^bbe_[A-Za-z0-9_-]{20,}$/.test(minted.token) && /^n_/.test(mint
   const bad = await fetch(URL.replace(/\/$/, '') + '/api/v1/agent/download',
     { headers: { Authorization: 'Bearer bbe_nonsense' } });
   ok(bad.status === 401, '...and a made-up token gets nothing');
-}
+});
 
 // ---- enrolling: the real agent, once ---------------------------------------
 // The configuration plane's two tools, stood in for (phase 5): bb-sandbox as
@@ -90,7 +90,7 @@ const SANDBOX_STATE = `${DIR}/sandbox-mounts.json`;
 // NVIDIA display device bound to nouveau, and a modinfo that finds a
 // module only once the stand-in bb-sandbox has "installed" one, so the
 // census reads the same on any box the suite runs on.
-{
+await section("A card of its own for the agent to find", async () => {
   const dev = `${DIR}/sys/bus/pci/devices/0000:04:00.0`;
   mkdirSync(dev, { recursive: true });
   mkdirSync(`${DIR}/sys/bus/pci/drivers/nouveau`, { recursive: true });
@@ -139,7 +139,7 @@ f="\${BB_NV_STATE:-/nonexistent}"
 if [ -s "$f" ]; then sed -n 1p "$f"; exit 0; fi
 echo "modinfo: ERROR: Module nvidia not found." >&2; exit 1
 `, { mode: 0o755 });
-}
+});
 writeFileSync(`${DIR}/bin/bb-sandbox`, `#!/usr/bin/env python3
 import json, os, sys
 f = os.environ["BB_SANDBOX_STATE"]
@@ -349,7 +349,7 @@ const agentEnv = { ...process.env, HOME: `${DIR}/agenthome`, BUILDERBOT_NODE_JSO
   BB_GPU_STATE: `${DIR}/gpu-state`, BUILDERBOT_GPU_DISPLAY_STATE: `${DIR}/gpu-state`,
   BUILDERBOT_SYS_ROOT: `${DIR}/sys`, BB_NV_STATE: `${DIR}/nv-installed`, BB_CTK_STATE: `${DIR}/ctk-installed`,
   BUILDERBOT_NETPLAN_BIN: `${DIR}/bin/netplan`, BUILDERBOT_NETPLAN_DIR: `${DIR}/netplan` };
-{
+await section("builderbot-agent enroll writes node.json, mode 0600", async () => {
   let out = '';
   try {
     // A toolchain store of its own: the default is /var/lib/builderbot, which
@@ -394,11 +394,11 @@ const agentEnv = { ...process.env, HOME: `${DIR}/agenthome`, BUILDERBOT_NODE_JSO
   } catch (e) { again = String(e.stderr); }
   ok(/refused/.test(again) && !existsSync(NODE_JSON + '.2'),
      `the enroll token is single-use: a second enrollment is refused (${again.trim().split('\n').pop()?.slice(0, 120) || 'no stderr'})`);
-}
+});
 
 // The agent refuses a system path for a store whatever it is told, which is
 // the same rule the controller applies, made at the resource.
-{
+await section("The agent refuses a system path for a store whatever it is told, which is", async () => {
   let refused = '';
   try {
     execFileSync('python3', [AGENT, 'enroll', '--controller', URL, '--token', 'bbe_x',
@@ -406,7 +406,7 @@ const agentEnv = { ...process.env, HOME: `${DIR}/agenthome`, BUILDERBOT_NODE_JSO
   } catch (e) { refused = String(e.stderr || '') + String(e.stdout || ''); }
   ok(/system directory/.test(refused),
      `the agent refuses --store cache=/etc at enrollment (${refused.trim().slice(0, 70)})`);
-}
+});
 
 // ---- the loop: hello, heartbeat, a job ---------------------------------------
 // The agent's output goes to a FILE, never a pipe. A pipe has to be drained
@@ -3672,7 +3672,7 @@ open(sys.argv[2], "wb").write(b.build(sys.argv[1]))`, `${R}/scripts/agent`, OLD]
 }
 
 // aerie nodes shows liveness
-{
+await section("aerie nodes shows liveness", async () => {
   const out = execFileSync('bash', ['scripts/aerie', 'nodes'],
     { encoding: 'utf8', cwd: REPO, env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
   ok(/agentbox/.test(out) && /agent/.test(out),
@@ -3684,7 +3684,7 @@ open(sys.argv[2], "wb").write(b.build(sys.argv[1]))`, `${R}/scripts/agent`, OLD]
     { encoding: 'utf8', cwd: REPO, env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
   ok(/node\s+agentbox \(/.test(one) && /agent\s+\S+ \(this controller ships \d+\.\d+\.\d+\)/.test(one),
      `aerie nodes show NAME prints that node, its agent against the one this controller ships (${one.trim().replace(/\s+/g, ' ').slice(0, 160)})`);
-}
+});
 
 // Retire what this file made: the rows stay as history (door 1) and leave
 // every list, which is what the files after this one expect to find: a
@@ -3710,7 +3710,7 @@ ok(page.errors.length === 0,
 // the new address puts the old file back and applies it again. Driven on the
 // module directly, with hello stubbed to fail, because the real path needs
 // an address that goes nowhere.
-{
+await section("the network revert, without a network to cut", async () => {
   const out = execFileSync('python3', ['-c', `
 import importlib.util, json, os, sys, tempfile, time
 os.environ['BUILDERBOT_NETPLAN_DIR'] = d = tempfile.mkdtemp()
@@ -3740,7 +3740,7 @@ print(json.dumps({'state': st, 'code': code, 'log': ''.join(j.lines),
      `a network change the controller cannot confirm is reverted (${R.state})`);
   ok(/dhcp4: true/.test(R.file) && !/10\.1\.1\.5/.test(R.file) && R.applies === 2,
      '...the previous file is back and applied a second time');
-}
+});
 
 // ---- the same network spec through NetworkManager ---------------------------
 // The job the controller sends is one shape (mode, address, gateway, dns)
@@ -3748,7 +3748,7 @@ print(json.dumps({'state': st, 'code': code, 'log': ''.join(j.lines),
 // nmcli that says it is running, that is NetworkManager: the connection's
 // ipv4 keys are modified and brought up, a repeat is "already applied", and
 // a change the controller cannot confirm is put back the same way.
-{
+await section("the same network spec through NetworkManager", async () => {
   const out = execFileSync('python3', ['-c', `
 import importlib.util, json, os, sys, tempfile
 os.environ['BUILDERBOT_NETPLAN_BIN'] = '/nonexistent/netplan'
@@ -3786,7 +3786,7 @@ print(json.dumps({'distro': m.distro_now(), 'r1': s1, 'log1': ''.join(j1.lines),
   ok(R.r3[0] === 'failed' && /reverting/.test(R.log3) && R.st3['ipv4.method'] === 'manual'
      && R.st3['ipv4.addresses'] === '10.1.1.5/24',
      `...and a change the controller cannot confirm is put back the same way (${R.r3[0]}: ${JSON.stringify(R.st3)})`);
-}
+});
 
 // ---- the family, from os-release; the file backends, from their files --------
 // The job spec is one shape for every distribution; what the agent does with
@@ -3795,7 +3795,7 @@ print(json.dumps({'distro': m.distro_now(), 'r1': s1, 'log1': ''.join(j1.lines),
 // with Arch, ...); systemd-networkd is a .network file plus a reload, put
 // back on revert; and ifupdown replaces only the interface's own stanza in
 // /etc/network/interfaces, keeping the rest of the file byte for byte.
-{
+await section("the family, from os-release", async () => {
   const NB = `${DIR}/nbin`; mkdirSync(NB, { recursive: true });
   // A systemctl that says networkd and wicked are active, on a PATH only
   // this test's python sees; the fixture agent must keep the real answer.
@@ -3898,13 +3898,13 @@ print(json.dumps({'fam': fam, 'nd_backend': nd_backend, 'r1': r1, 'nd_text': nd_
      `with ifupdown the interface's own stanza is replaced and the neighbors kept (${R.if_backend}, ${R.r3[0]})`);
   ok(R.r4[0] === 'failed' && R.if_after === R.if_text,
      '...and its revert is the whole file as it was before the change');
-}
+});
 
 // ---- the last two backends: wicked, and dhcpcd on its own -------------------
 // SUSE's wicked is ifcfg and ifroute files plus netconfig's resolver line,
 // then ifreload; Void's dhcpcd is a marked block in dhcpcd.conf and a
 // restart. Same spec, same revert, driven in process like the two above.
-{
+await section("the last two backends", async () => {
   const NB = `${DIR}/nbin2`; mkdirSync(NB, { recursive: true });
   writeFileSync(`${NB}/systemctl`, `#!/bin/sh
 echo "systemctl $*" >> "${DIR}/net2.log"
@@ -3970,7 +3970,7 @@ print(json.dumps({'w_backend': w_backend, 'r1': r1, 'w_files': w_files, 'r2': r2
      `with dhcpcd alone the spec is a marked block after the file's own lines, and a restart (${R.d_backend}, ${R.r3[0]})`);
   ok(R.r4[0] === 'succeeded' && R.d_after === 'hostname\nnoipv6\n',
      '...and dhcp takes the block out again, leaving the file as it was');
-}
+});
 
 // ---- the toolchain store, scoped by platform; and a Mac ----------------------------
 // The layout's standing rule: a scope's Android system images live once
@@ -3978,7 +3978,7 @@ print(json.dumps({'w_backend': w_backend, 'r1': r1, 'w_files': w_files, 'r2': r2
 // a second run changes nothing. Then the Mac: with platform.system()
 // answering Darwin, the agent's family is macos, its packages Homebrew, its
 // init launchd, its scope darwin-<arch>.
-{
+await section("the toolchain store, scoped by platform", async () => {
   const out = execFileSync('python3', ['-c', `
 import importlib.util, json, os, tempfile
 os.environ['BUILDERBOT_BREW_BIN'] = '/nonexistent/brew'
@@ -4012,7 +4012,7 @@ print(json.dumps({'r1': r1, 'r2': r2, 'mac': mac, 'scope': m.tc_scope(), 'root':
      `a Mac is its own family: macos, launchd, no network backend, and no package manager until Homebrew is there (${JSON.stringify(R.mac)})`);
   ok(R.scope === 'n_00aa11bb' && R.root === '/Volumes/SDK/n_00aa11bb',
      `...with its toolchains under its node id in the store, as every node's are (R196) (${R.root})`);
-}
+});
 
 // ---- addresses that move ---------------------------------------------------
 // The node dials out, so a node whose own address moves keeps working and
@@ -4020,7 +4020,7 @@ print(json.dumps({'r1': r1, 'r2': r2, 'mac': mac, 'scope': m.tc_scope(), 'root':
 // are healed here: the relay bound to the node's old address binds the new
 // one, and the session-ports rule that names the controller's address is
 // rewritten when that name resolves elsewhere, kept to the relay's port.
-{
+await section("addresses that move", async () => {
   const NB = `${DIR}/nbin`; mkdirSync(NB, { recursive: true });
   writeFileSync(`${NB}/nft`, `#!/bin/sh\necho "nft $*" >> "${DIR}/nft.log"\n`, { mode: 0o755 });
   const out = execFileSync('python3', ['-c', `
@@ -4062,7 +4062,7 @@ print(json.dumps({'first': first, 'calls': calls, 'restarted': getattr(a, 'resta
      '...applied once, and a second check with nothing changed applies nothing');
   ok(R.bind === '10.0.0.77' && /\.bb\/current$/.test(R.restarted) && R.rebound,
      `when the node's own address moves, the relay binds the new one (${R.bind})`);
-}
+});
 
 // ---- the agent's version is WINDOW.BUILD ----------------------------------
 // The window is the project's compatibility promise (while AerieOS is
@@ -4070,7 +4070,7 @@ print(json.dumps({'first': first, 'calls': calls, 'restarted': getattr(a, 'resta
 // in a file, which means it drifts the moment somebody bumps the minor and
 // does not think about the agent. That is the bump this is about, so the
 // check is here rather than in anybody's memory.
-{
+await section("the agent's version is WINDOW.BUILD", async () => {
   // the package's sources, the number in its __init__
   const PKG = `${REPO}/scripts/agent/aerieos_agent`;
   const src = readdirSync(PKG).filter(f => f.endsWith('.py')).sort()
@@ -4113,7 +4113,7 @@ print(json.dumps({'first': first, 'calls': calls, 'restarted': getattr(a, 'resta
   // that change could have cost.
   ok(/def bye\(\*_\):[\s\S]{0,400}?j\.cancel\(\)[\s\S]{0,1600}?self\.session_stop\(\)/.test(src),
      'the agent cancels its running jobs on SIGTERM, since systemd no longer does it');
-}
+});
 
 // ---- a recipe entry naming alternatives -------------------------------------
 // A library renamed between releases (libasound2 became libasound2t64) is one
@@ -4122,7 +4122,7 @@ print(json.dumps({'first': first, 'calls': calls, 'restarted': getattr(a, 'resta
 // plain names failed the whole apt install on every release but the one it
 // was written for. Stubbed: dpkg knows what is installed, apt-cache what the
 // repositories carry.
-{
+await section("a recipe entry naming alternatives", async () => {
   const alt = `${DIR}/altbin`; mkdirSync(alt, { recursive: true });
   const stub = (name, ok) => writeFileSync(`${alt}/${name}`,
     `#!/bin/sh\nfor a; do last="$a"; done\ncase " ${ok} " in *" $last "*) exit 0 ;; esac\nexit 100\n`, { mode: 0o755 });
@@ -4145,6 +4145,6 @@ print(json.dumps(m.sysdeps_missing(cat, "r", "apt", [m.DPKG_BIN, "-s"])[0]))`],
      `...and when none is, the one this release's repositories carry is installed (${JSON.stringify(b)})`);
   ok(JSON.stringify(c) === '["libnew","libplain"]',
      `...the first of them when it carries both (${JSON.stringify(c)})`);
-}
+});
 
 await done(browser);

@@ -7,7 +7,7 @@
 // own code, driven under a stand-in for VS Code's API against this server,
 // and its terminal, AerieOS's own on /termws.
 // No browser.
-import { ok, done, sleep, until, DIR, URL, OWNER, OWNER as ADMIN, asSession } from './lib.mjs';
+import { ok, done, sleep, until, DIR, URL, OWNER, OWNER as ADMIN, asSession, section } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, symlinkSync, existsSync, statSync, utimesSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -66,15 +66,15 @@ try { symlinkSync('../beta', `${tree}/editor-escape`); } catch {}
 const cookie = {};
 for (const [n, pw] of Object.entries(people)) cookie[n] = await signIn(base, n, pw);
 const c = Object.fromEntries(Object.keys(people).map(n => [n, new Client(base, cookie[n])]));
-{
+await section("the extension signs in as the person, with the cookie the dashboard would give, and a wron", async () => {
   let wrong = null;
   try { await signIn(base, 'ed.rw', 'not-the-password'); } catch (e) { wrong = e; }
   ok(Object.values(cookie).every(Boolean) && wrong instanceof Refused && /Wrong username or password/.test(wrong.message),
      'the extension signs in as the person, with the cookie the dashboard would give, and a wrong password is refused');
-}
+});
 
 // ---- which projects each may open ------------------------------------------------
-{
+await section("which projects each may open", async () => {
   const mine = {};
   for (const n of Object.keys(people)) mine[n] = (await c[n].projects()).projects;
   const acc = n => (mine[n].find(p => p.name === 'alpha') || {}).access || '';
@@ -83,10 +83,10 @@ const c = Object.fromEntries(Object.keys(people).map(n => [n, new Client(base, c
      && (await c['ed.rw'].projects()).api === API,
      `each is offered alpha exactly as far as the settings and roles give: rw, r, r capped by a role, none, not on it, and on it with no choice made (${
        Object.keys(people).map(n => `${n}=${acc(n) || '-'}`).join(' ')})`);
-}
+});
 
 // ---- reading and writing, as each ----------------------------------------------------
-{
+await section("reading and writing, as each", async () => {
   const read = {};
   for (const n of Object.keys(people)) read[n] = await as(c[n], 'alpha', 'read', { path: 'editor-probe.txt' });
   ok(read['ed.rw'].data && read['ed.r'].data && read['ed.cap'].data
@@ -119,10 +119,10 @@ print("\\n".join(f"{p} {a} {t}" for p, a, t in db.execute("SELECT principal, act
     `${DIR}/state/builderbot.db`], { encoding: 'utf8' });
   ok(/user:ed\.rw files-write alpha:editor-probe\.txt/.test(rows) && !/ed\.r files-write/.test(rows),
      `every change is on the audit trail under the person's name, and a refused one is not (${rows.trim().split('\n')[0]})`);
-}
+});
 
 // ---- what is never served -----------------------------------------------------------
-{
+await section("what is never served", async () => {
   const rw = c['ed.rw'];
   const up = await as(rw, 'alpha', 'read', { path: '../beta/README.md' });
   const git = await as(rw, 'alpha', 'read', { path: '.git/config' });
@@ -135,10 +135,10 @@ print("\\n".join(f"{p} {a} {t}" for p, a, t in db.execute("SELECT principal, act
   const r = await fetch(base + '/api/v1/files', { method: 'POST', body: JSON.stringify({ action: 'list', project: 'alpha', path: '' }),
     headers: asSession(tok) });
   ok(r.status === 403, `a session's token is refused: a session has the tree, and is never a person (${r.status})`);
-}
+});
 
 // ---- a save over a newer file, search, and changes as they happen --------------------
-{
+await section("a save over a newer file, search, and changes as they happen", async () => {
   const rw = c['ed.rw'];
   const first = await as(rw, 'alpha', 'read', { path: 'editor-probe.txt' });
   writeFileSync(`${tree}/editor-probe.txt`, 'Claude saved this meanwhile\nneedle\n');
@@ -163,10 +163,10 @@ print("\\n".join(f"{p} {a} {t}" for p, a, t in db.execute("SELECT principal, act
   const got = await waiting;
   ok(got.changes?.some(x => x.path === 'claude-wrote-this.txt' && x.type === 'created') && Date.now() - t0 < 8000,
      `a file a session writes is told to a waiting editor within seconds (${JSON.stringify(got.changes)} in ${Date.now() - t0} ms)`);
-}
+});
 
 // ---- access taken away, partway --------------------------------------------------------
-{
+await section("access taken away, partway", async () => {
   await admin('/api/roles', { action: 'assign', name: 'ed.r', project_roles: { alpha: ['ed-nofiles'] } });
   const gone = await as(c['ed.r'], 'alpha', 'read', { path: 'editor-probe.txt' });
   await admin('/api/users', { action: 'projects', name: 'ed.cap', projects: [] });
@@ -181,12 +181,12 @@ print("\\n".join(f"{p} {a} {t}" for p, a, t in db.execute("SELECT principal, act
   ok(out.status === 401 && /Sign In/.test(out.error), `...and a password change signs the extension out (${out.status}: ${out.error})`);
   cookie['ed.rw'] = await signIn(base, 'ed.rw', 'edrwpass2');
   c['ed.rw'] = new Client(base, cookie['ed.rw']);
-}
+});
 
 // ---- the extension itself, under a stand-in for VS Code -------------------------------
 // The parts of VS Code's API it uses, enough to drive its file system as
 // VS Code would: activate, register, stat, read, write, watch.
-{
+await section("the extension itself, under a stand-in for VS Code", async () => {
   const fired = [];
   class Emitter { constructor() { this.subs = []; this.event = f => { this.subs.push(f); return { dispose() {} }; }; }
     fire(x) { fired.push(x); this.subs.forEach(f => f(x)); } }
@@ -268,10 +268,10 @@ print("\\n".join(f"{p} {a} {t}" for p, a, t in db.execute("SELECT principal, act
   w.dispose();
   ok(fired.flat().some(e => e.uri?.path === '/alpha/watched.txt' && e.type === 2),
      `...and a file a session writes is told to VS Code as created, for open editors to follow (${Date.now() - t0} ms)`);
-}
+});
 
 // ---- the session's terminal, AerieOS's own (R133) ---------------------------------
-{
+await section("the session's terminal, AerieOS's own", async () => {
   // Opened, written to and ended through the extension's own client; the
   // reason a terminal ends with, a refusal among them, is what it closes on.
   // With something to type, the shell's prompt is waited for, then `want`
@@ -322,6 +322,6 @@ print("\\n".join(f"{p} {a} {t}" for p, a, t in db.execute("SELECT principal, act
   }
   const no = await run(c['ed.out'], 'sh:1:alpha');
   ok(no.why, `...and the same server refuses a terminal the account may not open, saying why (${String(no.why).slice(0, 80)})`);
-}
+});
 
 await done();

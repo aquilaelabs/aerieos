@@ -6,7 +6,7 @@
 // a node and lands on Home, whose Getting started card keeps what is left.
 // The fixture starts with setup done, so it is put back to first run here,
 // as making the owner does, and Finish puts it right again.
-import { URL, launch, newPage, ok, done, DIR, until, holdPoll, freePoll, api } from './lib.mjs';
+import { URL, launch, newPage, ok, done, DIR, until, holdPoll, freePoll, api, section } from './lib.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import { mkdirSync, rmSync, openSync } from 'node:fs';
 import { createServer } from 'node:net';
@@ -135,7 +135,7 @@ await firstRun(false);
 // installer, and Finish waits for that one and for no other (the operator,
 // 22 Oct). Told by the install's marker in its env file, BB_INSTALL. Each
 // on a controller of its own, from a fresh state, beside the harness's.
-{
+await section("a bare-metal install's first run", async () => {
   const DASH = fileURLToPath(new globalThis.URL('..', import.meta.url));
   const LIB = fileURLToPath(new globalThis.URL('../../lib', import.meta.url));
   const freePort = () => new Promise(res => {
@@ -684,6 +684,9 @@ await firstRun(false);
     // and drawn from that, and a poll landing between the saying and the
     // draw puts the server's own back, which has none of it.
     await holdPoll(page);
+    // ...and the nodes' own re-read with it, which a node's every check-in
+    // asks for: it puts back a machine that has adopted nothing.
+    await page.evaluate(() => { if (!window.__heldLoadNodes){ window.__heldLoadNodes = loadNodes; loadNodes = async () => {}; } });
     const ad = await page.evaluate(() => {
       const n = ownMachine();
       n.reported = { ...n.reported, disks: [{ name: 'sdb', by_id: '/dev/disk/by-id/ata-WDC_X_SER111', serial: 'SER111' },
@@ -894,6 +897,8 @@ await firstRun(false);
        `once read: each container's row, the network it joins and Download compose files, each VM defined or not with Start and its Starts with the machine tick, Define the VMs (${JSON.stringify(apps.acts)}; ${apps.tick}; ${apps.text.slice(0, 200)})`);
     // Each VM still to define is a tick, ticked; one taken off is not
     // defined, and the button says how many are (the operator, 1 Nov).
+    // The VM's tick drawn: read a moment after the list was, it was not there yet.
+    await page.waitForSelector('.dmtab [data-adpick="v:Ubuntu"]', { state: 'attached', timeout: 15000 }).catch(() => {});
     const picked = await page.evaluate(() => {
       const box = document.querySelector('.dmtab [data-adpick="v:Ubuntu"]');
       const was = box?.checked;
@@ -920,6 +925,7 @@ await firstRun(false);
     const noneHeld = await bmApi('/api/v1/nodes', { action: 'storage-adopt', id: own, adopt: 'release' });
     ok(/xfs, btrfs or zfs/.test(badFs.error || '') && !badFs.job && /nothing is adopted/.test(noneHeld.error || '') && !noneHeld.job,
        `storage-adopt refuses a filesystem it does not take and a Release with nothing adopted, before any job (${badFs.error}; ${noneHeld.error})`);
+    await page.evaluate(() => { if (window.__heldLoadNodes){ loadNodes = window.__heldLoadNodes; window.__heldLoadNodes = null; } });
     await freePoll(page);
   }
   // Name and time (R161 step 3): the own machine's section, Apply asleep
@@ -1089,5 +1095,5 @@ await firstRun(false);
        'Forget it withdraws it: the next hello carries no move, and nothing is armed');
     src.stop();
   }
-}
+});
 await done(browser);

@@ -5,7 +5,7 @@
 // allowed, and a bump must not sweep unrelated work into its commit. Both are
 // reachable through `aerie version`, which is the same module the notebook will
 // call, so testing the CLI tests the thing.
-import { launch, newPage, ready, ok, done, until, quiet, settled, SLOW, tmuxCapture, DIR, URL as DURL, refreshUntil, saveDialog, takeOn, openFold, registerProject, nbGo, asSession, mint } from './lib.mjs';
+import { launch, newPage, ready, ok, done, until, quiet, settled, SLOW, tmuxCapture, DIR, URL as DURL, refreshUntil, saveDialog, takeOn, openFold, registerProject, nbGo, asSession, mint, section } from './lib.mjs';
 import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, chmodSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -121,7 +121,7 @@ ok(r.code === 0 && readFileSync(`${ROOT}/VERSION`, 'utf8').trim() === '0.4.0', '
 //
 // Its own repository, because a tag is repo-wide state and the shared fixture
 // is read by everything after this.
-{
+await section("the release: the second gesture, and the outward-facing one", async () => {
   const R = `${WS}/relproj`;
   rmSync(R, { recursive: true, force: true });
   mkdirSync(R, { recursive: true });
@@ -164,7 +164,7 @@ print(json.dumps(m.release('relproj', **json.loads(${
   ok(!rel.ok && /v1\.2\.0 already exists/.test(rel.error || ''),
      `...and what is beside the commit is never read: with VERSION saying 1.3.0 uncommitted, the release is still the commit's 1.2.0 (${rel.error})`);
   rmSync(R, { recursive: true, force: true });
-}
+});
 
 // ---- the commit that ships is not always the one you are standing on -------
 // Work lands through a pull request, so what CI builds and the box runs is
@@ -176,7 +176,7 @@ print(json.dumps(m.release('relproj', **json.loads(${
 // A real bare remote rather than a stub: the whole question is what
 // origin/HEAD points at and whether HEAD is behind it, and a fake answer to
 // that would be testing the mock.
-{
+await section("the commit that ships is not always the one you are standing on", async () => {
   const P = `${WS}/shipproj`;
   const REMOTE = `${DIR}/shipproj.git`;
   rmSync(P, { recursive: true, force: true });
@@ -230,13 +230,13 @@ print(json.dumps(m.release('shipproj', push=False)))`], { env })
        r.tag || r.error})`);
   rmSync(P, { recursive: true, force: true });
   rmSync(REMOTE, { recursive: true, force: true });
-}
+});
 
 // ---- start: the first version, and nothing after ---------------------------
 // Creating a version and moving one are different decisions (the first has
 // no claim to overwrite), and until this policy existed the only way to let a
 // session write the first VERSION was to hand it the bumping too.
-{
+await section("start: the first version, and nothing after", async () => {
   const S = `${WS}/startpol`;
   rmSync(S, { recursive: true, force: true });
   mkdirSync(S, { recursive: true });
@@ -262,7 +262,7 @@ print(json.dumps(m.release('shipproj', push=False)))`], { env })
      && readFileSync(`${S}/VERSION`, 'utf8').trim() === '0.1.0',
      '...and may not move it afterwards, which is the whole point of the policy');
   rmSync(S, { recursive: true, force: true });
-}
+});
 
 // ---- the bump commits one path -------------------------------------------
 // An uncommitted VERSION rides along in whatever a session commits next,
@@ -354,7 +354,7 @@ ok(yb('changelog', 'add', 'Worked before any version existed', '--cat', 'Added')
 // repository's own changelog had none, because nothing anywhere said what the
 // categories were or when each applied. Refused with the rules rather than
 // filed in a heap above the headings.
-{
+await section("An entry goes under a category, and the tool is where a session learns", async () => {
   const none = yb('changelog', 'add', 'filed nowhere');
   ok(none.code !== 0 && /--cat NAME, one of/.test(none.out) && /Fixed\s+it was wrong, and now it is right/.test(none.out)
      && /a house rule is where a space says so/.test(none.out),
@@ -375,7 +375,7 @@ ok(yb('changelog', 'add', 'Worked before any version existed', '--cat', 'Added')
   const once = readFileSync(`${Y}/CHANGELOG.md`, 'utf8').split('\n').find(l => l.includes('Named its own commit'));
   ok(once === `- Named its own commit (${head})`,
      `an entry that already ends with the commit it is stamped with carries it once (${once})`);
-}
+});
 setPolicyFor('young', 'open');
 yb('version', 'init', '0.1.0');
 const born = yb('changelog').out;
@@ -404,7 +404,7 @@ ok(bare('--code').out === '1',
 // session building in its worktree was handed the main checkout's commit as
 // its package name and shipped nothing rather than a file named after code
 // it did not hold (24 Sep).
-{
+await section("Asked from one of the project's worktrees, the answer is that tree's", async () => {
   const WT = `${WS}/.worktrees/unversioned/u_0badf00d`;
   mkdirSync(`${WS}/.worktrees/unversioned`, { recursive: true });
   execFileSync('git', ['-C', BARE, 'worktree', 'add', '-q', '-b', 'claude/side', WT], { env });
@@ -417,7 +417,7 @@ ok(bare('--code').out === '1',
   ok(inWt('--file') !== bare('--file').out,
      '...so a package built there is named after the commit it holds');
   execFileSync('git', ['-C', BARE, 'worktree', 'remove', '--force', WT], { env });
-}
+});
 ok(bare('--msi').code !== 0,
    '...but a format that cannot be produced without one refuses');
 ok(/no VERSION file/.test(bare().out), '...and says how to opt in');
@@ -527,7 +527,7 @@ ok(missing.code !== 0 && /no unreleased entry 9/.test(missing.out),
 //
 // On entries of its own, added and taken away again, so the lines the bump
 // below is about are the ones the cases above left.
-{
+await section("the section is the operator's to shape", async () => {
   const rows = () => (cl('unreleased').out.match(/^\s*\d+\s+.*$/gm) || []);
   const shasOf = line => (line.match(/[0-9a-f]{7}/g) || []);
   const find = (list, word) => list.find(l => l.includes(word)) || '';
@@ -589,7 +589,7 @@ ok(missing.code !== 0 && /no unreleased entry 9/.test(missing.out),
     cl('rm', l.trim().split(/\s/)[0]);
   ok(rows().length === before,
      `...and the section is back to what the cases above left (${before})`);
-}
+});
 
 // ---- categories: the shape a changelog reader already knows ---------------
 // A cycle's lines are written one at a time by whoever did the work; what a
@@ -601,7 +601,7 @@ ok(missing.code !== 0 && /no unreleased entry 9/.test(missing.out),
 // A session files an entry under a category. It does not get to decide where
 // the category SITS: a new one lands at the end, and the arrangement is the
 // operator's, on the editor the browser cases below drive.
-{
+await section("categories: the shape a changelog reader already knows", async () => {
   const rows = () => (cl('unreleased').out.match(/^\s*\d+\s+.*$/gm) || []);
   const numOf = word => (rows().find(l => l.includes(word)) || '').trim().split(/\s/)[0];
   const file = () => readFileSync(`${M}/CHANGELOG.md`, 'utf8');
@@ -710,7 +710,7 @@ ok(missing.code !== 0 && /no unreleased entry 9/.test(missing.out),
   cl('rm', numOf('CATME a fix, moved'));
   ok(rows().length === before && !/^### (Added|Fixed)$/m.test(file()),
      `...and emptying a category takes its heading with it (${before} left)`);
-}
+});
 
 // The bump dates the section, in the same commit that moves VERSION.
 mb('bump', 'patch');
@@ -742,7 +742,7 @@ ok(reopened.indexOf('## Unreleased') !== -1
 // 0.1.0, bumped to 0.2.0 (which dated every entry under 0.2.0), then set to
 // 0.5.0 before anything was released: 0.2.0's notes are 0.5.0's. A tagged
 // number keeps its section, and a plain bump keeps the one it leaves.
-{
+await section("set renumbers a version nobody released", async () => {
   const R = `${WS}/renumber`;
   rmSync(R, { recursive: true, force: true });
   mkdirSync(R, { recursive: true });
@@ -768,7 +768,7 @@ ok(reopened.indexOf('## Unreleased') !== -1
   rb('changelog', 'add', 'Third feature', '--cat', 'Added');
   rb('version', 'set', '0.6.0');
   ok(/## 0\.5\.0/.test(file()) && /## 0\.6\.0/.test(file()), 'a released number keeps its section when the version is set past it');
-}
+});
 
 // ---- what a review pass caught, kept caught ------------------------------
 // A project release tag must not stamp a component: the repo-wide vX.Y.Z
@@ -994,7 +994,7 @@ ok(r0['building towards'] === '0.4.0',
 // Build and Version are sections of this tab, and a shut one still answers:
 // the node on the first, the number on the second. They were three unnamed
 // bands stacked, which on a phone is one scroll with nothing labeling it.
-{
+await section("Build and Version are sections of this tab, and a shut one still answers", async () => {
   const sects = await page.$$eval(`${NB} .nbview[data-view="artifacts"] .sect > summary`,
     ss => ss.map(s => [s.querySelector('.t')?.textContent,
                        s.querySelector('.sst')?.textContent]));
@@ -1002,19 +1002,19 @@ ok(r0['building towards'] === '0.4.0',
      'the tab names what it is showing: Build and Version are sections');
   ok(sects.find(([t]) => t === 'Version')?.[1] === '0.4.0',
      '...and the version is the heading\'s status, so a shut one still answers');
-}
+});
 // The SHAPE, and the ordinal against git rather than against a literal. The
 // ordinal is the commit count, and alpha is the shared fixture: an earlier
 // file in a full run commits into it, so a hardcoded 3 was right when this
 // file ran alone and wrong when it ran after git.mjs (B85). What the
 // assertion is actually about is that the line is the version, built from the
 // target, the count and the sha.
-{
+await section("The SHAPE, and the ordinal against git rather than against a literal", async () => {
   const n = execFileSync('git', ['-C', A, 'rev-list', '--count', 'HEAD'],
                          { encoding: 'utf8' }).trim();
   ok(new RegExp(`^0\\.4\\.0-dev\\.${n}\\+[0-9a-f]{7}$`).test(r0['a build now'] || ''),
      `...and what a build right now would be called (${r0['a build now']}, ordinal ${n})`);
-}
+});
 ok(/since 0\.4\.0: 1 commit\b/.test(await boxText()),
    '...with the commits since the target last moved, as the case for a bump');
 
@@ -1239,7 +1239,7 @@ ok(clog.inSheet && clog.tall && !clog.boxed,
 //
 // Unreleased only: everything below it is a release somebody may have read,
 // and it renders as the text it is.
-{
+await section("the editor: the arrangement is a gesture, not a file to hand-edit", async () => {
   const seed = ['# Changelog', '', '## Unreleased', '',
                 '- a loose note (aaaaaaa)', '',
                 '### Fixed', '',
@@ -1426,7 +1426,7 @@ ok(clog.inSheet && clog.tall && !clog.boxed,
     await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
   }
   await page.click(`${NB} #sheetClose`);
-}
+});
 
 // The real delivery path, against the harness's own tmux server: alpha has a
 // claude-alpha session, so this exercises notify.tell rather than a stub.
@@ -1473,7 +1473,7 @@ ok(cleanSoFar.length === 0, `no console errors from the version block${cleanSoFa
 // root with the new version and the part), so this exercises the mechanism on
 // a repository of its own rather than on AerieOS's two files, and rather
 // than on the shared fixture, whose ordinal everything above depends on.
-{
+await section("a repo's own stamps travel with the number", async () => {
   const S = `${WS}/stampproj`;
   rmSync(S, { recursive: true, force: true });
   mkdirSync(`${S}/tools`, { recursive: true });
@@ -1570,7 +1570,7 @@ ok(cleanSoFar.length === 0, `no console errors from the version block${cleanSoFa
                                 body: JSON.stringify({ project: 'alpha', node: '' }) });
   });
   rmSync(S, { recursive: true, force: true });
-}
+});
 
 // A project with no session says so rather than silently doing nothing.
 const askDead = await page.evaluate(async () => {
@@ -1591,7 +1591,7 @@ ok((await page.errors).every(e => /400/.test(e)),
 // so: it was bumped to 0.8.0 on a branch already merged into main, unpushed,
 // while the tab showed 0.8.0 and main still read 0.7.0. Built here for real,
 // with a bare remote, the branch merged the way a pull request merges it.
-{
+await section("where a bump lands", async () => {
   const L = `${WS}/landproj`, REMOTE = `${DIR}/landproj.git`;
   rmSync(L, { recursive: true, force: true });
   rmSync(REMOTE, { recursive: true, force: true });
@@ -1730,7 +1730,7 @@ ok((await page.errors).every(e => /400/.test(e)),
   await page.evaluate(() => { tabs.filter(t => t.kind === 'notebook' && t.arg === 'landproj').forEach(t => dropTab(t.id)); });
   rmSync(L, { recursive: true, force: true });
   rmSync(REMOTE, { recursive: true, force: true });
-}
+});
 
 // The briefing every session is handed. It is read into the prompt of every
 // session on every project, so a rendered example version in it is a number
@@ -1738,14 +1738,14 @@ ok((await page.errors).every(e => /400/.test(e)),
 // briefing does: a session asked to give a new project its first version read
 // 0.4.0 out of the file it had been briefed with and proposed it, having
 // derived nothing. The file changed under R63 step 3; the trap did not.
-{
+await section("The briefing every session is handed", async () => {
   const brief = readFileSync(new globalThis.URL(
     '../../../config/templates/briefing.md', import.meta.url), 'utf8');
   const rendered = brief.match(/\b\d+\.\d+\.\d+(-dev\.\d+)?/g) || [];
   ok(rendered.length === 0,
      `the briefing renders no example version${
        rendered.length ? ', got ' + rendered.join(', ') : ''}`);
-}
+});
 
 // fresh() removes stray projects but does not reach inside a fixture, so the
 // commits and the VERSION file this planted in alpha and beta have to go;
@@ -1765,7 +1765,7 @@ execFileSync('git', ['-C', A, 'remote', 'add', 'origin',
 // An owner who set every dial on the settings panel to auto still found the
 // version locked, since the policy lived on the Artifacts tab alone. The
 // panel carries it now and writes the same policy.
-{
+await section("Move the version, with the other Agents may dials", async () => {
   await page.evaluate(() => { document.querySelectorAll('.modal:not([hidden])').forEach(m => { m.hidden = true; }); renameProject('alpha'); });
   await page.waitForSelector('#rnmodal:not([hidden]) #rnGateVersion', { timeout: 15000 });
   const was = await page.$eval('#rnGateVersion', e => ({ v: e.value, opts: [...e.options].map(o => o.value).join() }));
@@ -1778,6 +1778,6 @@ execFileSync('git', ['-C', A, 'remote', 'add', 'origin',
   }, null, { timeout: 20000, polling: 500 });
   ok(true, '...and saving the dialog sets the policy the Artifacts view shows');
   await page.evaluate(() => postJSON('/api/version', { project: 'alpha', action: 'policy', policy: 'locked' }));
-}
+});
 
 await done(browser);

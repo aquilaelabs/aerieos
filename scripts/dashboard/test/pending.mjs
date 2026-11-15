@@ -8,7 +8,7 @@
 // hook line that tells the session what was decided, and the endpoint's
 // refusal of a session's own token. What is faked: nothing. The hook is the
 // shipped script run as a process, and bb is the checkout's.
-import { launch, newPage, ok, done, ready, saveDialog, URL, DIR, nbShown, sleep, unfold, asSession, mint } from './lib.mjs';
+import { launch, newPage, ok, done, ready, saveDialog, URL, DIR, nbShown, sleep, unfold, asSession, mint, section } from './lib.mjs';
 import { readFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -235,7 +235,7 @@ ok(!/The operator has answered/.test(hook('bb-prompt-relay', ['alpha', 'u_test']
    '...once');
 
 // ---- a session cannot answer for itself -------------------------------------
-{
+await section("a session cannot answer for itself", async () => {
   const tok = mint('alpha');
   const res = await fetch(URL.replace(/\/$/, '') + '/api/pending', {
     method: 'POST',
@@ -244,7 +244,7 @@ ok(!/The operator has answered/.test(hook('bb-prompt-relay', ['alpha', 'u_test']
   const body = await res.text();
   ok(res.status === 403 && /cannot answer for itself/.test(body),
      `a session's own token cannot approve what it added (${res.status} ${body.slice(0, 80)})`);
-}
+});
 
 // ---- rules, through the same door ------------------------------------------
 const set = await post('/api/prefs', { project: 'alpha', gate: { rules: 'ask' } });
@@ -266,7 +266,7 @@ ok(/no rule is waiting/.test(bb('rules', 'pending')),
 await done(browser);// A session asking for an item back off the shelf (R78) is held whatever the
 // gate says, with its reason, and a person's Approve replays it: a decision
 // with a notification behind it, not a gate on creation.
-{
+await section("gate says, with its reason, and a person's Approve replays it", async () => {
   const added = await post('/api/roadmap', { project: 'alpha', action: 'add', text: 'a parked plan' });
   const id = added.body.item.id;
   bb('roadmap', 'shelve', String(id));
@@ -282,6 +282,6 @@ await done(browser);// A session asking for an item back off the shelf (R78) is 
   bb('roadmap', 'done', String(id));
   ok(!roadmapItems().some(r => r.id === id),
      '...and the request never locked the item: a session ticks it off as usual afterwards');
-}
+});
 
 

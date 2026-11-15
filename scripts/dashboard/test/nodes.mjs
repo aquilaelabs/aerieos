@@ -4,7 +4,7 @@
 // the DOCKER_HOST mirror are seeded, work stamps the node it belongs to,
 // every mutation grows an audit row, and the page the operator sees is
 // exactly the page it was.
-import { URL, launch, newPage, ok, done, ready, sleep, DIR, tmuxNew, animatedDuring, openFold, openArchived, closeFold, patience, saveDialog, sectSave, openSection, splitPick, refreshUntil, prefsOf, until, OWNER, api, usersPy } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, sleep, DIR, tmuxNew, animatedDuring, openFold, openArchived, closeFold, patience, saveDialog, sectSave, openSection, splitPick, refreshUntil, prefsOf, until, OWNER, api, usersPy, section } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync, readFileSync } from 'node:fs';
 
@@ -106,7 +106,7 @@ ok(!local.capabilities.includes('docker-host'),
    '...and no docker-host capability: the local node is not a sandbox');
 // A node's Updates line names the release key it pinned and its spare (R232),
 // and says when this build names a spare the node has not pinned yet.
-{
+await section("A node's Updates line names the release key it pinned and its spare", async () => {
   const said = await page.evaluate(() => {
     const was = nodesAgent;
     const n = reported => ({ kind: 'agent', reported });
@@ -122,7 +122,7 @@ ok(!local.capabilities.includes('docker-host'),
      && said[1] === 'signed releases only (key aaaaaaaa…); no spare key pinned (Enroll script pins it)'
      && said[2] === 'signed releases only (key aaaaaaaa…)',
      `a node's Updates line names its release key and its spare, and says when the spare is still to pin (${JSON.stringify(said)})`);
-}
+});
 ok(await page.evaluate(() => !document.querySelector('.nodestab [data-cap], .nodestab [data-encap]')),
    'no capability toggles anywhere: a node does everything for the spaces bound to it');
 // The docker host, enrolled by the harness with a token (roadmap #24:
@@ -144,7 +144,7 @@ ok(list[0].id === 'local',
 // the host of every instance nobody bound to a node. The census already says
 // which nodes run docker, so those are preferred, with nothing asked on the
 // status poll's path. Its own scratch store, so the harness's nodes stay put.
-{
+await section("the default node runs docker, when any node says so", async () => {
   const got = JSON.parse(execFileSync('python3', ['-c', `
 import importlib.util, json, tempfile
 spec = importlib.util.spec_from_file_location('nodes',
@@ -218,14 +218,14 @@ print(json.dumps(out))
      `a job running far past its own timeout with no end from the node is failed as lost, and the slot goes to the next (${JSON.stringify(got.overdue)})`);
   ok(got.revs.job && got.revs.queued && got.revs.taken && got.revs.ended && got.revs.chunk,
      `a job being queued, taken and finished moves the nodes rev, and a log chunk does not, so an open Nodes page follows a job without a reload (${JSON.stringify(got.revs)})`);
-}
+});
 
 // ---- the seam: work says which node it belongs to --------------------------
 // A compose action claims the job slot; the claim now asks node_for() and
 // the answer rides the job the page polls. Fixed in phase 1 (docker work is
 // the sandbox record), and the call site is what phase 4's placement slides
 // into.
-{
+await section("the seam: work says which node it belongs to", async () => {
   const r = await page.evaluate(async () => (await (await fetch('/api/devapp', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'new', project: 'ep.silon', instance: 'ph1' }),
@@ -251,12 +251,12 @@ print(json.dumps(out))
   });
   ok(job && job.node === sandbox.id,
      `docker work is stamped with the sandbox node's id (${job && job.node})`);
-}
+});
 
 // ---- the audit trail -------------------------------------------------------
 // Door 2: every mutation through the POST funnel writes who/what/when with a
 // parameter digest, and never the parameters, which carry tokens.
-{
+await section("the audit trail", async () => {
   const asked = Math.floor(Date.now() / 1000);
   await page.evaluate(() => fetch('/api/bugs', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -284,19 +284,19 @@ print(json.dumps(out))
     `m.db._rows("SELECT principal FROM audit WHERE action = ?", ("node-seed",))`);
   ok(seed.length === 1 && seed[0].principal === 'system',
      'the seed itself is on the record, once, as system');
-}
+});
 
 // ---- aerie nodes --------------------------------------------------------------
-{
+await section("aerie nodes", async () => {
   const out = execFileSync('bash', ['scripts/aerie', 'nodes'],
     { encoding: 'utf8', cwd: REPO,
       env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
   ok(!/\blocal\b/.test(out) && /sandbox · stub/.test(out),
      'aerie nodes prints the enrolled machines, read-only. Never the controller, which is registry plumbing');
-}
+});
 
 // ---- phase 2: the Nodes tab ------------------------------------------------
-{
+await section("phase 2: the Nodes tab", async () => {
   await page.evaluate(() => { const c = document.getElementById('cardTools');
     if (c?.classList.contains('closed')) c.querySelector('h2').click(); });
   await page.evaluate(() => openNodesTab());
@@ -475,10 +475,10 @@ m._exec("UPDATE nodes SET agent = ? WHERE id = ?", (json.dumps(ag), "${added.id}
      && acts.some(r => r.action === 'node-update')
      && acts.some(r => r.principal === 'user:test'),
      'every node mutation wrote an audit row, naming the account that made it');
-}
+});
 
 // ---- phase 2: the docker manager's picker ----------------------------------
-{
+await section("phase 2: the docker manager's picker", async () => {
   // Opened with the node list DELIBERATELY not loaded, because that is the
   // state a fresh page is in: the picker is drawn from that list, and the
   // tab used to watch only its own revision, so the list landed, nothing
@@ -585,10 +585,10 @@ m._exec("UPDATE nodes SET agent = ? WHERE id = ?", (json.dumps(ag), "${added.id}
      '...and the tab\'s first draw picks the saved node up, not the default');
   await page.evaluate(() => { const t = tabs.find(x => x.kind === 'docker');
                               if (t) hideTab(t.id); });
-}
+});
 
 // ---- phase 2: the settings graduation ---------------------------------------
-{
+await section("phase 2: the settings graduation", async () => {
   await page.evaluate(() => toggleUiMenu(true));
   await page.waitForSelector('#uiProfile', { timeout: 10000 });
   ok(await page.evaluate(() => !document.querySelector('#uiMenu #logDays')),
@@ -620,14 +620,14 @@ m._exec("UPDATE nodes SET agent = ? WHERE id = ?", (json.dumps(ag), "${added.id}
   const off = await set(0);
   ok(off.ok && off.minutes === 0, '...and 0 turns the rule off again');
   try { execFileSync('tmux', ['kill-session', '-t', '=shell-idletest'], { stdio: 'ignore' }); } catch {}
-}
+});
 
 // ---- the configuration plane on the row (phase 5) ---------------------------
 // A node that enrolled as a sandbox gets a fold: mounts, stores and network
 // as the operator wants them, drawn against what the agent reports, with
 // Save keeping the record and Apply queuing the system job. Enrolled here by
 // hand (the census is a body) because the real agent has its own suite.
-{
+await section("the configuration plane on the row", async () => {
   const H = OWNER;
   const base = URL.replace(/\/$/, '');
   const napi = api;
@@ -2766,7 +2766,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
   await fetch(base + '/api/v1/agent/hello', { method: 'POST',
     headers: { Authorization: 'Bearer ' + en.token, 'Content-Type': 'application/json' },
     body: JSON.stringify({ census: CENSUS, version: shipped.version, digest: shipped.digest }) });
-}
+});
 
 // ---- a node's path mapping (§11: the record owns it) ------------------------
 // What DOCKER_HOST_PATHS was: on the sandbox node's row now, validated to
@@ -2775,7 +2775,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
 // on the agent row, which is the only remote row left; devapp.host_map
 // still reads it for whichever node is being addressed, so a line that drew
 // nowhere would have taken an editable setting out of reach in silence.
-{
+await section("a node's path mapping", async () => {
   const H = OWNER;
   const base = URL.replace(/\/$/, '');
   const papi = async (body) => (await fetch(base + '/api/v1/nodes', { method: 'POST', headers: H, body: JSON.stringify(body) })).json();
@@ -2823,7 +2823,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
     await papi({ action: 'update', id: sb.id, fields: { name: 'sandbox' } });
     await page.waitForFunction(id => nodesList?.find(n => n.id === id)?.name === 'sandbox', sb.id, { timeout: 15000 });
   }
-}
+});
 
 // ...and put the sandbox's path mapping back: it lives on the node record
 // now, which fresh() does not touch, so the mapping this file sets was still
@@ -2871,7 +2871,7 @@ await fillHeld(page, '#ndBody #ndEnUser', 'joe');
 // Read back before the press: a run under load once minted joesbox for bb
 // (B331), and whether the field still held joe at the press is the fact
 // that says where to look.
-{
+await section("Read back before the press", async () => {
   // Said with what was read (B331, 1 Oct): a sighting under load had the
   // account right at Mint and the name apparently not, and this check
   // printed neither.
@@ -2879,7 +2879,7 @@ await fillHeld(page, '#ndBody #ndEnUser', 'joe');
     user: b.querySelector('#ndEnUser')?.value, form: [...b.querySelectorAll('input')].map(i => i.id).join(',') }));
   ok(held.user === 'joe' && held.name === 'joesbox',
      `the enroll dialog holds the name and the account typed into it (${JSON.stringify(held)})`);
-}
+});
 await page.click('#ndBody #ndEnTok');
 await page.waitForSelector('#ndBody .ndtoken', { timeout: 15000 });
 ok(await page.$eval('#ndBody .ndtoken', el => /--user joe/.test(el.textContent)),
@@ -2888,7 +2888,7 @@ ok(await page.$eval('#ndBody .ndtoken', el => /--user joe/.test(el.textContent))
 // it from this controller with the same token, and that route serves it.
 ok(await page.$eval('#ndBody .ndtoken', el => /curl -fsSL -H 'Authorization: Bearer bbe_[^']+' '[^']*\/api\/v1\/agent\/download\?what=provisioner' -o provision-linux\.sh/.test(el.textContent)),
    '...after a curl that fetches the provisioner from this controller with the token');
-{
+await section("and the route hands the enroll token the provisioner itself", async () => {
   const tok = (await page.$eval('#ndBody .ndtoken', el => el.textContent)).match(/Bearer (bbe_[A-Za-z0-9_-]+)/)?.[1];
   const r = await fetch(URL.replace(/\/$/, '') + '/api/v1/agent/download?what=provisioner', { headers: { Authorization: 'Bearer ' + tok } });
   const body = await r.text();
@@ -2911,7 +2911,7 @@ ok(await page.$eval('#ndBody .ndtoken', el => /curl -fsSL -H 'Authorization: Bea
   await dev(false);
   ok(mac.status === 200 && /launchd|LaunchAgents/.test(macBody) && !/BBSANDBOX/.test(macBody),
      `...and with them on, the same route serves the macOS provisioner (${mac.status}, ${macBody.length} bytes)`);
-}
+});
 ok(await page.evaluate(async () => { await loadNodes();
      return (nodesList.find(n => n.name === 'joesbox')?.config || {}).user; }) === 'joe',
    '...with the pending row already saying which account, before the machine exists');
@@ -2926,7 +2926,7 @@ await page.evaluate(async () => {
 // router's config narrowed to the controller, with the router's one-way
 // rules on the dialog. A config that cannot be used is refused before a
 // pending row is made.
-{
+await section("Enroll node asks its questions and answers with one script", async () => {
   const WG = ['[Interface]', 'PrivateKey = cHJpdmF0ZWtleXByaXZhdGVrZXlwcml2YXRla2V5MDA=',
     'Address = 10.6.0.5/32', 'DNS = 192.168.1.1', '', '[Peer]',
     'PublicKey = cHVibGlja2V5cHVibGlja2V5cHVibGlja2V5cHViMDA=', 'AllowedIPs = 0.0.0.0/0',
@@ -3116,13 +3116,13 @@ await page.evaluate(async () => {
   if (row3) await page.evaluate(id => nodeAct({ action: 'retire', id }), row3.id);
   // Off again, for what follows: dev features were on for WireGuard above.
   await devSet(false);
-}
+});
 
 // What is offered (roadmap R54, step 6): with unvetted features off the
 // generator knows one hypervisor, the one every sandbox here was made on,
 // and refuses the rest with the sentence that names the switch. The rest
 // of this section runs with the switch on, as a dev instance does.
-{
+await section("What is offered", async () => {
   const probe = await page.evaluate(() => nodeAct({ action: 'vm-xml', name: 'probe' }));
   ok((probe.catalog || []).map(h => h.id).join() === 'unraid' && !probe.catalog[0].dev,
      `with unvetted features off the generator offers Unraid alone (${(probe.catalog || []).map(h => h.id).join(', ')})`);
@@ -3133,11 +3133,11 @@ await page.evaluate(async () => {
      `...and refuses another, naming the switch (${no.error})`);
   await page.evaluate(async () => { await fetch('/api/settings', { method: 'POST',
     headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ set: { offer_unvetted: true } }) }); });
-}
+});
 // A VM catalog that lands after its dialog closed paints over nothing else
 // (B424): Render a VM, closed before the answer, Enroll opened in the same
 // box and typed into, then the answer, and the enroll form is still there.
-{
+await section("A VM catalog that lands after its dialog closed paints over nothing else", async () => {
   await page.evaluate(() => {
     window.__realNodeAct = nodeAct;
     nodeAct = b => b.action === 'vm-xml' && !b.name
@@ -3158,7 +3158,7 @@ await page.evaluate(async () => {
      `a VM catalog landing after its dialog closed leaves the Enroll form, and what was typed, alone (${JSON.stringify(after)})`);
   await page.evaluate(() => { nodeAct = window.__realNodeAct; document.getElementById('ndmodal').hidden = true;
     document.getElementById('ndBody').innerHTML = ''; });
-}
+});
 await page.click('.pane .bar #ndVm');
 await page.waitForSelector('#ndBody .vmform', { timeout: 10000 });
 ok(await page.$eval('#ndBody', b => !b.querySelector('.vmmade')),
@@ -3202,13 +3202,13 @@ ok((await page.$$eval('#ndBody .vmsteps li', ls => ls.length)) >= 5
 // The CPU topology moves with the count: libvirt refuses a machine whose
 // sockets x cores x threads is not its vcpu count, which every count but
 // the shipped six tripped (Unraid, 4 vCPUs, 15 Sep).
-{
+await section("The CPU topology moves with the count", async () => {
   const four = await page.evaluate(() => nodeAct({ action: 'vm-xml', name: 'bb-four', cores: 4 }));
   const topo = /<topology sockets="(\d+)" cores="(\d+)" threads="(\d+)"\/>/.exec(four.text || '');
   ok(/<vcpu placement="static">4<\/vcpu>/.test(four.text || '') && topo
      && Number(topo[1]) * Number(topo[2]) * Number(topo[3]) === 4,
      `4 vCPUs gives a topology whose product is 4 (${topo ? topo[0] : four.error || 'no topology'})`);
-}
+});
 const bad = await page.evaluate(() => nodeAct({ action: 'vm-xml', name: '../evil' }));
 ok(!!bad.error && !bad.xml, 'a name that is not a name is refused rather than escaped into the file');
 // ...and Unraid's own pair goes back in, which is what a VM that already
@@ -3240,7 +3240,7 @@ ok(true, 'switching to Proxmox asks for the VM id it numbers machines with');
 await page.click('#ndBody #vmGo');
 await page.waitForFunction(() => /qm create/.test(document.querySelector('#ndBody .vmxml')?.textContent || ''),
                            null, { timeout: 15000 });
-{
+await section("Proxmox comes back as a qm create with the same machine in it", async () => {
   const pve = await page.$eval('#ndBody .vmxml', p => p.textContent);
   ok(/qm create 9000/.test(pve) && /--cores 6/.test(pve) && /--memory 24576/.test(pve)
      && /--smbios1 uuid=[0-9a-f-]{36}/.test(pve),
@@ -3248,7 +3248,7 @@ await page.waitForFunction(() => /qm create/.test(document.querySelector('#ndBod
   ok(/virtio=52:54:00:/.test(pve), '...on QEMU\'s MAC range, which is what Proxmox is');
   ok(await page.$eval('#ndBody .vmsteps', ol => /Proxmox host as root/.test(ol.textContent)),
      '...and the steps are that manager\'s, not Unraid\'s');
-}
+});
 for (const [hv, want, mark] of [['vmware', /^00:50:56:/, /ethernet0\.address/],
                                 ['hyperv', /^00:15:5d:/, /Set-VMNetworkAdapter/],
                                 ['virtualbox', /^08:00:27:/, /VBoxManage createvm/]]){
@@ -3273,7 +3273,7 @@ await page.click('#ndBody #vmCancel');
 // systemd-journal, so journalctl from a session answers "insufficient
 // permissions". This opens that deliberately, per node, and only while the
 // controller's debug switch is on.
-{
+await section("debug: whose machine logs a node's sessions may read", async () => {
   const n = (await page.evaluate(async () =>
     (await (await fetch('/api/v1/nodes')).json()).nodes))
     .find(x => x.kind === 'agent');
@@ -3333,7 +3333,7 @@ await page.click('#ndBody #vmCancel');
       body: JSON.stringify({ project: 'alpha', node: '' }) });
   });
   page.errors = [];
-}
+});
 
 ok(page.errors.length === 0,
    `zero console errors${page.errors.length ? ': ' + page.errors[0] : ''}`);
@@ -3342,7 +3342,7 @@ ok(page.errors.length === 0,
 // system job; a node that was not provisioned as one is refused with the
 // command to run on the machine; and the row is retired when the job
 // lands, which the fake agent reports the way a real one does.
-{
+await section("Uninstall from the row", async () => {
   const base = URL.replace(/\/$/, '');
   const napi = api;
   const shipped = (await napi('/api/v1/nodes')).agent || {};
@@ -3774,7 +3774,7 @@ ok(page.errors.length === 0,
   const listed = (await napi('/api/v1/nodes')).nodes.some(n => n.id === shed.id);
   ok(!listed, 'and the node is retired when the job succeeds, so it leaves the list');
   await napi('/api/v1/nodes', { action: 'retire', id: plain.id });
-}
+});
 
 // ---- Claude Code on a node: version, check, update (claudecode.py) ------
 // The node reports what its session account runs; the controller asks the
@@ -3782,7 +3782,7 @@ ok(page.errors.length === 0,
 // is a bell row and a sentence on the section; Update ends the Claude
 // sessions there, queues the job, and holds the node's projects until it
 // ends. A session's token cannot ask for it, and nothing in bb can.
-{
+await section("Claude Code on a node", async () => {
   const base = URL.replace(/\/$/, '');
   const H = OWNER;
   const napi = async (path, body, hdrs) => (await fetch(base + path, {
@@ -4040,7 +4040,7 @@ print(json.dumps({"held_while_ending": seen, "after": m.updating("n1"), "ok": r.
      `...and a space whose agent is ChatGPT offers Install ChatGPT where Codex is missing, Start agent where it is there (${JSON.stringify(other)})`);
   await napi('/api/prefs', { project: 'beta', node: '' });
   await napi('/api/v1/nodes', { action: 'retire', id: en.id });
-}
+});
 
 // A probe's end never moves the job revisions, however the race with its
 // waiter falls. run_wait forgets a probe the moment it sees the end, which
@@ -4050,7 +4050,7 @@ print(json.dumps({"held_while_ending": seen, "after": m.updating("n1"), "ok": r.
 // a probe: a refresh every second or two for as long as it was open (24 Sep).
 // Forced here by forgetting the job inside that housekeeping, which is the
 // losing order, deterministically.
-{
+await section("A probe's end never moves the job revisions, however the race with its", async () => {
   const out = execFileSync('python3', ['-c', `
 import importlib.util, json, sys, time
 spec = importlib.util.spec_from_file_location("nodes", "${REPO}/scripts/dashboard/nodes.py")
@@ -4074,13 +4074,13 @@ print(json.dumps({"ok": bool(r.get("ok")), "moved": m.jobs_state_rev() - before}
   const got = JSON.parse(out.trim().split('\n').pop());
   ok(got.ok && got.moved === 0,
      `a probe's result leaves the job revisions still even when its waiter forgets it first (${JSON.stringify(got)})`);
-}
+});
 
 // A node un-enrolled under a project (the operator, 5 Oct): the project's
 // Claude button goes dead with the reason on its row, its settings keep
 // the node selected as "name (removed)" in italics, and another project's
 // picker does not offer it at all.
-{
+await section("A node un-enrolled under a project", async () => {
   const H = OWNER;
   const base = URL.replace(/\/$/, '');
   const napi = async (path, body) => (await fetch(base + path, { method: 'POST', headers: H, body: JSON.stringify(body) })).json();
@@ -4123,14 +4123,14 @@ print(json.dumps({"ok": bool(r.get("ok")), "moved": m.jobs_state_rev() - before}
   await page.keyboard.press('Escape');
   await napi('/api/prefs', { project: 'delta', node: was });
   writeFileSync(`${DIR}/state/locked-projects.json`, JSON.stringify({ delta: { by: 'u_0000aaaa', admin: true } }));
-}
+});
 
 // The controller's own machine, a bare-metal install's node of itself (R90
 // step 8): minted from a shell with --own, its row wears "this machine",
 // its session network is set and its box cannot be cleared (said on the
 // row), a project's node pickers say which it is, and the container
 // picker offers it, its containers being the root agent's.
-{
+await section("The controller's own machine, a bare-metal install's node of itself", async () => {
   const H = OWNER;
   const base = URL.replace(/\/$/, '');
   const napi = async (path, body) => (await fetch(base + path, { method: 'POST', headers: H, body: JSON.stringify(body) })).json();
@@ -4219,6 +4219,6 @@ m._exec("UPDATE nodes SET reported = ?, agent = ? WHERE id = ?", (json.dumps(rep
   ok(!/wall between its sessions/.test(open), `...and with the wall up it is not refused for it (${open.slice(0, 80) || 'no refusal'})`);
   await napi('/api/prefs', { project: 'beta', node: wasBeta.node || '', nodes: wasBeta.nodes || [] });
   await napi('/api/v1/nodes', { action: 'retire', id: own.id });
-}
+});
 
 await done(browser);

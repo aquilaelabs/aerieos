@@ -7,7 +7,7 @@
 //
 // Same size matters as much as staying loaded: a hidden terminal is still an
 // attached tmux client, and tmux sizes a window to its smallest client.
-import { launch, newPage, ok, done, ready, URL } from './lib.mjs';
+import { launch, newPage, ok, done, ready, URL, section } from './lib.mjs';
 import { readFileSync, readdirSync } from 'node:fs';
 
 const browser = await launch();
@@ -174,7 +174,7 @@ ok(inPage.length > 3 && JSON.stringify(inPage) === JSON.stringify(inServer),
 // Each in one round trip: a status poll landing between setting the limit
 // and opening the tab put the server's limit back, and the shell opened
 // (B289).
-{
+await section("The limit is on terminals, per account", async () => {
   const shell = await page.evaluate(() => {
     state.max_tabs = tabs.filter(t => t.kind === 'term').length;
     const before = tabs.length;
@@ -193,13 +193,13 @@ ok(inPage.length > 3 && JSON.stringify(inPage) === JSON.stringify(inServer),
   ok(doc.after === doc.before + 1 && doc.nodes,
      '...while a document tab opens past it: it costs no terminal');
   await page.evaluate(() => { state.max_tabs = 12; });
-}
+});
 
 // A terminal in its own window (R8): the pop-out opens the terminal's own
 // URL in a window, the tab stays as a placeholder with Reattach and its
 // frame is torn down (a second client on the session is the size fight),
 // the layout carries the flag, and the window closing brings the tab back.
-{
+await section("A terminal in its own window", async () => {
   const id = ids[1];
   await page.evaluate(id => dockShow(id), id);
   await page.evaluate(() => { window.__pops = []; window.open = (url, name) => {
@@ -224,12 +224,12 @@ ok(inPage.length > 3 && JSON.stringify(inPage) === JSON.stringify(inServer),
   await page.waitForFunction(id => tabOf(id).popped === false, id, { timeout: 6000 });
   ok(await page.evaluate(id => !!document.querySelector(`#pane1 .stack > [data-key^="${id}|"].on.ownterm`), id),
      'closing the popped window brings the tab back on its own');
-}
+});
 
 // The tab on show, pressed, puts the dock down on the first press, also
 // after a click in the page above took the keyboard there: the press gave
 // the dock the keyboard back and it shut on the second.
-{
+await section("The tab on show, pressed, puts the dock down on the first press, also", async () => {
   const id = ids[1];
   await page.evaluate(id => { dockToggle(false); dockShow(id); }, id);
   await page.waitForFunction(id => dockUp && active === 1 && panes[1] === id, id, { timeout: 4000 });
@@ -239,12 +239,12 @@ ok(inPage.length > 3 && JSON.stringify(inPage) === JSON.stringify(inServer),
   ok(await page.evaluate(() => dockUp === false), `the tab on show puts the dock down on the first press, the keyboard on the page before it (${moved})`);
   await page.click(`.dockline [data-dock="${id}"]`);
   ok(await page.evaluate(id => dockUp === true && panes[1] === id, id), '...and brings it up again on the next');
-}
+});
 
 // The dock's line with more tabs than fit has an arrow at the end with more
 // past it on a desk, as a row of big chips has, and a press on it moves the
 // line along (the operator, 24 Oct).
-{
+await section("The dock's line with more tabs than fit has an arrow at the end with more", async () => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.evaluate(() => { for (let n = 0; n < 14; n++) openTab({ kind: 'term', arg: `sh:${40 + n}:alpha`, label: `many ${n}` });
                               panes[1] = tabs.find(t => t.arg === 'sh:40:alpha').id; dockUp = false; render(); });
@@ -306,6 +306,6 @@ ok(inPage.length > 3 && JSON.stringify(inPage) === JSON.stringify(inServer),
      `the dock's line drawn again keeps where it was scrolled to (${JSON.stringify({ before, after, drawn })})`);
   await page.evaluate(() => { if (state.chat?.unread) delete state.chat.unread.probe; });
   await page.evaluate(() => { tabs.filter(t => /^sh:(4\d|5[0-3]):alpha$/.test(t.arg)).forEach(t => dropTab(t.id)); });
-}
+});
 
 await done(browser);

@@ -5,7 +5,7 @@
 // says so and this skips rather than failing for a tool it never had.
 import { execFileSync, spawnSync, spawn } from 'node:child_process';
 import { existsSync, readFileSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
-import { ok, done, until, DIR } from './lib.mjs';
+import { ok, done, until, DIR, section } from './lib.mjs';
 import { createServer } from 'node:net';
 
 // A port the machine says is free, for a small server of a check's own, not
@@ -162,7 +162,7 @@ if (ff.status !== 0){
 // or deep screen a session had just driven into place was gone from the
 // shot. adb is stood in for by a script that answers get-state, the window
 // dump from a file, and screencap with one fixed picture, and logs a launch.
-{
+await section("emu PKG launches the package only when it is not already on the screen", async () => {
   const A = `${S}/adb`; mkdirSync(A, { recursive: true });
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kAAAAABJRU5ErkJggg==', 'base64');
   writeFileSync(`${A}/frame.png`, png);
@@ -191,14 +191,14 @@ exit 0
   const away = shot('away', '  Window #8 Window{2d u0 com.other/.Main}\n  mCurrentFocus=Window{2d u0 com.other/com.other.Main}\n');
   ok(away.r.status === 0 && /^monkey dev\.x/.test(away.launched),
      `...and one that is not on the screen is launched first (${away.launched})`);
-}
+});
 
 // A timed touch (R101): touch.py finds the panel and the screen through adb
 // and sends the whole gesture as one shell of sendevent lines with sleeps,
 // in the panel's own range, turned with the screen. The same stand-in adb,
 // answering getevent -p, wm size and dumpsys input from files, and logging
 // the shell it is handed.
-{
+await section("A timed touch", async () => {
   const A = `${S}/adb2`; mkdirSync(A, { recursive: true });
   writeFileSync(`${A}/adb`, `#!/bin/sh
 case "$1 $2 $3" in
@@ -263,7 +263,7 @@ exit 0
   ok(bad.r.status !== 0 && /a glide needs at least two points/.test(bad.r.stderr), 'a glide of one point is refused in words');
   const noms = touch('hold', '1', '2');
   ok(noms.r.status !== 0 && /hold takes --ms N/.test(noms.r.stderr), '...and a hold without its time');
-}
+});
 
 // The sources refuse in their own words when the node lacks what they need.
 // An emulator another session holds (30 Sep): the AVD is the account's,
@@ -271,7 +271,7 @@ exit 0
 // emulator's lock on the AVD says it is running; status, start and stop
 // name it rather than saying none is running or waiting for one that
 // refuses to run twice.
-{
+await section("The sources refuse in their own words when the node lacks what they need", async () => {
   const home = `${S}/avdhome`;
   mkdirSync(`${home}/builderbot-36.avd`, { recursive: true });
   mkdirSync(`${home}/running`, { recursive: true });
@@ -305,7 +305,7 @@ exit 0
   ok(/running in another of your sessions/.test(stop.stderr), '...and aerie emu stop says whose it is to stop');
   await until(free, 10000);
   ok(/no emulator is running/.test(emu('status').stdout), '...and with the lock let go, none is running');
-}
+});
 const noSrc = reel('--name', 'x');
 ok(noSrc.status !== 0 && /one source: --video FILE, --url URL, --emu \[PKG\] or --display :N/.test(noSrc.stderr || ''),
    `no source is refused naming the four (${(noSrc.stderr || '').trim().slice(0, 70)})`);
@@ -322,7 +322,7 @@ ok(noVid.status !== 0 && /no such video/.test(noVid.stderr || ''), 'a video that
 // carries none. The heading lands inside the second aerie capture shot waits
 // for; a page that changes later than that is one it cannot know about,
 // and --wait is for it.
-{
+await section("aerie capture shot at rest", async () => {
   const { spawn } = await import('node:child_process');
   const web = `${S}/web`; mkdirSync(web, { recursive: true });
   // Two pages (B392). The settled shots take the one whose heading lands
@@ -354,12 +354,12 @@ ok(noVid.status !== 0 && /no such video/.test(noVid.stderr || ''), 'a video that
   const gone = shot('', `${S}/gone.png`, '--now');
   ok(gone.status === 3 && !existsSync(`${S}/gone.png`) && /did not answer/.test(gone.stderr || ''),
      `...and a page that does not answer is no picture and exit 3, saying so (${gone.status}; ${(gone.stderr || '').trim().slice(0, 80)})`);
-}
+});
 // B143: this session's own token goes to the controller's origin alone. A
 // page on another host (here the same loopback under another port, as a dev
 // instance on bb-sandbox:7680 was beside the controller's :7680) is shot
 // and recorded without it; the controller itself is shot with it.
-{
+await section("B143: this session's own token goes to the controller's origin alone", async () => {
   const { spawn } = await import('node:child_process');
   const web = `${S}/heard`; mkdirSync(web, { recursive: true });
   const log = `${web}/auth.log`;
@@ -399,5 +399,5 @@ http.server.HTTPServer(("127.0.0.1", int(sys.argv[1])), H).serve_forever()
      && home.status === 0 && /Bearer bbs_dGVzdA/.test(homeHeard),
      `this session's token goes to the controller alone: a page elsewhere on its port is shot and recorded without it, the controller with it (${
        JSON.stringify({ away: awayHeard.trim().split('\n')[0], home: homeHeard.trim().split('\n')[0], reel: reelHeard.trim().split('\n')[0] })})`);
-}
+});
 await done();

@@ -7,7 +7,7 @@
 // device, a read-only person's change is refused, and a device waiting on
 // the project wakes when another changes it. The Profile page lists the
 // devices and Disconnect signs one out. No browser.
-import { ok, done, sleep, until, DIR, URL, OWNER as ADMIN, asUser, asSession } from './lib.mjs';
+import { ok, done, sleep, until, DIR, URL, OWNER as ADMIN, asUser, asSession, section } from './lib.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 
@@ -125,7 +125,7 @@ ok(woke.status === 200 && (woke.changes || []).some(c => c[0] === 'from-laptop.t
 // ...and one written on the controller some other way (a merge, a commit, a
 // file written straight onto its disk) is found by the waiting poll's own
 // scan within seconds, not at the app's next look of its own.
-{
+await section("and one written on the controller some other way", async () => {
   const at2 = (await dev(b.token, 'sync', { action: 'state', project: 'alpha' })).rev;
   const t1 = Date.now();
   const waiting2 = dev(b.token, 'sync', { action: 'since', project: 'alpha', rev: at2, wait: 20 });
@@ -135,13 +135,13 @@ ok(woke.status === 200 && (woke.changes || []).some(c => c[0] === 'from-laptop.t
   const woke2 = await waiting2;
   ok(woke2.status === 200 && (woke2.changes || []).some(c => c[0] === 'on-the-disk.txt') && Date.now() - t1 < 12000,
      `...and a file written on the controller's disk reaches a waiting device by its poll's scan (${Date.now() - t1} ms)`);
-}
+});
 
 // ---- the app itself (apps/windows/bbcompanion), its own command line against this server -----------
 // The agent's sync, shared, on the device door: signed in, a project picked
 // into a folder, the first copy made; then a change made in the folder goes
 // up and one made elsewhere comes down, with nothing but the app running.
-{
+await section("the app itself", async () => {
   const appEnv = { ...process.env, APPDATA: `${DIR}/appdata`, PYTHONPATH: `${REPO}/apps/windows:${REPO}/scripts/agent`,
                    BB_COMPANION_PASSWORD: people['dv.rw'] };
   const app = (...args) => { try { return { code: 0, out: execFileSync('python3', ['-m', 'bbcompanion', ...args], { env: appEnv, encoding: 'utf8', timeout: 120000 }) }; }
@@ -199,7 +199,7 @@ ok(woke.status === 200 && (woke.changes || []).some(c => c[0] === 'from-laptop.t
        `on Ask the person at the PC is asked, and an app with no window says no (${asked.got.state}: ${asked.got.result?.text})`);
     await admin('/api/prefs', { project: 'alpha', pc: 'deny' });
   } finally { daemon.kill(); }
-}
+});
 
 // ---- Profile lists them, and Disconnect signs one out ---------------------------------------
 const PERSON = asUser('dv.rw', people['dv.rw']);
@@ -218,7 +218,7 @@ ok(otherOut.error && (await dev(b.token, 'whoami', {})).status === 200,
    `another account cannot sign a person's device out (${otherOut.error})`);
 // ...but an administrator sees each account's devices on the Users page
 // and cuts one off for them (R272 step 8): seeing and revoking, never driving.
-{
+await section("but an administrator sees each account's devices on the Users page", async () => {
   const ul = await (await fetch(`${base}/api/users`, { headers: ADMIN })).json();
   const theirs = (ul.users || []).find(u => u.name === 'dv.rw')?.devices || [];
   const cut = await admin('/api/users', { action: 'device-signout', name: 'dv.rw', device: b.device.id });
@@ -226,12 +226,12 @@ ok(otherOut.error && (await dev(b.token, 'whoami', {})).status === 200,
   ok(theirs.some(d => d.id === b.device.id) && theirs.every(d => !('secret_hash' in d)) && cut.ok
      && (await dev(b.token, 'whoami', {})).status === 401 && !(asPerson.users || []).some(u => u.devices),
      `an administrator sees an account's devices and disconnects one for them; nobody else sees them (${JSON.stringify(cut)})`);
-}
+});
 
 // ---- the apps this controller offers, from its release (R272 step 3) --------------------------
 // A release with the three apps and their sha256 files, as the release
 // workflows attach them; the controller is 0.4.0-dev, so v0.4.0 matches.
-{
+await section("the apps this controller offers, from its release", async () => {
   const { createHash } = await import('node:crypto');
   const rel = `${DIR}/release`;
   mkdirSync(rel, { recursive: true });
@@ -285,6 +285,6 @@ ok(otherOut.error && (await dev(b.token, 'whoami', {})).status === 200,
   const hidden = await fetch(`${base}/apps/companion/aerieos-companion-0.4.0.exe`, { headers: PERSON });
   ok((plain.apps || []).map(x => x.name).join() === 'android' && hidden.status === 404,
      `without dev features only the Android app is offered, and the companion is not served (${(plain.apps || []).map(x => x.name)}; ${hidden.status})`);
-}
+});
 
 done();

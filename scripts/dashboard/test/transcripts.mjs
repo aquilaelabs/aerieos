@@ -2,7 +2,7 @@
 // newest first with the first thing typed, and each downloadable as a text
 // that carries the words, every command Claude ran and what came back, and
 // never Claude's private reasoning nor another account's file.
-import { URL, launch, newPage, ok, done, ready, DIR, splitPick } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, DIR, splitPick, section } from './lib.mjs';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -121,7 +121,7 @@ await page.evaluate(() => { resumePick = null; resumeFor = null; drawProjects(st
 // A label, a note and Kept (R236, the operator, 12 Nov): Edit swaps a row's
 // fields in, Save says each to the controller, and the row is then read by
 // its label, its first words still under it.
-{
+await section("A label, a note and Kept", async () => {
   const ROW = `${SESS} [data-cvrow="conv-two-2025"]`;
   await page.click(`${ROW} [data-cvedit]`);
   await page.waitForSelector(`${ROW} .cvform`, { timeout: 10000 });
@@ -164,7 +164,7 @@ await page.evaluate(() => { resumePick = null; resumeFor = null; drawProjects(st
   }
   await page.evaluate(() => openNotebook('alpha', 'sessions'));
   await page.waitForSelector(`${SESS} .cvlogs .artrow`, { timeout: 10000 });
-}
+});
 
 const tokyo = await page.evaluate(async () => (await fetch('/api/transcript?project=alpha&id=conv-one-2026&tz=Asia/Tokyo')).text());
 ok(/You \(2026-09-28 19:15\):/.test(tokyo), 'the stamps follow the zone the link names');
@@ -203,7 +203,7 @@ ok(/not by a session/.test(bySession.error || ''), `a session cannot make a conv
 await page.evaluate(() => openNotebook('alpha', 'sessions'));
 await page.waitForSelector(`${SESS} [data-cvresume="conv-two-2025"]`, { timeout: 15000 });
 const rowOf = id => `${SESS} .artrow:has([data-cvresume="${id}"])`;
-{
+await section("A person's own session says the same of their conversations", async () => {
   // A person's own session says the same of their conversations (aerie transcripts label).
   const cliS = (...a) => execFileSync('bash', [`${REPO}/scripts/aerie`, ...a], { encoding: 'utf8',
     env: { ...process.env, BUILDERBOT_ROLE: 'node', BB_CONTROLLER: URL.replace(/\/$/, ''), BB_TOKEN: token, BB_PROJECT: 'alpha', XDG_CACHE_HOME: `${DIR}/cache-transcripts` } });
@@ -213,7 +213,7 @@ const rowOf = id => `${SESS} .artrow:has([data-cvresume="${id}"])`;
      `aerie transcripts label names one from a session, and the list prints each under its label, a kept one marked and its note under it (${said.trim()})`);
   const del = await sfetch('/api/transcripts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project: 'alpha', id: 'conv-one-2026', action: 'delete' }) }).then(r => r.status, () => 0);
   ok(del === 403, `...while deleting one stays its person's, never a session's (${del})`);
-}
+});
 // A row's ⋯ opened until its item shows (B384): a redraw landing between
 // the press and the menu replaced the row, and the menu opened on the one
 // taken away.

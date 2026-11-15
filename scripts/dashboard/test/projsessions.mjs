@@ -3,7 +3,7 @@
 // A session is its account's (B172): nobody presses a key or types into
 // another person's, administrators included, and that still holds. Ending
 // one is the single exception, and an administrator's alone.
-import { launch, newPage, ok, done, ready, settled, tmuxNew, tmuxKill, URL, DIR, OWNER as H, asUser } from './lib.mjs';
+import { launch, newPage, ok, done, ready, settled, tmuxNew, tmuxKill, URL, DIR, OWNER as H, asUser, section } from './lib.mjs';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
@@ -86,7 +86,7 @@ ok(!((await call('/api/project-sessions?project=alpha')).sessions || []).some(r 
 // the bare name the status read them as unowned: an account given the
 // project listed the owner's Claude as one of its own, on Sessions and in
 // Sign out's count (the operator, 16 Oct).
-{
+await section("the owner's Claude on a node is the owner's alone", async () => {
   const ustate = JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users;
   const ownerUid = Object.values(ustate).find(u => u.role === 'owner').uid;
   const sample = extra => fetch(base + '/api/v1/agent/work', { method: 'POST',
@@ -100,7 +100,7 @@ ok(!((await call('/api/project-sessions?project=alpha')).sessions || []).some(r 
   ok(!watch.length && own.includes('claude-alpha'),
      `the owner's Claude session on a node is listed for the owner, bare, and for nobody else given the space (owner ${JSON.stringify(own)}, w.watch ${JSON.stringify(watch)})`);
   await sample([]);
-}
+});
 
 // ---- the dialog: at its foot, for an administrator -----------------------------
 const browser = await launch();
@@ -150,7 +150,7 @@ ok(!plainSess.shown && plainSess.ends === 0,
 ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + page.errors.join(' | ') : ''}`);
 // A project with a session open on a node cannot be deleted from under it
 // (B242): Delete read only this container's tmux, where no session runs now.
-{
+await section("A project with a session open on a node cannot be deleted from under it", async () => {
   const onNode = `${uid}~codex-gamma`;
   const r = await fetch(base + '/api/v1/agent/work', { method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + agent.token },
@@ -160,7 +160,7 @@ ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + p
   ok(r.ok && del.status === 409 && del.error?.includes(onNode),
      `a space with a session running on a node is refused Delete, naming the session (${del.status} ${del.error})`);
   await beat();
-}
+});
 
 // Nothing left for the next file: the sessions, and the node, retired the
 // way auth.mjs retires its own.

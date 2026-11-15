@@ -7,7 +7,7 @@
 // a page is named by the rows on it and never by a number. What is tested
 // here is that the helper is wired to every list, that a short list is left
 // whole, and that turning a page never drops rows or their behavior.
-import { launch, newPage, ok, done, ready, URL, DIR, nbGo } from './lib.mjs';
+import { launch, newPage, ok, done, ready, URL, DIR, nbGo, section } from './lib.mjs';
 import { writeFileSync, readFileSync, readdirSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 
 // alpha's tracker, made long enough to page. Written straight to the state
@@ -123,11 +123,11 @@ for (const [what, call] of [
 // ...and the Jobs tab, which lives in its own file. It is the list that grows
 // without bound (every compose action, exec and agent update stays on it),
 // so it was the one most in need of paging and the one that had none.
-{
+await section("and the Jobs tab, which lives in its own file", async () => {
   const jsrc = readFileSync(new globalThis.URL('../tab-jobs.js', import.meta.url), 'utf8');
   ok(jsrc.includes('paginate(tbl, ":scope > .jbrow"'),
      'jobs are paged, by the rows the tab really renders');
-}
+});
 
 // ---- one bucket per notebook, not one for all of them ----------------------
 // A notebook is a CLONE of one template, so every id inside it belongs to
@@ -137,7 +137,7 @@ for (const [what, call] of [
 // wiped a long one's page in another, and the reported symptom was paging
 // not working: it turned, then snapped back on the next redraw, a second
 // or two later.
-{
+await section("one bucket per notebook, not one for all of them", async () => {
   mkdirSync(`${DIR}/ws/alpha/dist/pagemany`, { recursive: true });
   for (let i = 1; i <= 34; i++)
     writeFileSync(`${DIR}/ws/alpha/dist/pagemany/f-${i}.bin`, 'x');
@@ -173,7 +173,7 @@ for (const [what, call] of [
      `...and a short list in another notebook does not turn it back (${await shown()} of ${opened})`);
   rmSync(`${DIR}/ws/alpha/dist/pagemany`, { recursive: true, force: true });
   rmSync(`${DIR}/ws/beta/dist`, { recursive: true, force: true });
-}
+});
 
 ok((await page.errors).length === 0, 'no console errors from paging');
 await done(browser);

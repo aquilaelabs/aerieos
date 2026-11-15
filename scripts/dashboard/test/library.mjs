@@ -4,7 +4,7 @@
 // /api/library; the search and the chips narrow the list and save nothing;
 // a row opens on its description; the verbs are the pages' own (an install
 // is the toolchain job, which the bb stub runs in a second).
-import { launch, newPage, ok, done, ready, URL } from './lib.mjs';
+import { launch, newPage, ok, done, ready, URL, section } from './lib.mjs';
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
@@ -69,7 +69,7 @@ ok(await page.evaluate(() => libTierWord('official') === 'Packaged by Aerie' && 
    'the tier chips are Packaged by Aerie, Verified, Vetted and Sideloaded');
 // ...and to the left of that pill a card names who the tool itself is by
 // (the operator, 12 Nov): the tier is the pack's, the maker the tool's.
-{
+await section("and to the left of that pill a card names who the tool itself is by", async () => {
   const by = await page.evaluate(() => { const c = document.querySelector('.librarytab .lcard[data-lrow="toolchain:jdk"] .lcmeta');
     return c && { first: c.firstElementChild?.className, text: c.firstElementChild?.textContent, pill: c.querySelector('.pill')?.textContent,
                   left: c.firstElementChild.getBoundingClientRect().right <= c.querySelector('.pill').getBoundingClientRect().left + 1 }; });
@@ -81,7 +81,7 @@ ok(await page.evaluate(() => libTierWord('official') === 'Packaged by Aerie' && 
     lint: makerLine((lib.rows || []).find(r => r.name === 'lint-tools') || {}).replace(/<[^>]+>/g, '') }));
   ok(!made.none.length && /^Put together by AerieOS from other people's work: shellcheck \(Vidar Holen\), .*ruff \(Astral\)/.test(made.lint),
      `every card AerieOS ships names a maker, and one of several makers' tools is AerieOS's with each credited in its Details (${made.none.join(', ') || 'all named'}; ${made.lint.slice(0, 90)})`);
-}
+});
 ok(await page.evaluate(() => {
   const head = document.querySelector('.doc .librarytab .pghead');
   return !!head && /Installed/.test(head.textContent);
@@ -177,7 +177,7 @@ const toLibrary = async () => {
   await page.evaluate(() => openLibrary());
   await page.waitForSelector('.doc .librarytab .lcard', { timeout: 15000 });
 };
-{
+await section("a toolchain card to open", async () => {
   const key = await page.evaluate(() => document.querySelector('.doc .librarytab .lcard[data-lrow^="toolchain:"]')?.dataset.lrow || '');
   ok(!!key, `a toolchain card to open (${key})`);
   const sel = `.doc .librarytab .lcard[data-lrow="${key}"]`;
@@ -194,12 +194,12 @@ const toLibrary = async () => {
   await page.click('.pane .bar [data-shellback]');
   await page.waitForFunction(() => tabOf(panes[0])?.kind === 'library', null, { timeout: 10000 });
   ok(true, '...and Back returns to the Library');
-}
+});
 
 // ---- the whole description (step 2) -----------------------------------------
 // An app's page holds its compose file with the blanks New container fills;
 // a toolchain's what it adds to a session and its terms.
-{
+await section("the whole description", async () => {
   const app = await page.evaluate(() => lib.rows.find(r => r.kind === 'app' && !r.wrong_platform) ? `app:${lib.rows.find(r => r.kind === 'app' && !r.wrong_platform).name}` : '');
   if (app){
     await toEntry(app);
@@ -222,14 +222,14 @@ const toLibrary = async () => {
        "Claude Code's page holds its facts, pointing at the Installed page for this person's sign-in (R172: the Library is the catalog)");
   }
   await toLibrary();
-}
+});
 
 // ---- the verbs are the pages' own ------------------------------------------
 // Install on a toolchain row that is not installed: the toolchain job on
 // the node, which the stub agent answers at once (it fails the install, as
 // toolchains.mjs's node tests find), and the row then says what the
 // job said: installed, or what failed under the row, as that page does.
-{
+await section("the verbs are the pages' own", async () => {
   const name = await page.evaluate(() => lib.rows.find(r => r.kind === 'toolchain' && !r.installed && r.verb === 'install' && !r.wrong_platform)?.name || '');
   if (name){
     await page.click(`.doc .librarytab [data-libact="install"][data-libname="${name}"]`);
@@ -241,7 +241,7 @@ const toLibrary = async () => {
        : r.querySelector('.sub.bad')?.textContent === s.err, said),
        said.installed ? '...and an installed row offers Remove' : '...and what failed is said under the row');
   } else ok(true, 'nothing uninstalled to install on the stub');
-}
+});
 // Install on an app row opens New container with that app picked.
 if (await page.$('.doc .librarytab [data-libkind="app"][data-libact="install"]')){
   const id = await page.$eval('.doc .librarytab [data-libkind="app"][data-libact="install"]', b => b.dataset.libname);
@@ -256,7 +256,7 @@ if (await page.$('.doc .librarytab [data-libkind="app"][data-libact="install"]')
 // ---- the bar's Check for updates (step 5) ------------------------------------
 // The check is the Toolchains job's: the bar says it is checking while it
 // runs, and the head says when versions were last checked once it ends.
-{
+await section("the bar's Check for updates", async () => {
   await page.click('.doc .librarytab [data-libcheck]');
   await page.waitForFunction(() => lib?.job?.action === 'check' && !lib.job.running, null, { timeout: 60000 });
   ok(await page.$eval('.doc .librarytab [data-libcheck]', b => !b.disabled && /check/i.test(b.textContent)),
@@ -269,13 +269,13 @@ if (await page.$('.doc .librarytab [data-libkind="app"][data-libact="install"]')
     return said === !!(lib.store?.checked) ? {checked: lib.store?.checked || 0, said} : null;
   }, null, { timeout: 10000 }).then(h => h.jsonValue());
   ok(when.said === !!when.checked, `...and the head says when versions were checked only once the node has a time (${when.checked ? 'said' : 'none yet, not drawn'})`);
-}
+});
 
 // ---- Add your own: an app of the person's own (step 3) -----------------------
 // The bar's Add your own opens one dialog for a tool pack or an app; an app
 // is a compose file with the known blanks, looked at before it is kept,
 // offered on an Apps card as sideloaded with Edit, and in New container.
-{
+await section("Add your own", async () => {
   const COMPOSE = 'services:\n  notes:\n    image: ghcr.io/example/notes:2.4.1\n    ports:\n      - "${PORT}:8080"\n    volumes:\n      - ${DATA}/notes:/data\n';
   await page.evaluate(async () => { await postJSON('/api/nasapps', {action: 'remove', app: 'notes'}); });   // a run cut short may have left it
   await page.click('.doc .librarytab [data-libadd]');
@@ -313,13 +313,13 @@ if (await page.$('.doc .librarytab [data-libkind="app"][data-libact="install"]')
   await page.evaluate(() => document.querySelector('.modal.askdlg:not([hidden]) [data-ai="0"]').click());
   await page.waitForFunction(() => document.getElementById('tpmodal').hidden && !lib?.rows.some(r => r.kind === 'app' && r.name === 'notes'), null, { timeout: 15000 });
   ok(true, 'Remove in there takes it off the catalog, and the card goes');
-}
+});
 
 // ---- a service's card: the catalog's entry alone (R172) ----------------------
 // The model router is a Services card whose Install is dead until something
 // is behind it, set on the Installed page; its Details show the entry and
 // draw no Configure of their own.
-{
+await section("a service's card", async () => {
   const RT = '.doc .librarytab .lcard[data-lrow="service:model-router"]';
   ok(await page.$(RT) !== null && await page.$eval(RT, c => /packaged by aerie/.test(c.querySelector('.lcmeta').textContent) && c.querySelector('[data-libact="install"]')?.disabled === true),
      'the model router is a Services card, packaged by Aerie, its Install dead while nothing is behind it');
@@ -327,7 +327,7 @@ if (await page.$('.doc .librarytab [data-libkind="app"][data-libact="install"]')
   ok(await page.$eval(ENTRY('service:model-router'), c => !c.querySelector('.lcform') && !c.querySelector('[data-signin]') && /Installed page/.test(c.querySelector('.ldetail').textContent)),
      '...and its page is the entry alone, pointing at the Installed page for what is set per node');
   await toLibrary();
-}
+});
 
 // ---- no node ---------------------------------------------------------------
 await page.evaluate(() => { nodesList = []; libNode = ''; lib = null; loadLibrary(); });

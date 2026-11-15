@@ -3,7 +3,7 @@
 // no notebook foot; Export as a zip; and aerie wiki for a session, under
 // Agents may: Write the wiki. Pushing to a forge is wiki.py's unit tier,
 // against a repository on disk: the harness has no forge.
-import { launch, newPage, ok, done, ready, URL, DIR } from './lib.mjs';
+import { launch, newPage, ok, done, ready, URL, DIR, section } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 
@@ -134,7 +134,7 @@ ok(await page.$eval(`${NB} .wkpick`, l => { const w = l.querySelector(':scope > 
 await page.setViewportSize({ width: 1280, height: 1000 });
 // Rename asks in a box under the article's tabs, not the browser's prompt
 // (R256 step 4): the name to change in it, Enter to rename, Escape to leave.
-{
+await section("Rename asks in a box under the article's tabs, not the browser's prompt", async () => {
   // Home links to the page about to be renamed: the rename moves the link.
   const h = await api(`/api/wiki?project=${P}&page=Home`);
   // The view reads the wiki again when a page of it is saved, and draws
@@ -162,7 +162,7 @@ await page.setViewportSize({ width: 1280, height: 1000 });
   ok(after.text === 'See [[Building it]].\n', `...and a link to it on another page follows it (${JSON.stringify(after.text)})`);
   ok(await page.evaluate(() => /links to it on 1 page now use its new name/.test(document.body.textContent)),
      '...and the page says how many pages it changed');
-}
+});
 await api('/api/prefs', { project: P, gate: { wiki: 'ask' } });
 ok(/held for the operator's approval/.test(bb('save', 'Faq', src)) && /no page called/.test(bbErr('show', 'Faq')),
    'under ask a session\'s page is held, not written');

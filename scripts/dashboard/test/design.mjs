@@ -3,7 +3,7 @@
 // for what they are for. Staged behind the notebook's Save; the prompts and
 // docs/design-language.md are the server's words, which is what aerie design
 // prints. The view is passive: nothing on it reaches into a session.
-import { launch, newPage, ok, done, ready, patience, openFold, URL, DIR, settled, quiet, OWNER } from './lib.mjs';
+import { launch, newPage, ok, done, ready, patience, openFold, URL, DIR, settled, quiet, OWNER, section } from './lib.mjs';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
@@ -52,7 +52,7 @@ const api = (path, body) => page.evaluate(async ([p, b]) => {
 }, [path, body]);
 
 // ---- the record, empty --------------------------------------------------------------
-{
+await section("the record, empty", async () => {
   const d = await api(`/api/design?project=${P}`);
   ok(d.status === 200 && d.pages.length === 0 && d.language.themes.length === 0
      && !('font' in d.language) && (d.language.scope || '') === ''
@@ -70,7 +70,7 @@ const api = (path, body) => page.evaluate(async ([p, b]) => {
   ok(d.presets.schemes[0].key === 'default' && d.presets.schemes.slice(1).map(s => s.key).join()
        === d.presets.schemes.slice(1).map(s => s.key).sort().join(),
      'the schemes lead with Default and are alphabetical after it');
-}
+});
 
 // ---- the view: add a page, lay it out, save ------------------------------------------
 await page.evaluate(n => openNotebook(n, 'design'), P);
@@ -131,7 +131,7 @@ ok(await page.$eval(`${NB} [data-dspage] .dsblock.on`, e => e.style.gridRow) ===
 // it, which is allowed now (the operator, 29 Sep): a later layer draws
 // over an earlier one, and the layers beside the board are the way to a
 // block another covers, top first, the selected one marked.
-{
+await section("Dragged a column to the right, the chart partly covers the list beside", async () => {
   const layers = await page.$$eval(`${NB} [data-dspage] .dslayers .dslayer`, rs => rs.map(r => `${r.dataset.dsl}${r.classList.contains('on') ? '*' : ''}:${r.querySelector('b').textContent}`));
   ok(layers.join(' ') === '5:List 4*:Chart 3:Card 2:Card 1:Card 0:Header' && !(await page.$(`${NB} .dsclash`)),
      `blocks may overlap, and the layers list names them top first with the selected one marked (${layers.join(' ')})`);
@@ -181,7 +181,7 @@ ok(await page.$eval(`${NB} [data-dspage] .dsblock.on`, e => e.style.gridRow) ===
   await page.click(`${NB} [data-dspage] .dslayer[data-dsl="4"]`);
   await page.waitForFunction(() => document.querySelector('.nb [data-dspage] .dsblock.on')?.dataset.i === '4', null, { timeout: 5000 });
   await page.focus(`${NB} [data-dspage] .dsblock.on`);
-}
+});
 await page.keyboard.press('Shift+ArrowLeft');
 ok(await page.$eval(`${NB} [data-dspage] .dsblock.on`, e => e.style.gridColumn) === '2 / span 7',
    '...and narrowed by a column it sits beside the list again');
@@ -238,7 +238,7 @@ ok(await page.$eval(`${NB} [data-sect="design:themes"] > summary .sst`, e => e.t
 // A frame changed and changed back is where it was (B348): to Phone the
 // blocks are clamped into six columns, and back on Desktop they sit where
 // they sat, not squeezed.
-{
+await section("A frame changed and changed back is where it was", async () => {
   await openSect('pages');   // one section open at a time (the operator, 5 Oct)
   const places = () => page.$$eval(`${NB} [data-dspage] .dsblock`, bs => bs.map(b => `${b.style.gridColumn} | ${b.style.gridRow}`).join('; '));
   const desk = await places();
@@ -258,7 +258,7 @@ ok(await page.$eval(`${NB} [data-sect="design:themes"] > summary .sst`, e => e.t
   const kept = (await api(`/api/design?project=${P}`)).pages[0];
   ok(kept.frame === 'desktop' && kept.layouts?.phone?.length === kept.blocks.length && kept.layouts.phone.every(r => r.x + r.w <= 6),
      `Save keeps the other frame's layout with the page, one place per block (${JSON.stringify(kept.layouts?.phone?.[4])})`);
-}
+});
 await page.selectOption(`${NB} [data-dspage] [data-dsf="platform"]`, 'android');
 await page.waitForFunction(() => document.querySelector('.nb [data-dspage] .dsboard')?.dataset.frame === 'phone', null, { timeout: 5000 });
 const frames = await page.$$eval(`${NB} [data-dspage] [data-dsf="frame"] option`, os => os.map(o => o.value));
@@ -288,7 +288,7 @@ ok(again.language.themes[1].light?.[0]?.hex === '#123456' && again.language.them
 // Settings): a changed choice, a theme added, a page added and a rule typed
 // leave the record as it is until the foot's Save, and Revert puts the view
 // back to what is saved.
-{
+await section("nothing takes effect until Save", async () => {
   const before = await api(`/api/design?project=${P}`);
   await openSect('themes');
   await page.selectOption(`${NB} #dsThemePick`, '0');
@@ -348,7 +348,7 @@ ok(again.language.themes[1].light?.[0]?.hex === '#123456' && again.language.them
   ok(/^2 themes/.test(await page.$eval(`${NB} [data-sect="design:themes"] > summary .sst`, e => e.textContent))
      && !(await page.$(`${NB} [data-dsrules="t0"] .rulerow.editing`)) && !(await saveAwake()),
      'Revert puts the view back to what is saved: the choice, the themes, the pages and the rules, and Save sleeps again');
-}
+});
 // From here rather than the page, so the refusal is not a console error.
 const badR = await fetch(URL.replace(/\/$/, '') + '/api/design', { method: 'POST',
   headers: OWNER,
@@ -362,7 +362,7 @@ ok(bad.status === 400 && /a color is #rrggbb/.test(bad.error), `a color that is 
 // start on "not chosen", and each says what it means once it is chosen.
 // They are each theme's (the operator, 29 Sep): the default theme's are
 // the design's, and another theme's are said under it where they differ.
-{
+await section("A choice nobody made promises nothing", async () => {
   const first = await page.$$eval(`${NB} #dst-0-font, ${NB} #dst-0-corners, ${NB} #dst-0-density, ${NB} #dst-0-motion`,
     ss => ss.map(x => `${x.value}|${x.options[0].textContent}`).join());
   ok(first === '|not chosen,|not chosen,|not chosen,|not chosen',
@@ -406,7 +406,7 @@ ok(bad.status === 400 && /a color is #rrggbb/.test(bad.error), `a color that is 
   await saved();
   await page.selectOption(`${NB} #dsThemePick`, '0');
   await page.waitForSelector(`${NB} [data-dstheme="0"]`, { timeout: 5000 });
-}
+});
 
 // ---- the file, and aerie design -----------------------------------------------------------
 await page.click(`${NB} #dsWrite`);
@@ -430,7 +430,7 @@ ok(bb('show', 'the home dashboard') === shown && /^Build or restyle the home das
 ok(bb('file') === written, 'aerie design file prints the file as the notebook wrote it');
 // A branch's own record, not the saved one (B227): aerie design json, edited,
 // renders through --from, and the notebook's design is left as it was.
-{
+await section("A branch's own record, not the saved one", async () => {
   const mine = `${DIR}/design-mine.json`;
   writeFileSync(mine, bb('json').replaceAll('#ff8800', '#00aa55'));
   const fromMine = bb('file', '--from', mine);
@@ -442,7 +442,7 @@ ok(bb('file') === written, 'aerie design file prints the file as the notebook wr
   writeFileSync(mine, JSON.stringify({ language: { themes: [{ name: 'x', mode: 'sideways' }] }, pages: [] }));
   try { bb('file', '--from', mine); } catch (e) { bad = String(e.stderr); }
   ok(/ERROR/.test(bad), `...and a record that would not save is refused the way a save is (${bad.trim()})`);
-}
+});
 let err = '';
 try { bb('show', 'nowhere'); } catch (e) { err = String(e.stderr); }
 ok(/no page, theme or rule here called 'nowhere'/.test(err), `...and a page that is not there is refused by name (${err.trim()})`);
@@ -452,7 +452,7 @@ ok(/no page, theme or rule here called 'nowhere'/.test(err), `...and a page that
 // (the survey of 28 Sep): a success color, a second surface or a chart
 // ramp by name, the exact font stacks, a dialog over the page, a phone
 // held sideways.
-{
+await section("beyond the ten", async () => {
   const pre = (await api(`/api/design?project=${P}`)).presets;
   ok(pre.tokens.map(t => t.key).join() === 'bg,panel,ink,dim,line,accent,warn,bad,note,good'
      && pre.kinds.some(k => k.key === 'overlay') && pre.frames.landscape.cols === 12,
@@ -508,13 +508,13 @@ ok(/no page, theme or rule here called 'nowhere'/.test(err), `...and a page that
   ok(back.themes.length === 1 && back.themes[0].name === 'Paper' && back.themes[0].colors.length === 10,
      'Remove takes a color out, Make default moves a theme first, and Remove theme takes the other away');
   ok(await page.$eval(`${NB} [data-dstheme="0"] [data-dstrm]`, b => !b.disabled), '...and the last theme can go too: no theme is a state a design may be in');
-}
+});
 
 // ---- a session writes one: aerie design json, edited, and aerie design save --------------------
 // Asked to put a design language into the notebook, a session reads the
 // record with json, changes it, and saves it back whole: a page without
 // an id is new, one with its id replaces that page.
-{
+await section("a session writes one", async () => {
   const rec = JSON.parse(bb('json'));
   ok(rec.language.themes[0].name === 'Paper' && rec.pages.length === 1 && rec.presets.kinds.length > 10,
      'aerie design json prints the record with the presets it is drawn from');
@@ -551,13 +551,13 @@ ok(/no page, theme or rule here called 'nowhere'/.test(err), `...and a page that
   await page.click(`${NB} [data-dspage="p2"] [data-dspagerm]`);
   await page.waitForFunction(() => document.querySelector('.nb #dsPagePick')?.options.length === 1 && document.querySelector('.nb [data-dspage="p1"]'), null, { timeout: 5000 });
   ok(true, 'Remove page takes it off the pulldown, which shows the first page again');
-}
+});
 
 // ---- the design's rules reach a session the way house rules do ---------------------------
 // A rule with a trigger is named in the briefing and arrives on its turn
 // (rules.matching, through the hooks); one without stands in every
 // briefing whole. aerie rules show reads it like any rule; aerie design show too.
-{
+await section("the design's rules reach a session the way house rules do", async () => {
   const rulesOut = execFileSync('bash', [`${REPO}/scripts/aerie`, 'rules', '--json'], { encoding: 'utf8',
     env: { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws`, BB_PROJECT: P } });
   const eff = JSON.parse(rulesOut);
@@ -862,12 +862,12 @@ ok(/no page, theme or rule here called 'nowhere'/.test(err), `...and a page that
   await saved();
   const gone2 = await api(`/api/design?project=${P}`);
   ok(!gone2.language.themes[1].rules.some(r => r.name === 'hull') && gone2.pages[0].rules.length === 0, 'Remove rule under a theme or a page takes it out');
-}
+});
 
 // ---- the dial: Agents may: Add to the design -------------------------------------------
 // A session's save goes through the project's setting: auto lands it (as
 // above), ask holds it for the operator's approval, deny refuses it by name.
-{
+await section("the dial: Agents may", async () => {
   const gate = mode => api('/api/prefs', { project: P, gate: { design: mode } });
   const rec = JSON.parse(bb('json'));
   rec.pages[0].notes = 'saved under ask';
@@ -887,7 +887,7 @@ ok(/no page, theme or rule here called 'nowhere'/.test(err), `...and a page that
   ok(!ok2.error && (await api(`/api/design?project=${P}`)).pages[0].notes === 'saved under ask',
      `...and Approve lands it as the session's save (${ok2.error || 'ok'})`);
   await gate('auto');
-}
+});
 
 // ---- a page removed, and the record put back ------------------------------------------
 await openSect('pages');   // one section open at a time (the operator, 5 Oct)
@@ -912,7 +912,7 @@ ok(gone.pages.length === 0 && gone.language.themes.length === 1 && gone.language
 // reports). It reads, the map lands on the first theme with the rules,
 // the second theme keeps its choice with no rule named, and the schema
 // prints whatever the store holds.
-{
+await section("A record saved under the build before the choices were each theme's", async () => {
   const store = `${DIR}/state/designs.json`;
   const all = existsSync(store) ? JSON.parse(readFileSync(store, 'utf8')) : {};
   all.beta = { language: { themes: [{ name: 'Dark', mode: 'dark', colors: [], rules: [{ name: 'differences', text: 'x' }] }, { name: 'Light', mode: 'light', colors: [] }],
@@ -929,7 +929,7 @@ ok(gone.pages.length === 0 && gone.language.themes.length === 1 && gone.language
      'aerie design schema and list answer over it');
   delete all.beta;
   writeFileSync(store, JSON.stringify(all));
-}
+});
 // A project read-only to you reads its design with nothing to press that
 // would change it: the editing buttons are not drawn, the fields are there
 // to read, dead (B293). Read-only the way the view reads it (its project's
@@ -937,7 +937,7 @@ ok(gone.pages.length === 0 && gone.language.themes.length === 1 && gone.language
 // here owns the project, so a lock would not hold it), put on the page's
 // record and the view drawn again until the draw is the read-only one: a
 // status read landing between the two put the record back (3 Nov).
-{
+await section("A project read-only to you reads its design with nothing to press that", async () => {
   const roDrawn = hidden => page.waitForFunction(({ p, hidden }) => [...document.querySelectorAll('.nb')].find(n => n.querySelector('#memTitle')?.textContent === `Notebook: ${p}`)
     ?.querySelector('.nbview[data-view="design"]:not([hidden]) #dsWrite')?.hidden === hidden, { p: P, hidden }, { timeout: 3000 }).then(() => true, () => false);
   const drawAs = async why => {
@@ -956,7 +956,7 @@ ok(gone.pages.length === 0 && gone.language.themes.length === 1 && gone.language
   await drawAs('');
   ok(drawn && ro.shown.length === 0 && ro.fields > 0 && !/Write the file/.test(ro.hint),
      `a read-only design draws no press that would change it, its fields there to read (${JSON.stringify({ drawn, ...ro, hint: ro.hint.slice(0, 50) })})`);
-}
+});
 rmSync(`${DIR}/ws/${P}/docs`, { recursive: true, force: true });
 ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + page.errors[0] : ''}`);
 await done(browser);

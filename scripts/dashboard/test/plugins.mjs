@@ -4,7 +4,7 @@
 // controller shows a person theirs on the Profile tab and every account's in
 // aerie diag. Then the two recipes that give the language-server plugins what
 // they run, since a session cannot npm install -g into the store.
-import { URL, launch, newPage, ok, done, ready, sleep, DIR, OWNER as ADMIN, asSession as bearer } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, sleep, DIR, OWNER as ADMIN, asSession as bearer, section } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -79,7 +79,7 @@ ok(store()[owner][minted.id].at === at, 'the same list again is not a write: a h
 
 // The Installed page says them, per agent on that node (R95 step 15, on
 // each agent's row there since R172), and says where they are changed.
-{
+await section("The Installed page says them, per agent on that node", async () => {
   const browser = await launch();
   const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
   await page.goto(URL); await ready(page);
@@ -114,11 +114,11 @@ ok(store()[owner][minted.id].at === at, 'the same list again is not a write: a h
   ok(/your plugins\s*none/.test(empty) && /your MCP servers\s*none/.test(empty),
      `a node that says the account has none takes them off (${empty.slice(0, 60)})`);
   await browser.close();
-}
+});
 
 // ---- aerie diag, for an administrator ----------------------------------------
 await beat([{ ...mine, email: '' }]);
-{
+await section("aerie diag names every account", async () => {
   const r = await call('/api/diag', { sections: ['plugins'] });
   const row = (r.plugins || []).find(x => x.node === 'plugbox');
   ok(row && row.account === 'test' && row.plugins.includes('pyright-lsp@claude-plugins-official 1.0.0 (off)')
@@ -128,10 +128,10 @@ await beat([{ ...mine, email: '' }]);
     env: { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', BB_CONTROLLER: base, DASHBOARD_AUTH: 'test:test' } });
   ok(/== plugins ==/.test(out) && /test on plugbox: .*code-simplifier/.test(out),
      `...and prints them readably (${out.trim().split('\n')[1]?.slice(0, 70)})`);
-}
+});
 
 // ---- what the language-server plugins run -----------------------------------
-{
+await section("what the language-server plugins run", async () => {
   const cat = JSON.parse(readFileSync(join(HERE, '..', '..', 'config', 'toolchains.json'), 'utf8')).toolchains;
   const ls = cat.find(p => p.name === 'language-servers'), kt = cat.find(p => p.name === 'kotlin-lsp');
   const run = ls?.source?.run?.join(' ') || '';
@@ -149,6 +149,6 @@ await beat([{ ...mine, email: '' }]);
   ok(v === '263.4702.0', `...whose version is read out of GitHub's latest-release answer (${v})`);
   const plan = execFileSync('bash', [BB, 'toolchains', 'plan', 'language-servers'], { encoding: 'utf8' });
   ok(/kind\s+command/.test(plan) && /npm install --prefix/.test(plan), 'aerie toolchains plan shows what an install would run');
-}
+});
 
 await done();

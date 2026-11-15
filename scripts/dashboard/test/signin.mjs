@@ -9,7 +9,7 @@
 // the sign-in's job the way an agent would, posts the flow's output as that
 // job's log and reads the code coming back down. No job here ever runs on a
 // real agent, which would find the machine's real Claude Code.
-import { launch, newPage, ok, done, ready, until, refreshUntil, URL, DIR, OWNER as H } from './lib.mjs';
+import { launch, newPage, ok, done, ready, until, refreshUntil, URL, DIR, OWNER as H, section } from './lib.mjs';
 import { readFileSync } from 'node:fs';
 
 const BASE = URL.replace(/\/$/, '');
@@ -208,7 +208,7 @@ await call('/api/v1/nodes', { action: 'online', id: box.id });
 // ChatGPT's, for Codex CLI: a device flow, so the section shows the link and
 // the one-time code the flow printed, for the person to enter on OpenAI's
 // page; nothing is pasted back. The node's report names the account.
-{
+await section("another coding agent's sign-in, on this node", async () => {
   const CX = `.thingtab [data-instnode="${box.id}"][data-thing="agent:codex-cli"] [data-signin="${box.id}"][data-siagent="codex"]`;
   await page.evaluate(id => openInstalledOn(id, 'codex'), box.id);
   await page.waitForSelector(`${CX} [data-si="in"]`, { timeout: 20000 });
@@ -243,10 +243,10 @@ await call('/api/v1/nodes', { action: 'online', id: box.id });
      && xo.type === 'codex-logout' && xo.spec?.uid === me,
      `Sign out asks first and is a codex-logout job there for this account (${xo.type || xo.error})`);
   await call('/api/v1/agent/result', { job: xo.id, state: 'succeeded', exit: 0 }, asNode);
-}
+});
 
 // ---- the agent a project's Start opens (R95 step 4) --------------------------
-{
+await section("the agent a project's Start opens", async () => {
   const set = await call('/api/prefs', { project: 'beta', agent_default: 'codex' });
   await page.evaluate(() => openProjectsTab());
   // One word on every card (the operator, 22 Oct): Start agent, the agent it
@@ -277,7 +277,7 @@ await call('/api/v1/nodes', { action: 'online', id: box.id });
   ok(term.status >= 400 && /do not allow ChatGPT sessions/.test(term.error) && !offeredCodex,
      `an agent the space switches off is refused at its terminal and missing from its chooser (${term.status} ${term.error.slice(0, 60)})`);
   await call('/api/prefs', { project: 'beta', agents_off: '' });
-}
+});
 
 // ---- an account that does not administer ------------------------------------
 // It is shown the nodes its own projects work on, no install or update, and
@@ -290,7 +290,7 @@ await call('/api/roles', { action: 'set', name: 'si-worker', scope: 'projects', 
 await call('/api/roles', { action: 'assign', name: 's.user', project_roles: { beta: ['si-worker'] } });
 // ...with the name and email its commits carry, which a session waits for.
 await call('/api/users', { action: 'edit', name: 's.user', profile: { full_name: 'S User', email: 's.user@example.invalid' } });
-{
+await section("the Claude Code versions it is sent are those nodes", async () => {
   const auth = 'Basic ' + Buffer.from('s.user:s.user-pass-1').toString('base64');
   const up = await newPage(browser, { viewport: { width: 1280, height: 1000 },
     httpCredentials: { username: 's.user', password: 's.user-pass-1' }, extraHTTPHeaders: { Authorization: auth } });
@@ -355,7 +355,7 @@ await call('/api/users', { action: 'edit', name: 's.user', profile: { full_name:
   ok(denied === 403, `the verbs behind the ghosted controls are an administrator's on the server as well (${denied})`);
   up.errors = [];
   await up.context().close();
-}
+});
 
 await call('/api/prefs', { project: 'beta', node: '' });
 await call('/api/v1/nodes', { action: 'retire', id: box.id });

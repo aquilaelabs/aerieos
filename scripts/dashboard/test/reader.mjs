@@ -7,7 +7,7 @@
 // refusal as an empty bin (B87); the settings page does not ask for what
 // the role cannot read (B89); the Profile's Password says what is wrong
 // under the field it is about (B90).
-import { launch, newPage, ok, done, ready, settled, quiet, URL, DIR, nbShown, splitPick, OWNER as owner } from './lib.mjs';
+import { launch, newPage, ok, done, ready, settled, quiet, URL, DIR, nbShown, splitPick, OWNER as owner, section } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 
@@ -148,7 +148,7 @@ ok(!st.snap && !st.sess, '...nor drawn');
 // ---- Tests, Wiki, Design, Artifacts and Pending (B101) --------------------
 // What each has to show, made by the owner: a test run ingested, a wiki
 // page, a build in dist/.
-{
+await section("Tests, Wiki, Design, Artifacts and Pending", async () => {
   const { writeFileSync, mkdirSync } = await import('node:fs');
   writeFileSync(`${DIR}/ws/alpha/.bb-test-run.log`,
     '[dashboard-test] == shape.mjs ==\nPASS  [+0.1s] a row a reader opens\n1 passed, 0 failed in 0.1s\n');
@@ -159,7 +159,7 @@ ok(!st.snap && !st.sess, '...nor drawn');
   writeFileSync(`${DIR}/ws/alpha/dist/rd-app-0.1.0.apk`, 'not really an apk');
   const wk = await api('/api/wiki', { project: 'alpha', action: 'save', name: 'Home', text: 'a page a reader reads', base: '' });
   ok(wk.status === 200, `the owner writes a wiki page for the reader to read (${wk.status} ${wk.error || ''})`);
-}
+});
 await view('tests', '#tstList .tst > summary');
 await page.click('.pane .nb #tstList .tst > summary');
 await page.waitForSelector('.pane .nb #tstList .tst[open] .bfield', { state: 'attached', timeout: 15000 });

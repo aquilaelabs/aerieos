@@ -4,7 +4,7 @@
 // as a field), the session token widened to the reads on every
 // request, every write refused by name, the relayed words kept to reads,
 // the grant carrying the reads for the view, and the briefing naming them.
-import { launch, newPage, ok, done, ready, settled, refreshUntil, saveDialog, sectSave, URL, DIR, prefsOf, projectKey, OWNER as H, asSession } from './lib.mjs';
+import { launch, newPage, ok, done, ready, settled, refreshUntil, saveDialog, sectSave, URL, DIR, prefsOf, projectKey, OWNER as H, asSession, section } from './lib.mjs';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
@@ -115,7 +115,7 @@ ok(noneR.status === 400 && /there is no space called nosuch/.test(noneR.error ||
 // A long command arrives whole (B3): 40 steps are 81 words, which a cap of
 // 64 cut to a --step with nothing after it; past the cap it is refused by
 // name rather than run as a shorter command.
-{
+await section("A long command arrives whole", async () => {
   const steps = Array.from({ length: 40 }, (_, i) => ['--step', `step ${i + 1}`]).flat();
   const long = await relay(['roadmap', 'add', 'forty steps', ...steps], 'alpha');
   const items = JSON.parse(readFileSync(`${DIR}/state/roadmap.json`, 'utf8')).projects?.alpha || [];
@@ -126,10 +126,10 @@ ok(noneR.status === 400 && /there is no space called nosuch/.test(noneR.error ||
   const huge = await relay(['roadmap', 'add', ...Array(1100).fill('w')], 'alpha');
   ok(huge.status === 400 && /sent 1102 words, and a relayed command carries 1024 at most/.test(huge.error || ''),
      `...and one past the cap is refused, naming it (${huge.error})`);
-}
+});
 // The name the dashboard shows answers for its directory (B1): the person
 // says it, and the session repeats it.
-{
+await section("The name the dashboard shows answers for its directory", async () => {
   const rn = await api('/api/rename', { name: 'beta', to: 'beta-shown' });
   const byLabel = await relay(['roadmap'], 'beta-shown');
   const addL = await relay(['roadmap', 'add', 'from alpha'], 'beta-shown');
@@ -139,7 +139,7 @@ ok(noneR.status === 400 && /there is no space called nosuch/.test(noneR.error ||
   // ...and said by the name it is shown under, not its directory (B58).
   ok(addL.status === 403 && /^beta-shown is read-only from a session on alpha/.test(addL.error || ''),
      `...and is held to beta's reads like its directory is, by its shown name (${addL.error})`);
-}
+});
 
 // ---- the grant carries the reads, for the view and the walls ---------------------------
 const grant = await api('/api/v1/tty-grant', { arg: 'claude:alpha' }, asSession(tok));
@@ -149,7 +149,7 @@ ok(Array.isArray(grant.reads) && grant.reads.join() === 'beta',
 // ---- the places on its node a project is shown (prefs.sees, B378) ------------------------
 // A session's view is built from what it is given, so a share mounted on
 // the node is out of it unless the project's settings name it.
-{
+await section("the places on its node a project is shown", async () => {
   const set = await api('/api/prefs', { project: 'alpha', sees: ['/mnt/media/', '/srv/samples', '/mnt/media'] });
   const kept = (await api('/api/status')).projects.find(p => p.name === 'alpha').prefs.sees;
   ok(set.status === 200 && kept.join() === '/mnt/media,/srv/samples',
@@ -239,12 +239,12 @@ ok(Array.isArray(grant.reads) && grant.reads.join() === 'beta',
   ok(!/this space is shown/.test((await api('/api/preamble?project=alpha')).text)
      && !(prefsOf('alpha').sees || []).length,
      '...and with none named the briefing names none');
-}
+});
 
 // ---- what its sessions may still reach where the node filters (Also reaches, 7 Oct) ------
 // An address, or one with a port, on the project's nodes it names (every one
 // when it names none). devapp.mjs proves what the node is handed.
-{
+await section("what its sessions may still reach where the node filters", async () => {
   const set = await api('/api/prefs', { project: 'alpha', reaches: ['192.168.1.50',
     { addr: '192.168.1.60:8123', nodes: ['n_two'] }, { addr: '192.168.1.60:8123', nodes: ['n_one'] }] });
   const kept = (await api('/api/status')).projects.find(p => p.name === 'alpha').prefs.reaches;
@@ -277,14 +277,14 @@ ok(Array.isArray(grant.reads) && grant.reads.join() === 'beta',
   const after = (prefsOf('alpha').reaches || []).map(e => e.addr);
   ok(after.join() === '192.168.1.60:8123,192.168.1.70', `...and Save keeps what the rows say, one removed and one added (${after.join(', ')})`);
   await api('/api/prefs', { project: 'alpha', reaches: [] });
-}
+});
 
 // ---- a read project's containers are read from here (B551, B552) ----------------------
 // bb -p beta devapp from a session on alpha, which reads beta: its listing
 // and its dev instance's state answer for beta, and changing anything of
 // beta's is still refused. Reads are set again here, since a check above
 // may have cleared them.
-{
+await section("a read project's containers are read from here", async () => {
   await api('/api/prefs', { project: 'alpha', reads: ['beta'] });
   const t2 = token('alpha');
   const ls = await api('/api/docker?project=beta', undefined, asSession(t2));
@@ -297,7 +297,7 @@ ok(Array.isArray(grant.reads) && grant.reads.join() === 'beta',
   ok(rb.status === 403, `...while rebuilding it is refused (${rb.status} ${rb.error || ''})`);
   const unread = await api('/api/devapp', { project: 'gamma', action: 'state' }, asSession(t2));
   ok(unread.status >= 400, `...and a space it does not read answers as before (${unread.status})`);
-}
+});
 
 // ---- the briefing names them ------------------------------------------------------------
 const pre = await api('/api/preamble?project=alpha');
@@ -312,7 +312,7 @@ ok(!/This space reads/.test((await api('/api/preamble?project=alpha')).text),
 // What every repository of a space shares is the space's (R223): on a
 // repository's settings it is drawn as the space's, its controls dead, with
 // a press to the space's own dialog; there it is live.
-{
+await section("What every repository of a space shares is the space's", async () => {
   // The dialog draws People and Toolchains when its own reads land: each
   // look is after them.
   const key = await page.evaluate(() => { const key = reposOf('alpha'); renameProject('alpha'); return key; });
@@ -337,10 +337,10 @@ ok(!/This space reads/.test((await api('/api/preamble?project=alpha')).text),
      `a repository's settings draw the space's as the space's, dead, with a press to its dialog, and its own live (${JSON.stringify(got.repo)})`);
   ok(got.space.bands === 0 && !got.space.nodeLocked && / settings$/.test(got.space.title),
      `...and the press opens the space's own dialog, where they are live (${JSON.stringify(got.space)})`);
-}
+});
 // ...and the space's dialog says under a dial which repository sets it
 // apart (R223), and nothing where none does.
-{
+await section("and the space's dialog says under a dial which repository sets it", async () => {
   await page.evaluate(async () => {
     const H = { 'Content-Type': 'application/json' };
     await fetch('/api/prefs', { method: 'POST', headers: H, body: JSON.stringify({ project: 'alpha', scope: 'repository', report: 'deny' }) });
@@ -360,6 +360,6 @@ ok(!/This space reads/.test((await api('/api/preamble?project=alpha')).text),
   });
   ok(/^Set apart: alpha: /.test(apart.said) && apart.others === 1,
      `the space's dialog names, under a dial, the repository that sets it apart (${JSON.stringify(apart)})`);
-}
+});
 ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + page.errors[0] : ''}`);
 await done(browser);

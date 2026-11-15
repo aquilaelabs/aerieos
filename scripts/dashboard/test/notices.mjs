@@ -4,7 +4,7 @@
 // the account's record; the bell a short list with See all; and the
 // Notifications page, its asks answered on the row with the long part in a
 // scrolling box, its history narrowed by chips, deleted and cleared.
-import { URL, DIR, launch, newPage, ok, done, ready, sleep, quiet, api } from './lib.mjs';
+import { URL, DIR, launch, newPage, ok, done, ready, sleep, quiet, api, section } from './lib.mjs';
 import { writeFileSync, rmSync } from 'node:fs';
 
 const until = async (fn, ms = 15000, step = 200) => {
@@ -20,7 +20,7 @@ await ready(page);
 await api('/api/notices', { action: 'clear' });
 
 // ---- the stack -------------------------------------------------------------
-{
+await section("the stack", async () => {
   await page.evaluate(() => { for (let i = 1; i <= 6; i++) notify(`stack ${i}`, i === 6 ? true : i === 5 ? 'warn' : false); });
   const st = await page.evaluate(() => [...document.querySelectorAll('#toast .tst')].map(t => ({
     text: t.querySelector('.tmsg').textContent, cls: t.className, icon: !!t.querySelector('.tic svg'), x: !!t.querySelector('.tx') })));
@@ -46,7 +46,7 @@ await api('/api/notices', { action: 'clear' });
   await page.mouse.move(10, 10);
   await until(() => page.evaluate(() => !document.querySelector('#toast .tst')), 8000);
   ok(await page.evaluate(() => !document.querySelector('#toast .tst')), '...and goes once the pointer leaves');
-}
+});
 
 // ---- a toast stays put when a dialog opens ---------------------------------
 // One place for the stack (the operator, 24 Oct: it moving beside a dialog
@@ -67,7 +67,7 @@ const toastRests = () => page.waitForFunction(() => {
   const t = document.querySelector('#toast .tst');
   return !!t && t.getBoundingClientRect().height > 0 && !moving(t) && !moving(document.getElementById('aboutModal'));
 }, null, { timeout: 10000 }).catch(() => {});
-{
+await section("with a dialog open a toast stays where it was, and its × puts it away", async () => {
   await page.evaluate(() => notify('said before a dialog'));
   await toastRests();
   const before = await toastAt();
@@ -79,19 +79,19 @@ const toastRests = () => page.waitForFunction(() => {
   ok(JSON.stringify(before) === JSON.stringify(during) && pressable && gone,
      `with a dialog open a toast stays where it was, and its × puts it away (${JSON.stringify({ before, during, pressable, gone })})`);
   await page.evaluate(() => { document.querySelectorAll('#toast .tst').forEach(t => t.remove()); closeAbout(); });
-}
+});
 
 // ---- every toast is on the record ------------------------------------------
-{
+await section("every toast is on the record", async () => {
   const kept = await until(async () => {
     const j = await api('/api/notices');
     return (j.notices || []).some(n => n.text === 'read me slowly') && (j.notices || []).some(n => n.text === 'stack 6' && n.level === 'bad') ? j : null;
   });
   ok(kept, 'every toast is kept on the account\'s record, with its level');
-}
+});
 
 // ---- the bell: a short list, and See all ------------------------------------
-{
+await section("the bell: a short list, and See all", async () => {
   await page.click('#bBell');
   await page.waitForSelector('#bellPanel:not([hidden]) #bellAll', { timeout: 5000 });
   const recent = await page.$$eval('#bellPanel .bnote:not(.ask):not(.att)', ns => ns.length);
@@ -101,10 +101,10 @@ const toastRests = () => page.waitForFunction(() => {
   // Hidden when its closing tween lands.
   ok(await page.waitForFunction(() => document.getElementById('bellPanel').hidden, null, { timeout: 3000 }).then(() => true, () => false),
      'See all shuts the bell and opens the Notifications page, at #/notifications');
-}
+});
 
 // ---- the page's history: chips, delete, clear --------------------------------
-{
+await section("the page's history", async () => {
   await page.waitForSelector('.noticestab .ntrow', { timeout: 15000 });
   const n0 = await page.$$eval('.noticestab .ntrow', rs => rs.length);
   ok(n0 >= 7, `the history lists what was said (${n0} rows)`);
@@ -145,10 +145,10 @@ const toastRests = () => page.waitForFunction(() => {
   await page.click('#ntClear');
   await page.waitForFunction(() => !document.querySelector('.noticestab .ntrow'), null, { timeout: 10000 });
   ok((await api('/api/notices')).notices.length === 0, 'Clear all empties the record, asked first');
-}
+});
 
 // ---- an ask: answered on the row, its long part in a scrolling box -----------
-{
+await section("an ask: answered on the row, its long part in a scrolling box", async () => {
   const answered = await page.evaluate(async () => {
     const calls = [];
     const real = phFetch;
@@ -179,10 +179,10 @@ const toastRests = () => page.waitForFunction(() => {
   const rec = await until(async () => ((await api('/api/notices')).notices || []).find(n => n.kind === 'ask'));
   ok(rec && /^Approved: container web on sandbox/.test(rec.text), `...an answer kept on the record as an answer (${rec?.text})`);
   await page.evaluate(() => { ph = { ...(ph || {}), asks: [] }; drawPanes(); });
-}
+});
 
 // ---- a job's toast follows the job, and its end is kept ---------------------
-{
+await section("a job's toast follows the job, and its end is kept", async () => {
   const q = await api('/api/v1/nodes', { action: 'exec', id: 'local', argv: ['sh', '-c', 'sleep 2; exit 4'] });
   await page.evaluate(id => notifyJob(id, 'a job from the suite'), q.job);
   const live = await page.evaluate(() => [...document.querySelectorAll('#toast .tst.job .tmsg')].map(t => t.textContent));
@@ -193,13 +193,13 @@ const toastRests = () => page.waitForFunction(() => {
   const rec = await until(async () => ((await api('/api/notices')).notices || []).find(n => n.kind === 'job' && n.job === q.job));
   ok(rec && rec.level === 'bad', '...and the end is kept on the record as a job\'s, with the job to open');
   await page.evaluate(() => document.querySelectorAll('#toast .tst').forEach(t => t.remove()));
-}
+});
 
 // ---- a session an outage held is offered back -------------------------------
 // R251: a session's gate marks it held while the controller is away, its
 // node's agent reports the mark, and once the controller answers the bell
 // lists it with a Resume that tells it to pick up from its note.
-{
+await section("a session an outage held is offered back", async () => {
   const users = await api('/api/users');
   const uid = (users.users || []).find(u => u.name === 'test')?.uid;
   // As the gate writes it: bb-tty's hook is `bb-gate PROJECT ACCOUNT`, so the
@@ -236,10 +236,10 @@ const toastRests = () => page.waitForFunction(() => {
   ok(gone, `...and the row goes (${await page.evaluate(() => [...document.querySelectorAll('#bellPanel .bnote')]
     .map(n => n.textContent.replace(/\s+/g, ' ').trim().slice(0, 60)).join(' | '))})`);
   await page.evaluate(() => { toggleBell(false); document.querySelectorAll('#toast .tst').forEach(t => t.remove()); });
-}
+});
 
 // ---- on a phone the stack spans the width above the dock's line -------------
-{
+await section("on a phone the stack spans the width above the dock's line", async () => {
   await page.setViewportSize({ width: 393, height: 851 });
   await page.evaluate(() => notify('on a phone'));
   // The page at the phone's width and drawn for it: the breakpoint's
@@ -264,12 +264,12 @@ const toastRests = () => page.waitForFunction(() => {
   ok(open.length === 1 && open[0] === 'notices:history' && !(await page.$('.noticestab details[data-sect="notices:waiting"]')),
      `on a phone, with nothing waiting, the page is its History, open (${open.join(', ')})`);
   await page.setViewportSize({ width: 1280, height: 900 });
-}
+});
 
 // A request that never landed is the controller not answering, said so, and
 // the Phone page's own read leaves it to the poll rather than keeping a
 // failure (B301).
-{
+await section("A request that never landed is the controller not answering, said so, and", async () => {
   const r = await page.evaluate(async () => {
     const words = [failWords(new TypeError('Failed to fetch')), failWords(new Error('quota spent'))];
     const kept = [], realFetch = window.fetch, realNotify = window.notify;
@@ -280,7 +280,7 @@ const toastRests = () => page.waitForFunction(() => {
   });
   ok(r.words[0] === 'the controller did not answer' && r.words[1] === 'quota spent' && !r.kept.some(t => /phone/.test(t)),
      `a fetch that never landed is said as the controller not answering, and the Phone page's own read keeps no failure for it (${JSON.stringify(r)})`);
-}
+});
 
 ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + page.errors.join(' | ') : ''}`);
 await done(browser);

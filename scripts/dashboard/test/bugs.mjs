@@ -3,7 +3,7 @@
 // report is a form submitted once, not a list curated in place), and nothing
 // is ever deleted: a bug closes as fixed or wontfix, each with a note, because
 // a closed bug is the record that stops the same report being chased twice.
-import { launch, newPage, ok, done, ready, nbShown, tmuxCapture, URL, DIR, openFold, closeFold, nbGo } from './lib.mjs';
+import { launch, newPage, ok, done, ready, nbShown, tmuxCapture, URL, DIR, openFold, closeFold, nbGo, section } from './lib.mjs';
 import { readFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -76,7 +76,7 @@ ok(/repro: put a compose file/.test(bbBug('show', '2')),
 ok(/happens: always/.test(bbBug('show', '2')) && /happens: sometimes/.test(bbBug('show', '1')),
    '...and beside its repro, whether it happens every time (R124)');
 // The opened row says it as a fact, and a chip narrows the list by it.
-{
+await section("The opened row says it as a fact, and a chip narrows the list by it", async () => {
   await page.waitForFunction(() => document.querySelectorAll('#bugList .bug').length === 2, null, { timeout: 10000 });
   const chips = await page.$$eval('#bugRepro [data-bgrepr]', bs => bs.map(b => b.dataset.bgrepr));
   await page.click('#bugRepro [data-bgrepr="always"]');
@@ -89,7 +89,7 @@ ok(/happens: always/.test(bbBug('show', '2')) && /happens: sometimes/.test(bbBug
   await page.click('#bugList .bug[data-id="1"] summary');
   ok(chips.join(',') === ',always,sometimes' && left === '2' && /Happens\s*sometimes/.test(fact),
      `the list narrows by whether a bug reproduces, and the opened row says it (${chips.join(',')}; ${left})`);
-}
+});
 // ---- the letter (roadmap #28) ------------------------------------------------
 // A bug is B2, everywhere it is printed; the bare number and the lower-case
 // letter are accepted on the way in; the ROADMAP's letter is refused with a
@@ -138,7 +138,7 @@ ok(!/picker loses/.test(bbBug()), '...and it leaves the open list');
 // it and when, how it was closed and when, with the note; the verbs are an
 // action bar with the one that cannot be undone last. It was six buttons in
 // a plain div with Delete third, where the thumb goes.
-{
+await section("What a report knows is facts above its verbs", async () => {
   const bar = await page.$eval('#bugList .bug[data-id="1"]', el => ({
     bar: el.querySelector('.macts')?.classList.contains('actbar'),
     facts: Object.fromEntries([...el.querySelectorAll('.facts .fact')].map(f => [f.querySelector('dt').textContent, f.querySelector('dd').textContent])),
@@ -147,7 +147,7 @@ ok(!/picker loses/.test(bbBug()), '...and it leaves the open list');
      `a report's facts say who reported it, and when and how it was closed with its note (${JSON.stringify(bar.facts)})`);
   ok(/bRm/.test(bar.last),
      '...and Delete is last, being the one that cannot be undone');
-}
+});
 ok(/\[fixed\]/.test(bbBug('all')), '...but never the tracker: aerie bug all still has it');
 ok(/bug tracker with 1 open \(1 low\)/.test(bbBug('--prompt')),
    '...and the next session is not told of a bug that is already fixed');
@@ -167,20 +167,20 @@ ok(read().find(b => b.id === 1).status_note === 'this time with the resize liste
    '...and closing again writes the new answer');
 // ...but not closing a closed one (bug #70): that overwrote the note that is
 // the whole point of closing, and left no line in the log saying so.
-{
+await section("but not closing a closed one", async () => {
   let said = '';
   try { bbBug('wontfix', '1', 'never mind'); } catch (e) { said = String(e.stderr || ''); }
   ok(/already fixed/.test(said) && /reopen it first/.test(said)
      && read().find(b => b.id === 1).status_note === 'this time with the resize listener',
      'closing a bug that is already closed is refused, and its note survives');
-}
+});
 
 // ---- the version it was seen in, and closed in (roadmap #6) ---------------
 // A tree with no commits has nothing honest to say about its version, and
 // nothing is said: a blank, never a made-up number. Its own project rather
 // than alpha, which another file commits in (B144). A project with a commit
 // gets the same identity `aerie version` prints, on filing and again on closing.
-{
+await section("the version it was seen in, and closed in", async () => {
   const N = `${DIR}/ws/eta`;
   execFileSync('git', ['init', '-q', N]);
   execFileSync(BB, ['bug', 'add', 'filed before any commit', '--sev', 'low'],
@@ -190,8 +190,8 @@ ok(read().find(b => b.id === 1).status_note === 'this time with the resize liste
   ok(e && !('seen_in' in e),
      'a report on a tree with no commits carries no version: a blank rather than a guess');
   execFileSync('rm', ['-rf', N]);
-}
-{
+});
+await section("a report is stamped with the space", async () => {
   const Z = `${DIR}/ws/zeta`;
   const genv = { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@x',
                  GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@x' };
@@ -216,7 +216,7 @@ ok(read().find(b => b.id === 1).status_note === 'this time with the resize liste
   ok(!('fixed_in' in zread()[0]),
      'reopening takes the closed-in stamp with the note, since it turned out not to be true');
   execFileSync('rm', ['-rf', Z]);
-}
+});
 
 // ---- editing ---------------------------------------------------------------
 bbBug('edit', '2', 'sev', 'medium');
@@ -313,7 +313,7 @@ await page.waitForFunction(() => document.querySelectorAll('#bugList .bug').leng
 
 // An open report's bar on a phone (B43): four on it share the width, and
 // none is cut short ('Send to Clau' at 360 and 393).
-{
+await section("An open report's bar on a phone", async () => {
   const was = page.viewportSize();
   await openFold(page, '#bugList .bug[data-id="3"]');
   const cut = [];
@@ -329,7 +329,7 @@ await page.waitForFunction(() => document.querySelectorAll('#bugList .bug').leng
   }
   await page.setViewportSize(was);
   ok(cut.length === 0, `an open report's buttons each fit their text at 360 and 393 (${cut.join(', ') || 'none cut'})`);
-}
+});
 
 // ---- deleting a report that should not exist -------------------------------
 // Not the same act as closing one: fixed and wontfix keep the bug, because a
@@ -505,7 +505,7 @@ const post = body => page.evaluate(async b => {
 // instantly by construction, so the summary's click is taken over; what
 // proves it is an animation running on the element and a height between the
 // two resting sizes rather than at one of them.
-{
+await section("opening one is a slide, not a snap", async () => {
   // Back on the list: the History above swapped it out, and a fold cannot be
   // measured through a view that is not on screen.
   await page.evaluate(n => openNotebook(n), 'alpha');
@@ -560,7 +560,7 @@ const post = body => page.evaluate(async b => {
   });
   ok(!back.open && back.inline === "" && Math.abs(back.box - back.want) < 0.05,
      `...and closes back to exactly its shut height, nothing of the tween left (${back.box} vs ${back.want}px)`);
-}
+});
 
 // ---- handing one to a session ----------------------------------------------
 // A bug goes over as a NUMBER and an instruction to look it up, never as a
@@ -725,18 +725,18 @@ if (page.errors.length) console.log(page.errors);
 // A deleted report's number is not handed out again either (bug B72). Last,
 // because its two log lines would push the oldest verb off the History
 // pane's first page for the check above.
-{
+await section("A deleted report's number is not handed out again either", async () => {
   const filed = bbBug('add', 'numbered after the deletions above', '--sev', 'low');
   const n = Number((filed.match(/filed B(\d+)/) || [])[1]);
   ok(n > 5, `a report filed after the newest were deleted gets a new number, not a reused one (B${n})`);
   bbBug('rm', String(n), 'numbering fixture');
-}
+});
 
 // B197: the token an open Bugs tab watches was the history's LENGTH, and the
 // history is capped, so past 300 events it sat at 300 for good and the tab
 // never re-read again. A tracker at the cap, one more write, and the token has
 // to have moved.
-{
+await section("B197: the token an open Bugs tab watches was the history's LENGTH, and the", async () => {
   const call = (path, body) => page.evaluate(async ([p, b]) => {
     const r = await fetch(p, b === null ? {} : { method: 'POST',
       headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
@@ -759,12 +759,12 @@ if (page.errors.length) console.log(page.errors);
   const len = JSON.parse(fs.readFileSync(FILE, 'utf8')).history.alpha.length;
   ok(!added.error && len === 300 && after !== before,
      `a tracker whose history is at its cap still moves its token on a write (${before} to ${after}, history ${len})`);
-}
+});
 
 // The cap is on OPEN bugs. It used to count every row, so a project that had
 // fixed 195 and had 5 open could file nothing more, under a message telling
 // it to close some, which changed nothing.
-{
+await section("The cap is on OPEN bugs", async () => {
   const fs = await import('node:fs');
   const d = JSON.parse(fs.readFileSync(FILE, 'utf8'));
   const rows = d.projects.gamma = d.projects.gamma || [];
@@ -777,6 +777,6 @@ if (page.errors.length) console.log(page.errors);
     body: JSON.stringify({ project: 'gamma', action: 'add', title: 'one more, with 200 fixed behind it',
                            severity: 'low', area: '', repro: '', expected: '', actual: '', notes: '' }) })).json());
   ok(!r.error, `200 fixed bugs do not stop the next one being filed (${r.error || 'filed'})`);
-}
+});
 
 await done(browser);

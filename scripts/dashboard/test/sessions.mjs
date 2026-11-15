@@ -3,7 +3,7 @@
 // macros only on shell tabs, middle-click ends a session, findings tab
 // behavior, and the phone's bottom bar: flyout slides and swaps, the strip
 // arrows and reveal, and the remembered view.
-import { launch, newPage, ok, done, ready, until, tmuxNew, tmuxKill, tmuxFmt, layoutSettled, refreshUntil, URL, DIR, closePage, unfold, member, OWNER } from './lib.mjs';
+import { launch, newPage, ok, done, ready, until, tmuxNew, tmuxKill, tmuxFmt, layoutSettled, refreshUntil, URL, DIR, closePage, unfold, member, OWNER, section } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -24,13 +24,13 @@ ok(sp.hash === '#/sessions' && sp.on && sp.head.join(',') === 'Session,Space,Nod
 const row = n => page.locator('.sesstbl .sessrow', { has: page.locator(`[data-go="${n}"]`) });
 // ...and a session on the controller itself says when it started, as a
 // node's does: its Started was blank for every one here (B149).
-{
+await section("and a session on the controller itself says when it started, as a", async () => {
   const started = await page.evaluate(() => {
     const r = document.querySelector('.sesstbl .sessrow [data-go="shell-9"]')?.closest('.sessrow');
     return r ? [...r.querySelectorAll('.td')].map(c => c.textContent.trim())[3] || '' : null;
   });
   ok(/ago|now/.test(started || ''), `a session here says when it started (${JSON.stringify(started)})`);
-}
+});
 const btn = n => row(n).locator('button').first();
 
 ok((await btn('shell-9').textContent()).trim() === 'Open', 'minimized session shows Open');
@@ -61,7 +61,7 @@ ok(tmuxFmt('shell-9', '#{pane_in_mode}') === '0', 'PgDn back at the bottom leave
 // The hot bar (the operator, 12 Nov): at a desk, over the terminal's bottom
 // right corner and slightly translucent, the keys a terminal is most
 // reached for, a shell's on a shell's tab.
-{
+await section("The hot bar (the operator, 12 Nov)", async () => {
   const HOT = '#pane1 .slot.ownterm .xhot';
   const hot = await page.evaluate(sel => { const b = document.querySelector(sel); if (!b) return null;
     const r = b.getBoundingClientRect(), h = b.parentElement.querySelector('.xhost').getBoundingClientRect();
@@ -105,7 +105,7 @@ ok(tmuxFmt('shell-9', '#{pane_in_mode}') === '0', 'PgDn back at the bottom leave
   await page.click(`${HOT} .xhottog`);
   ok(await page.$eval(HOT, b => !b.classList.contains('folded')), '...and brings it back');
   await page.evaluate(() => { const rec = [...TERMS.values()].find(r => sessionOf(r.t.arg) === 'shell-9'); termType(rec, new TextEncoder().encode('clear\r')); });
-}
+});
 ok((await row('shell-9').locator('.pill.ok').textContent()).trim() === 'on screen', 'its row says it is on screen');
 ok((await row('shell-9').locator('[data-go]').evaluate(e => saidOf(e))) === await page.$eval('#pane1 .dtab.on .dlbl', el => saidOf(el)),
    "the session row and its tab on the dock's line are described by the same words");
@@ -206,7 +206,7 @@ await page.waitForFunction(n =>
 // .field inside a .field and inset twice; the rules carried the sidebar's
 // tighter 11px, so this one view had three left edges where the roadmap
 // beside it had one.
-{
+await section("The view's bands line up with every other view's", async () => {
   // (at a desk the list is a floating card, R262: a band in one is placed
   // by the card's edge, as uniform.mjs measures it)
   const xs = await page.evaluate(() => {
@@ -226,7 +226,7 @@ await page.waitForFunction(n =>
   });
   ok(new Set(Object.values(xs)).size === 1 && !Object.values(xs).includes(null),
      'the notebook\'s Analysis bands share one left edge: ' + JSON.stringify(xs));
-}
+});
 ok(await page.$$eval('.pane .nb .field .field', es => es.length === 0),
    '...and nothing in the notebook is inset twice by a field inside a field');
 // The fourth log. Nothing writes it (it is the difference between one scan
@@ -296,12 +296,12 @@ await page.evaluate(() => openProjectsTab());
 await page.waitForSelector('.pgrid .pcard[data-row="ep.silon"] [data-c]', { timeout: 15000 });
 ok(await page.$eval('.pgrid .pcard[data-row="ep.silon"] [data-c]', b => b.textContent.trim() === 'Manage agent' && b.classList.contains('primary')),
    'dotted space: the agent button knows the session is running (Manage agent, green)');
-{
+await section("and one with no session of yours says Start agent, not green", async () => {
   const idle = await page.evaluate(() => [...document.querySelectorAll('.pgrid .pcard [data-c]')]
     .filter(b => !liveSessions().has(myClaude(b.dataset.c))).map(b => [b.textContent.trim(), b.classList.contains('primary')]));
   ok(idle.length > 0 && idle.every(([t, green]) => t === 'Start agent' && !green),
      `...and one with no session of yours says Start agent, not green (${JSON.stringify(idle.slice(0, 3))})`);
-}
+});
 await page.evaluate(() => railGo('sessions'));
 await page.click('.sesstbl [data-go="claude-ep_silon"]');
 await page.waitForFunction(() => tabs.some(t => t.arg === 'claude:ep.silon'));
@@ -396,7 +396,7 @@ ok(mob.display === 'flex' && !mob.bKeys,
 // On a phone the band at the terminal's foot is the hot bar (the operator,
 // 12 Nov): the keys of the terminal in front in a line that scrolls, Links
 // standing still at its end, and nothing floating over the terminal.
-{
+await section("On a phone the band at the terminal's foot is the hot bar", async () => {
   const band = await phone.evaluate(() => { const h = document.getElementById('mHot'), bar = document.getElementById('mobar');
     const ends = [...bar.querySelectorAll(':scope > button')].filter(b => b.offsetParent !== null);
     return { keys: [...h.querySelectorAll('button')].filter(b => !b.hidden).map(b => b.textContent.trim()).join(' '), shown: !h.hidden && h.offsetParent !== null,
@@ -413,7 +413,7 @@ ok(mob.display === 'flex' && !mob.bKeys,
      && band.words.every(d => d === 'none') && band.labels.every(Boolean)
      && band.tall && band.inBar && band.overlay === 0 && (!band.scrolls || (band.arrow && band.faded)) && band.after,
      `phone: the band at a shell's foot is its hot bar, a line of its keys (the hot ones, then the rest of the key table) that reads as the dock's line does, a faded end and its arrow where more lie past it, Links with the chain's picture still at the arrow's right, with no Commands press beside it, and nothing floats over the terminal (${JSON.stringify(band)})`);
-}
+});
 ok((mob.widths || []).length === 1 && mob.whole && !(await phone.$('#mMacros')) && !(await phone.$('#macpanel')),
    `...Links is the one press at its end, not cut, and there is no Commands panel (${JSON.stringify(mob.widths)})`);
 // A truncated version string answers nothing, so where it will not fit the
@@ -469,12 +469,12 @@ await bapi('/api/prefs', { project: 'alpha', node: deskbox.id });
 // ...with the tester signed in to Claude there, as that node would have
 // reported it: a Claude press on a node with no sign-in offers the sign-in
 // instead of Resume and New conversation, which is signin.mjs's to show.
-{
+await section("with the tester signed in to Claude there, as that node would have", async () => {
   const rec = `${DIR}/home/.claude/.bb-grant.json`;
   const d = JSON.parse(readFileSync(rec, 'utf8'));
   d.nodes[deskbox.id] = { email: 'tester@example.com', plan: 'max', at: 1 };
   writeFileSync(rec, JSON.stringify(d));
-}
+});
 // Under a full run this wait has crashed the file more than once (B124): a
 // node is live for LIVE_S after its hello, and a slow box can spend that
 // before the poll reads deskbox back. So the hello is repeated between
@@ -789,7 +789,7 @@ await page.evaluate(() => {
 // code it had: the operator met the old Global rules dialog under the new
 // version's notes. It reloads now, before the changelog, so the page is the
 // new run's code and the changelog is opened by that page.
-{
+await section("a new run of the container reloads the page", async () => {
   await page.evaluate(() => { window.__before = 1; });
   const nav = page.waitForNavigation({ timeout: 20000 }).then(() => true).catch(() => false);
   await page.evaluate(async () => {
@@ -801,6 +801,6 @@ await page.evaluate(() => {
   await ready(page);
   ok(reloaded && await page.evaluate(() => window.__before === undefined),
      `a restart the status poll notices reloads the page (${reloaded ? 'reloaded' : 'did not'})`);
-}
+});
 
 await done(browser);

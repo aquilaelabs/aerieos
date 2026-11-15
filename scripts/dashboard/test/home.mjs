@@ -3,7 +3,7 @@
 // own rows; the last ten jobs, each opening its row on the Jobs page; the
 // pinned projects at a glance; read whole on open and light when the queue
 // moves, never on a timer of its own.
-import { URL, launch, newPage, ok, done, ready, sleep, quiet, settled, api } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, sleep, quiet, settled, api, section } from './lib.mjs';
 
 const until = async (fn, ms = 20000, step = 200) => {
   const end = Date.now() + ms;
@@ -23,7 +23,7 @@ ok(await page.evaluate(() => tabOf(panes[0])?.kind === 'home' && location.hash =
    'Home is a page of its own on the rail, at #/home');
 
 // ---- the tiles: across the install, and what /api/home says --------------------
-{
+await section("the tiles: across the install, and what /api/home says", async () => {
   const h = await api('/api/home');
   const tiles = await page.$$eval('.doc.on .hometiles .tile', ts => ts.map(t => ({
     key: t.dataset.htile, value: t.querySelector('.tv')?.textContent, label: t.querySelector('.tl')?.textContent })));
@@ -38,10 +38,10 @@ ok(await page.evaluate(() => tabOf(panes[0])?.kind === 'home' && location.hash =
   const listed = await page.evaluate(() => (state?.sessions || []).length);
   ok(by.sessions.value === String(listed) && listed > 0,
      `...and sessions open is what the Sessions page lists, terminals included (${by.sessions.value} of ${listed})`);
-}
+});
 
 // ---- updates due counts each thing behind once (B28) ------------------------
-{
+await section("updates due counts each thing behind once", async () => {
   const n = await page.evaluate(() => {
     const was = state.attention;
     state.attention = [
@@ -54,10 +54,10 @@ ok(await page.evaluate(() => tabOf(panes[0])?.kind === 'home' && location.hash =
     return got;
   });
   ok(n === 7, `updates due is two toolchains, three containers, nginx and an agent, and no move, failing disk or restart owed (${n})`);
-}
+});
 
 // ---- a job that fails shows on Home by itself, through the jobs token ----------
-{
+await section("a job that fails shows on Home by itself, through the jobs token", async () => {
   const q = await api('/api/v1/nodes', { action: 'exec', id: 'local', argv: ['sh', '-c', 'echo from home; exit 3'] });
   ok(/^j_/.test(q.job || ''), `a job is queued on the controller (${q.job})`);
   const seen = await until(() => page.evaluate(id => !!document.querySelector(`.doc.on [data-hjob="${id}"] .pill.bad`), q.job), 30000);
@@ -71,10 +71,10 @@ ok(await page.evaluate(() => tabOf(panes[0])?.kind === 'home' && location.hash =
   await page.waitForFunction(id => tabOf(panes[0])?.kind === 'jobs'
     && document.querySelector(`.jbrow[data-job="${id}"].focus .jblog`), q.job, { timeout: 15000 });
   ok(true, 'a row on Last jobs opens its job on the Jobs page, brought into view with its log open');
-}
+});
 
 // ---- a tile is a link into its page ----------------------------------------
-{
+await section("a tile is a link into its page", async () => {
   await page.click('#rail [data-rail="home"]');
   await page.waitForSelector('.doc.on .hometiles [data-htile="nodes"]', { timeout: 15000 });
   await page.click('.doc.on .hometiles [data-htile="nodes"]');
@@ -98,10 +98,10 @@ ok(await page.evaluate(() => tabOf(panes[0])?.kind === 'home' && location.hash =
   ok(marked, '...and a press marks the Attention card where the updates are listed');
   ok(await page.evaluate(() => homeTiles().find(t => t.key === 'updates').label === (homeUpdates() === 1 ? 'update due' : 'updates due')),
      '...its label in the singular for one');
-}
+});
 
 // ---- Attention is the bell's rows, and the pinned projects are at a glance ----
-{
+await section("Attention is the bell's rows, and the pinned projects are at a glance", async () => {
   const same = await page.evaluate(() => {
     const card = document.querySelector('.doc.on .homegrid .hcard');
     return { home: card.querySelectorAll('.bnote').length, bell: needsRows().length,
@@ -137,10 +137,10 @@ ok(await page.evaluate(() => tabOf(panes[0])?.kind === 'home' && location.hash =
   ok(true, '...and its name opens the space\'s page');
   await page.click('#rail [data-rail="home"]');
   await page.waitForSelector('.doc.on .homegrid', { timeout: 15000 });
-}
+});
 
 // ---- the top bar's search (B72) ------------------------------------------------
-{
+await section("the top bar's search", async () => {
   ok(await page.$eval('#jump', i => i.placeholder) === 'jump to a page, space, container or node',
      'at 1280 the search\'s whole hint is shown, not cut mid-word');
   await page.fill('#jump', 'zzzz');
@@ -164,10 +164,10 @@ ok(await page.evaluate(() => tabOf(panes[0])?.kind === 'home' && location.hash =
      `...and Enter opens the marked row (${want})`);
   await page.click('#rail [data-rail="home"]');
   await page.waitForSelector('.doc.on .homegrid', { timeout: 15000 });
-}
+});
 
 // ---- on a phone the cards stack and nothing scrolls sideways -----------------
-{
+await section("on a phone the cards stack and nothing scrolls sideways", async () => {
   await page.setViewportSize({ width: 393, height: 851 });
   // The page at the new width and drawn for it: the breakpoint's listeners run
   // before a frame's callbacks.
@@ -181,7 +181,7 @@ ok(await page.evaluate(() => tabOf(panes[0])?.kind === 'home' && location.hash =
   ok(lay.stacked && lay.over <= 0 && lay.tiles,
      `on a phone Attention and Last jobs stack, and the tiles fit the width (${JSON.stringify(lay)})`);
   await page.setViewportSize({ width: 1280, height: 900 });
-}
+});
 
 // ---- no ring where it has no room -------------------------------------------
 // A press still waiting after a moment wears a ring (pressHold), and on the
@@ -189,7 +189,7 @@ ok(await page.evaluate(() => tabOf(panes[0])?.kind === 'home' && location.hash =
 // below it; on a sub-nav it widened the page pressed (the operator, 13 Nov:
 // where the wheel would disrupt a small space, like the rail's icons, none
 // pops up). A button with room still wears it.
-{
+await section("no ring where it has no room", async () => {
   // The delay is the subject: a read slow enough that a press would wear a ring.
   const slow = async r => { await sleep(1200); await r.continue().catch(() => {}); };
   const boxes = () => page.evaluate(() => [...document.querySelectorAll('#rail .ritem, .pane .bar.page .pseg button')]
@@ -236,7 +236,7 @@ ok(await page.evaluate(() => tabOf(panes[0])?.kind === 'home' && location.hash =
   await page.evaluate(() => document.getElementById('ringProbe').parentElement.remove());
   // The reads the route still holds let go and answered.
   await settled(page, { cap: 5000 });
-}
+});
 
 // ---- the controller restarts under the page (R246) -------------------------
 // With nothing unsaved the page starts again at once, as it always did. With
@@ -244,7 +244,7 @@ ok(await page.evaluate(() => tabOf(panes[0])?.kind === 'home' && location.hash =
 // the header says the controller was updated and what would be lost, with
 // Reload, and the page stays as it was left. It reloaded at once before, and
 // a staged edit or a half-typed message went with it.
-{
+await section("the controller restarts under the page", async () => {
   await page.evaluate(() => { window.__sameLoad = true; chatDraft.suite = 'half a message'; bootSeen = 'the run before this one'; });
   await page.evaluate(() => refresh());
   await page.waitForFunction(() => !document.getElementById('newBuild').hidden, null, { timeout: 10000 }).catch(() => {});
@@ -266,7 +266,7 @@ ok(await page.evaluate(() => tabOf(panes[0])?.kind === 'home' && location.hash =
   await page.evaluate(() => { refresh(); });
   ok(await nav, 'with nothing unsaved a restart reloads the page at once, as before');
   await ready(page);
-}
+});
 
 ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + page.errors.join(' | ') : ''}`);
 await done(browser);

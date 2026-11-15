@@ -1,7 +1,7 @@
 // The notebook's Artifacts view: what a project has built, from its dist/.
 // The convention IS the feature: the tab lists dist/ and nothing else, so a
 // build worth keeping has to be copied there, and an empty tab says that.
-import { launch, newPage, ok, done, ready, URL, DIR, refreshUntil, openFold, nbGo, settled, OWNER } from './lib.mjs';
+import { launch, newPage, ok, done, ready, URL, DIR, refreshUntil, openFold, nbGo, settled, OWNER, section } from './lib.mjs';
 import { mkdirSync, writeFileSync, symlinkSync, rmSync, renameSync, existsSync, utimesSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
@@ -62,7 +62,7 @@ symlinkSync(`${DIR}/ws/alpha/secret.txt`, `${DIR}/ws/alpha/dist/leak.txt`);
 
 // Five dev builds of one APK and its release (R105): the tab keeps the
 // newest three dev builds and never the release's place.
-{
+await section("Five dev builds of one APK and its release", async () => {
   const t0 = Math.floor(Date.now() / 1000) - 5000;
   for (let n = 1; n <= 5; n++){
     const f = `${DIR}/ws/alpha/dist/alpha-1.2.0-dev.${n}-abcdef${n}-debug.apk`;
@@ -79,7 +79,7 @@ symlinkSync(`${DIR}/ws/alpha/secret.txt`, `${DIR}/ws/alpha/dist/leak.txt`);
     job: 'j_sign1', node: 'n_x', type: 'sign', at: t0, sha256: 'ab'.repeat(32), path: 'dist/alpha-1.2.0-signed.apk',
     signed: { route: 'sideload', cert: '6557990CCC68E19D2F4CE5731C8D59F9845D87C9952DF09D30DFF05609488C2D',
               schemes: ['v2', 'v3'], from: 'alpha-1.2.0-debug.apk', key: 'watch', rotated_from: 'default' } }));
-}
+});
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 1000 } });
 await page.goto(URL);
@@ -94,15 +94,15 @@ await page.waitForSelector('.artrow', { timeout: 15000 });
 // when the view first shows (the operator, 6 Oct): they were a band under
 // Version, the one part of the tab that did not fold. On a desktop the
 // view's first section is open beside them (the operator, 7 Oct).
-{
+await section("The files are a section of their own, like the rest of the view, and open", async () => {
   const s = await page.evaluate(() => [...document.querySelectorAll('.nb .nbview[data-view="artifacts"] details.sect')]
     .filter(d => d.checkVisibility() && !d.parentElement.closest('details.sect')).map(d => `${d.dataset.sect}:${d.open ? 'open' : 'shut'}`));
   ok(s.includes('artifacts:files:open') && s.every(x => x.endsWith(':open')),
      `the files are their own section, and every section is open when the view shows (${s.join(' ')})`);
-}
+});
 // ...and on a phone one is open at a time, as on every folded surface
 // (R184, the operator, 11 Oct): the files, the rest shut and a tap away.
-{
+await section("and on a phone one is open at a time, as on every folded surface", async () => {
   const phone = await newPage(browser, { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   await phone.goto(URL);
   await ready(phone);
@@ -118,10 +118,10 @@ await page.waitForSelector('.artrow', { timeout: 15000 });
   ok(p.length > 1 && p.filter(x => x.endsWith(':open')).length === 1,
      `...on a phone, one open at a time (R184) (${p.join(' ')})`);
   await phone.close();
-}
+});
 
 // ---- a signed build (R106 step 4) --------------------------------------------
-{
+await section("a signed build", async () => {
   const r = await page.$eval('.artrow:has(b:text-is("alpha-1.2.0-signed.apk"))', e => ({
     pill: !!e.querySelector('.pill.ok'), text: e.textContent.replace(/\s+/g, ' '),
     copy: !!e.querySelector('[data-artfp]'), sign: !!e.querySelector('[data-artsign]') }));
@@ -129,11 +129,11 @@ await page.waitForSelector('.artrow', { timeout: 15000 });
      && /SHA-256 65:57:99:0C:CC:68:E1:9D:2F:4C:E5:73:1C:8D:59:F9:84:5D:87:C9:95:2D:F0:9D:30:DF:F0:56:09:48:8C:2D/.test(r.text)
      && r.copy && !r.sign,
      `a signed build says so, with the key, what verified and the whole fingerprint to copy, and offers no Sign again (${r.text.slice(0, 120)})`);
-}
+});
 
 // ---- the listing -----------------------------------------------------------
 const names = await page.$$eval('.artrow b', bs => bs.map(b => b.textContent));
-{
+await section("alpha-1.2.0-dev.4-abcdef4-debug.apk", async () => {
   const dev = names.filter(n => /^alpha-1\.2\.0-dev\./.test(n)).sort();
   const note = await page.$eval('#artList', e => [...e.querySelectorAll('.hint')].map(h => h.textContent).join(' '));
   ok(dev.join() === ['alpha-1.2.0-dev.3-abcdef3-debug.apk', 'alpha-1.2.0-dev.4-abcdef4-debug.apk', 'alpha-1.2.0-dev.5-abcdef5-debug.apk'].join()
@@ -186,7 +186,7 @@ const names = await page.$$eval('.artrow b', bs => bs.map(b => b.textContent));
   const unpin = await page.evaluate(async n => (await (await fetch('/api/artifacts', { method: 'POST',
     headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project: 'alpha', action: 'unpin', path: `dist/${n}` }) })).json()), oldest);
   ok(unpin.ok && unpin.pinned === false, '...and unpinned, it goes like any other build');
-}
+});
 ok(names.includes('streamlift-1.2.apk') && names.includes('companion-0.2.0.xpi'),
    `dist/ is listed, subdirectories included (${names.join(', ')})`);
 ok(await page.$eval('#artBuild', e => !e.hidden && /No node/.test(e.textContent)
@@ -210,7 +210,7 @@ ok(acts.find(a => a.name === 'streamlift-1.2.apk').install
 ok(acts.every(a => a.dl), '...and everything can be downloaded');
 
 // ---- the captures: apart from what ships, whose they are, gone by age ------
-{
+await section("the captures", async () => {
   const art = await page.evaluate(async () =>
     (await (await fetch('/api/artifacts?project=alpha')).json()));
   const capNames = (art.captures || []).map(c => c.name);
@@ -274,10 +274,10 @@ ok(acts.every(a => a.dl), '...and everything can be downloaded');
   ok(asSession.status === 403 && /aerie capture prune/.test(asSession.j.error || '') && existsSync(`${DIR}/ws/alpha/dist/reel/walk`),
      `a session is told to use aerie capture prune instead (${asSession.status} ${asSession.j.error})`);
   await pref({ project: 'alpha', capture_days: 7 });
-}
+});
 
 // ---- a script is a product, and one people read before they run it ---------
-{
+await section("a script is a product, and one people read before they run it", async () => {
   const arts = await page.evaluate(async () =>
     (await (await fetch('/api/artifacts?project=alpha')).json()).artifacts);
   const kind = n => arts.find(a => a.name === n)?.kind;
@@ -315,7 +315,7 @@ ok(acts.every(a => a.dl), '...and everything can be downloaded');
        JSON.stringify(sheet.text.slice(0, 40))})`);
   await page.click('.nb #sheetClose');
   await page.waitForSelector('.nb .nbsheet', { state: 'hidden' });
-}
+});
 
 // ---- the download, and what it refuses -------------------------------------
 const get = p => page.evaluate(async u => {
@@ -336,7 +336,7 @@ ok((await get('/api/artifact?project=alpha&path=dist/leak.txt')).status === 404,
 // symlink pointing out of the tree.
 ok(await page.$eval('#artSource', b => !b.disabled && b.textContent === 'Download source'),
    'the tab offers the code base as a download');
-{
+await section("it is a zip named for the space", async () => {
   const zipPath = `${DIR}/alpha-source.zip`, hdrs = `${DIR}/alpha-source.hdr`;
   execFileSync('curl', ['-fsS', '-u', 'test:test', '-D', hdrs, '-o', zipPath,
                         `${URL.replace(/\/$/, '')}/api/source?project=alpha`]);
@@ -350,7 +350,7 @@ print("\\n".join(zipfile.ZipFile(sys.argv[1]).namelist()))`, zipPath], { encodin
      `the tree is inside one directory named for the space (${names.length} entries)`);
   ok(!names.some(n => n.startsWith('alpha/dist/') || n.startsWith('alpha/.git/')),
      '...with neither dist/ nor .git in it');
-}
+});
 page.errors = [];
 
 // ---- installing needs a phone on the project's node ----------------------
@@ -410,7 +410,7 @@ ok(true, 'a space with no dist/ is told the convention, not shown a blank');
 // A second account's session builds in its worktree and its outputs land in
 // that worktree's dist/, where the tab never looked: its first build showed
 // nothing. Listed apart from dist/, with Download and View carrying the tree.
-{
+await section("a build on a branch, in an account's own worktree", async () => {
   const H = OWNER;
   await fetch(URL.replace(/\/$/, '') + '/api/users', { method: 'POST', headers: H,
     body: JSON.stringify({ action: 'add', name: 'w.builder', password: 'w.builder-pass-1', role: 'user' }) });
@@ -455,7 +455,7 @@ ok(true, 'a space with no dist/ is told the convention, not shown a blank');
   // born and there is no ref to delete; one that was born goes.
   try { execFileSync('git', ['-C', `${DIR}/ws/alpha`, 'branch', '-D', 'claude/w.builder'], { stdio: 'ignore' }); }
   catch { /* unborn */ }
-}
+});
 
 ok(page.errors.length === 0, 'zero console errors');
 if (page.errors.length) console.log(page.errors);
@@ -464,7 +464,7 @@ if (page.errors.length) console.log(page.errors);
 // ---- a build named with no version (the operator, 6 Oct) ----------------------
 // Nothing can tell when it is out of date, so the sweep leaves it and its row
 // says so in the warning color, with a Remove that a person presses.
-{
+await section("Put alpha back as it was found", async () => {
   writeFileSync(`${DIR}/ws/alpha/dist/app-debug.apk`, 'a build copied in by hand');
   await page.evaluate(() => getNotebook('alpha').view('artifacts'));
   await page.waitForFunction(() => [...document.querySelectorAll('#artList .artrow')]
@@ -479,7 +479,7 @@ if (page.errors.length) console.log(page.errors);
   await page.waitForFunction(() => ![...document.querySelectorAll('#artList .artrow b')].some(b => b.textContent === 'app-debug.apk'),
                              null, { timeout: 15000 });
   ok(!existsSync(`${DIR}/ws/alpha/dist/app-debug.apk`), '...and Remove takes it out of dist/');
-}
+});
 
 // a file that plants a dist/ tree and a symlink there has to clear them
 // itself, or every later file runs against a project this one changed.
