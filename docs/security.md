@@ -257,6 +257,22 @@ served, and the auth suite fails on one, so a new route cannot be reached
 before somebody has said who may reach it. Most routes are still the
 handler's own; each one moved into the table is one fewer place to forget.
 
+**What a session's token reaches.** A coding agent's session is not a
+person with fewer rights: it is another kind of caller, and the dispatcher
+refuses it on every route but the ones a second table names
+(`SESSION_ROUTES`, beside the first): the routes its own verbs and hooks
+call, about forty of the hundred and eighty. A route in that table still
+holds its own scope (the session's own space, the action, the space's
+dials); a route outside it cannot be reached by a session whatever its
+handler checks or forgets. So the accounts, the controller's settings, the
+page's own reads, a person's chat, tabs and other sessions are not a
+session's to ask for, and neither is the page: a session's token opens
+none of the dashboard, its terminals, a VM's screen or the metrics, and
+`aerie capture` sends that token to no page. The unit tier holds that
+every path a session-side script names is in the table, and the auth
+suite asks every other route with a session's token and expects the
+refusal, so a new route is closed to sessions until somebody names it.
+
 **A request from another site.** A change, and a read of `/api/`, sent with
 the browser's cookie is taken from the dashboard's own page alone
 (`Sec-Fetch-Site`), since some reads do things and another origin of the

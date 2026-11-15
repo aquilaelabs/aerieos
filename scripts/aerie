@@ -5140,13 +5140,28 @@ capture_trust() {
     fi
 }
 
+# Whether URL is on one of the origins this shell's own credential would go
+# to (capture_trust's list).
+capture_is_own() {
+    local origin; origin="$(printf '%s' "$1" | sed -E 's#^(https?://[^/]+).*#\1#')"
+    case ",$2," in *",$origin,"*) return 0 ;; esac
+    return 1
+}
+
+# What a session is told when it points a capture at the controller's own
+# dashboard: the page is a person's, and what a session photographs instead.
+capture_person_only() {
+    printf '%s is the controller'"'"'s own dashboard, which is a person'"'"'s page: a session'"'"'s token opens none of it. A session photographs a dev instance (aerie devapp says where it is; --auth USER:PASSWORD signs in to it), any other page, the emulator (--emu) or an X display (--display :N)' "$1"
+}
+
 # The store's tools for capture.py, which shot and reel share.
 capture_env() {
     local root; root="$(sdk_root 2>/dev/null || true)"
     local ff; ff="$(command -v ffmpeg || true)"; [ -n "$ff" ] || { [ -x "$root/ffmpeg/bin/ffmpeg" ] && ff="$root/ffmpeg/bin/ffmpeg"; }
     local adb; adb="$(command -v adb || true)"; [ -n "$adb" ] || { [ -x "$root/platform-tools/adb" ] && adb="$root/platform-tools/adb"; }
     BB_CAPTURE_FFMPEG="$ff" BB_CAPTURE_NODE_PATH="$(pw_node_path)" BB_CAPTURE_CHROME="$(find_chromium 2>/dev/null || true)" \
-    BB_CAPTURE_ADB="$adb" BB_CAPTURE_AUTH="${BB_TOKEN:-${DASHBOARD_AUTH:-}}" BB_CAPTURE_TRUST="$(capture_trust)" "$@"
+    BB_CAPTURE_ADB="$adb" BB_CAPTURE_AUTH="${BB_TOKEN:-${DASHBOARD_AUTH:-}}" BB_CAPTURE_TRUST="$(capture_trust)" \
+    BB_CAPTURE_PERSON_ONLY="$(capture_person_only "the page")" "$@"
 }
 
 capture_reel() {
@@ -5271,6 +5286,19 @@ capture_shot() {
         return
     fi
     [ "${#urls[@]}" -gt 0 ] || die "$(capture_shot_usage)"
+    # A session's token opens none of the controller's page (R227 step 4): a
+    # shot of the controller's own address with nothing else to sign in with
+    # says so, and the token goes to no page at all. A credential named with
+    # --auth is the person's word and is sent as before.
+    if [ "$trust" != named ]; then
+        case "$auth" in bbs_*)
+            local u
+            for u in "${urls[@]}"; do
+                capture_is_own "$u" "$trust" && die "$(capture_person_only "$u")"
+            done
+            auth="" ;;
+        esac
+    fi
     case "${width}${height}${scale}${wait}${resize}" in
         *[!0-9]*) die "--size WxH, --scale N, --wait MS and --resize W take whole numbers" ;;
     esac

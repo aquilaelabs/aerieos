@@ -375,8 +375,18 @@ const [exe, url, seconds, drive, vdir, auth, trust] = process.argv.slice(2);
 })();
 """
     env = dict(os.environ, NODE_PATH=node_path)
+    # A session's token opens none of the controller's page (R227 step 4):
+    # a reel of the controller's own address with nothing else to sign in
+    # with says so, and the token goes to no page.
+    auth, trust = os.environ.get("BB_CAPTURE_AUTH", ""), os.environ.get("BB_CAPTURE_TRUST", "")
+    if auth.startswith("bbs_"):
+        origin = re.sub(r"^(https?://[^/]+).*", r"\1", url)
+        if origin in [t for t in trust.split(",") if t]:
+            die(os.environ.get("BB_CAPTURE_PERSON_ONLY", "").replace("the page", url, 1)
+                or f"{url} is the controller's own dashboard, which is a person's page: a session's token opens none of it")
+        auth = ""
     r = subprocess.run(["node", "-", chrome, url, str(seconds), drive or "", vdir,
-                        os.environ.get("BB_CAPTURE_AUTH", ""), os.environ.get("BB_CAPTURE_TRUST", "")], input=script, capture_output=True,
+                        auth, trust], input=script, capture_output=True,
                        text=True, timeout=seconds + 120, check=False, env=env)
     if r.returncode:
         die(f"the recording did not finish: {(r.stderr or '').strip()[-400:]}")

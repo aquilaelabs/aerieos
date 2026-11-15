@@ -1144,65 +1144,43 @@ await section("what a session holds", async () => {
   const post = (path, body) => as(path, { method: 'POST',
     headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
-  const seen = await (await as('/api/status')).json();
-  ok(JSON.stringify((seen.projects || []).map(p => p.name)) === '["alpha"]',
-     `a session token sees its own space and no other (${
-       (seen.projects || []).map(p => p.name).join(', ')})`);
-  ok(/not a space/.test(((await (await post('/api/roadmap',
-       { action: 'save', project: 'ep.silon', items: [] })).json()).error) || ''),
-     '...and another space reads as absent, not refused');
-
-  // Parking a roadmap item is one direction for a session. It knows when
-  // something is blocked or waiting on somebody; it does not know why the
-  // operator wants one back, so taking it OFF the shelf is theirs. The CLI
-  // only ever passed on=true, and this door used to take whatever it was
-  // handed.
-  {
-    const added = await (await post('/api/roadmap',
-      { action: 'add', project: 'alpha', text: 'something to park' })).json();
-    const id = (added.items || []).slice(-1)[0]?.id ?? added.id;
-    const on = await (await post('/api/roadmap',
-      { action: 'shelve', project: 'alpha', id, on: true })).json();
-    ok(!on.error, `a session may park a roadmap item (${on.error || 'shelved'})`);
-    // ...and asking for it back is held for a person on the project (R78),
-    // the item still shelved: the door used to refuse outright.
-    const off = await post('/api/roadmap', { action: 'shelve', project: 'alpha', id, on: false, why: 'unblocked' });
-    const offBody = await off.json();
-    ok(off.status === 200 && offBody.held?.verb === 'unshelve' && /unblocked/.test(offBody.held?.summary || '')
-       && (offBody.items || []).find(r => r.id === id)?.shelved,
-       `...and asking for it back is held for approval, the item still shelved (${(offBody.held?.summary || offBody.error || '').slice(0, 60)})`);
-    const still = await (await as('/api/status')).json();
-    ok((still.projects || []).length === 1, '...with the refusal leaving the rest answering');
+  // A session is a caller of its own kind (R227 step 4): its token reaches
+  // the routes its own verbs and hooks use and nothing else. What it reads
+  // there is its own space's, and another space reads as absent.
+  const mine = await as('/api/brief?project=alpha');
+  const other = await as('/api/brief?project=ep.silon');
+  const otherSaid = (await other.json().catch(() => ({}))).error || '';
+  ok(mine.status === 200 && other.status !== 200 && /not a space/.test(otherSaid),
+     `a session's token reads its own space, and another reads as absent, not refused (${mine.status}; ${other.status}: ${otherSaid})`);
+  // The page's own reads are a person's (the operator, 15 Nov): the status
+  // read carried the controller's settings, the person's layout and the key
+  // store's state to a session that asked.
+  for (const path of ['/api/status', '/api/revs', '/api/live', '/api/findings', '/api/users', '/api/home', '/api/roles']) {
+    const r = await as(path);
+    const said = (await r.json().catch(() => ({}))).error || '';
+    ok(r.status === 403 && /a session's token does not reach this/.test(said), `${path} is not a session's to read (${r.status}: ${said.slice(0, 60)})`);
   }
-
-  // The scanner's report covers the whole share, so the Analysis surfaces are
-  // the one place a session could read somebody else's code back. The fixture
-  // report has a finding in alpha, in beta, in gamma, in delta, in two
-  // directories that are not projects, and one whose path places nowhere.
-  {
-    const fp = await (await as('/api/findings')).json();
-    const rows = (fp.reports || []).flatMap(r => r.findings || []);
-    ok(rows.length === 1 && rows[0].project === 'alpha' && rows[0].rule === 'A1',
-       `a session's findings are its own space's and no other (${
-         rows.map(r => `${r.project || '?'}:${r.rule}`).join(', ') || 'none'})`);
-    // Said of the whole payload, not just the rows: a project name in a
-    // subtitle or a count is the same leak in a smaller font.
-    const blob = JSON.stringify(fp);
-    const leaked = ['beta', 'gamma', 'delta', 'toolstore', 'vendored-junk', 'entirely.py']
-      .filter(w => blob.includes(w));
-    ok(leaked.length === 0,
-       `...and nothing else on the share is named anywhere in the payload (${
-         leaked.join(', ') || 'nothing leaked'})`);
-    ok(!('aside' in fp),
-       '...not even how many findings were held back, which would move when somebody else edits their code');
-    ok(JSON.stringify(fp.projects || []) === '["alpha"]',
-       `...and the spaces it lists are its own (${JSON.stringify(fp.projects || [])})`);
-    // The same question of the poll, which carries its own copy of the counts.
-    const stat = await (await as('/api/status')).json();
-    ok(Object.keys(stat.findings_counts || {}).join(',') === 'alpha',
-       `the poll's finding counts are its space's alone (${
-         Object.keys(stat.findings_counts || {}).join(',') || 'none'})`);
+  // ...and what acted as the person behind it, or wrote as a person, with
+  // no session's verb behind it: their chat, their tabs, their presence,
+  // a bug written as theirs and never held, a macro typed into their shell,
+  // their sessions ended, the roadmap over HTTP (aerie roadmap is relayed).
+  for (const [path, body] of [['/api/chat', { action: 'read' }], ['/api/layout', { tabs: [] }], ['/api/presence', { project: 'alpha' }],
+                              ['/api/bugs', { action: 'add', project: 'alpha', title: 'written as a person' }],
+                              ['/api/say', { session: 'claude-alpha', text: 'hello' }], ['/api/send', { session: 'claude-alpha', macro: 'lx-ls' }],
+                              ['/api/session', { session: 'claude-alpha', action: 'kill' }],
+                              ['/api/roadmap', { action: 'add', project: 'alpha', text: 'over HTTP' }]]) {
+    const r = await post(path, body);
+    const said = (await r.json().catch(() => ({}))).error || '';
+    ok(r.status === 403 && /a session's token does not reach this/.test(said), `${path} is not a session's to send (${r.status}: ${said.slice(0, 60)})`);
   }
+  // The page itself, its scripts, a terminal, a VM's screen and the metrics.
+  for (const path of ['/', '/index.html', '/page-shell.js', '/terminal', '/termws', '/screen/ws', '/metrics', '/apps/companion/x']) {
+    const r = await as(path);
+    const said = (await r.json().catch(() => ({}))).error || '';
+    ok(r.status === 403 && /the dashboard is a person's/.test(said), `${path} is not opened by a session's token (${r.status}: ${said.slice(0, 50)})`);
+  }
+  const alive = await as('/api/brief?project=alpha');
+  ok(alive.status === 200, '...with every refusal leaving its own routes answering');
 
   // The whole reason this exists: it is not the operator.
   for (const ep of ['/api/v1/nodes', '/api/toolchains', '/api/users']) {
@@ -1409,8 +1387,10 @@ await section("the Profile tab", async () => {
     const sessAuth = asSession(stok);
     const across = await act(sessAuth, '/api/send', { session: 'claude-beta', macro: 'lx-ls' });
     ok(across.status === 403, `a session's token cannot reach its own account's session on another space (${across.status})`);
+    // ...nor its own space's: typing into a person's shell is no verb of a
+    // session's, and its token reaches what its verbs use (R227 step 4).
     const home = await act(sessAuth, '/api/send', { session: 'claude-alpha', macro: 'lx-ls' });
-    ok(home.status !== 403, `...and does reach its own space's (${home.status})`);
+    ok(home.status === 403 && /a session's token does not reach this/.test(home.error || ''), `...nor its own space's (${home.status}: ${(home.error || '').slice(0, 50)})`);
     // A session's token carries its person's id, and the Profile page is
     // that person's alone (B764): no read of it, no notification sent
     // elsewhere, no browser sign-in of theirs ended.
@@ -1418,7 +1398,7 @@ await section("the Profile tab", async () => {
       const read = await fetch(URL.replace(/\/$/, '') + '/api/profile', { headers: sessAuth });
       const reach = await act(sessAuth, '/api/profile', { action: 'reach-set', kind: 'webhook', url: 'https://elsewhere.example/hook' });
       const out = await act(sessAuth, '/api/profile', { action: 'signin-out', id: 'any' });
-      ok(read.status === 403 && reach.status === 403 && out.status === 403 && /never by a session/.test(reach.error || ''),
+      ok(read.status === 403 && reach.status === 403 && out.status === 403 && /never by a session|a session's token does not reach this/.test(reach.error || ''),
          `a session's token is refused the Profile page of the person it runs for (${read.status} ${reach.status} ${out.status}: ${reach.error || ''})`);
     }
     // B173-B175: what acts on a project by name asks the right as well as
@@ -1456,7 +1436,7 @@ await section("the Profile tab", async () => {
       ok(un.status === 200 && plain && plain.pinned === false && owner && owner.pinned === true,
          `a plain account's unpin is its own: alpha off its sidebar and still on the owner's (${un.status}; ${plain?.pinned}/${owner?.pinned})`);
       const sess = await act(sessAuth, '/api/project-pin', { name: 'alpha', pinned: true });
-      ok(sess.status === 403 && /a session has no sidebar/.test(sess.error || ''), `...and a session pins for nobody (${sess.status})`);
+      ok(sess.status === 403 && /a session has no sidebar|a session's token does not reach this/.test(sess.error || ''), `...and a session pins for nobody (${sess.status})`);
       await act(plainAuth, '/api/project-pin', { name: 'alpha', pinned: true });
     }
     // A project's signing keys (R106): a session never reaches them, not
@@ -1839,10 +1819,12 @@ named = {n for t in out.values() for _, _, n in t["routes"]}
 out["GATES"] = {"none": sorted(named - set(gates)), "stale": sorted(set(gates) - named),
                 "odd": sorted(n for n, g in gates.items() if g != "handler" and not (isinstance(g, tuple) and g[0] in ("owner", "person") and g[1])),
                 "central": sum(1 for g in gates.values() if g != "handler")}
+out["SESSION"] = sorted(re.findall(r'"(_[a-z_0-9]+)"', re.search(r'^SESSION_ROUTES = frozenset\\(\\{(.*?)^\\}\\)', src, re.S | re.M).group(1)))
 print(json.dumps(out))`], { encoding: 'utf8' }));
   // Every route names who may reach it, beside the routes (R227): one that
   // names nothing is refused by the dispatcher, and is caught here first.
   const G = got.GATES; delete got.GATES;
+  const SESSION = new Set(got.SESSION); delete got.SESSION;
   ok(G.none.length === 0 && G.stale.length === 0 && G.odd.length === 0 && G.central >= 20,
      `every route names its permission in ROUTE_GATES, and nothing else is named there (${
        [G.none.length ? 'none for ' + G.none.join(', ') : '', G.stale.length ? 'no route for ' + G.stale.join(', ') : '',
@@ -1857,6 +1839,25 @@ print(json.dumps(out))`], { encoding: 'utf8' }));
     ok(t.missing.length === 0,
        `...and every method ${table} names is one the handler has (${t.missing.join(', ') || 'all there'})`);
   }
+  // A session is refused by the dispatcher on every route its table does
+  // not name (R227 step 4): each one asked with a session's token, so a
+  // route added tomorrow is closed to a session until somebody names it.
+  const named = new Set(Object.values(got).flatMap(t => t.routes.map(r => r[2])));
+  const stale = [...SESSION].filter(n => !named.has(n));
+  ok(SESSION.size >= 30 && SESSION.size <= 50 && stale.length === 0,
+     `a session's table names ${SESSION.size} routes, each one a route there is (${stale.join(', ') || 'none stale'})`);
+  const tok = mint('alpha');
+  const open = [];
+  for (const [table, t] of Object.entries(got)){
+    for (const [, path, name] of t.routes){
+      if (SESSION.has(name)) continue;
+      const r = await bare(path, table === 'GET_ROUTES' ? { headers: { Authorization: 'Bearer ' + tok } }
+        : { method: 'POST', headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }, body: '{}' });
+      const said = (await r.json().catch(() => ({}))).error || '';
+      if (r.status !== 403 || !/a session's token does not reach this|the dashboard is a person's/.test(said)) open.push(`${table === 'GET_ROUTES' ? 'GET' : 'POST'} ${path} ${r.status} ${said.slice(0, 40)}`);
+    }
+  }
+  ok(open.length === 0, `every other route refuses a session's token before its handler runs (${open.slice(0, 8).join('; ') || named.size - SESSION.size + ' refused'})`);
 });
 
 
@@ -1943,13 +1944,15 @@ await section("maintenance mode", async () => {
   r = await form('maintuser', 'maintpass11');
   ok(!r.headers.get('set-cookie') && SAID.test(await r.text()), '...a sign-in is refused with it, and no cookie minted');
   ok(SAID.test(await (await bare('/login')).text()), '...the sign-in page says it before anybody tries');
-  ok((await bare('/api/status', { headers: { Authorization: 'Bearer ' + userTok } })).status === 503,
+  // Asked of a route a session's token reaches (R227 step 4): the page's
+  // status read is a person's.
+  ok((await bare('/api/meta', { headers: { Authorization: 'Bearer ' + userTok } })).status === 503,
      "...a session of theirs is answered 503");
   r = await bare('/api/v1/device/signin', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: 'maintuser', password: 'maintpass11', name: 'their phone', kind: 'phone' }) });
   ok(r.status === 503 && SAID.test((await r.json()).error || ''), '...and the phone app cannot sign in');
   ok((await bare('/api/status', { headers: owner })).status === 200
-     && (await bare('/api/status', { headers: { Authorization: 'Bearer ' + ownerTok } })).status === 200,
+     && (await bare('/api/meta', { headers: { Authorization: 'Bearer ' + ownerTok } })).status === 200,
      'the owner is answered, and the owner\'s own session too');
   await page.waitForFunction(() => document.getElementById('maintband') && !document.getElementById('maintband').hidden, null, { timeout: 15000 })
     .then(() => true, () => false).then(v => ok(v, "the owner's page shows the maintenance band"));

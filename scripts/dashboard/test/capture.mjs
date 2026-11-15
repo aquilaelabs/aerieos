@@ -394,10 +394,25 @@ http.server.HTTPServer(("127.0.0.1", int(sys.argv[1])), H).serve_forever()
       { encoding: 'utf8', env: as('http://127.0.0.2:7680'), cwd: S });
     reelHeard = heard();
   }
+  // The controller's own dashboard is a person's page (R227 step 4): a
+  // session's token is sent to no page, and a shot or a reel of the
+  // controller's own address says so and asks nothing of it.
+  let homeReel = { status: 2, stderr: 'skipped' }, homeReelHeard = '';
+  if (reelHeard !== 'skipped') {
+    homeReel = spawnSync('bash', [`${REPO}/scripts/aerie`, 'capture', 'reel', '--url', url, '--seconds', '1'],
+      { encoding: 'utf8', env: as(`http://127.0.0.1:${port}`), cwd: S });
+    homeReelHeard = heard();
+  }
   srv.kill();
-  ok(away.status === 0 && awayHeard.length > 0 && !/bbs_/.test(awayHeard) && !/bbs_/.test(reelHeard)
-     && home.status === 0 && /Bearer bbs_dGVzdA/.test(homeHeard),
-     `this session's token goes to the controller alone: a page elsewhere on its port is shot and recorded without it, the controller with it (${
-       JSON.stringify({ away: awayHeard.trim().split('\n')[0], home: homeHeard.trim().split('\n')[0], reel: reelHeard.trim().split('\n')[0] })})`);
+  ok(away.status === 0 && awayHeard.length > 0 && !/bbs_/.test(awayHeard) && !/bbs_/.test(reelHeard),
+     `this session's token goes to no page: one elsewhere on the controller's port is shot and recorded without it (${
+       JSON.stringify({ away: awayHeard.trim().split('\n')[0], reel: reelHeard.trim().split('\n')[0] })})`);
+  const said = (home.stderr || '') + (home.stdout || '');
+  ok(home.status !== 0 && homeHeard === '' && !existsSync(`${S}/heard-home.png`)
+     && /is the controller's own dashboard, which is a person's page: a session's token opens none of it/.test(said)
+     && /dev instance/.test(said) && /--emu/.test(said),
+     `...and a shot of the controller's own dashboard is refused in words, with what a session photographs instead, nothing asked of the page (${home.status}: ${said.trim().slice(0, 90)})`);
+  ok(reelHeard === 'skipped' || (homeReel.status !== 0 && homeReelHeard === '' && /a person's page/.test((homeReel.stderr || '') + (homeReel.stdout || ''))),
+     `...a reel of it too (${homeReel.status}: ${String(homeReel.stderr || '').trim().slice(0, 70)})`);
 });
 await done();

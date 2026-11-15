@@ -6637,15 +6637,93 @@ ROUTE_GATES = {
 }
 
 
+# What a session's token reaches, and nothing else (R227 step 4; the
+# operator, 15 Nov: now, and whole). A coding agent's session is not a person
+# with fewer rights: it is another kind of caller, refused by the dispatcher
+# on every route but these, which are the ones its own verbs and hooks call
+# (each was found by its client: `aerie`, scripts/lib, bb-tty, the hooks).
+# Until this table a session was role `user` with its person's id, and each
+# handler that was a person's alone had to remember to say so: about 190
+# tests, and the ones nobody wrote served a session the account list, its
+# person's chat and layout, and the controller's settings in the status
+# read. A route here still holds its own scope (which space, which action,
+# which dial); a route not here cannot be reached by a session whatever its
+# handler forgot. unit/test_session_routes.py holds that every path a
+# session-side client names is in it; test/auth.mjs walks every route with a
+# session's token.
+SESSION_ROUTES = frozenset({
+    # What a session reads: its briefing, its space's CI, design and wiki,
+    # its containers and VMs, its jobs and the nodes they run on, its
+    # person's memories and conversations on the space, the phone lent to
+    # it, the catalog's search, and the diagnostics a grant allows.
+    "_get_brief", "_get_ci_runs", "_get_design", "_get_wiki", "_get_docker", "_get_vms", "_get_jobs", "_get_nodes",
+    "_get_node_busy", "_get_meta", "_get_memory", "_get_transcript", "_get_transcripts", "_get_phone", "_get_router_key",
+    "_get_catalog", "_get_trace",
+    # What it does: the relayed verbs (roadmap, bugs, rules, tests, git and
+    # the rest go through here), the hooks, the terminal's grant and the
+    # sign-in check a node runs for it,
+    "_bb_relay", "_hook", "_tty_grant", "_claude_login",
+    # its notebook's writes under the space's dials,
+    "_brief", "_design", "_wiki", "_memory", "_transcripts", "_tests", "_reports",
+    # its containers, VMs, jobs and git host,
+    "_devapp", "_docker_ctl", "_vms", "_jobs", "_forge",
+    # and what it asks a person for: a phone, root, a container, a signed
+    # build, a release, a tool pack, a lent PC, the diagnostics.
+    "_phone", "_signing", "_version", "_toolpacks", "_pc", "_diag", "_nodelog",
+})
+# The POSTs whose bodies are streamed, each with a door of its own ahead of
+# the route table.
+STREAMED_POSTS = ("/api/upload-archive", "/api/vms-iso-upload", "/api/move-land", "/api/node-files/upload")
+SESSION_REFUSED = ("a session's token does not reach this: it opens what a session's own verbs use, "
+                   "and the rest of the controller is a person's")
+# What a session does instead, said with the refusal where there is a verb
+# for it: the words each of these handlers used to answer a session with
+# itself. A route whose gate is a person's or the owner's says that gate's
+# own words, which were written for a session too.
+SESSION_INSTEAD = {
+    "_git_act": "a session uses aerie git",
+    "_get_git": "a session reads its repository with aerie git and git itself",
+    "_get_forge_access": "a session reads what it may do on the git host with aerie forge whoami",
+    "_roadmap": "a session reads and changes its space's roadmap with aerie roadmap",
+    "_get_todo": "a session reads its space's roadmap with aerie roadmap",
+    "_bugs": "a session reads and files its space's bugs with aerie bug",
+    "_get_bugs": "a session reads its space's bugs with aerie bug",
+    "_pending": "what a session has waiting is the operator's to approve or deny, on the notebook; a session cannot answer for itself",
+    "_get_pending": "a session reads what it has waiting with aerie roadmap pending",
+    "_rules": ("a session cannot change the rules it is being held to: they are the operator's, written on the space's "
+               "Overview in the notebook; aerie rules reads them and keeps a session's own notes"),
+    "_get_rules": "a session reads its rules with aerie rules",
+    "_artifacts": "a session lets a capture go with aerie capture prune NAME, and a pin is a person's",
+    "_schedules": "schedules are a person's: a session has no say in them",
+    "_get_schedules": "schedules are a person's: a session has no say in them",
+    "_get_library": "a session finds a tool pack with aerie tool search and asks for one with aerie tool install",
+    "_get_toolchains": "a session reads its node's toolchains with aerie toolchains",
+    "_get_findings": "a session reads its space's findings with aerie findings",
+    "_get_tests": "a session reads and runs its space's tests with aerie tests",
+    "_get_version": "a session reads and moves its space's version with aerie version",
+    "_get_changelog": "a session reads its space's changelog in the tree and adds to it with aerie changelog add",
+    "_get_preamble": "a session reads its briefing with aerie preamble",
+    "_get_help": "a session reads AerieOS's docs with aerie help",
+    "_prefs_post": "a space's settings are the operator's: a session reads them with aerie settings",
+    "_chat": "a session posts to its space's feed through its hooks, and a person's messages are theirs",
+}
+SESSION_NOT_THE_PAGE = ("the dashboard is a person's: a session's token opens none of its page, its terminals or its screens. "
+                        "A session reads and changes its space through aerie")
+
+
 def route_gate(name, me):
-    """Why this caller may not reach the handler `name`, or "" (ROUTE_GATES)."""
+    """Why this caller may not reach the handler `name`, or "" (ROUTE_GATES,
+    and for a session SESSION_ROUTES before anything else)."""
     g = ROUTE_GATES.get(name)
     if g is None:
         return "this route names no permission (ROUTE_GATES), so it is not served"
+    me = me or {}
+    if me.get("session") and name not in SESSION_ROUTES:
+        instead = g[1] if isinstance(g, tuple) else SESSION_INSTEAD.get(name, "")
+        return SESSION_REFUSED + (". " + instead[0].upper() + instead[1:] if instead else "")
     if g == "handler":
         return ""
     kind, words = g
-    me = me or {}
     if me.get("session"):
         return words
     if kind == "owner" and (users.account_of(me) or {}).get("role") != "owner":
@@ -8243,6 +8321,12 @@ class Handler(BaseHTTPRequestHandler):
             return self._deny()
         if self._two_factor_gate(path):
             return None
+        # The page is a person's (R227 step 4): a session's token opens the
+        # routes SESSION_ROUTES names, all of them under /api/, and none of
+        # the page, its scripts, a terminal, a VM's screen, a companion
+        # app's file or the metrics.
+        if not path.startswith("/api/") and (self._who() or {}).get("session"):
+            return self._json({"error": SESSION_NOT_THE_PAGE}, 403)
         if path == "/metrics":
             if NODES_OK:
                 return self._json({"error": NODES_OK}, 503)
@@ -9638,6 +9722,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": why}, 403)
         if self._two_factor_gate(self.path.split("?")[0]):
             return None
+        # The streamed bodies below are outside the route tables, and none
+        # is a session's (R227 step 4): refused here, before any is read.
+        if self.path.split("?")[0] in STREAMED_POSTS and (self._who() or {}).get("session"):
+            return self._json({"error": SESSION_REFUSED}, 403)
         # The one body that is not JSON: an archive to start a project from,
         # streamed to the spool by projects.spool_archive. Its own door
         # before the JSON read, and its own cap: MAX_BODY is sized for a

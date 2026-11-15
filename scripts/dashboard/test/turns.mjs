@@ -135,18 +135,21 @@ await section("A session told the controller moved", async () => {
   const nb = await sess({ node: 'nodeA' });
   ok(/somebody else changed this space's bugs: read `aerie bug`/.test(nb.line || ''),
      `a bug the operator filed is named on the next prompt (${(nb.line || 'no line').slice(0, 90)})`);
-  await call('/api/bugs', { project: 'alpha', action: 'add', title: 'the session found one', severity: 'low' }, bearer(toks[1]));
-  const own = await sess({ node: 'nodeA' });
-  ok(!/somebody else changed/.test(own.line || ''), `...and the session's own bug is not (${(own.line || 'no line').slice(0, 90)})`);
-  // ...nor one it filed with aerie bug add, which reaches the controller
-  // through the relay and not the notebook's route, and was told back to
+  // The notebook's own route is a person's (R227 step 4): a session's bug
+  // goes by the relay, as aerie bug add sends it, and one sent to the route
+  // with a session's token is refused, written by nobody.
+  const direct = await call('/api/bugs', { project: 'alpha', action: 'add', title: 'the session found one', severity: 'low' }, bearer(toks[1]));
+  ok(direct.status === 403 && /a session's token does not reach this/.test(direct.error || ''),
+     `the notebook's own route refuses a session's token (${direct.status || ''} ${(direct.error || '').slice(0, 50)})`);
+  // The session's own bug, filed with aerie bug add, which reaches the
+  // controller through the relay and not the notebook's route, was told back to
   // the session that filed it as somebody else's (B375). A read through
   // the relay marks nothing: what the operator did is still news after it.
   const relay = argv => call('/api/v1/bb', { argv }, bearer(toks[1]));
   const filed = await relay(['bug', 'add', 'the session found another', '--sev', 'low', '--here']);
   const ownRelay = await sess({ node: 'nodeA' });
   ok(/filed B\d+/.test(filed.out || '') && !/somebody else changed/.test(ownRelay.line || ''),
-     `...nor one it filed with aerie bug add (${(filed.out || filed.error || '').trim().slice(0, 40)}; ${(ownRelay.line || 'no line').slice(0, 60)})`);
+     `...and the session's own bug, filed with aerie bug add, is not named back to it (${(filed.out || filed.error || '').trim().slice(0, 40)}; ${(ownRelay.line || 'no line').slice(0, 60)})`);
   await call('/api/bugs', { project: 'alpha', action: 'add', title: 'the operator found a second', severity: 'low' });
   await relay(['bug']);
   const afterRead = await sess({ node: 'nodeA' });

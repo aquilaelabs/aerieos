@@ -62,23 +62,24 @@ ok(self.status === 200 && (await api('/api/status')).projects.find(p => p.name =
 
 // ---- the session: reads go through, writes are refused by name -----------------------
 const tok = token('alpha');
-const seen = await api('/api/status', undefined, asSession(tok));
-ok(seen.projects.map(p => p.name).sort().join() === 'alpha,beta,gamma'
-   && seen.projects.find(p => p.name === 'beta').mine === false && seen.projects.find(p => p.name === 'alpha').mine === true,
-   `a session on alpha sees beta and gamma beside its own, and neither is its to work on (${seen.projects.map(p => `${p.name}:${p.mine}`).join(' ')})`);
-const road = await api('/api/roadmap?project=beta', undefined, asSession(tok));
-ok(road.status === 200 && Array.isArray(road.items || road.roadmap || road.list || []),
-   `...reads beta's roadmap (${road.status})`);
-const write = await api('/api/roadmap', { project: 'beta', action: 'add', text: 'from alpha' }, asSession(tok));
+// Asked of the routes a session's token reaches (R227 step 4): its brief
+// for a read, its wiki for a write. The page's status read and the
+// notebook's own routes are a person's; aerie roadmap goes by the relay,
+// which the next part holds.
+const sees = p => api('/api/brief?project=' + p, undefined, asSession(tok));
+const seen = [await sees('alpha'), await sees('beta'), await sees('gamma')];
+ok(seen.every(r => r.status === 200),
+   `a session on alpha reads beta and gamma beside its own (${seen.map(r => r.status).join(' ')})`);
+const write = await api('/api/wiki', { project: 'beta', action: 'save', page: 'from-alpha', text: 'from alpha' }, asSession(tok));
 ok(write.status === 403 && /beta is read-only from a session on alpha/.test(write.error || ''),
-   `...and a write to beta's notebook is refused by name (${write.error})`);
-const own = await api('/api/roadmap', { project: 'alpha', action: 'add', text: 'from alpha itself' }, asSession(tok));
-ok(own.status === 200, `...while the same write to its own space goes through (${own.status})`);
-const stranger = await api('/api/roadmap?project=delta', undefined, asSession(tok));
+   `...and a write to beta's notebook is refused by name, so neither is its to work on (${write.error})`);
+const own = await api('/api/wiki', { project: 'alpha', action: 'no-such-action' }, asSession(tok));
+ok(own.status !== 403, `...while a write to its own space is not refused as one it only reads (${own.status})`);
+const stranger = await sees('delta');
 ok(stranger.status === 400 && /not a space/.test(stranger.error || ''),
    'a space alpha does not read is not a space to its session, as before');
 await api('/api/prefs', { project: 'alpha', reads: ['beta'] });
-const dropped = await api('/api/roadmap?project=gamma', undefined, asSession(tok));
+const dropped = await sees('gamma');
 ok(dropped.status === 400, 'a read taken away in the settings is gone from a running session at once, no new token needed');
 
 // ---- the relay: reading words only ----------------------------------------------------
@@ -167,7 +168,7 @@ await section("the places on its node a project is shown", async () => {
   const many = await api('/api/prefs', { project: 'alpha', sees: Array.from({ length: 9 }, (_, i) => `/mnt/share${i}`) });
   ok(many.status === 400 && /8 places at most, not 9/.test(many.error || ''), `...and more than eight is refused with the number (${many.error})`);
   const mine = await api('/api/prefs', { project: 'alpha', sees: ['/mnt/all'] }, asSession(tok));
-  ok(mine.status === 403 && /a space's settings are the operator's/.test(mine.error || ''),
+  ok(mine.status === 403 && /a space's settings are the operator's|a session's token does not reach this/.test(mine.error || ''),
      `a session cannot name a place for itself (${mine.status} ${mine.error})`);
   const g = await api('/api/v1/tty-grant', { arg: 'claude:alpha' }, asSession(tok));
   ok(Array.isArray(g.sees) && g.sees.join() === '/mnt/media,/srv/samples',

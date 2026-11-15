@@ -700,11 +700,11 @@ await section("the configuration plane on the row", async () => {
          JSON.stringify(toks.map(t => t.project))})`);
     // Worth being a real credential rather than a shape: the whole point is
     // that the session can go on using it.
-    const asSession = await (await fetch(URL.replace(/\/$/, '') + '/api/status',
-      { headers: { Authorization: 'Bearer ' + toks[0].token } })).json();
-    ok(JSON.stringify((asSession.projects || []).map(p => p.name)) === '["alpha"]',
-       `...and it is a working token for that space alone (${
-         (asSession.projects || []).map(p => p.name).join(',') || 'none'})`);
+    // Asked of a route a session's token reaches (R227 step 4): its brief.
+    const briefOf = p => fetch(URL.replace(/\/$/, '') + '/api/brief?project=' + p, { headers: { Authorization: 'Bearer ' + toks[0].token } }).then(r => r.status);
+    const asSession = [await briefOf('alpha'), await briefOf('beta')];
+    ok(asSession[0] === 200 && asSession[1] === 400,
+       `...and it is a working token for that space alone (alpha ${asSession[0]}, beta ${asSession[1]})`);
     await beat([{ name: `${uid}~shell-3` }]);
     const none = await napi('/api/v1/agent/hello', {
       census: CENSUS, version: shipped.version, digest: shipped.digest },
