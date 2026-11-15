@@ -7,13 +7,12 @@
 // device, a read-only person's change is refused, and a device waiting on
 // the project wakes when another changes it. The Profile page lists the
 // devices and Disconnect signs one out. No browser.
-import { ok, done, sleep, until, DIR, URL } from './lib.mjs';
+import { ok, done, sleep, until, DIR, URL, OWNER as ADMIN, asUser, asSession } from './lib.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 
 const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const base = URL.replace(/\/$/, '');
-const ADMIN = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
 const admin = async (path, body) => {
   const r = await fetch(base + path, { method: 'POST', headers: ADMIN, body: JSON.stringify(body) });
   return { status: r.status, ...(await r.json().catch(() => ({}))) };
@@ -173,7 +172,7 @@ ok(woke.status === 200 && (woke.changes || []).some(c => c[0] === 'from-laptop.t
     // with no window to ask in.
     const stok = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', 'dv.rw'], { encoding: 'utf8', env }).trim();
     const pcApi = async body => {
-      const r = await fetch(`${base}/api/pc`, { method: 'POST', headers: { Authorization: `Bearer ${stok}`, 'Content-Type': 'application/json' },
+      const r = await fetch(`${base}/api/pc`, { method: 'POST', headers: asSession(stok),
                                                 body: JSON.stringify(body) });
       return { status: r.status, ...(await r.json()) };
     };
@@ -203,7 +202,7 @@ ok(woke.status === 200 && (woke.changes || []).some(c => c[0] === 'from-laptop.t
 }
 
 // ---- Profile lists them, and Disconnect signs one out ---------------------------------------
-const PERSON = { Authorization: 'Basic ' + Buffer.from(`dv.rw:${people['dv.rw']}`).toString('base64'), 'Content-Type': 'application/json' };
+const PERSON = asUser('dv.rw', people['dv.rw']);
 const prof = await (await fetch(`${base}/api/profile`, { headers: PERSON })).json();
 const listed = (prof.devices || []).map(d => d.name);
 ok(['TEST-PC', 'LAPTOP', 'ELSEWHERE'].every(n => listed.includes(n)) && (prof.devices || []).every(d => !('secret_hash' in d) && d.kind === 'pc'),

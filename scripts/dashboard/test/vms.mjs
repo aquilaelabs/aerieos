@@ -5,7 +5,7 @@
 // a snapshot and Remove each a vm job; a session's aerie vm is held to its
 // project's Make VMs dial (deny refuses, ask goes to the bell, auto does it),
 // and a session never makes Windows.
-import { URL, launch, newPage, ok, done, ready, DIR, until } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, DIR, until, OWNER as H, asSession } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -18,7 +18,6 @@ const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
 await page.goto(URL);
 await ready(page);
 
-const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
 const base = URL.replace(/\/$/, '');
 const call = async (path, body, headers = H) => {
   const r = await fetch(base + path, body === undefined ? { headers } : { method: 'POST', headers, body: JSON.stringify(body) });
@@ -196,7 +195,7 @@ await call('/api/v1/jobs', { action: 'cancel', id: rv?.id });
 // A session's aerie vm, held to its project's dial.
 const tok = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', 'test'],
   { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
-const S = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok };
+const S = asSession(tok);
 const denied = await call('/api/vms', { action: 'new', name: 'w1', os: 'debian', keys: [KEY], why: 'a test box' }, S);
 ok(denied.status === 403 && /Make VMs is deny/.test(denied.error || ''), `at deny a session's aerie vm is refused, naming the setting (${denied.error})`);
 await call('/api/prefs', { project: 'alpha', makevms: 'ask' });

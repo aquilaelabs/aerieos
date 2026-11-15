@@ -3,7 +3,7 @@
 // macros only on shell tabs, middle-click ends a session, findings tab
 // behavior, and the phone's bottom bar: flyout slides and swaps, the strip
 // arrows and reveal, and the remembered view.
-import { launch, newPage, ok, done, ready, until, tmuxNew, tmuxKill, tmuxFmt, layoutSettled, refreshUntil, URL, DIR, closePage, unfold, member } from './lib.mjs';
+import { launch, newPage, ok, done, ready, until, tmuxNew, tmuxKill, tmuxFmt, layoutSettled, refreshUntil, URL, DIR, closePage, unfold, member, OWNER } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -44,6 +44,10 @@ ok(await page.evaluate(() => sessionOf(tabOf(panes[1]).arg) === 'shell-9' && doc
 // Pressed once the terminal shows the session, as a person would: before
 // its client attaches, keys reach bb-tty still starting, not tmux.
 await until(() => tmuxFmt('shell-9', '#{session_attached}') !== '0', 15000, 200);
+// ...and once the page's own terminal has its line to the session open: a
+// key sent before that goes nowhere, and under load the client was attached
+// a moment before the page's socket was (the gate of 15 Nov).
+await page.waitForFunction(() => [...TERMS.values()].some(r => r.el?.isConnected && r.ws?.readyState === 1), null, { timeout: 20000 }).catch(() => {});
 await page.evaluate(() => sendKey('pgup'));
 await page.waitForFunction(() => true); await until(() => tmuxFmt('shell-9', '#{pane_in_mode}') === '1', 10000);
 ok(tmuxFmt('shell-9', '#{pane_in_mode}') === '1', 'PgUp at a prompt enters copy mode (scrolls back)');
@@ -447,8 +451,7 @@ ok(await phone.$eval('#mLinksBox', b => b.hidden), '...and the next press puts t
 // session half good enough to take one, for as long as this block needs it.
 const bapi = async (path, body, hdrs) => (await fetch(URL.replace(/\/$/, '') + path, {
   method: body ? 'POST' : 'GET',
-  headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'),
-             'Content-Type': 'application/json', ...(hdrs || {}) },
+  headers: { ...OWNER, ...(hdrs || {}) },
   ...(body ? { body: JSON.stringify(body) } : {}) })).json();
 const deskbox = await bapi('/api/v1/nodes', { action: 'enroll', name: 'deskbox' });
 const deskAgent = await bapi('/api/v1/agent/enroll', { user: 'bb', version: 'harness', census: {
@@ -611,8 +614,11 @@ await phone.waitForSelector('.resumemenu', { timeout: 10000 });
 // Where it rests, not where it is mid-entrance: menuIn slides the chooser
 // down 5px over 140ms, and how far along that is when a round trip lands is
 // a fact about the box. Where it stops is what the operator sees (B77).
-await phone.waitForFunction(() => document.querySelector('.resumemenu')
-  ?.getAnimations().every(a => a.playState !== 'running'), null, { timeout: 10000 });
+// ...and in its pane: looked at before its entrance had begun it had no
+// animation to wait out, and read a moment later it was not yet in a pane
+// at all (two gates of 15 Nov, under load).
+await phone.waitForFunction(() => { const m = document.querySelector('.resumemenu');
+  return !!m && !!m.closest('.pane') && m.getAnimations().every(a => a.playState !== 'running'); }, null, { timeout: 10000 });
 const rest = await phone.$eval('.resumemenu', el => {
   const m = el.getBoundingClientRect(), pane = el.closest('.pane').getBoundingClientRect();
   const a = el._anchor, ap = a?.closest?.('.pane'), rb = document.querySelector('.railbar')?.getBoundingClientRect();

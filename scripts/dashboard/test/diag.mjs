@@ -6,15 +6,12 @@
 // to every tester whose session runs there. Whatever it returns carries no
 // credential. Nothing it makes is left behind, and what it touches is put back:
 // the account, the node's tick, the project's node and the switch.
-import { ok, done, URL, DIR } from './lib.mjs';
+import { ok, done, URL, DIR, asUser as basic, OWNER as ADMIN, asSession as bearer } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 
 const base = URL.replace(/\/$/, '');
 const HERE = new globalThis.URL('..', import.meta.url).pathname;
-const basic = (u, p) => ({ Authorization: 'Basic ' + Buffer.from(`${u}:${p}`).toString('base64'),
-                           'Content-Type': 'application/json' });
-const ADMIN = basic('test', 'test');
 const call = async (path, body, headers = ADMIN) => {
   const r = await fetch(base + path, body === undefined ? { headers }
     : { method: 'POST', headers, body: JSON.stringify(body) });
@@ -28,7 +25,6 @@ u.configure(state=${JSON.stringify(join(DIR, 'state'))}, write_json=lambda p, d:
 ${code}`], { encoding: 'utf8' }).trim();
 const ownerUid = usersPy('print(next(r["uid"] for r in u.load()["users"].values() if r.get("role") == "owner"))');
 const tok = uid => usersPy(`print(u.mint_session("alpha", uid=${JSON.stringify(uid)}))`);
-const bearer = t => ({ Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' });
 const CRED = /bb[a-z]_[A-Za-z0-9_-]{8,}|gh[pousr]_[A-Za-z0-9]{16,}|password\s*[:=]\s*\S{6,}/;
 
 // ---- an administrator ------------------------------------------------------

@@ -7,7 +7,7 @@
 // The hooks are the shipped scripts, run as processes, because "does the rule
 // reach the session" is the only question this file is about and a stub of
 // the hook would be a stub of the answer.
-import { launch, newPage, ok, done, ready, URL, DIR, nbShown, nbTab, sleep, openFold } from './lib.mjs';
+import { launch, newPage, ok, done, ready, URL, DIR, nbShown, nbTab, sleep, openFold, OWNER, asSession, mint } from './lib.mjs';
 import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -63,7 +63,7 @@ await page.waitForFunction(() => /2 files/.test(document.querySelector('#rulesBo
 const sects = await page.$$eval('#rulesBox .sect', ss => ss.map(s => s.querySelector('.stitle, .shead, summary')?.textContent || s.textContent.slice(0, 40)));
 ok(/Code base/.test(sects[0] || '') && /Your rules/.test(sects[1] || ''),
    `the code base section comes first, the rules after it (${sects.map(x => x.trim().slice(0, 20)).join(' | ')})`);
-const cb = await (await fetch(URL + 'api/codebase?project=alpha', { headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') } })).json();
+const cb = await (await fetch(URL + 'api/codebase?project=alpha', { headers: OWNER })).json();
 ok(cb.files === 2 && cb.lines === 3 && cb.code_lines === 2
    && cb.languages.some(l => l.name === 'Python' && l.lines === 2 && l.pct === 100)
    && cb.languages.some(l => l.name === 'Markdown' && l.kind === 'prose'),
@@ -76,7 +76,7 @@ ok(new RegExp(`${cb.files} file`).test(await page.$eval('#rulesBox .sect', e => 
 const cbText = await page.$eval('#rulesBox .sect', e => e.textContent.replace(/\s+/g, ' '));
 ok(/2 files and 3 lines tracked by git/.test(cbText) && /2 lines of code in 1 file\b/.test(cbText),
    `...and its body is the head's totals, then the code among them (${cbText.slice(0, 160)})`);
-const nogit = await (await fetch(URL + 'api/codebase?project=gamma', { headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') } })).json();
+const nogit = await (await fetch(URL + 'api/codebase?project=gamma', { headers: OWNER })).json();
 ok(/not a git repository/.test(nogit.error || ''), 'a space that is not a repository says so rather than counting nothing');
 ok(await page.$('#memList') !== null,
    '...on the same tab as the memories, which is the point of the rename');
@@ -377,26 +377,14 @@ ok(/dropped dont-edit-during-a-suite/.test(
 {
   // A real one, minted the way bb-tty mints the token it hands a session:
   // the point is a genuine session principal, not a shape.
-  const tok = execFileSync('python3', ['-c', `
-import importlib.util, os, sys
-spec = importlib.util.spec_from_file_location('users', ${
-  JSON.stringify(join(HERE, '..', 'users.py'))})
-m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
-import json
-def wj(path, d):
-    tmp = str(path) + '.new'
-    with open(tmp, 'w') as f: json.dump(d, f, indent=2)
-    os.replace(tmp, path)
-m.configure(state=${JSON.stringify(`${DIR}/state`)}, write_json=wj)
-print(m.mint_session('alpha'))
-`], { encoding: 'utf8' }).trim();
+  const tok = mint('alpha');
   ok(/^bbs_/.test(tok), 'a session token can be minted for the check below');
   // From outside the browser, which is where a session actually is: a shell
   // with a token and no cookie. Through the page it would have carried the
   // operator's own login as well, and proved nothing.
   const res = await fetch(URL.replace(/\/$/, '') + '/api/rules', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+    headers: asSession(tok),
     body: JSON.stringify({ project: 'alpha', action: 'save',
                            rules: [{ name: 'mine', text: 'a session wrote this' }] }) });
   const r = { status: res.status, body: await res.text() };
@@ -412,8 +400,7 @@ print(m.mint_session('alpha'))
 // The drift the block has, these do not: there is no copy anywhere, so a rule
 // the operator sets is the rule every session on the box is handed.
 {
-  const auth = { 'Content-Type': 'application/json',
-                 Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
+  const auth = OWNER;
   const api = async body => {
     const r = await fetch(URL.replace(/\/$/, '') + '/api/global-rules',
       { method: 'POST', headers: auth, body: JSON.stringify(body) });
@@ -441,11 +428,7 @@ print(m.mint_session('alpha'))
 
   // A session's token is a principal with user rights over one project; a
   // global rule reaches every project, so this endpoint wants an admin.
-  const tok = execFileSync('python3', ['-c', `
-import sys; sys.path.insert(0, ${JSON.stringify(join(HERE, '..'))})
-import users, statefile
-users.configure(write_json=statefile.write_json, state=${JSON.stringify(`${DIR}/state`)})
-print(users.mint_session('alpha'))`], { encoding: 'utf8' }).trim();
+  const tok = mint('alpha');
   const asSession = await fetch(URL.replace(/\/$/, '') + '/api/global-rules',
     { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
       body: JSON.stringify({ action: 'save', rules: [{ name: 'x', text: 'y' }] }) });
@@ -493,7 +476,7 @@ print(users.mint_session('alpha'))`], { encoding: 'utf8' }).trim();
   const standing = Array.from({ length: 41 }, (_, i) => ({ name: `standing-${i}`, text: `a standing rule, number ${i}` }));
   // From here rather than the page, so the refusal is not a console error.
   const over = await (await fetch(URL.replace(/\/$/, '') + '/api/rules', { method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') },
+    headers: OWNER,
     body: JSON.stringify({ project: 'alpha', action: 'save', rules: standing, force: true }) })).json();
   ok(/40 standing rules is the limit: each is read whole into every session/.test(over.error || '')
      && /Give one a file or a word that calls for it/.test(over.error || ''),
@@ -522,8 +505,7 @@ print(users.mint_session('alpha'))`], { encoding: 'utf8' }).trim();
 // carry no meaning here on purpose: an override you can only make by knowing
 // the other rule's name helps exactly the person who did not need it.
 {
-  const auth = { 'Content-Type': 'application/json',
-                 Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
+  const auth = OWNER;
   const post = async (path, body) => (await fetch(URL.replace(/\/$/, '') + path,
     { method: 'POST', headers: auth, body: JSON.stringify(body) })).json();
   const get = async path => (await fetch(URL.replace(/\/$/, '') + path, { headers: auth })).json();

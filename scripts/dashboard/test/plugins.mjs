@@ -4,7 +4,7 @@
 // controller shows a person theirs on the Profile tab and every account's in
 // aerie diag. Then the two recipes that give the language-server plugins what
 // they run, since a session cannot npm install -g into the store.
-import { URL, launch, newPage, ok, done, ready, sleep, DIR } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, sleep, DIR, OWNER as ADMIN, asSession as bearer } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -12,8 +12,6 @@ import { join } from 'node:path';
 const base = URL.replace(/\/$/, '');
 const HERE = new globalThis.URL('..', import.meta.url).pathname;
 const BB = join(HERE, '..', 'aerie');
-const ADMIN = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'),
-                'Content-Type': 'application/json' };
 const call = async (path, body, headers = ADMIN) => {
   const r = await fetch(base + path, body === undefined ? { headers }
     : { method: 'POST', headers, body: JSON.stringify(body) });
@@ -21,7 +19,6 @@ const call = async (path, body, headers = ADMIN) => {
   let j = {}; try { j = JSON.parse(t); } catch { /* 204 */ }
   return { status: r.status, ...j };
 };
-const bearer = t => ({ Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' });
 const owner = JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users.test.uid;
 
 // ---- aerie login --list reads them off the disk --------------------------------

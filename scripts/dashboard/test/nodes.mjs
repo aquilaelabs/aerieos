@@ -4,7 +4,7 @@
 // the DOCKER_HOST mirror are seeded, work stamps the node it belongs to,
 // every mutation grows an audit row, and the page the operator sees is
 // exactly the page it was.
-import { URL, launch, newPage, ok, done, ready, sleep, DIR, tmuxNew, animatedDuring, openFold, openArchived, closeFold, patience, saveDialog, sectSave, openSection, splitPick, refreshUntil, prefsOf, until } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, sleep, DIR, tmuxNew, animatedDuring, openFold, openArchived, closeFold, patience, saveDialog, sectSave, openSection, splitPick, refreshUntil, prefsOf, until, OWNER, api, usersPy } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync, readFileSync } from 'node:fs';
 
@@ -345,8 +345,7 @@ print(json.dumps(out))
   // can send docker to.
   {
     const base = URL.replace(/\/$/, '');
-    const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'),
-                'Content-Type': 'application/json' };
+    const H = OWNER;
     const post = async (path, body, headers = H) => (await fetch(base + path,
       { method: 'POST', headers, body: JSON.stringify(body) })).json();
     const mint = await post('/api/v1/nodes', { action: 'enroll', name: 'buildbox' });
@@ -368,8 +367,7 @@ print(json.dumps(out))
   // to the primary. buildbox reports no session half, so it refuses.
   {
     const base = URL.replace(/\/$/, '');
-    const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'),
-                'Content-Type': 'application/json' };
+    const H = OWNER;
     const post = async (path, body) => (await fetch(base + path,
       { method: 'POST', headers: H, body: JSON.stringify(body) })).json();
     const get = async path => (await fetch(base + path, { headers: H })).json();
@@ -630,10 +628,9 @@ m._exec("UPDATE nodes SET agent = ? WHERE id = ?", (json.dumps(ag), "${added.id}
 // Save keeping the record and Apply queuing the system job. Enrolled here by
 // hand (the census is a body) because the real agent has its own suite.
 {
-  const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
+  const H = OWNER;
   const base = URL.replace(/\/$/, '');
-  const napi = async (path, body, headers = H) => (await fetch(base + path, body === undefined
-    ? { headers } : { method: 'POST', headers, body: JSON.stringify(body) })).json();
+  const napi = api;
   const minted = await napi('/api/v1/nodes', { action: 'enroll', name: 'shed' });
   // The digest this controller ships, so the fixture node enrolls CURRENT.
   // Everything below drives Apply, the runner and installs, all of which are
@@ -2779,7 +2776,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
 // still reads it for whichever node is being addressed, so a line that drew
 // nowhere would have taken an editable setting out of reach in silence.
 {
-  const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
+  const H = OWNER;
   const base = URL.replace(/\/$/, '');
   const papi = async (body) => (await fetch(base + '/api/v1/nodes', { method: 'POST', headers: H, body: JSON.stringify(body) })).json();
   const sb = (await (await fetch(base + '/api/v1/nodes', { headers: H })).json()).nodes.find(n => n.name === 'sandbox');
@@ -2840,7 +2837,7 @@ await page.evaluate(() => nodeAct({ action: 'paths', id: nodesList.find(n => n.n
 // named the node's daemon for up to half an hour after the row was gone.
 const docBefore = await page.evaluate(() => state.doctor?.when || 0);
 for (const n of (await (await fetch(URL.replace(/\/$/, '') + '/api/v1/nodes',
-     { headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') } })).json()).nodes){
+     { headers: OWNER })).json()).nodes){
   if (n.kind !== 'local' && n.name !== 'sandbox')
     await page.evaluate(id => nodeAct({ action: 'retire', id }), n.id);
 }
@@ -3046,10 +3043,7 @@ await page.evaluate(async () => {
   // One name, one node (the operator, 11 Oct): the same name again is
   // refused rather than a second waiting row; the row shows what its
   // script was made with, its id, and offers the script again or Discard.
-  const napi = async (path, body) => (await fetch(URL.replace(/\/$/, '') + path, body === undefined
-    ? { headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') } }
-    : { method: 'POST', headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' },
-        body: JSON.stringify(body) })).json();
+  const napi = api;
   const dup = await napi('/api/v1/nodes', { action: 'enroll', script: true, name: 'vpsbox', user: 'bb', reach: 'lan', controller: 'http://192.168.1.16:7680' });
   ok(/already a node called vpsbox/.test(dup.error || '') && /Discard/.test(dup.error || ''),
      `a second script with a waiting row's name is refused, pointing at the row (${dup.error})`);
@@ -3349,10 +3343,8 @@ ok(page.errors.length === 0,
 // command to run on the machine; and the row is retired when the job
 // lands, which the fake agent reports the way a real one does.
 {
-  const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
   const base = URL.replace(/\/$/, '');
-  const napi = async (path, body, headers = H) => (await fetch(base + path, body === undefined
-    ? { headers } : { method: 'POST', headers, body: JSON.stringify(body) })).json();
+  const napi = api;
   const shipped = (await napi('/api/v1/nodes')).agent || {};
   const mint = async (name, census) => {
     const m = await napi('/api/v1/nodes', { action: 'enroll', name });
@@ -3792,7 +3784,7 @@ ok(page.errors.length === 0,
 // ends. A session's token cannot ask for it, and nothing in bb can.
 {
   const base = URL.replace(/\/$/, '');
-  const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
+  const H = OWNER;
   const napi = async (path, body, hdrs) => (await fetch(base + path, {
     method: body ? 'POST' : 'GET', headers: { ...H, ...(hdrs || {}) },
     ...(body ? { body: JSON.stringify(body) } : {}) })).json();
@@ -3922,18 +3914,7 @@ ok(page.errors.length === 0,
      '...and the Library\'s Claude Code card says what is out and offers Update');
   await page.evaluate(() => openNodesTab());
   // A session's token gets nowhere near it.
-  const tok = execFileSync('python3', ['-c', `
-import importlib.util, json, os, sys
-sys.path.insert(0, ${JSON.stringify(new globalThis.URL('..', import.meta.url).pathname)})
-spec = importlib.util.spec_from_file_location('u', ${JSON.stringify(new globalThis.URL('../users.py', import.meta.url).pathname)})
-m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
-def wj(path, d):
-    tmp = str(path) + '.new'
-    with open(tmp, 'w') as f: json.dump(d, f, indent=2)
-    os.replace(tmp, path)
-m.configure(state=${JSON.stringify(`${DIR}/state`)}, write_json=wj)
-print(m.mint_session('alpha'))
-`], { encoding: 'utf8' }).trim();
+  const tok = usersPy('u.mint_session("alpha")');
   const asSession = await fetch(base + '/api/agents', { method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
     body: JSON.stringify({ action: 'install', node: en.id, agent: 'claude' }) });
@@ -4100,7 +4081,7 @@ print(json.dumps({"ok": bool(r.get("ok")), "moved": m.jobs_state_rev() - before}
 // the node selected as "name (removed)" in italics, and another project's
 // picker does not offer it at all.
 {
-  const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
+  const H = OWNER;
   const base = URL.replace(/\/$/, '');
   const napi = async (path, body) => (await fetch(base + path, { method: 'POST', headers: H, body: JSON.stringify(body) })).json();
   const gone = await napi('/api/v1/nodes', { action: 'enroll', name: 'oldbox' });
@@ -4150,7 +4131,7 @@ print(json.dumps({"ok": bool(r.get("ok")), "moved": m.jobs_state_rev() - before}
 // row), a project's node pickers say which it is, and the container
 // picker offers it, its containers being the root agent's.
 {
-  const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
+  const H = OWNER;
   const base = URL.replace(/\/$/, '');
   const napi = async (path, body) => (await fetch(base + path, { method: 'POST', headers: H, body: JSON.stringify(body) })).json();
   const tok = execFileSync('python3', [`${REPO}/scripts/lib/nodes-verbs.py`, 'enroll-token', `${REPO}/scripts/dashboard/nodes.py`,

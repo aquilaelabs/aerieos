@@ -5,14 +5,12 @@
 // their gate, a log a person clears. Nothing goes back to the session that
 // made it: that loop worked only where AerieOS's own tracker sat beside
 // the sessions reporting to it (the operator, 8 Oct).
-import { launch, newPage, ready, ok, done, saveDialog, URL, DIR, unfold, splitPick, prefsOf } from './lib.mjs';
+import { launch, newPage, ready, ok, done, saveDialog, URL, DIR, unfold, splitPick, prefsOf, OWNER as ADMIN, asUser, asSession } from './lib.mjs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 
 const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const base = URL.replace(/\/$/, '');
-const ADMIN = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'),
-                'Content-Type': 'application/json' };
 const call = async (path, body, headers = ADMIN) => {
   const r = await fetch(base + path, body === undefined ? { headers }
     : { method: 'POST', headers, body: JSON.stringify(body) });
@@ -20,7 +18,7 @@ const call = async (path, body, headers = ADMIN) => {
 };
 const token = project => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', project, 'test'],
   { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
-const as = tok => ({ Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' });
+const as = asSession;
 const ALPHA = as(token('alpha'));
 const BETA = as(token('beta'));
 
@@ -289,7 +287,7 @@ print(json.dumps({"r": r, "text": z.read(f).decode() if f and f in z.namelist() 
   execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'add', 'repadmin', '--role', 'admin'],
     { input: 'repadminpass1\nrepadminpass1\n', encoding: 'utf8',
       env: { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } });
-  const as = { Authorization: 'Basic ' + Buffer.from('repadmin:repadminpass1').toString('base64'), 'Content-Type': 'application/json' };
+  const as = asUser('repadmin', 'repadminpass1');
   const send = async p => { const r = await fetch(URL.replace(/\/$/, '') + '/api/reports', { method: 'POST', headers: as,
     body: JSON.stringify({ action: 'add', project: p, text: 'seen from outside', area: 'Something else' }) }); return { status: r.status, body: await r.json() }; };
   await page.evaluate(() => fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' },

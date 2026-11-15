@@ -4,7 +4,7 @@
 // Everything here drives the stub docker the harness provides; the argv it
 // records IS the assertion, because the module's whole safety story is that
 // the buttons run table-lookup compose commands and nothing else.
-import { launch, newPage, ok, done, ready, sleep, patience, holdPoll, freePoll, refreshUntil, saveDialog, URL, DIR, nbShown, nbTab, openFold, nbGo, faded, projectKey, until, quiet, settled } from './lib.mjs';
+import { launch, newPage, ok, done, ready, sleep, patience, holdPoll, freePoll, refreshUntil, saveDialog, URL, DIR, nbShown, nbTab, openFold, nbGo, faded, projectKey, until, quiet, settled, OWNER, asSession } from './lib.mjs';
 import { writeFileSync, readFileSync, rmSync, existsSync, mkdirSync, chmodSync, readdirSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -47,7 +47,7 @@ git('commit', '-qm', 'compose');
 // outcome. An assertion about what a job LEFT BEHIND waits for the queue to
 // empty first, rather than sampling the row mid-settle (bug #13's shape).
 const idle = async (ms = 20000) => {
-  const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
+  const H = OWNER;
   await until(async () => !((await (await fetch(URL.replace(/\/$/, '') + '/api/v1/jobs?active=1', { headers: H })).json()).jobs || []).length,
               ms, 200);
 };
@@ -55,7 +55,7 @@ const idle = async (ms = 20000) => {
 // A compose job still queued or running, asked of the server: the job that
 // will move a row, which a wait has to give its time to (B624).
 const composeBusy = async () => {
-  const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
+  const H = OWNER;
   try {
     const r = await (await fetch(URL.replace(/\/$/, '') + '/api/v1/jobs?active=1&type=compose', { headers: H })).json();
     return (r.jobs || []).length > 0;
@@ -636,7 +636,7 @@ ok(!r.rebuild && /the code has moved since/.test(r.text) === false,
   ok(opts.some(([v, d]) => v === 'lan' && !d) && opts.some(([v, d]) => v === 'funnel' && d)
      && opts.some(([v, d]) => v === 'public' && d),
      'the route picker offers lan, grays funnel without tailscale, and names public as unbuilt');
-  const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
+  const H = OWNER;
   const rapi = async body => (await fetch(URL.replace(/\/$/, '') + '/api/devapp', { method: 'POST', headers: H, body: JSON.stringify(body) })).json();
   const pub = await rapi({ project: 'ep.silon', instance: 'main', action: 'route', mode: 'public' });
   ok(/not built/.test(pub.error || ''), 'public is refused by name');
@@ -1173,7 +1173,7 @@ ok(probs.length === 0 && !/will not work as written/.test(await page.$eval('#dev
   const r = await page.evaluate(async () => (await (await fetch('/api/devapp', { method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ project: 'ep.silon', action: 'rebuild', ack: '' }) })).json()));
-  const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
+  const H = OWNER;
   let job = null;
   if (r.job) await until(async () => {
     job = await (await fetch(URL.replace(/\/$/, '') + '/api/v1/jobs?id=' + r.job, { headers: H })).json();
@@ -1211,7 +1211,7 @@ ok(page.dialogs.slice(seen).some(d => /runs privileged/.test(d)),
     body: JSON.stringify({ project: 'ep.silon', action: 'rebuild', ack: '' }) })).json()));
   ok(r.ok && r.job && Date.now() - t0 < 5000,
      `a rebuild answers with its job before the gate has read the compose (${r.job || r.error})`);
-  const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
+  const H = OWNER;
   let job = null;
   await until(async () => {
     job = await (await fetch(URL.replace(/\/$/, '') + '/api/v1/jobs?id=' + r.job, { headers: H })).json();
@@ -2298,7 +2298,7 @@ ok(await page.$eval(`${DM} .sect .wport a`, a => a.getAttribute('href'))
       { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
     const grant = async arg => {
       const r = await fetch(URL.replace(/\/$/, '') + '/api/v1/tty-grant', { method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ arg }) });
+        headers: asSession(tok), body: JSON.stringify({ arg }) });
       return { status: r.status, ...(await r.json().catch(() => ({}))) };
     };
     const g = await grant(`ctr:ep.silon:main:${offered[0].ctr}`);
@@ -2445,8 +2445,7 @@ print(json.dumps({'n1': sorted(m.lans('n1')), 'n2': sorted(m.lans('n2'))}))
 // the env was told it already existed (B259).
 {
   const base = URL.replace(/\/$/, '');
-  const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'),
-              'Content-Type': 'application/json' };
+  const H = OWNER;
   const post = async (body) => (await fetch(base + '/api/devapp',
     { method: 'POST', headers: H, body: JSON.stringify(body) })).json();
   // The env directory made unwritable for one request: the write fails the
@@ -2514,7 +2513,7 @@ ok(/PORT=8080/.test(await page.$eval('#dnEnv', e => e.value)),
   // Asked from here rather than the page: a 400 the page fetches lands in
   // its console, and the dev row's check below wants that console clean.
   const own = await (await fetch(URL.replace(/\/$/, '') + '/api/devapp', { method: 'POST',
-      headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' },
+      headers: OWNER,
       body: JSON.stringify({ project: 'ep.silon', action: 'new', instance: 'Ep Silon' }) })).json();
   ok(/already has its own container, ep-silon, on the Containers page/.test(own.error || ''),
      `...and that name asked for again names the container it already is (${String(own.error).slice(0, 70)})`);
@@ -4176,7 +4175,7 @@ ok(await page.$('#devSend'),
     // still refused, on its job.
     writeFileSync(`${DIR}/dockerstate/riskynew.config`, JSON.stringify(
       { services: { app: { build: { context: '.' }, privileged: true } } }));
-    const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
+    const H = OWNER;
     const jobEnd = async id => {
       let j = null;
       if (id) await until(async () => {
@@ -4690,7 +4689,7 @@ print(json.dumps(out))
   const moveTok = execFileSync('bash', [fileURLToPath(new globalThis.URL('../../aerie', import.meta.url)), 'users', 'token', 'ep.silon', 'test'],
     { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
   const bySess = await fetch(URL.replace(/\/$/, '') + '/api/devapp', { method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + moveTok },
+    headers: asSession(moveTok),
     body: JSON.stringify({ project: 'ep.silon', action: 'move', instance: 'main', to: 'alpha' }) })
     .then(async r => ({ status: r.status, ...(await r.json()) }));
   ok(bySess.status === 403 && !(await api('/api/docker')).instances.some(d => d.project === 'alpha'),
@@ -4841,7 +4840,7 @@ print(json.dumps(out))
     { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
   const as = async (path, body) => {
     const r = await fetch(URL.replace(/\/$/, '') + path, body
-      ? { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+      ? { method: 'POST', headers: asSession(tok),
           body: JSON.stringify(body) }
       : { headers: { Authorization: 'Bearer ' + tok } });
     return { status: r.status, ...(await r.json().catch(() => ({}))) };
@@ -5124,8 +5123,7 @@ print(json.dumps({'bad': bool(bad.get('error')), 'good': bool(good.get('ok')), '
 // node most projects use, else the one that runs docker) stays the sandbox.
 {
   const base = URL.replace(/\/$/, '');
-  const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'),
-              'Content-Type': 'application/json' };
+  const H = OWNER;
   const post = async (path, body, headers = H) => (await fetch(base + path,
     { method: 'POST', headers, body: JSON.stringify(body) })).json();
   // The compose fixture, put back for this block: the suite tidied it away
@@ -5135,7 +5133,7 @@ print(json.dumps({'bad': bool(bad.get('error')), 'good': bool(good.get('ok')), '
   await post('/api/v1/agent/enroll', {
     user: 'bb', version: '1', digest: 'sha256:' + '2'.repeat(64),
     census: { cpu: 2, mem_mb: 4096, arch: 'x86_64', system: 'linux', sshd: true } },
-    { Authorization: 'Bearer ' + mint.token, 'Content-Type': 'application/json' });
+    asSession(mint.token));
   const ids = await page.evaluate(async () => {
     await loadNodes();
     return { spare: nodesList.find(n => n.name === 'spare')?.id || '',

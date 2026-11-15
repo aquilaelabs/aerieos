@@ -6,19 +6,12 @@
 // operator's window on all of it. Every assertion here goes through the queue
 // end to end (a job queued, placed, run, logged, ended), because the queue is
 // what this phase exists to prove.
-import { URL, launch, newPage, ok, done, ready, sleep, DIR, quiet } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, sleep, DIR, quiet, OWNER, api } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 
 const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
-const auth = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
+const auth = OWNER;
 const base = URL.replace(/\/$/, '');
-const api = async (path, body) => {
-  const r = await fetch(base + path, body === undefined
-    ? { headers: auth }
-    : { method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' },
-        body: JSON.stringify(body) });
-  return r.status === 204 ? {} : r.json();
-};
 const OVER = ['succeeded', 'failed', 'canceled'];
 const until = async (fn, ms = 20000, step = 200) => {
   const end = Date.now() + ms;
@@ -331,7 +324,7 @@ await ready(page);
   ok(/no such job/.test(missing), '...and an id that is not there says so rather than listing everything');
   // As a session of alpha: its project's jobs only, and another project's
   // job by id is "no such job", the same answer a typo gets.
-  const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
+  const H = OWNER;
   // One of beta's, so there is something to keep out of alpha's view.
   await exec({ id: 'local', project: 'beta', argv: ['true'] });
   const all = (await (await fetch(base + '/api/v1/jobs?n=100', { headers: H })).json()).jobs || [];

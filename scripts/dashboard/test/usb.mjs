@@ -7,7 +7,7 @@
 // offers Take back, the controllers are listed with what hangs off each and
 // what shares their IOMMU group, the Features section offers the IOMMU with
 // Install, and a session's aerie vm usb is held for a person whatever the dial.
-import { URL, launch, newPage, ok, done, ready, until, openSection, DIR, saveDialog, refreshUntil } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, until, openSection, DIR, saveDialog, refreshUntil, OWNER as H, asSession } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -22,7 +22,6 @@ const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
 await page.goto(URL);
 await ready(page);
 
-const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
 const base = URL.replace(/\/$/, '');
 const call = async (path, body, headers = H) => {
   const r = await fetch(base + path, body === undefined ? { headers } : { method: 'POST', headers, body: JSON.stringify(body) });
@@ -146,7 +145,7 @@ ok(true, 'installed and not on yet, the row asks for a restart');
 await call('/api/prefs', { project: 'alpha', makevms: 'auto' });
 const tok = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', 'test'],
   { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
-const SH = { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' };
+const SH = asSession(tok);
 const asked = await call('/api/vms', { action: 'usb-give', name: VMN, why: 'the stick', usb: { vendor: '0x0781', product: '0x5583', serial: '4C53' } }, SH);
 ok(asked.id && !asked.job, `a session's usb-give is held for a person on the bell even at auto (${JSON.stringify(asked).slice(0, 80)})`);
 const bell = await call('/api/phone');

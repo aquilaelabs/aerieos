@@ -4,7 +4,7 @@
 // project on several nodes, and dialogs that scroll.
 import { launch, newPage, ok, done, ready, openArchived, doctorFixture, animatedDuring, refreshUntil,
          holdPoll, freePoll, tmuxNew, tmuxKill, tmuxFmt, nbShown, URL, DIR, unfold, registerProject,
-         saveDialog, sectSave, until, quiet, settled, sleep } from './lib.mjs';
+         saveDialog, sectSave, until, quiet, settled, sleep, OWNER } from './lib.mjs';
 import { writeFileSync, readFileSync, existsSync, rmSync, utimesSync,
          mkdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -1019,7 +1019,7 @@ ok(true, '...and so does a click on the page under it');
 // seeded as having read both, or every file here would open under it.
 {
   const prefs = async p => (await fetch(URL + 'api/users', { method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') },
+    headers: OWNER,
     body: JSON.stringify({ action: 'prefs', prefs: p }) })).json();
   await prefs({ welcome_seen: false });
   await page.reload(); await ready(page);
@@ -2920,7 +2920,7 @@ await api('/api/pin', { name: 'lx-free', pinned: false });
     return y.model === 'sonnet' && y.effort === 'high'; }, { timeout: 20000 });
   ok(true, '...and Start saves them as this account\'s for the space, which the launcher reads, and opens the session');
   await (await fetch(URL.replace(/\/$/, '') + '/api/prefs', { method: 'POST',
-    headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' },
+    headers: OWNER,
     body: JSON.stringify({ project: 'alpha', model: '', effort: '' }) })).json();
   rmSync(tdir, { recursive: true, force: true });
   // The row planted again in the same evaluation as the read: a poll that
@@ -2958,7 +2958,7 @@ await api('/api/pin', { name: 'lx-free', pinned: false });
   // terminal, whatever asks for it, saying how many it lets each person run.
   {
     const cap = async n => (await fetch(URL.replace(/\/$/, '') + '/api/prefs', { method: 'POST',
-      headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' },
+      headers: OWNER,
       body: JSON.stringify({ project: 'alpha', agent_slots: n }) })).json();
     const set = await cap(1);
     const over = await page.evaluate(async () => {

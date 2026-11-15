@@ -4,15 +4,13 @@
 // Nodes tab where an administrator sets the number. The node is one this file
 // enrolls, with the session half up and a heartbeat whose panes carry the
 // spinner a working Claude pane does; the per-file world takes it away after.
-import { URL, launch, newPage, ok, done, ready, sleep, until, DIR, openSection, member } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, sleep, until, DIR, openSection, member, OWNER as ADMIN, asUser, asSession as bearer, usersPy } from './lib.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const base = URL.replace(/\/$/, '');
 const HERE = new globalThis.URL('..', import.meta.url).pathname;
-const ADMIN = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'),
-                'Content-Type': 'application/json' };
 const call = async (path, body, headers = ADMIN) => {
   const r = await fetch(base + path, body === undefined ? { headers }
     : { method: 'POST', headers, body: JSON.stringify(body) });
@@ -20,7 +18,6 @@ const call = async (path, body, headers = ADMIN) => {
   let j = {}; try { j = JSON.parse(t); } catch { /* 204 and friends */ }
   return { status: r.status, ...j };
 };
-const bearer = t => ({ Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' });
 const py = (mod, code) => execFileSync('python3', ['-c', `
 import importlib.util, json, time
 spec = importlib.util.spec_from_file_location("m", ${JSON.stringify(join(HERE, mod))})
@@ -107,7 +104,7 @@ m._save(d); print(uid)`);
 const owner = py('users.py', 'print(next(r["uid"] for r in m.load()["users"].values() if r.get("role") == "owner"))');
 const uids = [owner, make('tn.one'), make('tn.two'), make('tn.three')];
 await member('tn.one', 'tn.two', 'tn.three');
-const toks = uids.map(u => py('users.py', `print(m.mint_session("alpha", uid=${JSON.stringify(u)}))`));
+const toks = uids.map(u => usersPy(`u.mint_session("alpha", uid=${JSON.stringify(u)})`));
 const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
 
 // A session told the controller moved (R83): the build it began on is
@@ -252,7 +249,7 @@ const hook = (i, kind) => call('/api/v1/hook', { kind }, bearer(toks[i]));
   r = await call('/api/login-code', { code: 'abc#def' }, bearer(toks[1]));
   ok(r.status === 403, `a session cannot type a code into the controller's sign-in (${r.status})`);
   r = await call('/api/v1/nodes', { action: 'turns', id: minted.id, limit: 1 },
-    { Authorization: 'Basic ' + Buffer.from('tn.one:pw-tn.one-1').toString('base64'), 'Content-Type': 'application/json' });
+    asUser('tn.one', 'pw-tn.one-1'));
   ok(r.status === 403, `...nor can a plain account (${r.status})`);
   r = await call('/api/v1/nodes', { action: 'turns', id: minted.id, limit: 'lots' });
   ok(/whole number/.test(r.error || ''), `a limit that is not a number is refused, saying what one is (${r.error})`);

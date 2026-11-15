@@ -6,19 +6,12 @@
 // a node and lands on Home, whose Getting started card keeps what is left.
 // The fixture starts with setup done, so it is put back to first run here,
 // as making the owner does, and Finish puts it right again.
-import { URL, launch, newPage, ok, done, DIR, until, holdPoll, freePoll } from './lib.mjs';
+import { URL, launch, newPage, ok, done, DIR, until, holdPoll, freePoll, api } from './lib.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import { mkdirSync, rmSync, openSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
 
-const auth = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
-const base = URL.replace(/\/$/, '');
-const api = async (path, body) => {
-  const r = await fetch(base + path, body === undefined ? { headers: auth }
-    : { method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  return r.status === 204 ? {} : r.json();
-};
 const firstRun = async on => api('/api/settings', { set: { setup_done: !on } });
 
 const browser = await launch();

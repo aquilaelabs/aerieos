@@ -10,7 +10,7 @@
 // So what is measured here is the assembly itself (order, joins, the cap) and
 // then the thing that makes it worth having: the tab renders the SAME string
 // the endpoint returns, byte for byte, rather than its own idea of it.
-import { URL, DIR, launch, newPage, ok, done, ready, sleep, patience } from './lib.mjs';
+import { URL, DIR, launch, newPage, ok, done, ready, sleep, patience, OWNER } from './lib.mjs';
 import { writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -61,7 +61,7 @@ const droid = await api('/api/preamble?project=alpha&topic=android');
 ok(/^## Building and testing/.test(build.text || '') && /this node carries git, tmux, jq, python3 and curl by itself/.test(build.text || '')
    && /^## Android/.test(droid.text || '')
    && (await fetch(URL.replace(/\/$/, '') + '/api/preamble?project=alpha&topic=nope',
-        { headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') } })).status === 404,
+        { headers: OWNER })).status === 404,
    'a topic is its section whole, a gated one answers when asked for, and an unknown name is refused');
 // The line between the two: the briefing states what is true of the machine,
 // a shipped rule is an obligation, and nothing is said in both. An obligation

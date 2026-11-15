@@ -5,7 +5,7 @@
 // allowed, and a bump must not sweep unrelated work into its commit. Both are
 // reachable through `aerie version`, which is the same module the notebook will
 // call, so testing the CLI tests the thing.
-import { launch, newPage, ready, ok, done, until, quiet, settled, SLOW, tmuxCapture, DIR, URL as DURL, refreshUntil, saveDialog, takeOn, openFold, registerProject, nbGo } from './lib.mjs';
+import { launch, newPage, ready, ok, done, until, quiet, settled, SLOW, tmuxCapture, DIR, URL as DURL, refreshUntil, saveDialog, takeOn, openFold, registerProject, nbGo, asSession, mint } from './lib.mjs';
 import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, chmodSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -13,7 +13,6 @@ import { fileURLToPath } from 'node:url';
 // The checkout's bb, not the image's: the running image predates this
 // subcommand, which is exactly the case this repo's own CLAUDE.md warns about.
 const BB = fileURLToPath(new URL('../../aerie', import.meta.url));
-const REPO = fileURLToPath(new URL('../../../', import.meta.url));
 const WS = `${DIR}/ws`;
 const PROJ = 'versioned';
 const ROOT = `${WS}/${PROJ}`;
@@ -1356,16 +1355,9 @@ ok(clog.inSheet && clog.tall && !clog.boxed,
   // rule. Asked from node rather than from the page: a deliberate 403 is a
   // failed resource in the console, and the clean-console assertion below is
   // worth more than the convenience.
-  const stok = execFileSync('python3', ['-c', `
-import importlib.util, json, os, sys
-spec = importlib.util.spec_from_file_location("users", "${REPO}/scripts/dashboard/users.py")
-u = importlib.util.module_from_spec(spec); spec.loader.exec_module(u)
-def wj(p, d):
-    tmp = str(p) + ".tmp"; open(tmp, "w").write(json.dumps(d, indent=2)); os.replace(tmp, p)
-u.configure(state="${DIR}/state", write_json=wj)
-print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
+  const stok = mint('beta');
   const res = await fetch(`${DURL}/api/changelog`, { method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${stok}` },
+    headers: asSession(stok),
     body: JSON.stringify({ project: 'beta', groups: [] }) });
   const refused = await res.json();
   ok(res.status === 403 && /aerie changelog add/.test(refused.error || '')

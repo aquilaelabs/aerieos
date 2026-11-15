@@ -8,22 +8,13 @@
 // The harness's stub docker answers `compose config` and the build job, the
 // way devapp.mjs's New container tests use it, so this file proves the
 // asking, the routing, the reading and the answering.
-import { launch, newPage, ok, done, ready, URL, DIR } from './lib.mjs';
+import { launch, newPage, ok, done, ready, URL, DIR, call as api, asUser, OWNER as owner, asSession } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync, rmSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const base = URL.replace(/\/$/, '');
-const asUser = (u, pw) => ({ Authorization: 'Basic ' + Buffer.from(`${u}:${pw}`).toString('base64'),
-                             'Content-Type': 'application/json' });
-const owner = asUser('test', 'test');
-const api = async (path, body, headers = owner) => {
-  const r = await fetch(base + path, body === undefined ? { headers }
-    : { method: 'POST', headers, body: JSON.stringify(body) });
-  return { status: r.status, body: await r.json() };
-};
 const COMPOSE = 'services:\n  app:\n    image: alpine\n    command: sleep 1\n';
 const ask = (extra, headers = owner) => api('/api/phone', {
   action: 'ask', kind: 'container', why: 'a sonarr to test the media space against',
@@ -133,7 +124,7 @@ ok((await api('/api/docker')).body.instances.some(i => i.project === 'sonarr-for
   // under it (below).
   await api('/api/prefs', { project: 'alpha', devbuild: 'ask' });
   const bySession = await ask({ name: 'sonarr-by-session', project: '' },
-    { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok });
+    asSession(tok));
   const row = (await api('/api/phone')).body.asks.find(a => a.id === bySession.body.id);
   ok(row && row.for === 'alpha', `a session's ask belongs to its own space when it names none (${row?.for})`);
   await api('/api/phone', { action: 'deny', id: bySession.body.id });
@@ -141,7 +132,7 @@ ok((await api('/api/docker')).body.instances.some(i => i.project === 'sonarr-for
   // the operator, 24 Sep): refused at deny, made at once at auto when it is
   // the project's own on its own node, and asked at auto all the same for
   // another project or a node it names.
-  const S = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok };
+  const S = asSession(tok);
   await api('/api/prefs', { project: 'alpha', devbuild: 'deny' });
   const denied = await ask({ name: 'sonarr-denied-by-dial', project: '' }, S);
   ok(denied.status === 403 && /Run its container/.test(denied.body.error || ''),

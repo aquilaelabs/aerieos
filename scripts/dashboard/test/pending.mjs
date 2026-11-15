@@ -8,7 +8,7 @@
 // hook line that tells the session what was decided, and the endpoint's
 // refusal of a session's own token. What is faked: nothing. The hook is the
 // shipped script run as a process, and bb is the checkout's.
-import { launch, newPage, ok, done, ready, saveDialog, URL, DIR, nbShown, sleep, unfold } from './lib.mjs';
+import { launch, newPage, ok, done, ready, saveDialog, URL, DIR, nbShown, sleep, unfold, asSession, mint } from './lib.mjs';
 import { readFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -236,21 +236,10 @@ ok(!/The operator has answered/.test(hook('bb-prompt-relay', ['alpha', 'u_test']
 
 // ---- a session cannot answer for itself -------------------------------------
 {
-  const tok = execFileSync('python3', ['-c', `
-import importlib.util, os, sys
-spec = importlib.util.spec_from_file_location('users', ${JSON.stringify(join(HERE, '..', 'users.py'))})
-m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
-import json
-def wj(path, d):
-    tmp = str(path) + '.new'
-    with open(tmp, 'w') as f: json.dump(d, f, indent=2)
-    os.replace(tmp, path)
-m.configure(state=${JSON.stringify(`${DIR}/state`)}, write_json=wj)
-print(m.mint_session('alpha'))
-`], { encoding: 'utf8' }).trim();
+  const tok = mint('alpha');
   const res = await fetch(URL.replace(/\/$/, '') + '/api/pending', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+    headers: asSession(tok),
     body: JSON.stringify({ project: 'alpha', action: 'approve', ids: [1, 2, 3] }) });
   const body = await res.text();
   ok(res.status === 403 && /cannot answer for itself/.test(body),

@@ -4,10 +4,9 @@
 // ends it and the page is not toured again, on this browser or another;
 // Skip tour with its box ticked skips every page's; Show the tours again in
 // About brings them back. A phone's is a sheet.
-import { URL, launch, newPage, ok, done, ready, until, quiet } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, until, quiet, OWNER as H } from './lib.mjs';
 
 const browser = await launch();
-const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
 const base = URL.replace(/\/$/, '');
 const prefs = async p => (await fetch(base + '/api/users', { method: 'POST', headers: H, body: JSON.stringify({ action: 'prefs', prefs: p }) })).json();
 await prefs({ tour_seen: [], tour_off: false, welcome_seen: true });

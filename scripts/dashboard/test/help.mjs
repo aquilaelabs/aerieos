@@ -3,11 +3,7 @@
 // article, opens a long one on its contents box, follows a link between docs
 // in place with an address per doc, and searches them all as the bar's field
 // is typed, a result opening its doc at its section.
-import { URL, launch, newPage, ok, done, ready } from './lib.mjs';
-
-const auth = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
-const base = URL.replace(/\/$/, '');
-const get = async path => (await fetch(base + path, { headers: auth })).json();
+import { URL, launch, newPage, ok, done, ready, api as get } from './lib.mjs';
 
 // ---- the server's half ------------------------------------------------------
 {

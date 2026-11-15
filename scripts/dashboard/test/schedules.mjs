@@ -3,12 +3,11 @@
 // words, Run now runs it once as a job whose log is on the Jobs page, and
 // Turn off and Remove do what they say. A session's token and an account
 // without the Schedules area are refused, whatever they ask.
-import { launch, newPage, ok, done, ready, sleep, URL, DIR, member } from './lib.mjs';
+import { launch, newPage, ok, done, ready, sleep, URL, DIR, member, OWNER as H, asUser, asSession } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 
 const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const base = URL.replace(/\/$/, '');
-const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
 const api = async (path, body, h = H) => {
   const r = await fetch(base + path, body === undefined ? { headers: h } : { method: 'POST', headers: h, body: JSON.stringify(body) });
   return { status: r.status, body: await r.json().catch(() => ({})) };
@@ -123,7 +122,7 @@ ok(!!gone && (await api('/api/schedules', { action: 'remove', id: 'scan' })).sta
 {
   const tok = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', 'test'],
     { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
-  const SH = { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' };
+  const SH = asSession(tok);
   const read = await api('/api/schedules', undefined, SH);
   const write = await api('/api/schedules', { action: 'save', name: 'x', cron: '* * * * *', script: 'id', node: 'local' }, SH);
   ok(read.status === 403 && write.status === 403 && /a session has no say/.test(write.body.error || ''),
@@ -137,7 +136,7 @@ ok(!!gone && (await api('/api/schedules', { action: 'remove', id: 'scan' })).sta
      `a schedule's run is not a session's to read, by its id or in the list, and is the administrator's (${one.status})`);
   await api('/api/users', { action: 'add', name: 'w.sched', password: 'w.sched-pass-1', role: 'user' });
   await member('w.sched');
-  const UH = { Authorization: 'Basic ' + Buffer.from('w.sched:w.sched-pass-1').toString('base64'), 'Content-Type': 'application/json' };
+  const UH = asUser('w.sched', 'w.sched-pass-1');
   const plain = await api('/api/schedules', undefined, UH);
   ok(plain.status === 403, `an account without the Schedules area is refused (${plain.status} ${plain.body.error || ''})`);
 }

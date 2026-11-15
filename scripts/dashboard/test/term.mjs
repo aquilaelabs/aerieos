@@ -6,7 +6,7 @@
 // session; a tab popped out opens the same terminal on a page of its own
 // (terminal.html); a closed tab's socket goes with it. Driven through the
 // page, as a person at the dock would.
-import { launch, newPage, ok, done, ready, finger, until, quiet, URL, DIR, member, projectKey } from './lib.mjs';
+import { launch, newPage, ok, done, ready, finger, until, quiet, URL, DIR, member, projectKey, OWNER } from './lib.mjs';
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
@@ -256,7 +256,7 @@ ok(before === 1 && after.length === 0, `closing the tab closes its terminal (${b
 // on alpha opens a shell there, is taken off alpha, and within the server's
 // re-check (every few seconds) its socket closes, saying why.
 {
-  const h = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
+  const h = OWNER;
   const base = URL.replace(/\/$/, '');
   await fetch(`${base}/api/users`, { method: 'POST', headers: h,
     body: JSON.stringify({ action: 'add', name: 'w.term', password: 'w.term-pass-1', role: 'user' }) });

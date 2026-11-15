@@ -3,15 +3,8 @@
 // own rows; the last ten jobs, each opening its row on the Jobs page; the
 // pinned projects at a glance; read whole on open and light when the queue
 // moves, never on a timer of its own.
-import { URL, launch, newPage, ok, done, ready, sleep, quiet, settled } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, sleep, quiet, settled, api } from './lib.mjs';
 
-const auth = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
-const base = URL.replace(/\/$/, '');
-const api = async (path, body) => {
-  const r = await fetch(base + path, body === undefined ? { headers: auth }
-    : { method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  return r.status === 204 ? {} : r.json();
-};
 const until = async (fn, ms = 20000, step = 200) => {
   const end = Date.now() + ms;
   while (Date.now() < end){ const v = await fn(); if (v) return v; await sleep(step); }

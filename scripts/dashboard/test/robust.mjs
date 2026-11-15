@@ -6,7 +6,7 @@
 // browser would never send (wrong types, missing fields, absurd numbers),
 // because the checks are written against each field being the thing it is
 // supposed to be.
-import { launch, newPage, ok, done, ready, sleep, until, patience, URL } from './lib.mjs';
+import { launch, newPage, ok, done, ready, sleep, until, patience, URL, OWNER as H } from './lib.mjs';
 
 // ---- the app's own files carry a validator --------------------------------
 // index.html IS the application, and it went out with no ETag and no cache
@@ -20,7 +20,6 @@ import { launch, newPage, ok, done, ready, sleep, until, patience, URL } from '.
 // crashed this file in whole runs and then on every run once the page's body
 // was read to its end. node:http has no such path.
 import http from 'node:http';
-const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
 const get = (path, extra = {}) => new Promise((resolve, reject) => {
   const u = new globalThis.URL(URL.replace(/\/$/, '') + path);
   http.get({ host: u.hostname, port: u.port, path: u.pathname + u.search, headers: { ...H, ...extra } }, res => {

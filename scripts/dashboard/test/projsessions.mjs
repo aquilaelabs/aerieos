@@ -3,14 +3,12 @@
 // A session is its account's (B172): nobody presses a key or types into
 // another person's, administrators included, and that still holds. Ending
 // one is the single exception, and an administrator's alone.
-import { launch, newPage, ok, done, ready, settled, tmuxNew, tmuxKill, URL, DIR } from './lib.mjs';
+import { launch, newPage, ok, done, ready, settled, tmuxNew, tmuxKill, URL, DIR, OWNER as H, asUser } from './lib.mjs';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
 const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const base = URL.replace(/\/$/, '');
-const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'),
-            'Content-Type': 'application/json' };
 const call = async (path, body, h = H) => {
   const r = await fetch(base + path, body ? { method: 'POST', headers: h, body: JSON.stringify(body) }
                                           : { headers: h });
@@ -22,8 +20,7 @@ await call('/api/users', { action: 'add', name: 'w.sess', password: 'w.sess-pass
 await call('/api/users', { action: 'add', name: 'w.watch', password: 'w.watch-pass-1', role: 'user' });
 await call('/api/users', { action: 'projects', name: 'w.watch', projects: ['alpha'] });
 const uid = JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users['w.sess'].uid;
-const PLAIN = { Authorization: 'Basic ' + Buffer.from('w.watch:w.watch-pass-1').toString('base64'),
-                'Content-Type': 'application/json' };
+const PLAIN = asUser('w.watch', 'w.watch-pass-1');
 
 // w.sess's Claude session and a shell on alpha here, a Claude session on beta,
 // and a shell on alpha on a node, reported the way an agent reports one.

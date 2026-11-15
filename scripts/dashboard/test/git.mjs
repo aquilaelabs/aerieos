@@ -3,7 +3,7 @@
 // detail and diff, and the branches with whose worktree sits on which.
 // Real git on the fixture repos, read by the checkout's server; nothing
 // here writes through the dashboard, because this step has no actions.
-import { launch, newPage, ok, done, ready, refreshUntil, until, quiet as quietFor, tmuxNew, tmuxKill, tmuxCapture, URL, DIR, openFold, member } from './lib.mjs';
+import { launch, newPage, ok, done, ready, refreshUntil, until, quiet as quietFor, tmuxNew, tmuxKill, tmuxCapture, URL, DIR, openFold, member, OWNER, asUser, asSession, mint } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync, mkdirSync, existsSync, rmSync, readFileSync } from 'node:fs';
 
@@ -49,13 +49,13 @@ await ready(page);
 // claude/tabmade is a session's branch because its account exists (git.py
 // branch_owner): made the way the Users tab makes one.
 await fetch(URL.replace(/\/$/, '') + '/api/users', { method: 'POST',
-  headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' },
+  headers: OWNER,
   body: JSON.stringify({ action: 'add', name: 'tabmade', password: 'tabmade-pass-1', role: 'user' }) });
 await member('tabmade');
 
 // ---- the API, first ---------------------------------------------------------
 const api = async q => (await (await fetch(URL.replace(/\/$/, '') + '/api/git?project=beta&' + q,
-  { headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') } })).json());
+  { headers: OWNER })).json());
 const st = await api('what=status');
 ok(st.branch === main && st.files.some(f => f.path === 'a.txt' && f.state === 'modified')
    && st.files.some(f => f.path === 'new.txt' && f.state === 'untracked'),
@@ -100,7 +100,7 @@ ok(cmp.commits?.length === 1 && cmp.commits[0].subject === 'Old work' && cmp.fil
 ok((await api('what=compare&branch=' + main)).error && (await api('what=compare&branch=nope')).error,
    '...and main itself, or a branch that is not there, is refused');
 ok((await api('what=status').then(() => fetch(URL.replace(/\/$/, '') + '/api/git?project=nope&what=status',
-  { headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') } }))).status === 400,
+  { headers: OWNER }))).status === 400,
    'a space that is not one is refused');
 
 // ---- the view ---------------------------------------------------------------
@@ -210,7 +210,7 @@ ok(true, 'a commit made outside the dashboard arrives on the view by itself');
 // standing in for GitHub, with push rights granted the way the clone dialog
 // grants them. An account's, never a session's, and not on a locked project.
 {
-  const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
+  const H = OWNER;
   const act = async (action, args, headers = H) => {
     const r = await fetch(URL.replace(/\/$/, '') + '/api/git', { method: 'POST', headers,
       body: JSON.stringify({ project: 'beta', action, args: args || {} }) });
@@ -426,7 +426,7 @@ print(json.dumps(g._done(said, "fetched", ${JSON.stringify(`${DIR}/ws/beta`)})))
     // moves (R94): a branch switched under it is read at once, never a
     // kept answer from before.
     const statusBranch = async () => ((await (await fetch(URL.replace(/\/$/, '') + '/api/status',
-      { headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') } })).json()).projects || [])
+      { headers: OWNER })).json()).projects || [])
       .find(p => p.name === 'beta')?.git;
     const onReady = await statusBranch();
     git('checkout', '-q', main);
@@ -647,14 +647,7 @@ print(json.dumps(g._done(said, "fetched", ${JSON.stringify(`${DIR}/ws/beta`)})))
   }
 
   // Whose: a session's token cannot press these; it has aerie git.
-  const tok = execFileSync('python3', ['-c', `
-import importlib.util, json, os, sys
-spec = importlib.util.spec_from_file_location("users", "${REPO}/scripts/dashboard/users.py")
-u = importlib.util.module_from_spec(spec); spec.loader.exec_module(u)
-def wj(p, d):
-    tmp = str(p) + ".tmp"; open(tmp, "w").write(json.dumps(d, indent=2)); os.replace(tmp, p)
-u.configure(state="${DIR}/state", write_json=wj)
-print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
+  const tok = mint('beta');
   const asSession = await act('fetch', {}, { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' });
   ok(asSession.status === 403 && /aerie git/.test(asSession.error), "a session's token is refused the buttons, and told about aerie git");
   // Its owner's lock leaves its owner working (R119); an administrator's
@@ -819,7 +812,7 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
 // commit, a change or a branch is handed to the session as one line naming
 // it and the ask, typed into the session the way a roadmap step arrives.
 {
-  const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
+  const H = OWNER;
   const post = async (path, body, headers = H) => {
     const r = await fetch(URL.replace(/\/$/, '') + path, { method: 'POST', headers, body: JSON.stringify(body) });
     return { status: r.status, ...(await r.json().catch(() => ({}))) };
@@ -839,15 +832,8 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
      'a value or a key that is not one is refused');
 
   // The relay is the door: a session's aerie git push is judged there.
-  const tok = execFileSync('python3', ['-c', `
-import importlib.util, json, os
-spec = importlib.util.spec_from_file_location("users", "${REPO}/scripts/dashboard/users.py")
-u = importlib.util.module_from_spec(spec); spec.loader.exec_module(u)
-def wj(p, d):
-    tmp = str(p) + ".tmp"; open(tmp, "w").write(json.dumps(d, indent=2)); os.replace(tmp, p)
-u.configure(state="${DIR}/state", write_json=wj)
-print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
-  const S = { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' };
+  const tok = mint('beta');
+  const S = asSession(tok);
   const origin = `${DIR}/ws/.remotes/beta-origin.git`;
   const relay = (argv) => post('/api/v1/bb', { argv, cwd: B }, S);
   const denied = await relay(['git', 'push', 'origin', 'topic']);
@@ -1092,7 +1078,7 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
   // owner's, so a second account's press typed into the owner's
   // conversation, or found no session while its own was running.
   {
-    const hh = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
+    const hh = OWNER;
     for (const body of [{ action: 'add', name: 'w.asker', password: 'w.asker-pass-1', role: 'user' },
                         { action: 'projects', name: 'w.asker', projects: ['beta'] }])
       await fetch(URL.replace(/\/$/, '') + '/api/users', { method: 'POST', headers: hh, body: JSON.stringify(body) });
@@ -1101,7 +1087,7 @@ print(u.mint_session("beta"))`], { encoding: 'utf8' }).trim();
     const theirs = `${auid}~claude-beta`;
     tmuxNew(theirs, B);
     const r = await fetch(URL.replace(/\/$/, '') + '/api/git', { method: 'POST',
-      headers: { Authorization: 'Basic ' + Buffer.from('w.asker:w.asker-pass-1').toString('base64'), 'Content-Type': 'application/json' },
+      headers: asUser('w.asker', 'w.asker-pass-1'),
       body: JSON.stringify({ project: 'beta', action: 'ask', kind: 'review', args: { sha: head.sha } }) });
     const their = await r.json();
     ok(their.ok && their.session === theirs && tmuxCapture(theirs).includes(head.sha.slice(0, 7)),
@@ -1283,8 +1269,8 @@ ok(strip.groups.n === 5 && strip.groups.rows === 1 && strip.groups.inside && str
 // never while that account's Claude session there is working. Before the
 // fallback check below, so these writes are held to it too.
 {
-  const H2 = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
-  const PEER = { Authorization: 'Basic ' + Buffer.from('w.peer:w.peer-pass-1').toString('base64'), 'Content-Type': 'application/json' };
+  const H2 = OWNER;
+  const PEER = asUser('w.peer', 'w.peer-pass-1');
   const post = async (body, h = H2) => { const r = await fetch(URL.replace(/\/$/, '') + '/api/git',
     { method: 'POST', headers: h, body: JSON.stringify(body) }); return { status: r.status, ...(await r.json()) }; };
   const users = async body => fetch(URL.replace(/\/$/, '') + '/api/users',
@@ -1381,13 +1367,13 @@ ok(strip.groups.n === 5 && strip.groups.rows === 1 && strip.groups.inside && str
        peerTree.map(r => r.status).join(',')}: ${peerTree[0].error})`);
   for (const body of [{ action: 'add', name: 'w.boss', password: 'w.boss-pass-1', role: 'admin' },
                       { action: 'projects', name: 'w.boss', projects: ['beta'] }]) await users(body);
-  const BOSS = { Authorization: 'Basic ' + Buffer.from('w.boss:w.boss-pass-1').toString('base64'), 'Content-Type': 'application/json' };
+  const BOSS = asUser('w.boss', 'w.boss-pass-1');
   const bossAsked = await post({ project: 'beta', action: 'revert', args: { sha: 'zzzz' } }, BOSS);
   const bossSure = await post({ project: 'beta', action: 'revert', args: { sha: 'zzzz', confirmed: true } }, BOSS);
   ok(bossAsked.status === 409 && /test's working tree/.test(bossAsked.confirm || '')
      && !/working tree/.test(bossSure.error || '') && bossSure.status !== 409,
      `an administrator is asked first, naming whose tree, and then goes on (${bossSure.error})`);
-  const theirs = { Authorization: 'Basic ' + Buffer.from('w.dev:w.dev-pass-1').toString('base64'), 'Content-Type': 'application/json' };
+  const theirs = asUser('w.dev', 'w.dev-pass-1');
   const own = await post(merge, theirs);
   ok(!/session's branch|asked/.test(own.error || '') && own.status !== 409,
      `...and its own account merges it unasked (${own.ok ? (own.out || 'merged').slice(0, 40) : (own.error || '').slice(0, 60)})`);
@@ -1418,7 +1404,7 @@ ok(strip.groups.n === 5 && strip.groups.rows === 1 && strip.groups.inside && str
 // on: no version, no dist/, no push, and a session told not to decide that
 // for the person. Init is that way, from the API and from the row.
 {
-  const H2 = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
+  const H2 = OWNER;
   const g = async (action) => { const r = await fetch(URL.replace(/\/$/, '') + '/api/git',
     { method: 'POST', headers: H2, body: JSON.stringify({ project: 'gamma', action, args: {} }) });
     return { status: r.status, ...(await r.json()) }; };

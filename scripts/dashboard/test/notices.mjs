@@ -4,16 +4,9 @@
 // the account's record; the bell a short list with See all; and the
 // Notifications page, its asks answered on the row with the long part in a
 // scrolling box, its history narrowed by chips, deleted and cleared.
-import { URL, DIR, launch, newPage, ok, done, ready, sleep, quiet } from './lib.mjs';
+import { URL, DIR, launch, newPage, ok, done, ready, sleep, quiet, api } from './lib.mjs';
 import { writeFileSync, rmSync } from 'node:fs';
 
-const auth = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
-const base = URL.replace(/\/$/, '');
-const api = async (path, body) => {
-  const r = await fetch(base + path, body === undefined ? { headers: auth }
-    : { method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  return r.status === 204 ? {} : r.json();
-};
 const until = async (fn, ms = 15000, step = 200) => {
   const end = Date.now() + ms;
   while (Date.now() < end){ const v = await fn(); if (v) return v; await sleep(step); }

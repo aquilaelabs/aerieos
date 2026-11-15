@@ -6,7 +6,7 @@
 // identity landing in the repo's own config through /api/prefs and coming out
 // of aerie settings, and bb_setting (the boot scripts' read) run as bash
 // against the same file.
-import { launch, newPage, ok, done, ready, saveDialog, sectSave, rnSect, splitPick, refreshUntil, openFold, URL, DIR, unfold, until, settled } from './lib.mjs';
+import { launch, newPage, ok, done, ready, saveDialog, sectSave, rnSect, splitPick, refreshUntil, openFold, URL, DIR, unfold, until, settled, OWNER } from './lib.mjs';
 import { readFileSync, existsSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -369,7 +369,7 @@ ok(elsewhere.git_name === 'T. Person',
 // and an administrator adds and edits them there for every project. A rule
 // typed in one project's notebook comes back out of every project's preamble.
 {
-  const auth = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
+  const auth = OWNER;
   const pre = async p => (await (await fetch(URL.replace(/\/$/, '') + `/api/preamble?project=${p}`, { headers: auth })).json()).text || '';
   const globals = async () => ((await (await fetch(URL.replace(/\/$/, '') + '/api/global-rules', { headers: auth })).json()).rules || []);
   await page.evaluate(() => openSettingsTab());

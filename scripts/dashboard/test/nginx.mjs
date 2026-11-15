@@ -5,7 +5,7 @@
 // off; and the Enroll dialog's tick puts nginx on a node the moment it
 // enrolls. The harness's sandbox node is the node, and its stub docker reads
 // the generated compose file the way a daemon would.
-import { URL, launch, newPage, ok, done, ready, DIR } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, DIR, api } from './lib.mjs';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 // Poll fn until it answers something other than null, or give up.
@@ -20,10 +20,7 @@ const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
 await page.goto(URL);
 await ready(page);
 
-const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
 const base = URL.replace(/\/$/, '');
-const api = async (path, body) => (await fetch(base + path, body === undefined
-  ? { headers: H } : { method: 'POST', headers: H, body: JSON.stringify(body) })).json();
 
 // A tab of its own under Containers on the rail, beside the containers
 // (the operator, 18 Oct), for an account that reads the Nodes tab.

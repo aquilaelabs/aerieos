@@ -5,21 +5,12 @@
 // (the operator, 17 Oct).
 // Honored by the gate where they hold and nowhere else; a project's owner
 // gives roles on the projects they own and nothing Global.
-import { launch, newPage, ok, done, ready, sleep, URL, DIR, openSection, faded, projectKey } from './lib.mjs';
+import { launch, newPage, ok, done, ready, sleep, URL, DIR, openSection, faded, projectKey, asUser, call as api } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const base = URL.replace(/\/$/, '');
-const asUser = (u, pw) => ({ Authorization: 'Basic ' + Buffer.from(`${u}:${pw}`).toString('base64'),
-                             'Content-Type': 'application/json' });
-const owner = asUser('test', 'test');
-const api = async (path, body, headers = owner) => {
-  const r = await fetch(base + path, body === undefined ? { headers }
-    : { method: 'POST', headers, body: JSON.stringify(body) });
-  return { status: r.status, body: await r.json() };
-};
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 1400 } });

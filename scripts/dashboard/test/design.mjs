@@ -3,7 +3,7 @@
 // for what they are for. Staged behind the notebook's Save; the prompts and
 // docs/design-language.md are the server's words, which is what aerie design
 // prints. The view is passive: nothing on it reaches into a session.
-import { launch, newPage, ok, done, ready, patience, openFold, URL, DIR, settled, quiet } from './lib.mjs';
+import { launch, newPage, ok, done, ready, patience, openFold, URL, DIR, settled, quiet, OWNER } from './lib.mjs';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
@@ -351,7 +351,7 @@ ok(again.language.themes[1].light?.[0]?.hex === '#123456' && again.language.them
 }
 // From here rather than the page, so the refusal is not a console error.
 const badR = await fetch(URL.replace(/\/$/, '') + '/api/design', { method: 'POST',
-  headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' },
+  headers: OWNER,
   body: JSON.stringify({ project: P, action: 'save', language: { ...again.language, themes: [{ name: 'A', colors: [{ name: 'bg', hex: 'blue' }] }] }, pages: [] }) });
 const bad = { status: badR.status, ...(await badR.json()) };
 ok(bad.status === 400 && /a color is #rrggbb/.test(bad.error), `a color that is not a hex is refused by name (${bad.error})`);
@@ -602,7 +602,7 @@ ok(/no page, theme or rule here called 'nowhere'/.test(err), `...and a page that
   ok(now.length === 3 && now[2].name === 'tap-targets' && now[2].words.join() === 'tap,phone' && now[2].paths.join() === 'scripts/dashboard',
      `a rule typed in the view saves with its slug name and triggers (${JSON.stringify(now[2]).slice(0, 90)})`);
   const bad = await fetch(URL.replace(/\/$/, '') + '/api/design', { method: 'POST',
-    headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' },
+    headers: OWNER,
     body: JSON.stringify({ project: P, action: 'save', language: { ...(await api(`/api/design?project=${P}`)).language, rules: [{ name: 'empty' }] }, pages: [] }) });
   // (Sent the old way, on the language: carried into the default theme on the way in.)
   ok(bad.status === 400 && /the rule empty says nothing/.test((await bad.json()).error || ''), 'a rule with no text is refused by name');
@@ -610,7 +610,7 @@ ok(/no page, theme or rule here called 'nowhere'/.test(err), `...and a page that
   // its alpha, every problem is reported at once, and the schema is printed.
   const cur = (await api(`/api/design?project=${P}`)).language;
   const multi = await fetch(URL.replace(/\/$/, '') + '/api/design', { method: 'POST',
-    headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' },
+    headers: OWNER,
     body: JSON.stringify({ project: P, action: 'save', language: { ...cur, scope: 'x'.repeat(130), rules: ['a bare string', ...cur.themes[0].rules],
       themes: [{ ...cur.themes[0], colors: [{ name: 'glass', hex: '#1e232be0', means: 'a pane' }, { name: 'bad', hex: 'blue', means: '' }] }, ...cur.themes.slice(1)] },
       pages: [{ name: 'p', platform: 'web', frame: 'desktop', template: 'blank', blocks: [{ kind: 'card', label: 'y'.repeat(130), x: 0, y: 0, w: 2, h: 2 }] }] }) });
@@ -639,7 +639,7 @@ ok(/no page, theme or rule here called 'nowhere'/.test(err), `...and a page that
   // sentences no record could turn off; aerie settings showed two dials of
   // seven; and a design inside every limit was too large to send.
   const post = async body => { const r = await fetch(URL.replace(/\/$/, '') + '/api/design', { method: 'POST',
-    headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' },
+    headers: OWNER,
     body: JSON.stringify({ project: P, action: 'save', ...body }) }); return { status: r.status, ...(await r.json()) }; };
   const was = await api(`/api/design?project=${P}`);
   const faulty = await post({ language: { ...was.language, corners: 'pill', rules: ['a bare rule', ...was.language.themes[0].rules],

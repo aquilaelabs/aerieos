@@ -6,7 +6,8 @@
 // assertion is a round trip through the channel, which is the thing phase 3
 // exists to prove.
 import { URL, launch, newPage, ok, done, ready, sleep, refreshUntil, DIR,
-         tmuxNew, tmuxKill, tmuxFmt, tmuxCapture, openSection, quiet as quietFor } from './lib.mjs';
+         tmuxNew, tmuxKill, tmuxFmt, tmuxCapture, openSection, quiet as quietFor,
+         api, OWNER, asSession, mint } from './lib.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { readFileSync, existsSync, statSync, lstatSync, readlinkSync, writeFileSync, mkdirSync, readdirSync, openSync, rmSync, appendFileSync, realpathSync, copyFileSync, cpSync, chmodSync, symlinkSync } from 'node:fs';
@@ -38,14 +39,7 @@ if (process.env.BB_COVERAGE_DIR){
 let SCOPE = '';
 let PK = '';
 const NODE_JSON = `${DIR}/node.json`;
-const auth = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
-const api = async (path, body) => {
-  const r = await fetch(URL.replace(/\/$/, '') + path, body === undefined
-    ? { headers: auth }
-    : { method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' },
-        body: JSON.stringify(body) });
-  return r.status === 204 ? {} : r.json();
-};
+const auth = OWNER;
 const nodeById = async id => (await api('/api/v1/nodes')).nodes.find(n => n.id === id);
 const until = async (fn, ms = 15000, step = 200) => {
   const end = Date.now() + ms;
@@ -1057,27 +1051,17 @@ print(json.dumps(sorted(os.listdir(d))))
     // one (users.renewal, X-BB-Session), bbapi writes it where bb looks, and
     // bb prefers whichever of its two expires later.
     {
-      const mint = ttl => execFileSync('python3', ['-c', `
-import importlib.util, os, json
-spec = importlib.util.spec_from_file_location('users', ${JSON.stringify(`${REPO}/scripts/dashboard/users.py`)})
-m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
-def wj(path, d):
-    tmp = str(path) + '.new'
-    with open(tmp, 'w') as f: json.dump(d, f, indent=2)
-    os.replace(tmp, path)
-m.configure(state=${JSON.stringify(`${DIR}/state`)}, write_json=wj)
-print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       const expOf = t => Number(Buffer.from(t.slice(4), 'base64url').toString().split('|')[1]);
-      const short = mint(3600);
+      const short = mint('alpha', '', 3600);
       const raw = await fetch(URL.replace(/\/$/, '') + '/api/v1/bb', { method: 'POST',
-        headers: { Authorization: 'Bearer ' + short, 'Content-Type': 'application/json' },
+        headers: asSession(short),
         body: JSON.stringify({ argv: ['roadmap'] }) });
       const fresh = raw.headers.get('x-bb-session') || '';
       ok(raw.status === 200 && /^bbs_/.test(fresh) && expOf(fresh) - expOf(short) > 6 * 3600
          && Buffer.from(fresh.slice(4), 'base64url').toString().startsWith('alpha|'),
          `an answer to a token past half its life carries a fresh one for the same space (${fresh.slice(0, 8)}…)`);
       const full = await fetch(URL.replace(/\/$/, '') + '/api/v1/bb', { method: 'POST',
-        headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },
+        headers: asSession(tok),
         body: JSON.stringify({ argv: ['roadmap'] }) });
       ok(full.status === 200 && !full.headers.get('x-bb-session'),
          '...and one with most of its life left is left alone');
@@ -1129,7 +1113,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
     const api = async (body) => { const r = await fetch(URL.replace(/\/$/, '') + '/api/v1/claude-login',
       { method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + forMe },
+        headers: asSession(forMe),
         body: JSON.stringify(body) });
       return { status: r.status, ...(await r.json()) }; };
     // Where this account is signed in, as the page is told it.
@@ -1141,8 +1125,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
     // one of the project's: a machine that could name any node could report
     // for another.
     await fetch(URL.replace(/\/$/, '') + '/api/prefs', { method: 'POST',
-      headers: { 'Content-Type': 'application/json',
-                 Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') },
+      headers: OWNER,
       body: JSON.stringify({ project: 'alpha', node: minted.id }) });
     let w = await api({ email: 'tester@example.com', plan: 'max', signed_in: true });
     ok(w.ok && w.plan === 'max' && Object.keys(w).every(k => ['status', 'ok', 'plan'].includes(k)),
@@ -1225,7 +1208,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
     // A token for the project alone (a relayed verb's) is nobody's account,
     // and cannot report for one.
     const anon = await fetch(URL.replace(/\/$/, '') + '/api/v1/claude-login',
-      { method: 'POST', headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },
+      { method: 'POST', headers: asSession(tok),
         body: JSON.stringify({ email: 'x@example.invalid', signed_in: true }) });
     ok(anon.status === 403, 'a token for the space alone cannot speak for an account');
 
@@ -1235,8 +1218,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
     const owner = JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users.test.uid;
     const nodeTok = JSON.parse(readFileSync(NODE_JSON, 'utf8')).token;
     const beat = (logins) => fetch(URL.replace(/\/$/, '') + '/api/v1/agent/work',
-      { method: 'POST', headers: { Authorization: 'Bearer ' + nodeTok,
-                                   'Content-Type': 'application/json' },
+      { method: 'POST', headers: asSession(nodeTok),
         body: JSON.stringify({ sample: { cpu_pct: 1, logins }, running: [], wait: 0 }) });
     await api({ signed_in: false });
     ok(!(minted.id in await where()), 'a node saying this account is not signed in there takes it off the record');
@@ -1252,7 +1234,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
     // revs token `live` moving so the page knows to ask.
     {
       const tell = (title) => fetch(URL.replace(/\/$/, '') + '/api/v1/agent/sessions',
-        { method: 'POST', headers: { Authorization: 'Bearer ' + nodeTok, 'Content-Type': 'application/json' },
+        { method: 'POST', headers: asSession(nodeTok),
           body: JSON.stringify({ sessions: [{ name: `${owner}~claude-alpha`, attached: true, cwd: '/workspace/alpha',
                                               created: 1, title }] }) });
       const get = async p => (await fetch(URL.replace(/\/$/, '') + p, { headers: auth })).json();
@@ -1278,14 +1260,13 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       ok((idle.claude_with.alpha || []).includes('test') && !(idle.claude_busy.alpha || []).includes('test'),
          '...and waiting when its title says so');
       await fetch(URL.replace(/\/$/, '') + '/api/v1/agent/sessions',
-        { method: 'POST', headers: { Authorization: 'Bearer ' + nodeTok, 'Content-Type': 'application/json' },
+        { method: 'POST', headers: asSession(nodeTok),
           body: JSON.stringify({ sessions: [] }) });
     }
     // The seed goes back, and alpha to having no node.
     writeFileSync(`${DIR}/home/.claude/.bb-grant.json`, seed);
     await fetch(URL.replace(/\/$/, '') + '/api/prefs', { method: 'POST',
-      headers: { 'Content-Type': 'application/json',
-                 Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') },
+      headers: OWNER,
       body: JSON.stringify({ project: 'alpha', node: '' }) });
   }
 
@@ -1424,7 +1405,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
       } catch (e) { checked = `FAILED ${e.status}: ${e.stdout}${e.stderr}`; }
       bbOnNode(['rules', 'rm', 'relayprobe', 'test']);
       const sent = await (await fetch(URL.replace(/\/$/, '') + '/api/v1/bb', { method: 'POST',
-        headers: { Authorization: 'Bearer ' + forMe, 'Content-Type': 'application/json' },
+        headers: asSession(forMe),
         body: JSON.stringify({ argv: ['rules', 'check', '--all'], cwd: `${DIR}/ws/alpha` }) })).json();
       ok(/relayed=no/.test(checked) && /runs on the machine the session is on/.test(sent.error || ''),
          `aerie rules check on a node runs the rule's command there, and the controller refuses one relayed to it (${
@@ -1508,7 +1489,7 @@ print(m.mint_session('alpha', ttl=${ttl}))`], { encoding: 'utf8' }).trim();
         else writeFileSync(`${DIR}/state/rules.json`, kept);
       }
       const bad = await fetch(URL.replace(/\/$/, '') + '/api/v1/hook', { method: 'POST',
-        headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },
+        headers: asSession(tok),
         body: JSON.stringify({ kind: 'asked', text: 'hi' }) });
       ok(bad.status === 403, 'a token for the space alone, with no account, may not post as anybody');
     }

@@ -1,7 +1,7 @@
 // The notebook's Artifacts view: what a project has built, from its dist/.
 // The convention IS the feature: the tab lists dist/ and nothing else, so a
 // build worth keeping has to be copied there, and an empty tab says that.
-import { launch, newPage, ok, done, ready, URL, DIR, refreshUntil, openFold, nbGo, settled } from './lib.mjs';
+import { launch, newPage, ok, done, ready, URL, DIR, refreshUntil, openFold, nbGo, settled, OWNER } from './lib.mjs';
 import { mkdirSync, writeFileSync, symlinkSync, rmSync, renameSync, existsSync, utimesSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
@@ -411,7 +411,7 @@ ok(true, 'a space with no dist/ is told the convention, not shown a blank');
 // that worktree's dist/, where the tab never looked: its first build showed
 // nothing. Listed apart from dist/, with Download and View carrying the tree.
 {
-  const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
+  const H = OWNER;
   await fetch(URL.replace(/\/$/, '') + '/api/users', { method: 'POST', headers: H,
     body: JSON.stringify({ action: 'add', name: 'w.builder', password: 'w.builder-pass-1', role: 'user' }) });
   const uid = JSON.parse((await import('node:fs')).readFileSync(`${DIR}/state/users.json`, 'utf8')).users['w.builder'].uid;

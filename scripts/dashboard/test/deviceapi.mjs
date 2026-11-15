@@ -7,7 +7,7 @@
 // way to update, and the controller says the version it speaks for an app
 // newer than it to say so. The Android app's surface is
 // apps/android/api-surface.json, held by test/appapi.mjs. No browser.
-import { ok, done, DIR, URL, pinBreaks as breaks } from './lib.mjs';
+import { ok, done, DIR, URL, pinBreaks as breaks, OWNER as ADMIN, asSession } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -17,7 +17,6 @@ const require = createRequire(import.meta.url);
 const client = require(`${REPO}/apps/vscode/lib/client.js`);
 const base = URL.replace(/\/$/, '');
 const pins = JSON.parse(readFileSync(new globalThis.URL('./device-api.json', import.meta.url), 'utf8'));
-const ADMIN = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
 const admin = async (path, body) => {
   const r = await fetch(base + path, { method: 'POST', headers: ADMIN, body: JSON.stringify(body) });
   return { status: r.status, ...(await r.json().catch(() => ({}))) };
@@ -63,7 +62,7 @@ const signedIn = await dev('signin', { username: 'pin.rw', password: 'pinrwpass1
 token = signedIn.json?.token || '';
 const stok = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', 'pin.rw'], { encoding: 'utf8', env }).trim();
 const pcApi = async body => (await fetch(`${base}/api/pc`, { method: 'POST',
-  headers: { Authorization: `Bearer ${stok}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json();
+  headers: asSession(stok), body: JSON.stringify(body) })).json();
 
 // One driver per pinned call: the answer the app would get. A pin with no
 // driver fails, so a new pinned call cannot go undriven.

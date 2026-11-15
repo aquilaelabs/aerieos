@@ -7,7 +7,7 @@
 // own code, driven under a stand-in for VS Code's API against this server,
 // and its terminal, AerieOS's own on /termws.
 // No browser.
-import { ok, done, sleep, until, DIR, URL } from './lib.mjs';
+import { ok, done, sleep, until, DIR, URL, OWNER, OWNER as ADMIN, asSession } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, symlinkSync, existsSync, statSync, utimesSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -18,7 +18,6 @@ const require = createRequire(import.meta.url);
 const { Client, Refused, signIn, API } = require(`${REPO}/apps/vscode/lib/client.js`);
 const { Term } = require(`${REPO}/apps/vscode/lib/term.js`);
 const base = URL.replace(/\/$/, '');
-const ADMIN = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
 const admin = async (path, body) => {
   const r = await fetch(base + path, { method: 'POST', headers: ADMIN, body: JSON.stringify(body) });
   return { status: r.status, ...(await r.json().catch(() => ({}))) };
@@ -134,7 +133,7 @@ print("\\n".join(f"{p} {a} {t}" for p, a, t in db.execute("SELECT principal, act
        up.status} ${git.status} ${link.status})`);
   const tok = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', 'test'], { encoding: 'utf8', env }).trim();
   const r = await fetch(base + '/api/v1/files', { method: 'POST', body: JSON.stringify({ action: 'list', project: 'alpha', path: '' }),
-    headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' } });
+    headers: asSession(tok) });
   ok(r.status === 403, `a session's token is refused: a session has the tree, and is never a person (${r.status})`);
 }
 
@@ -313,7 +312,7 @@ print("\\n".join(f"{p} {a} {t}" for p, a, t in db.execute("SELECT principal, act
   // The page the Android app's WebView and a popped-out tab load: the same
   // terminal, on /termws, behind the same sign-in.
   {
-    const auth = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
+    const auth = OWNER;
     const page = await fetch(`${base}/terminal?arg=sh%3A1%3Aalpha`, { headers: auth });
     const body = await page.text();
     const anon = await fetch(`${base}/terminal?arg=sh%3A1%3Aalpha`, { redirect: 'manual' });

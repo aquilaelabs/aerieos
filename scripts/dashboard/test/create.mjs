@@ -4,7 +4,7 @@
 // clone path is tested up to its URL allow-list: the list is the thing under
 // test, and a real clone would need GitHub on the other end.
 import { launch, newPage, ok, done, ready, URL, DIR, animatedDuring, tmuxNew, tmuxKill,
-         refreshUntil, unfold, projectKey, holdPoll, freePoll, settled } from './lib.mjs';
+         refreshUntil, unfold, projectKey, holdPoll, freePoll, settled, OWNER, asUser } from './lib.mjs';
 import { readFileSync, existsSync, mkdirSync, writeFileSync, rmSync, chmodSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -1491,8 +1491,8 @@ await page.waitForFunction(() => document.getElementById('tmodal').hidden);
 // was not on it: read-only to the person who had just made it, and the node
 // the dialog picked was dropped for the same reason.
 {
-  const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
-  const MAKER = { Authorization: 'Basic ' + Buffer.from('w.maker:w.maker-pass-1').toString('base64'), 'Content-Type': 'application/json' };
+  const H = OWNER;
+  const MAKER = asUser('w.maker', 'w.maker-pass-1');
   const call = async (path, body, h) => { const r = await fetch(URL.replace(/\/$/, '') + path,
     { method: 'POST', headers: h, body: JSON.stringify(body) }); return { status: r.status, ...(await r.json().catch(() => ({}))) }; };
   await call('/api/users', { action: 'add', name: 'w.maker', password: 'w.maker-pass-1', role: 'admin' }, H);

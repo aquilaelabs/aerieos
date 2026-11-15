@@ -7,13 +7,12 @@
 // refusal as an empty bin (B87); the settings page does not ask for what
 // the role cannot read (B89); the Profile's Password says what is wrong
 // under the field it is about (B90).
-import { launch, newPage, ok, done, ready, settled, quiet, URL, DIR, nbShown, splitPick } from './lib.mjs';
+import { launch, newPage, ok, done, ready, settled, quiet, URL, DIR, nbShown, splitPick, OWNER as owner } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 
 const HERE = new globalThis.URL('..', import.meta.url).pathname;
 const base = URL.replace(/\/$/, '');
-const owner = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
 const api = async (path, body, headers = owner) => {
   const r = await fetch(base + path, body === undefined ? { headers } : { method: 'POST', headers, body: JSON.stringify(body) });
   let j = {}; try { j = await r.json(); } catch { /* not JSON */ }

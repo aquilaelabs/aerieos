@@ -4,11 +4,9 @@
 // sending a SARIF per scanner up), the report on the Analysis page and the
 // node's section saying its last run and the reports it sent; the projects
 // nothing covers listed with why; Remove taking it off again.
-import { URL, launch, newPage, ok, done, ready, patience, settled } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, patience, settled, api } from './lib.mjs';
 
 const BASE = URL.replace(/\/$/, '');
-const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
-const api = (path, body) => fetch(BASE + path, body ? { method: 'POST', headers: H, body: JSON.stringify(body) } : { headers: H }).then(r => r.json());
 const until = async (fn, ms = 30000) => { const end = Date.now() + patience(ms); for (;;) { const v = await fn(); if (v) return v; if (Date.now() > end) return null; await new Promise(r => setTimeout(r, 400)); } };   // the loop's own period
 
 const browser = await launch();

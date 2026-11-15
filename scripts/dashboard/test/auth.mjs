@@ -4,7 +4,8 @@
 // sign-in. A plain request to /termws is answered with what the socket
 // would be (a refusal and why, or that a websocket is asked for), which is
 // how most checks here ask; the socket itself is covered by term.mjs.
-import { launch, newPage, ok, done, until, quiet, URL, DIR, takeOn, openSection, member, splitPick, projectKey } from './lib.mjs';
+import { launch, newPage, ok, done, until, quiet, URL, DIR, takeOn, openSection, member, splitPick, projectKey,
+         asUser, OWNER, asSession, usersPy, mint } from './lib.mjs';
 import http from 'node:http';
 import { mkdirSync, writeFileSync, rmSync, readFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -106,7 +107,7 @@ ok(/Max-Age=0/.test(r.headers.get('set-cookie') || ''), 'logout clears the cooki
 
 // Big answers travel gzipped when the client takes it (the page and the
 // status snapshot a phone polls every 15s), and small ones as they are.
-const AUTHH = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
+const AUTHH = OWNER;
 r = await bare('/api/status', { headers: { ...AUTHH, 'Accept-Encoding': 'gzip' } });
 ok(r.headers.get('content-encoding') === 'gzip', 'the status snapshot travels gzipped');
 r = await bigGet('/', { ...AUTHH, 'Accept-Encoding': 'gzip' });
@@ -315,13 +316,11 @@ ${code}`], { encoding: 'utf8' });
 
   bb(['add', 'sharer', '--role', 'user'], 'stripspass1\nstripspass1\n');
   await member('sharer');
-  const asUser = (u, pw) => ({ Authorization: 'Basic ' + Buffer.from(`${u}:${pw}`).toString('base64'),
-                               'Content-Type': 'application/json' });
   const putTabs = (h, tabs) => bare('/api/layout', { method: 'POST', headers: h,
     body: JSON.stringify({ tabs, panes: [tabs[0]?.id || null, null], active: 0 }) });
   const strip = async h => ((await (await bare('/api/status', { headers: h })).json()).layout || {});
 
-  const owner = asUser('test', 'test');
+  const owner = OWNER;
   const other = asUser('sharer', 'stripspass1');
   // Given one project, because a `user` with none can reach nothing at all,
   // which is correct, and would make everything below pass for the wrong
@@ -375,8 +374,7 @@ ${code}`], { encoding: 'utf8' });
   // are a node's (R47), and its census is what says who has one open.
   {
     const term = (h, arg) => bare('/termws?arg=' + encodeURIComponent(arg), { headers: h });
-    const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'),
-                'Content-Type': 'application/json' };
+    const H = OWNER;
     const napi = async (path, body, hdrs) => (await bare(path, {
       method: body ? 'POST' : 'GET', headers: { ...H, ...(hdrs || {}) },
       ...(body ? { body: JSON.stringify(body) } : {}) })).json();
@@ -931,7 +929,7 @@ ${code}`], { encoding: 'utf8' }).trim();
   // returns None, so `if (no := self._may(...))` was never true. The nodes
   // suite found it, three files later, as a node nobody had enrolled.
   {
-    const own = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
+    const own = OWNER;
     const ns = await (await bare('/api/v1/nodes', { headers: own })).json();
     const made = (ns.nodes || []).map(n => n.name);
     ok(!made.includes('zzprobe'),
@@ -1115,8 +1113,7 @@ ${code}`], { encoding: 'utf8' }).trim();
 
   // The owner cannot be removed through the door either, not just in the page.
   const refused = await bare('/api/users', { method: 'POST',
-    headers: { 'Content-Type': 'application/json',
-               Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') },
+    headers: OWNER,
     body: JSON.stringify({ action: 'remove', name: 'test' }) });
   ok(refused.status === 400 && /cannot be deleted/.test((await refused.json()).error || ''),
      'and the store refuses it too, so aerie users is held to the same rule');
@@ -1141,18 +1138,7 @@ ${code}`], { encoding: 'utf8' }).trim();
 // install a toolchain" was a rule the code asked nicely about. It gets a token
 // scoped to its own project instead.
 {
-  const { execFileSync } = await import('node:child_process');
-  const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
-  const mint = (proj) => execFileSync('python3', ['-c', `
-import importlib.util, json, os
-spec = importlib.util.spec_from_file_location("users", "${REPO}/scripts/dashboard/users.py")
-u = importlib.util.module_from_spec(spec); spec.loader.exec_module(u)
-def wj(p, d):
-    tmp = str(p) + ".tmp"; open(tmp, "w").write(json.dumps(d, indent=2)); os.replace(tmp, p)
-u.configure(state="${DIR}/state", write_json=wj)
-print(u.${proj})`], { encoding: 'utf8' }).trim();
-
-  const tok = mint('mint_session("alpha")');
+  const tok = mint('alpha');
   const as = (path, opts = {}) => bare(path, { ...opts,
     headers: { Authorization: 'Bearer ' + tok, ...(opts.headers || {}) } });
   const post = (path, body) => as(path, { method: 'POST',
@@ -1250,7 +1236,7 @@ print(u.${proj})`], { encoding: 'utf8' }).trim();
 
   // Rotating the key takes every session token at once, which is the
   // granularity that matters, since they are minted fresh per connection.
-  mint('revoke_sessions()');
+  usersPy('u.revoke_sessions()');
   ok((await as('/api/status')).status === 401,
      'revoking the session key invalidates a token already handed out');
 
@@ -1272,8 +1258,7 @@ print(u.${proj})`], { encoding: 'utf8' }).trim();
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'add', name: 'profiled', password: 'tabmadepw1', role: 'user' }) })).json());
   await member('profiled');
-  const H = pw => ({ Authorization: 'Basic ' + Buffer.from(`profiled:${pw}`).toString('base64'),
-                     'Content-Type': 'application/json' });
+  const H = pw => asUser('profiled', pw);
   const api = async (pw, body) => {
     const r = await fetch(URL.replace(/\/$/, '') + '/api/profile',
       body ? { method: 'POST', headers: H(pw), body: JSON.stringify(body) } : { headers: H(pw) });
@@ -1375,7 +1360,7 @@ print(u.${proj})`], { encoding: 'utf8' }).trim();
     // The status payload says whether the account administers this
     // controller, which is what words an empty Projects card for a user
     // with nothing granted rather than telling them the share is missing.
-    const plain = await bare('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') },
+    const plain = await bare('/api/users', { method: 'POST', headers: OWNER,
       body: JSON.stringify({ action: 'add', name: 'plainone', password: 'plainonepw1', role: 'user' }) });
     const asUser = await (await bare('/api/status', { headers: { Authorization: 'Basic ' + Buffer.from('plainone:plainonepw1').toString('base64') } })).json();
     const asOwner = await (await bare('/api/status', { headers: { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') } })).json();
@@ -1406,7 +1391,7 @@ print(u.${proj})`], { encoding: 'utf8' }).trim();
     // and the owner's own here keep bare names; nobody ends or types into
     // anybody else's. Decided before the session is looked up, so a
     // name is enough to ask with.
-    const ownerAuth = { 'Content-Type': 'application/json', Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
+    const ownerAuth = OWNER;
     const act = async (h, path, body) => {
       const r = await bare(path, { method: 'POST', headers: h, body: JSON.stringify(body) });
       return { status: r.status, error: ((await r.json().catch(() => ({}))).error || '') };
@@ -1420,15 +1405,8 @@ print(u.${proj})`], { encoding: 'utf8' }).trim();
     ok(other.status === 403, `...nor can the owner type into another account's session (${other.status})`);
     const own = await act(ownerAuth, '/api/send', { session: 'claude-alpha', macro: 'lx-ls' });
     ok(own.status !== 403, `...while the owner still reaches their own (${own.status}: ${own.error.slice(0, 40)})`);
-    const { execFileSync: ef } = await import('node:child_process');
-    const ownerUid = JSON.parse((await import('node:fs')).readFileSync(`${DIR}/state/users.json`, 'utf8')).users.test.uid;
-    const stok = ef('python3', ['-c', `
-import importlib.util, json
-spec = importlib.util.spec_from_file_location("users", "${new globalThis.URL('..', import.meta.url).pathname}users.py")
-u = importlib.util.module_from_spec(spec); spec.loader.exec_module(u)
-u.configure(state="${DIR}/state", write_json=lambda p, d: open(p, "w").write(json.dumps(d)))
-print(u.mint_session("alpha", uid="${ownerUid}"))`], { encoding: 'utf8' }).trim();
-    const sessAuth = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + stok };
+    const stok = mint('alpha', 'test');
+    const sessAuth = asSession(stok);
     const across = await act(sessAuth, '/api/send', { session: 'claude-beta', macro: 'lx-ls' });
     ok(across.status === 403, `a session's token cannot reach its own account's session on another space (${across.status})`);
     const home = await act(sessAuth, '/api/send', { session: 'claude-alpha', macro: 'lx-ls' });
@@ -1593,13 +1571,8 @@ print(u.mint_session("alpha", uid="${ownerUid}"))`], { encoding: 'utf8' }).trim(
         execFileSync('git', ['init', '-q', R]);
         gitR('add', '-A'); gitR('commit', '-qm', 'first');
         await takeOn('relproj');
-        const btok = ef('python3', ['-c', `
-import importlib.util, json
-spec = importlib.util.spec_from_file_location("users", "${new globalThis.URL('..', import.meta.url).pathname}users.py")
-u = importlib.util.module_from_spec(spec); spec.loader.exec_module(u)
-u.configure(state="${DIR}/state", write_json=lambda p, d: open(p, "w").write(json.dumps(d)))
-print(u.mint_session("relproj", uid="${ownerUid}"))`], { encoding: 'utf8' }).trim();
-        const rAuth = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + btok };
+        const btok = mint('relproj', 'test');
+        const rAuth = asSession(btok);
         const rel = (body, h = rAuth) => bare('/api/version', { method: 'POST', headers: h,
           body: JSON.stringify({ action: 'release', project: 'relproj', why: '1.2.3 for testers', ...body }) })
           .then(async r => ({ status: r.status, body: await r.json().catch(() => ({})) }));
@@ -1898,7 +1871,7 @@ print(json.dumps(out))`], { encoding: 'utf8' }));
   users(['add', 'maintuser', '--role', 'user'], 'maintpass11\nmaintpass11\n');
   users(['add', 'maintadm', '--role', 'admin'], 'maintpass22\nmaintpass22\n');
   await member('maintuser');
-  const basic = (u, pw) => ({ Authorization: 'Basic ' + Buffer.from(`${u}:${pw}`).toString('base64'), 'Content-Type': 'application/json' });
+  const basic = asUser;
   const owner = basic('test', 'test'), user = basic('maintuser', 'maintpass11'), adm = basic('maintadm', 'maintpass22');
   const form = (u, pw) => bare('/login', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: `username=${u}&password=${pw}&next=/` });

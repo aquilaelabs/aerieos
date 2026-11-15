@@ -8,22 +8,13 @@
 // and whose system job runs the allowed command as the suite's own user:
 // this file proves the asking, the routing and the answering; the real
 // agent's own file proves the running and the guest-node refusal.
-import { launch, newPage, ok, done, ready, until, URL, DIR } from './lib.mjs';
+import { launch, newPage, ok, done, ready, until, URL, DIR, asUser, OWNER as owner, asSession, call as api, mint } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync, rmSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const base = URL.replace(/\/$/, '');
-const asUser = (u, pw) => ({ Authorization: 'Basic ' + Buffer.from(`${u}:${pw}`).toString('base64'),
-                             'Content-Type': 'application/json' });
-const owner = asUser('test', 'test');
-const api = async (path, body, headers = owner) => {
-  const r = await fetch(base + path, body === undefined ? { headers }
-    : { method: 'POST', headers, body: JSON.stringify(body) });
-  return { status: r.status, body: await r.json() };
-};
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 1000 } });
@@ -158,19 +149,10 @@ ok((await api('/api/phone', { action: 'allow', id: denied.body.id })).body.error
 
 // ---- a session's own token can ask, and reads only its own outcome ----------------
 {
-  const mint = (proj, who = '') => execFileSync('python3', ['-c', `
-import importlib.util, json, os
-spec = importlib.util.spec_from_file_location("users", "${REPO}/scripts/dashboard/users.py")
-u = importlib.util.module_from_spec(spec); spec.loader.exec_module(u)
-def wj(p, d):
-    tmp = str(p) + ".tmp"; open(tmp, "w").write(json.dumps(d, indent=2)); os.replace(tmp, p)
-u.configure(state="${DIR}/state", write_json=wj)
-uid = u.load()["users"]["${who}"]["uid"] if "${who}" else ""
-print(u.mint_session("${proj}", uid=uid))`], { encoding: 'utf8' }).trim();
-  const alpha = { Authorization: 'Bearer ' + mint('alpha'), 'Content-Type': 'application/json' };
+  const alpha = asSession(mint('alpha'));
   // A USER's session asks: they may not allow root on a shared machine, so
   // the request goes to every administrator, and not back to them.
-  const vsess = { Authorization: 'Bearer ' + mint('alpha', 'visitor'), 'Content-Type': 'application/json' };
+  const vsess = asSession(mint('alpha', 'visitor'));
   const vask = await api('/api/phone', { action: 'ask', kind: 'root', why: 'from a user session', cmd: ['true'] }, vsess);
   ok(vask.status === 200 && /administrators/.test(vask.body.to || ''),
      `a user's session may ask, and is told the request went to the administrators (${vask.body.to})`);
@@ -182,7 +164,7 @@ print(u.mint_session("${proj}", uid=uid))`], { encoding: 'utf8' }).trim();
   await api('/api/phone', { action: 'deny', id: vask.body.id }, ops);
   ok((await api('/api/phone', { action: 'outcome', id: vask.body.id }, vsess)).body.state === 'denied',
      '...while any administrator can answer it');
-  const beta = { Authorization: 'Bearer ' + mint('beta'), 'Content-Type': 'application/json' };
+  const beta = asSession(mint('beta'));
   const sess = await api('/api/phone', { action: 'ask', kind: 'root', why: 'from a session', cmd: ['true'] }, alpha);
   ok(sess.status === 200 && sess.body.id > 0, `a session token may ask for root on its space's node (${sess.status})`);
   const mine = (await api('/api/phone', undefined, alpha)).body.asks || [];

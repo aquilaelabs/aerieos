@@ -4,13 +4,12 @@
 // as a field), the session token widened to the reads on every
 // request, every write refused by name, the relayed words kept to reads,
 // the grant carrying the reads for the view, and the briefing naming them.
-import { launch, newPage, ok, done, ready, settled, refreshUntil, saveDialog, sectSave, URL, DIR, prefsOf, projectKey } from './lib.mjs';
+import { launch, newPage, ok, done, ready, settled, refreshUntil, saveDialog, sectSave, URL, DIR, prefsOf, projectKey, OWNER as H, asSession } from './lib.mjs';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
 const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const base = URL.replace(/\/$/, '');
-const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
 const api = async (path, body, headers = H) => {
   const r = await fetch(base + path, body === undefined ? { headers } : { method: 'POST', headers, body: JSON.stringify(body) });
   let j; try { j = await r.json(); } catch { j = {}; }
@@ -18,7 +17,6 @@ const api = async (path, body, headers = H) => {
 };
 const token = project => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', project, 'test'],
   { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
-const asSession = tok => ({ Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' });
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 1000 } });

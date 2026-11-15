@@ -6,11 +6,10 @@
 // in it; a dial set through one repository is the project's. The card's
 // front and back, the trash naming the project, and Put back asking where
 // when the project is gone.
-import { ok, done, DIR, URL, launch, newPage, ready, quiet, sleep } from './lib.mjs';
+import { ok, done, DIR, URL, launch, newPage, ready, quiet, sleep, OWNER as ADMIN } from './lib.mjs';
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const base = URL.replace(/\/$/, '');
-const ADMIN = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
 const post = async (path, body) => {
   const r = await fetch(base + path, { method: 'POST', headers: ADMIN, body: JSON.stringify(body) });
   return { status: r.status, ...(await r.json().catch(() => ({}))) };

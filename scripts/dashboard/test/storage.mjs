@@ -3,17 +3,14 @@
 // harness's fixture node is enrolled by hand with a walk in its census; the
 // tab lists it with its filesystems as meters, its stores, and its projects
 // largest first; Measure now queues the agent's storage job.
-import { URL, launch, newPage, ok, done, ready, until } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, until, api } from './lib.mjs';
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
 await page.goto(URL);
 await ready(page);
 
-const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
 const base = URL.replace(/\/$/, '');
-const api = async (path, body) => (await fetch(base + path, body === undefined
-  ? { headers: H } : { method: 'POST', headers: H, body: JSON.stringify(body) })).json();
 
 // A node with a walk in its census.
 const minted = await api('/api/v1/nodes', { action: 'enroll', name: 'diskbox' });

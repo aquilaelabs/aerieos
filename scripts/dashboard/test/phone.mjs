@@ -8,7 +8,7 @@
 // a phone that is always present. That is not a shortcut: a real adb answers
 // from whatever is actually paired to the box the suite runs on, which makes
 // the result a fact about the room rather than the code.
-import { launch, newPage, ok, done, ready, sleep, until, URL, DIR } from './lib.mjs';
+import { launch, newPage, ok, done, ready, sleep, until, URL, DIR, asUser, OWNER as owner, asSession, mint, call as api } from './lib.mjs';
 import { execSync, execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -16,14 +16,6 @@ import { dirname, join } from 'node:path';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const base = URL.replace(/\/$/, '');
-const asUser = (u, pw) => ({ Authorization: 'Basic ' + Buffer.from(`${u}:${pw}`).toString('base64'),
-                             'Content-Type': 'application/json' });
-const owner = asUser('test', 'test');
-const api = async (path, body, headers = owner) => {
-  const r = await fetch(base + path, body === undefined ? { headers }
-    : { method: 'POST', headers, body: JSON.stringify(body) });
-  return { status: r.status, body: await r.json() };
-};
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 1000 } });
@@ -285,15 +277,7 @@ ok((await api('/api/phone', { action: 'allow', id: denied.body.id })).body.error
 // reads the phone from the cache rather than asking a node it is not bound
 // to: ids are a small counter, and a probe is a job on somebody's machine.
 {
-  const mint = (proj) => execFileSync('python3', ['-c', `
-import importlib.util, json, os
-spec = importlib.util.spec_from_file_location("users", "${REPO}/scripts/dashboard/users.py")
-u = importlib.util.module_from_spec(spec); spec.loader.exec_module(u)
-def wj(p, d):
-    tmp = str(p) + ".tmp"; open(tmp, "w").write(json.dumps(d, indent=2)); os.replace(tmp, p)
-u.configure(state="${DIR}/state", write_json=wj)
-print(u.mint_session("${proj}"))`], { encoding: 'utf8' }).trim();
-  const beta = { Authorization: 'Bearer ' + mint('beta'), 'Content-Type': 'application/json' };
+  const beta = asSession(mint('beta'));
   const peek = await api('/api/phone', { action: 'outcome', id: asked.body.id }, beta);
   ok(peek.body.error && peek.body.out === undefined,
      "another space's session cannot read the outcome of a request it did not make");
@@ -391,7 +375,7 @@ ok(typeof asPhone.you === 'string' && (!lan || /^\d+\.\d+\.\d+\.\d+$/.test(asPho
 {
   const token = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', 'test'],
     { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
-  const session = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
+  const session = asSession(token);
   const use = (op, args) => api('/api/phone', { action: 'use', op, args, why: `${op} for the test` }, session);
   // Asked, allowed by the owner, and what it answered, as aerie phone reads it.
   const allowed = async (op, args) => {

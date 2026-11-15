@@ -905,6 +905,46 @@ export async function takeOn(...names) {
 // role a suite gives the accounts it makes, the way an administrator would
 // on the Roles tab: work on the projects the account is on, and read their
 // settings, releases, credential and containers, with the shielded console.
+// ---- asking the server from outside the page (R7 step 5) --------------------
+// Who asks and how were written out in suite after suite: the owner's Basic
+// header by hand in fifty-six files, an api() of one of two shapes in
+// thirty-three, asUser() in four, a session's token minted by a python
+// snippet in four. One of each, here.
+//
+// asUser(name, password): the headers an account asks with. OWNER is the
+// fixture's own owner. asSession(token): a session's.
+export const asUser = (u, pw) => ({ Authorization: 'Basic ' + Buffer.from(`${u}:${pw}`).toString('base64'),
+                                    'Content-Type': 'application/json' });
+export const OWNER = asUser(CREDS.username, CREDS.password);
+export const asSession = token => ({ Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' });
+// call(path, body, headers): a GET when there is no body, else a POST of it
+// as JSON, as the owner unless headers say who. Answers { status, body },
+// the body {} where the server sent none and null where it was not JSON.
+// api() is the same and answers the body alone, for a suite that reads only
+// what was said.
+export const call = async (path, body, headers = OWNER) => {
+  const r = await fetch(URL.replace(/\/$/, '') + path, body === undefined ? { headers }
+    : { method: 'POST', headers, body: JSON.stringify(body) });
+  let j = {};
+  if (r.status !== 204){ try { j = await r.json(); } catch (e) { j = null; } }
+  return { status: r.status, body: j };
+};
+export const api = async (path, body, headers = OWNER) => (await call(path, body, headers)).body;
+// usersPy(expr): users.py asked for `expr` over the fixture's own state, and
+// what it printed. mint(project, who, ttl): a session's token for a space,
+// made as the server makes one, for the account `who` (by name) when said.
+const TREE = new globalThis.URL('../../..', import.meta.url).pathname;
+export const usersPy = expr => execFileSync('python3', ['-c', `
+import importlib.util, json, os
+spec = importlib.util.spec_from_file_location("users", "${TREE}/scripts/dashboard/users.py")
+u = importlib.util.module_from_spec(spec); spec.loader.exec_module(u)
+def wj(p, d):
+    tmp = str(p) + ".tmp"; open(tmp, "w").write(json.dumps(d, indent=2)); os.replace(tmp, p)
+u.configure(state="${DIR}/state", write_json=wj)
+print(${expr})`], { encoding: 'utf8' }).trim();
+export const mint = (project, who = '', ttl = null) => usersPy(
+  `u.mint_session(${JSON.stringify(project)}${ttl === null ? '' : `, ttl=${Number(ttl)}`}, uid=(u.load()["users"][${JSON.stringify(who)}]["uid"] if ${JSON.stringify(who)} else ""))`);
+
 export const MEMBER = { projects: 'write', settings: 'read', releases: 'read', gitauth: 'read',
                         files: 'write', containers: 'read', terminal: 'read' };
 export async function member(...names) {

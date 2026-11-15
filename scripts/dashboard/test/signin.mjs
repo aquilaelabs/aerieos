@@ -9,11 +9,10 @@
 // the sign-in's job the way an agent would, posts the flow's output as that
 // job's log and reads the code coming back down. No job here ever runs on a
 // real agent, which would find the machine's real Claude Code.
-import { launch, newPage, ok, done, ready, until, refreshUntil, URL, DIR } from './lib.mjs';
+import { launch, newPage, ok, done, ready, until, refreshUntil, URL, DIR, OWNER as H } from './lib.mjs';
 import { readFileSync } from 'node:fs';
 
 const BASE = URL.replace(/\/$/, '');
-const H = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64'), 'Content-Type': 'application/json' };
 const call = async (path, body, hdrs) => {
   const r = await fetch(BASE + path, { method: body ? 'POST' : 'GET', headers: { ...H, ...(hdrs || {}) },
     ...(body ? { body: JSON.stringify(body) } : {}) });
