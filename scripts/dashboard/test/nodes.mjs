@@ -1548,6 +1548,18 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     ok(offLine && offLine.warn && offLine.under && /own console/.test(offLine.text) && /sudo aerieos-agent root-asks on/.test(offLine.text)
        && /Docker there is still root's/.test(offLine.text),
        `...and its row says so under the box, in the color of a thing switched off, with the limit on a node that runs containers (${JSON.stringify(offLine)})`);
+    // The limit is said wherever the node runs containers, by what the
+    // census reports of Docker or the capability it was enrolled with, and
+    // not only on a hosting-only node (walked on the dev pair, 15 Nov: a
+    // node reporting Docker 29.8.1 was not told it).
+    const lines = await page.evaluate(() => [
+      nodeRootOffLine({ reported: { root_off: true, docker: '29.8.1' }, config: {}, capabilities: [] }),
+      nodeRootOffLine({ reported: { root_off: true }, config: {}, capabilities: ['docker-host'] }),
+      nodeRootOffLine({ reported: { root_off: true }, config: {}, capabilities: ['package-build'] }),
+      nodeRootOffLine({ reported: { docker: '29.8.1' }, config: {}, capabilities: ['docker-host'] })]);
+    ok(/Docker there is still root's/.test(lines[0]) && /Docker there is still root's/.test(lines[1])
+       && /own console/.test(lines[2]) && !/Docker/.test(lines[2]) && lines[3] === '',
+       `...on any node that runs containers, by its census or its capability, and nothing while the switch is on (${lines.map(l => l ? (/Docker/.test(l) ? 'docker' : 'line') : 'none').join(' ')})`);
     await agent('hello', { census: CENSUS, version: shipped.version, digest: shipped.digest });
     const backOn = await rootAsk();
     if (backOn.id) await napi('/api/phone', { action: 'deny', id: backOn.id });

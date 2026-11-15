@@ -1124,7 +1124,9 @@ function nodeAgentsLine(n){
 // switched back on and what the switch does not reach.
 function nodeRootOffLine(n){
   if (!n.reported?.root_off) return "";
-  const docker = n.config?.host_only || (n.reported?.services || {}).docker;
+  // Docker here: the version the census reports, or the capability it was
+  // enrolled with; a hosting-only node runs containers by what it is.
+  const docker = n.config?.host_only || !!n.reported?.docker || (n.capabilities || []).includes("docker-host");
   return `<div class="sub warn" data-rootoff>Switched off at this machine's own console: it refuses every root command sent to it, whatever is set here. <code>sudo aerieos-agent root-asks on</code> at the machine switches it back on.${docker ? " It runs containers, and Docker there is still root's." : ""}</div>`;
 }
 function nodeHostRootRow(n){
