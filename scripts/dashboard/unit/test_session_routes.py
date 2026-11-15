@@ -89,7 +89,7 @@ class Gate(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         a = SERVER.index("\nROUTE_GATES = {")
-        b = SERVER.index("\ndef route_gate(name, me):")
+        b = SERVER.index("\ndef route_gate(name, me, action=None):")
         c = SERVER.index("\n\n\n", b)
 
         class _Users:
@@ -120,6 +120,21 @@ class Gate(unittest.TestCase):
             why = gate(name, sess)
             self.assertTrue(why.startswith("a session's token does not reach this"), why)
             self.assertIn(words, why, name)
+        # Where only some of a route's actions are a session's, the gate
+        # holds which, once the body is read: asked with no action (a GET),
+        # the route answers; with one of its own, it answers; with another,
+        # the refusal is the handler's own sentence.
+        self.assertEqual(gate("_phone", sess), "")
+        self.assertEqual(gate("_phone", sess, "ask"), "")
+        self.assertEqual(gate("_phone", sess, "pair"), "a session asks; a person answers")
+        self.assertIn("outside the session's view", gate("_jobs", sess, "run"))
+        self.assertEqual(gate("_jobs", sess, "cancel"), "")
+        self.assertIn("aerie tool install", gate("_toolpacks", sess, "remove"))
+        self.assertIn("aerie sign", gate("_signing", sess, "list"))
+        self.assertIn("by its person", gate("_transcripts", sess, "delete"))
+        self.assertEqual(gate("_transcripts", sess, "label"), "")
+        self.assertEqual(gate("_phone", {"name": "ann", "role": "user"}, "pair"), "", "a person's actions are the handler's to hold")
+        self.assertEqual(sorted(set(self.ns["SESSION_ACTIONS"]) - SESSION), [], "actions named for a route outside the table")
         # A route a person's or the owner's gate holds says that gate's own words.
         self.assertIn("aerie changelog add", gate("_changelog", sess))
         self.assertEqual(sorted(set(self.ns["SESSION_INSTEAD"]) & SESSION), [], "a hint for a route the session reaches")

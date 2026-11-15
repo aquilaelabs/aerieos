@@ -6674,6 +6674,22 @@ SESSION_ROUTES = frozenset({
 # The POSTs whose bodies are streamed, each with a door of its own ahead of
 # the route table.
 STREAMED_POSTS = ("/api/upload-archive", "/api/vms-iso-upload", "/api/move-land", "/api/node-files/upload")
+# Where only some of a route's actions are a session's: the actions, and
+# what the refusal of any other says, in the handler's own words. Held by
+# the dispatcher with the table, once the request's body is read, so the
+# handler below it is asked for one of these or not at all. A route of the
+# table that is not here holds its own actions, where which one is allowed
+# turns on more than its name (the space's dials, whose container it is).
+SESSION_ACTIONS = {
+    "_jobs": (("cancel",), "a session runs aerie run, build, test and emu where it is, on its space's node; a job would run "
+                           "outside the session's view, so a session cannot queue one"),
+    "_phone": (("ask", "outcome", "use"), "a session asks; a person answers"),
+    "_toolpacks": (("install",), "a session asks for a pack from the catalog with aerie tool install NAME, nothing else"),
+    "_transcripts": (("label", "note", "keep", "unkeep"), "a conversation is deleted or shared by its person, from the "
+                                                          "space's Sessions view, not by a session"),
+    "_signing": (("sign", "keys", "generate", "map", "rotate", "release", "release-sign"),
+                 "a session signs with aerie sign, which never hands it the key; the keys are a person's to manage"),
+}
 SESSION_REFUSED = ("a session's token does not reach this: it opens what a session's own verbs use, "
                    "and the rest of the controller is a person's")
 # What a session does instead, said with the refusal where there is a verb
@@ -6711,9 +6727,11 @@ SESSION_NOT_THE_PAGE = ("the dashboard is a person's: a session's token opens no
                         "A session reads and changes its space through aerie")
 
 
-def route_gate(name, me):
+def route_gate(name, me, action=None):
     """Why this caller may not reach the handler `name`, or "" (ROUTE_GATES,
-    and for a session SESSION_ROUTES before anything else)."""
+    and for a session SESSION_ROUTES before anything else, then the route's
+    actions where SESSION_ACTIONS names them: `action` is the request's, for
+    a POST)."""
     g = ROUTE_GATES.get(name)
     if g is None:
         return "this route names no permission (ROUTE_GATES), so it is not served"
@@ -6721,6 +6739,8 @@ def route_gate(name, me):
     if me.get("session") and name not in SESSION_ROUTES:
         instead = g[1] if isinstance(g, tuple) else SESSION_INSTEAD.get(name, "")
         return SESSION_REFUSED + (". " + instead[0].upper() + instead[1:] if instead else "")
+    if me.get("session") and action is not None and name in SESSION_ACTIONS and action not in SESSION_ACTIONS[name][0]:
+        return SESSION_ACTIONS[name][1]
     if g == "handler":
         return ""
     kind, words = g
@@ -8470,9 +8490,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def _get_findings(self):
         """GET /api/findings: findings.view, scoped to the projects this
-        account sees, and for a session to its own."""
+        account sees."""
         me = self._who() or {}
-        return self._json(findings.view(project_list(me), me.get("session") or ""))
+        return self._json(findings.view(project_list(me)))
 
     def _get_git(self):
         """GET /api/git: the notebook's Git view (gitview.view), for a
@@ -8690,12 +8710,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def _get_source(self):
         """GET /api/source: the code base as a zip, from the Artifacts view
-        (artifacts.source_download). A person's download, so a session's
-        token is refused: a session has the tree already."""
+        (artifacts.source_download). A person's download: a session's token
+        does not reach this route (SESSION_ROUTES), and a session has the
+        tree already."""
         q = urllib.parse.parse_qs(self.path.partition("?")[2])
         name = q.get("project", [""])[0]
-        if (self._who() or {}).get("session"):
-            return self._json({"error": "a session has the tree already"}, 403)
         if self._not_project(name):
             return
         got, status = artifacts.source_download(name)
@@ -8746,8 +8765,6 @@ class Handler(BaseHTTPRequestHandler):
         do or about 45 s pass, so an ask reaches the app in a second rather
         than on Android's alarm. A person's, not a session's."""
         who = self._who() or {}
-        if who.get("session"):
-            return self._json({"error": "the live connection is the companion app's"}, 403)
         q = urllib.parse.parse_qs(self.path.partition("?")[2])
         since = q.get("since", [""])[0]
         uid, admin = users.uid_of(who), users.is_admin(who)
@@ -8771,16 +8788,7 @@ class Handler(BaseHTTPRequestHandler):
         if why:
             return self._json({"error": why, "toolchains": []})
         if nid and nid != "local" and not NODES_OK:
-            d = toolchains.payload_for_node(nid)
-            # A toolchain job's output is the node's, read by a session only
-            # with its project's diagnostics grant, as aerie jobs reads it (the
-            # operator, 12 Oct): the rows and what failed stay, the log lines
-            # and the error excerpts go, with the reason in their place.
-            why = self._diag_why() if (self._who() or {}).get("session") else ""
-            if why and isinstance(d.get("job"), dict):
-                d["job"] = {k: v for k, v in d["job"].items() if k not in ("log", "errors")}
-                d["job"]["hidden"] = why
-            return self._json(d)
+            return self._json(toolchains.payload_for_node(nid))
         return self._json(toolchains.payload())
 
     def _get_agents(self):
@@ -8797,7 +8805,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": "no such node", "rows": []}, 404)
         out = {"node": nid, "name": n.get("name") or nid, "live": bool(n.get("live")), "rows": agentcode.rows(n)}
         me = self._who() or {}
-        if users.uid_of(me) and not me.get("session"):
+        if users.uid_of(me):
             mine = next((x for x in plugins.of(users.uid_of(me)) if x["node"] == nid), {})
             out["yours"] = {"plugins": mine.get("plugins") or [], "mcp": mine.get("mcp") or {}}
         return self._json(out)
@@ -8858,8 +8866,7 @@ class Handler(BaseHTTPRequestHandler):
         can = users.assignable(me)
         # Accounts and roles Read with nothing to give sees the whole of it,
         # to read: the page draws it without a control (B34).
-        readonly = not can["admin"] and not can["projects"] and not me.get("session") \
-            and not self._area_read_why("accounts", me=me)
+        readonly = not can["admin"] and not can["projects"] and not self._area_read_why("accounts", me=me)
         if not can["admin"] and not can["projects"] and not readonly:
             return self._json({"error": "the Roles page is an administrator's, a space owner's "
                                         "for their own spaces, or for reading, Accounts and roles Read's"}, 403)
@@ -8974,7 +8981,7 @@ class Handler(BaseHTTPRequestHandler):
         (adoptapps.export_zip). An administrator's, in a browser: their
         environments hold passwords."""
         me = self._who()
-        if (me or {}).get("session") or users.may(me, "admin"):
+        if users.may(me, "admin"):
             return self._json({"error": "an administrator downloads these, in a browser"}, 403)
         own = nodes.node(_own_node_id() or "") if BARE_METAL and not NODES_OK else None
         if not own:
@@ -8995,7 +9002,7 @@ class Handler(BaseHTTPRequestHandler):
         if not NODES_OK:
             mine = None if users.may(me, "admin") == "" \
                 else set(project_names(me))
-            if mine is not None and not (me or {}).get("session") and self._area_read_why("jobs"):
+            if mine is not None and self._area_read_why("jobs"):
                 mine = {p for p in mine if roles.level_of(me, "projects", p, users.may_work)}
             with timing.timed("home:jobs"):
                 got, _ = nodes.jobs_view("", {"n": ["500"]}, mine, hidden=self._jobs_hidden())
@@ -9416,7 +9423,7 @@ class Handler(BaseHTTPRequestHandler):
         who = self._who() or {}
         # Whether this person may change the global rules themselves, which
         # the notebook offers beside the project's own switch for each.
-        admin = users.is_admin(who) and not who.get("session")
+        admin = users.is_admin(who)
         return self._json(rules.payload(name) | {"rev": rules.rev(name), "may_global": admin})
 
     def _get_global_rules(self):
@@ -9569,9 +9576,6 @@ class Handler(BaseHTTPRequestHandler):
         name = q.get("project", [""])[0]
         if self._not_project(name):
             return
-        no = wiki.hidden_for(name, bool((self._who() or {}).get("session")))
-        if no:
-            return self._json({"error": no}, 403)
         try:
             fname, data = wiki.export_zip(name)
         except wiki.Refused as e:
@@ -9768,7 +9772,7 @@ class Handler(BaseHTTPRequestHandler):
             if (path == route) if how == "exact" else path.startswith(route):
                 if (why := self._work_refused(route, str(req.get("project") or ""))):
                     return self._json({"error": why}, 400)
-                if (why := route_gate(name, self._who())):
+                if (why := route_gate(name, self._who(), field(req, "action"))):
                     return self._json({"error": why}, 403)
                 # What a write to the notebook or the settings means for the
                 # sessions is recorded before its reply goes, not after: the
@@ -9931,13 +9935,7 @@ class Handler(BaseHTTPRequestHandler):
         """POST /api/prefs: a project's settings dialog, saved by
         prefs.dialog_save behind the gates here."""
         name = req.get("project", "")
-        # A session may not change the settings of the project it runs
-        # in (the gate that holds its own additions, the commands a
-        # build runs, the identity its commits carry), and nobody may
-        # change a project they cannot see or have not taken on.
-        if (self._who() or {}).get("session"):
-            return self._json({"error": "a space's settings are the operator's: "
-                                        "say what should change in your reply"}, 403)
+        # Nobody may change a project they cannot see or have not taken on.
         if self._not_project(name):
             return
         if self._readonly(name):
@@ -10074,8 +10072,7 @@ class Handler(BaseHTTPRequestHandler):
             slot = (nodes.runner_slot(field(req, "url").strip()) if act == "runner-token"
                     else re.sub(r"[^a-z0-9.-]", "", field(req, "slot"))[:60])
             have = {r["slot"] for r in runners.listing() if r["id"] == nid} if not NODES_OK else set()
-            why = (users.may(me, "nodes-write") if me.get("session") else "") or users.may_instance(
-                me, "runner", f"{nid}/{slot}" if slot in have else "", f"{slot} on {nname}")
+            why = users.may_instance(me, "runner", f"{nid}/{slot}" if slot in have else "", f"{slot} on {nname}")
         else:
             why = users.may_instance(me, "nodes-write", "" if act in ("add", "vm-xml") else nid, nname)
         if why:
@@ -10128,16 +10125,12 @@ class Handler(BaseHTTPRequestHandler):
                                         + NODES_OK}, 500)
         act = field(req, "action")
         if act in ("run", "emu"):
-            # Never from a session (R35). A session is on its project's node and
-            # runs these verbs where it is, inside its view; a job runs as the
-            # node's enrolled account, outside every view and in the docker
-            # group, so a session token that could queue one would read every
-            # project on the machine and be root on it. Measured on
-            # bb-dev-sandbox, 16 Sep, before this refusal.
-            if (self._who() or {}).get("session"):
-                return self._json({"error": "a session runs aerie run, build, test and emu where it "
-                                            "is, on its space's node; a job would run outside "
-                                            "the session's view, so a session cannot queue one"}, 403)
+            # Never from a session (R35), which SESSION_ACTIONS holds at the
+            # gate: a session is on its project's node and runs these verbs
+            # where it is, inside its view; a job runs as the node's enrolled
+            # account, outside every view and in the docker group, so a
+            # session token that could queue one would read every project on
+            # the machine and be root on it. Measured on bb-dev-sandbox, 16 Sep.
             # ...nor from an account without the right: the same job queued with
             # a password instead of a token is the same command in the same
             # docker group. Nothing on the page queues one for a plain user; bb
@@ -10591,8 +10584,6 @@ class Handler(BaseHTTPRequestHandler):
         me = self._who() or {}
         uid = users.uid_of(me)
         if field(req, "action") == "cancel":
-            if me.get("session"):
-                return self._json({"error": "a session does not sign an account in or out"}, 403)
             return self._json(*signin.verb("cancel", "", uid))
         nid, no = self._signin_node(req)
         if no:
@@ -10603,8 +10594,6 @@ class Handler(BaseHTTPRequestHandler):
         """Hand the code from the browser to the sign-in flow: signin.take_code,
         for the person whose flow it is."""
         me = self._who() or {}
-        if me.get("session"):
-            return self._json({"error": "a session does not sign an account in or out"}, 403)
         uid = users.uid_of(me)
         if not uid or not signin.running(uid):
             return self._json({"error": "no sign-in of yours is running"}, 403)
@@ -10795,8 +10784,6 @@ class Handler(BaseHTTPRequestHandler):
         """Where the controller keeps one kind of what grows (paths.py), and
         what is there moved across. An administrator's, never a session's:
         it is this machine's disks."""
-        if (self._who() or {}).get("session"):
-            return self._json({"error": "the controller's storage is the operator's"}, 403)
         if self._refused("controller"):
             return
         name = field(req, "name")
@@ -11224,11 +11211,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def _members(self, req):
         """A project's owner, whether it is invite only, its people and its
-        invitations, and an invitee's answer (membership.verb). A session
-        is refused: who joins a project is a person's decision."""
+        invitations, and an invitee's answer (membership.verb). A session's
+        token does not reach this route (SESSION_ROUTES): who joins a project
+        is a person's decision."""
         me = self._who() or {}
-        if me.get("session"):
-            return self._json({"error": "who joins a space is a person's decision"}, 403)
         if not me:
             return self._json({"error": "not signed in"}, 401)
         name = field(req, "project")
@@ -11245,10 +11231,8 @@ class Handler(BaseHTTPRequestHandler):
         """POST /api/keys (R154): the install key and everything kept under
         it for an administrator (status, show, saved, change), and the
         account's own key for its sign-ins on the nodes (mine, change-mine).
-        A session is refused whatever it asks."""
+        A session's token does not reach this route (SESSION_ROUTES)."""
         who = self._who() or {}
-        if who.get("session"):
-            return self._json({"error": "the keys are a person's to manage"}, 403)
         act = field(req, "action")
         uid = users.uid_of(who) or ""
         if act == "mine":
@@ -11482,8 +11466,7 @@ class Handler(BaseHTTPRequestHandler):
             # Sign a build). It never receives the key, the list, or a
             # backup; asking to sign is all a session does here.
             act = field(req, "action")
-            if act not in ("sign", "keys", "generate", "map", "rotate", "release", "release-sign") \
-                    or name != who["session"]:
+            if name != who["session"]:
                 return self._json({"error": "a session signs with aerie sign, which never hands it the key; "
                                             "the keys are a person's to manage"}, 403)
             owner = membership.owner_of(name)
@@ -11667,14 +11650,6 @@ class Handler(BaseHTTPRequestHandler):
         if self._readonly(name):
             return None
         who = self._who() or {}
-        # A session asks for a phone (aerie phone run) and a person answers; it
-        # does not push or install by itself, and uid_of answering the
-        # session's account made the owner check pass for it (the audit of
-        # 26 Sep). A capture it lets go of with aerie capture prune, in the tree.
-        if who.get("session"):
-            return self._json({"error": "a session asks for the phone with aerie phone run and lets a "
-                                        "capture go with aerie capture prune NAME; neither is done from here, "
-                                        "and a pin is a person's"}, 403)
         if field(req, "action") == "forget-capture":
             return self._json(*artifacts.forget_capture(name, field(req, "name")))
         # A build named with no version, which no sweep can judge: a person's Remove.
@@ -11703,9 +11678,7 @@ class Handler(BaseHTTPRequestHandler):
         # a phone is its owner's, and phone.py holds the ownership (only the
         # account that connected one can disconnect it or answer for it,
         # and root on a shared sandbox is an administrator's whoever asks).
-        # A session's token may reach none of them.
-        if field(req, "action") not in ("ask", "outcome", "use") and (self._who() or {}).get("session"):
-            return self._json({"error": "a session asks; a person answers"}, 403)
+        # A session's token reaches none of them (SESSION_ACTIONS, at the gate).
         # The outcome of a request is the asking session's to read (scoped
         # to its project below) and an administrator's; not any account's
         # by id, since the output of a root command on a shared machine is
@@ -11909,12 +11882,6 @@ class Handler(BaseHTTPRequestHandler):
         me = self._who()
         if not me or not users.uid_of(me):
             return self._json({"error": "not an account"}, 403)
-        # A person's, never their session's (B764): a session's token carries
-        # its person's id, and with it this page would have let a session
-        # send that person's notifications elsewhere, end their browser
-        # sign-ins and enroll a second factor on their account.
-        if me.get("session"):
-            return self._json({"error": "a profile is its person's, read and changed from their own sign-in, never by a session"}, 403)
         if req is None:
             return self._json(*profiletab.view(me))
         payload, status, renamed = profiletab.verb(me, field(req, "action"), req, origin=self._origin())
@@ -11924,8 +11891,6 @@ class Handler(BaseHTTPRequestHandler):
         """GET /api/snapshots?project=NAME: the days kept of the project's
         tree (snapshots.py), newest first, and how many it keeps. An
         administrator's, like a restore."""
-        if (self._who() or {}).get("session"):
-            return self._json({"error": "a space's snapshots are the operator's"}, 403)
         q = urllib.parse.parse_qs(self.path.partition("?")[2])
         name = q.get("project", [""])[0]
         if self._refused("settings", name) or self._not_project(name):
@@ -11937,8 +11902,6 @@ class Handler(BaseHTTPRequestHandler):
         day or one file of it (snapshots.restore, which snapshots the tree
         first so it can be undone). Never a session's: a session is what a
         restore may be undoing."""
-        if (self._who() or {}).get("session"):
-            return self._json({"error": "a space's snapshots are the operator's"}, 403)
         name = field(req, "project")
         if self._refused("settings", name) or self._not_project(name):
             return None
@@ -12003,10 +11966,9 @@ class Handler(BaseHTTPRequestHandler):
         if not me or not uid:
             return self._json({"error": "not an account"}, 403)
         name, sid, act = field(req, "project"), field(req, "id"), field(req, "action")
+        # Of these four a person's own session may say too; the rest are the
+        # person's alone, which SESSION_ACTIONS holds at the gate.
         said = act in ("label", "note", "keep", "unkeep")
-        if me.get("session") and not said:
-            return self._json({"error": "a conversation is deleted or shared by its person, from the "
-                                        "space's Sessions view, not by a session"}, 403)
         if self._not_project(name):
             return
         if act == "delete":
@@ -12081,9 +12043,6 @@ class Handler(BaseHTTPRequestHandler):
         """POST /api/forge-access {project, action: measure}: the token
         measured again, for the Permissions section's Measure; an account's
         on a project it may change."""
-        me = self._who() or {}
-        if me.get("session"):
-            return self._json({"error": "an account's: a session reads it with aerie forge whoami"}, 403)
         name = field(req, "project")
         if self._not_project(name) or self._readonly(name):
             return None
@@ -12120,7 +12079,7 @@ class Handler(BaseHTTPRequestHandler):
         session runs in the project directory, because that session is
         standing in it (gitview.in_use)."""
         me = self._who()
-        if not me or not users.uid_of(me) or me.get("session"):
+        if not me or not users.uid_of(me):
             return self._json({"error": "an account's, not a session's: a session uses aerie git"}, 403)
         name = field(req, "project")
         if name not in set(project_names(me)):
@@ -12338,9 +12297,7 @@ class Handler(BaseHTTPRequestHandler):
         step 5), as its project's Install a tool pack dial says."""
         me = self._who() or {}
         if me.get("session"):
-            sess = me["session"]
-            if field(req, "action") != "install":
-                return self._json({"error": "a session asks for a pack from the catalog with aerie tool install NAME, nothing else"}, 403)
+            sess = me["session"]             # install alone reaches here (SESSION_ACTIONS)
             name = field(req, "name")
             entry = next((e for e in (catalogindex.index(settings.get("catalog_url") or None).get("index") or {}).get("packs") or []
                           if e["name"] == name and e.get("kind", "pack") == "pack" and not e.get("withdrawn")), None)
@@ -12434,13 +12391,9 @@ class Handler(BaseHTTPRequestHandler):
         A session does not get this. The CLI verbs it has (add, edit, merge,
         split, rm) each say what they are doing to one entry; handing it the
         whole section would make "the changelog is the operator's arrangement"
-        a convention rather than a rule. The refusal names the verbs.
+        a convention rather than a rule. The route's gate (ROUTE_GATES)
+        names the verbs in its refusal.
         """
-        if (self._who() or {}).get("session"):
-            return self._json({"error": "the changelog's arrangement is the "
-                                        "operator's: a session writes entries with "
-                                        "`aerie changelog add`, and corrects one with "
-                                        "`edit`, `merge`, `split` or `rm`"}, 403)
         name = req.get("project", "")
         # A role that reads the project does not rearrange its changelog
         # either (B101): the Save was live for it, and went through.
@@ -12535,11 +12488,9 @@ class Handler(BaseHTTPRequestHandler):
         account this request proved, a project it sees, and the file access
         its settings give it through the editor's door, asked on this request
         (ftp.access_for), so the extension can do nothing the account cannot.
-        A session is refused: it has the tree, and it is never a person."""
+        A session's token does not reach this route (SESSION_ROUTES): it has
+        the tree, and it is never a person."""
         me = self._who() or {}
-        if me.get("session"):
-            return self._json({"error": "a session has its space's tree already: this is a "
-                                        "person's editor's"}, 403)
         if why := files.api_refused(self.headers.get("X-BB-Api"), self.headers.get("X-BB-App")):
             return self._json({"error": why, "update": True}, 426)
         if field(req, "action") == "projects":
@@ -12648,8 +12599,6 @@ class Handler(BaseHTTPRequestHandler):
         and its last run's state, and the nodes it may run on. Read on
         Schedules; never a session's, whatever its token holds."""
         who = self._who() or {}
-        if who.get("session"):
-            return self._json({"error": "schedules are a person's: a session has no say in them"}, 403)
         why = users.may(who, "schedules-read")
         if why:
             return self._json({"error": why}, 403)
@@ -12671,8 +12620,6 @@ class Handler(BaseHTTPRequestHandler):
         off among them), remove, or run now. Write on Schedules; never a
         session's."""
         who = self._who() or {}
-        if who.get("session"):
-            return self._json({"error": "schedules are a person's: a session has no say in them"}, 403)
         why = users.may(who, "schedules")
         if why:
             return self._json({"error": why}, 403)
@@ -12701,7 +12648,7 @@ class Handler(BaseHTTPRequestHandler):
         """GET /api/storebackups (R162 step 5): the backups the controller's
         own machine copies, as recorded. An administrator's."""
         who = self._who() or {}
-        if who.get("session") or not users.is_admin(who):
+        if not users.is_admin(who):
             return self._json({"error": "the machine's backups are an administrator's"}, 403)
         return self._json({"backups": storebackups.rows()})
 
@@ -12710,7 +12657,7 @@ class Handler(BaseHTTPRequestHandler):
         remove a backup's record; Run now is the nodes verb storage-backup.
         An administrator's."""
         who = self._who() or {}
-        if who.get("session") or not users.is_admin(who):
+        if not users.is_admin(who):
             return self._json({"error": "the machine's backups are an administrator's"}, 403)
         act, by = field(req, "action"), self._principal()
         if act == "set":
@@ -12731,7 +12678,7 @@ class Handler(BaseHTTPRequestHandler):
         picture. A person's to read, never a session's; ?v= is the pin, so
         an update is a new address and the old one may be kept."""
         who = self._who() or {}
-        if not who or who.get("session"):
+        if not who:
             return self._json({"error": "a person's to read"}, 403)
         q = urllib.parse.parse_qs(self.path.partition("?")[2])
         got = nasapps.icon_of(q.get("app", [""])[0]) if q.get("app") else toolpacks.icon_of(q.get("name", [""])[0])
@@ -12761,8 +12708,6 @@ class Handler(BaseHTTPRequestHandler):
         administrator's for the catalog), so the list is what the person
         may act on."""
         who = self._who() or {}
-        if who.get("session"):
-            return self._json({"error": "the library is a person's to read here; a session has aerie tool"}, 403)
         q = urllib.parse.parse_qs(self.path.partition("?")[2])
         nid, why = self._node_asked(q.get("node", [""])[0])
         if why:
@@ -12827,8 +12772,6 @@ class Handler(BaseHTTPRequestHandler):
         and Configure for an added pack with a config block (packconfig,
         an administrator's, as the pack is); never a session's."""
         who = self._who() or {}
-        if who.get("session"):
-            return self._json({"error": "the library is a person's"}, 403)
         act, nid, pack = field(req, "action"), field(req, "node"), field(req, "pack")
         if not nid or not nodes.node(nid):
             return self._json({"error": "which node?"}, 400)
@@ -12929,8 +12872,6 @@ class Handler(BaseHTTPRequestHandler):
         container dialog offers, each with what it is and the blanks it
         takes. For whoever may make a container; never a session's."""
         who = self._who() or {}
-        if who.get("session"):
-            return self._json({"error": "the app catalog is a person's"}, 403)
         why = users.may(who, "docker-write")
         if why:
             return self._json({"error": why}, 403)
@@ -12942,8 +12883,6 @@ class Handler(BaseHTTPRequestHandler):
         it runs as, the time zone, its port), for the dialog to show before
         Create makes it as any container."""
         who = self._who() or {}
-        if who.get("session"):
-            return self._json({"error": "the app catalog is a person's"}, 403)
         why = users.may(who, "docker-write")
         if why:
             return self._json({"error": why}, 403)
@@ -12985,7 +12924,7 @@ class Handler(BaseHTTPRequestHandler):
         controller's own machine mounts, as recorded, never a password.
         An administrator's."""
         who = self._who() or {}
-        if who.get("session") or not users.is_admin(who):
+        if not users.is_admin(who):
             return self._json({"error": "the machine's other disks and shares are an administrator's"}, 403)
         return self._json({"mounts": extmounts.rows()})
 
@@ -12994,7 +12933,7 @@ class Handler(BaseHTTPRequestHandler):
         or on and off (Eject is off: the agent unmounts within a minute).
         An administrator's; the own machine's agent follows at its hello."""
         who = self._who() or {}
-        if who.get("session") or not users.is_admin(who):
+        if not users.is_admin(who):
             return self._json({"error": "the machine's other disks and shares are an administrator's"}, 403)
         act, by = field(req, "action"), self._principal()
         if act == "set":
@@ -13015,8 +12954,6 @@ class Handler(BaseHTTPRequestHandler):
         the account sees the project and as one line otherwise. Never a
         session's: a session reads its node with aerie node busy."""
         who = self._who() or {}
-        if who.get("session"):
-            return self._json({"error": "a node's disks are a person's to read here"}, 403)
         if NODES_OK:
             return self._json({"error": "the node store did not open: " + NODES_OK}, 500)
         payload, status = storage.view(nodes.node_list(), who, is_admin=users.is_admin,
@@ -13054,8 +12991,6 @@ class Handler(BaseHTTPRequestHandler):
         minutes for a day, an hour for a month). Read on the Nodes area;
         never a session's."""
         who = self._who() or {}
-        if who.get("session"):
-            return self._json({"error": "a machine's history is a person's to read"}, 403)
         why = users.may(who, "node")
         if why:
             return self._json({"error": why}, 403)
@@ -13070,8 +13005,6 @@ class Handler(BaseHTTPRequestHandler):
         """Measure now on the Storage page: a node's disks walked at once
         (nodes.node_storage_measure). Write on Storage for that node."""
         who = self._who() or {}
-        if who.get("session"):
-            return self._json({"error": "a node's disks are a person's to read here"}, 403)
         nid = field(req, "node")
         if not nid or not nodes.node(nid):
             return self._json({"error": "which node?"}, 400)
@@ -13083,8 +13016,6 @@ class Handler(BaseHTTPRequestHandler):
         """The nginx page (nginxproxy.view): every node's nginx, for an
         account that may read the Nodes page; never a session's."""
         who = self._who() or {}
-        if who.get("session"):
-            return self._json({"error": "a node's proxy is a person's"}, 403)
         if not users.is_admin(who) and not roles.level_of(who, "nodes"):
             return self._json({"error": "the nginx page is the Nodes page's area: ask for Read on Nodes"}, 403)
         return self._json(nginxproxy.view(devapp, devactions.state))
@@ -13093,8 +13024,6 @@ class Handler(BaseHTTPRequestHandler):
         """GET /api/router?node=ID: a node's model router (router.status)
         and the projects it may be offered to, for an account that reads the
         Nodes page; never a session's."""
-        if (self._who() or {}).get("session"):
-            return self._json({"error": "a node's router is a person's"}, 403)
         if self._refused("nodes"):
             return
         q = urllib.parse.parse_qs(self.path.partition("?")[2])
@@ -13128,8 +13057,6 @@ class Handler(BaseHTTPRequestHandler):
         compose jobs, Ollama's models pulled and removed, a project allowed
         or not, the models and the spend read; docker-write like the
         nginx page, and never a session's."""
-        if (self._who() or {}).get("session"):
-            return self._json({"error": "a node's router is a person's"}, 403)
         if self._refused("docker-write"):
             return
         act, nid = field(req, "action"), field(req, "node")
@@ -13167,8 +13094,6 @@ class Handler(BaseHTTPRequestHandler):
         """The Scanners page (scanners.view): every node's scanners, the
         schedule, the versions and what nothing covers, for an account that
         may read the Nodes page; never a session's."""
-        if (self._who() or {}).get("session"):
-            return self._json({"error": "a node's scanners are a person's"}, 403)
         if self._refused("nodes"):
             return
         return self._json(scanners.view())
@@ -13177,8 +13102,6 @@ class Handler(BaseHTTPRequestHandler):
         """Deploy, update, remove, run now, the schedule and a version check
         (scanners.py): compose and scan jobs on a node, so docker-write like
         a written container, and never a session's."""
-        if (self._who() or {}).get("session"):
-            return self._json({"error": "a node's scanners are a person's"}, 403)
         if self._refused("docker-write"):
             return
         act, nid = field(req, "action"), field(req, "node")
@@ -13212,8 +13135,6 @@ class Handler(BaseHTTPRequestHandler):
         node, so docker-write like a written container, and never a
         session's. Check reads the registry now; update pins the newest
         line on the node and rebuilds (R192)."""
-        if (self._who() or {}).get("session"):
-            return self._json({"error": "a node's proxy is a person's"}, 403)
         if self._refused("docker-write"):
             return
         act, nid = field(req, "action"), field(req, "node")
@@ -13270,8 +13191,6 @@ class Handler(BaseHTTPRequestHandler):
         """Check for updates on the Containers page (imagecheck.py, R195): every
         container's registry images on one node, or all, asked now. A
         person's, under docker-write, since what it leads to is an Update."""
-        if (self._who() or {}).get("session"):
-            return self._json({"error": "checking for image updates is a person's"}, 403)
         if self._refused("docker-write"):
             return
         if field(req, "action") != "check":
@@ -13296,16 +13215,12 @@ class Handler(BaseHTTPRequestHandler):
         """GET /api/notices: notices.listing, this account's own (R218 step 6).
         A session has none: what a page said is a person's."""
         who = self._who() or {}
-        if who.get("session"):
-            return self._json({"error": "a session has no notices"}, 403)
         return self._json(*notices.listing(users.uid_of(who)))
 
     def _notices(self, req):
         """Keep, delete or clear what the page said to this account:
         notices.act. The account's own, so no grant; a session has none."""
         who = self._who() or {}
-        if who.get("session"):
-            return self._json({"error": "a session has no notices"}, 403)
         return self._json(*notices.act(users.uid_of(who), req))
 
     def _bell(self, req):
@@ -13313,8 +13228,6 @@ class Handler(BaseHTTPRequestHandler):
         (bellseen.py), or resume a session an outage held (R251). The
         account's own, so no grant; a session has no bell."""
         who = self._who() or {}
-        if who.get("session"):
-            return self._json({"error": "a session has no bell"}, 403)
         uid = users.uid_of(who)
         if field(req, "action") == "restore":
             return self._json(*bellseen.restore(uid))
@@ -13344,7 +13257,7 @@ class Handler(BaseHTTPRequestHandler):
         name = repos.key_of(name)
         me = self._who()
         owner = membership.owner_of(name)
-        uid = "" if not me or me.get("session") else users.uid_of(me)
+        uid = "" if not me else users.uid_of(me)
         admin = bool(uid) and users.is_admin(me)
         if not lock_may(name, uid, admin, projects.load_locks().get(name)):
             return self._json({"error": "an administrator locked it, and an administrator unlocks it"
@@ -13407,7 +13320,7 @@ class Handler(BaseHTTPRequestHandler):
         and owned (what a delete would leave with no project). A person's,
         never a session's."""
         me = self._who()
-        if not me or me.get("session"):
+        if not me:
             return self._json({"error": "a person makes and changes spaces, never a session"}, 403)
         act = field(req, "action")
         admin = users.is_admin(me)
@@ -13576,7 +13489,7 @@ class Handler(BaseHTTPRequestHandler):
         if self._not_card(name):
             return None
         me = self._who()
-        if not me or me.get("session") or not (users.is_admin(me) or users.uid_of(me) == membership.owner_of(name)):
+        if not me or not (users.is_admin(me) or users.uid_of(me) == membership.owner_of(name)):
             return self._json({"error": "the space's owner or an administrator archives it"}, 403)
         return self._json(*projects.archive_verb(name, on))
 
@@ -13718,10 +13631,8 @@ class Handler(BaseHTTPRequestHandler):
         (projects.pin). No session is touched and nothing is blocked: this is
         the one control of the three that is purely about the view."""
         # A person's own set (the operator, 27 Sep): any signed-in account
-        # may pin for itself; a session has no sidebar and pins for nobody.
+        # may pin for itself.
         me = self._who() or {}
-        if me.get("session"):
-            return self._json({"error": "a session has no sidebar: the pins are a person's own"}, 403)
         return self._json(*projects.pin(users.uid_of(me), req.get("name", ""), bool(req.get("pinned")),
                                         users.starts_unpinned(me)))
 
@@ -13730,8 +13641,6 @@ class Handler(BaseHTTPRequestHandler):
         rename a group (projects.set_group, rename_group), or delete one
         (delete_group): a label for the Projects page, nothing more."""
         me = self._who() or {}
-        if me.get("session"):
-            return self._json({"error": "a session has no Spaces page: the groups are a person's own"}, 403)
         if "rename" in req:
             return self._json(*projects.rename_group(users.uid_of(me), field(req, "rename"), field(req, "to")))
         if "delete" in req:
@@ -13745,8 +13654,6 @@ class Handler(BaseHTTPRequestHandler):
         """Give a project one of the colors for this account alone, or none
         (projects.set_mark): worn by its card, its tabs and its bar."""
         me = self._who() or {}
-        if me.get("session"):
-            return self._json({"error": "a session has no Spaces page: a space's color is a person's own"}, 403)
         name, color = field(req, "name"), field(req, "color")
         if self._not_card(name):
             return None
@@ -13776,7 +13683,7 @@ class Handler(BaseHTTPRequestHandler):
         not yet here; an administrator's. An armed move asks the new
         address whether it landed on the way, once a minute at most."""
         me = self._who() or {}
-        if not users.is_admin(me) or me.get("session"):
+        if not users.is_admin(me):
             return self._json({"error": "moving the controller is an administrator's"}, 403)
         q = urllib.parse.parse_qs(self.path.partition("?")[2])
         with contextlib.suppress(Exception):                     # noqa: BLE001 (the ask never holds the read)
@@ -13812,7 +13719,7 @@ class Handler(BaseHTTPRequestHandler):
         ask (the new address asked now whether the bundle landed, R175).
         The owner's."""
         me = self._who() or {}
-        if (users.account_of(me) or {}).get("role") != "owner" or me.get("session"):
+        if (users.account_of(me) or {}).get("role") != "owner":
             return self._json({"error": "moving the controller is its owner's"}, 403)
         act = field(req, "action")
         if act == "prepare":
@@ -13892,7 +13799,7 @@ class Handler(BaseHTTPRequestHandler):
         fresh under the armed move's key at this moment (R175 step 1), or the
         one just packed by name; the owner's."""
         me = self._who() or {}
-        if (users.account_of(me) or {}).get("role") != "owner" or me.get("session"):
+        if (users.account_of(me) or {}).get("role") != "owner":
             return self._json({"error": "the move bundle is its owner's"}, 403)
         # ?name= is the bundle the page just packed (action pack), served as
         # it is; with no name, packed fresh here as before.
@@ -13919,7 +13826,7 @@ class Handler(BaseHTTPRequestHandler):
         """GET /api/move-backup?name=: the controller's backup packed under a
         token of its own, as a download; the owner's."""
         me = self._who() or {}
-        if (users.account_of(me) or {}).get("role") != "owner" or me.get("session"):
+        if (users.account_of(me) or {}).get("role") != "owner":
             return self._json({"error": "the controller's backup is its owner's"}, 403)
         q = urllib.parse.parse_qs(self.path.partition("?")[2])
         p = move.backup_path(q.get("name", [""])[0])
@@ -13937,7 +13844,7 @@ class Handler(BaseHTTPRequestHandler):
         """GET /api/backup (R161 step 4): the password set or not, the last
         copy, where the copies go and the copies found; an administrator's."""
         me = self._who() or {}
-        if not users.is_admin(me) or me.get("session"):
+        if not users.is_admin(me):
             return self._json({"error": "the backup is an administrator's"}, 403)
         # ...with whether this account is the owner, whose Back up now and
         # Download are (_backup's own test): the poll carries the name alone.
@@ -13950,7 +13857,7 @@ class Handler(BaseHTTPRequestHandler):
     def _backup(self, req):
         """POST /api/backup {action: now}: a copy written now, the owner's."""
         me = self._who() or {}
-        if (users.account_of(me) or {}).get("role") != "owner" or me.get("session"):
+        if (users.account_of(me) or {}).get("role") != "owner":
             return self._json({"error": "a backup now is the owner's"}, 403)
         if field(req, "action") != "now":
             return self._json({"error": "action is now"}, 400)
@@ -13964,7 +13871,7 @@ class Handler(BaseHTTPRequestHandler):
         download, the owner's; sealed, so a download is only ever a sealed
         file."""
         me = self._who() or {}
-        if (users.account_of(me) or {}).get("role") != "owner" or me.get("session"):
+        if (users.account_of(me) or {}).get("role") != "owner":
             return self._json({"error": "a backup's download is the owner's"}, 403)
         name = (urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get("name") or [""])[0]
         if not re.fullmatch(r"builderbot-backup-[A-Za-z0-9.+-]+-\d{8}-\d{6}(-\d+)?\.bbbackup", name):

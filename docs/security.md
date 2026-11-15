@@ -272,6 +272,17 @@ none of the dashboard, its terminals, a VM's screen or the metrics, and
 every path a session-side script names is in the table, and the auth
 suite asks every other route with a session's token and expects the
 refusal, so a new route is closed to sessions until somebody names it.
+Where only some of a route's actions are a session's (asking for a phone
+and not pairing one, installing a pack from the catalog and not removing
+one), the same table names the actions and the dispatcher holds them once
+the request is read. And a session carries no account's id and no role of
+a person's: what the controller keeps by a caller's id (a layout, a key
+store, a sign-in) it keeps nothing of for a session, and the routes that
+do act for the person a session works for (their memories and
+conversations on the space, their git token for a push, the phone lent to
+them) ask for that person by name. What a session may ask of the
+permissions at all is a list of four (read its space, work in it, write
+to it, and the relayed verbs), each still held to the account behind it.
 
 **A request from another site.** A change, and a read of `/api/`, sent with
 the browser's cookie is taken from the dashboard's own page alone

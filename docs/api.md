@@ -21,7 +21,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | GET | `/api/move-backup` | exact | `_get_move_backup` | GET /api/move-backup?name=: the controller's backup packed under a token of its own, as a download; the owner's. |  |
 | GET | `/api/backup` | exact | `_get_backup` | GET /api/backup (R161 step 4): the password set or not, the last copy, where the copies go and the copies found; an administrator's. |  |
 | GET | `/api/backup-file` | exact | `_get_backup_file` | GET /api/backup-file?name=NAME: a copy under the state as a download, the owner's; sealed, so a download is only ever a sealed file. |  |
-| GET | `/api/findings` | prefix | `_get_findings` | GET /api/findings: findings.view, scoped to the projects this account sees, and for a session to its own. |  |
+| GET | `/api/findings` | prefix | `_get_findings` | GET /api/findings: findings.view, scoped to the projects this account sees. |  |
 | GET | `/api/profile` | prefix | `_profile` | The signed-in account's own settings (the Profile page): read on GET, saved on POST, by profiletab.py. |  |
 | GET | `/api/transcripts` | prefix | `_get_transcripts` | GET /api/transcripts?project=NAME: the signed-in account's own conversations with Claude on that project, newest first (transcripts.mine); with audit=DAYS, what they did against the house rules that can be counted instea |  |
 | GET | `/api/snapshots` | prefix | `_get_snapshots` | GET /api/snapshots?project=NAME: the days kept of the project's tree (snapshots.py), newest first, and how many it keeps. | refused: settings |
