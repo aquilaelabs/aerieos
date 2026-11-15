@@ -48,8 +48,8 @@ function convRows(project, rows, theirs = false, editing = ""){
   // times on this page are in, so the log and the page agree.
   const tz = userTZ() || Intl.DateTimeFormat().resolvedOptions().timeZone || "";
   return `<div class="cvlogs">${rows.map(r => !theirs && editing === r.id ? `
-    <div class="artrow cvediting" data-cvrow="${esc(r.id)}"><div class="grow">${convForm(r)}</div></div>` : `
-    <div class="artrow" data-cvrow="${esc(r.id)}">
+    <div class="artrow cvediting" data-key="${esc(r.id)}" data-cvrow="${esc(r.id)}"><div class="grow">${convForm(r)}</div></div>` : `
+    <div class="artrow" data-key="${esc(r.id)}" data-cvrow="${esc(r.id)}">
       <div class="grow">
         <div class="top">${r.label ? `<b class="cvlabel">${esc(r.label)}</b> <span class="dim" title="${esc(fmtTime(r.at * 1000))}">${esc(ago(r.at))}</span>`
             : `<b title="${esc(fmtTime(r.at * 1000))}">${esc(ago(r.at))}</b>`} <span class="pill cvagent" title="the coding agent this conversation is with">${esc(agentById(r.agent)?.name || "Claude")}</span> <span class="dim">${esc(size(r.bytes))}${
@@ -94,29 +94,29 @@ function nbSessionsView({$, nb, project, root}){
       {label: "visible to every session", value: open, omit: !open}] : [],
       mine.length ? "yours alone unless you make one visible: each is the whole exchange" : "");
     // Found by label, note, first words or agent, once there are enough to
-    // look through; the field keeps its caret across the redraw it causes.
+    // look through; the patch (R244) keeps the field, its focus and its
+    // caret across the redraw it causes.
     const shown = mine.filter(matches);
     const finder = mine.length > 5 ? `<div class="field cvfindrow"><input type="search" class="cvfind" maxlength="80" autocomplete="off" spellcheck="false"
       aria-label="find a conversation" placeholder="find by label, note or first words" value="${esc(find)}"></div>` : "";
-    const had = document.activeElement?.classList?.contains("cvfind") ? document.activeElement.selectionStart : null;
     // What the view is for is its empty state (the a-notebook/views rule).
-    list.innerHTML = (mine.length ? finder + `<div class="field mineconv">${shown.length ? convRows(project, shown, false, editing)
+    patch(list, (mine.length ? finder + `<div class="field mineconv">${shown.length ? convRows(project, shown, false, editing)
         : `<div class="hint">None of your conversations here matches that.</div>`}</div>`
       : `<div class="field"><div class="hint nbempty">Your sessions on this space, once you have had one: each is listed here for you alone, to resume, read, download or make visible to every session here.</div></div>`)
       // ...and others' they made visible, which any session here reads too.
       + (theirs.length ? docSection("sessions", "visible", "Made visible by others", String(theirs.length),
-          `<div class="field theirconv">${convRows(project, theirs, true)}</div>`) : "");
+          `<div class="field theirconv">${convRows(project, theirs, true)}</div>`) : ""));
     wireSections(list);
     const f = list.querySelector(".cvfind");
     if (f){
-      f.oninput = () => { find = f.value; drawSessions(); };
-      if (had !== null){ f.focus(); f.setSelectionRange(had, had); }
+      f.oninput = e => { if (e.isComposing) return; find = f.value; drawSessions(); };
+      f.oncompositionend = () => { find = f.value; drawSessions(); };
     }
     // Edit swaps a row's label, note and Keep in; Cancel puts them away.
     list.querySelectorAll("[data-cvedit]").forEach(b => b.onclick = () => { editing = b.dataset.cvedit; drawSessions(); list.querySelector(".cvLabel")?.focus(); });
     list.querySelectorAll("[data-cvcancel]").forEach(b => b.onclick = () => { editing = ""; drawSessions(); });
     list.querySelectorAll("[data-cvsave]").forEach(b => b.onclick = () => save(b));
-    list.querySelector(".cvLabel")?.addEventListener("keydown", e => { if (e.key === "Enter"){ e.preventDefault(); save(list.querySelector("[data-cvsave]")); } });
+    { const lab = list.querySelector(".cvLabel"); if (lab) lab.onkeydown = e => { if (e.key === "Enter"){ e.preventDefault(); save(list.querySelector("[data-cvsave]")); } }; }
     list.querySelectorAll(".cvlogs").forEach((l, i) => paginate(l, ":scope > .artrow", {key: `nbSess${i}:` + project, noun: "conversations"}));
     // The ⋯ of a row, as an action bar's (wireMore), its menu over the page.
     list.querySelectorAll(".acts .more > button").forEach(b => b.onclick = () => {

@@ -946,12 +946,16 @@ itself (the password managers' ignore marks, a title moved to
 `aria-description`, a class it added) and what a person changed (a value
 typed, a box ticked, a fold turned) stay, while a press's own state
 (`disabled`, `aria-busy`, a button's label) is the markup's again at the
-next draw, and `pressBack()` gives a press's button back as its markup has
-it then. What the page's code puts into a drawn surface carries `data-own`
+next draw, and `pressBack()` and `unbusy()` give a press's button back as
+its markup has it then, never the label kept from before the press. A
+patch is not held by an open menu, which it keeps where it is with what is
+typed in it; a document's whole draw still is, in `renderDoc`. What the page's code puts into a drawn surface carries `data-own`
 (a jump bar, a slide marker, a status it fills into a summary) and is left
 where it is; on an element the markup draws, `data-own` says its children
-are its code's (a fold read when it is opened). The Containers and Nodes
-pages draw through it; `patch.mjs` holds every rule.
+are its code's (a fold read when it is opened). The Containers, Nodes, VMs,
+Files, nginx and Library pages, the Git view's branch picker, the Sessions
+view's conversations and the first-run page draw through it, none keeping a
+caret or a focus by hand; `patch.mjs` holds every rule.
 
 ### words-on-the-screen
 

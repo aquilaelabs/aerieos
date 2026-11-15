@@ -530,13 +530,13 @@ function nbGitView({$, nb, project}){
     const still = locked || treeOf().barred || !cur;
     box.hidden = !cur;
     const label = `<span class="gbpickic" aria-hidden="true">${BRANCH_ICON}</span><span class="gbpickname">${esc(cur)}</span>`;
-    if (still){ box.innerHTML = `<span class="gbpickb still">${label}</span>`; return; }
+    if (still){ patch(box, `<span class="gbpickb still">${label}</span>`); return; }
     // A redraw while the picker is open (a commit landing from elsewhere)
-    // keeps it open with what was typed and the caret where it was.
+    // keeps it open with what was typed, patched into what is there (R244),
+    // so the find box keeps its focus and its caret.
     const old = box.querySelector("#gitPickFind"), was = old?.value || "";
-    const typing = !!old && document.activeElement === old, caret = typing ? old.selectionStart : null;
     const open = !!box.querySelector(".gbpickmenu:not([hidden])");
-    box.innerHTML = `<button type="button" class="gbpickb" data-menuopen aria-haspopup="menu" aria-expanded="${open}"
+    patch(box, `<button type="button" class="gbpickb" data-menuopen aria-haspopup="menu" aria-expanded="${open}"
         aria-label="the branch the tree is on: ${esc(cur)}; press to switch or create one">${label}<span class="gbpickcaret" aria-hidden="true">▾</span></button>
       <div class="actmenu gbpickmenu" role="menu"${open ? "" : " hidden"}>
         <input id="gitPickFind" type="search" maxlength="120" autocomplete="off" spellcheck="false" value="${esc(was)}"
@@ -544,7 +544,7 @@ function nbGitView({$, nb, project}){
         <div class="gbpicklist">${local.map(b => `<button type="button" role="menuitem" data-gitpick="${esc(b.name)}"${
           b.head ? ` class="on" aria-current="true"` : ""}>${esc(b.name)}</button>`).join("")}</div>
         <button type="button" role="menuitem" class="gbpicknew" data-gitpicknew hidden></button>
-      </div>`;
+      </div>`);
     const btn = box.querySelector(".gbpickb"), menu = box.querySelector(".gbpickmenu"), find = box.querySelector("#gitPickFind");
     const sift = () => {
       const q = find.value.trim(), ql = q.toLowerCase();
@@ -555,7 +555,6 @@ function nbGitView({$, nb, project}){
     };
     sift();
     if (open) floatAt(menu, btn);
-    if (typing){ find.focus(); try{ find.setSelectionRange(caret, caret); }catch(e){ /* not a text box */ } }
     btn.onclick = () => {
       const opening = menu.hidden;
       closeMore();

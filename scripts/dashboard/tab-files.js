@@ -179,12 +179,12 @@ function renderFilesInto(i){
     return;
   }
   if (fl.error && !fl.roots){
-    paint(d.list, `<div class="field"><div class="notice bad">${esc("could not read the files: " + fl.error)}</div></div>`);
+    patch(d.list, `<div class="field"><div class="notice bad">${esc("could not read the files: " + fl.error)}</div></div>`);
     return;
   }
   const roots = fl.roots || [];
   if (!roots.length){
-    paint(d.list, `<div class="empty">${esc(fl.name || "This node")} has no pool, array or share to browse. Make one on the Storage page, and its files show here.</div>`);
+    patch(d.list, `<div class="empty">${esc(fl.name || "This node")} has no pool, array or share to browse. Make one on the Storage page, and its files show here.</div>`);
     return;
   }
   const rows = fl.error ? [] : flRows();
@@ -215,7 +215,9 @@ function renderFilesInto(i){
     : `<div class="fxempty">${flFilter ? "Nothing here matches the filter." : trash ? "Nothing has been deleted from this place." : "This folder is empty."}</div>`;
   const foot = fl.error ? "" : `<div class="fxfoot">${flTrashTop() ? "What was deleted from this place. Put back returns what is ticked to where it was. " : ""}${
     count}${fl.truncated ? `; the first ${(fl.entries || []).length} are shown, and this folder holds more` : ""}</div>`;
-  paint(d.list, `<div class="fxpage" data-fxnode="${esc(flNode)}">${why}<div class="fxcols">${flPlaces(roots)}<div class="fxmain">${bar}${up}${body}${foot}</div></div></div>`);
+  // Patched into what is there (R244): the filter being typed in, a row
+  // ticked and a fold opened stay where they were through a re-read.
+  patch(d.list, `<div class="fxpage" data-fxnode="${esc(flNode)}">${why}<div class="fxcols">${flPlaces(roots)}<div class="fxmain">${bar}${up}${body}${foot}</div></div></div>`);
   wireFiles(d.el);
   if (rows.length > 120) paginate(d.el.querySelector(".fxtbl"), ".tline", {key: `fx:${flNode}:${flRoot}:${flPath}`, noun: "items"});
 }
@@ -238,8 +240,13 @@ function wireFiles(root){
     flRev++; drawPanes();
   });
   const f = root.querySelector("#flFilter");
-  if (f) f.oninput = () => { flFilter = f.value; flRev++; drawPanes(); requestAnimationFrame(() => {
-    const g = document.querySelector("#flFilter"); if (g){ g.focus(); g.setSelectionRange(g.value.length, g.value.length); } }); };
+  // The patch keeps the box, its focus and its caret where the person put
+  // it; a word an input method is still composing is filtered on once it
+  // is chosen (R244 step 4).
+  if (f){
+    f.oninput = e => { if (e.isComposing) return; flFilter = f.value; flRev++; drawPanes(); };
+    f.oncompositionend = () => { flFilter = f.value; flRev++; drawPanes(); };
+  }
   const pick = root.querySelector("#flPick");
   if (pick) pick.onchange = () => { flUpload([...pick.files]); pick.value = ""; };
   root.querySelectorAll("[data-fxact]").forEach(b => b.onclick = () => pressing(b, () => flAct(b.dataset.fxact, root)));

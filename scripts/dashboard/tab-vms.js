@@ -234,7 +234,6 @@ function renderVmsInto(i){
   if (!el) return;
   el.classList.add("flush");
   if (!vmsData){
-    el.__vmHtml = "";
     el.innerHTML = `<div class="doctab vmtab">${skTpl(`${vmBar(true)}${statTiles([{label: "running", value: GHOST, sub: GHOST},
         {label: "spaces", value: GHOST}, {label: "snapshots", value: GHOST}])}
       <section class="dmcard"><div class="field dmgroup"><b>${skv(8)}</b></div>${skRows(2)}</section>`)}</div>`;
@@ -262,11 +261,10 @@ function renderVmsInto(i){
         : "A space's sessions make them with <code>aerie vm new</code> where its settings allow it."}</div>`
     : !rows.length ? `<div class="empty">No VM matches “${esc(vmsSearch)}”.</div>` : "";
   const head = off || vmsErr || !onNode.length ? "" : vmTiles(onNode, chips.length) + chipBar(chips, vmsChip, "data-vmchip");
-  // A reload that lands while the search is being typed in keeps the box's
-  // focus and its caret, as Containers' does: the box is drawn anew.
-  // Written only when it says something new, as the Containers page is
-  // (the operator, 26 Oct): a read bringing the same VMs leaves the page,
-  // its menus and its focus alone.
+  // Written only when it says something new, and then patched into what is
+  // there (R244), as the Containers page is: a read bringing the same VMs
+  // leaves the page alone, and one bringing news keeps the search box being
+  // typed in, its caret, and a fold or a menu that is open.
   // The domains a node's libvirt has that AerieOS did not make (R165
   // step 1): read here by an administrator, under the node picked, with no
   // button on them; not counted in the tiles or the chips, which are
@@ -274,20 +272,19 @@ function renderVmsInto(i){
   const others = off ? [] : (vmsData.others || []).filter(v => !vmsNode || v.node === vmsNode)
     .filter(v => !q || [v.name, v.node_name].some(x => String(x || "").toLowerCase().includes(q)));
   const html = `<div class="doctab vmtab">${vmBar(false)}${head}${empty || vmGroupsHtml(rows)}${others.length ? vmOthersHtml(others) : ""}</div>`;
-  if (el.__vmHtml === html && el.querySelector(":scope > .vmtab")) return;
-  const typing = document.activeElement?.id === "vmSearch" && el.contains(document.activeElement) ? document.activeElement.selectionStart : null;
-  el.innerHTML = html;
-  el.__vmHtml = html;
+  if (!patch(el, html) && el.querySelector(":scope > .vmtab")) return;
   wireVms(el);
-  const sb = typing === null ? null : el.querySelector("#vmSearch");
-  if (sb){ sb.focus(); try{ sb.setSelectionRange(typing, typing); }catch(e){ /* a type that cannot */ } }
 }
 
 function wireVms(el){
   el.querySelectorAll("[data-vmclone]").forEach(b => b.onclick = () => pressing(b, () => vmCloneAsk(b.dataset.vmclone, b.dataset.vmfrom)));
   const s = el.querySelector("#vmSearch");
-  if (s) s.oninput = () => { vmsSearch = s.value; const at = s.selectionStart; drawPanes();
-    const n = document.querySelector("#vmSearch"); if (n){ n.focus(); n.setSelectionRange(at, at); } };
+  // The patch keeps the box, its focus and its caret; a word an input
+  // method is still composing is filtered on once it is chosen (R244 step 4).
+  if (s){
+    s.oninput = e => { if (e.isComposing) return; vmsSearch = s.value; drawPanes(); };
+    s.oncompositionend = () => { vmsSearch = s.value; drawPanes(); };
+  }
   el.querySelectorAll("[data-vmchip]").forEach(c => c.onclick = () => chipMove(
     () => el, ".row, .sect", () => { vmsChip = c.dataset.vmchip; drawPanes(); }));
   const np = el.querySelector("#vmPickNode");

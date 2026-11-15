@@ -1024,8 +1024,17 @@ function pctBar(said, label = "progress"){
 // refusal is the worst of both.
 function unbusy(btn, word){
   if (!btn) return;
-  btn.disabled = false;
   btn.removeAttribute("aria-busy");
+  // A button a patched surface drew (R244) is given back as its markup has
+  // it now: the redraw the press brought may have drawn it with another
+  // label (a branch switched to) or disabled, and the word kept from before
+  // the press would undo that.
+  if (btn.__markupHtml !== undefined){
+    if (btn.innerHTML !== btn.__markupHtml){ btn.innerHTML = btn.__markupHtml; for (const c of btn.children) patchRecord(c); }
+    pressBack(btn);
+    return;
+  }
+  btn.disabled = false;
   btn.textContent = word;
 }
 

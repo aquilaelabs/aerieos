@@ -417,7 +417,10 @@ await section("A redraw must not take an open menu with it", async () => {
     await page.evaluate(() => { window.__heldHtml = painted.get(document.querySelector('.dmtab').parentElement)?.html; });
     await page.keyboard.press('Escape');
     const drawn = () => painted.get(document.querySelector('.dmtab').parentElement)?.html !== window.__heldHtml;
-    await page.waitForFunction(drawn, null, { timeout: 5000 }).catch(() => {});
+    // Given the suites' own patience: the owed redraw waits on a 250 ms
+    // watch of the menu and then a whole refresh, which a loaded run makes
+    // slower than five seconds (B816).
+    await page.waitForFunction(drawn, null, { timeout: patience(15000) }).catch(() => {});
     const after = await page.evaluate(drawn);
     ok(after, '...and the redraw it was owed happens once the menu shuts');
   }

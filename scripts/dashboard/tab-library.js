@@ -482,7 +482,7 @@ function renderLibraryInto(i){
         may.packs ? `<button type="button" class="primary" data-libadd>${barSaid("Add your own", "Add")}</button>` : ""}${
         clean.length ? `<button type="button" class="danger" data-libclean>Remove</button>` : ""}` : "";
   if (lib.error){
-    paint(d.list, `<div class="field"><div class="notice bad">${esc("could not read the library: " + lib.error)}</div></div>`);
+    patch(d.list, `<div class="field"><div class="notice bad">${esc("could not read the library: " + lib.error)}</div></div>`);
     return;
   }
   // A card not for this node is not drawn (R170 step 9): counted in the head.
@@ -526,7 +526,9 @@ function renderLibraryInto(i){
         ? `<button type="button" data-libsysdeps${stale ? " disabled" : ""} title="install these on ${esc(lib.name || "the node")} without reinstalling the toolchains">Install system packages</button>`
         : "This node's owner installs them: the agent does not administer the machine."}</div></div>` : ""}`;
   libHold = stale ? "this node is not reporting" : pro ? "this node's store is read-only to it" : "";
-  paint(d.list, `<div data-libnode="${esc(libNode)}">${notes}${head}${libFilterBand(kindRows, tierRows, acts)}<div class="field libgroups">${libSections(rows, may)}</div></div>`);
+  // Patched into what is there (R244): the search being typed in keeps its
+  // focus and its caret through the redraw its own key brings.
+  patch(d.list, `<div data-libnode="${esc(libNode)}">${notes}${head}${libFilterBand(kindRows, tierRows, acts)}<div class="field libgroups">${libSections(rows, may)}</div></div>`);
   // The ellipsis on a card whose job runs is ticked by the one timer every
   // page shares (tcTickDots), so a redraw does not restart it.
   if (!tcDotsTimer && d.list.querySelector(".dots")) tcDotsTimer = setInterval(tcTickDots, 400);
@@ -551,7 +553,8 @@ function wireLibrary(root){
   if (typeof wireSignin === "function") wireSignin(root);
   const q = root.querySelector("#libFind");
   if (q){
-    q.oninput = () => { libQ = q.value; libRev++; drawPanes(); keepFocus(q); };
+    q.oninput = e => { if (e.isComposing) return; libQ = q.value; libRev++; drawPanes(); };
+    q.oncompositionend = () => { libQ = q.value; libRev++; drawPanes(); };
   }
   // A chip rearranges the shelf (R192): the cards that stay slide to their
   // places, the ones it leaves out fade away, the ones it brings fade up.
@@ -584,15 +587,6 @@ function wireLibrary(root){
   if (add) add.onclick = () => libWithToolchains(() => tpOpen(""));
   root.querySelectorAll("[data-libact]").forEach(b => b.onclick = () => libAct(b, b.dataset.libact, b.dataset.libkind, b.dataset.libname));
   root.querySelectorAll("[data-liblook]").forEach(b => b.onclick = () => libLook(b.dataset.liblook));
-}
-
-// The search keeps its caret through the redraw its own keystroke brings.
-function keepFocus(q){
-  const at = q.selectionStart;
-  queueMicrotask(() => {
-    const again = document.getElementById("libFind");
-    if (again && document.activeElement !== again){ again.focus(); try{ again.setSelectionRange(at, at); }catch(e){ /* a type without a caret */ } }
-  });
 }
 
 // The pack dialogs read the Toolchains page's rows (tpOpen's Edit finds the

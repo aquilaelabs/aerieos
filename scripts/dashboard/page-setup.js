@@ -85,12 +85,12 @@ function drawSetup(){
                               s.git, s.claude, s.project, s.own?.reported?.console || null, ((s.node || s.own)?.jobs || []).map(j => [j.apply || "", j.step || "", Math.floor((Date.now() / 1000 - (j.started || 0)) / 60)]), !!s.own && [setupDisksSig(dk), (dk?.pools || []).length, dk?.array?.mount || "", (dk?.shares || []).length]]);
   if (sig === setupSig) return;
   setupSig = sig;
-  const typed = setupKeepTyped(el);
+  // Patched into what is there (R244): what was typed, a file picked and
+  // the field being typed in stay where they were through the redraw.
   if (setupWalking()){
-    el.innerHTML = setupWalkHtml(s);
+    patch(el, setupWalkHtml(s));
     wireSetup(el, s);
     setupInOrder(el, s);
-    typed();
     return;
   }
   const card = setupCard;
@@ -98,7 +98,7 @@ function drawSetup(){
   const stick = setupStickOf(s);
   const placed = !stick || !!stick.ready || !!stick.projects_bound;
   let next = 2;
-  el.innerHTML = `<div class="setuppage">
+  patch(el, `<div class="setuppage">
     <div class="setuphead">
       <div class="setuptitle"><h2>Set up AerieOS</h2>${setupTopActs(s)}</div>
       <p>AerieOS works on nodes: machines you enroll, where spaces are kept, built and worked on. One is all it needs to start.</p>
@@ -144,10 +144,9 @@ function drawSetup(){
       <div class="actbar"><button type="button" class="primary" id="setupFinish"${s.node ? "" : " disabled"}>Finish</button></div>
       <div class="hint bad" id="setupWhy" hidden></div>
     </div>
-  </div>`;
+  </div>`);
   wireSetup(el, s);
   setupInOrder(el, s);
-  typed();
 }
 
 // What a disk's row shows, for the redraw test: a disk's temperature and the
@@ -199,30 +198,6 @@ function setupDisksSig(dk){
   return JSON.stringify([!!dk, !!setupDisks.made], null) + JSON.stringify((dk?.disks || []).map(d => [d.name, d.size_mb, d.model, d.serial, d.ssd, d.removable, d.system, d.holds, d.parts, d.by_id, d.smart?.health]));
 }
 
-// Text a person has typed, put back when the page has had to be drawn again:
-// a disk plugged in mid-sentence moves the page, and is no reason to lose it.
-// A file picked is put back as the file itself: a file field's value cannot
-// be set, and trying threw, which left the page half wired, so Land it here
-// did nothing once the page had redrawn under a picked bundle (B776).
-function setupKeepTyped(el){
-  const had = [...el.querySelectorAll("input[id]:not([type=checkbox]):not([type=radio]):not([type=hidden]):not([type=file]), textarea[id]")]
-    .filter(i => i.value).map(i => ({id: i.id, value: i.value, focus: i === document.activeElement, at: i.selectionStart}));
-  const files = [...el.querySelectorAll("input[type=file][id]")].filter(i => i.files?.length).map(i => ({id: i.id, files: i.files}));
-  return () => {
-    had.forEach(h => {
-      const now = el.querySelector("#" + CSS.escape(h.id));
-      if (!now || now.value) return;
-      now.value = h.value;
-      now.dispatchEvent(new Event("input", {bubbles: true}));
-      if (h.focus){ now.focus(); try{ now.setSelectionRange(h.at, h.at); }catch(e){ /* a type with no caret */ } }
-    });
-    files.forEach(h => {
-      const now = el.querySelector("#" + CSS.escape(h.id));
-      if (!now || now.files?.length) return;
-      try{ now.files = h.files; now.dispatchEvent(new Event("change", {bubbles: true})); }catch(e){ /* picked again by hand */ }
-    });
-  };
-}
 
 function wireSetup(el, s){
   el.querySelectorAll("[data-setwalk]").forEach(b => b.onclick = () => setupWalkPick(b.dataset.setwalk));

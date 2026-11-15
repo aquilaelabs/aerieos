@@ -78,7 +78,10 @@ function drawInto(el, html, quiet, keyed){
   // A mark the markup carries itself (Abort's Stopping) is not a press's.
   if (rec && was === html && (html.includes('aria-busy="true"') || !el.querySelector('[aria-busy="true"]'))) return false;
   // Not recorded, so the same markup is still a change on the next poll.
-  if (menuHolds(el)) return false;
+  // A patch keeps an open menu where it is, with what is typed in it, so it
+  // is not held by one (R244 step 5); a document's whole draw still is, in
+  // renderDoc.
+  if (!keyed && menuHolds(el)) return false;
   const arriving = !rec || WAITING.test(rec.html);
   // A surface another writer filled since (a skeleton, an error) is drawn
   // whole: there is nothing of the last draw's to keep.
@@ -127,7 +130,13 @@ function patchAttrs(n){ const o = {}; for (const at of n.attributes) o[at.name] 
 function patchRecord(root){
   if (root.nodeType !== 1) return;
   root.__markup = patchAttrs(root);
-  for (const e of root.querySelectorAll("*")) e.__markup = patchAttrs(e);
+  if (root.tagName === "BUTTON") root.__markupHtml = root.innerHTML;
+  for (const e of root.querySelectorAll("*")){
+    e.__markup = patchAttrs(e);
+    // ...and a button's label, which a press gives back (unbusy) as the
+    // markup has it then rather than as it was when the press began.
+    if (e.tagName === "BUTTON") e.__markupHtml = e.innerHTML;
+  }
 }
 function patchWas(n){ return n.__markup || patchAttrs(n); }
 // What one element is called among its siblings: a row's data-key, which a
@@ -208,6 +217,7 @@ function patchNode(a, b){
   a.__markup = now;
   if (a.tagName === "BUTTON"){
     if (a.innerHTML !== b.innerHTML){ a.innerHTML = b.innerHTML; for (const c of a.children) patchRecord(c); }
+    a.__markupHtml = b.innerHTML;
   } else if (a.tagName === "TEXTAREA"){
     // Its text is its default value: a person's typing is its value, which
     // follows the markup's text only when that changed.

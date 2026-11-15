@@ -64,26 +64,19 @@ async function loadNginx(){
     nginxList = nginxList || [];
   }
   nginxRev++;
-  if (tabs.some(t => t.kind === "nginx")){ const f = nginxKeepTyping(); drawPanes(); nginxRefocus(f); }
+  if (tabs.some(t => t.kind === "nginx")){ nginxKeepTyping(); drawPanes(); }
 }
 
 // What is being typed survives a re-read (B729): the rows are read into the
-// node's draft before the poll's redraw, and the field with focus gets it
-// back with its caret, so a hostname half typed is not swapped for the
-// pulldown it was typed in place of.
+// node's draft before the poll's redraw, which draws the form from it, so a
+// hostname half typed is drawn as the box it is typed in and not as the
+// pulldown it was typed in place of; the patch (R244) keeps that box, its
+// focus and its caret.
 function nginxKeepTyping(){
   const sect = document.querySelector(".nginxtab [data-ngnode]");
   const n = sect && (nginxList || []).find(x => x.node === sect.dataset.ngnode);
-  if (!n || !sect.querySelector("#ngCert")) return null;    // undeployed: no rows to read
+  if (!n || !sect.querySelector("#ngCert")) return;    // undeployed: no rows to read
   nginxReadDraft(sect, n);
-  const a = document.activeElement, row = a?.closest?.(".ngroute");
-  return row && a.dataset.ng ? {i: row.dataset.i, k: a.dataset.ng, pos: a.selectionStart} : null;
-}
-function nginxRefocus(f){
-  const el = f && document.querySelector(`.nginxtab .ngroute[data-i="${f.i}"] [data-ng="${f.k}"]`);
-  if (!el) return;
-  el.focus();
-  if (typeof f.pos === "number"){ try{ el.setSelectionRange(f.pos, f.pos); }catch(e){ /* a select */ } }
 }
 
 async function nginxAct(body){
@@ -450,8 +443,8 @@ function renderNginxInto(i){
   const n = nginxPick();
   const pnodes = nginxList.map(x => ({id: x.node, name: x.name, live: x.live}));
   d.setBar(nginxBar(pnodes, n));
-  d.list.innerHTML = n ? nginxBody(n)
-    : noNodeYet("nginx runs on a node");
+  patch(d.list, n ? nginxBody(n)
+    : noNodeYet("nginx runs on a node"));
   wireNginxTab(d.el);
 }
 
@@ -519,8 +512,10 @@ function wireNginxTab(root){
     const d = nginxDraftOf(n), add = sect.querySelector("[data-ngcertsave]");
     if (add) add.disabled = !(d.cert.trim() && d.key.trim());
   };
-  sect.addEventListener("input", sync);
-  sect.addEventListener("change", sync);
+  // Set, not added: the patch keeps the section across redraws (R244), and
+  // this runs after each one.
+  sect.oninput = sync;
+  sect.onchange = sync;
   // A pair taken off: asked, then saved at once, since what it leaves (a
   // route's pick falling back to its domain's pair, or 80 alone) is drawn
   // from the server's answer.

@@ -201,6 +201,18 @@ await section("a press's own state is the markup's again at the next draw", asyn
     const now = el.querySelector('button');
     return { same, other: { replaced: now !== c, nd: now.dataset.nd, disabled: now.disabled } };
   });
+  const label = await page.evaluate(() => {
+    const el = document.querySelector('#r244');
+    el.innerHTML = ''; patch(el, '<button type="button" data-menuopen><span class="name">master</span></button><i>1</i>');
+    const b = el.querySelector('button'), word = b.textContent;
+    busy(b, 'Creating');
+    patch(el, '<button type="button" data-menuopen><span class="name">picked-new</span></button><i>2</i>');    // the reload the press brought
+    b.innerHTML = 'Creating<span class="dots"></span>';                                                       // ...under a word still on it
+    unbusy(b, word);                                                                                          // the press's end
+    return { name: b.querySelector('.name')?.textContent, busy: b.getAttribute('aria-busy'), disabled: b.disabled };
+  });
+  ok(label.name === 'picked-new' && label.busy === null && !label.disabled,
+     `...and a press that gives its button back gives it as the markup has it now, not the label kept from before the press (${JSON.stringify(label)})`);
   ok(back.same.kept && back.same.after && back.other.replaced && back.other.nd === 'to-sync' && back.other.disabled,
      `...and a press that ends gives its button back as the markup has it now, and another action's button is never the pressed one renamed (${JSON.stringify(back)})`);
   ok(JSON.stringify(r.abort) === '[true,false,"Abort"]' && JSON.stringify(r.measure) === '[true,false,null,"Measure now",false]',
@@ -228,6 +240,18 @@ await section("what the page's code puts in stays when it says so, and nothing e
   ok(!swap.stale && swap.own === 1, `...and a box whose children are its code's is never another element turned into it, old children and all (${JSON.stringify(swap)})`);
   ok(r.nav && r.sst === '3 images' && r.read === '3 images' && r.acts === 'Test now',
      `a jump bar, a status and a fold's read the code marked as its own stay, and a part a press drew by hand follows the markup with nothing stale left (${JSON.stringify(r)})`);
+});
+
+await section("an open menu in the surface is kept open, and the draw lands", async () => {
+  await fresh('<div class="pick"><button type="button" data-menuopen><span class="name">master</span></button><div class="actmenu" role="menu"><input type="search" id="r244find" value=""></div></div>');
+  const r = await page.evaluate(() => {
+    const el = document.querySelector('#r244'), menu = el.querySelector('.actmenu'), f = el.querySelector('#r244find');
+    f.focus(); f.value = 'picked-new';
+    const drew = patch(el, '<div class="pick"><button type="button" data-menuopen><span class="name">picked-new</span></button><div class="actmenu" role="menu"><input type="search" id="r244find" value=""></div></div>');
+    return { drew, name: el.querySelector('.name').textContent, menuKept: el.querySelector('.actmenu') === menu && !menu.hidden, value: f.value, focus: document.activeElement === f };
+  });
+  ok(r.drew && r.name === 'picked-new' && r.menuKept && r.value === 'picked-new' && r.focus,
+     `a draw into a surface with its menu open lands, the menu and what is typed in it kept (${JSON.stringify(r)})`);
 });
 
 await section("a style the markup changes is applied to the element it keeps", async () => {
