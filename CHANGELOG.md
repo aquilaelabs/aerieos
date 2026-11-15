@@ -49,7 +49,11 @@
 - An audit entry or a job whose new id was already taken is written under another; it was dropped, the job with an error (8a8f0b4)
 - A hostname being typed on the nginx page is no longer wiped when the page re-reads (e688169)
 - Ending a session just before the controller restarts still ends it, and a sign-in to a coding agent that was in progress is on its row again after the restart, its link shown and its code taken: both were forgotten with the restart. (ff55bda)
-- A node's token is checked and rotated in one step. Two of a node's calls arriving together could each retire its token, and enrolling a node again or locking it down left a token it had been handed and not yet used able to come alive later. (ff55bda)
+- A node's token is checked and rotated in one step. Two of a node's calls arriving together could each retire its token, and enrolling a node again or locking it down left a token it had been handed and not yet used able to come alive later. Upgrading: `/config` moves to state 24, so a build from before this one no longer starts on it; there is nothing to do (ff55bda)
+
+### Security
+
+- A coding agent's session reaches only what its own verbs use. Its token is refused on every other route of the controller, with the verb that is a session's way to the same thing where there is one; it could read the list of accounts, its person's chat and tab layout, and the controller's settings in the page's own status read, and could type into or end its person's other sessions. A session's token also opens none of the dashboard: `aerie capture shot` and `reel` of the controller's own address say so, and photograph a dev instance, any other page, the emulator or a display as before. Upgrading: nothing to do; a session that photographed the controller's own dashboard photographs a dev instance of it instead (`aerie devapp`). (2241625)
 
 ## 0.9.0-dev.5341: 2026-11-12
 
