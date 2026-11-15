@@ -382,8 +382,8 @@ class SessionAndAccount(unittest.TestCase):
             users._save(d)
 
     def sess(self, uid, project, reads=()):
-        return {"name": f"session:{project}", "role": "user", "projects": [project, *reads],
-                "session": project, "uid": uid, "reads": list(reads)}
+        return {"name": f"session:{project}", "kind": "session", "role": "session", "projects": [project, *reads],
+                "session": project, "seat": uid, "reads": list(reads)}
 
     def test_a_session_is_held_to_its_accounts_roles(self):
         may = self.users.may

@@ -21,9 +21,19 @@ OTHER = {"uid": "u2", "name": "Other"}
 
 
 class Users:
+    # As users.py answers them (R227 step 4): a session carries no account's
+    # id, and the person it works for is its seat.
     @staticmethod
     def uid_of(who):
-        return (who or {}).get("uid", "")
+        return "" if (who or {}).get("session") else (who or {}).get("uid", "")
+
+    @staticmethod
+    def seat_of(who):
+        return (who or {}).get("seat", "") if (who or {}).get("session") else ""
+
+    @classmethod
+    def whose(cls, who):
+        return cls.uid_of(who) or cls.seat_of(who)
 
     @staticmethod
     def account_of(who):
@@ -260,7 +270,7 @@ class Lease(unittest.TestCase):
         saved = (phone.leasing, phone.nodes)
         self.addCleanup(lambda: (setattr(phone, "leasing", saved[0]), setattr(phone, "nodes", saved[1])))
         phone.leasing, phone.nodes = pl, None
-        session = {"name": "Owner", "uid": "u1", "session": "app"}
+        session = {"name": "Owner", "seat": "u1", "session": "app"}
         r, st = phone.verb("use", {"op": "install", "args": {"file": "src/a.apk"}}, session, False)
         self.assertEqual(st, 400)
         self.assertNotIn("asked", r)
@@ -289,7 +299,7 @@ class Owner(Lease):
         self.addCleanup(setattr, pl, "use", real)
         pl.use = lambda proj, op, args: (ran.append((proj, op)) or ({"path": "dist/phone/shot-1.png"}, 200)) \
             if op != "status" else real(proj, op, args)
-        session = {"name": "Owner", "uid": "u1", "session": "app"}
+        session = {"name": "Owner", "seat": "u1", "session": "app"}
         r, st = phone.verb("use", {"op": "shot", "args": {}, "why": "see the settings screen"}, session, False)
         self.assertEqual(st, 200)
         rid = r["asked"]
@@ -318,7 +328,7 @@ class Session(unittest.TestCase):
         phone.leasing, phone.nodes = pl, None
 
         class U(Users):
-            account_of = staticmethod(lambda who: {"name": who.get("aname", ""), "uid": who.get("uid", "")})
+            account_of = staticmethod(lambda who: {"name": who.get("aname", ""), "uid": who.get("uid", "") or who.get("seat", "")})
             is_admin = staticmethod(lambda who: False)
         phone.users = U
         phone._trust.clear()
@@ -331,7 +341,7 @@ class Session(unittest.TestCase):
             if op != "status" else real(proj, op, args)
 
     def shot(self, uid="u3"):
-        sess = {"name": "session:app", "uid": uid, "aname": "Asker", "session": "app"}
+        sess = {"name": "session:app", "seat": uid, "aname": "Asker", "session": "app"}
         return phone.verb("use", {"op": "shot", "args": {}, "why": "look"}, sess, False)[0]
 
     def settle(self, rid):
@@ -359,7 +369,7 @@ class Session(unittest.TestCase):
         first = self.shot()
         phone.decide(first["asked"], True, "u1", "Owner", session=True)
         self.settle(first["asked"])
-        sess = {"name": "session:app", "uid": "u3", "aname": "Asker", "session": "app"}
+        sess = {"name": "session:app", "seat": "u3", "aname": "Asker", "session": "app"}
         r = phone.verb("use", {"op": "touch", "args": {"kind": "tap", "x": 1, "y": 2, "anyapp": True},
                                "why": "glide on the keyboard"}, sess, False)[0]
         self.assertFalse(r["allowed"])
@@ -391,7 +401,7 @@ class Session(unittest.TestCase):
         # stopped parsing and aerie phone ui printed its tail as an ERROR.
         big = "<node/>" * 15000
         pl.use = lambda proj, op, args: ({"code": 0, "out": big}, 200)
-        sess = {"name": "session:app", "uid": "u3", "aname": "Asker", "session": "app"}
+        sess = {"name": "session:app", "seat": "u3", "aname": "Asker", "session": "app"}
         rid = phone.verb("use", {"op": "ui", "args": {}, "why": "read the screen"}, sess, False)[0]["asked"]
         phone.decide(rid, True, "u1", "Owner")
         self.settle(rid)

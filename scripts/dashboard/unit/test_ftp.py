@@ -219,7 +219,7 @@ class Ftp(unittest.TestCase):
         self.assertEqual(users.may(users.get("boss"), "ftp", "alpha"), "", "the space's owner")
         self.assertEqual(users.may(users.get("adm"), "ftp", "alpha"), "", "an administrator (R152)")
         self.assertIn("space's owner or an administrator", users.may(users.get("ann"), "ftp", "alpha"))
-        sess = {"name": "session:alpha", "role": "owner", "projects": ["alpha"], "session": "alpha", "uid": "u_1"}
+        sess = {"name": "session:alpha", "role": "owner", "projects": ["alpha"], "session": "alpha", "seat": "u_1"}
         self.assertIn("session", users.may(sess, "ftp", "alpha"))
 
     def test_a_login_is_no_more_than_the_accounts_roles_give(self):

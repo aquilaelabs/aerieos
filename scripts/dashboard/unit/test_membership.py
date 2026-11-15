@@ -130,7 +130,7 @@ class Membership(unittest.TestCase):
         self.assertEqual(membership.mine(self.me("cy")), [])
 
     def test_a_session_does_none_of_it(self):
-        sess = {"session": "app", "name": "ada", "uid": "u_00000002", "role": "user"}
+        sess = {"session": "app", "name": "ada", "seat": "u_00000002", "role": "session"}
         self.assertFalse(membership.may_manage(sess, "app"))
         self.assertEqual(membership.answer(sess, 1, True)[1], 403)
 

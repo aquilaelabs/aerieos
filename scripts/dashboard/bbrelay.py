@@ -187,7 +187,7 @@ def admit(me, req):
     # names no project still hears the useful half rather than "not a
     # project": having no author is the answer either way.
     if argv and argv[0] == "git" and argv[1:2] not in (["policy"], ["ls-remote"]) \
-            and users.uid_of(me) and not users.git_ready(me, project):
+            and users.whose(me) and not users.git_ready(me, project):
         return None, ({"error": "no name and email for commits yet: set them on your "
                                 "Profile (the gear in the dashboard's header), or for "
                                 "this space alone on its notebook's Settings"}, 403)
@@ -295,8 +295,8 @@ def run(me, req, project):
     # session last read it, and whether a change was its own (#26, #27).
     # Only for a session token: a person at a node's console writes as a
     # person, and a person's writes are news to every session.
-    if me.get("session") and me.get("uid"):
-        env["BB_ACCOUNT_UID"] = me["uid"]
+    if users.seat_of(me):
+        env["BB_ACCOUNT_UID"] = users.seat_of(me)
     else:
         env.pop("BB_ACCOUNT_UID", None)
     if field(req, "from") == "session":
@@ -318,14 +318,14 @@ def run(me, req, project):
         # A session's git is its person's, with their own token, while they
         # are signed in (R159): signed out everywhere, aerie git waits for them,
         # and a project nobody signed in gave a token says so.
-        u = gitcreds.usable(project, str(me.get("uid") or ""))
+        u = gitcreds.usable(project, users.whose(me))
         # The project's git policy may turn the hold off (the Git view's
         # "Hold a push that looks sensitive"): the push then goes unread.
         hold = prefs.get(project)["gitpol"].get("scan") != "off"
         # A session's push is held to the project's Change CI workflow files
         # (B559): a workflow it wrote runs with the repository's secrets.
         wf = not me.get("session") or not forgeaccess or forgeaccess.override(project).get("workflows") != "deny"
-        r = gitrelay.run(project, str(cwd), argv[1], argv[2:], scan=hold, uid=str(me.get("uid") or ""),
+        r = gitrelay.run(project, str(cwd), argv[1], argv[2:], scan=hold, uid=users.whose(me),
                          token_why=u.get("why", ""), workflows=wf)
         if "error" in r:
             return r, 400
@@ -335,7 +335,7 @@ def run(me, req, project):
             # node's bb waits on the ask the way aerie root run does, and the
             # push runs here when they approve, its apply handed back then.
             a = phone.ask_push(project, str(cwd), argv[2:], r["held"],
-                               asker_uid=me.get("uid") or "", asker_name=me.get("name") or "",
+                               asker_uid=users.whose(me), asker_name=me.get("name") or "",
                                asker_admin=users.is_admin(me))
             if a.get("error"):
                 return {"error": a["error"]}, 400

@@ -101,7 +101,7 @@ class Gate(unittest.TestCase):
         cls.ns = ns
 
     def test_a_session_is_refused_everywhere_but_its_table(self):
-        gate, sess = self.ns["route_gate"], {"name": "session:alpha", "session": "alpha", "role": "user", "uid": "u_1"}
+        gate, sess = self.ns["route_gate"], {"name": "session:alpha", "kind": "session", "session": "alpha", "role": "session", "seat": "u_1"}
         for name in sorted(GATES):
             why = gate(name, sess)
             if name in SESSION:
@@ -113,7 +113,7 @@ class Gate(unittest.TestCase):
     def test_the_refusal_says_what_a_session_does_instead(self):
         # The words the handlers used to answer a session with themselves:
         # which verb is its own way to the same thing.
-        gate, sess = self.ns["route_gate"], {"name": "session:alpha", "session": "alpha", "role": "user", "uid": "u_1"}
+        gate, sess = self.ns["route_gate"], {"name": "session:alpha", "kind": "session", "session": "alpha", "role": "session", "seat": "u_1"}
         for name, words in (("_git_act", "aerie git"), ("_pending", "cannot answer for itself"), ("_artifacts", "aerie capture prune"),
                             ("_rules", "being held to"), ("_schedules", "a session has no say"), ("_roadmap", "aerie roadmap"),
                             ("_bugs", "aerie bug")):

@@ -200,14 +200,33 @@ def uid_of(u):
     (ALL), which are nobody: a background sweep has no tab strip, and every
     per-account store treats "" as "do not store".
 
-    A session's token answers its PERSON's id (it is how a node fetches that
-    account's own sign-in and how a session's notes are kept as theirs), so
-    this is not the test for "a person is asking": a handler that is a
-    person's alone refuses `me.get("session")` as well, as the Profile page
-    does (B764: this said a session answered "", and one handler believed it).
+    A session answers "" too (R227 step 4): it is a caller of its own kind
+    and carries no account's id, so whatever keeps something by this id keeps
+    nothing for a session unless its handler asked whose() by name. It
+    answered its person's id until then, and each handler that was a
+    person's alone had to remember to refuse a session as well (B764).
     """
+    if (u or {}).get("session"):
+        return ""
     uid = (u or {}).get("uid") or ""
     return "" if uid == "\u0000server" else str(uid)
+
+
+def seat_of(u):
+    """The id of the person a session works for, "" for anything that is not
+    a session or was minted for nobody: whose terminal it is. Asked by name
+    where a session's route acts for that person (their memories and
+    conversations on the space, their git token, the phone lent to them,
+    what a hook files as theirs) and nowhere else."""
+    u = u or {}
+    return str(u.get("seat") or "") if u.get("session") else ""
+
+
+def whose(u):
+    """The person a caller is, or works for: an account's own id, a
+    session's seat. For the routes a session's table names, where the work
+    is the person's whoever's hands did it."""
+    return uid_of(u) or seat_of(u)
 
 
 def starts_unpinned(u):
@@ -236,7 +255,7 @@ def tmux_prefix(u):
     conversation per project is the rule, and who holds it is a record the
     dashboard keeps rather than a name (roadmap #26 step 2).
     """
-    uid = uid_of(u)
+    uid = whose(u)
     return f"{uid}~" if uid and uid != owner_uid() else ""
 
 
@@ -266,9 +285,9 @@ def account_of(u):
     account it was minted for, found by uid. A session has an author too,
     and it is the person's."""
     u = u or {}
-    if u.get("session") and u.get("uid"):
+    if u.get("session") and u.get("seat"):
         for name, rec in load()["users"].items():
-            if isinstance(rec, dict) and rec.get("uid") == u["uid"]:
+            if isinstance(rec, dict) and rec.get("uid") == u["seat"]:
                 return {**rec, "name": name}
     return u
 
@@ -993,8 +1012,11 @@ def session_principal(tok):
     want = hmac.new(_session_key(), signed.encode(), hashlib.sha256).hexdigest()[:32]
     if not hmac.compare_digest(sig, want):
         return None
-    return {"name": f"session:{project}", "role": "user",
-            "projects": list(dict.fromkeys([project, key_of(project)])), "session": project, "uid": uid}
+    # A caller of its own kind (R227 step 4): no role's rights and no
+    # account's id. `seat` names the person it works for, which the routes a
+    # session's table names ask for by name (seat_of, whose).
+    return {"name": f"session:{project}", "kind": "session", "role": "session",
+            "projects": list(dict.fromkeys([project, key_of(project)])), "session": project, "seat": uid}
 
 
 # --- editing ---------------------------------------------------------------

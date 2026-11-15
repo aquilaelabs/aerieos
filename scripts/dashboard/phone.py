@@ -1728,7 +1728,7 @@ def verb(action, req, who, fresh):
     a change that succeeds carries the tab's fresh data, fresh(), which the
     server reads with this request's own address."""
     act = action
-    uid, me = users.uid_of(who), who.get("name") or "somebody"
+    uid, me = users.whose(who), who.get("name") or "somebody"
     nid = field(req, "node")
     if act in ("pair", "connect", "disconnect", "forget"):
         if nodes is None or not nid or not nodes.node(nid):
@@ -1911,7 +1911,7 @@ def verb(action, req, who, fresh):
                                      rec.get("owner") or "", rec.get("owner_name") or "its owner",
                                      asker=acct.get("name") or who.get("name") or "",
                                      extra={"op": str(op)[:20], "args": args,
-                                            "asker_uid": str(who.get("uid") or "")}))
+                                            "asker_uid": users.whose(who)}))
         return {"asked": r["id"], "to": r["to"], "allowed": bool(r.get("allowed"))}, 200
     elif act == "allow" or act == "deny":
         r = decide(req.get("id"), act == "allow", uid, me, admin=users.is_admin(who),

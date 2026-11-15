@@ -3821,7 +3821,7 @@ def _diag_watch(project, uid):
             return None
         if not settings.get("debug_mode") or not prefs.get(project)["diag"]:
             return None
-        me = users.account_of({"session": project, "uid": uid})
+        me = users.account_of({"session": project, "seat": uid})
         if not me.get("name") or users.may(me, "debug"):
             return None
         return reports.listing()
@@ -6767,7 +6767,7 @@ class Handler(BaseHTTPRequestHandler):
         _writing.who = u
         # Whose work this request's git is (R159): the person, or the person
         # a session was started for; and their sign-in, seen.
-        gitcreds.ACTING.set(users.uid_of(u) if u else "")
+        gitcreds.ACTING.set(users.whose(u) if u else "")
         if u and u.get("lid"):
             # Bound to the browser it was made in (R158 step 8): from
             # another, or once ended from Profile, the cookie is nobody's.
@@ -6895,7 +6895,7 @@ class Handler(BaseHTTPRequestHandler):
         why = users.may(self._who(), "write", name)
         # ...and a project its owner has locked is nobody else's to change
         # (R119), whoever they are.
-        if not why and (bad := projects.locked_out(name, users.uid_of(self._who()))):
+        if not why and (bad := projects.locked_out(name, users.whose(self._who()))):
             why = bad["error"]
         if not why:
             return False
@@ -9457,7 +9457,7 @@ class Handler(BaseHTTPRequestHandler):
         name = q.get("project", [""])[0]
         if self._not_project(name):
             return
-        return self._json(brief.view(name, users.uid_of(self._who())))
+        return self._json(brief.view(name, users.whose(self._who())))
 
     def _brief(self, req):
         """POST /api/brief: the first Claude press's Build it and Start
@@ -9472,7 +9472,7 @@ class Handler(BaseHTTPRequestHandler):
         # works on it.
         if field(req, "action") != "take" and self._readonly(name):
             return
-        return self._json(*brief.verb(name, req, users.uid_of(who), who.get("name") or "somebody",
+        return self._json(*brief.verb(name, req, users.whose(who), who.get("name") or "somebody",
                                       bool(who.get("session"))))
 
     def _get_design(self):
@@ -9617,7 +9617,7 @@ class Handler(BaseHTTPRequestHandler):
         if self._not_project(q.get("project", [""])[0]):
             return
         got = memory.payload(q.get("project", [""])[0], sessions_anywhere(),
-                             home=home_for(users.uid_of(self._who())))
+                             home=home_for(users.whose(self._who())))
         return self._json(got if got is not None
                           else {"error": "not a space"}, 400 if got is None else 200)
 
@@ -9790,7 +9790,7 @@ class Handler(BaseHTTPRequestHandler):
                         # stores' rule, not this one's.
                         who = self._who() or {}
                         if who.get("session"):
-                            session_mark_own(who["session"], who.get("uid") or "", who)
+                            session_mark_own(who["session"], users.seat_of(who), who)
                         elif path.startswith("/api/memory") and _memory_written(req, self._held):
                             _mem_edited(field(req, "project"))
                 finally:
@@ -10184,7 +10184,7 @@ class Handler(BaseHTTPRequestHandler):
         me = self._who()
         if not me:
             return self._json({"error": "not signed in"}, 401)
-        uid = me.get("uid") if me.get("session") else ""
+        uid = users.seat_of(me)
         if not uid:
             return self._json({"error": "a Claude sign-in is reported with a session token "
                                         "minted for an account, the one a node-bound "
@@ -10240,7 +10240,7 @@ class Handler(BaseHTTPRequestHandler):
         what its own account could open through the proxy, and nothing else.
         """
         who = self._who() or {}
-        if not who.get("session") or not users.uid_of(who):
+        if not who.get("session") or not users.seat_of(who):
             return self._json({"error": "a terminal on a node is granted to a session token "
                                         "minted for an account, and this is not one"}, 403)
         me = users.account_of(who)
@@ -10309,7 +10309,7 @@ class Handler(BaseHTTPRequestHandler):
         me = self._who()
         if not me:
             return self._json({"error": "not signed in"}, 401)
-        uid = me.get("uid") if me.get("session") else ""
+        uid = users.seat_of(me)
         project = me.get("session") or ""
         if not uid or not project:
             return self._json({"error": "a hook posts with a session token minted for an "
@@ -10344,7 +10344,7 @@ class Handler(BaseHTTPRequestHandler):
             wssync.changed(project)
             out = (out[0] | {"sync_rev": wssync.rev_of(project)}, out[1])
         if before is not None:
-            session_mark_own(project, me.get("uid") or "", me, since=before)
+            session_mark_own(project, users.seat_of(me), me, since=before)
         return self._json(*out)
 
     def _agent(self):
@@ -10666,7 +10666,7 @@ class Handler(BaseHTTPRequestHandler):
         act = field(req, "action")
         # "send" is a write to the roadmap (it marks a step sent) and starts a
         # session's turn, so it goes with the rest.
-        if (bad := projects.locked_out(name, users.uid_of(self._who()))):
+        if (bad := projects.locked_out(name, users.whose(self._who()))):
             return self._json(bad, 409)
         # Closing a batch its session will never close (B198) is an
         # administrator's, like the other decisions about other people's work.
@@ -10679,7 +10679,7 @@ class Handler(BaseHTTPRequestHandler):
         """The Phone page's data as this request reads it: who is asking, the
         nodes they may see (_node_scope) and this browser's own address and
         kind, which phone.tab_view decides whether to offer."""
-        return phone.tab_view(users.uid_of(self._who()), admin=users.is_admin(self._who()),
+        return phone.tab_view(users.whose(self._who()), admin=users.is_admin(self._who()),
                               project=(self._who() or {}).get("session") or "",
                               node=node, probe=probe, scope=self._node_scope(),
                               ua=self.headers.get("User-Agent", ""),
@@ -11748,7 +11748,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self._refused("rules", name) or self._readonly(name):
             return None
-        if (bad := projects.locked_out(name, users.uid_of(self._who()))):
+        if (bad := projects.locked_out(name, users.whose(self._who()))):
             return self._json(bad, 409)
         return self._json(*rules.verb(name, field(req, "action"), req))
 
@@ -11793,7 +11793,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(*testreg.verb(name, act, req))
         if self._readonly(name):
             return None
-        if (bad := projects.locked_out(name, users.uid_of(self._who()))):
+        if (bad := projects.locked_out(name, users.whose(self._who()))):
             return self._json(bad, 409)
         return self._json(*testreg.verb(name, act, req))
 
@@ -11822,7 +11822,7 @@ class Handler(BaseHTTPRequestHandler):
         # so an action added later is a write until somebody says otherwise.
         if field(req, "action") not in ("history", "finished") and self._readonly(name):
             return None
-        if (bad := projects.locked_out(name, users.uid_of(self._who()))):
+        if (bad := projects.locked_out(name, users.whose(self._who()))):
             return self._json(bad, 409)
         return self._json(*bugs.verb(name, field(req, "action"), req, sessions=sessions_anywhere,
                                      prefix=users.tmux_prefix(self._who())))
@@ -11837,7 +11837,7 @@ class Handler(BaseHTTPRequestHandler):
         # read had no project check at all (the audit of 26 Sep).
         if self._not_project(proj):
             return None
-        if (bad := projects.locked_out(proj, users.uid_of(self._who()))):
+        if (bad := projects.locked_out(proj, users.whose(self._who()))):
             return self._json(bad, 409)
         # Seeing a project and being able to change it are different
         # questions now (users.may_work): an administrator is shown every
@@ -11847,7 +11847,7 @@ class Handler(BaseHTTPRequestHandler):
             return None
         # Whose memories: the reader's own home, never the owner's (B67).
         # A session's are the account's that started it.
-        return self._json(*memory.verb(proj, act, req, home_for(users.uid_of(self._who()))))
+        return self._json(*memory.verb(proj, act, req, home_for(users.whose(self._who()))))
 
     def _custom(self, req):
         """Save or delete one of the operator's own command lists:
@@ -11879,7 +11879,7 @@ class Handler(BaseHTTPRequestHandler):
             if not users.may_work(me, into):
                 return self._json({"error": f"{registry.label(into)} is not on your list of spaces: "
                                             "add it to your own list on the Users page first"}, 403)
-            if (bad := projects.locked_out(into, users.uid_of(me))):
+            if (bad := projects.locked_out(into, users.whose(me))):
                 return self._json(bad, 403)
             return self._json(*projects.create_from_dialog(
                 {**req, "_uid": users.uid_of(me)}, env=users.git_env(me, projects.sanitize_name(field(req, "name"))),
@@ -11963,7 +11963,7 @@ class Handler(BaseHTTPRequestHandler):
         included: on its own project and on one its project reads, it
         lists the account's conversations there for `aerie transcripts`."""
         me = self._who()
-        uid = users.uid_of(me) if me else ""
+        uid = users.whose(me) if me else ""
         if not me or not uid:
             return self._json({"error": "not an account"}, 403)
         q = urllib.parse.parse_qs(self.path.partition("?")[2])
@@ -11999,7 +11999,7 @@ class Handler(BaseHTTPRequestHandler):
         label), since it changes nothing but what its person reads of their
         own conversations."""
         me = self._who()
-        uid = users.uid_of(me) if me else ""
+        uid = users.whose(me) if me else ""
         if not me or not uid:
             return self._json({"error": "not an account"}, 403)
         name, sid, act = field(req, "project"), field(req, "id"), field(req, "action")
@@ -12035,7 +12035,7 @@ class Handler(BaseHTTPRequestHandler):
         account's own transcripts directory and nowhere else, so another
         account's id is simply not found."""
         me = self._who()
-        uid = users.uid_of(me) if me else ""
+        uid = users.whose(me) if me else ""
         if not me or not uid:
             return self._json({"error": "not an account"}, 403)
         q = urllib.parse.parse_qs(self.path.partition("?")[2])
@@ -12446,7 +12446,7 @@ class Handler(BaseHTTPRequestHandler):
         # either (B101): the Save was live for it, and went through.
         if self._not_project(name) or self._readonly(name):
             return
-        if (bad := projects.locked_out(name, users.uid_of(self._who()))):
+        if (bad := projects.locked_out(name, users.whose(self._who()))):
             return self._json(bad, 409)
         return self._json(*changelog.editor_verb(name, req))
 
@@ -12599,7 +12599,7 @@ class Handler(BaseHTTPRequestHandler):
             # ticked Include it (the operator, 2 Oct): theirs only, found and
             # rendered here, never named by the page.
             if not sess and req.get("include_conversation"):
-                uid = users.uid_of(me)
+                uid = users.whose(me)
                 rows = transcripts.mine(uid, [proj])
                 if rows:
                     text, _ = transcripts.render(uid, proj, rows[0]["id"])

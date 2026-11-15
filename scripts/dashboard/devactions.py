@@ -1856,7 +1856,7 @@ def request(project, instance, action, req, *, me, principal, dial="", test_cmd=
     # press the same button, naming the instance the server resolved. Reads
     # and the env editor are not news, so they are not on this list.
     if action in ("up", "down", "rebuild", "update", "remove", "abort"):
-        say(project, users.uid_of(me),
+        say(project, users.whose(me),
             f"{principal[len('user:'):]} ran {action} on "
             f"{project}" + (f" ({instance})" if instance != devapp.MAIN else ""))
     with acting_as(principal):
