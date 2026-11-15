@@ -8,6 +8,7 @@
 - Declared downloads, pack format 3: a pack's manifest can list every file its install takes from somewhere else, each with its address and its sha256 (`install.fetch`). AerieOS fetches each and holds it to that sha256 before the install runs, and the install steps then run with no network, so nothing a pack did not declare can arrive; a node that cannot cut the network for a step installs the pack all the same and says so on the job and on the pack's page. Look says what a pack declares, or that it declares none, before it is added (95bebe6)
 - A managed node cuts the network for a declared pack's install steps even where its system keeps network namespaces from ordinary accounts (Ubuntu does): the node's agent installs a small root helper, `bb-netcut`, with one sudo rule for the account its jobs run as, and the helper runs each step as that account again with no network. A node whose agent is not root still installs such a pack with the network and says so. (d987f70)
 - An agent update that does not start no longer strands its node. The node runs the new agent once to see that it loads before installing it, keeps the one it replaces, and puts that one back by itself when the new one cannot be loaded, crashes three times, or runs ten minutes without reaching its controller. A node that went back says so on the bell and on its row, and is not sent that build again until Update agent is pressed. The first update onto this build is made the old way; every one after it is covered. (6e5a538)
+- A machine's own console can switch off every root command the controller sends: after `sudo aerieos-agent root-asks off` at the machine, that node refuses `aerie root run` and a schedule as root whoever allowed it, the controller says so before anybody is asked, and the node's row says it is off and where it is switched back on. What AerieOS does as root by name goes on, and Docker on a node that runs containers is still root's. (ff55bda)
 
 ### Changed
 
@@ -30,6 +31,8 @@
 - A release's Android app is signed from the run that builds it while that run is still going, once the release exists, so a workflow can build the app and make the release in one run (cadab82)
 - `aerie version` on a commit tagged as a pre-release (a dev build, a candidate) says what the tag says, where it said a dev build's number with the commit after it (59da71e)
 - Every release of AerieOS is built by one run that passes lint, the unit tests and every browser suite before anything is published, and makes the release once, with every file, at its end (0d187b2, cadab82)
+- The configuration's backup carries the install key, sealed under the backup password with the rest, so the password alone restores a copy whole, its sign-ins and tokens included. Copies written before are marked without the install key in Backup copies and on the first-run restore page. (ff55bda)
+- A node that pinned the release key keeps the tools root installs from the bundle (the machine's helper, the session's, the one that cuts a pack's install off the network) only when the release signed them, as it takes an agent update: otherwise root goes on with the copy it has and the job says why. A machine whose console allows unsigned builds takes them from a branch's build as before. (ff55bda)
 
 ### Fixed
 
@@ -45,6 +48,8 @@
 - A repository whose daily snapshots were switched off before that switch was removed is no longer left off with nothing to turn it back on: it keeps 0 days, which the days field shows and changes. A person's terminal colors for one space, which nothing read any more, are no longer stored. The step that was to do both in the last release read a file by the wrong name and changed nothing. Upgrading: `/config` moves to state 22, so a build from before this one no longer starts on it; a repository that had the switch off shows Snapshots kept for 0 days, and its snapshots stay (8a8f0b4)
 - An audit entry or a job whose new id was already taken is written under another; it was dropped, the job with an error (8a8f0b4)
 - A hostname being typed on the nginx page is no longer wiped when the page re-reads (e688169)
+- Ending a session just before the controller restarts still ends it, and a sign-in to a coding agent that was in progress is on its row again after the restart, its link shown and its code taken: both were forgotten with the restart. (ff55bda)
+- A node's token is checked and rotated in one step. Two of a node's calls arriving together could each retire its token, and enrolling a node again or locking it down left a token it had been handed and not yet used able to come alive later. (ff55bda)
 
 ## 0.9.0-dev.5341: 2026-11-12
 
