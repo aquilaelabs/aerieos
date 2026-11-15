@@ -753,8 +753,15 @@ await section("the configuration plane on the row", async () => {
   await pickNode(page, minted.id);
   const ROW = `.nodestab .ndrow[data-node="${minted.id}"]`;
   await page.waitForSelector(`${ROW} .ndconf`, { timeout: 15000 });
-  ok(await page.$(`${ROW} .ndstale`) === null && await page.$(`${ROW} [data-nd="update-agent"]`) === null,
-     'a node running the shipped agent wears no update pill and is offered no update');
+  const pillSaid = await page.evaluate(sel => { const r = document.querySelector(sel), p = r?.querySelector('.ndstale'), b = r?.querySelector('[data-nd="update-agent"]');
+    const n = (nodesList || []).find(x => x.id === r?.dataset.node);
+    const list = r?.parentElement, rec = list && painted.get(list);
+    return { pill: p?.textContent || null, button: b?.textContent || null, pillMarkup: p ? !!p.__markup : null, node: n?.agent?.version, digest: n?.agent?.digest?.slice(7, 15),
+             ships: nodesAgent?.version, shipsDigest: nodesAgent?.digest?.slice(7, 15), stale: n ? nodeStale(n) : null,
+             ...(b ? { rows: document.querySelectorAll('.ndrow').length, inMarkup: rec ? /update-agent/.test(rec.html) : 'no record', btnRec: b.__markup ? JSON.stringify(b.__markup) : 'unrecorded',
+                       path: (() => { const out = []; for (let e = b; e && e !== r; e = e.parentElement) out.push(e.tagName + '.' + (e.className || '').split(' ').join('.') + (e.__markup ? '' : '!')); return out.join(' < '); })() } : {}) }; }, ROW);
+  ok(pillSaid.pill === null && pillSaid.button === null,
+     `a node running the shipped agent wears no update pill and is offered no update (${JSON.stringify(pillSaid)})`);
   // The controller is not on this tab at all now, a stronger version of the
   // claim this used to make by picking it and finding no storage section and
   // no agent to update.
@@ -1437,8 +1444,11 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     ok(page.dialogs.length === 1 && /Remove the space copies/.test(page.dialogs[0])
        && off.workspace === 'off' && off.clean && told.mode === 'off' && told.clean === off.clean,
        `once everything is up, Clean up asks, marks the node off and hands the agent its clean-up by a token (${JSON.stringify([off.workspace, told.mode, !!told.clean])})`);
-    ok(await page.$eval(`${ROW} [data-nd="to-sync"]`, b => b.disabled),
-       '...and Move to a synced copy waits while the copies are being removed');
+    const toSync = await page.$eval(`${ROW} [data-nd="to-sync"]`, b => {
+      const list = b.closest('.ndrow')?.parentElement, html = (list && painted.get(list)?.html) || '';
+      return { disabled: b.disabled, el: b.outerHTML.slice(0, 160), drawn: (html.match(/<button[^>]*data-nd="to-sync"[^>]*>/) || ['none'])[0] };
+    });
+    ok(toSync.disabled, `...and Move to a synced copy waits while the copies are being removed (${JSON.stringify(toSync)})`);
     await beat({ sync_clean: { token: off.clean, freed: 5 * 1048576, error: '' } });
     await page.evaluate(() => loadNodes());
     await page.waitForFunction(sel => /copies were removed, 5 ?MB freed/.test(document.querySelector(sel)?.textContent || ''),
@@ -3492,7 +3502,12 @@ await section("Uninstall from the row", async () => {
     // ...and while that job runs the box stays ticked, ghosted, rather than
     // going back to the machine's old state under "Applying".
     await page.evaluate(() => loadNodes());
-    await page.waitForFunction(s => document.querySelector(s)?.querySelector('[data-nd="gpu-apply"]')?.disabled, sect, { timeout: 15000 });
+    await page.waitForFunction(s => document.querySelector(s)?.querySelector('[data-nd="gpu-apply"]')?.disabled, sect, { timeout: 15000 }).catch(async e => {
+      console.log('[nodes] gpu-apply not ghosted: ' + JSON.stringify(await page.evaluate(s => { const b = document.querySelector(s)?.querySelector('[data-nd="gpu-apply"]');
+        const list = b?.closest('.ndrow')?.parentElement, html = (list && painted.get(list)?.html) || '';
+        return { el: b?.outerHTML.slice(0, 200), drawn: (html.match(/<button[^>]*data-nd="gpu-apply"[^>]*>/) || ['none'])[0], rec: b?.__markup }; }, sect)));
+      throw e;
+    });
     const mid = await sw();
     ok(mid.emu && mid.emuDead, `while the emulator's job runs its box stays ticked and ghosted (${JSON.stringify(mid)})`);
     if (ej?.id) await napi('/api/v1/jobs', { action: 'cancel', id: ej.id });

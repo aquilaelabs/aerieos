@@ -306,7 +306,8 @@ function dmStatsPatch(){
     const t = document.createElement("template");
     t.innerHTML = dmStatStrip(d);
     const fresh = t.content.firstElementChild;
-    if (fresh && fresh.outerHTML !== el.outerHTML) el.replaceWith(fresh);
+    // Recorded as markup, so the page's next patch takes it for its own.
+    if (fresh && fresh.outerHTML !== el.outerHTML){ patchRecord(fresh); el.replaceWith(fresh); }
   }
   for (const el of document.querySelectorAll("[data-dmcpu]")){
     const st = all[el.dataset.dmcpu];
@@ -1984,7 +1985,7 @@ function dmRowsHtml(ins, job, blind){
       </div>
       ${docSection("docker", `wire:${d.project}|${d.instance}`,
                    "Ports and mounts", dmPortsSaid(d),
-                   `<div class="wire">${skel("rows", 2, "reading…")}</div>`, {open: false})}
+                   `<div class="wire" data-own>${skel("rows", 2, "reading…")}</div>`, {open: false})}
 `;
     return dmRowWrap(d, st, inner, blind);
   }).join("");
@@ -2110,7 +2111,7 @@ async function loadDockerImages(det){
   const dang = (j.images || []).filter(i => i.dangling).length;
   // The section's status, once there is one: docSection draws none for "".
   let st = det.querySelector(":scope > summary .sst");
-  if (!st){ st = document.createElement("span"); st.className = "sst"; det.querySelector(":scope > summary")?.appendChild(st); }
+  if (!st){ st = document.createElement("span"); st.className = "sst"; st.setAttribute("data-own", ""); det.querySelector(":scope > summary")?.appendChild(st); }
   st.textContent = `${(j.images || []).length} image${(j.images || []).length === 1 ? "" : "s"}, ${(j.volumes || []).length} volume${(j.volumes || []).length === 1 ? "" : "s"}`;
   box.innerHTML = statTiles([
     {label: "images", value: (j.images || []).length, sub: humanBytes(df("Images").size || (j.images || []).reduce((n, i) => n + i.size, 0))},
@@ -2221,7 +2222,9 @@ function dmWireRows(el, list = dockerList){
       const willOpen = !d.open;
       slideDetails(d, willOpen);
       if (willOpen && d.querySelector(".dmimgbox")) loadDockerImages(d);
-      else if (willOpen && !d.dataset.done) loadWire(d);
+      // Read on every opening: the page keeps the fold across its redraws
+      // (R244), so it shows what was read last while it reads again.
+      else if (willOpen) loadWire(d);
     };
     // A fold left open across a redraw is drawn back as "reading…": its
     // read is started again, unless one is already on its way to it.
@@ -2526,8 +2529,7 @@ function dmWireRows(el, list = dockerList){
 // The search (R216): what was typed, where the caret was when the redraw
 // took the box, and whether a redraw since was the search's own (only
 // then is the focus put back, so a redraw for a revision does not steal it).
-let dmSearch = "", dmSearchCaret = null, dmSearchTimer = null, dmSearchAt = 0;
-const dmSearchTouched = () => Date.now() - dmSearchAt < 1500;
+let dmSearch = "", dmSearchTimer = null;
 function dmMatch(r){
   const q = dmSearch.trim().toLowerCase();
   if (!q) return true;
@@ -2762,7 +2764,7 @@ function dmTiles(t){
 // container uses.
 function dmImagesSection(){
   return state?.can?.admin ? docSection("docker", "images", "Images and volumes", "",
-    `<div class="dmimgbox">${skel("rows", 3, "reading…")}</div>`, {open: false, fold: true}) : "";
+    `<div class="dmimgbox" data-own>${skel("rows", 3, "reading…")}</div>`, {open: false, fold: true}) : "";
 }
 // ...and the page's head under them: when the images were checked.
 function dmStatus(d){
@@ -2811,7 +2813,6 @@ function renderDockerInto(i){
     // builders given nothing (the operator, 18 Oct: a template written
     // beside the page fell behind it): the bar, the tiles, the status line,
     // then the rows.
-    el.__dmHtml = "";
     // The old system's containers and VMs need nothing of the daemon's
     // answer, so they are drawn while it is on its way.
     const old = dmOldApps();
@@ -2964,10 +2965,11 @@ function renderDockerInto(i){
   // Written only when it says something new (the operator, 26 Oct: the page
   // was written again on every read, its open folds read again, the pointer's
   // place lost): a read that brings the same list leaves the page alone.
-  if (el.__dmHtml === html && el.querySelector(":scope > .dmtab")){ dmSyncDialogs(el); return; }
+  // ...and one that does is patched into what is there (R244): a person's
+  // typing in the search or a row's settings, an open fold and what was read
+  // into it, and an open dialog all stay where they were.
+  if (!patch(el, html) && el.querySelector(":scope > .dmtab")){ dmSyncDialogs(el); return; }
   dmNoteOpen(el);
-  el.innerHTML = html;
-  el.__dmHtml = html;
   gateDocker(el, off);
   wireAdoptApps(el);
   // The asks answer through the phone's endpoint, which holds the one list of
@@ -2989,21 +2991,15 @@ function renderDockerInto(i){
     chipMove(() => document.querySelector(".pane .doc.on .dmtab"), ".dmcard, .tbl > .row, .tbl .rows > .row",
              () => { dmChip = c.dataset.dmchip; dockerRev++; drawPanes(); }));
   dmViewWire(el, () => fadeThrough(DM_PARTS, () => { dockerRev++; drawPanes(); }));
-  // The search redraws as it is typed, and keeps its focus and its caret
-  // across the redraw, which replaces the box.
+  // The search redraws as it is typed; the patch keeps the box, its focus
+  // and its caret.
   const sb = el.querySelector("#dmSearch");
   if (sb){
     sb.oninput = () => {
-      dmSearch = sb.value; dmSearchCaret = sb.selectionStart; dmSearchAt = Date.now();
+      dmSearch = sb.value;
       clearTimeout(dmSearchTimer);
       dmSearchTimer = setTimeout(() => { dockerRev++; drawPanes(); }, 120);
     };
-    // ...never from under an open dialog: a redraw just after typing took
-    // the focus back from the one New container had opened (B872).
-    if (dmSearchCaret !== null && document.activeElement !== sb && dmSearchTouched()
-        && !document.querySelector(".modal:not([hidden])")){
-      sb.focus(); try{ sb.setSelectionRange(dmSearchCaret, dmSearchCaret); }catch(e){ /* a type that cannot */ }
-    }
   }
   // The wiring, fetched when the fold is opened and not before. It needs the
   // compose file parsed, which is the one thing overview() refuses to do for

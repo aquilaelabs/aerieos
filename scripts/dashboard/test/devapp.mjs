@@ -412,10 +412,13 @@ await section("A redraw must not take an open menu with it", async () => {
       window.fetch = (...a) => { if (String(a[0]).startsWith('/api/revs')) asked++; return f(...a); };
       await pollRevs(); window.fetch = f; return asked; });
     ok(polled === 0, `...and the revisions poll waits rather than firing a watch under it (${polled} asked)`);
+    // The owed redraw is seen in what was drawn: the page is patched, not
+    // written again, so its elements are the same ones before and after.
+    await page.evaluate(() => { window.__heldHtml = painted.get(document.querySelector('.dmtab').parentElement)?.html; });
     await page.keyboard.press('Escape');
-    await page.waitForFunction(() => document.querySelector('.dmtab') !== window.__heldTab,
-                               null, { timeout: 5000 }).catch(() => {});
-    const after = await page.evaluate(() => document.querySelector('.dmtab') !== window.__heldTab);
+    const drawn = () => painted.get(document.querySelector('.dmtab').parentElement)?.html !== window.__heldHtml;
+    await page.waitForFunction(drawn, null, { timeout: 5000 }).catch(() => {});
+    const after = await page.evaluate(drawn);
     ok(after, '...and the redraw it was owed happens once the menu shuts');
   }
 });
@@ -2176,10 +2179,10 @@ await section("A stack of more than one container says whose each port is", asyn
      `a stack's Ports and mounts are grouped under each service (${JSON.stringify(groups)})`);
   // ...and the fold stays read across a redraw (B827): the stats and every
   // job step redraw the list, and an open fold came back as its shapes.
-  // Written again, not left alone: the page writes its markup only when it
-  // says something new (renderDockerInto's __dmHtml), and a redraw that
-  // changed nothing would ask nothing of the fold.
-  const rewrite = () => { document.querySelector('.dmtab').parentElement.__dmHtml = ''; dockerRev++; drawPanes(); };
+  // Written again whole, not left alone: the page patches its markup only
+  // when it says something new, and a redraw that changed nothing would ask
+  // nothing of the fold; forgetting what was drawn makes the next draw whole.
+  const rewrite = () => { painted.delete(document.querySelector('.dmtab').parentElement); dockerRev++; drawPanes(); };
   await page.evaluate(rewrite);
   ok(await page.waitForFunction(sel => document.querySelectorAll(sel + ' .sect .wire .wgrp').length === 2, DM, { timeout: 15000 })
        .then(() => true, () => false),

@@ -126,7 +126,10 @@ async function pressing(btn, fn){
     clearInterval(t);
     delete btn.__noRing;
     if (btn.classList.contains("working")){ btn.classList.remove("working"); btn.removeAttribute("aria-busy"); }
-    if (btn.isConnected) btn.disabled = false;
+    // Given back as its markup has it now: a surface the page patches
+    // (R244) keeps the button the press began on, which a redraw during the
+    // press may have drawn disabled, or made another button in its place.
+    pressBack(btn);
   }
 }
 
@@ -670,7 +673,7 @@ function wireReportSection(root, n){
   // Read when the section is opened, and again when its span is picked;
   // nothing polls: the next open reads again.
   if (!ndHistory[n.id] && sect.open) loadHistory(n.id, "day");
-  sect.addEventListener("toggle", () => { if (sect.open && !ndHistory[n.id]) loadHistory(n.id, "day"); });
+  sect.ontoggle = () => { if (sect.open && !ndHistory[n.id]) loadHistory(n.id, "day"); };
   const fmtOf = id => (ND_REPORT.find(([k]) => id.startsWith(`rep:${k}:`)) || [, , v => `${Math.round(v)}%`])[2];
   wireCharts(sect, fmtOf);
 }
@@ -2020,7 +2023,7 @@ function ndRowHtml(n, lead = ""){
           ${state?.can?.debug === false ? "" : `<button type="button" data-ndlog="${esc(n.id)}" data-ndlogname="${esc(n.name)}"
             title="the agent's own journal, in the dock, read again every ten seconds">Agent log</button>`}
         </div>
-        <div class="sub ndtest" hidden></div>` : "";
+        <div class="sub ndtest" data-own hidden></div>` : "";
     const health = docSection("nodes", "health", ndTitle("health"),
       n.kind === "agent" ? (n.live ? "live" : n.agent?.token_reuse?.at
         ? "turned away: it presented a token it had already replaced, as a machine restored from a snapshot does, or a copy of its disk; Enroll script brings it back if you restored it"
@@ -2130,8 +2133,10 @@ function renderNodesInto(i){
   // Enrolling is a dialog now (#ndmodal), not two panels appended here; see
   // the markup's comment. Which means a poll landing while it is open cannot
   // take the name being typed with it, because this list is not where it is.
-  d.list.innerHTML = ndOffLine() + ndNotHereHtml() + rows + none
-    + (!nodesList.length ? `<div class="empty">The node list could not be read.</div>` : "");
+  // Patched into what is there (R244): a setting being typed, a fold turned
+  // and what a press wrote into the row stay where they were.
+  patch(d.list, ndOffLine() + ndNotHereHtml() + rows + none
+    + (!nodesList.length ? `<div class="empty">The node list could not be read.</div>` : ""));
   d.el.querySelectorAll("[data-ndcopyline]").forEach(b => b.onclick = async () => {
     const code = b.parentElement.querySelector("code");
     try{ await navigator.clipboard.writeText(code.textContent); }

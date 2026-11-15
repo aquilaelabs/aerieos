@@ -48,7 +48,20 @@ const WAITING = /class="(loading|empty)[ "]|loading…/;
 const paintedKids = el => { let n = el.childNodes.length;
   for (const c of el.children) if (c.classList.contains("slmark")) n--;
   return n; };
-function paint(el, html, quiet = false){
+function paint(el, html, quiet = false){ return drawInto(el, html, quiet, false); }
+
+// The same, with the new markup patched into what is there rather than
+// written over it (R244): every element the new markup can be matched to is
+// kept and brought up to date, so a redraw from the poll leaves a person's
+// typing, its caret and an open IME composition, a fold they turned and a
+// dialog they have open where they were. Measured on the Containers and
+// Nodes pages before it was chosen (R244 step 1): replacing lost all of
+// those, lifting a form region out and back still ended the composition and
+// shut the folds, and this kept every one for about twice replace's time,
+// four milliseconds at today's sizes, paid only when the markup changed.
+function patch(el, html, quiet = false){ return drawInto(el, html, quiet, true); }
+
+function drawInto(el, html, quiet, keyed){
   const rec = painted.get(el);
   // What it left there is what is there: a renderer that wrote the element
   // directly in between (a "loading…", an error) replaced its children, and
@@ -67,7 +80,14 @@ function paint(el, html, quiet = false){
   // Not recorded, so the same markup is still a change on the next poll.
   if (menuHolds(el)) return false;
   const arriving = !rec || WAITING.test(rec.html);
-  el.innerHTML = html;
+  // A surface another writer filled since (a skeleton, an error) is drawn
+  // whole: there is nothing of the last draw's to keep.
+  if (keyed && was !== undefined) patchInto(el, html);
+  else {
+    el.innerHTML = html;
+    // What the markup gave each element, for the first patch after it.
+    if (keyed) for (const c of el.children) patchRecord(c);
+  }
   painted.set(el, {html, first: el.firstChild, n: paintedKids(el)});
   // ...but never while the card around it is folding. contentIn starts at
   // opacity 0 and takes 180ms, which is exactly the fold's duration, so a
@@ -90,6 +110,174 @@ function paint(el, html, quiet = false){
     el.classList.add("justpainted");
   }
   return true;
+}
+
+// ---- the patch ----
+// Each element keeps the attributes its markup gave it (__markup), recorded
+// as it is written and before anything else on the page has touched it. A
+// patch then changes only what the markup changed between the two: what the
+// page puts on an element itself (a password manager's ignore marks, a title
+// moved to aria-description) and what the person changed (a fold turned, a
+// dialog opened, a value typed, a box ticked) are neither of the markups'
+// and are left as they are. data-own says what is code's: on an element the
+// markup draws, its children (a fold read when it is opened), and on one the
+// code puts in, the element itself (patchOwn).
+const PATCH_PRESS = ["disabled", "aria-busy"];
+function patchAttrs(n){ const o = {}; for (const at of n.attributes) o[at.name] = at.value; return o; }
+function patchRecord(root){
+  if (root.nodeType !== 1) return;
+  root.__markup = patchAttrs(root);
+  for (const e of root.querySelectorAll("*")) e.__markup = patchAttrs(e);
+}
+function patchWas(n){ return n.__markup || patchAttrs(n); }
+// What one element is called among its siblings: a row's data-key, which a
+// list's rows carry so that one moved, added or taken away takes nothing of
+// its neighbors' with it, else its id. "" is no name: matched by place.
+function patchKey(n){ return n.nodeType === 1 ? n.getAttribute("data-key") || n.id || "" : ""; }
+// Whether `a` can be brought up to `b` rather than replaced: the same kind of
+// node, the same tag, and for a form control or a button the same type, name
+// and data-* (which field it edits, data-k="rootasks"; which action it is,
+// data-nd="sync-clean"), so what a person typed is never handed to another
+// field, and a press that still holds its button never writes to another.
+function patchSame(a, b){
+  if (a.nodeType !== b.nodeType) return false;
+  if (a.nodeType !== 1) return true;
+  if (a.tagName !== b.tagName || patchKey(a) !== patchKey(b)) return false;
+  // One whose children are its code's is only ever itself: matched to
+  // another element in its place, it would keep that one's old children.
+  if (("data-own" in patchWas(a)) !== b.hasAttribute("data-own")) return false;
+  if (a.tagName === "INPUT" || a.tagName === "SELECT" || a.tagName === "TEXTAREA" || a.tagName === "BUTTON")
+    return patchFieldOf(patchWas(a)) === patchFieldOf(patchAttrs(b));
+  return true;
+}
+function patchFieldOf(attrs){
+  let s = (attrs.type || "") + "|" + (attrs.name || "") + "|";
+  for (const name of Object.keys(attrs).sort()) if (name.startsWith("data-")) s += name + "=" + attrs[name] + ";";
+  return s;
+}
+// What a person changes in a form control is a property its markup only
+// starts: it follows the markup when the markup changed it (a Revert, a
+// draft drawn, the server's new value), never when the markup says what it
+// said before. Set only when it differs, so a caret is not moved for nothing.
+function patchControl(a, was, now){
+  if (a.tagName === "INPUT"){
+    const t = (now.type || "text").toLowerCase();
+    if (t === "checkbox" || t === "radio"){
+      const want = "checked" in now;
+      if (want !== ("checked" in was) && a.checked !== want) a.checked = want;
+    } else if (t !== "file"){
+      const want = now.value ?? "";
+      if (want !== (was.value ?? "") && a.value !== want) a.value = want;
+    }
+  } else if (a.tagName === "OPTION"){
+    const want = "selected" in now;
+    if (want !== ("selected" in was) && a.selected !== want) a.selected = want;
+  }
+}
+function patchNode(a, b){
+  if (a.nodeType !== 1){ if (a.nodeValue !== b.nodeValue) a.nodeValue = b.nodeValue; return; }
+  const was = patchWas(a), now = patchAttrs(b);
+  patchControl(a, was, now);
+  for (const name in was) if (!(name in now) && a.hasAttribute(name)) a.removeAttribute(name);
+  for (const name in now){
+    if (was[name] === now[name] || a.getAttribute(name) === now[name]) continue;
+    // A class the page's code added (a fold's current one, a split list's
+    // open one) outlives the markup changing its own: the markup's tokens
+    // come and go, the others stay.
+    if (name === "class" && was.class !== undefined){
+      const gone = was.class.split(/\s+/).filter(Boolean), come = now.class.split(/\s+/).filter(Boolean);
+      for (const t of gone) if (!come.includes(t)) a.classList.remove(t);
+      for (const t of come) a.classList.add(t);
+    } else {
+      a.setAttribute(name, now[name]);
+      // A style is written as data-style (the page's content policy draws
+      // no style attribute) and applied through the CSSOM as an element
+      // lands (index.html); one that stays and changes is applied here.
+      if (name === "data-style") a.style.cssText = now[name];
+    }
+  }
+  if ("data-style" in was && !("data-style" in now)) a.style.cssText = "";
+  // A press's own state is the markup's again at the next draw, as it was
+  // when a draw wrote everything: a button a press disabled or marked busy
+  // (busy(): "Asking..." and its dots) is given back by the redraw after it.
+  for (const name of PATCH_PRESS){
+    const want = now[name];
+    if (want === undefined){ if (a.hasAttribute(name)) a.removeAttribute(name); }
+    else if (a.getAttribute(name) !== want) a.setAttribute(name, want);
+  }
+  a.__markup = now;
+  if (a.tagName === "BUTTON"){
+    if (a.innerHTML !== b.innerHTML){ a.innerHTML = b.innerHTML; for (const c of a.children) patchRecord(c); }
+  } else if (a.tagName === "TEXTAREA"){
+    // Its text is its default value: a person's typing is its value, which
+    // follows the markup's text only when that changed.
+    const want = b.textContent;
+    if (want !== a.defaultValue){ a.defaultValue = want; if (a.value !== want) a.value = want; }
+  } else if (!("data-own" in now)) patchKids(a, b);
+}
+// The new children into `from` in order: a named one is found wherever it
+// is among the old and moved into place; an unnamed one is matched to the
+// old one in its place when it is the same kind; anything else is the new
+// node itself, moved in from the new markup. What is left of the old is gone.
+// An element the page's code put into a drawn surface and marked data-own
+// (a split list's index row, a jump bar, a slide marker, a status filled into
+// a summary) is stepped over and left where it is: its code keeps it or
+// takes it away. Anything else no markup wrote (a part a press drew again by
+// its own hand) follows the markup like the rest, so nothing stale stays.
+function patchOwn(n){ return !!n && n.nodeType === 1 && !n.__markup && n.hasAttribute("data-own"); }
+function patchKids(from, to){
+  const named = new Map();
+  for (const n of from.childNodes){ const k = patchKey(n); if (k && !patchOwn(n)) named.set(n.tagName + "#" + k, n); }
+  let cur = from.firstChild;
+  for (const want of [...to.childNodes]){
+    while (patchOwn(cur)) cur = cur.nextSibling;
+    const k = patchKey(want);
+    // One unnamed node gone from before its place is stepped over, so the
+    // rest of an unnamed run is still matched rather than all remade.
+    if (!k && cur && !patchKey(cur) && !patchSame(cur, want) && cur.nextSibling && !patchOwn(cur.nextSibling)
+        && !patchKey(cur.nextSibling) && patchSame(cur.nextSibling, want)){
+      const gone = cur; cur = cur.nextSibling; from.removeChild(gone);
+    }
+    const old = k ? named.get(want.tagName + "#" + k) : cur && !patchKey(cur) ? cur : null;
+    if (old && patchSame(old, want)){
+      if (k) named.delete(want.tagName + "#" + k);
+      if (old !== cur && patchHeld(old)){
+        // Moving it would blur what has the focus and close an open
+        // dialog, so the ones before it are moved past it instead, in
+        // their order, still to be matched.
+        const after = old.nextSibling;
+        while (cur && cur !== old){ const next = cur.nextSibling; if (!patchOwn(cur)) from.insertBefore(cur, after); cur = next; }
+      }
+      if (old === cur) cur = cur.nextSibling;
+      else from.insertBefore(old, cur);
+      patchNode(old, want);
+    } else {
+      patchRecord(want);
+      from.insertBefore(want, cur);
+    }
+  }
+  while (cur){ const next = cur.nextSibling; if (!patchOwn(cur)) from.removeChild(cur); cur = next; }
+}
+// Whether moving `n` would lose what a person has in it: the focus, an open
+// dialog (taken out of the top layer), a frame (loaded again).
+function patchHeld(n){
+  if (n.nodeType !== 1) return false;
+  const a = document.activeElement;
+  return (a && a !== document.body && n.contains(a)) || n.matches("dialog[open], iframe") || !!n.querySelector("dialog[open], iframe");
+}
+function patchInto(el, html){
+  const t = document.createElement("template");
+  t.innerHTML = html;
+  patchKids(el, t.content);
+}
+
+// A press's button given back when the press ends: as its markup has it,
+// where a patch keeps it (the same element, perhaps drawn disabled since, or
+// another button now in its place), and enabled where nothing recorded one.
+function pressBack(btn){
+  if (!btn?.isConnected) return;
+  const want = !!btn.__markup && "disabled" in btn.__markup;
+  if (btn.disabled !== want) btn.disabled = want;
 }
 
 // A change a press already made in place (a card turned over: its class and

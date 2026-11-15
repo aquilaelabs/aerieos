@@ -475,7 +475,7 @@ function slideMark(box, key, vertical = false){
   // or three times on one press), so a slide already under way goes on.
   let m = box.querySelector(":scope > .slmark") || SLIDE_MARKS[key]?.el;
   if (!on){ m?.remove(); if (box.classList.contains("slides")) box.classList.remove("slides"); return; }
-  if (!m){ m = document.createElement("span"); m.className = "slmark"; m.setAttribute("aria-hidden", "true"); }
+  if (!m){ m = document.createElement("span"); m.className = "slmark"; m.setAttribute("aria-hidden", "true"); m.setAttribute("data-own", ""); }
   if (m.parentNode !== box) box.append(m);
   // Written only when it changes: a draw that moves nothing writes nothing.
   if (!box.classList.contains("slides")) box.classList.add("slides");

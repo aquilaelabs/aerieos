@@ -932,6 +932,27 @@ identity (a memory, a bug, a test, a rule) keeps its open set in its view
 instead. `uniform.mjs` fails any `<details>` on any tab or notebook view that
 has neither.
 
+A surface that is patched keeps the rest a person has (R244). `patch(el,
+html)`, beside `paint()`, writes a new draw into what is there rather than
+over it: every element the new markup can be matched to is kept and brought
+up to date, so a field being typed in keeps its value, its caret and an IME
+composition, and a dialog open in the surface stays open. A list's rows
+carry `data-key`, so a row added, taken away or moved takes nothing of its
+neighbors'; a form control or a button is matched only to one with the
+same type, name and `data-*`, so typing is never handed to another field
+and a press never writes to another action's button. It changes only what
+the markup changed since it last drew: what the page puts on an element
+itself (the password managers' ignore marks, a title moved to
+`aria-description`, a class it added) and what a person changed (a value
+typed, a box ticked, a fold turned) stay, while a press's own state
+(`disabled`, `aria-busy`, a button's label) is the markup's again at the
+next draw, and `pressBack()` gives a press's button back as its markup has
+it then. What the page's code puts into a drawn surface carries `data-own`
+(a jump bar, a slide marker, a status it fills into a summary) and is left
+where it is; on an element the markup draws, `data-own` says its children
+are its code's (a fold read when it is opened). The Containers and Nodes
+pages draw through it; `patch.mjs` holds every rule.
+
 ### words-on-the-screen
 
 Applies to: scripts/dashboard; hint, wording, text, copy, sentence, empty, state, line

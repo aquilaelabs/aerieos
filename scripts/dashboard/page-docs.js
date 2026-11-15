@@ -579,6 +579,7 @@ function splitSects(root, key, {says = {}, sel = ":scope > details.sect", marks 
   if (!nav){
     nav = document.createElement("div");
     nav.className = "rlist snav";
+    nav.setAttribute("data-own", "");
     nav.setAttribute("role", "tablist");
     root.insertBefore(nav, root.firstChild);
     // A press on the open section's head, on a phone, goes back to the list.
@@ -728,6 +729,8 @@ function sectJump(g){
   // Two or more (the operator, 23 Oct: every page with more than one).
   if (mine.length < 2){ have?.remove(); return; }
   const bar = have || document.createElement("nav");
+  // The code's own, which a patched surface leaves where it is (R244).
+  if (!have) bar.setAttribute("data-own", "");
   // In a dialog every line is a .field band (the design's dialog layout).
   // Written only where it moved: this runs after every draw, and a poll that
   // brought nothing new must write nothing (when-a-view-re-reads).
