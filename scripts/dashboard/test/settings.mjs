@@ -396,6 +396,10 @@ await section("global rules", async () => {
   await page.click('.nb .grule.editing .grSave');
   await page.waitForFunction(() => [...document.querySelectorAll('.nb #rlGlobal .grule .btitle')].some(e => e.textContent.trim() === 'no-secrets'),
     null, { timeout: 15000 });
+  // Stored, asked of the server until it says so: the page lists the rule
+  // as it is saved, and under load the list was read a moment before the
+  // save had landed (three whole runs of 14 and 15 Nov).
+  await until(async () => (await globals()).some(r => r.name === 'no-secrets' && !r.builtin), 15000, 200);
   ok((await globals()).some(r => r.name === 'no-secrets' && !r.builtin), 'an administrator adds a global rule from a space\'s notebook, stored once');
   ok(/Never write credentials/.test(await pre('alpha')) && /Never write credentials/.test(await pre('beta')) && /\(global\)/.test(await pre('beta')),
      '...and every space\'s sessions are handed it, marked global');

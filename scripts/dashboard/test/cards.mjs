@@ -2197,7 +2197,7 @@ await section("which asks, names the bin, and moves nothing when declined", asyn
   await page.waitForFunction(() => document.getElementById('rnmodal').hidden, { timeout: 15000 });
   await page.waitForFunction(() => !document.querySelector('.askdlg'), null, { timeout: 5000 });
   ok(/moves to \/workspace\/\.trash\/alpha/.test(asked) && existsSync(`${DIR}/ws/alpha/.git`),
-     '...which asks, names the bin, and moves nothing when declined');
+     `...which asks, names the bin, and moves nothing when declined (asked: ${asked.replace(/\s+/g, ' ').slice(0, 90) || 'nothing'})`);
   await page.evaluate(n => renameProject(n), 'alpha');   // the settings form (the row's gear went in R119 step 3)
   await page.waitForSelector('#rnmodal:not([hidden])');
 });

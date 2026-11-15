@@ -59,9 +59,15 @@ export const record = (suite, subject, said, since = 0) => {
 export const section = async (name, fn) => {
   try { await fn(); }
   catch (e) {
-    const where = /([\w.-]+\.mjs):(\d+):\d+/.exec(String(e?.stack || '').split('\n').slice(1).join('\n'));
+    // Where in the suite, not where in this library: the first place on
+    // the way out that is the suite's own, and what was being waited for
+    // where the browser says (a timeout's first line names neither).
+    const frames = [...String(e?.stack || '').matchAll(/([\w.-]+\.mjs):(\d+):\d+/g)];
+    const where = frames.find(f => f[1] !== 'lib.mjs') || frames[0];
+    const lines = String(e?.message || e).split('\n').map(l => l.replace(/\x1b\[\d+m/g, '').trim()).filter(Boolean);
+    const waited = lines.find(l => /^- waiting for /.test(l));
     console.log(`FAIL  ${name}: this part stopped${where ? ` at ${where[1]}:${where[2]}` : ''} (${
-      String(e?.message || e).split('\n')[0].slice(0, 220)})`);
+      (lines[0] || 'it threw').slice(0, 220)}${waited ? `; ${waited.slice(2, 200)}` : ''})`);
     fail++;
   }
 };
