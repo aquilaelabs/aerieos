@@ -309,7 +309,12 @@ await section("The header names the daemon by its node when the node is an agent
   });
   // Through its agent, the ordinary case, says nothing the picker has not
   // (R227 step 1), and never an address it does not dial.
-  const src = await page.evaluate(() => ({ agent: !!dockerList.src.agent, line: document.querySelector('.dmtab .dmsrc')?.textContent.replace(/\s+/g, ' ').trim() || '' }));
+  // Read in the same look that waited for it: the page drops the listing
+  // while it reads it again, and a read after the wait met it gone (six
+  // times in whole runs, 14 and 15 Nov; B810 is the page's side of this).
+  const src = await page.waitForFunction(() => dockerList?.src
+    ? { agent: !!dockerList.src.agent, line: document.querySelector('.dmtab .dmsrc')?.textContent.replace(/\s+/g, ' ').trim() || '' } : null,
+    null, { timeout: 20000 }).then(h => h.jsonValue());
   ok(src.agent && !/ at |ssh:/.test(src.line),
      `an agent node's daemon is named by the picker alone, never by an address it does not dial (${JSON.stringify(src).slice(0, 80)})`);
 });
