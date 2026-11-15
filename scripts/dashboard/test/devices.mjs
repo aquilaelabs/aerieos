@@ -274,7 +274,14 @@ await section("the apps this controller offers, from its release", async () => {
      `an app from before the door's window is told to update, not half served (${old.status}: ${oldJ.error})`);
   // A switch moved is looked at at once: what is off goes.
   const off = await admin('/api/settings', { set: { apps_vscode: false } });
-  await until(async () => { v = await (await fetch(`${base}/api/apps`, { headers: ADMIN })).json(); return !v.checking; }, 10000, 250);
+  // Waited for by what is checked: the look the switch starts is another
+  // thread's, and "not checking" was also true in the moment before it began,
+  // with the app still held (seen once under a whole run's load, 15 Nov).
+  await until(async () => {
+    v = await (await fetch(`${base}/api/apps`, { headers: ADMIN })).json();
+    const a = (v.apps || []).find(x => x.name === 'vscode');
+    return !v.checking && !a?.offered && !a?.files.length;
+  }, 15000, 250);
   const vs = (v.apps || []).find(x => x.name === 'vscode');
   const gone = await fetch(`${base}/apps/vscode/aerieos-vscode-0.4.0.vsix`, { headers: PERSON });
   ok(!vs?.offered && !vs?.files.length && gone.status === 404,
