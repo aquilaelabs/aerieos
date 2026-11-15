@@ -283,14 +283,14 @@ function backupSection(){
   if (b.error) return `<div class="hint bad">${esc(b.error)}</div>`;
   const owner = !!b.owner;
   const rows = (b.copies || []).map(c => `<div class="row"><div class="grow"><div class="name">${esc(c.name)}</div>
-      <div class="sub">${esc(c.where)} · ${esc(humanBytes(c.size || 0))} · ${c.made_at ? esc(ago(c.made_at)) : ""}${c.version ? ` · ${esc(c.version)}` : ""}</div></div>
+      <div class="sub">${esc(c.where)} · ${esc(humanBytes(c.size || 0))} · ${c.made_at ? esc(ago(c.made_at)) : ""}${c.version ? ` · ${esc(c.version)}` : ""}${c.carries_key ? "" : " · without the install key"}</div></div>
       ${owner && !/\.builderbot\/backup$/.test(c.where) ? `<span class="acts"><a class="btn" href="/api/backup-file?name=${encodeURIComponent(c.name)}" download>Download</a></span>` : ""}</div>`).join("");
   return `<div class="row stack2" data-group="Backup copies"><div class="grow">
       <div class="sub">${b.on ? `Copies go to ${(b.where || []).map(esc).join(", ")}${b.made_at ? `; the last was written ${esc(ago(b.made_at))} (${esc(humanBytes(b.size || 0))})` : "; none written yet"}.` : "No backup password set: nothing is copied until one is, under Backup."}${(b.failed || []).length ? ` <span class="bad">Not written: ${esc(b.failed.join("; "))}.</span>` : ""}</div>
       ${(b.other || []).length ? `<div class="field">${lbl("", "Also copied to", "a disk or share under Other disks and shares on the Storage page, so a copy is off this machine; one mounted read-only cannot take one")}
         ${(b.other || []).map(o => `<label class="ndcap"><input type="checkbox" data-backupalso="${esc(o.id)}"${o.on ? " checked" : ""}${o.ro || !owner ? " disabled" : ""}> ${esc(o.name)} <span class="sub">${esc(o.kind === "smb" ? "SMB share" : o.kind === "nfs" ? "NFS export" : "disk")}${o.ro ? ", read-only" : ""}</span></label>`).join("")}
         <div class="actbar"><span class="sp"></span><button type="button" data-backupalsosave${owner ? "" : " disabled"}>Save</button></div></div>` : ""}
-      <div class="hint">These copies are the controller: its accounts, the spaces' notebooks and settings, its nodes and keys. The files on your pools are not in them; the Storage page's snapshots and Backups keep those.</div>
+      <div class="hint">These copies are the controller: its accounts, the spaces' notebooks and settings, its nodes and keys, with the install key inside, so the backup password alone restores one whole. The files on your pools are not in them; the Storage page's snapshots and Backups keep those.${(b.copies || []).some(c => !c.carries_key) ? " A copy marked without the install key was written before copies carried it: restored, its sign-ins and tokens stay locked until the key is given under Controller, Keys." : ""}</div>
       ${rows ? `<div class="rows">${rows}</div>` : ""}
       <div class="actbar"><span class="sp"></span><button type="button" class="primary" data-backupnow${b.on && owner ? "" : " disabled"}>Back up now</button></div>
     </div></div>`;
@@ -739,7 +739,7 @@ const SETTING_GROUPS = [
    heading: s => s?.settings?.backup_password?.set ? "on" : "off",
    fields: [
     {key: "backup_password", label: "Backup password", type: "secret",
-     hint: "Eight characters at least. With one set, a sealed copy of the configuration (accounts, nodes, spaces, settings, the stores) is written after every change onto every pool of this machine and under the state, the five newest kept; a fresh install's first page restores one with this password. Keep the password where you keep the owner's: a copy without it is a sealed file."}]},
+     hint: "Eight characters at least. With one set, a sealed copy of the configuration (accounts, nodes, spaces, settings, the stores) is written after every change onto every pool of this machine and under the state, the five newest kept; a fresh install's first page restores one with this password. A copy carries the install key, so whoever holds a copy and this password holds everything the controller keeps: keep the password where you keep the owner's. A copy without it is a sealed file."}]},
   // Unpublished builds (the operator, 1 Nov): in debug mode alone, a GitHub
   // token that may read AerieOS's repository, with which the dev channel and
   // the version picker see the drafts not published yet.

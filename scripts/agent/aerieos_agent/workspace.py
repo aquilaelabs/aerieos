@@ -2,12 +2,14 @@
 import contextlib
 import glob
 import hashlib
+import json
 import os
 import re
 import shutil
 import tarfile
-from .base import ROOT_BUNDLE_DIR, ROOT_TOOLS, TOOLS_DIR, fs_holds, log
-from .stores import dir_bytes, tc_root
+from . import release
+from .base import ROOT_BUNDLE_DIR, ROOT_TOOLS, TOOLS_DIR, TOOLS_SIG, fs_holds, log
+from .stores import dir_bytes, load_state, tc_root
 
 
 class WorkspaceMixin:
@@ -185,7 +187,13 @@ class WorkspaceMixin:
                 os.unlink(tar_path)
             return ""
         if root:
-            self._keep_root_tools(tar_path, hexd[:16] or "bundle", say)
+            # What this node trusts, read from the file its console writes
+            # (as an update's check does), not this process's copy.
+            try:
+                trust = load_state()
+            except SystemExit:
+                trust = self.state
+            self._keep_root_tools(tar_path, hexd[:16] or "bundle", say, trust)
             self._keep_root_bundle(tar_path, hexd[:16] or "bundle", say)
         into = os.path.join(bbdir, hexd[:16] or "bundle")
         if not os.path.isdir(into):
@@ -226,27 +234,46 @@ class WorkspaceMixin:
         return into
 
     @staticmethod
-    def _keep_root_tools(tar_path, name, say):
+    def _keep_root_tools(tar_path, name, say, trust=None):
         """Root's own copy of the tools it installs, lifted straight out of
         the checked tar into TOOLS_DIR/<name>/, and TOOLS_DIR/current pointed
-        at it; the copies of other bundles go."""
+        at it; the copies of other bundles go. On a node that pinned
+        AerieOS's release key, only when the release signed those files
+        (release.may_keep_tools, R227 step 1): the bundle's digest is the
+        controller's word, and these are what root runs. Refused, root
+        keeps the copy it has, and the job says why. Whether it was kept."""
         into = os.path.join(TOOLS_DIR, name)
+        # This bundle's already, checked when it was kept: nothing to do,
+        # and nothing said again on every job that fetches the bundle.
+        if os.path.isdir(into) and os.path.realpath(os.path.join(TOOLS_DIR, "current")) == os.path.realpath(into):
+            return True
         try:
             with tarfile.open(tar_path) as tar:
+                files, sig = {}, ""
                 for m in tar.getmembers():
                     rel = m.name.lstrip("./")
+                    if rel == TOOLS_SIG and m.isfile() and m.size <= 4096:
+                        with contextlib.suppress(ValueError, AttributeError):
+                            sig = str(json.loads(tar.extractfile(m).read().decode("utf-8", "replace")).get("sig") or "")
+                        continue
                     # ...and the provisioner's family files (R204), which it
                     # sources from beside itself.
                     if (rel not in ROOT_TOOLS and not rel.startswith("nodes/families/")) or not m.isfile():
                         continue
+                    src = tar.extractfile(m)
+                    if src is not None:
+                        files[rel] = src.read()
+                ok, said = release.may_keep_tools(trust or {}, release.tools_digest(files), sig)
+                if said:
+                    say(said + "\n")
+                if not ok:
+                    return False
+                for rel, data in files.items():
                     dest = os.path.join(into, rel)
                     os.makedirs(os.path.dirname(dest), mode=0o700, exist_ok=True)
-                    src = tar.extractfile(m)
-                    if src is None:
-                        continue
                     fd = os.open(dest + ".new", os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
                     with os.fdopen(fd, "wb") as out:
-                        shutil.copyfileobj(src, out)
+                        out.write(data)
                     os.replace(dest + ".new", dest)
             tmp = os.path.join(TOOLS_DIR, ".current.new")
             if os.path.lexists(tmp):
@@ -258,6 +285,8 @@ class WorkspaceMixin:
                     shutil.rmtree(os.path.join(TOOLS_DIR, other), ignore_errors=True)
         except (OSError, tarfile.TarError) as e:
             say(f"could not keep root's copy of the bundle's tools: {e}\n")
+            return False
+        return True
 
     @staticmethod
     def _keep_root_bundle(tar_path, name, say):

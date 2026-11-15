@@ -278,6 +278,29 @@ def start_on_node(nodes, node_id, uid, name="", token="", agent="claude"):
 
 
 
+def resume():
+    """The flows found again after the controller restarted (R227 step 13):
+    a sign-in is a job on a node, which the restart did not end, and what
+    its page draws is read from that job's log, so each one still going is
+    its account's flow again, its link shown and its code taken. They were
+    kept in memory alone, and a person half-way through was left with a job
+    running on the node and a page that said no sign-in was. The count."""
+    if nodes is None:
+        return 0
+    found = 0
+    for j in nodes.jobs_going("user:signin"):
+        uid = str(j["spec"].get("uid") or "")
+        if not uid or not j["node"]:
+            continue
+        n = nodes.node(j["node"]) or {}
+        f = NodeFlow(nodes, j["node"], j["id"], n.get("name") or "", uid=uid, agent=str(j["spec"].get("agent") or "claude"))
+        with _lock:
+            # The newest of an account's, as a new sign-in replaces its own.
+            _flows[uid] = f
+        found += 1
+    return found
+
+
 def submit(code, uid):
     with _lock:
         f = _flows.get(str(uid))

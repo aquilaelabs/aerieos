@@ -856,7 +856,7 @@ def screen_key(node_id):
     """The key a VM's screen request to this node is signed with (R99): its
     live node token's stored hash, which the agent computes from the token it
     holds; "" for a node with none."""
-    rows = _rows("SELECT secret_hash FROM tokens WHERE node_id = ? AND kind = 'node' AND revoked = 0 "
+    rows = _rows("SELECT secret_hash FROM tokens WHERE node_id = ? AND kind = 'node' AND state = 'live' "
                  "ORDER BY created DESC LIMIT 1", (node_id,))
     return str(rows[0]["secret_hash"]) if rows else ""
 
@@ -889,14 +889,21 @@ def _hash(secret):
     return hashlib.sha256(secret.encode()).hexdigest()
 
 
-def _token_mint(kind, node_id, ttl=None):
+# What a token is, in a column of its own (R227 step 14; the revoked column
+# carried all four as 0, 1, 2 and 3 until migration 0008, and a statement
+# written for two of them, revoked = 0, passed over the other two: a pending
+# token outlived the enrollment that was to end every token before it).
+TOKEN_LIVE, TOKEN_PENDING, TOKEN_RETIRED, TOKEN_REVOKED = "live", "pending", "retired", "revoked"
+
+
+def _token_mint(kind, node_id, ttl=None, state=TOKEN_LIVE):
     secret = secrets.token_urlsafe(32)
     tid = mint("t")
     now = int(time.time())
     _exec("INSERT INTO tokens (id, kind, node_id, secret_hash, created, "
-          "expires, revoked, uses) VALUES (?, ?, ?, ?, ?, ?, 0, 0)",
+          "expires, state, uses) VALUES (?, ?, ?, ?, ?, ?, ?, 0)",
           (tid, kind, node_id, _hash(secret), now,
-           now + ttl if ttl else None))
+           now + ttl if ttl else None, state))
     return tid, TOKEN_PREFIX[kind] + secret
 
 
@@ -906,8 +913,7 @@ def _token_mint(kind, node_id, ttl=None):
 # is still taken for GRACE_S, for calls that were already on their way; after
 # that, presenting it means a copy of the node's credential is in use
 # somewhere (a copied disk, a stolen file), and the node's tokens are revoked
-# and the bell says so. Kept in the revoked column: 0 live, 1 revoked.
-TOKEN_PENDING, TOKEN_RETIRED = 2, 3
+# and the bell says so.
 ROTATE_GRACE_S = 180
 RETIRED_KEEP_S = 30 * 86400
 
@@ -917,17 +923,19 @@ def rotate_token(node_id):
     A pending one it never used is dropped; retired ones older than a month
     are forgotten."""
     now = int(time.time())
-    _exec("UPDATE tokens SET revoked = 1 WHERE node_id = ? AND kind = 'node' AND revoked = ?",
-          (node_id, TOKEN_PENDING))
-    _exec("DELETE FROM tokens WHERE node_id = ? AND kind = 'node' AND revoked = ? AND created < ?",
-          (node_id, TOKEN_RETIRED, now - RETIRED_KEEP_S))
-    tid, bearer = _token_mint("node", node_id)
-    _exec("UPDATE tokens SET revoked = ? WHERE id = ?", (TOKEN_PENDING, tid))
+    # One transaction (R227 step 14): the pending one dropped and its
+    # successor made together, born pending, so no moment holds two pending
+    # tokens or a new one that is live before the node has used it.
+    with db.transaction():
+        _exec("UPDATE tokens SET state = ? WHERE node_id = ? AND kind = 'node' AND state = ?",
+              (TOKEN_REVOKED, node_id, TOKEN_PENDING))
+        _exec("DELETE FROM tokens WHERE node_id = ? AND kind = 'node' AND state = ? AND created < ?",
+              (node_id, TOKEN_RETIRED, now - RETIRED_KEEP_S))
+        _tid, bearer = _token_mint("node", node_id, state=TOKEN_PENDING)
     # In the database file before the node is told it: a token handed out
     # and then lost with the log (a controller re-created on a mount that
     # does not keep it, 3 Nov) is a node this side no longer knows.
-    with contextlib.suppress(sqlite3.Error):
-        db.fold()
+    db.through()
     return bearer
 
 
@@ -992,19 +1000,21 @@ def recover_token(node_id, bearers, peer=""):
     for b in offered:
         if not isinstance(b, str) or not b.startswith(pre):
             continue
-        rows = _rows("SELECT * FROM tokens WHERE secret_hash = ? AND kind = 'node'", (_hash(b[len(pre):]),))
-        if not rows:
-            continue
-        t = rows[0]
-        if t["node_id"] != node_id or t["revoked"] not in (0, TOKEN_PENDING, TOKEN_RETIRED):
-            return None
-        # A retired one is passed over: the node holds a newer one this
-        # record may know further down its list (B759: a token a move's new
-        # home handed out sat ahead of the one this record still held live).
-        if t["revoked"] == TOKEN_RETIRED:
-            continue
-        if authenticate(b).get("error"):
-            return None
+        # What the row says and the check made on it, as one (R227 step 14).
+        with db.transaction():
+            rows = _rows("SELECT * FROM tokens WHERE secret_hash = ? AND kind = 'node'", (_hash(b[len(pre):]),))
+            if not rows:
+                continue
+            t = rows[0]
+            if t["node_id"] != node_id or t["state"] == TOKEN_REVOKED:
+                return None
+            # A retired one is passed over: the node holds a newer one this
+            # record may know further down its list (B759: a token a move's new
+            # home handed out sat ahead of the one this record still held live).
+            if t["state"] == TOKEN_RETIRED:
+                continue
+            if authenticate(b).get("error"):
+                return None
         print(f"dashboard: node {node_id} came back by a token from before its newest (a restored record); a fresh one handed over", flush=True)
         return rotate_token(node_id)
     return None
@@ -1031,7 +1041,7 @@ def _token_reused(t):
     nid = t["node_id"]
     # Every one, live, pending and retired: a pending token the copy was
     # handed must not come alive later.
-    _exec("UPDATE tokens SET revoked = 1 WHERE node_id = ? AND kind = 'node'", (nid,))
+    _exec("UPDATE tokens SET state = ? WHERE node_id = ? AND kind = 'node'", (TOKEN_REVOKED, nid))
     n = node(nid)
     if n:
         ag = dict(n.get("agent") or {})
@@ -1057,44 +1067,17 @@ def authenticate(bearer):
                 None)
     if not kind:
         return {"error": "not an AerieOS token"}
-    secret = bearer[len(TOKEN_PREFIX[kind]):]
-    rows = _rows("SELECT * FROM tokens WHERE secret_hash = ? AND kind = ?",
-                 (_hash(secret), kind))
-    if not rows:
-        return {"error": "unknown token"}
-    t = rows[0]
-    if kind == "node" and t["revoked"] == TOKEN_PENDING:
-        # Its first use (R135 step 4): this token is the node's now, and
-        # the one before retires with its grace.
-        # The one coming live is never among those retired, and comes live
-        # with no expiry (B570): two of the agent's calls carrying it at once
-        # each ran the retire, the second catching the first's live token,
-        # which then expired with the grace and left the node no credential.
-        now = int(time.time())
-        _exec("UPDATE tokens SET revoked = ?, expires = ? WHERE node_id = ? AND kind = 'node' AND revoked = 0 AND id != ?",
-              (TOKEN_RETIRED, now + ROTATE_GRACE_S, t["node_id"], t["id"]))
-        _exec("UPDATE tokens SET revoked = 0, expires = NULL WHERE id = ?", (t["id"],))
-        t = dict(t, revoked=0, expires=None)
-    elif kind == "node" and t["revoked"] == TOKEN_RETIRED:
-        if not (t["expires"] and t["expires"] >= time.time()):
-            _token_reused(t)
-            _refused(t["node_id"], "credential revoked")
-            return {"error": "credential revoked"}
-        t = dict(t, revoked=0, expires=None)
-    if t["revoked"]:
-        if kind == "node":
-            _refused(t["node_id"], "credential revoked")
-        return {"error": "credential revoked" if kind == "node"
-                else "enrollment token already used"}
-    # A node's live token has no expiry (only an enroll token's TTL and a
-    # retired one's grace do): one that carries one got it from the race
-    # above, and is given back its life rather than leaving the node shut
-    # out until it is enrolled again (B570).
-    if kind == "node" and t["expires"]:
-        _exec("UPDATE tokens SET expires = NULL WHERE id = ? AND revoked = 0", (t["id"],))
-        t = dict(t, expires=None)
-    if t["expires"] and t["expires"] < time.time():
-        return {"error": "token expired"}
+    # The row read and whatever its state then makes of it, as one
+    # transaction (R227 step 14): each statement was its own commit, so two
+    # of an agent's calls carrying its new token at once each read it pending
+    # and each retired the live one, the second catching the first's (B570,
+    # mended afterwards by handing a live token its life back).
+    with db.transaction():
+        t = _token_checked(kind, bearer[len(TOKEN_PREFIX[kind]):])
+    if t.get("error"):
+        return t
+    # The node's own state after it, outside the transaction: a lockdown
+    # that has run out retires the node, which reaches past this table.
     n = node(t["node_id"])
     if n and kind == "node" and lockdown_over(n):
         node_state(f"node:{n['id']}", n["id"], "retired")
@@ -1105,8 +1088,43 @@ def authenticate(bearer):
             "token": t["id"]}
 
 
+def _token_checked(kind, secret):
+    """The token's row once its state has been moved by this use, or
+    {"error"}: called inside one transaction."""
+    rows = _rows("SELECT * FROM tokens WHERE secret_hash = ? AND kind = ?",
+                 (_hash(secret), kind))
+    if not rows:
+        return {"error": "unknown token"}
+    t = rows[0]
+    if kind == "node" and t["state"] == TOKEN_PENDING:
+        # Its first use (R135 step 4): this token is the node's now, and
+        # the one before retires with its grace. The one coming live comes
+        # live with no expiry: only an enroll token's time and a retired
+        # one's grace carry one.
+        _exec("UPDATE tokens SET state = ?, expires = ? WHERE node_id = ? AND kind = 'node' AND state = ? AND id != ?",
+              (TOKEN_RETIRED, int(time.time()) + ROTATE_GRACE_S, t["node_id"], TOKEN_LIVE, t["id"]))
+        _exec("UPDATE tokens SET state = ?, expires = NULL WHERE id = ?", (TOKEN_LIVE, t["id"]))
+        t = dict(t, state=TOKEN_LIVE, expires=None)
+    elif kind == "node" and t["state"] == TOKEN_RETIRED:
+        if not (t["expires"] and t["expires"] >= time.time()):
+            _token_reused(t)
+            _refused(t["node_id"], "credential revoked")
+            return {"error": "credential revoked"}
+        t = dict(t, state=TOKEN_LIVE, expires=None)
+    if t["state"] != TOKEN_LIVE:
+        if kind == "node":
+            _refused(t["node_id"], "credential revoked")
+        return {"error": "credential revoked" if kind == "node"
+                else "enrollment token already used"}
+    if t["expires"] and t["expires"] < time.time():
+        return {"error": "token expired"}
+    return t
+
+
 def revoke_tokens(node_id, kinds=("node", "enroll")):
-    _exec("UPDATE tokens SET revoked = 1 WHERE node_id = ? AND revoked = 0 "
+    """Every token of those kinds the node has, whatever its state: one
+    still pending or retired inside its grace goes too."""
+    _exec("UPDATE tokens SET state = 'revoked' WHERE node_id = ? AND state != 'revoked' "
           f"AND kind IN ({', '.join('?' * len(kinds))})",
           (node_id, *kinds))
 
@@ -1347,7 +1365,7 @@ def enroll(auth, census, addr, version="", digest="", user=""):
                          "make a script for this one on the Nodes page (Enroll node)"}
     # Burned in one statement, so two enrolments racing on one token (a
     # provisioner's retry) cannot both pass and mint two node tokens.
-    cur = _exec("UPDATE tokens SET revoked = 1, uses = uses + 1 WHERE id = ? AND revoked = 0",
+    cur = _exec("UPDATE tokens SET state = 'revoked', uses = uses + 1 WHERE id = ? AND state = 'live'",
                 (auth["token"],))
     if cur.rowcount != 1:
         return {"error": "this enrollment token was already used"}
@@ -1371,6 +1389,10 @@ def enroll(auth, census, addr, version="", digest="", user=""):
             fn(nid)
         except Exception as e:  # noqa: BLE001 (said, never the enrollment's failure)
             print(f"[nodes] after enrolling {nid}: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
+    # The node's first token on the disk before the node holds it (R227 step
+    # 7): lost with the log, the machine is enrolled as far as it knows and
+    # unknown here, with no older token to come back by.
+    db.through()
     return {"ok": True, "node_id": nid, "token": secret,
             "name": n["name"], "capabilities": n["capabilities"],
             "user": cfg.get("user", "bb"), "poll": POLL_S}
@@ -1932,6 +1954,8 @@ def _census(c):
     out["release_key"] = re.sub(r"[^0-9a-f]", "", str(c.get("release_key") or ""))[:16]
     out["release_spare"] = re.sub(r"[^0-9a-f]", "", str(c.get("release_spare") or ""))[:16]
     out["unsigned_ok"] = c.get("unsigned_ok") is True
+    # Root commands switched off at its own console (R227 step 2).
+    out["root_off"] = c.get("root_off") is True
     # The GPU (R20): the NVIDIA card by its PCI id, before any driver, and
     # what the display's unit last said; absent where there is no card.
     for k in ("gpu_card", "gpu_display", "gpu_amd"):
@@ -2544,9 +2568,22 @@ token_stale = None
 can_seal = None
 
 
+def root_off(n):
+    """The sentence a node that runs no root command refuses with, or "":
+    its own console's word (aerieos-agent root-asks off, R227 step 2), which
+    nothing here turns back on. Said before a person is asked to allow
+    one, and before a schedule or an administrator sends one."""
+    if n and (n.get("reported") or {}).get("root_off"):
+        return (f"{n['name']} runs no root command sent to it: that was switched off at its own console, "
+                "and is switched back on there (sudo aerieos-agent root-asks on)")
+    return ""
+
+
 def root_refused(n):
     """The sentence a node whose sessions may not ask for root refuses with,
     or "" when they may."""
+    if root_off(n):
+        return root_off(n)
     if n and (n.get("config") or {}).get("no_root"):
         return (f"root commands from sessions are off on {n['name']}: the Sessions "
                 "section on its row on the Nodes page turns them back on")
@@ -6169,6 +6206,8 @@ def root_wait(principal, node_id, argv, why="", timeout=600, light=False):
         return {"error": f"the node is {n['state']}; a root command goes to an online node"}
     if node_locked(n):
         return {"error": node_locked(n)}
+    if root_off(n):
+        return {"error": root_off(n)}
     spec = {"apply": "root", "timeout": int(timeout), **({"light": True} if light else {}),
             "config": {"argv": [str(a) for a in argv], "why": str(why)[:300],
                        # The person, for the log's first line; the audit row
@@ -6237,10 +6276,25 @@ def ask_hello(node_id):
             _wake.notify_all()
 
 
-# Sessions to end on a node, by node id, until its agent's next poll takes
-# them. In memory like the hello requests: a kill nobody delivered within a
-# poll is one the operator will press again, and a restart should forget it.
-_kills = {}
+# Sessions to end on a node, until its agent's next poll takes them: kept in
+# the store (the kills table, R227 step 13), so an End pressed just before
+# the controller restarts still reaches the node. It was in memory, and the
+# row the press took off the page came back with its session running. Each
+# is kept with when it was asked, which the node holds against the session's
+# own start, so one that arrives late never ends a session started since;
+# one nobody took in a day is dropped.
+KILL_KEEP_S = 86400
+
+
+def _kills_take(node_id):
+    """{name: asked at} for the node, taken off the table in the same
+    transaction that read them."""
+    with db.transaction():
+        rows = _rows("SELECT name, at FROM kills WHERE node_id = ?", (node_id,))
+        if rows:
+            _exec("DELETE FROM kills WHERE node_id = ?", (node_id,))
+    since = time.time() - KILL_KEEP_S
+    return {r["name"]: float(r["at"]) for r in rows if float(r["at"]) >= since}
 
 
 # node id -> {project: revision}: synced projects that moved since the
@@ -6442,7 +6496,7 @@ def session_kill(node_id, name):
         # When it was asked, kept with it: an agent that hears late (its held
         # poll down while the controller restarted) must not end a session
         # started under the same name since, which is what Restart makes.
-        _kills.setdefault(node_id, {})[str(name)[:120]] = time.time()
+        _exec("INSERT OR REPLACE INTO kills (node_id, name, at) VALUES (?, ?, ?)", (node_id, str(name)[:120], time.time()))
         # Off the list from this moment: the heartbeat that stops carrying
         # it is up to a poll away, and a row that stays after ✕ for twenty
         # seconds reads as a button that did nothing.
@@ -6752,7 +6806,7 @@ def job_next(node_id, wait, runner="node", alive=None):
                 # Sessions card (roadmap #24): a node's tmux is the
                 # session account's on that machine, so the agent kills
                 # them, and the held poll is how it hears at once.
-                kills = _kills.pop(node_id, None)
+                kills = _kills_take(node_id)
                 if kills:
                     for k in kills:
                         _kill_taken[(node_id, k)] = time.time()
@@ -6879,6 +6933,21 @@ def _job_out(j):
             j[k] = json.loads(j[k])
     j["cancel"] = bool(j.get("cancel"))
     return j
+
+
+def jobs_going(requested_by):
+    """The jobs one principal asked for that have not ended: [{id, node,
+    spec}], oldest first."""
+    out = []
+    for r in _rows("SELECT id, node, placement, spec FROM jobs WHERE requested_by = ? AND state IN ('queued', 'assigned', 'running') "
+                   "ORDER BY queued", (requested_by,)):
+        try:
+            spec, place = json.loads(r["spec"] or "{}"), json.loads(r["placement"] or "{}")
+        except ValueError:
+            continue
+        out.append({"id": r["id"], "node": r["node"] or (place.get("node") if isinstance(place, dict) else "") or "",
+                    "spec": spec if isinstance(spec, dict) else {}})
+    return out
 
 
 def job(job_id, with_log=True):

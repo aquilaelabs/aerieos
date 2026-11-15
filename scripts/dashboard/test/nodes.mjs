@@ -1534,6 +1534,24 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     const off = await rootAsk();
     ok(/root/.test(off.error || '') && !off.ok, `...and off, the ask is refused and told so (${off.error})`);
     await napi('/api/v1/nodes', { action: 'root-asks', id: minted.id, on: true });
+    // The machine's own console switched root commands off (R227 step 2):
+    // its census says so, the ask is refused before anybody is asked, and
+    // the row says where it is switched back on, under the box.
+    await agent('hello', { census: { ...CENSUS, root_off: true }, version: shipped.version, digest: shipped.digest });
+    const atConsole = await rootAsk();
+    if (atConsole.id) await napi('/api/phone', { action: 'deny', id: atConsole.id });
+    ok(!atConsole.ok && /switched off at its own console/.test(atConsole.error || '') && /root-asks on/.test(atConsole.error || ''),
+       `a node whose console switched root commands off refuses the ask, saying where it is switched back on (${atConsole.error})`);
+    await page.waitForFunction(sel => !!document.querySelector(sel + ' [data-rootoff]'), ROW, { timeout: 15000 }).catch(() => {});
+    const offLine = await page.$eval(`${ROW} [data-rootoff]`, e => ({ text: e.textContent, warn: e.classList.contains('warn'),
+                                                                     under: !!e.closest('.field')?.querySelector('[data-k="rootasks"]') })).catch(() => null);
+    ok(offLine && offLine.warn && offLine.under && /own console/.test(offLine.text) && /sudo aerieos-agent root-asks on/.test(offLine.text)
+       && /Docker there is still root's/.test(offLine.text),
+       `...and its row says so under the box, in the color of a thing switched off, with the limit on a node that runs containers (${JSON.stringify(offLine)})`);
+    await agent('hello', { census: CENSUS, version: shipped.version, digest: shipped.digest });
+    const backOn = await rootAsk();
+    if (backOn.id) await napi('/api/phone', { action: 'deny', id: backOn.id });
+    ok(backOn.ok, `...and switched back on there, the ask goes to a person again (${backOn.error || 'asked'})`);
     await napi('/api/prefs', { project: 'gamma', hosts: [] });
     // Each project's containers kept to their own network (R178), on every
     // node with no switch since R146: the hello says so.

@@ -42,7 +42,7 @@ class Rotation(unittest.TestCase):
         # expiry; three minutes on the node had no credential left.
         from unittest import mock
         new = self.hello()["token"]
-        stale = nodes._rows("SELECT * FROM tokens WHERE revoked = ?", (nodes.TOKEN_PENDING,))
+        stale = nodes._rows("SELECT * FROM tokens WHERE state = ?", (nodes.TOKEN_PENDING,))
         self.assertIn("node", nodes.authenticate(new))
         real = nodes._rows
         calls = iter([stale])
@@ -53,15 +53,57 @@ class Rotation(unittest.TestCase):
         with mock.patch.object(nodes.time, "time", return_value=time.time() + 3600):
             self.assertIn("node", nodes.authenticate(new), "still the node's an hour on")
 
-    def test_a_live_token_that_carries_an_expiry_is_given_its_life_back(self):
-        # B570: a node shut out by the race comes back at its next call.
-        nodes._exec("UPDATE tokens SET expires = ? WHERE kind = 'node' AND revoked = 0", (int(time.time()) - 60,))
-        self.assertIn("node", nodes.authenticate(self.first))
+    def test_two_threads_with_a_new_token_at_once_are_one_after_the_other(self):
+        # R227 step 14: the read and the write it decides are one
+        # transaction, so of two calls arriving together one finds the token
+        # pending and the other finds it live; the token before is retired
+        # once, with one grace, and the new one carries no expiry.
+        import threading
+        for _round in range(20):
+            new = self.hello()["token"]
+            gate, said = threading.Barrier(2), []
+            def call(new=new, gate=gate, said=said):
+                gate.wait()
+                said.append(nodes.authenticate(new))
+            pair = [threading.Thread(target=call) for _ in range(2)]
+            for t in pair:
+                t.start()
+            for t in pair:
+                t.join()
+            self.assertTrue(all("node" in x for x in said), said)
+            live = nodes._rows("SELECT * FROM tokens WHERE node_id = ? AND state = ?", (self.nid, nodes.TOKEN_LIVE))
+            self.assertEqual([(len(live), live[0]["expires"])], [(1, None)], "one live token, with no expiry")
+
+    def test_a_statement_that_fails_takes_the_whole_check_back(self):
+        # The token before is not left retired by a use of the new one that
+        # did not finish: the transaction is all of it or none.
+        from unittest import mock
+        new = self.hello()["token"]
+        real = nodes._exec
+        def fails_on_the_second(q, a=()):
+            if "expires = NULL" in q:
+                raise nodes.sqlite3.OperationalError("disk I/O error")
+            return real(q, a)
+        with mock.patch.object(nodes, "_exec", side_effect=fails_on_the_second), self.assertRaises(nodes.sqlite3.OperationalError):
+            nodes.authenticate(new)
+        states = sorted(r["state"] for r in nodes._rows("SELECT state FROM tokens WHERE node_id = ? AND kind = 'node'", (self.nid,)))
+        self.assertEqual(states, [nodes.TOKEN_LIVE, nodes.TOKEN_PENDING], "as it was before the call")
+        self.assertIn("node", nodes.authenticate(new), "and the next use goes through")
+
+    def test_every_token_goes_when_the_node_s_tokens_are_revoked(self):
+        # A pending token and one retired inside its grace went on being
+        # taken after revoke_tokens, which was written for the live one.
+        first_new = self.hello()["token"]
+        nodes.authenticate(first_new)
+        pending = self.hello()["token"]
+        nodes.revoke_tokens(self.nid)
+        for name, tok in (("retired", self.first), ("live", first_new), ("pending", pending)):
+            self.assertEqual(nodes.authenticate(tok), {"error": "credential revoked"}, name)
 
     def test_a_retired_token_after_its_grace_revokes_the_node(self):
         new = self.hello()["token"]
         nodes.authenticate(new)
-        nodes._exec("UPDATE tokens SET expires = ? WHERE revoked = ?", (int(time.time()) - 1, nodes.TOKEN_RETIRED))
+        nodes._exec("UPDATE tokens SET expires = ? WHERE state = ?", (int(time.time()) - 1, nodes.TOKEN_RETIRED))
         self.assertEqual(nodes.authenticate(self.first), {"error": "credential revoked"})
         self.assertEqual(nodes.authenticate(new), {"error": "credential revoked"}, "the live one goes with it")
         rows = [r for r in nodes.token_attention() if r["kind"] == "token-reuse"]
@@ -69,7 +111,7 @@ class Rotation(unittest.TestCase):
 
     def test_a_node_turned_away_says_so_until_it_is_back(self):
         # B569: the page said quiet for two days while the agent was refused.
-        nodes._exec("UPDATE tokens SET revoked = 1 WHERE node_id = ?", (self.nid,))
+        nodes._exec("UPDATE tokens SET state = 'revoked' WHERE node_id = ?", (self.nid,))
         self.assertEqual(nodes.authenticate(self.first), {"error": "credential revoked"})
         rows = [r for r in nodes.token_attention() if r["kind"] == "node-refused"]
         self.assertEqual([(r["id"], r["why"]) for r in rows], [(self.nid, "credential revoked")])
@@ -155,6 +197,31 @@ class Restored(unittest.TestCase):
         nodes._recover_at.clear()
         self.assertIsNone(nodes.recover_token("n_ffffffff", self.past), "another node's past is not this one's")
         self.assertIsNone(nodes.recover_token(self.nid, "not a list"))
+
+
+class Migration(unittest.TestCase):
+    """Migration 0008: the four numbers of the revoked column become the
+    state's four words, a live node token loses an expiry the old race left
+    it, and the revoked column is gone."""
+
+    def test_the_states_come_across(self):
+        import sqlite3
+        here = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "migrations")
+        c = sqlite3.connect(":memory:")
+        c.executescript(open(os.path.join(here, "0001_init.sql")).read())
+        rows = [("t_live", "node", 0, None), ("t_raced", "node", 0, 99), ("t_gone", "node", 1, None), ("t_pending", "node", 2, None),
+                ("t_retired", "node", 3, 1234), ("e_open", "enroll", 0, 5678), ("e_used", "enroll", 1, 5678)]
+        for tid, kind, revoked, expires in rows:
+            c.execute("INSERT INTO tokens (id, kind, node_id, secret_hash, created, expires, revoked, uses) VALUES (?, ?, 'n_1', ?, 1, ?, ?, 0)",
+                      (tid, kind, tid, expires, revoked))
+        c.executescript(open(os.path.join(here, "0008_token_state.sql")).read())
+        got = {r[0]: (r[1], r[2]) for r in c.execute("SELECT id, state, expires FROM tokens")}
+        self.assertEqual(got, {"t_live": ("live", None), "t_raced": ("live", None), "t_gone": ("revoked", None),
+                               "t_pending": ("pending", None), "t_retired": ("retired", 1234),
+                               "e_open": ("live", 5678), "e_used": ("revoked", 5678)})
+        self.assertNotIn("revoked", [r[1] for r in c.execute("PRAGMA table_info(tokens)")])
+
+
 
 if __name__ == "__main__":
     unittest.main()

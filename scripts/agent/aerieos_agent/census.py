@@ -411,6 +411,8 @@ def census(state):
         "release_key": str(console_said().get("release_key") or "")[:16],
         "release_spare": str(console_said().get("release_spare") or "")[:16],
         "unsigned_ok": console_said().get("unsigned_ok") is True,
+        # ...and whether its console switched root commands off (R227 step 2).
+        "root_off": console_said().get("root_off") is True,
         # ...and whether this agent may install the machine's own packages
         # here: the stamp AND root, which is what administers() asks. The
         # stamp alone said yes for an agent that could not, and the

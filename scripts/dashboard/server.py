@@ -1976,6 +1976,8 @@ def schedule_queue(s, argv, by):
         if not (n.get("reported") or {}).get("sandbox"):
             return {"error": f"{n['name']} was not provisioned as an AerieOS sandbox, so root there is its owner's: "
                              "run it as the jobs account, or on a sandbox node"}
+        if nodes.root_off(n):
+            return {"error": nodes.root_off(n) + ": run it as the jobs account, or on another node"}
         spec = {"apply": "root", "timeout": t,
                 "config": {"argv": argv, "why": f"the schedule {s.get('name', '')}", "by": by, "timeout": t}}
         r = nodes.job_add(principal, {"node": nid}, "system", spec)
@@ -13897,7 +13899,8 @@ class Handler(BaseHTTPRequestHandler):
         its backup password."""
         found = backup.found(_own_pool_mounts())
         rows = "".join(f'<label class="pick"><input type="radio" name="found" value="{html_escape(c["path"])}"{" checked" if i == 0 else ""}> '
-                       f'{html_escape(c["name"])} · {html_escape(c["host"] or "this machine")} · {time.strftime("%d %b %Y %H:%M", time.gmtime(c["made_at"]))}</label>'
+                       f'{html_escape(c["name"])} · {html_escape(c["host"] or "this machine")} · {time.strftime("%d %b %Y %H:%M", time.gmtime(c["made_at"]))}'
+                       f'{"" if c.get("carries_key") else " · without the install key: its sign-ins and tokens stay locked until the key is given under Controller, Keys"}</label>'
                        for i, c in enumerate(found))
         fields = RESTORE_FIELDS.replace("<!--FOUND-->", (f'<p class="note">Found on this machine\'s disks, newest first:</p>{rows}' if rows
                                                          else '<p class="note">No copy found on this machine\'s disks yet (its pools come in once the node reports); upload one below.</p>'))
@@ -14460,6 +14463,9 @@ def main():
         threading.Thread(target=_reach_loop, name="reach", daemon=True).start()
     threading.Thread(target=_move_loop, name="move", daemon=True).start()
     db.start_folding()        # the write-ahead log folded into the database every minute (B654)
+    if not NODES_OK:
+        with contextlib.suppress(Exception):   # noqa: BLE001 (a sign-in found again is a kindness, never a start that fails)
+            signin.resume()       # a sign-in still going on a node is its account's flow again (R227 step 13)
     ciwatch.start()           # a project's CI, once a day (R117)
     releasesign.start()       # a release's unsigned APK, signed on its node (R106)
     releasefiles.start()      # a release's files checked against its list (R190)

@@ -89,6 +89,28 @@ class Backup(unittest.TestCase):
         # A move bundle is not a backup, and a backup takes no move token.
         self.assertIn("password, not a move token", move.restore(found[0]["path"], "tok", state_dir=fresh).get("error", ""))
 
+    def test_a_copy_carries_the_install_key_and_the_restore_takes_it(self):
+        # R227 step 10 (the operator, 15 Nov): the key inside, sealed like the
+        # rest, so the password alone brings back what the state keeps sealed.
+        from unittest import mock
+        key = b"k" * 32
+        with mock.patch.object(move, "install_key", lambda: key):
+            backup.make("user:ann", "asked")
+        found = backup.found([str(self.pool)])
+        self.assertTrue(found[0]["carries_key"] and backup.status()["copies"][0]["carries_key"])
+        self.assertNotIn(key, Path(found[0]["path"]).read_bytes(), "sealed with the rest, never in the clear")
+        fresh = self.tmp / "fresh" / "config"
+        fresh.mkdir(parents=True)
+        took = []
+        with mock.patch.object(move, "install_landed_key", lambda k, d: took.append(bytes(k)) and ""):
+            r = backup.restore(found[0]["path"], self.password, state_dir=fresh, workspace_dir=self.tmp / "ws2", build_state_version=19)
+        self.assertTrue(r.get("ok"), r)
+        self.assertEqual(took, [key], "the landing is handed the key the copy carried")
+
+    def test_a_copy_from_an_install_with_no_key_says_it_carries_none(self):
+        backup.make("user:ann", "asked")
+        self.assertFalse(backup.found([str(self.pool)])[0]["carries_key"])
+
     def test_the_loop_copies_once_the_state_has_been_quiet(self):
         backup.make("user:ann", "asked")
         at = backup.status()["made_at"]

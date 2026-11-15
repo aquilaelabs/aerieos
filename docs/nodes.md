@@ -1786,7 +1786,12 @@ sandbox is a permissions design of its own, not written). Allow queues the job w
 its spec so its log is the record, and only a sandbox node takes it: the
 agent refuses it without the stamp like storage and network. It is not
 sudo: there is no second command without a second question, and nothing
-pretends. A node can be LOCKED (`config.lock`, the Lock under Advanced,
+pretends. A machine's own console can refuse them all (`sudo aerieos-agent
+root-asks off`, kept in node.json as the console's word like the release
+key's pin and reported as `root_off`): the agent then fails `apply: root`
+with 77 before anything runs, and the controller refuses the ask, a
+schedule as root and `root_wait` with the sentence `nodes.root_off` says,
+so nobody is asked to allow what the node would refuse. A node can be LOCKED (`config.lock`, the Lock under Advanced,
 `nodes.node_lock`): while it is, `node_apply` for storage and network and
 `root_wait` refuse with `node_locked`'s sentence, a root ask is refused at
 ask time, and the Nodes page ghosts both Apply buttons saying why, for a machine

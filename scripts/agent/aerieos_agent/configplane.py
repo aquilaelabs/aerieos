@@ -29,6 +29,7 @@ from .base import (
 )
 from .stores import (
     _can_chown,
+    console_said,
     dir_bytes,
     make_store,
     mount_covering,
@@ -797,6 +798,13 @@ class ConfigPlaneMixin:
         if not argv:
             job.say("refused: nothing to run\n")
             return "failed", 64
+        # This machine's own word first (R227 step 2), read from the file
+        # its console writes: the allowing was done on the controller, and
+        # whoever holds the controller can say a person allowed anything.
+        if console_said().get("root_off") is True:
+            job.say("refused: this machine runs no root command the controller sends; that was switched off at its own "
+                    f"console, and is switched back on there: sudo {names.command()} root-asks on\n")
+            return "failed", 77
         job.say(f"# root on this node, allowed by {cfg.get('by') or 'the operator'}: "
                 f"{cfg.get('why') or '(no reason given)'}\n")
         try:

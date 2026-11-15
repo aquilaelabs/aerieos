@@ -47,6 +47,23 @@ def digest():
     return "sha256:" + hashlib.sha256(_load("bundle").build(AGENT)).hexdigest()
 
 
+def tools_digest():
+    """The digest of the tools root installs from the bundle, as this tree
+    holds them and as a node works it out from the bundle it was sent
+    (release.tools_digest): the files base.ROOT_TOOLS names and the
+    provisioner's family files, each by its name in the bundle."""
+    root = os.path.join(HERE, "..")
+    names = list(_load("base").ROOT_TOOLS)
+    fam = os.path.join(root, "nodes", "families")
+    for d, _dirs, files in os.walk(fam):
+        names += [os.path.relpath(os.path.join(d, f), root).replace(os.sep, "/") for f in files]
+    held = {}
+    for name in names:
+        with open(os.path.join(root, name), "rb") as f:
+            held[name] = f.read()
+    return _load("release").tools_digest(held)
+
+
 def public_keys():
     """The keys the committed file names: the one the builds sign with, then
     its spare (R232). A node pins both, so a build signed by either is taken."""
@@ -99,7 +116,13 @@ def main(argv):
                     by = k
                     break
         print(f"{os.path.relpath(SIG)}: " + (why or f"signed by {by[:16]}… for {digest()[:19]}…"))
-        return 1 if why else 0
+        # ...and root's tools, signed beside it under their own line.
+        tools = got.get("tools") if isinstance(got.get("tools"), dict) else {}
+        twhy = "it carries no signature for the tools root installs" if not tools else \
+            "it is for other tools than this tree holds" if tools.get("digest") != tools_digest() else \
+            next((w for w in [release.verify(by or public_key(), tools.get("digest"), tools.get("sig"), release.TOOLS_MESSAGE)] if w), "")
+        print(f"{os.path.relpath(SIG)}: root's tools: " + (twhy or f"signed by {(by or public_key())[:16]}… for {tools_digest()[:19]}…"))
+        return 1 if why or twhy else 0
     seed = os.environ.get("AERIEOS_RELEASE_KEY", "").strip().lower()
     if not seed:
         print("no AERIEOS_RELEASE_KEY in the environment: the agent ships unsigned, as a build from a branch does")
@@ -115,12 +138,16 @@ def main(argv):
               + ", ".join(k[:16] + "…" for k in public_keys()) + "): nodes pinned to those would refuse this build, "
               "so nothing is signed", file=sys.stderr)
         return 2
-    d = digest()
-    out = {"digest": d, "sig": key.sign(release.MESSAGE + d.encode()).hex(), "key": pub}
+    d, t = digest(), tools_digest()
+    out = {"digest": d, "sig": key.sign(release.MESSAGE + d.encode()).hex(), "key": pub,
+           # The tools root installs from the bundle, under a line of their
+           # own: the controller puts this in the bundle it serves.
+           "tools": {"digest": t, "sig": key.sign(release.TOOLS_MESSAGE + t.encode()).hex()}}
     with open(SIG, "w", encoding="utf-8") as f:
         json.dump(out, f)
         f.write("\n")
-    print(f"signed the agent {d[:19]}… with the " + ("spare release key" if pub in public_keys()[1:] else "release key") + f" {pub[:16]}…")
+    print(f"signed the agent {d[:19]}… and root's tools {t[:19]}… with the "
+          + ("spare release key" if pub in public_keys()[1:] else "release key") + f" {pub[:16]}…")
     return 0
 
 

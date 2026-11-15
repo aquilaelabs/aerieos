@@ -157,15 +157,20 @@ big stick unused.
 
 With a backup password set under Controller settings, Backup, the
 controller keeps a sealed copy of its configuration (the same bundle a move
-carries: the state without its logs, the stores, the secrets; never the
-repositories) after every change, once the state has been quiet for a
+carries: the state without its logs, the stores, the secrets, and the
+install key, so the password alone restores what the state keeps sealed;
+never the repositories) after every change, once the state has been quiet for a
 quarter of an hour: under the state, and on every pool of the machine at
 `/mnt/POOL/.builderbot/backup`, the five newest in each; Back up now writes
 one at once, and each copy under the state is downloadable. Backup copies'
 **Also copied to** sends each copy as well to a disk or share ticked under
 Other disks and shares (`/mnt/other/NAME/.builderbot/backup`), so one is off
 the machine. The key is the password's (scrypt), so a copy carried off is a
-sealed file. These copies are the controller, not the files on the pools:
+sealed file, and one opened with the password is the whole controller, its
+sign-ins and tokens included: keep the password as you keep the owner's. A
+copy written before copies carried the install key is marked without it, and
+restored, its sign-ins and tokens stay locked until the key is given under
+Controller, Keys. These copies are the controller, not the files on the pools:
 the Storage page's snapshots and Backups keep those.
 
 A stick that dies is replaced by one written from the release's image with

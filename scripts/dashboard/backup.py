@@ -1,6 +1,7 @@
 """The configuration backed up and found again (R161 step 4): the same
 bundle a move carries (move.pack: the state without its logs, the stores,
-the secrets), sealed under a key the backup password derives, written after
+the secrets, and the install key what they are sealed under opens with:
+R227 step 10), sealed under a key the backup password derives, written after
 every change to the state (a quiet quarter of an hour after the last) onto
 every pool of the controller's own machine (/mnt/POOL/.builderbot/backup)
 and under the state, the five newest kept in each, and downloadable. A new
@@ -111,7 +112,8 @@ def make(principal, why="asked"):
 
     def manifest_of(counts):
         return {"kind": "backup", "version": _version(), "state_version": int(_state_version() or 0), "made_at": made_at,
-                "salt": base64.b64encode(salt).decode(), "host": _host(), "counts": counts, "why": why, "by": str(principal)[:80]}
+                "salt": base64.b64encode(salt).decode(), "host": _host(), "counts": counts, "why": why, "by": str(principal)[:80],
+                "carries_key": bool(counts.get("install_key"))}
     # Packed once, as it is sealed, into the first folder that takes it
     # (never whole in memory, B558), and copied from there to the rest.
     written, failed, first, size = [], [], None, 0
@@ -120,7 +122,11 @@ def make(principal, why="asked"):
             d.mkdir(parents=True, exist_ok=True, mode=0o700)
             tmp = d / (name + ".partial")
             if first is None:
-                _bundle(tmp, move_header(), manifest_of, key_from(pw, salt))
+                # With the install key inside, sealed like the rest (the
+                # operator, 15 Nov): the password alone then restores what
+                # the state keeps sealed, the sign-ins and the tokens too,
+                # where a copy without it brought them back locked.
+                _bundle(tmp, move_header(), manifest_of, key_from(pw, salt), carry_key=True)
             else:
                 shutil.copyfile(first, tmp)
             os.chmod(tmp, 0o600)
@@ -158,7 +164,8 @@ def copies():
                 m, _ = _manifest(str(p))
                 if m:
                     out.append({"where": str(d), "name": p.name, "size": p.stat().st_size, "made_at": int(m.get("made_at") or 0),
-                                "version": str(m.get("version") or ""), "state_version": int(m.get("state_version") or 0)})
+                                "version": str(m.get("version") or ""), "state_version": int(m.get("state_version") or 0),
+                                "carries_key": bool(m.get("carries_key"))})
         except OSError:
             continue
     out.sort(key=lambda c: -c["made_at"])
@@ -183,7 +190,8 @@ def found(dirs):
                 m, _ = _manifest(str(p))
                 if m:
                     out.append({"path": str(p), "name": p.name, "made_at": int(m.get("made_at") or 0), "version": str(m.get("version") or ""),
-                                "state_version": int(m.get("state_version") or 0), "host": str(m.get("host") or "")})
+                                "state_version": int(m.get("state_version") or 0), "host": str(m.get("host") or ""),
+                                "carries_key": bool(m.get("carries_key"))})
         except OSError:
             continue
     out.sort(key=lambda c: -c["made_at"])

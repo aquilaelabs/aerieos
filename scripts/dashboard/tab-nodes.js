@@ -1118,6 +1118,15 @@ function nodeAgentsLine(n){
 // for a root command by name (aerie root run --node NAME), and this switch
 // decides, as the Sessions section's does on a node that runs them. A
 // draft until its Save, like that one.
+// What a machine's own console said of root commands (R227 step 2): off
+// there, every one is refused whatever this row's box says, so the row says
+// so under the box, in the color of a thing switched off, with where it is
+// switched back on and what the switch does not reach.
+function nodeRootOffLine(n){
+  if (!n.reported?.root_off) return "";
+  const docker = n.config?.host_only || (n.reported?.services || {}).docker;
+  return `<div class="sub warn" data-rootoff>Switched off at this machine's own console: it refuses every root command sent to it, whatever is set here. <code>sudo aerieos-agent root-asks on</code> at the machine switches it back on.${docker ? " It runs containers, and Docker there is still root's." : ""}</div>`;
+}
 function nodeHostRootRow(n){
   const c = nodeDraft(n);
   const rootOn = !n.config?.no_root;
@@ -1128,6 +1137,7 @@ function nodeHostRootRow(n){
     <label class="ndcap"><input type="checkbox" data-k="rootasks" ${c.draft.rootAsks ? "checked" : ""}>
       let a session of a space that hosts containers here ask for a root command (aerie root run --node ${esc(n.name)}), which a person then allows or denies</label>
     ${rootOn ? "" : `<div class="sub dim">A session that asks is refused and told this is off.</div>`}
+    ${nodeRootOffLine(n)}
   </div>`;
 }
 
@@ -1207,7 +1217,8 @@ function nodeSessNetRow(n){
     ${line}</div>
     <div class="field"><label class="ndcap"><input type="checkbox" data-k="rootasks" ${c.draft.rootAsks ? "checked" : ""}>
       let a session ask for a root command (aerie root run), which a person then allows or denies</label>
-    ${rootOn ? "" : `<div class="sub dim">A session that asks is refused and told this is off.</div>`}</div>
+    ${rootOn ? "" : `<div class="sub dim">A session that asks is refused and told this is off.</div>`}
+    ${nodeRootOffLine(n)}</div>
     <div class="field"><div class="sub">Each account here is a user of its own, so no account and no shell as the session account reaches another's sign-ins or terminals.</div>
     ${acctLine}</div>
     <div class="field"><div class="sub">The coding agents' sign-ins are kept sealed here, opened only while their person has a terminal open.</div>

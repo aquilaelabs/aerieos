@@ -12,6 +12,7 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "..", "agent"))
+sys.path.insert(0, os.path.join(HERE, ".."))          # the dashboard's own modules, for the bundle it builds
 from aerieos_agent import release, stores  # noqa: E402
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey  # noqa: E402
 
@@ -249,6 +250,66 @@ class Signer(unittest.TestCase):
         keys = enrollscript.release_keys()
         self.assertEqual(len(keys), 2, "the repository names a spare for the release key")
         self.assertEqual(release.clean_keys(",".join(keys)), keys)
+
+
+class FromTheBuildToTheNode(unittest.TestCase):
+    """What the build signs is what the controller's bundle carries and what
+    a pinned node then keeps: the three work the list out apart (the tool
+    from the tree, the node from the bundle it was sent), and a file the
+    bundle holds that the signature does not cover would leave every pinned
+    node on its old tools."""
+
+    def test_the_tree_signed_is_the_bundle_kept(self):
+        import tarfile
+        from unittest import mock
+        from aerieos_agent import base as agent_base, workspace as agent_workspace
+        import workspace as controller_bundle  # the dashboard's, which builds the bundle
+        root = os.path.normpath(os.path.join(HERE, "..", "..", ".."))
+        tool, sig = os.path.join(root, "tools", "sign-agent.py"), os.path.join(root, "scripts", "agent", "agent.sig")
+        had = open(sig).read() if os.path.exists(sig) else None
+        self.addCleanup(lambda: open(sig, "w").write(had) if had is not None else (os.path.exists(sig) and os.unlink(sig)))
+        k, pub = pair()
+        d = tempfile.mkdtemp()
+        mine = os.path.join(d, "release.pub")
+        with open(mine, "w") as f:
+            f.write(f"aerieos-release-ed25519 {pub}\n")
+        env = dict(os.environ, AERIEOS_RELEASE_PUB=mine, AERIEOS_RELEASE_KEY=k.private_bytes_raw().hex())
+        r = subprocess.run([sys.executable, tool], env=env, capture_output=True, text=True, timeout=60, check=False)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("and root's tools", r.stdout)
+        with open(sig) as f:
+            got = json.load(f)
+        self.assertEqual(release.verify(pub, got["tools"]["digest"], got["tools"]["sig"], release.TOOLS_MESSAGE), "")
+        r = subprocess.run([sys.executable, tool, "--check"], env=env, capture_output=True, text=True, timeout=60, check=False)
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertIn("root's tools: signed by", r.stdout)
+        # The controller's bundle, as a node is sent it...
+        with mock.patch.object(controller_bundle, "_bundle", {}), mock.patch.object(controller_bundle, "REPO", __import__("pathlib").Path(root)):
+            body = controller_bundle.bundle()["body"]
+        tar = os.path.join(d, "bundle.tar")
+        with open(tar, "wb") as f:
+            f.write(body)
+        with tarfile.open(tar) as t:
+            self.assertIn(agent_base.TOOLS_SIG, t.getnames())
+        # ...and the node, pinned to that key.
+        tools, said = os.path.join(d, "tools"), []
+        os.makedirs(tools)
+        with mock.patch.object(agent_workspace, "TOOLS_DIR", tools):
+            kept = agent_workspace.WorkspaceMixin._keep_root_tools(tar, "abcd", said.append, {"release_key": pub})
+        self.assertTrue(kept, said)
+        self.assertTrue(os.path.isfile(os.path.join(tools, "abcd", "nodes", "provision-linux.sh")))
+        self.assertTrue(os.path.isdir(os.path.join(tools, "abcd", "nodes", "families")))
+        # A build from a branch signs nothing, and its bundle carries no signature.
+        os.unlink(sig)
+        with mock.patch.object(controller_bundle, "_bundle", {}), mock.patch.object(controller_bundle, "REPO", __import__("pathlib").Path(root)):
+            body = controller_bundle.bundle()["body"]
+        with open(tar, "wb") as f:
+            f.write(body)
+        with tarfile.open(tar) as t:
+            self.assertNotIn(agent_base.TOOLS_SIG, t.getnames())
+        with mock.patch.object(agent_workspace, "TOOLS_DIR", tools):
+            self.assertFalse(agent_workspace.WorkspaceMixin._keep_root_tools(tar, "ef01", said.append, {"release_key": pub}))
+            self.assertEqual(os.readlink(os.path.join(tools, "current")), "abcd")
 
 
 if __name__ == "__main__":

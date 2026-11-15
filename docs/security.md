@@ -41,9 +41,15 @@ pool mounts. Everything the controller keeps sealed is sealed under a key
 derived from it: the accounts' keys, the signing keys, two-factor secrets,
 the deploy keys, a space's own git line from before 0.8.0.
 
-- Protects against: a copy of `/config` (ciphertext alone), a backup
-  restored on another machine (refused until the key is given), an
-  operator of the share the state lives on.
+- Protects against: a copy of `/config` (ciphertext alone), a move's
+  bundle landed on another machine without the key ticked (what is sealed
+  stays locked until the key is given), an operator of the share the state
+  lives on.
+- The configuration's own backup (Controller settings, Backup) carries the
+  install key inside, sealed with the rest under the backup password, so
+  the password alone restores a copy whole: a copy is a sealed file to
+  whoever lacks the password, and everything the controller keeps to
+  whoever has both. Choose that password as you would the owner's.
 - Does not protect against: root on the running controller, who reads the
   key where the controller does; the stick and its pool's disks taken
   together; a secrets folder copied along with
@@ -289,19 +295,37 @@ job and on the node's row. A node's row says which it
 is under Updates. While the repository names no key, no node pins one and
 updates are taken as before.
 
-**The rest, it still does.** The agent runs as root; a root command an
-administrator approves is run as given (which, on a node provisioned as a
-sandbox, could also undo the pin); the scripts root installs from the
-bundle are accepted on a digest the controller names; and the jobs
-account's Docker is root's on a node that runs containers. So whoever
-holds the controller (a copy of its state with the install key, an
-administrator's sign-in) still holds those nodes: the signature closes the
-update as a way in, not the others. What bounds them is on the
-controller's side: **Lock system changes** on a node's row has the
+**The tools root installs from the bundle, it does not either.** The
+provisioner with the machine's own helper in it, the helper that builds a
+session's view and the one that cuts a pack's install off the network reach
+a node in the bundle of `aerie` the controller serves, whose digest moves
+with a person's tool packs and is the controller's word. A release's build
+signs the list of those files, each with its digest, and a pinned node
+keeps a copy of them for root only under that signature: otherwise root
+goes on with the copy it has, the job saying why, and a machine whose
+console allows unsigned builds takes them from a branch's build as it takes
+that build's agent.
+
+**The rest, it still does, unless its console says otherwise.** The agent
+runs as root; a root command an administrator approves is run as given
+(which, on a node provisioned as a sandbox, could also undo the pin); and
+the jobs account's Docker is root's on a node that runs containers. So
+whoever holds the controller (a copy of its state with the install key, an
+administrator's sign-in) still holds those nodes: the signatures close the
+update and root's own tools as ways in, not the others. What bounds them
+on the controller's side: **Lock system changes** on a node's row has the
 controller refuse storage, network and root changes there, and every root
-command is on the record with who approved it. One thing is held by the
-node itself: on the controller's own machine the root agent runs docker
-for the controller and nothing else under that mark.
+command is on the record with who approved it. Two things are held by the
+node itself. On the controller's own machine the root agent runs docker for
+the controller and nothing else under that mark. And a machine's own
+console can switch root commands off: after `sudo aerieos-agent root-asks
+off` there, that node refuses every root command the controller sends
+(`aerie root run`, a schedule as root), whoever allowed it, and the
+controller says so before anybody is asked; its row says it is off, and
+only `sudo aerieos-agent root-asks on` at that machine turns it back on.
+What AerieOS does as root by name (storage, updates, its own tools) goes
+on, and where the machine runs containers, Docker there is still root's:
+the switch closes the free-form command, which is the widest of them.
 
 ## The signing keys, and replacing one
 

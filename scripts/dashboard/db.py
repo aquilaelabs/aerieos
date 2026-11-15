@@ -24,6 +24,7 @@ half-working. The notebook's JSON files are NOT this module's business: they
 are small, human-edited and read whole, and they stay where they are.
 """
 
+import contextlib
 import hashlib
 import hmac
 import json
@@ -108,8 +109,40 @@ def _q(sql):
 def _exec(sql, args=()):
     with _lock:
         cur = _db.execute(_q(sql), args)
-        _db.commit()
+        if not (_held and _held_by == threading.get_ident()):
+            _db.commit()
         return cur
+
+
+# How deep a thread is in transaction(), and which thread: moved under
+# _lock alone. Nothing that waits on the store's condition belongs inside
+# one, since the wait lets go of the lock with the transaction still open.
+_held = 0
+_held_by = 0
+
+
+@contextlib.contextmanager
+def transaction():
+    """What is read and what is then written, as one: the store's lock held
+    from the first statement to the last and one commit when the outermost
+    leaves, so no other thread's statement lands between a row read and the
+    write decided by it, and a stop half-way leaves none of it (R227 step
+    14). Whatever raises out of the outermost takes all of it back. One
+    inside another is the same transaction."""
+    global _held, _held_by
+    with _lock:
+        _held += 1
+        _held_by = threading.get_ident()
+        try:
+            yield
+        except BaseException:
+            _held -= 1
+            if not _held:
+                _db.rollback()
+            raise
+        _held -= 1
+        if not _held:
+            _db.commit()
 
 
 def _rows(sql, args=()):
@@ -175,8 +208,28 @@ def fold():
     if _db is None:
         return (0, 0, 0)
     with _lock:
+        if _held and _held_by == threading.get_ident():
+            # Inside this thread's own transaction the log cannot be folded
+            # (SQLite refuses with the table locked), and what it holds is
+            # not committed yet: the next fold takes it.
+            return (1, 0, 0)
         row = _db.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
     return tuple(row) if row else (0, 0, 0)
+
+
+def through():
+    """What was just committed, in the database file before anybody is told
+    of it (R227 step 7): a token handed to a node, at its enrollment and at
+    each rotation. The store commits to its log and syncs that at a fold
+    (the synchronous setting is NORMAL: FULL would sync on every heartbeat,
+    which on a FUSE /config is the page waiting on the disk all day), so the
+    last minute's commits are what a power cut can take; the few that must
+    not go that way are folded as they are made. A job is not one of them:
+    every listing read from a node is a job too, and one lost in its first
+    minute is seen to be gone and pressed again, where a token lost is a
+    node locked out. Never raises: the minute's fold is still coming."""
+    with contextlib.suppress(sqlite3.Error):
+        fold()
 
 
 def start_folding(every=FOLD_S):

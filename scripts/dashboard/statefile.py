@@ -68,6 +68,42 @@ def frozen():
         yield
 
 
+class Landing(OSError):
+    """A write refused because the state it was for is being replaced."""
+
+
+# The folder a landing is replacing and the thread doing it, or nothing.
+_landing = []
+
+
+def landing_begins(folder):
+    """The state under `folder` is being replaced whole (a move's bundle or
+    a backup landing, R227 step 8): from here every state file another
+    thread of this process would write there is refused, at once and
+    without waiting, since what that thread holds is the state that is
+    going. A writer already renaming its file finishes first. Refused, never
+    held: a writer made to wait while it holds its module's lock would stop
+    the landing, which takes those locks. The landing's own thread writes as
+    before. It stays so until landing_over(), or until the process ends,
+    which is how a landing that worked ends."""
+    with _gate:
+        _landing[:] = [os.path.realpath(str(folder)), threading.get_ident()]
+
+
+def landing_over():
+    """The state that was there is back as it was: writers go on."""
+    with _gate:
+        _landing[:] = []
+
+
+def _not_landing(path):
+    if _landing and _landing[1] != threading.get_ident():
+        folder, into = _landing[0], os.path.realpath(os.path.dirname(path) or ".")
+        if into == folder or into.startswith(folder.rstrip("/") + "/"):
+            raise Landing(errno.EBUSY, "this controller's state is being replaced by the one that just landed: "
+                                       "nothing more is written to it until the controller has restarted", path)
+
+
 class FileLock:
     """`with lock:` over `locked(path)`, for a module that held a threading
     lock alone around a read, a change and a save of its file: the same
@@ -166,6 +202,7 @@ def write_json(path, obj, mode=0o644, sync=True):
     of milliseconds a write and was paid on every edit a session made. A
     power cut can cost such a store its last minutes and nothing else."""
     path = _p(path)
+    _not_landing(path)
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path) or ".",
                                prefix=os.path.basename(path) + ".",
@@ -178,6 +215,7 @@ def write_json(path, obj, mode=0o644, sync=True):
         # mkstemp gives 600 and these were world-readable before.
         os.chmod(tmp, mode)
         with _gate:
+            _not_landing(path)
             os.replace(tmp, path)
         if sync:
             _sync_dir(path)
@@ -194,6 +232,7 @@ def write_text(path, text, mode=0o644, encoding="utf-8"):
     gitrelay.py, changelog.py and memory.py each carried their own and each
     met the fixed-temp-file race on its own before this."""
     path = _p(path)
+    _not_landing(path)
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path) or ".",
                                prefix="." + os.path.basename(path) + ".", suffix=".tmp")
@@ -203,6 +242,7 @@ def write_text(path, text, mode=0o644, encoding="utf-8"):
             _sync(f)
         os.chmod(tmp, mode)
         with _gate:
+            _not_landing(path)
             os.replace(tmp, path)
         _sync_dir(path)
     except BaseException:

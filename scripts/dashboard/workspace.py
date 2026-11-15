@@ -347,6 +347,25 @@ BUNDLE_PARTS = ("scripts/aerie", "scripts/bb", "scripts/lib", "config/toolchains
 _bundle_missing = set()
 
 
+# The member a node reads the release's signature over root's tools from
+# (the agent's base.TOOLS_SIG).
+TOOLS_SIG = "nodes/root-tools.sig"
+
+
+def _tools_sig():
+    """The bundle's root-tools.sig as text, or "": {"digest", "sig"} from
+    the tools half of scripts/agent/agent.sig, which a release's build
+    writes and a build from a branch does not."""
+    try:
+        d = json.loads((REPO / "scripts" / "agent" / "agent.sig").read_text())
+        t = d.get("tools") if isinstance(d, dict) else None
+        if isinstance(t, dict) and re.fullmatch(r"[0-9a-f]{128}", str(t.get("sig") or "")):
+            return json.dumps({"digest": str(t.get("digest") or "")[:80], "sig": t["sig"]})
+    except (OSError, ValueError):
+        pass
+    return ""
+
+
 def bundle():
     """bb, its library and the catalog as one tar: {body, digest}. Rebuilt
     when any of its files moves, so a node installing a toolchain runs the
@@ -363,7 +382,11 @@ def bundle():
     stamp.extend(int(p.stat().st_mtime_ns) for _, p in hosted)
     shipped = REPO / "config" / "toolchains.json"
     newer = toolchains_json(shipped.read_text()) if toolchains_json and shipped.is_file() else ""
-    key = hash((tuple(stamp), packs, newer))
+    # The release's signature over the tools root installs from this bundle
+    # (R227 step 1), where the build made one: beside the agent's, in the
+    # file tools/sign-agent.py writes, and carried as a member of its own.
+    tools_sig = _tools_sig()
+    key = hash((tuple(stamp), packs, newer, tools_sig))
     if _bundle.get("key") != key:
         import io
         buf = io.BytesIO()
@@ -392,6 +415,11 @@ def bundle():
                         continue
                     with open(f, "rb") as fh:
                         tar.addfile(ti, fh)
+            if tools_sig:
+                data = tools_sig.encode("utf-8")
+                ti = tarfile.TarInfo(TOOLS_SIG)
+                ti.size, ti.mode, ti.mtime = len(data), 0o644, int(time.time())
+                tar.addfile(ti, io.BytesIO(data))
             if packs:
                 data = packs.encode("utf-8")
                 ti = tarfile.TarInfo("config/toolpacks.json")

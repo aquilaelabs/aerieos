@@ -113,6 +113,7 @@ def cmd_enroll(args):
         raise SystemExit("--release-key takes the release key as 64 hex characters, and its spare after a comma")
     pins = release.clean_keys(opts["--release-key"]) or release.keys(was)
     unsigned = release.unsigned_ok(was)
+    root_off = was.get("root_off") is True
     # The account sessions run as (roadmap #24), when this agent runs as
     # root. Recorded even when empty, so `status` shows the decision.
     state["session_user"] = opts["--session-user"]
@@ -143,6 +144,11 @@ def cmd_enroll(args):
     state.pop("release_key", None)
     state.pop("release_spare", None)
     state.pop("unsigned_ok", None)
+    state.pop("root_off", None)
+    if root_off:
+        # What the console said of root commands outlives an enrollment, as
+        # the pin does: enrolling again is the controller's script.
+        state["root_off"] = True
     if pins:
         state["release_key"] = pins[0]
         if len(pins) > 1:
@@ -303,6 +309,29 @@ def cmd_unsigned(args):
            + ("" if release.keys(state) else "; none is pinned yet, so that applies once one is")))
 
 
+def cmd_root_asks(args):
+    """root-asks [on|off]: whether this machine runs a root command the
+    controller sends (R227 step 2)."""
+    state = load_state()
+    if not args:
+        print("root commands from the controller: "
+              + ("refused here" if state.get("root_off") is True else "run once a person there allowed them"))
+        return
+    if args[0] not in ("on", "off"):
+        raise SystemExit("root-asks takes on or off")
+    _at_console("deciding whether root commands are run here")
+    if args[0] == "off":
+        state["root_off"] = True
+    else:
+        state.pop("root_off", None)
+    save_state(state, console=True)
+    print("this machine refuses every root command the controller sends (aerie root run, a schedule as root), whoever "
+          "allowed it there; what AerieOS does as root by name (storage, updates, its own tools) goes on, and where this "
+          "machine runs containers, Docker here is still root's"
+          if args[0] == "off" else
+          "this machine runs a root command the controller sends once a person there allowed it")
+
+
 def main(argv):
     cmd = argv[0] if argv else ""
     if cmd == "enroll":
@@ -311,6 +340,8 @@ def main(argv):
         cmd_release_key(argv[1:])
     elif cmd == "unsigned":
         cmd_unsigned(argv[1:])
+    elif cmd == "root-asks":
+        cmd_root_asks(argv[1:])
     elif cmd == "follow":
         cmd_follow(argv[1:])
     elif cmd == "run":
