@@ -86,7 +86,7 @@ function renderThingInto(i){
   }
   const r = thingRow();
   if (inst.error || !r){
-    paint(d.list, `<div class="field"><div class="notice ${inst.error ? "bad" : "warn"}">${esc(inst.error
+    patch(d.list, `<div class="field"><div class="notice ${inst.error ? "bad" : "warn"}">${esc(inst.error
       ? "could not read what is installed: " + inst.error
       : `${thingLabel()} is not installed on ${inst.name || "this node"} now: the Library installs it.`)}</div></div>`);
     return;
@@ -106,7 +106,7 @@ function renderThingInto(i){
     const html = body(r);
     return html ? docSection("thing", k, title, "", `<div class="field irow idetail" data-irow="${esc(thingKey)}">${html}</div>`, {open: true}) : "";
   }).join("");
-  paint(d.list, `<div data-instnode="${esc(instNode)}" data-thing="${esc(thingKey)}">${head}${err}${sects}</div>`);
+  patch(d.list, `<div data-instnode="${esc(instNode)}" data-thing="${esc(thingKey)}">${head}${err}${sects}</div>`);
   wireInstalled(d.el);
   if (thingAt){
     d.el.querySelector(`details.sect[data-sect="${CSS.escape("thing:" + thingAt)}"]`)?.scrollIntoView({block: "start"});

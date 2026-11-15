@@ -52,7 +52,7 @@ function drawKeys(){
   // Links. A desk's keys float over the
   // terminal.
   const hot = $("mHot"), own = t?.kind === "term" && termOwn(t) && isPhone() ? t : null;
-  if (paint(hot, own ? termHotButtons(own, mobMoreKeys(own)) : "")){
+  if (patch(hot, own ? termHotButtons(own, mobMoreKeys(own)) : "")){
     hot.querySelectorAll("[data-hk]").forEach(b => b.onclick = () => { mobLinksShut(); sendKey(b.dataset.hk); });
     // A press on the band leaves the keyboard where it is.
     hot.onpointerdown = e => { if (e.target.closest("button")) e.preventDefault(); };

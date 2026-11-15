@@ -256,7 +256,7 @@ function nbWikiView({$, nb, project}){
     // An empty wiki is its empty state, not a fault: the bar's own line
     // says its buttons wait for a page, in the bar's voice, not in red.
     // In the control row's slot, a note as every view's status line is.
-    paint($("wkNetState"), `<div class="notice note">${esc((rem?.label ? `${rem.label}'s wiki` : "no remote: Export is how it leaves")
+    patch($("wkNetState"), `<div class="notice note">${esc((rem?.label ? `${rem.label}'s wiki` : "no remote: Export is how it leaves")
       + (pages().length ? "" : rem?.label ? "; Export and Push wait for a page" : "; it waits for a page"))}</div>`);
     // A role that reads the project and does not write it (B101): Pull and
     // Push dead, and that is the reason said under them.

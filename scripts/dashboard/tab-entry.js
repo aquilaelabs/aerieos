@@ -44,7 +44,7 @@ function renderEntryInto(i){
   }
   const r = entryRow();
   if (lib.error || !r){
-    paint(d.list, `<div class="field"><div class="notice ${lib.error ? "bad" : "warn"}">${esc(lib.error
+    patch(d.list, `<div class="field"><div class="notice ${lib.error ? "bad" : "warn"}">${esc(lib.error
       ? "could not read the Library: " + lib.error
       : `${entryLabel()} is not in the Library for ${lib.name || "this node"} now.`)}</div></div>`);
     return;
@@ -56,7 +56,7 @@ function renderEntryInto(i){
     actions: `${libState(r)}${libActs(r, may)}`, cls: "entryhead"}).replace('<div class="name">', `<div class="name">${libIcon(r)}`);
   const err = !r.running && (r.kind === "toolchain" || r.kind === "pack") && lib?.job?.errors?.[r.name] ? `<div class="field"><div class="sub bad">${esc(lib.job.errors[r.name])}</div></div>` : "";
   const about = `${r.about ? `<span class="sub">${esc(r.about)}</span>` : ""}${r.machine && r.name === TC_DRIVER ? libDriverPick(r.machine) : ""}${libDetail(r)}`;
-  paint(d.list, `<div data-libnode="${esc(libNode)}" data-entry="${esc(entryKey)}">${head}${err}${
+  patch(d.list, `<div data-libnode="${esc(libNode)}" data-entry="${esc(entryKey)}">${head}${err}${
     docSection("entry", "about", "What it is", "", `<div class="field ldetail">${about}</div>`, {open: true})}</div>`);
   wireLibrary(d.el);
 }

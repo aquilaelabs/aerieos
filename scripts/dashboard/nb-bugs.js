@@ -4,6 +4,10 @@
 
 "use strict";
 
+// A press handler set, not added (R244): a row drawn again is kept, and a
+// listener added on every draw would answer each press once per draw.
+function onPress(root, sel, fn){ const b = root.querySelector(sel); if (b) b.onclick = fn; }
+
 // Whether a report answers a search (R254 step 1): its number (B12 or 12)
 // or any of its words, case aside. An empty search is all.
 function bugMatch(b, q){
@@ -355,18 +359,18 @@ function nbBugsView({$, nb, project}){
         dropBox(body, {q, sub: ": kept on the bug", placeholder: "a commit, a word", verb,
                        go: note => postBug({action: "status", id, status, note}), cancel: () => drawBugs(true)});
       };
-      d.querySelector(".bFix")?.addEventListener("click",
+      onPress(d, ".bFix",
         () => ask("fixed", "What fixed it?", "Close as fixed"));
-      d.querySelector(".bWont")?.addEventListener("click",
+      onPress(d, ".bWont",
         () => ask("wontfix", "Why not?", "Close: won't fix"));
-      d.querySelector(".bNa")?.addEventListener("click",
+      onPress(d, ".bNa",
         () => ask("na", "What stopped it applying?", "Close: not applicable"));
-      d.querySelector(".bReopen")?.addEventListener("click",
+      onPress(d, ".bReopen",
         () => postBug({action: "status", id, status: "open", note: ""}));
       // Handing a bug over. Same box the roadmap opens under a step, opened
       // under the report instead; it asks the same question and the pickers
       // behind it are the same two.
-      d.querySelector(".bSend")?.addEventListener("click", () => {
+      onPress(d, ".bSend", () => {
         const body = d.querySelector(".body");
         if (body.querySelector(".sendbox")) { nb.shutSendBoxes(); return; }
         nb.shutSendBoxes();
@@ -411,7 +415,7 @@ function nbBugsView({$, nb, project}){
       // Same box the roadmap's bin opens, for the same reason: nothing here
       // can be undone, so the only thing between a deleted report and its
       // being filed again is a note saying why it went.
-      d.querySelector(".bRm")?.addEventListener("click", () => {
+      onPress(d, ".bRm", () => {
         closeMore();
         const body = d.querySelector(".body");
         if (body.querySelector(".dropbox")) return;
@@ -422,7 +426,7 @@ function nbBugsView({$, nb, project}){
                        verb: "Remove it", tone: "danger", cancel: () => drawBugs(true),
                        go: why => postBug({action: "remove", id, why})});
       });
-      d.querySelector(".bEdit")?.addEventListener("click", () => {
+      onPress(d, ".bEdit", () => {
         const body = d.querySelector(".body");
         const b = (nb.bugs.bugs || []).find(x => x.id === id);
         body.innerHTML = bugForm(b);

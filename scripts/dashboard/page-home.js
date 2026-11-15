@@ -260,7 +260,7 @@ function renderHomeInto(i){
   }
   // Painted only when it changed: Home redraws on every poll (its rows are
   // the poll's), and an unchanged draw keeps a pointer's hover and a fold.
-  if (!paint(d.list, (homeData.error ? `<div class="hint bad">${esc(homeData.error)}</div>` : "")
+  if (!patch(d.list, (homeData.error ? `<div class="hint bad">${esc(homeData.error)}</div>` : "")
     + homeTilesHtml(homeTiles()) + homeCards(homeJobsHtml()))) return;
   const root = d.list;
   root.querySelectorAll('[data-htile="sessions"]').forEach(a => a.onclick = e => { e.preventDefault(); railGo("sessions"); });

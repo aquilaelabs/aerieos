@@ -67,7 +67,7 @@ const SURFACE = [ 'adoptLayout', 'adoptMode', 'adoptMotion', 'applyMotion', 'ado
   'pFillGates', 'pFillNode', 'pDirOf', 'dmCalled', 'dmJobSettle', 'rnFillReads', 'rnLoadTools', 'rnFillTools', 'rnLockSettings', 'rnRowsList', 'rnHostIds', 'rnBars', 'rnWireBox', 'rnBarSay', 'rnRevertSect', 'rnSectChanges', 'rnEnc', 'rnDec', 'pJobAct', 'pJobPoll', 'pJobSeen', 'pJobWire', 'pNameShow', 'pOpen',
   // A terminal in its own window (R8).
   'popOut', 'reattachTab',
-  'pShowKey', 'pSlide', 'paginate', 'paint', 'paintAdopt', 'patch', 'drawInto', 'patchKey', 'patchSame', 'patchFieldOf', 'patchAttrs', 'patchRecord', 'patchWas', 'patchControl', 'patchNode', 'patchKids', 'patchOwn', 'patchHeld', 'patchInto', 'pressBack', 'paintBar', 'paneStack',
+  'pShowKey', 'pSlide', 'paginate', 'paint', 'paintAdopt', 'onPress', 'patch', 'drawInto', 'patchKey', 'patchSame', 'patchFieldOf', 'patchAttrs', 'patchRecord', 'patchWas', 'patchControl', 'patchNode', 'patchKids', 'patchOwn', 'patchHeld', 'patchInto', 'pressBack', 'drawFresh', 'paintBar', 'paneStack',
   'phFetch', 'tcAct', 'tcPick',
   // The Emulator tab (tab-emulator.js).
   'openEmulator', 'emuPick', 'loadEmulator', 'emuAddRows', 'emuFlavorNow', 'emuTickedHere', 'emuRow', 'renderEmulatorInto', 'emuAct', 'tcTermsLine', 'tcVerifiedLine', 'tcReceiptLines', 'tcSystemLine', 'tcNeedsLine', 'tcDriverLine', 'tcDriverOption', 'tcToolkitLine', 'nodesReadOnly', 'headerOnly', 'splitSects', 'splitDraw', 'splitAway', 'bootOwn', 'splitMove', 'splitMarks', 'splitOff', 'rnSplit', 'rolesInsts', 'rolesLvlAt', 'rolesSetAll', 'viewSaid', 'pageKey', 'pageLimit', 'rnPrefsOf',

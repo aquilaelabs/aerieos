@@ -142,7 +142,14 @@ function patchWas(n){ return n.__markup || patchAttrs(n); }
 // What one element is called among its siblings: a row's data-key, which a
 // list's rows carry so that one moved, added or taken away takes nothing of
 // its neighbors' with it, else its id. "" is no name: matched by place.
-function patchKey(n){ return n.nodeType === 1 ? n.getAttribute("data-key") || n.id || "" : ""; }
+function patchKey(n){
+  if (n.nodeType !== 1) return "";
+  // An option is its value: a pulldown whose list changed under a redraw
+  // keeps the option the person picked, rather than its place being
+  // rewritten into another value still picked (seen on nginx's host).
+  if (n.tagName === "OPTION") return "opt:" + (n.getAttribute("value") ?? n.textContent);
+  return n.getAttribute("data-key") || n.id || "";
+}
 // Whether `a` can be brought up to `b` rather than replaced: the same kind of
 // node, the same tag, and for a form control or a button the same type, name
 // and data-* (which field it edits, data-k="rootasks"; which action it is,
@@ -279,6 +286,14 @@ function patchInto(el, html){
   const t = document.createElement("template");
   t.innerHTML = html;
   patchKids(el, t.content);
+}
+
+// The next draw of the surface holding `el` writes it all again rather than
+// patching it: for a form a save is done with (a secret saved is drawn as
+// set, its field empty to type a replacement into), where what the person
+// typed is meant to go. Said by the save, never by a poll.
+function drawFresh(el){
+  for (let e = el; e; e = e.parentElement) if (painted.has(e)){ painted.delete(e); return; }
 }
 
 // A press's button given back when the press ends: as its markup has it,

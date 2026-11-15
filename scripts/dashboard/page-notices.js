@@ -128,7 +128,7 @@ function renderNoticesInto(i){
                      </div>`).join("")}</div>`
                    : `<div class="hint">${all.length ? "none of this kind" : "nothing yet: what the page tells you is kept here"}</div>`),
                  {prime: !waiting.length});
-  if (!paint(d.list, html)) return;
+  if (!patch(d.list, html)) return;
   const list = d.list.querySelector(".ntlist");
   if (list) paginate(list, ":scope > .ntrow", {key: "ntList", noun: "notices"});
   wireNotices(d.el);

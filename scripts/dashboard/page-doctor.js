@@ -17,7 +17,7 @@ function drawDoctor(){
   if (!d || !d.when){
     setClass(dot, "st");
     setAttr($("bDocDot"), "aria-label", "aerie doctor: no verdict yet");
-    paint(el, `<div class="empty">${d?.running ? "running…" : "first run pending…"}</div>`);
+    patch(el, `<div class="empty">${d?.running ? "running…" : "first run pending…"}</div>`);
     return;
   }
   const tip = c => c.text + (c.detail ? "\n\n" + c.detail : "");
@@ -35,7 +35,7 @@ function drawDoctor(){
   setClass(dot, "st " + level);
   setAttr($("bDocDot"), "aria-label", level === "ok" ? `aerie doctor: all ${fine.length} ok`
     : `aerie doctor: ${probs.length} to look at`);
-  paint(el,
+  patch(el,
     `<div class="probs">${probs.map(c =>
        `<div class="sub ${c.level === "FAIL" ? "bad" : "warn"}" title="${esc(tip(c))}">${esc(c.text)}${
           c.detail ? `<span class="why">${esc(c.detail)}</span>` : ""}${

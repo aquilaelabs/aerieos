@@ -79,7 +79,7 @@ function renderNetworkInto(i){
     // second box in the first (seen at a desk, 29 Oct).
     const head = d.list.querySelector(":scope > .pghead"), was = head?.dataset.drawn, now = networkReach();
     if (head && was !== now){ head.outerHTML = now; d.list.querySelector(":scope > .pghead")?.setAttribute("data-drawn", now); }
-    paint(dial.querySelector(":scope > .body"), networkDial(), true);
+    patch(dial.querySelector(":scope > .body"), networkDial(), true);
     const st = dial.querySelector(":scope > summary .sst"), says = networkDialStatus();
     if (st) st.textContent = says;
     else if (says) dial.querySelector(":scope > summary").insertAdjacentHTML("beforeend", `<span class="sst">${esc(says)}</span>`);

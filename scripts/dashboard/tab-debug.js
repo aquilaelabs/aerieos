@@ -62,7 +62,7 @@ function renderDebugInto(i){
   // In one wrapper, as the Installed page's: the jump bar wireSections puts
   // over the two sections goes inside it, so the list's own children are
   // what was painted and a read that brings nothing writes nothing.
-  if (paint(d.list, `<div class="dbgpage">${html}</div>`)) wireDebug(d.el);
+  if (patch(d.list, `<div class="dbgpage">${html}</div>`)) wireDebug(d.el);
 }
 
 function wireDebug(el){

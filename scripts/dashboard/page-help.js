@@ -141,7 +141,7 @@ function renderHelpInto(i){
       : skTpl(`<div class="field wkreader"><nav class="wknav">${skRows(8)}</nav><article class="wkarticle">${skel("lines", 12)}</article></div>`);
     return;
   }
-  if (!paint(d.list, `<div class="field wkreader">${helpNav()}${helpHits ? helpResults() : helpArticle()}</div>`)) return;
+  if (!patch(d.list, `<div class="field wkreader">${helpNav()}${helpHits ? helpResults() : helpArticle()}</div>`)) return;
   const root = d.list;
   root.querySelectorAll(".wknav a[data-page]").forEach(a => a.onclick = e => { e.preventDefault(); helpGo(a.dataset.page); });
   const pick = root.querySelector("#helpPick");

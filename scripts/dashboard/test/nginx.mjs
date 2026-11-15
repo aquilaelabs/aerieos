@@ -211,8 +211,9 @@ ok(asleepNew && await page.$eval(`${fresh} [data-ngsave]`, b => !b.disabled) && 
    'the form\'s Save wakes once it has a hostname and a port, and a new route has no Delete');
 await page.click(`${fresh} [data-ngsave]`);
 await page.waitForFunction(id => (nginxList || []).find(n => n.node === id)?.routes?.length === 2, sandbox.node, { timeout: 15000 });
-ok((await api('/api/nginx')).nodes.find(n => n.node === sandbox.node).routes.some(r => r.host === 'api.example.com' && r.port === 8081),
-   '...and Save keeps it on the controller');
+const savedRoutes = (await api('/api/nginx')).nodes.find(n => n.node === sandbox.node).routes;
+ok(savedRoutes.some(r => r.host === 'api.example.com' && r.port === 8081),
+   `...and Save keeps it on the controller (${JSON.stringify(savedRoutes.map(r => [r.host, r.port, r.path]))})`);
 await page.waitForFunction(s => !document.querySelector(s + ' .ngform') && document.querySelectorAll(s + ' .ngrec').length === 2, sect, { timeout: 15000 });
 ok(await page.$eval(`${sect} .ngrec[data-i="1"]`, r => /api\.example\.com/.test(r.textContent) && /8081/.test(r.textContent)),
    '...and folds back to a row reading the route');

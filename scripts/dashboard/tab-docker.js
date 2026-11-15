@@ -2995,7 +2995,11 @@ function renderDockerInto(i){
   // and its caret.
   const sb = el.querySelector("#dmSearch");
   if (sb){
-    sb.oninput = () => {
+    // A word an input method is still composing is filtered on once it is
+    // chosen (R244 step 4).
+    sb.oncompositionend = () => sb.oninput({});
+    sb.oninput = e => {
+      if (e.isComposing) return;
       dmSearch = sb.value;
       clearTimeout(dmSearchTimer);
       dmSearchTimer = setTimeout(() => { dockerRev++; drawPanes(); }, 120);

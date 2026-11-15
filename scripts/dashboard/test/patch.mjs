@@ -97,6 +97,19 @@ await section("a row's typing stays in its row when the rows move", async () => 
   ok(run.kept && run.text === 'onetwothree!', `...and an unnamed run with its first taken away keeps the rest (${JSON.stringify(run)})`);
 });
 
+await section("a pick in a pulldown stays on its value when the list changes under it", async () => {
+  const sel = opts => `<select data-ng="host">${opts.map(o => `<option value="${o}">${o}</option>`).join('')}</select><i>${opts.length}</i>`;
+  await fresh(sel(['www.example.com', 'api.example.com']));
+  const r = await page.evaluate(([two]) => {
+    const el = document.querySelector('#r244'), s = el.querySelector('select');
+    s.value = 'api.example.com';                                   // the person's pick
+    patch(el, two);                                                 // a host added before it, under a redraw
+    return { value: s.value, kept: el.querySelector('select') === s, options: [...s.options].map(o => o.value).join(',') };
+  }, [sel(['www.example.com', 'two.example.com', 'api.example.com'])]);
+  ok(r.kept && r.value === 'api.example.com' && r.options === 'www.example.com,two.example.com,api.example.com',
+     `the option picked is still picked by its value, not whatever came to stand in its place (${JSON.stringify(r)})`);
+});
+
 await section("a fold is the person's, unless the markup changes it", async () => {
   await fresh('<details class="sect"><summary>Storage</summary><div>a</div></details><span>1</span>');
   const r = await page.evaluate(() => {

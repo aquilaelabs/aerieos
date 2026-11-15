@@ -375,8 +375,9 @@ function wireInstalled(root){
           const i = row.querySelector(`[data-icsub="${CSS.escape(sf.name)}"]`); if (i && !i.value) i.value = dr[f.name][j][sf.name]; }
       });
     }
-    form.addEventListener("input", read);
-    form.addEventListener("change", read);
+    // Set, not added: a patched page keeps the form across its draws (R244).
+    form.oninput = read;
+    form.onchange = read;
     form.querySelectorAll("[data-icadd]").forEach(b => b.onclick = () => { const v = read(); v[b.dataset.icadd] = [...(v[b.dataset.icadd] || []), {}]; instRev++; drawPanes(); });
     form.querySelectorAll("[data-icrm]").forEach(b => b.onclick = () => { const v = read(); v[b.dataset.icrm].splice(Number(b.dataset.icrow), 1); instRev++; drawPanes(); });
     const save = form.querySelector("[data-icsave]");
@@ -385,6 +386,9 @@ function wireInstalled(root){
       const j = await (await postJSON("/api/library", {action: "configure", node: instNode, pack: r.name, values: read(), ...(scope === "person" ? {scope} : {})})).json().catch(() => ({error: "no answer"}));
       if (j.error){ notify(j.error, true); return; }
       delete instDraft[dk];
+      // Saved, the form is drawn fresh: a key is shown as set and its field
+      // empties to type a replacement into.
+      drawFresh(form);
       notify(j.job ? "saved: the router is rebuilt with the change, its row on the Containers page has the build" : "saved");
       await loadInstalled();
     });

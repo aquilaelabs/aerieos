@@ -62,7 +62,7 @@ function renderSessionsInto(i){
   const ss = state?.sessions;
   if (!ss){
     d.setBar("");
-    paint(d.list, skTpl(skTable(SESS_COLS, 3, "sesstbl", "row sessrow")));
+    patch(d.list, skTpl(skTable(SESS_COLS, 3, "sesstbl", "row sessrow")));
     return;
   }
   const agentSs = ss.filter(s => agentOfSession(tmuxBase(s.name))), claudes = agentSs.length;
@@ -99,7 +99,7 @@ function renderSessionsInto(i){
   }).join("");
   const html = ss.length ? glance + tblWrap(SESS_COLS, rows, "sesstbl")
     : `<div class="empty">nothing is running: a terminal or an agent's session you open is listed here</div>`;
-  if (!paint(d.list, html)) return;
+  if (!patch(d.list, html)) return;
   // Kept from the pane under the page: its click makes the page's pane the
   // active one, and the terminal just opened in the dock would lose the
   // keys and the commands to a page that cannot take them.

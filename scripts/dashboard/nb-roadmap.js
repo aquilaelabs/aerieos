@@ -379,11 +379,11 @@ function nbRoadmapView({$, nb}){
     // Bound on the summary rather than the toggle event, because toggle
     // fires after the browser has already snapped it open.
     $("roadmapList").querySelectorAll("details.grp > summary").forEach(sm => {
-      sm.addEventListener("click", e => {
+      sm.onclick = e => {
         e.preventDefault();
         if (e.target.closest("button, a, input, textarea, select, .dtog, .dinfo")) return;
         slideDetails(sm.parentElement, !sm.parentElement.open);
-      });
+      };
     });
     $("roadmapList").querySelectorAll(".addstep").forEach(box => {
       box.querySelector("button").onclick = () => openStepInput(box);
