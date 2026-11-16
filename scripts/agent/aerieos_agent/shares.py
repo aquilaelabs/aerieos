@@ -20,6 +20,7 @@ import subprocess
 import time
 
 from .base import log
+from .accounts import accounts_moved
 from .stores import save_state
 from .names import ETC
 
@@ -267,6 +268,7 @@ class SharesMixin:
             except KeyError:
                 p = subprocess.run(["useradd", "-r", "-M", "-U", "-d", "/nonexistent", "-s", "/usr/sbin/nologin", "-G", "bbu", r["user"]],
                                    capture_output=True, text=True, timeout=30, check=False)
+                accounts_moved()
                 if p.returncode != 0:
                     log(f"shares: could not make {r['user']}: {(p.stderr or '').strip()[:160]}")
         have = set()
@@ -331,6 +333,7 @@ class SharesMixin:
             group()
         p = subprocess.run(["useradd", "-r", "-M", "-U", "-d", "/nonexistent", "-s", "/usr/sbin/nologin", "-G", "bbu", name],
                            capture_output=True, text=True, timeout=30, check=False)
+        accounts_moved()
         if p.returncode != 0:
             why = (p.stderr or "").strip()[:160] or f"useradd exit {p.returncode}"
             log(f"shares: could not make {name}: {why}")

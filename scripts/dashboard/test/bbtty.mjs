@@ -227,7 +227,7 @@ await section("What bb does with it", async () => {
   const dead = 'bbs_' + Buffer.from('alpha|1000000000|u_0badf00d|deadbeef')
     .toString('base64url').replace(/=+$/, '');
   const ask = (env) => execFileSync('bash', ['-c',
-    'eval "$(sed -n "/^bb_token_exp()/,/^}/p;/^bb_token_project()/,/^}/p;/^bb_token_dead()/,/^}/p;/^bb_token_now()/,/^}/p" "$1")"; bb_token_now',
+    'eval "$(sed -n "/^bb_token_fields()/,/^}/p;/^bb_token_exp()/,/^}/p;/^bb_token_project()/,/^}/p;/^bb_token_dead()/,/^}/p;/^bb_token_kept()/,/^}/p;/^bb_token_now()/,/^}/p" "$1")"; bb_token_now',
     'sh', BBBIN],
     { encoding: 'utf8', env: { ...process.env, HOME: join(DIR, 'home'), BB_PROJECT: 'alpha', ...env } }).trim();
   ok(ask({ BB_TOKEN: dead }) === tokWritten,
@@ -256,7 +256,7 @@ await section("What bb does with it", async () => {
      && (statSync(landed).mode & 0o077) === 0,
      `aerie token keep stores a token where that account's sessions read it, 0600 (${fresh.slice(0, 12)}…)`);
   ok(execFileSync('bash', ['-c',
-       'eval "$(sed -n "/^bb_token_exp()/,/^}/p;/^bb_token_project()/,/^}/p;/^bb_token_dead()/,/^}/p;/^bb_token_now()/,/^}/p" "$1")"; bb_token_now',
+       'eval "$(sed -n "/^bb_token_fields()/,/^}/p;/^bb_token_exp()/,/^}/p;/^bb_token_project()/,/^}/p;/^bb_token_dead()/,/^}/p;/^bb_token_kept()/,/^}/p;/^bb_token_now()/,/^}/p" "$1")"; bb_token_now',
        'sh', BBBIN],
        { encoding: 'utf8', env: { ...process.env, HOME: keepHome, BB_PROJECT: 'alpha',
                                   BB_TOKEN: dead } }).trim() === fresh,

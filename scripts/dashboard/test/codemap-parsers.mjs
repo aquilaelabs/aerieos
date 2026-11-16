@@ -16,9 +16,17 @@ import { createRequire } from 'node:module';
 
 const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const CODEMAP = `${REPO}/scripts/lib/codemap.py`;
+// The index as two files since format 5 (R228 step 16): what each file
+// calls and passes by name beside the rest, joined back here per file.
+const readIndex = root => {
+  const idx = JSON.parse(readFileSync(join(root, '.bb-map', 'map5.json'), 'utf8'));
+  const calls = JSON.parse(readFileSync(join(root, '.bb-map', 'map5-calls.json'), 'utf8'));
+  for (const [f, e] of Object.entries(idx.files)) Object.assign(e, calls.files[f] || {});
+  return idx;
+};
 const build = root => {
   execFileSync('python3', [CODEMAP, '--root', root, 'build'], { encoding: 'utf8' });
-  return JSON.parse(readFileSync(join(root, '.bb-map', 'map4.json'), 'utf8'));
+  return readIndex(root);
 };
 const show = xs => xs.slice(0, 6).map(x => JSON.stringify(x)).join(' ');
 
@@ -161,6 +169,9 @@ if (!babel) {
   const py = execFileSync('python3', ['-c', `
 import ast, json, sys
 idx = json.load(open(sys.argv[1]))
+calls = json.load(open(sys.argv[3]))["files"]
+for p, f in idx["files"].items():
+    f.update(calls.get(p) or {})
 bad = []
 for p, f in idx["files"].items():
     if f["lang"] != "py":
@@ -182,7 +193,7 @@ for p, f in idx["files"].items():
             if nm and (nm, n.lineno) not in calls:
                 bad.append([p, "call", nm, n.lineno])
 print(json.dumps(bad[:10] + [len(bad)]))
-`, join(REPO, '.bb-map', 'map4.json'), REPO], { encoding: 'utf8' });
+`, join(REPO, '.bb-map', 'map5.json'), REPO, join(REPO, '.bb-map', 'map5-calls.json')], { encoding: 'utf8' });
   const r = JSON.parse(py);
   ok(r[r.length - 1] === 0, `the map agrees with python's ast on every def, its end and every call in this tree${
     r.length > 1 ? ': ' + show(r.slice(0, -1)) : ''}`);

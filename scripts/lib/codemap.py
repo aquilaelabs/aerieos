@@ -64,8 +64,15 @@ INDEX_DIR = ".bb-map"
 # bb a session runs while the controller's build lagged the tree. The file
 # is named for the format too, so two bb builds on one tree keep to their
 # own files during the window when both exist.
-FORMAT = 4
+FORMAT = 5
 INDEX_FILE = f"map{FORMAT}.json"
+# ...and in a file of their own since format 5 (R228 step 16), what each
+# file calls and the functions it passes by name: 85% of the index's bytes,
+# read by who-calls, coverage and preflight, and by none of the lookups a
+# session makes most (find, defs, draws), which read the rest in a tenth of
+# the time. Joined on the first question that asks for them (Index).
+CALLS_FILE = f"map{FORMAT}-calls.json"
+LAZY = ("calls", "passed")
 # vendor: libraries a project carries as they were published (the dashboard's
 # xterm.js, Go's vendor/), minified or not, and not its own code.
 SKIP_DIRS = {".git", "node_modules", "dist", "__pycache__", ".bb-map", "scratchpad", "vendor",
@@ -1924,6 +1931,8 @@ def build(root, prior=None):
     which is every first question after an edit; this is a tenth of that.
     The flat lists the questions read are joined at load and not written."""
     root = Path(root)
+    if isinstance(prior, Index):
+        prior.join_calls(rebuild=False)
     kept = (prior or {}).get("files", {})
     files, scanned, fresh = {}, 0, {}
     for p, lang in sources(root):
@@ -1934,7 +1943,7 @@ def build(root, prior=None):
             continue
         old = kept.get(rel)
         if old and old.get("mtime") == mtime and old.get("lang") == lang and "defs" in old \
-                and old.get("scan") == SCANNER:
+                and "calls" in old and old.get("scan") == SCANNER:
             files[rel] = old
             continue
         try:
@@ -1984,13 +1993,21 @@ def build(root, prior=None):
     try:
         out.mkdir(exist_ok=True)
         exclude(root)
-        tmp = out / (INDEX_FILE + ".tmp")
-        tmp.write_text(json.dumps(idx))
-        tmp.replace(out / INDEX_FILE)
+        # Two files, the calls first: a core written beside the calls of an
+        # older build names another `built` than they do, and the first
+        # question that asks for the calls builds again rather than read them.
+        core = {k: v for k, v in idx.items() if k != "files"}
+        core["files"] = {rel: {k: v for k, v in e.items() if k not in LAZY} for rel, e in files.items()}
+        calls = {"built": idx["built"], "files": {rel: {k: e.get(k, []) for k in LAZY} for rel, e in files.items()}}
+        for name, body in ((CALLS_FILE, calls), (INDEX_FILE, core)):
+            tmp = out / (name + ".tmp")
+            tmp.write_text(json.dumps(body))
+            tmp.replace(out / name)
         # The index an older reader wrote stays behind otherwise, and two of
         # them were sitting beside this one at seven megabytes each.
         for old in out.glob("*.json"):
-            if old.name != INDEX_FILE and (old.name == "index.json" or re.fullmatch(r"map\d+\.json", old.name)):
+            if old.name not in (INDEX_FILE, CALLS_FILE) and (
+                    old.name == "index.json" or re.fullmatch(r"map\d+(-calls)?\.json", old.name)):
                 old.unlink(missing_ok=True)
         idx["kept"] = True
     except OSError:
@@ -2160,14 +2177,64 @@ def exclude(root):
         return False               # the map still builds; only the exclude is lost
 
 
+class Index(dict):
+    """The index as load and build hand it. idx["calls"] and idx["passed"]
+    are joined from CALLS_FILE on the first question that asks for them
+    (R228 step 16): a lookup of a definition reads a tenth of the bytes."""
+
+    def __missing__(self, key):
+        if key in LAZY:
+            self.join_calls()
+            return dict.__getitem__(self, key)
+        raise KeyError(key)
+
+    def get(self, key, default=None):
+        if key in LAZY and not dict.__contains__(self, key):
+            self.join_calls()
+        return dict.get(self, key, default)
+
+    def join_calls(self, rebuild=True):
+        """Each file's calls and passed names onto its entry, and the two
+        flat lists made. From the calls file beside the index when it is
+        this build's; otherwise the tree is scanned again (`rebuild`), or,
+        for a build about to rescan anyway, the entries are left without
+        them and so are rescanned."""
+        files = self["files"]
+        if any("calls" not in e for e in files.values()):
+            got = None
+            try:
+                got = json.loads((Path(self["root"]) / INDEX_DIR / CALLS_FILE).read_text())
+            except (OSError, ValueError, KeyError):
+                got = None
+            if not isinstance(got, dict) or got.get("built") != self.get("built") \
+                    or not isinstance(got.get("files"), dict):
+                if not rebuild:
+                    return
+                whole = build(Path(self["root"]))
+                files = whole["files"]
+                dict.__setitem__(self, "files", files)
+                for k in ("defs", "draws", "routes", "built"):
+                    dict.__setitem__(self, k, dict.__getitem__(whole, k))
+            else:
+                for rel, e in files.items():
+                    have = got["files"].get(rel) or {}
+                    for k in LAZY:
+                        e.setdefault(k, have.get(k, []))
+        for k in LAZY:
+            dict.__setitem__(self, k, [x for f in files.values() for x in f.get(k, [])])
+
+
 def flat(idx):
     """The per-file index with the lists the questions read joined on, and
     each definition's ordinal among the definitions of its name in its file,
     which is what coverage is keyed on: a line number moves with every edit
     above it, and after one section left the page every count read as
-    unreached."""
-    for k in ("defs", "calls", "draws", "routes", "passed"):
+    unreached. The calls and passed names wait for a question that asks."""
+    idx = idx if isinstance(idx, Index) else Index(idx)
+    for k in ("defs", "draws", "routes"):
         idx[k] = [x for f in idx["files"].values() for x in f.get(k, [])]
+    if all("calls" in e for e in idx["files"].values()):
+        idx.join_calls()
     for entry in idx["files"].values():
         seen = {}
         for d in entry.get("defs", []):
@@ -2177,10 +2244,11 @@ def flat(idx):
 
 
 def usable(prior):
-    """An index this reader wrote: its format, and every file entry whole."""
+    """An index this reader wrote: its format, and every file entry whole
+    (its calls are in CALLS_FILE)."""
     return (isinstance(prior, dict) and prior.get("format") == FORMAT
             and isinstance(prior.get("files"), dict)
-            and all(isinstance(v, dict) and "defs" in v and "calls" in v and "mtime" in v
+            and all(isinstance(v, dict) and "defs" in v and "mtime" in v
                     for v in prior["files"].values()))
 
 
@@ -2195,6 +2263,9 @@ def load(root, force=False):
             prior = None
     if not usable(prior):
         return build(root)
+    prior = Index(prior)
+    # Its calls are found beside it in this tree, wherever it was built.
+    dict.__setitem__(prior, "root", str(root))
     have = prior.get("files", {})
     now, langs = {}, {}
     for p, lang in sources(root):
@@ -3685,6 +3756,15 @@ def main(argv):
         else:
             rows = [d for d in idx["defs"] if d["file"] == name or d["file"].endswith("/" + name)]
         sys.stdout.write(records.dump(records.document("map", rows, Path(root).name), fmt))
+        return 0
+    if verb == "find" and len(rest) > 1:
+        # Several names in one process (R228 step 16), each answer under the
+        # line that asks it: the rule hook asks all of one grep's names at
+        # once, where each was a process and a load of the index.
+        out = []
+        for n in rest:
+            out += [f"$ aerie map find {n}", *q_find(idx, n, root)]
+        print("\n".join(out))
         return 0
     if verb == "find":
         lines = q_find(idx, rest[0], root)

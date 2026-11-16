@@ -1,10 +1,12 @@
 """What each running container uses, read by the agent once a minute for the
 hour the controller keeps (R218 step 9): one docker stats, its lines read
 into [cpu %, memory %] by name, a line it cannot read skipped, and nothing at
-all said between two minutes or where there is no docker."""
+all said between two minutes or where there is no docker. The read runs on a
+thread of its own (R228 step 18) and its answer rides a later turn."""
 import os
 import sys
 import tempfile
+import time
 import types
 import unittest
 
@@ -23,13 +25,37 @@ class CtrStats(unittest.TestCase):
         os.chmod(path, 0o755)
         agent.DOCKER_BIN = path
 
+    def handed(self, me, wait=10):
+        """stats_now asked turn after turn until it hands an answer over."""
+        end = time.monotonic() + wait
+        while time.monotonic() < end:
+            got = agent.SessionsMixin.stats_now(me)
+            if got is not None:
+                return got
+            if not getattr(me, "stats_reading", False) and getattr(me, "stats_got", None) is None:
+                return None
+            time.sleep(0.02)
+        return None
+
     def test_a_minutes_sample_is_read_into_numbers(self):
         self.fake_docker("web-1\t12.50%\t3.25%\nweird line\ndb-1\t--\t1%\nnginx\t0.00%\t0.40%\n")
         me = types.SimpleNamespace()
-        got = agent.SessionsMixin.stats_now(me)
-        self.assertEqual(got, {"web-1": [12.5, 3.25], "nginx": [0.0, 0.4]})
+        self.assertIsNone(agent.SessionsMixin.stats_now(me), "the turn that starts the read does not wait for it")
+        self.assertEqual(self.handed(me), {"web-1": [12.5, 3.25], "nginx": [0.0, 0.4]})
         # ...and nothing again until the minute is up.
         self.assertIsNone(agent.SessionsMixin.stats_now(me))
+        self.assertFalse(getattr(me, "stats_reading", False))
+
+    def test_the_read_does_not_hold_the_turn(self):
+        # A docker that takes its time: the turn that starts it goes on.
+        self.fake_docker("web-1\t1.00%\t2.00%\n")
+        with open(agent.DOCKER_BIN, "w") as f:
+            f.write("#!/bin/sh\nsleep 1\nprintf 'web-1\\t1.00%%\\t2.00%%\\n'\n")
+        me = types.SimpleNamespace()
+        t0 = time.monotonic()
+        self.assertIsNone(agent.SessionsMixin.stats_now(me))
+        self.assertLess(time.monotonic() - t0, 0.5)
+        self.assertEqual(self.handed(me), {"web-1": [1.0, 2.0]})
 
     def test_docker_is_found_on_the_path_by_its_bare_name(self):
         # B764: DOCKER_BIN is "docker" unless the environment names a path,
@@ -40,7 +66,7 @@ class CtrStats(unittest.TestCase):
         old = os.environ.get("PATH", "")
         os.environ["PATH"] = d + os.pathsep + old
         try:
-            self.assertEqual(agent.SessionsMixin.stats_now(types.SimpleNamespace()), {"web-1": [1.0, 2.0]})
+            self.assertEqual(agent.SessionsMixin.stats_read(types.SimpleNamespace()), {"web-1": [1.0, 2.0]})
             self.assertIsNotNone(agent.SessionsMixin.published_now(types.SimpleNamespace()))
         finally:
             os.environ["PATH"] = old

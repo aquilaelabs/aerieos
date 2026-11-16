@@ -124,16 +124,17 @@ def map_first(req, patterns, also=""):
     import subprocess
     bb = os.path.join(HERE, "..", "aerie")
     said = []
-    for n in names:
-        try:
-            r = subprocess.run(["bash", bb, "map", "find", n], capture_output=True, text=True, timeout=10,
-                               cwd=req.get("cwd") or None)
-        except (OSError, subprocess.SubprocessError):
+    # Every name in one ask (R228 step 16): each was a process of its own and
+    # a load of the index, 0.8 s a name inside the tool call it rides on.
+    try:
+        r = subprocess.run(["bash", bb, "map", "find", *names], capture_output=True, text=True, timeout=15,
+                           cwd=req.get("cwd") or None)
+        out = "" if r.returncode else (r.stdout or "")
+    except (OSError, subprocess.SubprocessError):
+        out = ""
+    for n, lines in rulehook.find_answers(names, out):
+        if not lines or lines[0].startswith("nothing defines"):
             continue
-        out = (r.stdout or "").strip()
-        if r.returncode or not out or out.startswith("nothing defines"):
-            continue
-        lines = out.splitlines()
         said.append(f"$ aerie map find {n}\n" + "\n".join(lines[:rulehook.MAP_LINES])
                     + (f"\n({len(lines) - rulehook.MAP_LINES} more lines)" if len(lines) > rulehook.MAP_LINES else ""))
     if not said:

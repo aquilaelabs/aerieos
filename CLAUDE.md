@@ -119,7 +119,7 @@ pass before anything is published; `aerie ci-log` reads a run's output.
   break, in the same change as the removal of what it supersedes.
   `test/version.mjs` holds both WINDOWs to the VERSION file.
 - **Three numbers.** `aerie version` moves per commit; a file two builds may
-  read carries a format it checks (`.bb-map/map3.json`,
+  read carries a format it checks (`.bb-map/map5.json`,
   `.bb-map/coverage.json`); `AGENT_VERSION` moves by hand with any change to
   the agent, and `aerie lint` fails when it did not.
 - **/config's state.** `scripts/dashboard/stateversion.py` stamps

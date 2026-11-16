@@ -624,6 +624,10 @@ def docker_user(on):
     return ""
 
 
+# How often a table in place is looked for (SessionNet.table_gone).
+TABLE_LOOK_S = 30
+
+
 class SessionNet:
     """Each session kept to its own project's network, where the controller
     asks for it and this node can (R79). A thread of its own: a session that
@@ -663,6 +667,19 @@ class SessionNet:
         self.ctr_up = False
         self.ctr_filled = None
         self.ctr_said = ""
+        # When each table was last seen in place (table_gone).
+        self.looked = {}
+
+    def table_gone(self, table, now):
+        """Whether a table this thread put in place has gone (a flush, a
+        firewall reload), looked at every TABLE_LOOK_S and taken as there
+        between (R228 step 18): listed every two seconds, two tables were
+        two processes a step for what changes once in a long while."""
+        if now - self.looked.get(table, 0) < TABLE_LOOK_S:
+            return False
+        self.looked[table] = now
+        return subprocess.run([NFT_BIN, "list", "table", "inet", table], capture_output=True,
+                              timeout=15, check=False).returncode != 0
 
     def start(self):
         threading.Thread(target=self.run, name="sessnet", daemon=True).start()
@@ -796,8 +813,7 @@ class SessionNet:
             if p.returncode:
                 return f"nft refused the containers' table: {(p.stderr or p.stdout).strip()[:200]}"
             self.ctr_up, self.ctr_filled = True, None
-        elif subprocess.run([NFT_BIN, "list", "table", "inet", CTRNET_TABLE], capture_output=True,
-                            timeout=15, check=False).returncode:
+        elif self.table_gone(CTRNET_TABLE, now):
             self.ctr_up = False
             return "the containers' table was gone and is being put back"
         if now - self.containers_at > 10:
@@ -837,8 +853,7 @@ class SessionNet:
             if bad:
                 return f"Docker's forwarding would not take the rules: {bad}"
             self.up, self.filled, self.docker_at = True, None, now
-        elif subprocess.run([NFT_BIN, "list", "table", "inet", SESSNET_TABLE], capture_output=True,
-                            timeout=15, check=False).returncode:
+        elif self.table_gone(SESSNET_TABLE, now):
             # Gone from under us (a flush, a firewall reload): put back next turn.
             self.up = False
             return "the table was gone and is being put back"

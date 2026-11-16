@@ -672,7 +672,7 @@ await section("The code map is built for the new project in the background", asy
   const m = await page.evaluate(() => state.mapping['My-New-App']);
   // Zero files is the true count: a fresh repo holds nothing the map
   // indexes. What is proved is that the build ran and wrote the index.
-  ok(!m.error && m.files === 0 && existsSync(`${DIR}/ws/My-New-App/.bb-map/map4.json`),
+  ok(!m.error && m.files === 0 && existsSync(`${DIR}/ws/My-New-App/.bb-map/map5.json`),
      `a new space is mapped as it is created, in the background (${m.files} files in ${m.took}s${m.error ? '; ' + m.error : ''})`);
   ok(/^\.bb-map\/$/m.test(readFileSync(`${DIR}/ws/My-New-App/.git/info/exclude`, 'utf8')),
      '...and .bb-map/ is excluded through .git/info/exclude, not the project\'s .gitignore');

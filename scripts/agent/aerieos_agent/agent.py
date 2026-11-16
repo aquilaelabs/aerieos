@@ -26,7 +26,7 @@ from .wssync import WorkspaceSync
 from .claudesync import ClaudeMirror
 from .screen import ScreenRelay
 from .sessions import SessionWatch, SessionsMixin
-from .accounts import AccountsMixin
+from .accounts import AccountsMixin, kept_lookup
 from .tokens import TokensMixin
 from .workspace import WorkspaceMixin
 from .work import WorkMixin
@@ -196,7 +196,8 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         except KeyError as e:
             raise RuntimeError(f"enrolled account {user!r} does not exist here") from e
         env.update({"HOME": pw.pw_dir, "USER": user, "LOGNAME": user})
-        groups = [g.gr_gid for g in grp.getgrall() if user in g.gr_mem]
+        # Every group read once a minute, not once a job (accounts.kept_lookup).
+        groups = kept_lookup(("groups", user), lambda: [g.gr_gid for g in grp.getgrall() if user in g.gr_mem])
         return {"user": pw.pw_uid, "group": pw.pw_gid, "extra_groups": groups}
 
     def take_token(self, new):

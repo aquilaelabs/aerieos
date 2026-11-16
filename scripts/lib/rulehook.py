@@ -146,6 +146,23 @@ MAP_NAMES = 2
 MAP_LINES = 6
 
 
+def find_answers(names, out):
+    """[(name, its answer's lines)] out of one `aerie map find NAME...`: one
+    name's answer is the whole output, several each sit under the line that
+    asks for it (codemap.py's find)."""
+    lines = (out or "").strip().splitlines()
+    if len(names) == 1:
+        return [(names[0], lines)]
+    got, cur = {}, None
+    for ln in lines:
+        if ln.startswith("$ aerie map find "):
+            cur = ln[len("$ aerie map find "):]
+            got[cur] = []
+        elif cur is not None:
+            got[cur].append(ln)
+    return [(n, got.get(n, [])) for n in names]
+
+
 def _plain(pattern):
     """A regex as the words it looks for: anchors, word edges and the
     escapes a person types around a name taken out."""

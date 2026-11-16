@@ -12,6 +12,24 @@ from . import AGENT_VERSION
 # ---------------------------------------------------------------------------
 # the connection
 
+# One TLS context of each kind a process (R228 step 18): one made for every
+# request read the system's CA store each time, 4 to 7 ms a call. `verify`
+# is the CA-checked kind (a public hostname); the other checks nothing
+# itself, its caller comparing the certificate with the pin.
+_CONTEXTS = {}
+
+
+def _context(verify):
+    got = _CONTEXTS.get(verify)
+    if got is None:
+        got = ssl.create_default_context()
+        if not verify:
+            got.check_hostname = False
+            got.verify_mode = ssl.CERT_NONE
+        _CONTEXTS[verify] = got
+    return got
+
+
 class Controller:
     """One controller, one credential, one way to talk to it.
 
@@ -48,7 +66,7 @@ class Controller:
     def _conn(self, timeout):
         if self.scheme == "http":
             return http.client.HTTPConnection(self.host, self.port, timeout=timeout)
-        ctx = ssl.create_default_context()
+        ctx = _context(self.pin == self.CA)
         if self.pin == self.CA:
             # A public hostname (R170): the system's CAs and the name, as a
             # browser would; nothing is pinned, since the certificate the
@@ -57,8 +75,7 @@ class Controller:
             c.connect()
             self.seen_pin = self.CA
             return c
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE       # the pin below is the check
+        # The pin below is the check (_context made this one without a CA's).
         # The certificate is pinned on first use and any other refused; a CA
         # check would refuse the self-signed one a home proxy serves.
         # nosemgrep: httpsconnection-detected

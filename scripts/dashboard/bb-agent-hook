@@ -343,6 +343,36 @@ def run(argv, payload, timeout):
         return 0, "", ""
 
 
+def run_here(argv, payload):
+    """A step's script run inside this process, as run() runs it in a
+    process of its own (R228 step 17): before every tool call each guard
+    was a python of its own, two of them a shell call's, about half of the
+    100 ms the call waited. The script is run as `python3 SCRIPT` runs it
+    (runpy, as __main__), with the step's argv and stdin and what it prints
+    captured, and ends as that process would: its exit's number, 0 when it
+    returns, 1 when it raises."""
+    import io                                                    # noqa: PLC0415 (only on this path)
+    import runpy                                                 # noqa: PLC0415
+    import warnings                                              # noqa: PLC0415
+    was = sys.argv, sys.stdin, sys.stdout, sys.stderr
+    out, err = io.StringIO(), io.StringIO()
+    sys.argv, sys.stdin, sys.stdout, sys.stderr = list(argv), io.StringIO(json.dumps(payload)), out, err
+    try:
+        # ...with a fresh process's quiet about unclosed files, which its
+        # stderr would never have carried.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", ResourceWarning)
+            runpy.run_path(argv[0], run_name="__main__")
+        code = 0
+    except SystemExit as e:
+        code = e.code if isinstance(e.code, int) and not isinstance(e.code, bool) else (0 if e.code is None else 1)
+    except Exception:                                           # noqa: BLE001 (as its own process would end)
+        code = 1
+    finally:
+        sys.argv, sys.stdin, sys.stdout, sys.stderr = was
+    return code, out.getvalue(), err.getvalue()
+
+
 def refusal(code, out, err):
     """Why a hook refused, or "". A guard says no in one of the two ways
     Claude Code reads, since Claude Code runs each of them itself: exit 2
@@ -650,7 +680,10 @@ def main(argv):
         print(why, file=sys.stderr)
         return 2
     for cmd, timeout in plan(event, call, proj, who):
-        code, out, err = run(cmd, call, timeout)
+        # Before a tool, the guards run here: the call waits on them, and
+        # each is quick. The other events' steps (a turn waited for, the
+        # checks at a stop) keep their own process and its time limit.
+        code, out, err = run_here(cmd, call) if event == "pre" else run(cmd, call, timeout)
         reason = refusal(code, out, err)
         if out.strip() and not reason:
             said.append(out.strip())

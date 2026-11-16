@@ -41,6 +41,7 @@ from .stores import noexec, tc_root
 from .backends import _have
 from .toolchains import sdk_env
 from .census import controller_ip, network_now
+from .accounts import kept_lookup
 
 
 
@@ -495,7 +496,9 @@ class SessionsMixin:
         # Every account user there is, the setting on or not: one turned off
         # still has its sessions running until they end (R125).
         if os.geteuid() == 0:
-            users += sorted(p.pw_name for p in pwd.getpwall() if p.pw_name.startswith("bbu-"))
+            # ...read once a minute, not every turn (accounts.kept_lookup).
+            users += kept_lookup("bbu-users", lambda: sorted(p.pw_name for p in pwd.getpwall()
+                                                              if p.pw_name.startswith("bbu-")))
         return users
 
     def _tmux_as(self, user, argv, timeout=10, quiet=False):
@@ -1015,13 +1018,39 @@ class SessionsMixin:
     def stats_now(self):
         """What each running container here uses, by name: [cpu %, memory %],
         for the hour's ring the controller keeps (R218 step 9). One docker
-        stats a minute, cached between like published_now; None where there
-        is no docker or it did not answer, and absent from the heartbeats
-        between, which the controller reads as no news."""
-        now = time.time()
-        if now - getattr(self, "stats_at", 0) < 60:
-            return None
-        self.stats_at = now
+        stats a minute, read on a thread of its own (R228 step 18): it takes
+        two seconds, and on the loop's own turn a job, a cancel or a sync
+        hint waited them out. Its answer rides the first heartbeat after it
+        lands; None meanwhile, where there is no docker or it did not
+        answer, and in the heartbeats between, which the controller reads as
+        no news."""
+        lock = self.__dict__.setdefault("stats_lock", threading.Lock())
+        with lock:
+            got, self.stats_got = getattr(self, "stats_got", None), None
+            if got is not None:
+                return got or None
+            now = time.time()
+            if now - getattr(self, "stats_at", 0) < 60 or getattr(self, "stats_reading", False):
+                return None
+            self.stats_at = now
+            if not shutil.which(DOCKER_BIN):        # on the PATH (B764)
+                return None
+            self.stats_reading = True
+
+        def read():
+            got = None
+            try:
+                got = SessionsMixin.stats_read(self)
+            finally:
+                with lock:
+                    # {} for no answer: handed over as None, and the read done.
+                    self.stats_got = got if got is not None else {}
+                    self.stats_reading = False
+        threading.Thread(target=read, name="docker-stats", daemon=True).start()
+        return None
+
+    def stats_read(self):
+        """One docker stats, read into {name: [cpu %, memory %]}, or None."""
         docker = shutil.which(DOCKER_BIN)       # on the PATH (B764)
         if not docker:
             return None

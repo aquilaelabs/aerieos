@@ -120,6 +120,21 @@ class Runs(unittest.TestCase):
         self.assertEqual((code, err.strip()), (2, "this session is held"))
         self.assertEqual(self.ran(), [["alpha", "u_0123abcd"]], "the guards after it are not asked")
 
+    def test_before_a_tool_the_guards_run_in_this_process(self):
+        # R228 step 17: each guard was a python of its own before every tool
+        # call. A refusal is passed on as before, and nothing was started.
+        real = self.h.subprocess.run
+        started = []
+        self.h.subprocess.run = lambda *a, **k: started.append(a) or real(*a, **k)
+        self.addCleanup(setattr, self.h.subprocess, "run", real)
+        code, out, _ = self.call("codex", "pre", {"tool_name": "shell", "tool_input": {"command": "rm -rf /tmp/x"}})
+        self.assertEqual(code, 2)
+        self.assertEqual(started, [])
+        self.assertEqual(self.ran(), [["alpha", "u_0123abcd"], ["guard", "alpha"]])
+        # ...while a prompt's steps, which may wait a long time, keep theirs.
+        self.call("codex", "prompt", {"prompt": "hello"})
+        self.assertTrue(started)
+
     def test_a_stop_a_check_sends_back_is_refused_once_a_turn_whether_the_agent_says_so_or_not(self):
         open(os.path.join(self.d, "failing"), "w").close()
         sid = "0199aaaa-bbbb-7ccc-8ddd-eeeeffff0001"

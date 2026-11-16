@@ -1,15 +1,14 @@
-"""Behind the build line of `aerie status` on a node (bb_controller_stamp in bb):
-which image the controller is on, asked over /api/meta, said softly. A
-session is always on a node, where BB_IMAGE_REV and BB_VERSION are empty, and
-the which-build rule sends it to aerie status to learn the build, so this has to
-work there. A controller that is down, or a session with no token, is a
-state the line reports rather than dies on.
+"""Behind the build lines of `aerie status` on a node (bb_stamps in aerie):
+which image the controller is on, asked over /api/meta, said softly, and
+the node's agent. A session is always on a node, where BB_IMAGE_REV and
+BB_VERSION are empty, and the which-build rule sends it to aerie status to
+learn the build, so this has to work there. A controller that is down, or a
+session with no token, is a state the line reports rather than dies on.
 
-BB_META_AUTH is the auth header. The line is printed with no newline, for bb
-to put in its sentence.
+BB_META_AUTH is the auth header, BB_NODE_ID the node. Two lines, the second
+the agent's or empty, the last with no newline.
 """
 import os
-import sys
 import urllib.parse
 
 import bbapi
@@ -22,38 +21,42 @@ import bbapi
 # made once, and the first version of this line made it again.
 # Short timeout: aerie status is run often, and a controller that is down should
 # cost a line rather than a 30-second wait.
-# `agent` as the argument: the line for this node's agent instead (R131),
-# its version and when it was built, or nothing when it cannot be had.
-AGENT = sys.argv[1:] == ["agent"]
+# One ask for both lines (R228 step 17): the controller's build, then, on a
+# line of its own, this node's agent (R131) with when it was built, or
+# nothing after the newline when it cannot be had. aerie status ran this
+# twice, two pythons and two requests.
 NODE = os.environ.get("BB_NODE_ID", "")
-if AGENT and not NODE:
-    raise SystemExit(0)
 try:
-    st, m = bbapi.request("/api/meta" + (f"?node={urllib.parse.quote(NODE)}" if AGENT else ""),
+    st, m = bbapi.request("/api/meta" + (f"?node={urllib.parse.quote(NODE)}" if NODE else ""),
                           auth=os.environ["BB_META_AUTH"], timeout=5)
 except Exception:
     st, m = None, {}
-if AGENT:
-    ag = (m or {}).get("agent") if isinstance(m, dict) else None
-    if isinstance(ag, dict) and ag.get("version"):
-        print(ag["version"] + (f" (built {ag['built'][:10]})" if ag.get("built") else ""), end="")
-    raise SystemExit(0)
-if st is None:
-    print("unreachable: the controller did not answer", end="")
-    raise SystemExit(0)
-if st >= 400 or not isinstance(m, dict) or m.get("error"):
-    why = (m or {}).get("error") or f"HTTP {st}"
-    print(f"the controller refused this session: {why}", end="")
-    raise SystemExit(0)
-ver = (m.get("version") or "").strip()
-rev = (m.get("image") or "").strip()
-built = (m.get("built") or "").strip()
-if not ver and not rev:
-    print("unstamped: the controller's image was built outside CI", end="")
-else:
+
+
+def controller_line():
+    if st is None:
+        return "unreachable: the controller did not answer"
+    if st >= 400 or not isinstance(m, dict) or m.get("error"):
+        why = (m or {}).get("error") or f"HTTP {st}"
+        return f"the controller refused this session: {why}"
+    ver = (m.get("version") or "").strip()
+    rev = (m.get("image") or "").strip()
+    built = (m.get("built") or "").strip()
+    if not ver and not rev:
+        return "unstamped: the controller's image was built outside CI"
     out = ver or rev[:7]
     if rev and rev[:7] not in out:
         out += f" ({rev[:7]})"
     if built:
         out += f" (built {built})"
-    print(out, end="")
+    return out
+
+
+def agent_line():
+    ag = (m or {}).get("agent") if isinstance(m, dict) and NODE else None
+    if isinstance(ag, dict) and ag.get("version"):
+        return ag["version"] + (f" (built {ag['built'][:10]})" if ag.get("built") else "")
+    return ""
+
+
+print(controller_line() + "\n" + agent_line(), end="")

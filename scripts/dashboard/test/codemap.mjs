@@ -6,7 +6,7 @@
 // beside the copy and never in the checkout.
 import { ok, done, DIR, section } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync, existsSync, mkdirSync, chmodSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, chmodSync, statSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 
 const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
@@ -267,8 +267,25 @@ ok(/^\d+-\d+  function nbRoadmapView$/m.test(defs) && /^  \d+-\d+  function draw
    && /^  \d+-\d+  arrow onclick  \(in drawRoadmap\)/m.test(defs),
    'defs lists a file top down, a function under the closure it lives in and a callback under its function');
 
+// The index is two files (R228 step 16): what each file calls and passes by
+// name, most of its bytes, beside the rest, and a definition is found with
+// the calls file out of reach; several names are one ask.
+await section("A definition is found without the calls, and several names are one ask", async () => {
+  const dir = `${REPO}/.bb-map`;
+  const core = statSync(`${dir}/map5.json`).size, calls = statSync(`${dir}/map5-calls.json`).size;
+  ok(calls > core, `the calls are a file of their own, the larger (${core} and ${calls} bytes)`);
+  renameSync(`${dir}/map5-calls.json`, `${dir}/map5-calls.json.away`);
+  let found = '';
+  try { found = map('find', 'openDocker'); } finally { renameSync(`${dir}/map5-calls.json.away`, `${dir}/map5-calls.json`); }
+  ok(/tab-docker\.js:\d+ to \d+  function/.test(found), `...and a definition is found without them (${found.split('\n')[0]})`);
+  ok(/tab-docker\.js/.test(map('who-calls', 'openDocker')), '...while who-calls reads them');
+  const two = map('find', 'openDocker', 'tmux_sessions');
+  ok(/^\$ aerie map find openDocker\n[^$]*tab-docker\.js[\s\S]*^\$ aerie map find tmux_sessions\n[^$]*server\.py/m.test(two),
+     `several names are one ask, each answer under its own line (${two.split('\n').length} lines)`);
+});
+
 // It rebuilds itself when a source is newer, and not otherwise.
-const stamp = () => readFileSync(`${REPO}/.bb-map/map4.json`, 'utf8').match(/"built": ([\d.]+)/)[1];
+const stamp = () => readFileSync(`${REPO}/.bb-map/map5.json`, 'utf8').match(/"built": ([\d.]+)/)[1];
 const before = stamp();
 map('find', 'openDocker');
 ok(stamp() === before, 'a query on an unchanged tree does not rebuild');
@@ -280,7 +297,7 @@ ok(/\(1 file scanned\)/.test(map()), '...rescanning that file alone and keeping 
 // An index of another format is rebuilt, never read: the first map crashed
 // with a KeyError on every question when it met a newer index on the tree.
 await section("An index of another format is rebuilt, never read", async () => {
-  const f = `${REPO}/.bb-map/map4.json`;
+  const f = `${REPO}/.bb-map/map5.json`;
   const good = readFileSync(f, 'utf8');
   writeFileSync(f, JSON.stringify({ built: 1, files: { 'scripts/aerie': { mtime: 1, lang: 'sh' } }, defs: [], calls: [], draws: [] }));
   ok(/^scripts\/dashboard\/tab-docker\.js:\d+ to \d+  function$/m.test(map('find', 'openDocker')),
@@ -325,7 +342,7 @@ await section("the index stays out of git", async () => {
   const g = (cwd, ...a) => execFileSync('git', ['-C', cwd, ...a], { encoding: 'utf8', env }).trim();
   const build = root => execFileSync('python3', [`${REPO}/scripts/lib/codemap.py`, '--root', root, 'build'],
                                      { encoding: 'utf8' });
-  const ignored = root => { try { g(root, 'check-ignore', '-q', '.bb-map/map4.json'); return true; }
+  const ignored = root => { try { g(root, 'check-ignore', '-q', '.bb-map/map5.json'); return true; }
                             catch { return false; } };
   const t = mkdtempSync(`${tmpdir()}/bbmap-`);
   g(t, 'init', '-q', '-b', 'main');
@@ -348,7 +365,7 @@ await section("the index stays out of git", async () => {
   try { execFileSync('python3', [`${REPO}/scripts/lib/codemap.py`, '--root', plain, 'exclude'],
                      { encoding: 'utf8', stdio: 'pipe' }); }
   catch (e) { why = String(e.stderr || ''); }
-  ok(existsSync(`${plain}/.bb-map/map4.json`) && /not in a git repository/.test(why),
+  ok(existsSync(`${plain}/.bb-map/map5.json`) && /not in a git repository/.test(why),
      '...while a tree with no repository still gets its map, and aerie map exclude says why it wrote nothing');
   g(t, 'worktree', 'remove', '--force', `${t}-wt`);
   for (const d of [t, plain]) rmSync(d, { recursive: true, force: true });
