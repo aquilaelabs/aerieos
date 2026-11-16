@@ -57,6 +57,9 @@
 - Ending a session just before the controller restarts still ends it, and a sign-in to a coding agent that was in progress is on its row again after the restart, its link shown and its code taken: both were forgotten with the restart. (ff55bda)
 - A node's token is checked and rotated in one step. Two of a node's calls arriving together could each retire its token, and enrolling a node again or locking it down left a token it had been handed and not yet used able to come alive later. Upgrading: `/config` moves to state 24, so a build from before this one no longer starts on it; there is nothing to do (ff55bda)
 - A container's Agent pill on the Containers page says a space's Run its container setting as soon as it is changed, rather than after the list is next read (eb4e0a5)
+- A press whose request never reaches the controller says so: the toast reads that the controller did not answer, where about a hundred and twenty presses did nothing and said nothing, and a release draft's Save the notes and Publish said they were done over a refusal. Anything else the page meets and nothing catches is said as a toast, once a minute for the same words (2df776a)
+- A button's spinning ring follows its own press: it no longer spins on for a page's refresh that happened to start just after it on a slow link, and a press that asks a question and then sends wears it while it sends (2df776a)
+- A page whose data moves quickly (the Jobs page while a job writes its log, Storage, VMs, Users, Schedules, Scanners) reads it one read at a time, never drawing an older answer over a newer one, and while a job runs it reads once more rather than once for every line of its log (2df776a)
 
 ### Security
 
