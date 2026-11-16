@@ -1,21 +1,20 @@
-// paint(): replace a surface's markup only when it changed, the one way
-// every list on this page is redrawn on the poll; and newShell(), a terminal
-// opened in the dock. What was the tab strip around them (its drag, its
-// picker, its arrows and pin menu) went with R218 step 4: terminals are the
-// dock's line (page-dock.js) and every other tab is a page on the rail.
+// patch(): a surface's new markup brought into what is there, the one way
+// every list on this page is drawn again; and newShell(), a terminal opened
+// in the dock. What was the tab strip around them (its drag, its picker, its
+// arrows and pin menu) went with R218 step 4: terminals are the dock's line
+// (page-dock.js) and every other tab is a page on the rail.
 //
 // One classic script beside index.html (docs/design-language.md, Files):
 // pure declarations, nothing runs at load.
 
 "use strict";
 
-// Rebuild-if-changed, for every list this page redraws on the poll. The poll
-// is every fifteen seconds and nearly always says the same thing; replacing
-// identical markup anyway dropped :hover under a resting pointer, reset a
-// link mid-"updating…", and made every card blink for nothing. Markup is
-// compared as a string (cheap, since it was just built) and only a
-// difference touches the DOM. Returns whether it did, for the callers that
-// bind handlers or animate only on a real change.
+// What each surface was last drawn with, by the markup it was given. The
+// poll is every fifteen seconds and nearly always says the same thing;
+// writing identical markup anyway dropped :hover under a resting pointer,
+// reset a link mid-"updating…", and made every card blink for nothing.
+// Markup is compared as a string (cheap, since it was just built) and only
+// a difference touches the DOM.
 const painted = new WeakMap();
 
 // The same rule for the frame's small writes (R218 step 10): a text, an
@@ -35,15 +34,10 @@ function setDisabled(el, off){ if (el && el.disabled !== !!off) el.disabled = !!
 // A title is taken off by untitle() and kept for a screen reader as the
 // element's description or name, so it is compared against what was kept.
 function setTitle(el, s){ if (el && saidOf(el) !== String(s)) el.title = String(s); }
-// Every redraw on the page goes through here, which is what makes it the one
-// place worth teaching about arriving. It already skips the write when
-// nothing changed; that is what keeps :hover alive and stops a mid-edit
-// field being wiped by a poll, and now the FIRST real content fades in.
-//
-// First only, deliberately. Fading on every change would flicker a list every
-// time a poll moved one word in it, which is worse than not animating at all.
-// "First" means: nothing has been painted here yet, or what was here was a
-// placeholder saying it had not arrived.
+// The FIRST real content fades in: nothing drawn here yet, or what was here
+// a placeholder saying it had not arrived. First only, deliberately: fading
+// on every change would flicker a list every time a poll moved one word in
+// it, which is worse than not animating at all.
 const WAITING = /class="(loading|empty)[ "]|loading…/;
 // What a draw wrote into a surface, as its record knows it: its children
 // but the page's own (patchOwn: a slide marker, a section's jump bar put
@@ -57,63 +51,48 @@ const paintedKids = el => { let n = 0;
 const paintedFirst = el => { let c = el.firstChild;
   while (patchOwn(c)) c = c.nextSibling;
   return c; };
-function paint(el, html, quiet = false){ return drawInto(el, html, quiet, false); }
 
-// The same, with the new markup patched into what is there rather than
-// written over it (R244): every element the new markup can be matched to is
-// kept and brought up to date, so a redraw from the poll leaves a person's
-// typing, its caret and an open IME composition, a fold they turned and a
-// dialog they have open where they were. Measured on the Containers and
-// Nodes pages before it was chosen (R244 step 1): replacing lost all of
-// those, lifting a form region out and back still ended the composition and
-// shut the folds, and this kept every one for about twice replace's time,
-// four milliseconds at today's sizes, paid only when the markup changed.
-function patch(el, html, quiet = false){ return drawInto(el, html, quiet, true); }
-
-function drawInto(el, html, quiet, keyed){
+// The new markup patched into what is there rather than written over it
+// (R244): every element the new markup can be matched to is kept and brought
+// up to date, so a redraw from the poll leaves a person's typing, its caret
+// and an open IME composition, a fold they turned, a menu and a dialog they
+// have open where they were. Measured on the Containers and Nodes pages
+// before it was chosen (R244 step 1): replacing lost all of those, lifting a
+// form region out and back still ended the composition and shut the folds,
+// and this kept every one for about twice replace's time, four milliseconds
+// at today's sizes, paid only when the markup changed. Returns whether it
+// wrote anything, for the callers that wire or animate only on a change.
+// `quiet` is the frame's own (the rail, a page's bar and foot): chrome is
+// there, it does not arrive.
+function patch(el, html, quiet = false){
   const rec = painted.get(el);
   // What it left there is what is there: a renderer that wrote the element
   // directly in between (a "loading…", an error) replaced its children, and
-  // the same markup painted again is then a change (R218 step 10, now that a
-  // page's list outlives its draws). A fold opened or a box ticked since
-  // replaces nothing and still reads as unchanged.
-  // ...counting the children it wrote: a slide marker (slideMark) put in
-  // beside them is the motion's, not a write that makes the markup stale.
+  // the same markup drawn again is then a change, written whole, since there
+  // is nothing of the last draw's to keep. A fold opened or a box ticked
+  // since replaces nothing and still reads as unchanged.
   const was = rec && rec.first === paintedFirst(el) && rec.n === paintedKids(el) ? rec.html : undefined;
   // ...unless a button in it was marked busy since (busy(): "Asking..."):
-  // the press rewrote it in place, and the same markup painted again is what
+  // the press rewrote it in place, and the same markup drawn again is what
   // takes the mark off. Skipped, Measure now said Asking until a reload (the
-  // operator, 23 Oct).
-  // A mark the markup carries itself (Abort's Stopping) is not a press's.
+  // operator, 23 Oct). A mark the markup carries itself (Abort's Stopping)
+  // is not a press's.
   if (rec && was === html && (html.includes('aria-busy="true"') || !el.querySelector('[aria-busy="true"]'))) return false;
-  // Not recorded, so the same markup is still a change on the next poll.
-  // A patch keeps an open menu where it is, with what is typed in it, so it
-  // is not held by one (R244 step 5); a document's whole draw still is, in
-  // renderDoc.
-  if (!keyed && menuHolds(el)) return false;
   const arriving = !rec || WAITING.test(rec.html);
-  // A surface another writer filled since (a skeleton, an error) is drawn
-  // whole: there is nothing of the last draw's to keep.
-  if (keyed && was !== undefined) patchInto(el, html);
+  if (was !== undefined) patchInto(el, html);
   else {
     el.innerHTML = html;
     // What the markup gave each element, for the first patch after it.
-    if (keyed) for (const c of el.children) patchRecord(c);
+    for (const c of el.children) patchRecord(c);
   }
   painted.set(el, {html, first: paintedFirst(el), n: paintedKids(el)});
-  // ...but never while the card around it is folding. contentIn starts at
-  // opacity 0 and takes 180ms, which is exactly the fold's duration, so a
-  // repaint landing on a collapsing card blanks its body at full height and
-  // fades it back in as the card shuts. That is the flicker on Runner and
-  // Projects and not the other cards: those two are the ones whose bodies
-  // redraw from the poll, so they are the ones a fold can collide with.
-  //
-  // Suppressed rather than delayed. The animation exists to make arriving
-  // content feel like it arrived; content arriving into something on its way
-  // shut has nowhere to arrive, and the fold is the motion that matters.
+  // ...but never fading while the card around it is folding. contentIn
+  // starts at opacity 0 and takes 180ms, which is exactly the fold's
+  // duration, so a draw landing on a collapsing card blanked its body at
+  // full height and faded it back in as the card shut. Suppressed rather
+  // than delayed: content arriving into something on its way shut has
+  // nowhere to arrive, and the fold is the motion that matters.
   const folding = el.closest(".card")?.getAnimations().length > 0;
-  // `quiet` is the frame's own (the rail, a page's bar and foot): chrome is
-  // there, it does not arrive.
   if (arriving && !quiet && !folding && !WAITING.test(html) && !noMotion()){
     // Restarted rather than added-once: an element can arrive more than once
     // in a session, and a class already on it would not replay.
@@ -325,6 +304,47 @@ function pressBack(btn){
   if (!btn?.isConnected) return;
   const want = !!btn.__markup && "disabled" in btn.__markup;
   if (btn.disabled !== want) btn.disabled = want;
+}
+
+// What the page's code takes from a drawn surface for whoever is looking (a
+// press a role does not give, a field a locked space keeps): hidden or dead,
+// and marked so that a draw for somebody it does give has it back. A patch
+// keeps what code did to an element its markup does not mention, so giving
+// it back is the code's as well (R244): giveBack first, then takeAway what
+// this look takes, on every draw.
+function takeAway(el, hide = false){
+  if (!el) return;
+  el.setAttribute("data-taken", "");
+  if (hide) el.hidden = true; else el.disabled = true;
+}
+// What is typed into a find box acts once a word is whole: never in the
+// middle of an input method's composition, whose keys are not letters yet,
+// and once at its end (R244 step 4). Set, so a draw that keeps the box may
+// set it again.
+function onTyping(inp, fn){
+  if (!inp) return;
+  inp.oninput = e => { if (!e.isComposing) fn(); };
+  inp.oncompositionend = () => fn();
+}
+// A Revert's fields as the markup draws them. A patch keeps what is typed
+// wherever the markup says what it said before, and a field typed into with
+// no draw since was drawn with the saved value then and now, so a Revert
+// that only drops its drafts and draws again would leave the typing there
+// (R244). Called after that draw.
+function fieldsBack(root){
+  root?.querySelectorAll("input, select, textarea").forEach(f => {
+    if (f.type === "checkbox" || f.type === "radio"){ if (f.checked !== f.defaultChecked) f.checked = f.defaultChecked; }
+    else if (f.tagName === "SELECT"){ for (const o of f.options) if (o.selected !== o.defaultSelected) o.selected = o.defaultSelected; }
+    else if (f.type !== "file" && f.value !== f.defaultValue) f.value = f.defaultValue;
+  });
+}
+function giveBack(root){
+  root?.querySelectorAll("[data-taken]").forEach(e => {
+    e.removeAttribute("data-taken");
+    pressBack(e);
+    const hid = !!e.__markup && "hidden" in e.__markup;
+    if (e.hidden !== hid) e.hidden = hid;
+  });
 }
 
 // A terminal at some directory, always a new one. "" is the workspace root.

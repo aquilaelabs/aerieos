@@ -553,8 +553,7 @@ function wireLibrary(root){
   if (typeof wireSignin === "function") wireSignin(root);
   const q = root.querySelector("#libFind");
   if (q){
-    q.oninput = e => { if (e.isComposing) return; libQ = q.value; libRev++; drawPanes(); };
-    q.oncompositionend = () => { libQ = q.value; libRev++; drawPanes(); };
+    onTyping(q, () => { libQ = q.value; libRev++; drawPanes(); });
   }
   // A chip rearranges the shelf (R192): the cards that stay slide to their
   // places, the ones it leaves out fade away, the ones it brings fade up.

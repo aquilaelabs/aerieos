@@ -896,7 +896,7 @@ the page coming back reads at once.
 **A draw writes only what changed.** The page draws as often as anything
 asks it to, and a draw that finds nothing new touches nothing: a page's
 skeleton (`docSurface`) outlives its draws, every list, bar, foot and the
-rail go through `paint()`, and the frame's small writes through `setText`,
+rail go through `patch()`, and the frame's small writes through `setText`,
 `setAttr`, `setClass`, `setHidden` and `setDisabled`, each a no-op when the
 value is already there. Written unconditionally, a status read rewrote two
 hundred nodes of the frame and faded the Home page in again each time, the
@@ -917,11 +917,12 @@ on a surface are open rather than typed: a menu and a fold. Neither is a
 tab's to look after, because a rule one tab keeps is a rule the next forgets.
 
 A `<select>` whose list is showing holds the redraw. `menuHolds(root)` is
-asked at the three places a redraw that did not come from a press starts: the
+asked at the two places a redraw that did not come from a press starts: the
 revisions poll, which is skipped whole so the news is still news on the next
-tick; `renderDoc`, which draws every document tab; and `paint()`, which draws
-every card. The draw that was skipped happens when the list shuts. A draw
-that came from a press is not held, since the press is what shut the list.
+tick, and `renderDoc`, which draws every document tab. The draw that was
+skipped happens when the list shuts. A draw that came from a press is not
+held, since the press is what shut the list. A patch keeps an open menu in
+the surface it draws, so it needs no holding of its own.
 
 A fold stays the way it was left. One with a `data-sect` key is recorded by
 the page's one `toggle` listener, and only when somebody pressed it, so a
@@ -932,9 +933,8 @@ identity (a memory, a bug, a test, a rule) keeps its open set in its view
 instead. `uniform.mjs` fails any `<details>` on any tab or notebook view that
 has neither.
 
-A surface that is patched keeps the rest a person has (R244). `patch(el,
-html)`, beside `paint()`, writes a new draw into what is there rather than
-over it: every element the new markup can be matched to is kept and brought
+A surface keeps the rest a person has (R244). `patch(el, html)` writes a
+new draw into what is there rather than over it: every element the new markup can be matched to is kept and brought
 up to date, so a field being typed in keeps its value, its caret and an IME
 composition, and a dialog open in the surface stays open. A list's rows
 carry `data-key`, so a row added, taken away or moved takes nothing of its
@@ -956,8 +956,7 @@ markup always draws that line and the person's pick would otherwise stay.
 An element's `style` is never the markup's (the content policy draws none;
 `data-style` is, applied through the CSSOM), so a part a press drew by its
 own hand keeps its place and color when the surface around it is patched. A
-patch is not held by an open menu, which it keeps where it is with what is
-typed in it; a document's whole draw still is, in `renderDoc`. What the
+patch keeps an open menu where it is with what is typed in it. What the
 page's code puts into a drawn surface carries `data-own` and is left where
 it is: a jump bar, a slide marker, a status it fills into a summary, a box
 asking for a name (`askInline`), a card's color swatches, and a copy of a
@@ -968,12 +967,14 @@ and the next draw is still a patch. On an element the markup draws,
 `data-own` says its children are its code's (a fold read when it is opened,
 a commit's detail read when it is picked). A handler on an element a patch
 keeps is set (`onclick =`), never added, or a second draw would run it
-twice. Every page's bar and foot, the rail, the dock's line, a space's
+twice; `uniform.mjs` draws every page and view twice over and names any
+listener a draw adds to what the last one kept. Every page's bar and foot, the rail, the dock's line, a space's
 header, a view's glance, the Spaces grid, the Containers, Nodes, VMs,
 Files, nginx, Library, Home, Sessions and Installed pages, the first-run
-page, and the notebook's Git, Design, bugs, roadmap and Sessions views draw
-through it, none keeping a caret
-or a focus by hand; `patch.mjs` holds every rule.
+page, every notebook view and every other list draw through it, none keeping
+a caret or a focus by hand. A find box acts once a word is whole
+(`onTyping`): never in the middle of an input method's composition, and once
+at its end. `patch.mjs` holds every rule.
 
 ### words-on-the-screen
 

@@ -299,7 +299,8 @@ function drawPanes(){
     // replaced whenever the slot is, and a handler bound once would be bound
     // to a node nothing is looking at any more.
     wireConsole(el);
-    el.querySelector("[data-reattach]")?.addEventListener("click", e => reattachTab(t.id, e));
+    const ra = el.querySelector("[data-reattach]");
+    if (ra) ra.onclick = e => reattachTab(t.id, e);
     // A VM's screen shown again after being hidden: one marked stale slept
     // through a disconnect, and needs the reload it was spared while nobody
     // was looking at it; any other is nudged to its box's size.

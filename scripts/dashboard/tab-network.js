@@ -89,10 +89,10 @@ function renderNetworkInto(i){
   const sect = (key, title, status, html, opts = {}) =>
     docSection("network", key, title, status, html.replace(/<h4>[^<]*<\/h4>\s*/, ""), opts);
   const groups = settingsSections().filter(g => NETWORK_GROUPS.includes(g.key));
-  d.list.innerHTML = networkReach() + `<div class="sectjump" data-sects></div>`
+  patch(d.list, networkReach() + `<div class="sectjump" data-sects></div>`
     + sect("reach", "Reached at", location.protocol.replace(":", ""), `<div class="field" data-group="Reached at"><div class="sub">The page is at ${esc(location.origin)}; a node dials the same address, or the hostname Reach from outside names, and a phone or the companion pins the certificate the Connection group shows.</div></div>`)
     + sect("dial", "Nodes dial in", networkDialStatus(), networkDial())
-    + groups.map(g => sect(g.key, g.title, g.status, withRevert(g.html, g.key), {cls: g.cls})).join("");
+    + groups.map(g => sect(g.key, g.title, g.status, withRevert(g.html, g.key), {cls: g.cls})).join(""));
   sectJump(d.list.querySelector("[data-sects]"));
   wireSections(d.el);
   splitSects(d.list, "network", {says: NETWORK_SAYS, back: "Network"});

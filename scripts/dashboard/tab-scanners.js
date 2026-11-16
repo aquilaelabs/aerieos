@@ -151,13 +151,13 @@ function renderScannersInto(i){
   const lt = data.latest || {};
   d.setBar("");
   const deployed = (data.nodes || []).some(n => n.deployed);
-  d.list.innerHTML = pageHead({facts: [["Newest known", scannersVersions(lt.versions)],
+  patch(d.list, pageHead({facts: [["Newest known", scannersVersions(lt.versions)],
       ["Checked", lt.at ? ago(lt.at) : "never: the defaults this release pins"], ["Nodes scanning", String((data.nodes || []).filter(n => n.deployed).length)]], actions: scannersActs(data)})
     + (lt.error ? `<div class="hint warn">${esc(lt.error)}</div>` : "")
     + scannersScheduleSection(data.schedule || {}, deployed)
     + (data.nodes || []).map(scannersNodeSection).join("")
     + ((data.nodes || []).length ? "" : noNodeYet("the scanners run on a node"))
-    + scannersUncovered(data.uncovered || []);
+    + scannersUncovered(data.uncovered || []));
   wireScannersTab(d.el);
 }
 

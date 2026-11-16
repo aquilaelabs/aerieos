@@ -181,12 +181,12 @@ function nbDesignView({$, nb, project, root}){
     // is not drawn (the operator, 21 Oct), so every press that would change
     // it is gone, a fold's own toggle kept, and the fields stay to read,
     // dead, the pulldowns that pick what is shown live (B293).
-    // Marked, so a project that is yours to change again gives them back:
-    // a patch keeps what the code did to an element its markup did not.
+    // Taken away, so a project that is yours to change again gives them back.
+    giveBack(body);
     if (dsRo()){
-      body.querySelectorAll("input,select:not([data-dspick]),textarea").forEach(e => { e.disabled = true; e.dataset.roOff = ""; });
-      body.querySelectorAll("button").forEach(b => { if (!b.closest("summary") && !b.hasAttribute("aria-expanded")){ b.hidden = true; b.disabled = true; b.dataset.roOff = ""; } });
-    } else body.querySelectorAll("[data-ro-off]").forEach(e => { delete e.dataset.roOff; pressBack(e); e.hidden = !!e.__markup && "hidden" in e.__markup; });
+      body.querySelectorAll("input,select:not([data-dspick]),textarea").forEach(e => takeAway(e));
+      body.querySelectorAll("button").forEach(b => { if (!b.closest("summary") && !b.hasAttribute("aria-expanded")){ takeAway(b, true); b.disabled = true; } });
+    }
     drawHint();
   }
 

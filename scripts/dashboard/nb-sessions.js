@@ -109,8 +109,7 @@ function nbSessionsView({$, nb, project, root}){
     wireSections(list);
     const f = list.querySelector(".cvfind");
     if (f){
-      f.oninput = e => { if (e.isComposing) return; find = f.value; drawSessions(); };
-      f.oncompositionend = () => { find = f.value; drawSessions(); };
+      onTyping(f, () => { find = f.value; drawSessions(); });
     }
     // Edit swaps a row's label, note and Keep in; Cancel puts them away.
     list.querySelectorAll("[data-cvedit]").forEach(b => b.onclick = () => { editing = b.dataset.cvedit; drawSessions(); list.querySelector(".cvLabel")?.focus(); });

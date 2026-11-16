@@ -342,8 +342,10 @@ function nbWikiView({$, nb, project}){
         : `<span class="dim">nothing yet</span>`}</div>`;
     // The add band is the first band under the head, above where the wiki
     // goes (B457); the rest is the body.
-    $("wkAddBox").innerHTML = add;
-    box.innerHTML = log + `<div class="field wkreader">${articles().length ? nav() : ""}${article()}</div>`;
+    // Patched (R244): a page's name and Markdown being typed, here or in a
+    // page's editor, stay as they are when the wiki is read again.
+    patch($("wkAddBox"), add);
+    patch(box, log + `<div class="field wkreader">${articles().length ? nav() : ""}${article()}</div>`);
     wire(box);
     wire($("wkAddBox"));
   }

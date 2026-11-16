@@ -139,9 +139,9 @@ function nbSigningView({$, nb, project}){
     // Import a backup and New key, the view's adds, the control row's
     // actions with New key the primary (a-notebook/views, R109), the form
     // either opens unrolling under the row.
-    $("sgActs").innerHTML = why ? "" : `<button type="button" id="sgImp" data-add="import" aria-expanded="${adding === "import"}"${
-        locked ? "" : ` disabled title="no key can be added until the backups have a password"`}><span class="lng">Import a backup</span><span class="shrt">Import</span></button><button type="button" class="primary" id="sgNew" data-add="key" aria-expanded="${adding === "key"}">New key</button>`;
-    $("sgAdd").innerHTML = why ? ""
+    patch($("sgActs"), why ? "" : `<button type="button" id="sgImp" data-add="import" aria-expanded="${adding === "import"}"${
+        locked ? "" : ` disabled title="no key can be added until the backups have a password"`}><span class="lng">Import a backup</span><span class="shrt">Import</span></button><button type="button" class="primary" id="sgNew" data-add="key" aria-expanded="${adding === "key"}">New key</button>`);
+    patch($("sgAdd"), why ? ""
       : adding === "key" ? `<div class="field"><div class="addbar actbar ctlrow">
           <input id="sgNewName" autocomplete="off" spellcheck="false" placeholder="name, e.g. watch" aria-label="a new key's name">
           <button type="button" id="sgNewGo">Add it</button><button type="button" id="sgAddCancel">Cancel</button></div></div>`
@@ -159,7 +159,7 @@ function nbSigningView({$, nb, project}){
           <div class="sub dim">A backup from a space with a backup password is wrapped under that password: type it here. A keystore on its own needs the password it was made with.</div>
           <div class="actbar"><button type="button" id="sgAddCancel">Cancel</button><button type="button" class="primary" id="sgImpGo" disabled>Import</button></div>
         </div></div>`
-      : "";
+      : "");
     // The backup password (the operator, 1 Oct): the project's owner's to
     // set, and every download's to give, AerieOS's owner's included.
     const lock = `<div class="field"><div class="rnsign rnsignlock">
@@ -224,7 +224,9 @@ function nbSigningView({$, nb, project}){
       const s = keys[key] || {}, n = SIGN_ROUTES.filter(([r]) => s[r]).length;
       return n ? `${n} of 2` : "none";
     };
-    $("sgBox").innerHTML =
+    // Patched (R244): a key's name, a password or an alias being typed stays
+    // when a release's signing moves the view.
+    patch($("sgBox"),
       // The keys are the project's, as many as it has: big chips pick one,
       // the small pills are for the view's own sections (R122). The chips
       // come first and the view's own boxes under them (the operator, 26 Oct).
@@ -245,7 +247,7 @@ function nbSigningView({$, nb, project}){
       + docSection("signing", "apps", "Apps", mapped.length ? `${mapped.length}` : "none",
           apps + (why ? "" : nb.sectBar("signing:apps")))
       + docSection("signing", "releases", "Releases", relStatus, relBody,
-          {cls: r.wanted && (r.why || (r.failed || []).length) ? "warn" : ""});
+          {cls: r.wanted && (r.why || (r.failed || []).length) ? "warn" : ""}));
     wireSections($("sgBox"));
     $("sgBox").querySelectorAll("[data-sgkey]").forEach(c => c.onclick = () =>
       chipMove(() => $("sgBox"), ".sect", () => { keyPick = c.dataset.sgkey; drawSigning(); }));

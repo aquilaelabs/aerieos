@@ -75,7 +75,7 @@ function nbArtifactsView({$, nb, project, root, sheet}){
       if (el){
         el.hidden = false;
         el.className = "";
-        el.innerHTML = docSection("artifacts", "build", artTitle("build"),
+        patch(el, docSection("artifacts", "build", artTitle("build"),
           b.node ? (b.gap ? "agent behind" : b.name) : "no node",
           b.node && b.gap
             ? `<div class="hint bad">Nothing runs on <b>${esc(b.name)}</b> until its agent is
@@ -89,7 +89,7 @@ function nbArtifactsView({$, nb, project, root, sheet}){
                  : "An account that may open the Library adds to it there."}</div>`
             : `<div class="hint">No node: nothing can be compiled for this space here.
                ${esc(b.why || "")}</div>`,
-          {cls: b.node ? (b.gap ? "bad" : "") : "warn"});
+          {cls: b.node ? (b.gap ? "bad" : "") : "warn"}));
         wireSections(el);
       }
     }
@@ -241,10 +241,12 @@ function nbArtifactsView({$, nb, project, root, sheet}){
                 : "pin: keep it, whatever builds come after it"}">${TACK}</button>`}
           </span>
         </div>`).join("");
-    list.innerHTML = (devHtml ? docSection("artifacts", "dev", "Docker",
+    // Patched (R244): a field or a fold in the list stays as the person left
+    // it when a build lands or the dev instance moves.
+    patch(list, (devHtml ? docSection("artifacts", "dev", "Docker",
                                             cf.available === false ? "unreachable"
                                             : `${cfFiles.length} compose file${cfFiles.length === 1 ? "" : "s"}`, devHtml) : "")
-      + docSection("artifacts", "files", artTitle("files"), rows.length ? `${rows.length} in dist/` : "none yet", filesBody, {prime: true});
+      + docSection("artifacts", "files", artTitle("files"), rows.length ? `${rows.length} in dist/` : "none yet", filesBody, {prime: true}));
     wireSections(list);
     paginate(list.querySelector('[data-sect="artifacts:files"] > .body'), ":scope > .artrow", {key: "artList", noun: "files"});
     // What a session looked with (R96): a reel's sheet, an emulator shot.
@@ -258,7 +260,7 @@ function nbArtifactsView({$, nb, project, root, sheet}){
     if (capBox){
       capBox.hidden = !caps.length;
       const days = art.capture_days ?? 7;
-      capBox.innerHTML = !caps.length ? "" : docSection("artifacts", "captures", "Captures",
+      patch(capBox, !caps.length ? "" : docSection("artifacts", "captures", "Captures",
         `${caps.length}, kept ${days ? `${days} day${days === 1 ? "" : "s"}` : "until removed"}`,
         `<div class="hint">What a session looked with: a reel's sheet (<b>aerie capture reel</b>) or an
            emulator shot, not what the space ships. ${days
@@ -275,7 +277,7 @@ function nbArtifactsView({$, nb, project, root, sheet}){
               }&path=${encodeURIComponent(c.path)}" download>Download</a>
             ${projWriteWhy(project) ? "" : `<button type="button" data-artcap="${i}" title="remove it from dist/ now, for everybody">Remove</button>`}
           </span>
-        </div>`).join(""));
+        </div>`).join("")));
       wireSections(capBox);
       capBox.querySelectorAll("[data-artcap]").forEach(b => b.onclick = async () => {
         const c = caps[+b.dataset.artcap];
@@ -296,7 +298,7 @@ function nbArtifactsView({$, nb, project, root, sheet}){
     if (brList){
       brList.hidden = !brRows.length;
       let at = 0;
-      brList.innerHTML = !brRows.length ? "" : docSection("artifacts", "branches", "Branch builds", String(brRows.length),
+      patch(brList, !brRows.length ? "" : docSection("artifacts", "branches", "Branch builds", String(brRows.length),
         `<div class="hint">Built on a branch. Merge it to main to put its build in dist/.</div>`
         + groups.map(g => `<div class="sub dim ggroup">${esc(g.who === state?.me ? "your" : `${g.who}'s`)} branch builds${
             g.branch ? `, on ${esc(g.branch)}` : ""}</div>` + g.artifacts.map(a => { const i = at++; return `
@@ -310,7 +312,7 @@ function nbArtifactsView({$, nb, project, root, sheet}){
               <a class="btn" href="/api/artifact?project=${encodeURIComponent(project)
                 }&path=${encodeURIComponent(a.path)}&tree=${encodeURIComponent(g.uid)}" download>Download</a>
             </span>
-          </div>`; }).join("")).join(""));
+          </div>`; }).join("")).join("")));
       if (brRows.length){
         wireSections(brList);
         paginate(brList.querySelector('[data-sect="artifacts:branches"] > .body'), ":scope > .artrow", {key: "artBranches", noun: "files"});
@@ -446,9 +448,9 @@ function nbArtifactsView({$, nb, project, root, sheet}){
       // on this tab with nothing naming it. "unavailable" rather than a
       // guess at which, because this branch is both a malformed VERSION and
       // a project with no git behind it; the body says which.
-      box.innerHTML = docSection("artifacts", "version", artTitle("version"), "unavailable",
+      patch(box, docSection("artifacts", "version", artTitle("version"), "unavailable",
         `<div class="verln"><span>version</span><code>${esc(ver.error)}</code></div>`,
-        {cls: "warn"});
+        {cls: "warn"}));
       wireSections(box);
       return;
     }
@@ -476,12 +478,14 @@ function nbArtifactsView({$, nb, project, root, sheet}){
         save: () => nb.verCommitStaged(comp),
         revert: () => nb.verClearStaged(comp)});
     });
-    box.innerHTML = all.map(v => docSection("artifacts",
+    // Patched (R244): a starting version or a bump being typed stays when a
+    // build lands or the version is read again.
+    patch(box, all.map(v => docSection("artifacts",
       `version${v.component ? ":" + v.component : ""}`,
       all.length > 1 ? (v.component || `${projLabel(v.project)} (the space)`) : artTitle("version"),
       v.target || "no VERSION file",
       verSection(v) + nb.sectBar(`artifacts:version${v.component ? ":" + v.component : ""}`),
-      {cls: v.target ? "" : "warn"})).join("");
+      {cls: v.target ? "" : "warn"})).join(""));
     wireSections(box);
     loadDrafts();
     // A role without Releases and versions Write on the project (B101):
@@ -490,11 +494,12 @@ function nbArtifactsView({$, nb, project, root, sheet}){
     // too. Nothing says why (the operator, 21 Oct).
     {
       const relWhy = projReleaseWhy(project), ro = projWriteWhy(project);
+      giveBack(box);
       if (relWhy){
-        box.querySelectorAll("[data-verbump],[data-verrelease],[data-verunbump],[data-verinit],[data-veradd]").forEach(x => { x.hidden = true; });
-        box.querySelectorAll("#verPolicy,.vstart,.vdir").forEach(x => { x.disabled = true; });
+        box.querySelectorAll("[data-verbump],[data-verrelease],[data-verunbump],[data-verinit],[data-veradd]").forEach(x => takeAway(x, true));
+        box.querySelectorAll("#verPolicy,.vstart,.vdir").forEach(x => takeAway(x));
       }
-      if (ro) box.querySelectorAll("[data-verask]").forEach(x => { x.hidden = true; });
+      if (ro) box.querySelectorAll("[data-verask]").forEach(x => takeAway(x, true));
     }
     // Releasing: outward-facing, and the one thing on this tab other people
     // fetch. Confirmed by name, because a pushed tag is not taken back from
@@ -1052,20 +1057,20 @@ this directory">Send to ${esc(sendAgent(project).name)}</button>
     const ds = j.drafts || [];
     if (!ds.length){ box.innerHTML = ""; return; }
     const may = !projReleaseWhy(project);
-    box.innerHTML = docSection("artifacts", "drafts", "Drafts", `${ds.length} waiting`, ds.map(d => {
+    patch(box, docSection("artifacts", "drafts", "Drafts", `${ds.length} waiting`, ds.map(d => {
       const miss = d.missing || [];
       // What keeps it from being published, each said on its row (R206 step
       // 3): a tag that is not on the git host stops the press; placeholder
       // notes are put right in the box, so the press stays and is checked.
       const holds = d.holds || [], stop = miss.length || holds.some(h => h.what !== "notes");
-      return `<div class="field verdraft" data-draft="${esc(d.tag)}">
+      return `<div class="field verdraft" data-draft="${esc(d.tag)}" data-key="${esc(d.tag)}">
         <div class="verln"><span>${d.prerelease ? "dev build" : "release"}</span><a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer">${esc(d.tag)}</a></div>
         ${miss.length ? `<div class="hint warn">Not whole yet: ${esc(miss.join(", "))} still missing; CI may still be building it.</div>` : ""}
         ${holds.map(h => `<div class="hint warn" data-drafthold="${esc(h.what)}">Not published yet: ${esc(h.why)}.</div>`).join("")}
         <textarea rows="12" aria-label="${esc(d.tag)}'s notes"${may ? "" : " readonly"}>${esc(d.notes)}</textarea>
         ${may ? `<div class="actbar"><span class="sp"></span><button type="button" data-draftsave>Save the notes</button><button type="button" class="primary" data-draftpub${stop ? " disabled" : ""}>Publish</button></div>` : ""}
       </div>`;
-    }).join("") + `<div class="hint">Only this repository's own people see a draft. Read its notes and correct them, then Publish: the release goes public, the dev channel and the containers following :dev take it, and a stable one becomes :latest. Publish it here: the git host's own form checks none of this, and one published there with its tag field emptied went out under a name nothing reads.</div>`, {cls: "warn"});
+    }).join("") + `<div class="hint">Only this repository's own people see a draft. Read its notes and correct them, then Publish: the release goes public, the dev channel and the containers following :dev take it, and a stable one becomes :latest. Publish it here: the git host's own form checks none of this, and one published there with its tag field emptied went out under a name nothing reads.</div>`, {cls: "warn"}));
     wireSections(box);
     box.querySelectorAll("[data-draft]").forEach(row => {
       const tag = row.dataset.draft, ta = row.querySelector("textarea");

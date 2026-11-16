@@ -218,7 +218,7 @@ function renderEmulatorInto(i){
     : d.sdkmanager === false ? `${d.name} needs the Android command-line tools first` : "";
   // The node is the Build group's header's (R178).
   surf.setBar("");
-  surf.list.innerHTML = `
+  patch(surf.list, `
     ${
     // Its node as a head (the operator, 25 Oct): where the images an
     // emulator boots are kept; its free space is the tile's (R218 step 24).
@@ -261,7 +261,7 @@ function renderEmulatorInto(i){
       emuAddRows(d, held) + `<div class="hint tcterms">Adding an image accepts
       <a href="https://developer.android.com/studio/terms" target="_blank" rel="noreferrer">Google's
       Android SDK terms</a>.</div>` + emuAddBar(d, held, job))}
-    ${(d.phones || []).length ? docSection("emulator", "phones", "Phones", emuPhonesSaid(d.phones), emuPhones(d)) : ""}`;
+    ${(d.phones || []).length ? docSection("emulator", "phones", "Phones", emuPhonesSaid(d.phones), emuPhones(d)) : ""}`);
 
   // Its sections stand open at a desk and take turns on a phone.
   wireSections(el);

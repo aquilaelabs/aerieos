@@ -439,7 +439,7 @@ function nbGitView({$, nb, project}){
     body.querySelectorAll("[data-gbchip]").forEach(b => b.onclick = () =>
       chipMove(() => body, ".gbranch", () => { gitBranchChip = b.dataset.gbchip; drawGit(); }));
     const bf = $("gitBranchFind");
-    if (bf) bf.oninput = () => { gitBranchFind = bf.value; gitBranchShow(body); };
+    onTyping(bf, () => { gitBranchFind = bf.value; gitBranchShow(body); });
     // A branch with work main lacks opens its comparison from its ⋯ or from
     // a press anywhere on its line that is not a button.
     body.querySelectorAll("[data-gitcmp]").forEach(b => b.onclick = () => { closeMore(); gitGoCompare(b.dataset.gitcmp); });
@@ -571,7 +571,7 @@ function nbGitView({$, nb, project}){
       floatAt(menu, btn);
       find.focus();
     };
-    find.oninput = sift;
+    onTyping(find, sift);
     find.onkeydown = e => {
       if (e.key !== "Enter") return;
       e.preventDefault();

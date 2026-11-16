@@ -2997,13 +2997,11 @@ function renderDockerInto(i){
   if (sb){
     // A word an input method is still composing is filtered on once it is
     // chosen (R244 step 4).
-    sb.oncompositionend = () => sb.oninput({});
-    sb.oninput = e => {
-      if (e.isComposing) return;
+    onTyping(sb, () => {
       dmSearch = sb.value;
       clearTimeout(dmSearchTimer);
       dmSearchTimer = setTimeout(() => { dockerRev++; drawPanes(); }, 120);
-    };
+    });
   }
   // The wiring, fetched when the fold is opened and not before. It needs the
   // compose file parsed, which is the one thing overview() refuses to do for

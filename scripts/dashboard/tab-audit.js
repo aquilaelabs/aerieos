@@ -66,12 +66,12 @@ function renderAuditInto(i){
     return;
   }
   const rows = data.rows || [];
-  d.list.innerHTML = pageHead({facts: [["Recorded", String(data.total || 0)], ["Shown", String(rows.length)],
+  patch(d.list, pageHead({facts: [["Recorded", String(data.total || 0)], ["Shown", String(rows.length)],
       ["Since", rows.length ? new Date(rows[rows.length - 1].at * 1000).toLocaleDateString() : ""]],
       actions: pick("auditPerson", "Person", (data.people || []).map(p => [p, p]), auditPerson)
         + pick("auditMachine", "Machine", (data.machines || []).map(m => [m.id, m.name]), auditMachine)})
     + (auditErr ? `<div class="notice bad">${esc(auditErr)}</div>` : "")
-    + docSection("audit", "trail", "What was done", String(data.total || 0), auditRows(rows));
+    + docSection("audit", "trail", "What was done", String(data.total || 0), auditRows(rows)));
   wireAudit(d.el);
   const tbl = d.el.querySelector(".audittbl");
   if (tbl) paginate(tbl, ":scope > .auditrow", {key: "auditList", noun: "entries", total: data.total || rows.length,

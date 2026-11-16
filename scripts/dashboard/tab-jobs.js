@@ -308,12 +308,12 @@ function renderJobsInto(i){
   const chips = chipBar(JOB_VIEWS.map(g => ({key: g.key, label: g.label, count: count(g.is)})), jobsShow, "data-jbshow",
                         jobsList.length);
   const said = JOB_VIEWS.find(g => g.key === jobsShow);
-  d.list.innerHTML = tiles + chips + jobsSection(shown.length ? tblWrap(JOB_COLS, rows, "jbtbl")
+  patch(d.list, tiles + chips + jobsSection(shown.length ? tblWrap(JOB_COLS, rows, "jbtbl")
     : `<div class="empty">${said ? (said.key === "live" ? "nothing is running or waiting"
                                      : `nothing ${said.key === JOB_TODAY.key ? "failed today" : said.key} among the last ${jobsList.length} jobs`)
                                    + ` <button type="button" data-jbshow="">Show every job</button>`
                                  : "no jobs yet: a compose action, an exec on a node, or an agent update will appear here"}</div>`,
-    shown.length ? `${shown.length}` : "none");
+    shown.length ? `${shown.length}` : "none"));
   d.list.querySelectorAll("[data-jbfollow]").forEach(b => b.onclick = e => {
     e.stopPropagation();
     openLogTab(`log:job:${b.dataset.jbfollow}`, `Log: ${b.dataset.label}`);

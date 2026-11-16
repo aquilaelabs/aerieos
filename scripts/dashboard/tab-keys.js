@@ -107,13 +107,13 @@ function renderKeysInto(i){
   }
   const k = keysData.install || {}, rows = keysData.kept || [];
   d.setBar("");
-  d.list.innerHTML = pageHead({facts: k.where ? [
+  patch(d.list, pageHead({facts: k.where ? [
       ["Install key", k.fingerprint, {cls: "keyfp"}], ["Kept in", KEYS_WHERE[k.where]],
       ["Made", KEYS_WHEN(k.made)], ["Changed", k.changed && k.changed !== k.made ? KEYS_WHEN(k.changed) : ""],
       ["Saved", k.changeable ? (k.saved ? "yes" : "not yet") : ""]] : [["Install key", "none"]]})
     + docSection("keys", "install", "Install key", k.where ? k.fingerprint : "none", keysInstallBody(k),
                  {cls: k.where && (k.where === "state" || (k.changeable && !k.saved)) ? "warn" : ""})
-    + docSection("keys", "kept", "Kept under it", String(rows.length), keysKeptBody(rows));
+    + docSection("keys", "kept", "Kept under it", String(rows.length), keysKeptBody(rows)));
   wireKeys(d.el);
 }
 

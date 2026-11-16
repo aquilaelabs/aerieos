@@ -701,9 +701,9 @@ function drawJump(){
   // staying shut as if the field had not heard (B72).
   const none = !jumpRows.length && !!inp.value.trim();
   list.hidden = !jumpRows.length && !none;
-  list.innerHTML = none ? `<div class="jnone" role="option" aria-disabled="true">nothing matches “${esc(inp.value.trim())}”</div>`
+  patch(list, none ? `<div class="jnone" role="option" aria-disabled="true">nothing matches “${esc(inp.value.trim())}”</div>`
     : jumpRows.map(([label, where], i) =>
-    `<button type="button" class="jrow${i === 0 ? " on" : ""}" id="jumpRow${i}" data-jump="${i}" role="option" aria-selected="${i === 0}"><span class="jl">${esc(label)}</span><span class="jw">${esc(where)}</span></button>`).join("");
+    `<button type="button" class="jrow${i === 0 ? " on" : ""}" id="jumpRow${i}" data-jump="${i}" role="option" aria-selected="${i === 0}"><span class="jl">${esc(label)}</span><span class="jw">${esc(where)}</span></button>`).join(""));
   list.querySelectorAll("[data-jump]").forEach(b => b.onclick = () => jumpGo(Number(b.dataset.jump)));
   if (jumpRows.length) inp.setAttribute("aria-activedescendant", "jumpRow0");
   else inp.removeAttribute("aria-activedescendant");
@@ -749,7 +749,7 @@ function wireJump(){
   };
   said();
   if (window.ResizeObserver) new ResizeObserver(said).observe(inp);
-  inp.oninput = drawJump;
+  onTyping(inp, drawJump);
   inp.onfocus = () => { (nodesList === null ? loadNodes() : Promise.resolve()).then(dmJumpLoad).then(drawJump); drawJump(); };
   inp.onkeydown = e => {
     if (e.key === "Enter"){ e.preventDefault(); jumpGo(jumpAt); }

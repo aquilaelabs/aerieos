@@ -437,7 +437,7 @@ function docSurface(i, kind){
   // every draw, a page drawn by the poll was born again each time, its list
   // fading in as if it had just arrived, its scroll and whatever was under
   // the pointer lost, though nothing in it had changed. A draw that changes
-  // nothing now writes nothing: the list goes through paint() or patch(),
+  // nothing now writes nothing: the list goes through patch(),
   // and the bar and the foot are patched only where what they say moved, a
   // picker or a search in the bar kept as it is (R244).
   let box = el.firstElementChild;
@@ -731,9 +731,17 @@ function sectJump(g){
   all.forEach(o => { seen[titleOf(o)] = (seen[titleOf(o)] || 0) + 1; });
   const mine = all.filter(o => seen[titleOf(o)] === 1);
   const have = g.querySelector(":scope .sectjump");
-  // Two or more (the operator, 23 Oct: every page with more than one).
-  if (mine.length < 2){ have?.remove(); return; }
+  // Two or more (the operator, 23 Oct: every page with more than one). One
+  // the page's markup drew (Settings') is hidden rather than taken out: its
+  // markup still has it, and a list missing a child the markup drew reads
+  // as another writer's at the next draw, which is then written whole (R244).
+  if (mine.length < 2){
+    if (have && have.__markup && !patchOwn(have)){ if (!have.hidden) have.hidden = true; }
+    else have?.remove();
+    return;
+  }
   const bar = have || document.createElement("nav");
+  if (bar.hidden) bar.hidden = false;
   // The code's own, which a patched surface leaves where it is (R244).
   if (!have) bar.setAttribute("data-own", "");
   // In a dialog every line is a .field band (the design's dialog layout).

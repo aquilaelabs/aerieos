@@ -555,7 +555,7 @@ function renderProjectsInto(i){
     el.querySelector("#bTrashTab").onclick = openTrash;
     const box = el.querySelector("#pjSearch");
     box.value = pjQuery;
-    box.oninput = () => { pjQuery = box.value; renderProjectsInto(i); };
+    onTyping(box, () => { pjQuery = box.value; renderProjectsInto(i); });
   }
   const grid = el.querySelector("#pjGrid");
   // New project and the trash are not drawn for an account whose roles do

@@ -90,7 +90,8 @@ function renderSessionsInto(i){
         esc(names.get(s.name) || s.name)}</span>${t && panes.indexOf(t.id) !== -1 ? ` <span class="pill ok">on screen</span>` : ""}${task}`,
       proj ? esc(projLabel(proj)) : `<span class="dim">workspace</span>`,
       s.node ? esc(s.node) : `<span class="dim">this controller</span>`,
-      s.created ? esc(ago(s.created)) : "",
+      // A clock: it moves with time, not with news (uniform's quiet read).
+      s.created ? `<span class="ago">${esc(ago(s.created))}</span>` : "",
       `<div class="actbar">${t ? (claude ? "" : `<button type="button" data-min="${esc(t.id)}"
           title="take its tab off the strip; it keeps running">Minimize</button>`)
         : `<button type="button" data-a="${esc(s.name)}" title="reopen its tab">Open</button>`}

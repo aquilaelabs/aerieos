@@ -223,14 +223,14 @@ function renderSchedulesInto(i){
   const on = rows.filter(s => s.on), next = on.filter(s => s.next_at).sort((a, b) => a.next_at - b.next_at)[0];
   // New schedule on the head (the operator, 29 Oct: not a row of its own).
   d.setBar("");
-  d.list.innerHTML = pageHead({facts: [["Schedules", String(rows.length)], ["Turned on", String(on.length)],
+  patch(d.list, pageHead({facts: [["Schedules", String(rows.length)], ["Turned on", String(on.length)],
                                        ["Next run", next ? `${next.name}, ${schedWhen(next.next_at)}` : "none"]],
                                actions: may ? `<button type="button" class="primary" id="bSchedNew">New schedule</button>` : ""})
     + docSection("schedules", "list", "Schedules", `${rows.length}`,
         rows.length ? `<div class="schedrows">${rows.map(s => schedRow(s, may)).join("")}</div>`
           // Nothing yet, said in words (the scan that used to stand here is
           // the Scanners page's own since R145).
-          : `<div class="empty">No schedule yet. New schedule runs a command on a node at the times you set, as cron runs one; the static analysis scan has a schedule of its own on the Scanners page.</div>`);
+          : `<div class="empty">No schedule yet. New schedule runs a command on a node at the times you set, as cron runs one; the static analysis scan has a schedule of its own on the Scanners page.</div>`));
   wireSchedules(d.el);
 }
 

@@ -58,7 +58,7 @@ function settingsKeep(el){
     };
     i.oninput = on; i.onchange = on;
   });
-  el.querySelectorAll("[data-clear]").forEach(i => { i.addEventListener("change", () => settingsWake(el)); });
+  el.querySelectorAll("[data-clear]").forEach(i => { i.onchange = () => settingsWake(el); });
   settingsWake(el);
 }
 // A section's Apply and Revert awake only while one of its fields differs
@@ -138,7 +138,7 @@ function renderSettingsInto(i){
   // The logs are an administrator's: a poll that has landed without them
   // means this account has no Logs section, not one still on its way (B38).
   const logs = logSection();
-  d.list.innerHTML = `${head}<div class="sectjump" data-sects></div>
+  patch(d.list, `${head}<div class="sectjump" data-sects></div>
     ${logs || !state ? sect("logs", "Logs", "", `<div class="row stack2" data-group="Logs"><div class="grow">${withRevert(logs, "logs")
         || `<div class="sub">log settings arrive with the first poll…</div>`}</div></div>`) : ""}
     ${sect("reports", "AerieOS bug reports", reportsCount() === null ? "" : reportsCount() ? `${reportsCount()} report${reportsCount() === 1 ? "" : "s"}` : "none", reportsSection())}
@@ -156,7 +156,7 @@ function renderSettingsInto(i){
     sect("reset", "Reset AerieOS", "", `<div class="field" data-group="Reset">
       <div class="hint">Start over at the setup page, un-enrolling the nodes first if you choose. Everything but space files is moved aside, not deleted.</div>
       <div class="actbar"><span class="sp"></span><button type="button" class="danger" id="setReset">Reset AerieOS</button></div>
-    </div>`)}`;
+    </div>`)}`);
   sectJump(d.list.querySelector("[data-sects]"));
   wireSections(d.el);
   // A page of settings (page-docs.js splitSects): the sections a list beside
@@ -167,6 +167,8 @@ function renderSettingsInto(i){
     sec?.querySelectorAll("input, select").forEach(i => { if (i.id) delete settingsDraft[i.id]; });
     settingsRev++;
     drawPanes();
+    fieldsBack(sec);
+    if (sec?.isConnected) settingsWake(d.el);
   });
   wireLogSection(d.el);
   wireIdleSection(d.el);
@@ -847,7 +849,9 @@ function catalogStatus(s){
 }
 function wireCatalogMirror(root){
   const file = root.querySelector("#mirrorFile");
-  root.querySelector("[data-mirrorimport]")?.addEventListener("click", () => file?.click());
+  // Set, not added: the page is patched and keeps these buttons (R244).
+  const imp = root.querySelector("[data-mirrorimport]");
+  if (imp) imp.onclick = () => file?.click();
   if (file) file.onchange = async () => {
     const f = file.files[0];
     if (!f) return;
@@ -861,7 +865,8 @@ function wireCatalogMirror(root){
     if (state && !j.error) state.catalog_mirror = j.mirror;
     settingsRev++; drawPanes(); refresh();
   };
-  root.querySelector("[data-mirrorforget]")?.addEventListener("click", async e => {
+  const fg = root.querySelector("[data-mirrorforget]");
+  if (fg) fg.onclick = async e => {
     const b = e.currentTarget;
     if (!await askYes("Forget the catalog's mirror? The Library reads the catalog's address alone again; packs kept from the mirror stay.")) return;
     busy(b, "Forgetting");
@@ -869,7 +874,7 @@ function wireCatalogMirror(root){
     notify(j.error || "the mirror is forgotten", !!j.error);
     if (state && !j.error) state.catalog_mirror = null;
     settingsRev++; drawPanes();
-  });
+  };
 }
 
 function appsIntro(){

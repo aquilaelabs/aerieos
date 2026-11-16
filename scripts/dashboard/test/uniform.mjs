@@ -1145,9 +1145,10 @@ for (const kind of kinds){
     const name = e => e ? (e.id ? '#' + e.id : e.tagName.toLowerCase() + (typeof e.className === 'string' && e.className ? '.' + e.className.trim().split(/\s+/)[0] : '')) : '?';
     const mo = new MutationObserver(ms => ms.forEach(m => {
       const t = m.target.nodeType === 1 ? m.target : m.target.parentElement;
-      // A clock's text, and a terminal's own drawing (what it prints, its
-      // cursor), are not the page drawing again for a read.
-      if (t?.closest('#uptime, #docWhen, .xterm')) return;
+      // A clock's text (an age a row says, marked .ago), and a terminal's
+      // own drawing (what it prints, its cursor), are not the page drawing
+      // again for a read: an age crosses a minute between two reads.
+      if (t?.closest('#uptime, #docWhen, .xterm, .ago')) return;
       seen.push(`${name(t)} ${m.type === 'attributes' ? '@' + m.attributeName : m.type}`);
     }));
     // ...unless it did bring something: a token the page follows that moved
@@ -1163,6 +1164,45 @@ for (const kind of kinds){
   ok(quietRead.seen.length === 0 || quietRead.moved.length > 0,
      `[${kind}] a status read that brings nothing new writes nothing${quietRead.seen.length ? ': ' + quietRead.seen.slice(0, 6).join('; ') : ''}${
        quietRead.moved.length ? '; moved: ' + quietRead.moved.join(', ') : ''}`);
+  // A draw adds no listener to what the last draw kept (R244 step 3): a
+  // patch keeps the page's elements, so a handler wired with
+  // addEventListener at every draw is wired once more each time and a press
+  // runs it twice. Set as a property (onclick =) it is the same handler
+  // again. The page is drawn twice over (a page's render forced, a
+  // notebook view shown again, which reads and draws it), and every
+  // listener added in that window to an element that was already there, or
+  // to window or document, is named. Adding the same function again is
+  // nothing in the DOM and is not counted; nor is one that removes itself
+  // after its first event.
+  const wired = await page.evaluate(async view => {
+    if (!window.__lsn){
+      const seen = new WeakMap(), add = EventTarget.prototype.addEventListener;
+      window.__lsn = { on: false, got: [] };
+      EventTarget.prototype.addEventListener = function(type, fn, opts){
+        const once = typeof opts === 'object' && opts?.once;
+        const cap = typeof opts === 'boolean' ? opts : !!opts?.capture;
+        let m = seen.get(this); if (!m) seen.set(this, m = new Map());
+        const k = type + (cap ? ':c' : ''), fns = m.get(k) || new Set(); m.set(k, fns);
+        if (window.__lsn.on && !once && !fns.has(fn)) window.__lsn.got.push({ el: this, type });
+        fns.add(fn);
+        return add.call(this, type, fn, opts);
+      };
+    }
+    const name = e => e === window ? 'window' : e === document ? 'document' : e.id ? '#' + e.id
+      : e.tagName.toLowerCase() + (typeof e.className === 'string' && e.className ? '.' + e.className.trim().split(/\s+/)[0] : '');
+    const draw = async () => {
+      if (view) getNotebook('alpha').view(view);
+      else { const p = document.getElementById('pane0'); if (p) delete p.dataset.rev; drawPanes(); }
+      await new Promise(r => setTimeout(r, 1200));
+    };
+    await draw();                                    // the first draw's own additions are its first wiring
+    const before = new WeakSet([window, document, ...document.querySelectorAll('*')]);
+    window.__lsn.got = []; window.__lsn.on = true;
+    await draw(); await draw();
+    window.__lsn.on = false;
+    return [...new Set(window.__lsn.got.filter(x => before.has(x.el)).map(x => `${name(x.el)} ${x.type}`))];
+  }, kind.startsWith('notebook:') ? kind.slice('notebook:'.length) : '');
+  ok(wired.length === 0, `[${kind}] a draw adds no listener to what the last draw kept${wired.length ? ': ' + wired.slice(0, 6).join('; ') : ''}`);
 }
 }
 

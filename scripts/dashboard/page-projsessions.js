@@ -31,12 +31,12 @@ const rnSessWho = r => r.who === state?.me ? "you" : r.who;
 function rnSessionsDraw(name, rows){
   if (rnMode === "git") return;                    // the remote's door alone (B539)
   const list = $("rnSessList");
-  list.innerHTML = rows.length ? rows.map((r, i) => `<div class="row rnsess">
+  patch(list, rows.length ? rows.map((r, i) => `<div class="row rnsess">
       <div class="grow"><div class="name">${esc(rnSessWho(r))}</div>
         <div class="sub">${[r.kind === "claude" ? "Claude" : "shell",
           r.node ? "on " + esc(r.node) : "", esc(r.state || "")].filter(Boolean).join(" · ")}</div></div>
       <button type="button" class="danger" data-rnsessend="${i}">End</button>
-    </div>`).join("") : `<div class="hint">No sessions on this space.</div>`;
+    </div>`).join("") : `<div class="hint">No sessions on this space.</div>`);
   list.querySelectorAll("[data-rnsessend]").forEach(b =>
     // Its own attribute: data-rnend is a section bar's End and save, which
     // the dialog's delegated click took this press for as well.

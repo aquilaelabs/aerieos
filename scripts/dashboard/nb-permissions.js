@@ -61,8 +61,9 @@ function nbPermsView({$, nb, project, root}){
           <button type="button" class="permGitApply"${dirty && !locked ? "" : " disabled"}>Apply</button>
         </div></div></div>`;
     const html = docSection("permissions", "push", "Pushing", `${pol.push || "allow"} · ${pol.main || "deny"}${pol.scan === "off" ? " · unheld" : ""}`, body);
-    if (host.dataset.drawn === html) return;
-    host.innerHTML = html; host.dataset.drawn = html;
+    // Patched (R244): a pick not yet applied stays, and a read that brings
+    // nothing new writes nothing.
+    if (!patch(host, html)) return;
     wireSections(host);
     host.querySelectorAll("[data-gitpol]").forEach(sel => sel.onchange = () => {
       if (sel.value === (saved[sel.dataset.gitpol] || GITPOL_DEFAULT[sel.dataset.gitpol])) delete draft[sel.dataset.gitpol];
@@ -129,8 +130,7 @@ function nbPermsView({$, nb, project, root}){
     const on = rows.filter(r => r.token !== false && (r.fixed || (hostDraft[r.id] || r.set) === "allow")).length;
     const html = docSection("permissions", "githost", "On the git host",
       rows.length ? `${on} of ${rows.length} allowed` : "", facts + list + foot);
-    if (el.dataset.drawn === html) return;
-    el.innerHTML = html; el.dataset.drawn = html;
+    if (!patch(el, html)) return;
     wireSections(el);
     el.querySelectorAll("[data-forgepol]").forEach(sel => sel.onchange = () => {
       const r = rows.find(x => x.id === sel.dataset.forgepol);

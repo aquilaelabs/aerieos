@@ -134,7 +134,7 @@ function renderProfileInto(i){
   // you are first, since that is what is changed here most.
   const sec = (id, title, inner) => docSection("profile", id, title, "",
     `<div class="row stack2"><div class="grow">${inner}</div></div>`);
-  d.list.innerHTML = `${head}
+  patch(d.list, `${head}
     ${sec("you", "Who you are", `
         <div class="logset">
           ${PROFILE_FIELDS.map(([k, label, hint, type]) => `
@@ -181,7 +181,7 @@ function renderProfileInto(i){
     ${sec("terminal", "Your terminal", profileTerminal())}
     ${profile.smb ? docSection("profile", "shares", "Your shares", profile.smb.rows?.length ? String(profile.smb.rows.length) : "", profileShares(profile.smb)) : ""}
     ${docSection("profile", "reach", "Where the bell reaches you", (pfReach?.dest || []).length ? String(pfReach.dest.length) : "", profileReach())}
-    ${docSection("profile", "devices", "Signed in as you", "", profileSignins(profile.signins || []) + profileDevices(profile.devices || []))}`;
+    ${docSection("profile", "devices", "Signed in as you", "", profileSignins(profile.signins || []) + profileDevices(profile.devices || []))}`);
   wireSections(d.list);
   splitSects(d.list, "profile", {says: PROFILE_SAYS, back: "Profile"});
   wireProfile(d.el);

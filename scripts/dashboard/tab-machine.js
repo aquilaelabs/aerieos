@@ -71,9 +71,9 @@ function renderMachineInto(i){
     d.list.innerHTML = `<div class="empty">This install's own machine is not enrolled as a node yet: the setup page shows it being set up, and the installer's --install does it (install-controller.sh --no-node leaves it out, and then there is nothing here).</div>`;
     return;
   }
-  d.list.innerHTML = machineHead(n)
+  patch(d.list, machineHead(n)
     + (state?.release?.running !== undefined ? docSection("nodes", "updates", "Updates", state.release.newer ? `${state.release.newer} is out` : state.release.latest ? "up to date" : "", updatesSection()) : "")
-    + olderVersionsSection(n);
+    + olderVersionsSection(n));
   wireNodesTab(d.el);
   nodesReadOnly(d.el);
   wireUpdates(d.el);

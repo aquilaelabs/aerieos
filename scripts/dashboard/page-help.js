@@ -133,7 +133,7 @@ function renderHelpInto(i){
     d.setBar(`<input id="helpQ" type="search" placeholder="search the docs" aria-label="search the docs" autocomplete="off" spellcheck="false">`);
     const q = d.bar.querySelector("#helpQ");
     q.value = helpQ;
-    q.oninput = () => { helpQ = q.value; clearTimeout(helpTimer); helpTimer = setTimeout(helpSearch, 220); };
+    onTyping(q, () => { helpQ = q.value; clearTimeout(helpTimer); helpTimer = setTimeout(helpSearch, 220); });
     q.onkeydown = e => { if (e.key === "Escape" && q.value){ q.value = ""; helpQ = ""; helpHits = null; helpRev++; drawPanes(); } };
   }
   if (!helpIndex){

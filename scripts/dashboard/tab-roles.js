@@ -437,13 +437,13 @@ function renderRolesInto(i){
   // The page's head (the operator, 29 Oct): how many roles, and how many
   // of them are a project's.
   const all = Object.values(rolesData.roles || {});
-  d.list.innerHTML = `
+  patch(d.list, `
     ${rolesErr ? `<div class="row bad"><div class="grow">${esc(rolesErr)}</div></div>` : ""}
     ${pageHead({facts: [["Roles", String(all.length)], ["For spaces", String(all.filter(r => r.scope === "projects").length)]], actions: newRole})}
     <div class="rsplit${rolesPhoneOpen ? " open" : ""}">
       <div class="rlist">${ro.list}</div>
       <div class="rdetail">${ro.detail}</div>
-    </div>`;
+    </div>`);
   wireRoles(d.el);
   if (rolesMoveNext){ splitMove(d.list.querySelector(".rsplit"), rolesMoveNext); rolesMoveNext = ""; }
 }

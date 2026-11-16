@@ -110,9 +110,11 @@ function nbTestsView({$, nb, project}){
       return;
     }
     const all = j.tests || [];
-    // A redraw comes from the poll as well as from this panel, and it
-    // replaces the list wholesale, so text somebody is part-way through
-    // typing has to come back with the row. Carried only where it DIFFERS
+    // A redraw comes from the poll as well as from this panel. It patches the
+    // list (R244), and a row's body is its own code's, filled again only when
+    // what it shows moved, so typing stays where it is; when it is filled
+    // again (another window described the test) the text somebody is part-way
+    // through typing has to come back with the row. Carried only where it DIFFERS
     // from what is about to be drawn, which settles the precedence without a
     // dirty flag to clear: their unsaved words beat the stored ones, a save
     // of their own leaves nothing to carry, and a row they never touched
@@ -212,7 +214,7 @@ function nbTestsView({$, nb, project}){
     // ---- the filter --------------------------------------------------------
     const suites = [...new Set(all.map(t => t.suite))].sort();
     $("tstBar").hidden = false;
-    $("tstSuite").innerHTML = optionList([["", "all suites"], ...suites], nb.tstSuite);
+    patch($("tstSuite"), optionList([["", "all suites"], ...suites], nb.tstSuite));
     $("tstFlagged").checked = nb.tstFlagged;
     $("tstUndoc").checked = nb.tstUndoc;
     const shown = all.filter(t => (!nb.tstSuite || t.suite === nb.tstSuite)
@@ -231,7 +233,13 @@ function nbTestsView({$, nb, project}){
     // its folds by.
     const openRows = new Set([...$("tstList").querySelectorAll(".tst[open]")]
                              .map(e => e.dataset.key));
-    $("tstList").innerHTML = shown.length ? shown.map(t => `
+    // What a row's body shows, as one short word: its body is filled again
+    // only when this moves (a description saved, Edit pressed or let go).
+    const sigOf = t => { let h = 0;
+      for (const ch of JSON.stringify([t.protects, t.notes, t.accepted, t.sits_on, t.was, t.history, tstEditing.has(t.key)]))
+        h = (h * 31 + ch.charCodeAt(0)) | 0;
+      return String(h); };
+    patch($("tstList"), shown.length ? shown.map(t => `
       <details class="tst${t.suspect ? " flagged" : ""}" data-key="${esc(t.key)}"${
         openRows.has(t.key) ? " open" : ""}>
         <summary>
@@ -247,17 +255,19 @@ function nbTestsView({$, nb, project}){
           ${t.after ? `<span class="tstafter">follows: ${esc(
              t.after.length > 120 ? t.after.slice(0, 118) + "…" : t.after)}</span>` : ""}
         </summary>
-        <div class="body"></div>
+        <div class="body" data-own></div>
       </details>`).join("")
-      : `<div class="empty">nothing matches the filters</div>`;
+      : `<div class="empty">nothing matches the filters</div>`);
     paginate($("tstList"), ":scope > .tst", {key: "tstList", noun: "tests"});
     // The editor, built on the way open. Every row has one; there is a place
     // to describe every test in the project, but a row nobody has opened is
     // a summary line and an empty div until they do.
     const fill = box => {
       const t = byKey.get(box.dataset.key), body = box.querySelector(".body");
-      if (!t || !body || body.dataset.done) return;
-      body.dataset.done = "1";
+      if (!t || !body) return;
+      const sig = sigOf(t);
+      if (body.dataset.done === sig) return;
+      body.dataset.done = sig;
       const draft = drafts.get(box.dataset.key);
       // A role that reads the project and does not write it (B101): no
       // Edit, and the fields never out.

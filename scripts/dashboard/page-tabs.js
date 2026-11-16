@@ -590,7 +590,7 @@ function drawCard(id, fn){
   try{ fn(); }
   catch(e){
     const el = id && $(id);
-    if (el) paint(el, `<div class="empty warn">not drawn; this card's draw failed
+    if (el) patch(el, `<div class="empty warn">not drawn; this card's draw failed
       on the container's answer; the rest of the page is fine.
       ${esc(String(e && e.message || e))}</div>`);
     setTimeout(() => { throw e; });

@@ -2215,11 +2215,11 @@ function renderRunnerInto(i){
   // the head's action row under its facts (the operator, 29 Oct: the bar
   // it stood in left a gap), so the bar carries nothing.
   d.setBar("");
-  d.list.innerHTML = n
+  patch(d.list, n
     ? `<div class="ndrow runnerpanel" data-node="${esc(n.id)}"><div class="ndconf">${nodeRunnerSection(n, nodeDraft(n),
         // Several to compare; one is what the section under it says already.
         (state?.node_runners || []).length > 1 ? runnerRows() : "", runnerAddBtn(n, nodeDraft(n)))}</div></div>`
-    : noNodeYet("a runner is added to a node");
+    : noNodeYet("a runner is added to a node"));
   const show = d.list.querySelector("[data-nrunnershow]");
   if (show) show.onclick = () => { nodeDraft(n).addRunner = true; nodesRev++; drawPanes(); };
   if (n) wireNodeConf(d.list.querySelector(".ndrow"), n.id);

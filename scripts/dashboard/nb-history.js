@@ -75,7 +75,7 @@ function nbHistoryView({$, nb, project}){
          and drop lands here from now on.`}</div>`;
       return;
     }
-    $("roadmapHist").innerHTML = nb.roadmapLog.map((e, k, all) => {
+    patch($("roadmapHist"), nb.roadmapLog.map((e, k, all) => {
       const [word, tone] = ACT[e.act] || [e.act || "changed", ""];
       // R on the number, as everywhere an item is named (ids.py): a log line
       // is exactly where a bare number could be read against the bug tracker.
@@ -99,7 +99,7 @@ function nbHistoryView({$, nb, project}){
                 nb.nbUnsaved() ? ` disabled title="${esc(`save or revert first: ${nb.nbUnsaved()} not on disk yet`)}"` : ""
               }>Put back</button>` : ""}</span>
     </div>`;
-    }).join("");
+    }).join(""));
     $("roadmapHist").querySelectorAll(".hput").forEach(b => b.onclick = async () => {
       busy(b, "Putting back");
       const j = await nb.postRoadmap({action: "restore", id: Number(b.dataset.id), at: Number(b.dataset.at)});
@@ -134,10 +134,10 @@ function nbHistoryView({$, nb, project}){
 
   // Typing searches, but not on every keystroke: each one is a round trip, and
   // a thumb types faster than a fetch comes back.
-  $("histFind").oninput = () => {
+  onTyping($("histFind"), () => {
     clearTimeout(nb.histTimer);
     nb.histTimer = setTimeout(loadHistory, 250);
-  };
+  });
   $("histFind").onkeydown = e => {
     if (e.key === "Enter"){ e.preventDefault(); clearTimeout(nb.histTimer); loadHistory(); }
     if (e.key === "Escape" && e.target.value){

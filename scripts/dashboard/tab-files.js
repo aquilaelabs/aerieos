@@ -244,8 +244,7 @@ function wireFiles(root){
   // it; a word an input method is still composing is filtered on once it
   // is chosen (R244 step 4).
   if (f){
-    f.oninput = e => { if (e.isComposing) return; flFilter = f.value; flRev++; drawPanes(); };
-    f.oncompositionend = () => { flFilter = f.value; flRev++; drawPanes(); };
+    onTyping(f, () => { flFilter = f.value; flRev++; drawPanes(); });
   }
   const pick = root.querySelector("#flPick");
   if (pick) pick.onchange = () => { flUpload([...pick.files]); pick.value = ""; };

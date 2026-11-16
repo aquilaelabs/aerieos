@@ -382,5 +382,29 @@ await section("a part a press drew by hand keeps the style its data-style gave i
      `its place stays when the surface around it is patched (${JSON.stringify(r)})`);
 });
 
+await section("what the code takes away for a role it gives back as the markup has it", async () => {
+  // A role that may not release hides Release and deadens the fields; a
+  // patch keeps what code did to an element, so the look after the role
+  // changes gives back exactly what the markup draws: a press drawn dead
+  // stays dead.
+  await fresh('<div class="v"><button type="button" data-rel>Release</button><button type="button" data-save disabled>Save</button><input class="vstart" value="1.0"><i>1</i></div>');
+  const r = await page.evaluate(() => {
+    const el = document.querySelector('#r244'), rel = el.querySelector('[data-rel]'), save = el.querySelector('[data-save]'), inp = el.querySelector('.vstart');
+    // A draw for the role that may not: patched, given back, taken away.
+    const look = (n, may) => {
+      patch(el, `<div class="v"><button type="button" data-rel>Release</button><button type="button" data-save disabled>Save</button><input class="vstart" value="1.0"><i>${n}</i></div>`);
+      giveBack(el);
+      if (!may){ takeAway(rel, true); takeAway(save, true); takeAway(inp); }
+    };
+    look(1, false); look(2, false);
+    const held = { rel: rel.hidden, save: save.hidden, inp: inp.disabled, kept: el.querySelector('.vstart') === inp };
+    // ...and one for a role that may.
+    look(3, true);
+    return { held, rel: [rel.hidden, rel.disabled], save: [save.hidden, save.disabled], inp: inp.disabled, marks: el.querySelectorAll('[data-taken]').length };
+  });
+  ok(r.held.rel && r.held.save && r.held.inp && r.held.kept && !r.rel[0] && !r.rel[1] && !r.save[0] && r.save[1] && !r.inp && r.marks === 0,
+     `taken away by each draw for a role that does not give them, and given back as the markup draws them by the first that does (${JSON.stringify(r)})`);
+});
+
 await page.evaluate(() => document.querySelector('#r244')?.remove());
 await done(browser);

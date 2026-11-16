@@ -56,10 +56,13 @@ function fxWireBar(root, st, redraw){
   // Debounced like the history search: a repaint per keystroke redraws the
   // list under the reader's cursor for nothing the last keystroke does not
   // already deliver.
+  // ...and never mid-word in an input method: the list narrows when the
+  // word is finished (R244 step 4).
   let t = null;
-  if (inp) inp.oninput = () => { clearTimeout(t); t = setTimeout(() => {
+  const narrow = () => { clearTimeout(t); t = setTimeout(() => {
     st.find = inp.value; redraw();
   }, 250); };
+  onTyping(inp, narrow);
 }
 
 // The one answer, from the poll: no /reports mount, nothing in it, or nothing
@@ -254,7 +257,7 @@ function renderFindingsInto(i){
           + "not what it checked."}</div>`;
   d.setBar(fxBarHtml(all.filter(f => !fxProject || fxProj(f) === fxProject),
                      fxState, projSelect));
-  d.list.innerHTML = body;
+  patch(d.list, body);
   const aside = findings.aside ? `${findings.aside} finding(s) are
       against paths that are no space's and are counted aside rather than
       listed${(state?.findings_heads || []).length

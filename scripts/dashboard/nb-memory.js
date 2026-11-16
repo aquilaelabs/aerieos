@@ -58,7 +58,7 @@ function nbMemoryView({$, nb}){
     // with nothing changed (save_index drops them and keeps every other line
     // where it was), offered as its own press (B455).
     const dangling = j.issues.filter(i => i.fix === "tidy").length;
-    $("memDrift").innerHTML = j.issues.length
+    patch($("memDrift"), j.issues.length
       ? docSection("memory", "drift", "Index",
                    `${j.issues.length} problem${j.issues.length === 1 ? "" : "s"}`,
                    j.issues.map(i => `<div>${esc(i.text)}</div>`).join("")
@@ -66,7 +66,7 @@ function nbMemoryView({$, nb}){
                        ? "a line for a memory that is gone" : `${dangling} lines for memories that are gone`}</span>
                        <button type="button" id="memTidy">Take ${dangling === 1 ? "it" : "them"} out</button></div>` : ""),
                    {cls: "warn"})
-      : "";
+      : "");
     wireSections($("memDrift"));
     const tidy = $("memTidy");
     if (tidy) tidy.onclick = async () => {
@@ -106,8 +106,10 @@ function nbMemoryView({$, nb}){
     // A role that reads the project and does not write it (B86): no Edit
     // or Remove on a memory, and Write a memory dead with the reason.
     const ro = projWriteWhy(nb.memProj);
-    $("memList").innerHTML = j.memories.map(m => `
-    <details class="mem chev" data-file="${esc(m.file)}"${open.has(m.file) ? " open" : ""}>
+    // Patched (R244), each memory by its file: one being edited keeps its
+    // fields, caret and fold when another memory or the index moves.
+    patch($("memList"), j.memories.map(m => `
+    <details class="mem chev" data-file="${esc(m.file)}" data-key="${esc(m.file)}"${open.has(m.file) ? " open" : ""}>
       <summary>
         ${m.type ? `<span class="tag mtype ${esc(m.type)}">${esc(m.type)}</span>` : ""}
         <span class="mname">${esc(m.name)}</span>
@@ -161,7 +163,7 @@ function nbMemoryView({$, nb}){
     </details>`).join("")
       // Said in the list, where every other view says it, rather than by
       // hiding the list and leaving a heading over nothing.
-      || `<div class="empty">none yet: sessions write these as they learn the space; Write a memory adds one by hand</div>`;
+      || `<div class="empty">none yet: sessions write these as they learn the space; Write a memory adds one by hand</div>`);
     paginate($("memList"), ":scope > .mem", {noun: "memories"});
     // The fold, driven rather than left to the browser's instant one: the same
     // height tween every fold uses (slideDetails), so a memory opens the way a
@@ -172,20 +174,25 @@ function nbMemoryView({$, nb}){
         slideDetails(sum.parentElement, !sum.parentElement.open);
       };
     });
+    // What is stored is what the markup drew (a field's default), not what
+    // the field holds: a patch keeps what was typed in it.
     $("memList").querySelectorAll("textarea[data-file], .ix input").forEach(t => {
-      t.dataset.was = t.value;
+      t.dataset.was = t.defaultValue;
       t.oninput = nb.syncSave;
     });
-    // ...and what was being typed goes back in, over the stored text `was`
-    // now remembers, so the redraw changed nothing about what is unsaved.
+    // ...and what was being typed stays, over the stored text `was` now
+    // remembers, even where a session changed the memory under it (the patch
+    // would follow the new text): the clash band says so, and the redraw
+    // changes nothing about what is unsaved. Written only where it differs,
+    // so the caret stays where it was.
     typed.forEach((v, file) => {
       const d = $("memList").querySelector(`.mem[data-file="${CSS.escape(file)}"]`);
       if (!d) return;
       const ta = d.querySelector("textarea[data-file]");
       const t = d.querySelector(".ixt"), h = d.querySelector(".ixh");
-      if (ta && v.text !== undefined) ta.value = v.text;
-      if (t && v.title !== undefined) t.value = v.title;
-      if (h && v.hook !== undefined) h.value = v.hook;
+      if (ta && v.text !== undefined && ta.value !== v.text) ta.value = v.text;
+      if (t && v.title !== undefined && t.value !== v.title) t.value = v.title;
+      if (h && v.hook !== undefined && h.value !== v.hook) h.value = v.hook;
     });
     $("memList").querySelectorAll(".mEdit").forEach(b => b.onclick = () => {
       nb.memEditing.add(b.closest(".mem").dataset.file);

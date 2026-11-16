@@ -325,10 +325,13 @@ ok(await page.evaluate(() => ({
 // A redraw is not always this panel's own: an ingest under an open tab draws
 // one on the next poll, and it used to take unsaved typing with it.
 await page.fill(`${box} .tstN`, 'half a sentence, not saved yet');
+// ...and since R244 the field itself stays, focused, the caret where it was.
+await page.$eval(`${box} .tstN`, e => { e.focus(); e.setSelectionRange(4, 4); window.__tstN = e; });
 await page.evaluate(() => notebooks.get('alpha').reloadTests());
 await page.waitForFunction(s => document.querySelector(s + ' .tstN'), box, { timeout: 10000 });
-ok(await page.$eval(`${box} .tstN`, e => e.value) === 'half a sentence, not saved yet',
-   'a redraw under an open editor gives back what was being typed into it');
+const kept = await page.$eval(`${box} .tstN`, e => ({ value: e.value, same: e === window.__tstN, focus: document.activeElement === e, caret: e.selectionStart }));
+ok(kept.value === 'half a sentence, not saved yet' && kept.same && kept.focus && kept.caret === 4,
+   `a redraw under an open editor keeps the field being typed in, its words, its focus and its caret (${JSON.stringify(kept)})`);
 ok(await page.$eval(`${box} .tstP`, e => e.value)
      === 'the daemon address is parsed, not guessed',
    '...and the field beside it, which was saved, still reads what was stored');

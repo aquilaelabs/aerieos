@@ -688,7 +688,7 @@ function makeNotebook(project){
     slideMark(sub, "nbv:" + project + ":" + g);
   }
   $("bugSort").onchange = drawBugs;
-  $("bugFind").addEventListener("input", () => { nb.bugFind = $("bugFind").value; drawBugs(true); });
+  onTyping($("bugFind"), () => { nb.bugFind = $("bugFind").value; drawBugs(true); });
   // What this notebook watches. Registered once per instance, and only ever
   // acted on while the view in question is actually on screen: a token
   // moving for a tab nobody is looking at is not worth a fetch.
@@ -850,7 +850,7 @@ function makeNotebook(project){
   // This project's containers as the Containers page draws them, scoped to
   // it (the operator, 19 Oct): its tiles, when the images were checked, and
   // its card in the page's cards or list, whichever this browser keeps.
-  let dkSeen = "", dkGot = null;
+  let dkGot = null;
   async function loadNbDocker(){
     const p = (state?.projects || []).find(x => x.name === project);
     const node = p?.prefs?.node || dockerNode || "";
@@ -878,19 +878,19 @@ function makeNotebook(project){
       behind: mine.filter(d => (d.images_behind || []).length || d.nginx_to).length, checked: !!got.images_at}),
       blind && n ? `on ${esc(where)}: the daemon did not answer, so the rows cannot say what is running`
         : n ? `on ${esc(where)}${imgs}` : "no node runs this space's containers yet", "", blind && n ? "warn" : "");
-    const key = JSON.stringify([mine, others, job && job.step, job && job.running, job && (job.log || "").length,
-                                dmView, got.images_at, blind]);
-    if (key === dkSeen) return;
-    dkSeen = key;
-    $("dkSeg").innerHTML = n ? dmViewSeg() : "";
-    dmViewWire($("dkSeg"), () => { dkSeen = ""; drawNbDocker(); });
+    // Patched as the Containers page's rows are (R244): a row's settings
+    // dialog open, a field typed in it and a fold stay as they are, and a
+    // draw that brings nothing new writes nothing, which a key of its own
+    // used to decide.
+    patch($("dkSeg"), n ? dmViewSeg() : "");
+    dmViewWire($("dkSeg"), () => drawNbDocker());
     const ck = $("dkCheck");
     ck.hidden = blind || !mayDocker() || !mine.length;
     ck.onclick = () => dmCheck(ck, node, () => { unbusy(ck, "Check"); ck.insertAdjacentHTML("beforeend", `<span class="lng"> for updates</span>`); loadNbDocker(); });
     // What the view is for, as its empty state (R119 step 4).
     dmNoteOpen($("dkList"));
-    $("dkList").innerHTML = dmGroupsHtml(mine, others, job, blind, project)
-      || `<div class="field"><div class="hint nbempty">Send ${esc(projLabel(project))} from ${pageLink("", "Artifacts", `#/spaces/${encodeURIComponent(project)}/artifacts`)}, or pick it on a container's row on the ${pageLink("docker", "Containers page")}.</div></div>`;
+    patch($("dkList"), dmGroupsHtml(mine, others, job, blind, project)
+      || `<div class="field"><div class="hint nbempty">Send ${esc(projLabel(project))} from ${pageLink("", "Artifacts", `#/spaces/${encodeURIComponent(project)}/artifacts`)}, or pick it on a container's row on the ${pageLink("docker", "Containers page")}.</div></div>`);
     dmWireRows($("dkList"), got);
   }
   $("dkOpen").onclick = () => openDocker();

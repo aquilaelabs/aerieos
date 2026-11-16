@@ -67,7 +67,7 @@ const SURFACE = [ 'adoptLayout', 'adoptMode', 'adoptMotion', 'applyMotion', 'ado
   'pFillGates', 'pFillNode', 'pDirOf', 'dmCalled', 'dmJobSettle', 'rnFillReads', 'rnLoadTools', 'rnFillTools', 'rnLockSettings', 'rnRowsList', 'rnHostIds', 'rnBars', 'rnWireBox', 'rnBarSay', 'rnRevertSect', 'rnSectChanges', 'rnEnc', 'rnDec', 'pJobAct', 'pJobPoll', 'pJobSeen', 'pJobWire', 'pNameShow', 'pOpen',
   // A terminal in its own window (R8).
   'popOut', 'reattachTab',
-  'pShowKey', 'pSlide', 'paginate', 'paint', 'onPress', 'patch', 'drawInto', 'patchKey', 'patchSame', 'patchFieldOf', 'patchAttrs', 'patchRecord', 'patchWas', 'patchControl', 'patchNode', 'patchKids', 'patchOwn', 'patchHeld', 'patchInto', 'pressBack', 'drawFresh', 'paintBar', 'paneStack',
+  'pShowKey', 'pSlide', 'paginate', 'onPress', 'patch', 'patchKey', 'patchSame', 'patchFieldOf', 'patchAttrs', 'patchRecord', 'patchWas', 'patchControl', 'patchNode', 'patchKids', 'patchOwn', 'patchHeld', 'patchInto', 'pressBack', 'drawFresh', 'takeAway', 'giveBack', 'onTyping', 'fieldsBack', 'paintBar', 'paneStack',
   'phFetch', 'tcAct', 'tcPick',
   // The Emulator tab (tab-emulator.js).
   'openEmulator', 'emuPick', 'loadEmulator', 'emuAddRows', 'emuFlavorNow', 'emuTickedHere', 'emuRow', 'renderEmulatorInto', 'emuAct', 'tcTermsLine', 'tcVerifiedLine', 'tcReceiptLines', 'tcSystemLine', 'tcNeedsLine', 'tcDriverLine', 'tcDriverOption', 'tcToolkitLine', 'nodesReadOnly', 'headerOnly', 'splitSects', 'splitDraw', 'splitAway', 'bootOwn', 'splitMove', 'splitMarks', 'splitOff', 'rnSplit', 'rolesInsts', 'rolesLvlAt', 'rolesSetAll', 'viewSaid', 'pageKey', 'pageLimit', 'rnPrefsOf',
@@ -150,7 +150,7 @@ ok(added.length === 0,
 const REACHED = ['refresh', 'openTab', 'hideTab', 'tabOf', 'sessionOf',
                  'newShell', 'setProjectPinned', 'renameProject', 'drawProjects',
                  'renderSessionsInto', 'drawBell', 'notify', 'openTrash', 'drawTrash',
-                 'paint', 'drawUiMenu', 'toggleBell'];
+                 'patch', 'drawUiMenu', 'toggleBell'];
 // NOT the bridges out of makeNotebook: ruleStagedCount and its version
 // equivalents. They are top-level `let`, and `new Function` below cannot see
 // the global LEXICAL environment, so asking about one here answers

@@ -68,9 +68,9 @@ function renderPhoneInto(i){
   const n = nodes.find(x => x.id === phNode) || (!phNode ? nodes[0] : null);
   d.setBar("");
   phFoot = "";
-  d.list.innerHTML = n ? phonePanel(n)
+  patch(d.list, n ? phonePanel(n)
     : picked ? `<div class="hint">${esc(picked.name)} has no adb: install Android platform tools on it from the ${pageLink("library", "Library")}.</div>`
-    : `<div class="hint">No node carries adb yet: install Android platform tools on one from the ${pageLink("library", "Library")}.</div>`;
+    : `<div class="hint">No node carries adb yet: install Android platform tools on one from the ${pageLink("library", "Library")}.</div>`);
   d.setFoot(phFoot);
   if (!tcDotsTimer && d.list.querySelector(".dots")) tcDotsTimer = setInterval(tcTickDots, 400);
   wirePhoneTab(d.el);

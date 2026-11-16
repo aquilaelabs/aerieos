@@ -184,13 +184,13 @@ function renderUsersInto(i){
   // Oct): how many accounts, and how many may administer.
   const admins = usersList.filter(x => x.role === "owner" || x.role === "admin").length;
   const seen = usersList.filter(x => x.seen && Date.now() / 1000 - x.seen < 86400 * 7).length;
-  d.list.innerHTML = `
+  patch(d.list, `
     ${usersErr ? `<div class="row bad"><div class="grow">${esc(usersErr)}</div></div>` : ""}
     ${pageHead({facts: [["Accounts", String(usersList.length)], ["Administrators", String(admins)], ["Seen this week", String(seen)]], actions: addUser})}
     <div class="rsplit${usersPhoneOpen ? " open" : ""}">
       <div class="rlist">${usersList.map(userRow).join("") || `<div class="empty">nobody yet</div>`}</div>
       <div class="rdetail">${u ? usersDetail(u) : `<div class="empty">nobody to show</div>`}</div>
-    </div>`;
+    </div>`);
   wireUsersBar(d.el);
   wireUsers(d.el);
   if (usersMoveNext){ splitMove(d.list.querySelector(".rsplit"), usersMoveNext); usersMoveNext = ""; }

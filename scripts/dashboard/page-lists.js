@@ -50,6 +50,7 @@ function paginate(host, rowSel, opts = {}){
     if (rows.length >= opts.total) return;
     const bar = document.createElement("div");
     bar.className = "pagemore";
+    bar.setAttribute("data-own", "");      // the list's code's: a patch steps over it (R244)
     bar.innerHTML = `<span>${rows.length} of ${opts.total}${opts.noun ? " " + esc(opts.noun) : ""}</span>
       <button type="button" class="next">Show more</button>`;
     const more = () => {
@@ -78,6 +79,7 @@ function paginate(host, rowSel, opts = {}){
   if (shown >= rows.length) return;
   const bar = document.createElement("div");
   bar.className = "pagemore";
+  bar.setAttribute("data-own", "");
   bar.innerHTML = `<span>${shown} of ${rows.length}${opts.noun ? " " + esc(opts.noun) : ""}</span>
     <button type="button" class="next">Show more</button>`;
   const more = () => {

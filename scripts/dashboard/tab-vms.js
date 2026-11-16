@@ -282,8 +282,7 @@ function wireVms(el){
   // The patch keeps the box, its focus and its caret; a word an input
   // method is still composing is filtered on once it is chosen (R244 step 4).
   if (s){
-    s.oninput = e => { if (e.isComposing) return; vmsSearch = s.value; drawPanes(); };
-    s.oncompositionend = () => { vmsSearch = s.value; drawPanes(); };
+    onTyping(s, () => { vmsSearch = s.value; drawPanes(); });
   }
   el.querySelectorAll("[data-vmchip]").forEach(c => c.onclick = () => chipMove(
     () => el, ".row, .sect", () => { vmsChip = c.dataset.vmchip; drawPanes(); }));

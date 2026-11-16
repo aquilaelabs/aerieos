@@ -976,8 +976,8 @@ function renderStorageInto(i){
   // The node is the group header's (R177) and Measure now the head's, so
   // the page's own bar has nothing to carry.
   d.setBar("");
-  d.list.innerHTML = n ? storageBody(n, where)
-    : noNodeYet("the disks measured here are a node's");
+  patch(d.list, n ? storageBody(n, where)
+    : noNodeYet("the disks measured here are a node's"));
   wireStorageTab(d.el);
   if (n) wireStorageShares(d.el, n);
   if (n) wireStoragePools(d.el, n);

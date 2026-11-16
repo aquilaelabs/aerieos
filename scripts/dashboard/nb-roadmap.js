@@ -1261,7 +1261,7 @@ function nbRoadmapView({$, nb}){
     else drawFinished();
   });
   wireSections($("roadmapDoneSect").parentElement);
-  $("roadmapFind").addEventListener("input", () => {
+  onTyping($("roadmapFind"), () => {
     nb.roadmapFind = $("roadmapFind").value;
     redrawRoadmap();
     drawFinished();
