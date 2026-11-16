@@ -175,7 +175,7 @@ function tcReceiptLines(p){
   // it on a node that cannot cut it.
   if (r.net === "cut") lines.push(`<span class="sub tcreceipt">Its downloads are declared: each matched its sha256, and its install steps ran with no network.</span>`);
   if (r.net === "open") lines.push(`<span class="sub tcreceipt">Its downloads are declared and each matched its sha256, but this node cannot cut the network for a step, so its install steps ran with it.</span>`);
-  if (r.stale) lines.push(`<span class="sub warn tcreceipt">This copy is from an earlier manifest: the one kept now is <code>${short(r.stale)}</code>. Remove it here and install it again to take what that one installs.</span>`);
+  if (r.stale) lines.push(`<span class="sub warn tcreceipt">This copy is from an earlier manifest: the one kept now is <code>${short(r.stale)}</code>. Install again takes what that one installs.</span>`);
   if (r.before) lines.push(`<span class="sub warn tcreceipt">The same manifest left other files here the time before (receipt <code>${short(r.before)}</code>): something its install fetches has changed.</span>`);
   if (r.differs?.length) lines.push(`<span class="sub warn tcreceipt">The same manifest left other files on ${esc(r.differs.map(d => d.node).join(", "))} (receipt ${
     r.differs.map(d => `<code>${short(d.tree)}</code>`).join(", ")}): something its install fetches is not pinned.</span>`);

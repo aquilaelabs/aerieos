@@ -172,8 +172,26 @@ await section("an install's receipt", async () => {
   });
   ok(said.plain.length === 1 && /^Installed .+ from manifest aaaaaaaaaaaa: 214 files, 48\.0 MB, receipt 111111111111\.$/.test(said.plain[0]) && / 1 file,/.test(said.one),
      `an installed pack says its receipt: the manifest it came from, when, how many files and how big, and one hash over them (${said.plain[0]})`);
-  ok(said.stale.length === 2 && /^WARN This copy is from an earlier manifest: the one kept now is bbbbbbbbbbbb\. Remove it here and install it again/.test(said.stale[1]),
+  ok(said.stale.length === 2 && /^WARN This copy is from an earlier manifest: the one kept now is bbbbbbbbbbbb\. Install again takes what that one installs\.$/.test(said.stale[1]),
      `...a copy from an earlier manifest than the one kept now says so, and what to do (${said.stale[1]})`);
+  // ...and its row and its Library card say it where the state is read,
+  // with Install again to press (B799): it read installed, nothing to press.
+  const rows = await page.evaluate(() => {
+    const r = { kind: 'toolchain', name: 'zig', label: 'Zig', installed: true, pack: null,
+                receipt: { commit: 'a'.repeat(40), tree: '1'.repeat(64), stale: 'b'.repeat(40) } };
+    const box = document.createElement('div');
+    const words = h => { box.innerHTML = h; return box.textContent.trim(); };
+    const presses = h => { box.innerHTML = h; return [...box.querySelectorAll('button')].map(b => `${b.dataset.instact || b.dataset.libact}:${b.textContent}`); };
+    const prev = libNode; libNode = libNode || 'n_x';
+    const out = { row: words(instState(r)), acts: presses(instActs(r, { install: true })),
+                  card: words(libState(r)), verb: presses(libActs(r, { install: true, packs: true })),
+                  fresh: words(instState({ ...r, receipt: { ...r.receipt, stale: '' } })) };
+    libNode = prev;
+    return out;
+  });
+  ok(rows.row === 'installed from an earlier manifest' && rows.acts[0] === 'update:Install again'
+     && rows.card === 'installed from an earlier manifest' && rows.verb.includes('install:Install again') && rows.fresh === 'installed',
+     `...and its Installed row and Library card say it with Install again to press (${JSON.stringify(rows)})`);
   ok(said.before.length === 2 && /^WARN The same manifest left other files here the time before \(receipt 222222222222\)/.test(said.before[1]),
      `...the same manifest having left other files here before is said (${said.before[1]})`);
   ok(said.differs.length === 2 && /^WARN The same manifest left other files on alder, birch \(receipt 333333333333, 444444444444\): something its install fetches is not pinned\.$/.test(said.differs[1]),

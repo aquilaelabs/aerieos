@@ -109,6 +109,7 @@ function instState(r){
   if (r.pack?.disabled) return w(esc(r.pack.disabled) + ": the Library offers a version that fits when there is one", "warn");
   // The version that is out is the row's pill ("2.1.314 is out"), so the
   // state says only that, as the Library's card does.
+  if (r.installed && !r.update && r.receipt?.stale) return w("installed from an earlier manifest", "warn");
   if (r.installed) return w(r.update ? "software update available" : "installed", r.update ? "warn" : "ok");
   if (r.unknown) return w("installed, version unknown");
   return w("");
@@ -127,7 +128,10 @@ function instActs(r, may){
   if (r.machine) return r.machine.managed && !r.machine.imaged && r.installed && may.install ? a("remove", "Remove", "danger") : "";
   if (!may.install) return "";
   // Software update, as the Library's card says it (the operator, 13 Nov).
-  const upd = r.installed && r.update ? a("update", "Software update", "primary") : "";
+  // ...and Install again on a copy an earlier manifest made, which takes what
+  // the one kept now installs (B799): the same job, removing it first.
+  const upd = r.installed && r.update ? a("update", "Software update", "primary")
+    : r.installed && r.receipt?.stale ? a("update", "Install again", "primary") : "";
   // Edit on a pack a person added themselves, as on the Library's card: one
   // kept from the catalog is the catalog's, its kept copy reached from its
   // Details page there.

@@ -184,6 +184,7 @@ function libState(r){
   // The catalog pins a newer commit of a pack kept from it: said as what
   // it is, the pack's manifest and not the program on the node.
   if (r.repin) return w("manifest update available", "warn");
+  if (r.installed && !r.update && r.receipt?.stale) return w("installed from an earlier manifest", "warn");
   if (r.installed) return w(r.update ? "software update available" : "installed", r.update ? "warn" : "ok");
   if (r.unknown) return w("installed, version unknown");
   return w("");
@@ -219,7 +220,9 @@ function libActs(r, may){
   if (r.machine && (!r.machine.managed || r.machine.imaged)) return "";
   // The container toolkit installed but unknown to Docker is put right by
   // installing it again, which its line on the Installed page says.
-  const again = r.machine?.state === "unconfigured";
+  const again = r.machine?.state === "unconfigured"
+    // ...and a pack whose copy here an earlier manifest made (B799).
+    || !!(r.installed && r.receipt?.stale);
   // One switched off for not fitting this AerieOS is not installed anywhere
   // new: its way back is the catalog's newer pin, below.
   const verb = r.pack?.disabled ? "" : r.update ? a("install", "Software update", "primary", libHold) : again ? a("install", "Install again", "primary", libHold)
@@ -236,7 +239,7 @@ function libActs(r, may){
   // its card never carries a Software update: the manifest is what moves.
   // Keeping one changes what the controller and its sessions read at once
   // and reinstalls nothing: a node's copy made by the earlier manifest's
-  // install steps stays until it is removed and installed again.
+  // install steps stays, and its card then offers Install again (B799).
   if (r.repin && may.packs) return `${a("repin", "Manifest update", "primary")}${edit}`;
   return `${verb}${edit}`;
 }
