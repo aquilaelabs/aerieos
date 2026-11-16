@@ -42,6 +42,7 @@ import json
 import os
 import tempfile
 import threading
+import time
 
 # path -> [reentrant lock, depth, fd]. The RLock makes the depth and the fd
 # safe to touch: only the thread holding it ever does.
@@ -192,6 +193,137 @@ def set_aside(folder, name):
     return os.path.basename(dst)
 
 
+# ---- a state file read once while it stays the same file (R228 step 1) ----
+# The text of each state file read through here, kept by what the file is on
+# disk (its inode, size and times): on a /config served over the network each
+# open and read was a round trip, and one status read opened users.json
+# seventy times. Every caller still parses its own copy, so nothing one
+# changes reaches another; what is saved is the trip to the disk. A request
+# (begin_request) looks at each file once: the first ask stats it, and the
+# same answer serves the rest of that request, as a request is one moment.
+# A write through write_json or write_text forgets the file at once.
+_texts = {}
+_texts_lock = threading.Lock()
+_here = threading.local()
+
+
+# How long a request's look at a file holds: a request is one moment, and
+# one that lives on (a terminal's socket, a node's long-poll) looks again.
+REQUEST_HOLD_S = 2.0
+
+
+def begin_request():
+    """A request begins on this thread: each file is looked at once in it."""
+    _here.seen = {}
+    _here.t0 = time.monotonic()
+
+
+def end_request():
+    """...and ends: the next one looks again."""
+    _here.seen = None
+
+
+def writes_here():
+    """How many state files this thread has written: a request's own answer
+    about itself (who is asking) is kept until it writes one."""
+    return getattr(_here, "wrote", 0)
+
+
+def _forget(path):
+    with _texts_lock:
+        _texts.pop(path, None)
+    seen = getattr(_here, "seen", None)
+    if seen is not None:
+        seen.pop(path, None)
+        seen.pop(("sig", path), None)
+    _here.wrote = getattr(_here, "wrote", 0) + 1
+
+
+def forget(path):
+    """A state file written some other way than write_json or write_text
+    (its own temporary and rename): read afresh from now on."""
+    _forget(_p(path))
+
+
+def _request_seen():
+    seen = getattr(_here, "seen", None)
+    if seen is not None and time.monotonic() - getattr(_here, "t0", 0) > REQUEST_HOLD_S:
+        seen.clear()
+        _here.t0 = time.monotonic()
+    return seen
+
+
+# A file changed this recently is never taken as the same file: a
+# filesystem's clock moves in ticks, and two writes of one size in place
+# within a tick leave inode, size and times as they were (git's "racy"
+# entries). Such a file is read again until it has been still this long.
+RACY_NS = 2_000_000_000
+
+
+def sig(path):
+    """What the file is on disk, (inode, size, mtime, ctime, racy), or None
+    when it is not there: looked at once a request, for a module that keeps
+    its own parse of a file (registry, repos, roles) and checked it on every
+    call. `racy` is 0 for a file still since RACY_NS, and a value no other
+    look gives for one changed since, so it matches nothing kept."""
+    path = _p(path)
+    seen = _request_seen()
+    key = ("sig", path)
+    if seen is not None and key in seen:
+        return seen[key]
+    try:
+        st = os.stat(path)
+        racy = time.time_ns() - max(st.st_mtime_ns, st.st_ctime_ns) < RACY_NS
+        got = (st.st_ino, st.st_size, st.st_mtime_ns, st.st_ctime_ns, time.monotonic_ns() if racy else 0)
+    except OSError:
+        got = None
+    if seen is not None:
+        seen[key] = got
+    return got
+
+
+def read_text(path):
+    """The file's text, or None when it cannot be read (missing, a folder,
+    not text): from what was kept while the file is the same one."""
+    path = _p(path)
+    seen = _request_seen()
+    if seen is not None and path in seen:
+        return seen[path]
+    sig_ = sig(path)
+    text = None
+    if sig_ is not None:
+        with _texts_lock:
+            got = _texts.get(path)
+        if got and got[0] == sig_:
+            text = got[1]
+        else:
+            try:
+                with open(path, encoding="utf-8") as f:
+                    text = f.read()
+            except (OSError, UnicodeDecodeError):
+                text = None
+            if text is not None:
+                with _texts_lock:
+                    if len(_texts) > 1024:
+                        _texts.clear()
+                    _texts[path] = (sig_, text)
+    if seen is not None:
+        seen[path] = text
+    return text
+
+
+def read_json(path, default=None):
+    """The file's JSON, parsed for this caller alone, or `default` when the
+    file is missing or is not JSON."""
+    text = read_text(path)
+    if text is None:
+        return default
+    try:
+        return json.loads(text)
+    except ValueError:
+        return default
+
+
 def write_json(path, obj, mode=0o644, sync=True):
     """Atomically replace `path` with `obj` as JSON. `mode` is the file's
     from the moment it is in place: a file of password hashes was 0644
@@ -217,6 +349,7 @@ def write_json(path, obj, mode=0o644, sync=True):
         with _gate:
             _not_landing(path)
             os.replace(tmp, path)
+        _forget(path)
         if sync:
             _sync_dir(path)
     except BaseException:
@@ -244,6 +377,7 @@ def write_text(path, text, mode=0o644, encoding="utf-8"):
         with _gate:
             _not_landing(path)
             os.replace(tmp, path)
+        _forget(path)
         _sync_dir(path)
     except BaseException:
         with contextlib.suppress(OSError):

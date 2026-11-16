@@ -227,6 +227,16 @@ lay_out() {
     install -m 0644 "$t/Dockerfile" "$dir.partial/Dockerfile"
     chmod -R a+rX "$dir.partial"
     chmod -R +x "$dir.partial/scripts"
+    # The scripts' bytecode, as the image makes it (R228 step 8): nothing at
+    # run time writes any, so without it each start and each relayed verb
+    # compiles again. Made here by this machine's python3, never carried
+    # from the tree laid out, whose may be another python's or stale; a
+    # machine with no python3 yet has nothing to run it.
+    find "$dir.partial" -name __pycache__ -type d -prune -exec rm -rf {} +
+    if command -v python3 >/dev/null 2>&1; then
+        python3 -m compileall -q "$dir.partial/scripts" >/dev/null 2>&1 \
+            || warn "the scripts did not all compile ahead of time: they run, and compile as they load"
+    fi
     # noVNC: a VM's screen in the dock (R99), the image's pinned release,
     # checked by the image's digest.
     if [ "${NO_FETCH:-0}" != 1 ]; then

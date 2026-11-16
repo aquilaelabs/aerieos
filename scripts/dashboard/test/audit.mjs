@@ -51,4 +51,15 @@ ok(seen.refused, 'the refused cookie is on it as a line of its own');
 await page.selectOption('#auditPerson', 'test');
 await page.waitForFunction(() => { const rows = [...document.querySelectorAll('.audittab .auditrow')]; return rows.length > 0 && rows.every(r => r.textContent.includes('test')); }, null, { timeout: patience(15000) });
 ok(true, 'picked to one person, every row is theirs');
+
+// A notebook's presence beat changes nothing a person reads the audit for,
+// and it came every fifteen seconds an open notebook (R228 step 7): it is
+// not a row, while a write beside it still is.
+const audited = await page.evaluate(async () => {
+  for (let i = 0; i < 3; i++) await postJSON('/api/presence', { project: 'alpha', client: 'audit-probe', where: 'roadmap' });
+  const j = await (await fetch('/api/audit?n=500')).json();
+  return { beats: j.rows.filter(r => r.action.startsWith('/api/presence')).length,
+           signout: j.rows.some(r => r.action === '/api/profile:signin-out') };
+});
+ok(audited.beats === 0 && audited.signout, `a presence beat is not an audit row, a sign-out is (${audited.beats} beats on it)`);
 await done(browser);

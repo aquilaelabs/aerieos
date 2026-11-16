@@ -227,12 +227,10 @@ _lock = statefile.on(lambda: FILE)
 
 
 def load():
-    try:
-        with open(FILE) as f:
-            d = __import__("json").load(f)
-        return d if isinstance(d, dict) else {}
-    except (OSError, ValueError):
-        return {}
+    # Read once while it is the same file (statefile.read_json, R228 step 1):
+    # every setting asked for reads it, a dozen times a status read.
+    d = statefile.read_json(FILE)
+    return d if isinstance(d, dict) else {}
 
 
 URL_RE = re.compile(r"^https?://[^\s/?#]+(/[^\s]*)?$")

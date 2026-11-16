@@ -36,6 +36,8 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+import statefile
+
 STATE = None
 write_json = None
 seal = None
@@ -105,11 +107,8 @@ def _file():
 
 
 def _load():
-    try:
-        d = json.loads(_file().read_text())
-        return d if isinstance(d, dict) else {}
-    except (OSError, ValueError, AttributeError):
-        return {}
+    d = statefile.read_json(_file())         # read once while the same file (R228 step 1)
+    return d if isinstance(d, dict) else {}
 
 
 def _save(d):

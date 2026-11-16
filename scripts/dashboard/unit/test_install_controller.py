@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import tarfile
 import tempfile
+import time
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -81,6 +82,7 @@ class LaidOutAsTheImage(unittest.TestCase):
     def test_every_copy_line_lands_where_the_image_puts_it(self):
         rel = os.path.join(self.root, "opt", "aerieos-releases", "1.2.3")
         os.makedirs(os.path.dirname(rel))
+        began = time.time() - 1
         r = sh(f'lay_out "{ROOT}" "{rel}" 1.2.3 abc123', root=self.root)
         self.assertEqual(r.returncode, 0, r.stderr)
         copies = re.findall(r"^COPY (\S+) (/opt/aerieos\S*)$", dockerfile(), re.M)
@@ -102,6 +104,12 @@ class LaidOutAsTheImage(unittest.TestCase):
         self.assertIn("BB_VERSION=1.2.3\n", env)
         self.assertIn("BB_IMAGE_REV=abc123\n", env)
         self.assertFalse(os.path.exists(rel + ".partial"))
+        # ...with the scripts' bytecode made here, as the image makes it (R228
+        # step 8), and not copied from the tree's (cp -a keeps its old time).
+        cache = os.path.join(rel, "scripts", "dashboard", "__pycache__")
+        made = [n for n in os.listdir(cache) if n.startswith("server.") and n.endswith(".pyc")]
+        self.assertTrue(made)
+        self.assertGreaterEqual(os.path.getmtime(os.path.join(cache, made[0])), began)
 
     def test_flip_keeps_the_one_before(self):
         rels = os.path.join(self.root, "opt", "aerieos-releases")

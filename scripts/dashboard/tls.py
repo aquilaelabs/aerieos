@@ -323,5 +323,15 @@ def wrap(sock, peek_timeout=5.0):
         return sock
 
 
+class WrapOnItsThread:
+    """A threading server's mixin: each connection is wrapped (wrap) on the
+    thread that serves it (R228 step 3). wrap waits up to its peek_timeout
+    for a first byte, and in get_request, on the one accept thread, a
+    connection that sent nothing held every other behind it that long."""
+
+    def process_request_thread(self, request, client_address):
+        super().process_request_thread(wrap(request), client_address)
+
+
 def over_tls(connection):
     return isinstance(connection, ssl.SSLSocket)

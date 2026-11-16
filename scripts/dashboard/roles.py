@@ -18,10 +18,11 @@ person should be given a group of permissions.
 """
 import contextlib
 import json
-import os
 import re
 import threading
 from pathlib import Path
+
+import statefile
 
 NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9 ._-]{0,39}$")
 
@@ -263,10 +264,9 @@ _read_kept = [None, None]
 
 
 def _read():
-    try:
-        st = os.stat(FILE)
-        sig = (st.st_ino, st.st_size, st.st_mtime_ns)
-    except (OSError, TypeError):
+    # What the file is, looked at once a request (statefile.sig, R228 step 1).
+    sig = statefile.sig(FILE) if FILE else None
+    if sig is None:
         return {}
     if _read_kept[0] != sig:
         try:

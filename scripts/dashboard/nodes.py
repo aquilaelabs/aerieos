@@ -944,16 +944,20 @@ def _refused(node_id, why):
     is quiet (B569): the agent asked every five minutes for two days with
     its token expired while the Nodes page said only quiet. Written at most
     once a minute; its next good hello takes it off."""
-    n = node(node_id) if node_id else None
-    if not n:
-        return
-    ag = dict(n.get("agent") or {})
-    was = ag.get("refused") if isinstance(ag.get("refused"), dict) else {}
-    now = int(time.time())
-    if was.get("why") == why and now - int(was.get("at") or 0) < 60:
-        return
-    ag["refused"] = {"at": now, "why": why, "since": int(was.get("since") or now) if was.get("why") == why else now}
-    _exec("UPDATE nodes SET agent = ? WHERE id = ?", (json.dumps(ag), node_id))
+    # Read and written under the store's lock, the row read afresh (R228
+    # step 6): a hello, a heartbeat or a session report landing between this
+    # read and its write was written over, the census with it.
+    with _lock:
+        n = _node(node_id) if node_id else None
+        if not n:
+            return
+        ag = dict(n.get("agent") or {})
+        was = ag.get("refused") if isinstance(ag.get("refused"), dict) else {}
+        now = int(time.time())
+        if was.get("why") == why and now - int(was.get("at") or 0) < 60:
+            return
+        ag["refused"] = {"at": now, "why": why, "since": int(was.get("since") or now) if was.get("why") == why else now}
+        _exec("UPDATE nodes SET agent = ? WHERE id = ?", (json.dumps(ag), node_id))
     _bump()
 
 
@@ -1042,11 +1046,15 @@ def _token_reused(t):
     # Every one, live, pending and retired: a pending token the copy was
     # handed must not come alive later.
     _exec("UPDATE tokens SET state = ? WHERE node_id = ? AND kind = 'node'", (TOKEN_REVOKED, nid))
-    n = node(nid)
-    if n:
-        ag = dict(n.get("agent") or {})
-        ag["token_reuse"] = {"at": int(time.time()), "token": t["id"]}
-        _exec("UPDATE nodes SET agent = ? WHERE id = ?", (json.dumps(ag), nid))
+    # Read and written under the store's lock, the row read afresh (R228
+    # step 6): a hello, a heartbeat or a session report landing between this
+    # read and its write was written over, the census with it.
+    with _lock:
+        n = _node(nid)
+        if n:
+            ag = dict(n.get("agent") or {})
+            ag["token_reuse"] = {"at": int(time.time()), "token": t["id"]}
+            _exec("UPDATE nodes SET agent = ? WHERE id = ?", (json.dumps(ag), nid))
         _bump()
     print(f"dashboard: node {nid} presented a retired token after its grace; its tokens are revoked "
           "(a machine restored from a snapshot or a backup, or a copy of its credential in use somewhere)", flush=True)
@@ -1424,7 +1432,51 @@ def agent_window(version):
 # that watches for any of it waits a poll window per thing it watches, and
 # three of them were the slowest intervals in the suite. Nothing else sets it.
 POLL_S = int(os.environ.get("BB_NODE_POLL") or 25)
-_wake = threading.Condition(_lock)
+# What a held poll waits on (R228 step 24): a lock of its own, not the
+# store's. It was a condition on the store's one lock, so each poll scanned
+# the queue holding it, and every wake had every node's poll scan in turn
+# while each status read and audit row waited behind them. A wake is
+# counted (_wake_gen), so one that lands while a poll is scanning is not
+# missed when it goes back to waiting; _notify is how anything wakes them.
+_wake = threading.Condition(threading.Lock())
+_wake_gen = [0]
+# One scan at a time per node (an agent that restarted can leave its last
+# poll held beside its new one): two would each count a free slot.
+_scanning = {}
+_scanning_lock = threading.Lock()
+
+
+def _notify():
+    """Wake every held poll: something they wait for may have moved."""
+    with _wake:
+        _wake_gen[0] += 1
+        _wake.notify_all()
+
+
+def _await_wake(gen, seconds):
+    """Wait up to `seconds` for a wake past the one numbered `gen` (read
+    before the look that found nothing). A job's end wakes (job_result),
+    so whoever waits on one hears it when it lands (R228 step 23)."""
+    if seconds <= 0:
+        return
+    with _wake:
+        if _wake_gen[0] == gen:
+            _wake.wait(seconds)
+
+
+def _wake_now():
+    with _wake:
+        return _wake_gen[0]
+
+
+# How long a waiter looks again with no wake: an end that wakes nobody (a job
+# marked lost by a hello) is heard by then.
+WAIT_LOOK_S = 1.0
+
+
+def _scan_lock(node_id):
+    with _scanning_lock:
+        return _scanning.setdefault(node_id, threading.Lock())
 
 # The last hour of samples per node, for its charts (R218 step 9, docs/
 # nodes.md §9), and of each running container's on an agent node, sampled
@@ -5102,14 +5154,18 @@ def reported_set(nid, key, sub, value):
     finished job measured (claudecode.update_done, B249). The next hello
     replaces the whole record, which is right: the node's word is the
     census, and this is only how the minutes before it are not wrong."""
-    n = node(nid)
-    if not n:
-        return
-    rep = n.get("reported") or {}
-    inner = rep.get(key) if isinstance(rep.get(key), dict) else {}
-    inner[sub] = value
-    rep[key] = inner
-    _exec("UPDATE nodes SET reported = ? WHERE id = ?", (json.dumps(rep), nid))
+    # Read and written under the store's lock, the row read afresh (R228
+    # step 6): a hello, a heartbeat or a session report landing between this
+    # read and its write was written over, the census with it.
+    with _lock:
+        n = _node(nid)
+        if not n:
+            return
+        rep = n.get("reported") or {}
+        inner = rep.get(key) if isinstance(rep.get(key), dict) else {}
+        inner[sub] = value
+        rep[key] = inner
+        _exec("UPDATE nodes SET reported = ? WHERE id = ?", (json.dumps(rep), nid))
     _bump()
 
 
@@ -5231,59 +5287,63 @@ def hello(nid, census, addr, version="", digest="", running=None, keep=None, rot
     restarted has none, and the rows this side still had as running there
     are then failed as lost: a subprocess does not survive its parent, so
     a row saying otherwise would say it forever."""
-    n = node(nid)
-    if not n:
-        return {"error": "no such node"}
-    was_live = bool(n.get("live"))
-    if str((n.get("agent") or {}).get("digest") or "") != str(digest or "")[:80]:
-        checks_wanted.add(nid)
-    ag = n.get("agent") or {}
-    if isinstance(running, list):
-        jobs_reconcile(nid, [str(j) for j in running])
-        ag["held"] = jobs_held(nid, [str(j) for j in running])
-    agent_built(ag, str(digest)[:80], agent_file()["digest"], os.environ.get("BB_IMAGE_BUILT", ""))
-    ag.update({"version": str(version)[:40], "digest": str(digest)[:80],
-               "addr": addr, "last_seen": int(time.time()),
-               })
-    ag.pop("refused", None)
-    # An update this node would not run and went back from (R241), in the
-    # shapes this side keeps; gone once it says none.
-    went = agent_back(back)
-    if went:
-        ag["back"] = went
-    else:
-        ag.pop("back", None)
-    # Why an idle session's token was not refreshed here, said by the agent
-    # that tried (B419).
-    kc = keep_clean(keep)
-    if kc is not None:
-        token_reads_audit(n, ag.get("keep"), kc)
-        ag["keep"] = kc
-    rep = n.get("reported") or {}
-    # The tmux sessions ride the HEARTBEAT, not the census, so the live set is
-    # what the last one recorded rather than anything hello was handed. Read
-    # before _census replaces the record below (R27).
-    live_sessions = rep.get("sessions") or []
-    sample = rep.get("sample")
-    # When this census was taken. The heartbeat is every 25 seconds but the
-    # census only rides hello, every ten minutes, so "when did the node last
-    # dial in" is not the same question as "how old is this answer", and it
-    # is the second one a refusal is reasoning from.
-    census_at = int(time.time())
-    # What only the heartbeat carries is kept across the census replacing
-    # the record: dropped, a synced project read as not copied (the session
-    # gate held it) and the node's sessions as none (Move to a synced copy
-    # ended nothing) until the next heartbeat, and hellos come every half
-    # minute or so on a busy node.
-    beat = {k: rep[k] for k in ("sessions", "published", "sync", "sync_drain", "sync_clean") if k in rep}
-    rep = _census(census)
-    rep["at"] = census_at
-    if sample:
-        rep["sample"] = sample
-    rep.update(beat)
-    _exec("UPDATE nodes SET agent = ?, reported = ?, os = ?, arch = ? "
-          "WHERE id = ?", (json.dumps(ag), json.dumps(rep), rep["system"],
-                           rep["arch"], nid))
+    # Read and written under the store's lock, the row read afresh (R228
+    # step 6): a hello, a heartbeat or a session report landing between this
+    # read and its write was written over, the census with it.
+    with _lock:
+        n = _node(nid)
+        if not n:
+            return {"error": "no such node"}
+        was_live = bool(n.get("live"))
+        if str((n.get("agent") or {}).get("digest") or "") != str(digest or "")[:80]:
+            checks_wanted.add(nid)
+        ag = n.get("agent") or {}
+        if isinstance(running, list):
+            jobs_reconcile(nid, [str(j) for j in running])
+            ag["held"] = jobs_held(nid, [str(j) for j in running])
+        agent_built(ag, str(digest)[:80], agent_file()["digest"], os.environ.get("BB_IMAGE_BUILT", ""))
+        ag.update({"version": str(version)[:40], "digest": str(digest)[:80],
+                   "addr": addr, "last_seen": int(time.time()),
+                   })
+        ag.pop("refused", None)
+        # An update this node would not run and went back from (R241), in the
+        # shapes this side keeps; gone once it says none.
+        went = agent_back(back)
+        if went:
+            ag["back"] = went
+        else:
+            ag.pop("back", None)
+        # Why an idle session's token was not refreshed here, said by the agent
+        # that tried (B419).
+        kc = keep_clean(keep)
+        if kc is not None:
+            token_reads_audit(n, ag.get("keep"), kc)
+            ag["keep"] = kc
+        rep = n.get("reported") or {}
+        # The tmux sessions ride the HEARTBEAT, not the census, so the live set is
+        # what the last one recorded rather than anything hello was handed. Read
+        # before _census replaces the record below (R27).
+        live_sessions = rep.get("sessions") or []
+        sample = rep.get("sample")
+        # When this census was taken. The heartbeat is every 25 seconds but the
+        # census only rides hello, every ten minutes, so "when did the node last
+        # dial in" is not the same question as "how old is this answer", and it
+        # is the second one a refusal is reasoning from.
+        census_at = int(time.time())
+        # What only the heartbeat carries is kept across the census replacing
+        # the record: dropped, a synced project read as not copied (the session
+        # gate held it) and the node's sessions as none (Move to a synced copy
+        # ended nothing) until the next heartbeat, and hellos come every half
+        # minute or so on a busy node.
+        beat = {k: rep[k] for k in ("sessions", "published", "sync", "sync_drain", "sync_clean") if k in rep}
+        rep = _census(census)
+        rep["at"] = census_at
+        if sample:
+            rep["sample"] = sample
+        rep.update(beat)
+        _exec("UPDATE nodes SET agent = ?, reported = ?, os = ?, arch = ? "
+              "WHERE id = ?", (json.dumps(ag), json.dumps(rep), rep["system"],
+                               rep["arch"], nid))
     _bump()
     if not was_live:
         _revived(nid)
@@ -5428,140 +5488,144 @@ def heartbeat(nid, sample, addr, running=0):
     riding the channel that exists anyway. Written to the row (current
     value) and to the ring (the last hour); last_seen is what liveness
     reads. The address is refreshed too; see _addr."""
-    n = node(nid)
-    if not n:
-        return
-    s = sample if isinstance(sample, dict) else {}
-    clean = {"at": int(time.time())}
-    for k in ("cpu_pct", "load1", "mem_used_mb", "mem_mb"):
-        with contextlib.suppress(TypeError, ValueError):
-            clean[k] = round(float(s.get(k) or 0), 1)
-    # The card's gauges only when the node has one answering: absent is
-    # "no GPU", which a zero would not say.
-    for k in ("gpu_pct", "gpu_mem_used_mb", "gpu_mem_mb"):
-        if k in s:
+    # Read and written under the store's lock, the row read afresh (R228
+    # step 6): a hello, a heartbeat or a session report landing between this
+    # read and its write was written over, the census with it.
+    with _lock:
+        n = _node(nid)
+        if not n:
+            return
+        s = sample if isinstance(sample, dict) else {}
+        clean = {"at": int(time.time())}
+        for k in ("cpu_pct", "load1", "mem_used_mb", "mem_mb"):
             with contextlib.suppress(TypeError, ValueError):
                 clean[k] = round(float(s.get(k) or 0), 1)
-    # What runs there by kind, its cores and who computes on its card, for
-    # a session judging whether the machine is quiet enough to time
-    # anything on (R108). Only the kinds the agent counts, as numbers.
-    with contextlib.suppress(TypeError, ValueError):
-        if "cores" in s:
-            clean["cores"] = max(0, min(4096, int(s.get("cores") or 0)))
-        if "gpu_procs" in s:
-            clean["gpu_procs"] = max(0, min(9999, int(s.get("gpu_procs") or 0)))
-    if isinstance(s.get("kinds"), dict):
-        clean["kinds"] = {k: max(0, min(9999, int(v))) for k, v in list(s["kinds"].items())[:16]
-                          if k in PROC_KINDS and isinstance(v, (int, float))}
-    # ...and the card's memory by what holds it, in MB, the same kinds and
-    # "other" (B532): what filled the card is a kind, never a name.
-    if isinstance(s.get("gpu_mem_kinds"), dict):
-        clean["gpu_mem_kinds"] = {k: max(0, min(10**7, int(v))) for k, v in list(s["gpu_mem_kinds"].items())[:16]
-                                  if (k in PROC_KINDS or k == "other") and isinstance(v, (int, float))}
-    clean["running"] = int(running or 0)
-    # The counters and the temperature the reporting takes its points from
-    # (R164 step 4): two non-negative integers each, a whole degree.
-    for k in ("net", "io"):
-        v = s.get(k)
-        if isinstance(v, list) and len(v) == 2 and all(isinstance(x, int) and not isinstance(x, bool) and x >= 0 for x in v):
-            clean[k] = [min(x, 10**15) for x in v]
-    if isinstance(s.get("temp_c"), int) and not isinstance(s.get("temp_c"), bool) and 0 < s["temp_c"] < 150:
-        clean["temp_c"] = s["temp_c"]
-    # How long the agent's last turn spent before its poll, by part (B841):
-    # a job queued meanwhile waited for it.
-    if isinstance(s.get("turn_ms"), dict):
-        clean["turn_ms"] = {re.sub(r"[^a-z_]", "", str(k))[:24]: max(0, min(10**7, int(v)))
-                            for k, v in list(s["turn_ms"].items())[:20] if isinstance(v, (int, float))}
-    stores = s.get("stores") if isinstance(s.get("stores"), dict) else {}
-    clean["stores"] = {str(r)[:20]: _mb((v or {}).get("free_mb"))
-                       for r, v in list(stores.items())[:8]}
-    totals = {str(r)[:20]: _mb((v or {}).get("total_mb"))
-              for r, v in list(stores.items())[:8]}
-    # The root filesystem and Docker's, where a node fills that is no
-    # store's (R110): [free MB, total MB] each, for the bell's room check.
-    disks = s.get("disks") if isinstance(s.get("disks"), dict) else {}
-    clean["disks"] = {r: [_mb((disks.get(r) or {}).get("free_mb")), _mb((disks.get(r) or {}).get("total_mb"))]
-                      for r in ("root", "docker") if isinstance(disks.get(r), dict)}
-    clean["store_totals"] = totals
-    # AerieOS's memory fence (R110 step 4), [max MB, used MB], or None
-    # from an agent that looked and found none; absent from an older one.
-    if "fence" in s:
-        f = s.get("fence")
-        clean["fence"] = ([_mb(f.get("max_mb")), _mb(f.get("used_mb"))]
-                          if isinstance(f, dict) and _mb(f.get("max_mb")) else None)
-    # A running VM's memory as its balloon says, [usable MB, available MB],
-    # for the bell's ten minutes (R110 step 8).
-    vm = s.get("vm_mem") if isinstance(s.get("vm_mem"), dict) else {}
-    clean["vm_mem"] = {str(d)[:63]: [int(v[0]), int(v[1])] for d, v in list(vm.items())[:32]
-                       if re.fullmatch(r"bbvm-[a-z0-9][a-z0-9-]{0,62}", str(d)) and isinstance(v, list) and len(v) == 2
-                       and all(isinstance(x, int) and x >= 0 for x in v)}
-    ag = n.get("agent") or {}
-    ag["last_seen"] = clean["at"]
-    rep = n.get("reported") or {}
-    # What another page draws from this row, as it stood before this sample:
-    # if none of it moved, the sample's numbers are the only news, and only
-    # the Nodes page, which shows them, is told (R218 step 10).
-    was = _heartbeat_news(ag, rep)
-    if addr:
-        ag["addr"] = addr
-    rep["sample"] = clean
-    # What the node publishes, by compose project (R82): the ports another
-    # node's session of the same project may reach. A change re-sends every
-    # firewall its allow list, so a container coming up on one node is
-    # reachable from the other within a poll.
-    moved = False
-    if isinstance(s.get("published"), dict):
-        pub = {}
-        for k, v in list(s["published"].items())[:64]:
-            ports = sorted({int(p) for p in (v if isinstance(v, list) else []) if str(p).isdigit()
-                            and 0 < int(p) < 65536})[:32]
-            if ports:
-                pub[str(k)[:100]] = ports
-        moved = pub != (rep.get("published") or {})
-        rep["published"] = pub
-    # The node's tmux sessions (roadmap #24), for the Sessions card: name,
-    # whether a client is attached, the active pane's directory and title
-    # (a Claude session reports its state through the title). Whitelisted
-    # like everything a node says; absent when the agent did not send it.
-    if isinstance(s.get("sessions"), list):
-        rep["sessions"] = _session_rows(s["sessions"])
-        _sessions_at[nid] = time.time()
-    # The sessions a controller outage held (R251), for the bell's "stopped
-    # by the update" once this answers again; whitelisted, and a heartbeat
-    # without it keeps what was there.
-    if isinstance(s.get("held"), list):
-        rep["held"] = [{"project": re.sub(r"[^A-Za-z0-9._-]", "", str(h.get("project") or ""))[:100],
-                        "uid": re.sub(r"[^A-Za-z0-9_]", "", str(h.get("uid") or ""))[:40],
-                        "session": re.sub(r"[^A-Za-z0-9_~.:-]", "", str(h.get("session") or ""))[:120],
-                        "since": _mb(h.get("since")) or 0}
-                       for h in s["held"][:32] if isinstance(h, dict) and h.get("session")]
-    # Each synced project's state on the node (R162): whether its first
-    # copy is done, what is waiting to go up, and why not when it cannot.
-    if isinstance(s.get("sync"), dict):
-        rep["sync"] = sync_rows(s["sync"])
-    # ...leaving it (R164): what is still to go up; absent when not leaving.
-    if isinstance(s.get("sync_drain"), dict):
-        d = s["sync_drain"]
-        rep["sync_drain"] = {"files": max(0, min(10**7, int(d.get("files") or 0))),
-                             "claude": max(0, min(10**7, int(d.get("claude") or 0))),
-                             "walked": d.get("walked") is True}
-    else:
-        rep.pop("sync_drain", None)
-    # ...and the answer to the clean-up asked of it, by the asker's token.
-    if isinstance(s.get("sync_clean"), dict):
-        c = s["sync_clean"]
-        rep["sync_clean"] = {"token": str(c.get("token") or "")[:64],
-                             "freed": max(0, int(c.get("freed") or 0)),
-                             "error": str(c.get("error") or "")[:300]}
-    # The fingerprint of its containers: kept on the row, and a change of it
-    # moves the Containers page's token (a node with no docker sends none).
-    dig = re.sub(r"[^0-9a-f]", "", str(s.get("ctr_digest") or ""))[:32]
-    if dig and dig != rep.get("ctr_digest"):
-        rep["ctr_digest"] = dig
-        _ctr_rev[0] += 1
-    store_merge(rep.get("stores") or {}, clean["stores"], totals)
-    _exec("UPDATE nodes SET agent = ?, reported = ? WHERE id = ?",
-          (json.dumps(ag), json.dumps(rep), nid))
+        # The card's gauges only when the node has one answering: absent is
+        # "no GPU", which a zero would not say.
+        for k in ("gpu_pct", "gpu_mem_used_mb", "gpu_mem_mb"):
+            if k in s:
+                with contextlib.suppress(TypeError, ValueError):
+                    clean[k] = round(float(s.get(k) or 0), 1)
+        # What runs there by kind, its cores and who computes on its card, for
+        # a session judging whether the machine is quiet enough to time
+        # anything on (R108). Only the kinds the agent counts, as numbers.
+        with contextlib.suppress(TypeError, ValueError):
+            if "cores" in s:
+                clean["cores"] = max(0, min(4096, int(s.get("cores") or 0)))
+            if "gpu_procs" in s:
+                clean["gpu_procs"] = max(0, min(9999, int(s.get("gpu_procs") or 0)))
+        if isinstance(s.get("kinds"), dict):
+            clean["kinds"] = {k: max(0, min(9999, int(v))) for k, v in list(s["kinds"].items())[:16]
+                              if k in PROC_KINDS and isinstance(v, (int, float))}
+        # ...and the card's memory by what holds it, in MB, the same kinds and
+        # "other" (B532): what filled the card is a kind, never a name.
+        if isinstance(s.get("gpu_mem_kinds"), dict):
+            clean["gpu_mem_kinds"] = {k: max(0, min(10**7, int(v))) for k, v in list(s["gpu_mem_kinds"].items())[:16]
+                                      if (k in PROC_KINDS or k == "other") and isinstance(v, (int, float))}
+        clean["running"] = int(running or 0)
+        # The counters and the temperature the reporting takes its points from
+        # (R164 step 4): two non-negative integers each, a whole degree.
+        for k in ("net", "io"):
+            v = s.get(k)
+            if isinstance(v, list) and len(v) == 2 and all(isinstance(x, int) and not isinstance(x, bool) and x >= 0 for x in v):
+                clean[k] = [min(x, 10**15) for x in v]
+        if isinstance(s.get("temp_c"), int) and not isinstance(s.get("temp_c"), bool) and 0 < s["temp_c"] < 150:
+            clean["temp_c"] = s["temp_c"]
+        # How long the agent's last turn spent before its poll, by part (B841):
+        # a job queued meanwhile waited for it.
+        if isinstance(s.get("turn_ms"), dict):
+            clean["turn_ms"] = {re.sub(r"[^a-z_]", "", str(k))[:24]: max(0, min(10**7, int(v)))
+                                for k, v in list(s["turn_ms"].items())[:20] if isinstance(v, (int, float))}
+        stores = s.get("stores") if isinstance(s.get("stores"), dict) else {}
+        clean["stores"] = {str(r)[:20]: _mb((v or {}).get("free_mb"))
+                           for r, v in list(stores.items())[:8]}
+        totals = {str(r)[:20]: _mb((v or {}).get("total_mb"))
+                  for r, v in list(stores.items())[:8]}
+        # The root filesystem and Docker's, where a node fills that is no
+        # store's (R110): [free MB, total MB] each, for the bell's room check.
+        disks = s.get("disks") if isinstance(s.get("disks"), dict) else {}
+        clean["disks"] = {r: [_mb((disks.get(r) or {}).get("free_mb")), _mb((disks.get(r) or {}).get("total_mb"))]
+                          for r in ("root", "docker") if isinstance(disks.get(r), dict)}
+        clean["store_totals"] = totals
+        # AerieOS's memory fence (R110 step 4), [max MB, used MB], or None
+        # from an agent that looked and found none; absent from an older one.
+        if "fence" in s:
+            f = s.get("fence")
+            clean["fence"] = ([_mb(f.get("max_mb")), _mb(f.get("used_mb"))]
+                              if isinstance(f, dict) and _mb(f.get("max_mb")) else None)
+        # A running VM's memory as its balloon says, [usable MB, available MB],
+        # for the bell's ten minutes (R110 step 8).
+        vm = s.get("vm_mem") if isinstance(s.get("vm_mem"), dict) else {}
+        clean["vm_mem"] = {str(d)[:63]: [int(v[0]), int(v[1])] for d, v in list(vm.items())[:32]
+                           if re.fullmatch(r"bbvm-[a-z0-9][a-z0-9-]{0,62}", str(d)) and isinstance(v, list) and len(v) == 2
+                           and all(isinstance(x, int) and x >= 0 for x in v)}
+        ag = n.get("agent") or {}
+        ag["last_seen"] = clean["at"]
+        rep = n.get("reported") or {}
+        # What another page draws from this row, as it stood before this sample:
+        # if none of it moved, the sample's numbers are the only news, and only
+        # the Nodes page, which shows them, is told (R218 step 10).
+        was = _heartbeat_news(ag, rep)
+        if addr:
+            ag["addr"] = addr
+        rep["sample"] = clean
+        # What the node publishes, by compose project (R82): the ports another
+        # node's session of the same project may reach. A change re-sends every
+        # firewall its allow list, so a container coming up on one node is
+        # reachable from the other within a poll.
+        moved = False
+        if isinstance(s.get("published"), dict):
+            pub = {}
+            for k, v in list(s["published"].items())[:64]:
+                ports = sorted({int(p) for p in (v if isinstance(v, list) else []) if str(p).isdigit()
+                                and 0 < int(p) < 65536})[:32]
+                if ports:
+                    pub[str(k)[:100]] = ports
+            moved = pub != (rep.get("published") or {})
+            rep["published"] = pub
+        # The node's tmux sessions (roadmap #24), for the Sessions card: name,
+        # whether a client is attached, the active pane's directory and title
+        # (a Claude session reports its state through the title). Whitelisted
+        # like everything a node says; absent when the agent did not send it.
+        if isinstance(s.get("sessions"), list):
+            rep["sessions"] = _session_rows(s["sessions"])
+            _sessions_at[nid] = time.time()
+        # The sessions a controller outage held (R251), for the bell's "stopped
+        # by the update" once this answers again; whitelisted, and a heartbeat
+        # without it keeps what was there.
+        if isinstance(s.get("held"), list):
+            rep["held"] = [{"project": re.sub(r"[^A-Za-z0-9._-]", "", str(h.get("project") or ""))[:100],
+                            "uid": re.sub(r"[^A-Za-z0-9_]", "", str(h.get("uid") or ""))[:40],
+                            "session": re.sub(r"[^A-Za-z0-9_~.:-]", "", str(h.get("session") or ""))[:120],
+                            "since": _mb(h.get("since")) or 0}
+                           for h in s["held"][:32] if isinstance(h, dict) and h.get("session")]
+        # Each synced project's state on the node (R162): whether its first
+        # copy is done, what is waiting to go up, and why not when it cannot.
+        if isinstance(s.get("sync"), dict):
+            rep["sync"] = sync_rows(s["sync"])
+        # ...leaving it (R164): what is still to go up; absent when not leaving.
+        if isinstance(s.get("sync_drain"), dict):
+            d = s["sync_drain"]
+            rep["sync_drain"] = {"files": max(0, min(10**7, int(d.get("files") or 0))),
+                                 "claude": max(0, min(10**7, int(d.get("claude") or 0))),
+                                 "walked": d.get("walked") is True}
+        else:
+            rep.pop("sync_drain", None)
+        # ...and the answer to the clean-up asked of it, by the asker's token.
+        if isinstance(s.get("sync_clean"), dict):
+            c = s["sync_clean"]
+            rep["sync_clean"] = {"token": str(c.get("token") or "")[:64],
+                                 "freed": max(0, int(c.get("freed") or 0)),
+                                 "error": str(c.get("error") or "")[:300]}
+        # The fingerprint of its containers: kept on the row, and a change of it
+        # moves the Containers page's token (a node with no docker sends none).
+        dig = re.sub(r"[^0-9a-f]", "", str(s.get("ctr_digest") or ""))[:32]
+        if dig and dig != rep.get("ctr_digest"):
+            rep["ctr_digest"] = dig
+            _ctr_rev[0] += 1
+        store_merge(rep.get("stores") or {}, clean["stores"], totals)
+        _exec("UPDATE nodes SET agent = ?, reported = ? WHERE id = ?",
+              (json.dumps(ag), json.dumps(rep), nid))
     ring = _samples.setdefault(nid, [])
     ring.append(clean)
     _trim(ring, clean["at"])
@@ -5653,19 +5717,23 @@ def sessions_report(nid, rows):
     carries, so nothing reads them two ways."""
     if not isinstance(rows, list):
         return {"error": "sessions is a list"}
-    n = node(nid)
-    if not n:
-        return {"error": "no such node"}
-    rep = n.get("reported") or {}
-    new = _session_rows(rows)
-    # Nothing a page draws moved (the same sessions, each working or waiting
-    # as before, on another frame of its mark): nothing is written and no
-    # page is told. Every frame was a write of the node's whole record and
-    # a status read by every open page, every two seconds a session worked.
-    if _sessions_news(new) == _sessions_news(rep.get("sessions")):
-        return {"ok": True, "sessions": len(new)}
-    rep["sessions"] = new
-    _exec("UPDATE nodes SET reported = ? WHERE id = ?", (json.dumps(rep), nid))
+    # Read and written under the store's lock, the row read afresh (R228
+    # step 6): a hello, a heartbeat or a session report landing between this
+    # read and its write was written over, the census with it.
+    with _lock:
+        n = _node(nid)
+        if not n:
+            return {"error": "no such node"}
+        rep = n.get("reported") or {}
+        new = _session_rows(rows)
+        # Nothing a page draws moved (the same sessions, each working or waiting
+        # as before, on another frame of its mark): nothing is written and no
+        # page is told. Every frame was a write of the node's whole record and
+        # a status read by every open page, every two seconds a session worked.
+        if _sessions_news(new) == _sessions_news(rep.get("sessions")):
+            return {"ok": True, "sessions": len(new)}
+        rep["sessions"] = new
+        _exec("UPDATE nodes SET reported = ? WHERE id = ?", (json.dumps(rep), nid))
     _bump()
     return {"ok": True, "sessions": len(rep["sessions"])}
 
@@ -5970,8 +6038,7 @@ def job_add(principal, placement, type, spec, project="", source=None):
     if not probe:
         audit(principal, "job-add", jid, {"placement": pl, "type": type})
         _jstate_bump()
-    with _wake:
-        _wake.notify_all()
+    _notify()
     return {"ok": True, "job": jid}
 
 
@@ -6027,13 +6094,14 @@ def run_wait(principal, node_id, argv, env=None, timeout=30, files=None,
         return {"error": r["error"]}
     deadline = time.time() + timeout + 10
     while time.time() < deadline:
+        gen = _wake_now()
         j = job(r["job"])
         if j and j["state"] in JOB_END:
             if forget:
                 job_forget(r["job"])
             return {"code": j.get("exit_code") if j["state"] == "succeeded" or j.get("exit_code") is not None else 1,
                     "out": exec_out(j.get("log") or ""), "job": r["job"], "state": j["state"]}
-        time.sleep(0.25)
+        _await_wake(gen, min(WAIT_LOOK_S, deadline - time.time()))
     # Taken back, not left in the queue: a probe nobody is waiting for any
     # more would otherwise run whenever the node's slot freed: an `adb
     # install` an hour after the operator read it as failed.
@@ -6172,6 +6240,7 @@ def tell_wait(node_id, session, text, timeout=20, who="dashboard"):
         return {"error": r["error"]}
     deadline = time.time() + timeout + 10
     while time.time() < deadline:
+        gen = _wake_now()
         j = job(r["job"])
         if j and j["state"] in JOB_END:
             code = j.get("exit_code")
@@ -6181,7 +6250,7 @@ def tell_wait(node_id, session, text, timeout=20, who="dashboard"):
                 return {"ok": True, "sent": False, "typed": True, "text": text, "job": r["job"]}
             last = [x for x in (j.get("log") or "").splitlines() if x.strip()]
             return {"error": last[-1] if last else f"the send failed on {n['name']} (exit {code})"}
-        time.sleep(0.25)
+        _await_wake(gen, min(WAIT_LOOK_S, deadline - time.time()))
     job_cancel("dashboard", r["job"])
     return {"error": f"the agent on {n['name']} took the send but did not report back within {timeout}s"}
 
@@ -6219,11 +6288,12 @@ def root_wait(principal, node_id, argv, why="", timeout=600, light=False):
     audit(principal, "root-run", node_id, {"argv": argv, "why": why, "job": r["job"]})
     deadline = time.time() + timeout + 10
     while time.time() < deadline:
+        gen = _wake_now()
         j = job(r["job"])
         if j and j["state"] in JOB_END:
             return {"code": j.get("exit_code") if j["state"] == "succeeded" or j.get("exit_code") is not None else 1,
                     "out": j.get("log") or "", "job": r["job"], "state": j["state"]}
-        time.sleep(0.25)
+        _await_wake(gen, min(WAIT_LOOK_S, deadline - time.time()))
     why = _no_answer(r["job"], node_id, timeout)
     job_cancel(principal, r["job"])
     return {"error": why}
@@ -6272,8 +6342,7 @@ def ask_hello(node_id):
         # A Condition over the store lock, not an Event: the held poll is
         # waiting on it, and notifying is how it hears without waiting out
         # its five seconds.
-        with _wake:
-            _wake.notify_all()
+        _notify()
 
 
 # Sessions to end on a node, until its agent's next poll takes them: kept in
@@ -6305,6 +6374,7 @@ _sync_hints = {}
 def sync_hint(node_id, project, rev):
     with _wake:
         _sync_hints.setdefault(node_id, {})[project] = rev
+        _wake_gen[0] += 1
         _wake.notify_all()
 
 
@@ -6492,15 +6562,18 @@ def session_kill(node_id, name):
     n = node(node_id)
     if not n or n["kind"] != "agent":
         return {"error": "no such node"}
+    # When it was asked, kept with it: an agent that hears late (its held
+    # poll down while the controller restarted) must not end a session
+    # started under the same name since, which is what Restart makes.
+    # Written before the wake's lock is taken, never under it: a wake may
+    # come from inside the store's lock, so the two are taken in that order.
+    _exec("INSERT OR REPLACE INTO kills (node_id, name, at) VALUES (?, ?, ?)", (node_id, str(name)[:120], time.time()))
     with _wake:
-        # When it was asked, kept with it: an agent that hears late (its held
-        # poll down while the controller restarted) must not end a session
-        # started under the same name since, which is what Restart makes.
-        _exec("INSERT OR REPLACE INTO kills (node_id, name, at) VALUES (?, ?, ?)", (node_id, str(name)[:120], time.time()))
         # Off the list from this moment: the heartbeat that stops carrying
         # it is up to a poll away, and a row that stays after ✕ for twenty
         # seconds reads as a button that did nothing.
         _ended[(node_id, str(name)[:120])] = time.time()
+        _wake_gen[0] += 1
         _wake.notify_all()
     return {"ok": True, "queued": True}
 
@@ -6554,6 +6627,7 @@ def session_tmux(node_id, ops):
         return {"error": "no such node"}
     with _wake:
         _tmux_ops.setdefault(node_id, []).extend(ops[:16])
+        _wake_gen[0] += 1
         _wake.notify_all()
     return {"ok": True, "queued": True}
 
@@ -6724,125 +6798,143 @@ def job_next(node_id, wait, runner="node", alive=None):
     is concurrency, counted from the rows. The job's node is written at this
     moment and never again: placement frozen at assignment."""
     deadline = time.time() + max(0, float(wait))
-    with _wake:
-        while True:
-            if alive is not None and not alive():
-                return None
-            n = node(node_id)
-            if n and n["state"] == "online":
-                _requeue_unclaimed(node_id)
-                _fail_overdue(node_id)
-                # A slot free, or not: with none, a LIGHT job may still go
-                # (see _light). Everything else waits for the slot as before.
-                free = job_running(node_id) < n["concurrency"]
-                lane = not free and _light_running(node_id) < LIGHT_SLOTS
-                # An agent update waits for the node to go quiet (B516): the
-                # agent refuses it while another job runs, and a node always
-                # doing something (a session building and testing all day)
-                # refused every press. So while one is queued the node is
-                # handed nothing new, and it is handed the update once what
-                # was running has finished; a node not quiet within
-                # UPDATE_QUIET_S fails it, saying so, and works again.
-                # Not on a node locked down: its lockdown job is all it takes.
-                upd = _update_gate(node_id) if runner == "node" and not (n.get("config") or {}).get("lockdown") else None
-                # ...and while a store move runs, nothing else is handed out
-                # either: what the node runs reads and writes the stores.
-                # A sign-in is handed out past a full slot (SIGNIN_JOBS),
-                # but not past either of these.
-                stopped = False
-                if upd is None and runner == "node" and (storage_moving(node_id) or {}).get("state") == "moving":
-                    free = lane = False
-                    stopped = True
-                if upd is not None:
-                    free = lane = False
-                    stopped = True
-                    if upd:
-                        _exec("UPDATE jobs SET state = 'assigned', node = ?, started = ? WHERE id = ?",
-                              (node_id, int(time.time()), upd["id"]))
-                        _jstate_bump()
-                        # ...naming what the agent last said it holds that
-                        # this side has finished or dropped. The agent
-                        # passes over only those of them whose work
-                        # has ended and that are only posting their end, so a
-                        # stuck job no longer blocks its own way out and a
-                        # job still working is never left behind (B520).
-                        held = (n.get("agent") or {}).get("held") or []
-                        spec = (upd.get("spec") or {}) | {"settled": held}
-                        return upd | {"state": "assigned", "node": node_id, "spec": spec}
-                for j in (_rows("SELECT * FROM jobs WHERE state = 'queued' AND "
-                                "(node = ? OR node = '') ORDER BY queued, id",
-                                (node_id,)) if not stopped else ()):
-                    j = _job_out(j)
-                    # Queued, but its plan is still being prepared
-                    # (devactions._submit): not this poll's.
-                    if (j.get("spec") or {}).get("hold"):
-                        continue
-                    if runner_of(j["type"], n["kind"]) != runner or not fits(j, n):
-                        continue
-                    if not free and not (lane and _light(j)) and j["type"] not in SIGNIN_JOBS:
-                        continue
-                    # One pressed while another it would collide with
-                    # runs waits its turn here (job_waits).
-                    if job_waits(j, node_id):
-                        continue
-                    # An agent's job is `assigned` until its first log post
-                    # says it started: the poll reply can be lost on the
-                    # wire. The controller's own runner starts it on the
-                    # thread that asked, so it is running from here.
-                    st = "running" if runner == "controller" else "assigned"
-                    _exec("UPDATE jobs SET state = ?, node = ?, "
-                          "started = ? WHERE id = ?",
-                          (st, node_id, int(time.time()), j["id"]))
-                    if not _quiet(j["id"]):
-                        _jstate_bump()
-                    return j | {"state": st, "node": node_id}
-            if runner == "node":
-                asked = [r["id"] for r in _rows(
-                    "SELECT id FROM jobs WHERE node = ? AND cancel = 1 AND "
-                    "state IN ('assigned', 'running')", (node_id,))]
-                if asked:
-                    return {"cancel": asked}
-                # ...and the sessions the operator has ended from the
-                # Sessions card (roadmap #24): a node's tmux is the
-                # session account's on that machine, so the agent kills
-                # them, and the held poll is how it hears at once.
-                kills = _kills_take(node_id)
-                if kills:
-                    for k in kills:
-                        _kill_taken[(node_id, k)] = time.time()
-                    # The names as every agent reads them, and beside them how
-                    # long ago each was asked, in seconds: an age, not a time,
-                    # so the node's clock need not agree with this one's.
-                    now = time.time()
-                    return {"kill_sessions": sorted(kills),
-                            "kill_ages": {k: round(now - at, 1) for k, at in kills.items()}}
-                ops = _tmux_ops.pop(node_id, None)
-                if ops:
-                    return {"tmux": ops}
-                # ...and a request for a fresh census, when something has
-                # been refused on the strength of an old one. The agent says
-                # hello every ten minutes, which is fine for a display and
-                # too coarse for a gate: a refusal can be reasoning about a
-                # node as it was nine minutes ago, and the retry a human
-                # makes five seconds later reasons about the same stale
-                # answer. This is how the next one does not.
-                if _hello_wanted.pop(node_id, None):
-                    return {"hello": True}
-                # ...and setup having ended where the screen still takes
-                # admin with no password (R194).
-                if _console_close_due(node_id):
-                    return {"console_close": True}
-                # ...and the synced projects that moved (R162, wssync.py):
-                # the agent asks what changed, so a save on another node or
-                # in VS Code reaches this one in a second, not at its next
-                # look of its own.
-                moved = _sync_hints.pop(node_id, None)
-                if moved:
-                    return {"sync": moved}
-            left = deadline - time.time()
-            if left <= 0:
-                return None
-            _wake.wait(min(left, 5))
+    while True:
+        if alive is not None and not alive():
+            return None
+        with _wake:
+            gen = _wake_gen[0]
+        with _scan_lock(node_id):
+            got = _job_next_scan(node_id, runner)
+        if got is not None:
+            return got
+        left = deadline - time.time()
+        if left <= 0:
+            return None
+        with _wake:
+            if _wake_gen[0] == gen:
+                _wake.wait(min(left, 5))
+
+
+def _job_next_scan(node_id, runner):
+    """One look for what job_next hands this node's poll, or None. Each read
+    and write takes the store's lock for itself, and a queued job is taken
+    only while it is still queued (two nodes' polls may look at an unplaced
+    one at once)."""
+    n = node(node_id)
+    if n and n["state"] == "online":
+        _requeue_unclaimed(node_id)
+        _fail_overdue(node_id)
+        # A slot free, or not: with none, a LIGHT job may still go
+        # (see _light). Everything else waits for the slot as before.
+        free = job_running(node_id) < n["concurrency"]
+        lane = not free and _light_running(node_id) < LIGHT_SLOTS
+        # An agent update waits for the node to go quiet (B516): the
+        # agent refuses it while another job runs, and a node always
+        # doing something (a session building and testing all day)
+        # refused every press. So while one is queued the node is
+        # handed nothing new, and it is handed the update once what
+        # was running has finished; a node not quiet within
+        # UPDATE_QUIET_S fails it, saying so, and works again.
+        # Not on a node locked down: its lockdown job is all it takes.
+        upd = _update_gate(node_id) if runner == "node" and not (n.get("config") or {}).get("lockdown") else None
+        # ...and while a store move runs, nothing else is handed out
+        # either: what the node runs reads and writes the stores.
+        # A sign-in is handed out past a full slot (SIGNIN_JOBS),
+        # but not past either of these.
+        stopped = False
+        if upd is None and runner == "node" and (storage_moving(node_id) or {}).get("state") == "moving":
+            free = lane = False
+            stopped = True
+        if upd is not None:
+            free = lane = False
+            stopped = True
+            if upd and _exec("UPDATE jobs SET state = 'assigned', node = ?, started = ? "
+                             "WHERE id = ? AND state = 'queued'",
+                             (node_id, int(time.time()), upd["id"])).rowcount == 1:
+                _jstate_bump()
+                # ...naming what the agent last said it holds that
+                # this side has finished or dropped. The agent
+                # passes over only those of them whose work
+                # has ended and that are only posting their end, so a
+                # stuck job no longer blocks its own way out and a
+                # job still working is never left behind (B520).
+                held = (n.get("agent") or {}).get("held") or []
+                spec = (upd.get("spec") or {}) | {"settled": held}
+                return upd | {"state": "assigned", "node": node_id, "spec": spec}
+        for j in (_rows("SELECT * FROM jobs WHERE state = 'queued' AND "
+                        "(node = ? OR node = '') ORDER BY queued, id",
+                        (node_id,)) if not stopped else ()):
+            j = _job_out(j)
+            # Queued, but its plan is still being prepared
+            # (devactions._submit): not this poll's.
+            if (j.get("spec") or {}).get("hold"):
+                continue
+            if runner_of(j["type"], n["kind"]) != runner or not fits(j, n):
+                continue
+            if not free and not (lane and _light(j)) and j["type"] not in SIGNIN_JOBS:
+                continue
+            # One pressed while another it would collide with
+            # runs waits its turn here (job_waits).
+            if job_waits(j, node_id):
+                continue
+            # An agent's job is `assigned` until its first log post
+            # says it started: the poll reply can be lost on the
+            # wire. The controller's own runner starts it on the
+            # thread that asked, so it is running from here.
+            st = "running" if runner == "controller" else "assigned"
+            if _exec("UPDATE jobs SET state = ?, node = ?, "
+                     "started = ? WHERE id = ? AND state = 'queued'",
+                     (st, node_id, int(time.time()), j["id"])).rowcount != 1:
+                continue
+            if not _quiet(j["id"]):
+                _jstate_bump()
+            return j | {"state": st, "node": node_id}
+    if runner == "node":
+        asked = [r["id"] for r in _rows(
+            "SELECT id FROM jobs WHERE node = ? AND cancel = 1 AND "
+            "state IN ('assigned', 'running')", (node_id,))]
+        if asked:
+            return {"cancel": asked}
+        # ...and the sessions the operator has ended from the
+        # Sessions card (roadmap #24): a node's tmux is the
+        # session account's on that machine, so the agent kills
+        # them, and the held poll is how it hears at once.
+        kills = _kills_take(node_id)
+        if kills:
+            for k in kills:
+                _kill_taken[(node_id, k)] = time.time()
+            # The names as every agent reads them, and beside them how
+            # long ago each was asked, in seconds: an age, not a time,
+            # so the node's clock need not agree with this one's.
+            now = time.time()
+            return {"kill_sessions": sorted(kills),
+                    "kill_ages": {k: round(now - at, 1) for k, at in kills.items()}}
+        with _wake:
+            ops = _tmux_ops.pop(node_id, None)
+        if ops:
+            return {"tmux": ops}
+        # ...and a request for a fresh census, when something has
+        # been refused on the strength of an old one. The agent says
+        # hello every ten minutes, which is fine for a display and
+        # too coarse for a gate: a refusal can be reasoning about a
+        # node as it was nine minutes ago, and the retry a human
+        # makes five seconds later reasons about the same stale
+        # answer. This is how the next one does not.
+        if _hello_wanted.pop(node_id, None):
+            return {"hello": True}
+        # ...and setup having ended where the screen still takes
+        # admin with no password (R194).
+        if _console_close_due(node_id):
+            return {"console_close": True}
+        # ...and the synced projects that moved (R162, wssync.py):
+        # the agent asks what changed, so a save on another node or
+        # in VS Code reaches this one in a second, not at its next
+        # look of its own.
+        with _wake:
+            moved = _sync_hints.pop(node_id, None)
+        if moved:
+            return {"sync": moved}
+    return None
 
 
 # Whether this controller has finished being first set up (R194): joined by
@@ -7325,8 +7417,7 @@ def job_result(node_id, job_id, state, exit_code=None, error="", outputs=None):
                   f"{type(e).__name__}: {e}", file=sys.stderr, flush=True)
     if not quiet:
         _jstate_bump()
-    with _wake:
-        _wake.notify_all()      # the slot is free: a held poll may take the next
+    _notify()      # the slot is free: a held poll may take the next
     return {"ok": True}
 
 
@@ -7340,8 +7431,7 @@ def job_release(job_id, spec):
           (json.dumps(spec if isinstance(spec, dict) else {}), job_id))
     if not _quiet(job_id):
         _jstate_bump()
-    with _wake:
-        _wake.notify_all()
+    _notify()
     return True
 
 
@@ -7353,8 +7443,7 @@ def job_refuse(job_id, why):
           "AND state = 'queued'", (int(time.time()), str(why)[:500], job_id))
     if not _quiet(job_id):
         _jstate_bump()
-    with _wake:
-        _wake.notify_all()
+    _notify()
 
 
 def _canceler(principal):
@@ -7406,8 +7495,7 @@ def job_cancel(principal, job_id):
     if not _quiet(job_id):
         audit(principal, "job-cancel", job_id, {})
         _jstate_bump()
-    with _wake:
-        _wake.notify_all()
+    _notify()
     return {"ok": True}
 
 
@@ -7563,6 +7651,10 @@ AGENT_VERSION_PY = AGENT_DIR / "aerieos_agent" / "__init__.py"
 _agent_cache = {}
 
 
+# How often the agent's sources are looked at for a change (agent_file).
+AGENT_LOOK_S = 2.0
+
+
 def _agent_bundle():
     """aerieos_agent/bundle.py, loaded by path: it makes the zip a node
     runs, and the agent itself makes the same one to know its own digest."""
@@ -7580,12 +7672,18 @@ def agent_file():
     as it ran the single file. Built once per change of its sources, so the
     digest hello answers with is the sources on disk right now, which is
     what makes 'is my agent current' a byte comparison on the node rather
-    than a version number anyone typed."""
+    than a version number anyone typed. Its sources are looked at every
+    AGENT_LOOK_S at most (R228 step 26): each status read and each node's
+    hello asked, and each look stats every file of the package."""
+    now = time.monotonic()
+    if _agent_cache.get("digest") and now - _agent_cache.get("looked", 0) < AGENT_LOOK_S:
+        return {k: v for k, v in _agent_cache.items() if k not in ("bundle", "looked")}
     try:
         b = _agent_bundle()
         mtime = b.newest(str(AGENT_DIR))
     except (OSError, ImportError, SyntaxError, ValueError):
         return {"body": b"", "digest": "", "version": ""}
+    _agent_cache["looked"] = now
     if _agent_cache.get("mtime") != mtime:
         try:
             body = b.build(str(AGENT_DIR))
@@ -7607,7 +7705,7 @@ def agent_file():
         _agent_cache.update({
             "mtime": mtime, "body": body, "digest": digest,
             "version": m.group(1).decode() if m else "?"})
-    return {k: v for k, v in _agent_cache.items() if k != "bundle"}
+    return {k: v for k, v in _agent_cache.items() if k not in ("bundle", "looked")}
 
 
 # ---------------------------------------------------------------------------

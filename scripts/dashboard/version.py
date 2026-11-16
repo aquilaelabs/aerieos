@@ -772,13 +772,9 @@ def render(project, comp="", repo=None):
 # Who may move it
 
 def load():
-    try:
-        with open(FILE) as f:
-            d = json.load(f)
-        if isinstance(d, dict) and isinstance(d.get("projects"), dict):
-            return d
-    except (OSError, ValueError):
-        pass
+    d = statefile.read_json(FILE)            # read once while the same file (R228 step 1)
+    if isinstance(d, dict) and isinstance(d.get("projects"), dict):
+        return d
     return {"projects": {}}
 
 

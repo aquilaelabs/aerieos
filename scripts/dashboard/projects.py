@@ -49,6 +49,7 @@ import membership
 # alternative was this module carrying a second copy of the URL rules.
 import forges
 import registry
+import statefile
 
 # A personal access token belonging to ONE project.
 #
@@ -427,12 +428,8 @@ PUSH_FILE = None            # set in configure(), beside the rest
 
 
 def load_push():
-    try:
-        with open(STATE / "push-rights.json") as f:
-            d = json.load(f)
-        return d if isinstance(d, dict) else {}
-    except (OSError, ValueError):
-        return {}
+    d = statefile.read_json(STATE / "push-rights.json")   # read once while the same file (R228 step 1)
+    return d if isinstance(d, dict) else {}
 
 
 def save_push(d):
@@ -2204,10 +2201,7 @@ def _load_pins():
     """Every account's pinned set, {uid: [names]}. The file was one flat list
     for everybody until 27 Sep; read as everyone's default under "*" once,
     and written back keyed by account the first time anybody pins."""
-    try:
-        v = json.loads(_pins_file().read_text())
-    except (OSError, ValueError):
-        return {}
+    v = statefile.read_json(_pins_file())    # read once while the same file (R228 step 1)
     if isinstance(v, list):
         return {"*": sorted({x for x in v if isinstance(x, str)})}
     if not isinstance(v, dict):
@@ -2310,10 +2304,7 @@ def _projects_here():
 
 
 def _marks(kind):
-    try:
-        d = json.loads((STATE / MARK_FILES[kind]).read_text())
-    except (OSError, ValueError):
-        return {}
+    d = statefile.read_json(STATE / MARK_FILES[kind])   # read once while the same file (R228 step 1)
     return d if isinstance(d, dict) else {}
 
 
@@ -2431,11 +2422,8 @@ def _archived_file():
 
 
 def _names(f):
-    try:
-        v = json.loads(f.read_text())
-        return sorted({x for x in v if isinstance(x, str)}) if isinstance(v, list) else []
-    except (OSError, ValueError):
-        return []
+    v = statefile.read_json(f)               # read once while the same file (R228 step 1)
+    return sorted({x for x in v if isinstance(x, str)}) if isinstance(v, list) else []
 
 
 def rekey(old, new):
@@ -2467,10 +2455,7 @@ def rekey(old, new):
 
 def load_locks():
     """{name: {by, admin}}: every locked project and whose lock it is."""
-    try:
-        v = json.loads(_locks_file().read_text())
-    except (OSError, ValueError):
-        return {}
+    v = statefile.read_json(_locks_file())   # read once while the same file (R228 step 1)
     if not isinstance(v, dict):
         return {}
     return _keyed({k: {"by": str(r.get("by") or ""), "admin": bool(r.get("admin"))}

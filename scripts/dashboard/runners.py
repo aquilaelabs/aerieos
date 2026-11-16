@@ -43,9 +43,25 @@ def mint(kind, node_id, slot, runner_id=""):
     return {"error": f"the controller cannot mint a runner token: {_why(r)}"}
 
 
+# What --list said, kept TOKENS_KEEP_S (R228 step 6): the Nodes listing
+# asked on every read, a sudo and a process each. A store, a forget or a
+# reset here forgets it; one made outside the dashboard shows within the time.
+TOKENS_KEEP_S = 60.0
+_tokens_kept = {"at": 0.0, "out": None}
+_tokens_lock = threading.Lock()
+
+
+def _tokens_forget():
+    with _tokens_lock:
+        _tokens_kept.update(at=0.0, out=None)
+
+
 def tokens():
     """{node id: {slot, ...}} for every runner token stored, from one call
     to the helper's --list. Which runners have a token, and nothing else."""
+    with _tokens_lock:
+        if _tokens_kept["out"] is not None and time.monotonic() - _tokens_kept["at"] < TOKENS_KEEP_S:
+            return {k: set(v) for k, v in _tokens_kept["out"].items()}
     r = run(["sudo", "-n", HELPER, "--list"], timeout=20)
     out = {}
     if r["code"] == 0:
@@ -53,12 +69,15 @@ def tokens():
             parts = line.split()
             if len(parts) == 2:
                 out.setdefault(parts[0], set()).add(parts[1])
+        with _tokens_lock:
+            _tokens_kept.update(at=time.monotonic(), out={k: set(v) for k, v in out.items()})
     return out
 
 
 def store(node_id, slot, url, forge, token):
     """Hand a runner's token to the helper on stdin: it never rides an argv,
     where every account on the box could read it off ps."""
+    _tokens_forget()
     try:
         p = subprocess.run(["sudo", "-n", HELPER, "store", node_id, slot],
                            input=f"RUNNER_URL={url}\nRUNNER_FORGE={forge}\nRUNNER_TOKEN={token}\n",
@@ -72,6 +91,7 @@ def store(node_id, slot, url, forge, token):
 
 
 def forget(node_id, slot):
+    _tokens_forget()
     r = run(["sudo", "-n", HELPER, "forget", node_id, slot], timeout=20)
     return {"ok": True} if r["code"] == 0 else {"error": _why(r)}
 
@@ -79,6 +99,7 @@ def forget(node_id, slot):
 def reset():
     """Forget every stored token, for a controller being reset: the nodes
     they were for are being forgotten too. True when the helper did."""
+    _tokens_forget()
     return run(["sudo", "-n", HELPER, "--reset"], timeout=20)["code"] == 0
 
 

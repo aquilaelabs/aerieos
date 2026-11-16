@@ -51,11 +51,9 @@ def _file():
 
 
 def _load():
-    try:
-        import json                                         # noqa: PLC0415
-        d = json.loads(_file().read_text())
-    except (OSError, ValueError):
-        return {}
+    # Every request with a cookie asks (seen): read once while it is the
+    # same file (statefile.read_json, R228 step 1), its own copy each.
+    d = statefile.read_json(_file())
     return d if isinstance(d, dict) else {}
 
 

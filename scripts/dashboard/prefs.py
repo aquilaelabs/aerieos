@@ -432,11 +432,9 @@ def _load():
     on every project that exists at the time, so nothing changes underfoot for
     an install that had one.
     """
-    try:
-        with open(FILE) as f:
-            d = json.load(f)
-    except (OSError, ValueError):
-        return {"projects": {}, "users": {}}
+    # Read once while it is the same file (statefile.read_json, R228 step 1):
+    # every space's row asks; its own copy each, as the shaping below edits it.
+    d = statefile.read_json(FILE)
     if not isinstance(d, dict):
         return {"projects": {}, "users": {}}
     p = d.get("projects")

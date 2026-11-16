@@ -299,16 +299,30 @@ def _dirs(uid, project):
     gives a tree's folder (every character not a letter or a digit a dash),
     which is the one another agent's log is kept under."""
     base = Path(root_for(uid))
-    out = []
+    # Worked out once an account, space and root (R228 step 26): a status
+    # read asked it a dozen times, and the list's own membership test
+    # compared every path with every other, some five thousand a call.
+    key = (str(base), str(WORKSPACE), uid, project)
+    got = _dirs_kept.get(key)
+    if got is not None:
+        return list(got)
+    out, seen = [], set()
     # ...and each slot's past the first (R143): u_x-2, u_x-codex-2.
     trees = [f"{uid}-{a}" for a in OTHER_AGENTS]
     trees += [f"{t}-{n}" for t in [uid, *trees] for n in range(2, agents.MAX_SLOTS + 1)]
     for p in (WORKSPACE / project, WORKTREES / project / uid,
               *(WORKTREES / project / t for t in trees)):
         for name in (_slug(p), re.sub(r"[^A-Za-z0-9]", "-", str(p))):
-            if base / name not in out:
+            if name not in seen:
+                seen.add(name)
                 out.append(base / name)
+    if len(_dirs_kept) > 4096:
+        _dirs_kept.clear()
+    _dirs_kept[key] = tuple(out)
     return out
+
+
+_dirs_kept = {}
 
 
 def _files(uid, project):

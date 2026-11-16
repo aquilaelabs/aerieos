@@ -11,6 +11,7 @@ import ssl
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -72,12 +73,8 @@ class Pair(unittest.TestCase):
             def log_message(self, format, *args):
                 del format, args
 
-        class S(ThreadingHTTPServer):
+        class S(tls.WrapOnItsThread, ThreadingHTTPServer):
             daemon_threads = True
-
-            def get_request(self):
-                sock, addr = super().get_request()
-                return tls.wrap(sock), addr
 
         srv = S(("127.0.0.1", 0), H)
         threading.Thread(target=srv.serve_forever, daemon=True).start()
@@ -97,6 +94,14 @@ class Pair(unittest.TestCase):
         from cryptography.hazmat.primitives import hashes
         got = ":".join(f"{b:02X}" for b in x509.load_der_x509_certificate(der).fingerprint(hashes.SHA256()))
         self.assertEqual(got, tls.fingerprint())
+        # A connection that sends nothing holds nobody else up (R228 step 3):
+        # its first byte is waited for on its own thread, not the accept one.
+        with socket.create_connection(("127.0.0.1", port), timeout=5):
+            t0 = time.monotonic()
+            quick = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+            quick.request("GET", "/")
+            self.assertEqual(json.loads(quick.getresponse().read()), {"tls": False})
+            self.assertLess(time.monotonic() - t0, 2.0)
 
 
 if __name__ == "__main__":

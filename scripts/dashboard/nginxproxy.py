@@ -31,6 +31,8 @@ import time
 import urllib.request
 from pathlib import Path
 
+import statefile
+
 STATE = None
 write_json = None
 _lock = threading.Lock()
@@ -69,11 +71,8 @@ def _file():
 
 
 def _load():
-    try:
-        d = json.loads(_file().read_text())
-        return d if isinstance(d, dict) else {}
-    except (OSError, ValueError, AttributeError):
-        return {}
+    d = statefile.read_json(_file())         # read once while the same file (R228 step 1)
+    return d if isinstance(d, dict) else {}
 
 
 # The token the nginx tab watches (/api/revs `nginx`, B714): moved by every

@@ -813,6 +813,7 @@ def compat_reap_once():
         if not why:
             continue
         r = run(["tmux", "kill-session", "-t", "=" + s["name"]], timeout=10)
+        tmux_forget()
         if r["code"] == 0:
             ended.append(s["name"])
             print(f"dashboard: compat: ended {s['name']} ({why})", flush=True)
@@ -1410,8 +1411,11 @@ def _project_columns(who, facts):
     # One batch spans the notebook, so the count the panel shows has to be
     # both halves added up; a banner reporting only the roadmap's would read
     # as "nothing much" while a dozen tracker changes sat unrecorded.
-    roadmap_batches = roadmap.batches()
-    for name, b in bugs.batches().items():
+    # Each from what its store's file is now (_derived, R228 step 5): a status
+    # read parsed roadmap.json and bugs.json twice each, under their locks.
+    # The batches are copied, as the merge below adds into them.
+    roadmap_batches = {k: dict(v) for k, v in _derived(STATE / "roadmap.json", "batches", roadmap.batches).items()}
+    for name, b in _derived(STATE / "bugs.json", "batches", bugs.batches).items():
         if name in roadmap_batches:
             roadmap_batches[name]["changes"] += b.get("changes", 0)
             roadmap_batches[name]["at"] = min(roadmap_batches[name]["at"], b["at"])
@@ -1421,12 +1425,12 @@ def _project_columns(who, facts):
     # half of one tab on this fifteen-second poll while the other half rode
     # /api/revs at a second and a half; they are all on /api/revs now (see
     # revisions()), and this poll stopped paying to compute them.
-    bug_counts = bugs.counts()          # open bugs per project, for the row and the app
-    test_counts = testreg.counts()
-    rule_counts = rules.counts()
+    bug_counts = _derived(STATE / "bugs.json", "counts", bugs.counts)      # open bugs per project, for the row and the app
+    test_counts = _derived(STATE / "tests.json", "counts", testreg.counts)
+    rule_counts = _derived(STATE / "rules.json", "counts", rules.counts)
     # What a session has waiting for the operator (roadmap #27): the count
     # lights the bell and the notebook band.
-    pend_counts = pending.counts()
+    pend_counts = _derived(STATE / "pending.json", "counts", pending.counts)
     timing.add("projects:setup:notebook", (time.monotonic() - _t1) * 1000)
     # The setup above, every file the whole list reads once, as one part.
     timing.add("projects:setup", (time.monotonic() - _t0) * 1000)
@@ -2781,14 +2785,44 @@ def tmux_owner(name):
     return m.group(0)[:-1] if m else ""
 
 
-def tmux_sessions():
+# This container's tmux listed at most every TMUX_LOOK_S for what only draws
+# (R228 step 2): the status read and the revisions poll each forked two
+# tmux processes, the poll every page makes every second and a half. What
+# acts on a session (ending one, the compatibility hold) lists afresh, and
+# an end here forgets the kept listing at once.
+TMUX_LOOK_S = 2.0
+_tmux_kept = {"at": 0.0, "out": None, "panes": None}
+_tmux_kept_lock = threading.Lock()
+
+
+def tmux_forget():
+    """A session here started or ended: the next listing is a fresh one."""
+    with _tmux_kept_lock:
+        _tmux_kept.update(at=0.0, out=None, panes=None)
+
+
+def _tmux_listing(kept):
+    """(list-sessions' lines or None with no server, {name: active pane})."""
+    now = time.monotonic()
+    if kept:
+        with _tmux_kept_lock:
+            if _tmux_kept["out"] is not None and now - _tmux_kept["at"] < TMUX_LOOK_S:
+                return _tmux_kept["out"], _tmux_kept["panes"]
     r = run(["tmux", "list-sessions", "-F", "#{session_name}\t#{session_attached}\t#{session_created}"],
             timeout=10)
-    if r["code"] != 0:
-        return []          # no server running yet is the normal empty case
-    panes = session_cwds()
+    out = r["out"] if r["code"] == 0 else ""
+    panes = session_cwds() if r["code"] == 0 else {}
+    with _tmux_kept_lock:
+        _tmux_kept.update(at=now, out=out, panes=panes)
+    return out, panes
+
+
+def tmux_sessions(kept=False):
+    """This container's tmux sessions as rows. `kept` takes a listing up to
+    TMUX_LOOK_S old, for a view's poll."""
+    lines, panes = _tmux_listing(kept)
     rows = []
-    for line in r["out"].splitlines():
+    for line in lines.splitlines():
         if "\t" in line:
             name, attached, created = (line.split("\t") + ["", ""])[:3]
             info = panes.get(name, {})
@@ -3331,6 +3365,7 @@ def _end_agent(session):
             return {"ended": False, "why": r["error"]}
         return {"ended": True, "on_node": on_node["node"]}
     r = run(["tmux", "kill-session", "-t", "=" + session], timeout=10)
+    tmux_forget()
     if r["code"] != 0:
         return {"ended": False, "why": (r["out"] or "tmux refused").strip()[:200]}
     return {"ended": True}
@@ -3357,7 +3392,9 @@ def end_session(session, node="", wait=False):
         return nodes.session_kill(on_node["node_id"], on_node["node_name"])
     if session not in here:
         return {"code": 0, "out": "", "err": "", "gone": True}
-    return run(["tmux", "kill-session", "-t", session], timeout=10)
+    r = run(["tmux", "kill-session", "-t", session], timeout=10)
+    tmux_forget()
+    return r
 
 
 def others_sessions():
@@ -3755,8 +3792,14 @@ def _seen_now(project, who):
     made through the notebook by somebody who is not a session. Not the
     memory files' mtimes, which the poll's token is: a session's own memory
     tool writes those files without passing through here, and read as
-    news to the session that wrote them (B269)."""
-    r = revisions(who, [project])
+    news to the session that wrote them (B269). The two store tokens are
+    read as the poll reads them, and not by asking the whole poll for them
+    (R228 step 2): every relayed verb and prompt hook asked."""
+    r = {}
+    if WORKSPACE.joinpath(project).is_dir() and not project.startswith(".") \
+            and (who is None or who is users.ALL or users.may_see(who, project)):
+        r = {f"bug:{project}": _cached(STATE / "bugs.json", bugs.revisions).get(project, 0),
+             f"rules:{project}": _cached(STATE / "rules.json", rules.revisions).get(project, rules.EMPTY_REV)}
     try:
         pf = json.dumps(prefs.get(project) or {}, sort_keys=True)
     except Exception:                                                     # noqa: BLE001
@@ -5214,7 +5257,7 @@ if not NODES_OK:
 # Every account's sessions on a project, for its settings dialog, and an
 # administrator ending one (projsessions.py): the rows the Sessions card is
 # made from, and its kill.
-projsessions.configure(sessions=lambda: tmux_sessions() + node_tmux_sessions(),
+projsessions.configure(sessions=lambda: tmux_sessions(kept=True) + node_tmux_sessions(),
                        base=tmux_base, owner=tmux_owner, accounts=account_names,
                        owner_name=users.owner_name, end=end_session)
 projsessions.BEHIND = session_behind
@@ -5819,6 +5862,21 @@ def _cached(path, fn):
     return v
 
 
+def _derived(path, name, fn):
+    """fn(), a value worked out from one store's file (the status read's
+    counts and batches), kept while that file is the same file
+    (statefile.sig: inode, size and times, looked at once a request). The
+    value is shared: a caller that changes it copies it first."""
+    key = (str(path), name)
+    m = statefile.sig(path)
+    hit = _rev_cache.get(key)
+    if hit is not None and m is not None and hit[0] == m:
+        return hit[1]
+    v = fn()
+    _rev_cache[key] = (m, v)
+    return v
+
+
 def revisions(who=None, projects=None):
     """Every token a view watches, with each node's row read once for all of
     them (nodes.held): the nodes token, the VMs' and the live sessions' each
@@ -6009,7 +6067,7 @@ def _snapshot(who):
     # bare (node_tmux_sessions), and by the bare name they read as unowned,
     # so every account on that project listed the owner's Claude as its own.
     with timing.timed("status:sessions"):
-        every = tmux_sessions() + node_tmux_sessions()
+        every = tmux_sessions(kept=True) + node_tmux_sessions()
         sessions = [s for s in every
                     if _session_visible(s.get("node_name") or s["name"], mine, seen, users.sees_all(who))]
     with timing.timed("status:signin"):
@@ -6793,13 +6851,86 @@ def setup_finished():
 _landing_lock = threading.Lock()
 
 
+# How long a kept connection waits for its next request (R228 step 9).
+KEEP_IDLE_S = 30
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "builderbot-dashboard"
+    # Kept connections (R228 step 9): every poll and every file was a new
+    # connection and a thread, and over TLS a handshake. A reply whose end
+    # the client cannot know (no Content-Length: a stream, a websocket, a
+    # reply written by hand or none at all) ends its connection, and so does
+    # a request that carried a body, which a handler may not have read whole.
+    protocol_version = "HTTP/1.1"
+    # ...with Nagle's algorithm off: a reply goes as headers, then a body, and
+    # on a kept connection the body waited for the client's delayed ack, 40
+    # ms a reply where a connection of its own took 3.
+    disable_nagle_algorithm = True
 
     def log_message(self, fmt, *args):      # quieter than the default
         pass
 
+    def handle_one_request(self):
+        # A kept connection's next request is waited for KEEP_IDLE_S at most
+        # (parse_request takes the limit off once it has come).
+        if getattr(self, "_served", False):
+            self.connection.settimeout(KEEP_IDLE_S)
+        self._served = True
+        super().handle_one_request()
+
+    def parse_request(self):
+        # ...and the last reply's headers are forgotten before this request's
+        # first: an Expect: 100-continue (curl's, for a larger body) is
+        # answered in here with headers of its own.
+        self.connection.settimeout(None)
+        self._sent = None
+        return super().parse_request()
+
+    def send_response(self, code, message=None):
+        self._sent = {"code": code, "length": False, "connection": False}
+        super().send_response(code, message)
+
+    def send_header(self, keyword, value):
+        sent = getattr(self, "_sent", None)
+        if sent is not None:
+            k = keyword.lower()
+            sent["length"] = sent["length"] or k == "content-length"
+            sent["connection"] = sent["connection"] or k == "connection"
+        super().send_header(keyword, value)
+
+    def end_headers(self):
+        sent = getattr(self, "_sent", None)
+        if sent is not None and sent["code"] == 101:
+            self.close_connection = True
+        elif sent is not None and not sent["connection"] and (
+                (not sent["length"] and sent["code"] not in (204, 304)) or self._had_body()):
+            self.send_header("Connection", "close")
+        super().end_headers()
+
+    def _had_body(self):
+        h = self.headers
+        return bool(h is not None and (h.get("Transfer-Encoding")
+                                       or (h.get("Content-Length") or "0").strip() not in ("", "0")))
+
     def _who(self):
+        """The account making this request, or None, proved once a request
+        (R228 step 1): the gates and the handler each asked, four to six
+        times a request, and each proof read the accounts, the sign-ins and
+        the second factors again. Kept on the handler for this request only
+        (_begin forgets it, the instance outliving a request on a kept
+        connection), and proved again once the request writes a state file
+        (an account renamed, a password or a second factor changed) or holds
+        longer than a request's moment (a terminal's socket)."""
+        memo = getattr(self, "_who_memo", None)
+        if memo is not None and memo[0] == statefile.writes_here() \
+                and time.monotonic() - memo[1] < statefile.REQUEST_HOLD_S:
+            return memo[2]
+        u = self._who_proved()
+        self._who_memo = (statefile.writes_here(), time.monotonic(), u)
+        return u
+
+    def _who_proved(self):
         """The account making this request, or None. Kept for the notebook's
         logs on the way past (writer_name), so an entry can say WHICH person
         wrote it. See _who_raw for how the principal itself is proved."""
@@ -6860,16 +6991,27 @@ class Handler(BaseHTTPRequestHandler):
         return logins.mint(u.get("uid") or "", "", self.headers.get("User-Agent", ""), self._client_ip())
 
     def _who_raw(self):
+        """_who_raw_proved, once a request as _who is (R228 step 1): the
+        gates ask it beside _who. The flags it sets (_basic_2fa, _renewed)
+        stay as the first proof left them."""
+        memo = getattr(self, "_who_raw_memo", None)
+        if memo is not None and memo[0] == statefile.writes_here() \
+                and time.monotonic() - memo[1] < statefile.REQUEST_HOLD_S:
+            return memo[2]
+        u = self._who_raw_proved()
+        self._who_raw_memo = (statefile.writes_here(), time.monotonic(), u)
+        return u
+
+    def _who_raw_proved(self):
         """The account making this request, or None.
 
-        Deliberately NOT remembered on the handler. BaseHTTPRequestHandler
-        reuses one instance for the life of a connection, so a principal
-        cached on `self` outlives the request that proved it: harmless while
-        protocol_version is HTTP/1.0 and every connection carries one request,
-        and a cross-request credential leak the day somebody turns keep-alive
-        on for the throughput. The cost it would have saved is already saved:
-        users.authenticate_pair remembers a verified credential for a minute,
-        so repeat calls are a digest and a dict lookup rather than a pbkdf2.
+        Kept for this request only (_who_raw), and forgotten by _begin as the
+        next one starts: BaseHTTPRequestHandler reuses one instance for the
+        life of a connection, so a principal left on `self` would outlive the
+        request that proved it, a cross-request credential leak once a
+        connection carries more than one. users.authenticate_pair remembers
+        a verified password for a minute besides, so a proof is a digest and a
+        dict lookup rather than a pbkdf2.
 
         Basic and the cookie both land here. Basic is what `aerie` and the test
         suite send; the cookie is what a browser gets from the login page.
@@ -8268,13 +8410,41 @@ class Handler(BaseHTTPRequestHandler):
             except OSError:
                 pass                                    # client already left
 
+    def _begin(self):
+        """A request begins: what the last one on this connection proved and
+        set is forgotten (a kept connection serves several, R228 step 9, on
+        one thread), and each state file is looked at once in this one
+        (statefile.begin_request, R228 step 1)."""
+        self._who_memo = self._who_raw_memo = self._sent = None
+        self._maint = self._basic_2fa = False
+        self._renewed = ""
+        self._held = None
+        _writing.who = None
+        gitcreds.ACTING.set("")
+        statefile.begin_request()
+
+    def _end(self):
+        """A request ends: one that sent no reply through send_response (a
+        websocket's, written by hand, or none) ends its connection too."""
+        statefile.end_request()
+        if self._sent is None:
+            self.close_connection = True
+
     def do_GET(self):
-        if not self._tunnel_refused():
-            self._safely(self._get)
+        self._begin()
+        try:
+            if not self._tunnel_refused():
+                self._safely(self._get)
+        finally:
+            self._end()
 
     def do_POST(self):
-        if not self._tunnel_refused():
-            self._safely(self._post)
+        self._begin()
+        try:
+            if not self._tunnel_refused():
+                self._safely(self._post)
+        finally:
+            self._end()
 
     def _tunnel_refused(self):
         """A node's tunnel address asks for the agent's API or nothing
@@ -9789,7 +9959,7 @@ class Handler(BaseHTTPRequestHandler):
         # a new row shape. (Bug #16's caveat still applies, narrowed: anything
         # holding an account's credential writes as that account, because the
         # server cannot tell the person from the session they started.)
-        if not NODES_OK:
+        if not NODES_OK and not _quiet_post(path, req):
             act = path + (":" + str(req["action"])[:40]
                           if isinstance(req.get("action"), str) else "")
             db.audit(self._principal(), act,
@@ -14352,22 +14522,36 @@ class Handler(BaseHTTPRequestHandler):
             time.sleep(1)
 
 
-class Server(ThreadingHTTPServer):
+# POSTs that change nothing a person reads the audit for (R228 step 7): a
+# notebook's presence beat every fifteen seconds, and a session's hooks
+# keeping their own books on every edit, prompt and turn. They were most of
+# the audit's rows, 5,760 a day for one open notebook, and pushed real
+# history out of the 200,000 kept. The path, and the hook kinds by name; a
+# hook's asked and started are kept, since each says something to people.
+QUIET_POSTS = {"/api/presence": None,
+               "/api/v1/hook": {"note", "seen", "asking", "guards", "recall", "turn", "turn-done"}}
+
+
+def _quiet_post(path, req):
+    """Whether this POST is one QUIET_POSTS leaves out of the audit."""
+    if path not in QUIET_POSTS:
+        return False
+    kinds = QUIET_POSTS[path]
+    return kinds is None or (isinstance(req, dict) and req.get("kind") in kinds)
+
+
+class Server(tls.WrapOnItsThread, ThreadingHTTPServer):
     """The listen queue a room of people and sessions needs. socketserver's
     default is 5 connections waiting to be accepted: at 129 arriving together
     the kernel reset the rest, and the ones it kept retried on a backoff that
     turned seconds into a minute. Threads are daemons so a stop is not held
-    up by a request still being answered."""
+    up by a request still being answered. One port, both ways (R158 step 2,
+    tls.py): a connection that opens a TLS handshake is wrapped in the
+    certificate in force, the rest served as plain http, so a node keeps
+    dialing http while a browser gets https; the look is on the request's
+    own thread (tls.WrapOnItsThread)."""
     request_queue_size = 128
     daemon_threads = True
-
-    def get_request(self):
-        # One port, both ways (R158 step 2, tls.py): a connection that opens
-        # a TLS handshake is wrapped in the certificate in force, the rest
-        # served as plain http, so a node keeps dialing http while a browser
-        # gets https.
-        sock, addr = super().get_request()
-        return tls.wrap(sock), addr
 
 
 # ---- function coverage (roadmap R76) ----------------------------------------

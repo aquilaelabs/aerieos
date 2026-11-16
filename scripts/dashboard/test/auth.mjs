@@ -2011,4 +2011,31 @@ await section("A terminal's socket opens from this dashboard's own page and no o
      `a terminal's or a screen's socket from another origin is refused, and this origin's is not (${JSON.stringify(got)})`);
 });
 
+// Kept connections (R228 step 9): a read after a read goes on the same
+// connection, and who asked is proved for each request, never carried from
+// the one before it on that connection; a request that carried a body ends
+// its connection, which a handler may not have read whole.
+await section('A connection is kept from one request to the next, and each is proved on its own', async () => {
+  const u = new globalThis.URL(URL);
+  const agent = new http.Agent({ keepAlive: true, maxSockets: 1 });
+  const ask = (path, headers = {}, body = null) => new Promise(resolve => {
+    const req = http.request({ host: u.hostname, port: u.port, path, agent, method: body ? 'POST' : 'GET',
+                               headers: { ...headers, ...(body ? { 'Content-Type': 'application/json' } : {}) } });
+    req.on('response', res => { res.resume(); res.on('end', () => resolve({ status: res.statusCode, reused: req.reusedSocket,
+                                                                              conn: res.headers.connection || '' })); });
+    req.on('error', e => resolve({ status: 0, error: String(e) }));
+    req.end(body || undefined);
+  });
+  const auth = { Authorization: 'Basic ' + Buffer.from('test:test').toString('base64') };
+  const a = await ask('/api/revs', auth), b = await ask('/api/revs', auth), anon = await ask('/api/status');
+  ok(a.status === 200 && b.status === 200 && b.reused,
+     `a second read goes on the first one's connection (${JSON.stringify([a, b])})`);
+  ok(anon.status === 401 && anon.reused, `...and the next request on it, signed in as nobody, is nobody (${JSON.stringify(anon)})`);
+  const posted = await ask('/api/presence', auth, JSON.stringify({ project: 'alpha', client: 'keep', where: 'roadmap' }));
+  const after = await ask('/api/revs', auth);
+  ok(posted.conn === 'close' && after.status === 200 && !after.reused,
+     `a request with a body ends its connection, and the next read opens another (${JSON.stringify([posted, after])})`);
+  agent.destroy();
+});
+
 await done(browser);

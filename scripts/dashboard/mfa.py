@@ -54,10 +54,7 @@ def _file():
 
 
 def load():
-    try:
-        d = json.loads(_file().read_text())
-    except (OSError, ValueError):
-        d = {}
+    d = statefile.read_json(_file())          # read once while it is the same file (R228 step 1)
     return d if isinstance(d, dict) else {}
 
 

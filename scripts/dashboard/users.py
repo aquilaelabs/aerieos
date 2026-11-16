@@ -115,11 +115,10 @@ def mint_uid():
 
 
 def load():
-    try:
-        d = json.loads(_file().read_text())
-    except (OSError, ValueError):
-        return {"users": {}}
-    if not isinstance(d.get("users"), dict):
+    # Read once while the file is the same file (statefile.read_json, R228
+    # step 1): a status read asked for it seventy times. Its own copy each.
+    d = statefile.read_json(_file())
+    if not isinstance(d, dict) or not isinstance(d.get("users"), dict):
         return {"users": {}}
     return d
 

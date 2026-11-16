@@ -23,6 +23,8 @@ import threading
 import time
 from pathlib import Path
 
+import statefile
+
 STATE = Path("/config")
 WORKSPACE = Path("/workspace")
 FILE = "paths.json"
@@ -46,17 +48,17 @@ def configure(*, state, workspace):
 
 
 def _load():
-    try:
-        d = json.loads((STATE / FILE).read_text())
-        return {k: str(v) for k, v in d.items() if k in KINDS and isinstance(v, str)}
-    except (OSError, ValueError, AttributeError):
+    d = statefile.read_json(STATE / FILE)   # read once while the same file (R228 step 1)
+    if not isinstance(d, dict):
         return {}
+    return {k: str(v) for k, v in d.items() if k in KINDS and isinstance(v, str)}
 
 
 def _save(d):
     tmp = STATE / f".{FILE}.{os.getpid()}"
     tmp.write_text(json.dumps(d, indent=1, sort_keys=True))
     os.replace(tmp, STATE / FILE)
+    statefile.forget(STATE / FILE)
 
 
 def default(name):

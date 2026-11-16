@@ -331,8 +331,14 @@ COPY CHANGELOG.md /opt/aerieos/CHANGELOG.md
 # scripts/startup.d/05-unraid-icon.root.sh.
 COPY config/icon.png /opt/aerieos/icon.png
 
+# The scripts' bytecode, made here (R228 step 8): PYTHONDONTWRITEBYTECODE
+# above keeps a session's tree clean, and with it nothing ever wrote any, so
+# every relayed verb's python compiled its modules again (200 ms where 30
+# would do) and the dashboard compiled itself at each start. A node's agent
+# is unaffected: its bundle takes only the .py files (bundle.sources).
 RUN set -eux; \
     chmod -R +x /opt/aerieos/scripts; \
+    python3 -m compileall -q -j 0 /opt/aerieos/scripts; \
     ln -sf /opt/aerieos/scripts/aerie /usr/local/bin/aerie; \
     # /opt/aerieos/bin sits first on PATH and holds privilege-dropping
     # wrappers, so `docker exec -it Aerie-Workshop aerie` runs as `builder`

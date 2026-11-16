@@ -40,6 +40,7 @@ import time
 from pathlib import Path
 
 import packformat
+import statefile
 
 FILE = None
 write_json = None
@@ -1635,12 +1636,11 @@ def offered_agents():
     """[(name, label, adapter)] for every installed pack that offers a coding
     agent, in name order; read again only when the packs' file changes, since
     every session name is asked of it."""
-    try:
-        st = FILE.stat() if FILE else None
-        # ...and again when the install's setting for sideloaded agents turns.
-        stamp = (str(FILE), st.st_mtime_ns, st.st_size, bool(sideload_agents())) if st else None
-    except OSError:
-        stamp = None
+    # What the file is, looked at once a request (statefile.sig, R228 step
+    # 26): every session name asks, some two hundred times a status read.
+    st = statefile.sig(FILE) if FILE else None
+    # ...and again when the install's setting for sideloaded agents turns.
+    stamp = (str(FILE), st, bool(sideload_agents())) if st else None
     if stamp is None or stamp != _offered["stamp"]:
         rows = []
         for name, rec in sorted(packs().items()) if stamp is not None else ():

@@ -34,6 +34,7 @@ import time
 from pathlib import Path
 
 import roles
+import statefile
 import users
 
 STATE = None
@@ -57,15 +58,14 @@ def _write(name, d):
         w(_st() / name, d)
     else:
         (_st() / name).write_text(json.dumps(d))
+    statefile.forget(_st() / name)
 
 
 def _read(name, empty):
-    try:
-        with open(_st() / name, encoding="utf-8") as f:
-            d = json.load(f)
-        return d if isinstance(d, dict) else empty
-    except (OSError, ValueError):
-        return empty
+    # A role check reads the owners for every space a status read draws:
+    # read once while it is the same file (statefile.read_json, R228 step 1).
+    d = statefile.read_json(_st() / name)
+    return d if isinstance(d, dict) else empty
 
 
 def _keyed(ps, merge=None):
