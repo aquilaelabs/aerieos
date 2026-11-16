@@ -469,13 +469,16 @@ def rename_container(name, new, instance=None):
 
 
 def read_container(name):
-    """What was written, for the editor to open on."""
+    """What was written, for the editor to open on, and whether it is
+    AerieOS's own: the editor opened while the page's list was put away has
+    no row to read that from (B810)."""
     try:
         compose = (devapp.containers_dir(name) / "docker-compose.yml").read_text(
             encoding="utf-8", errors="replace")
     except OSError:
         compose = ""
-    return {"compose": redact_keys(compose), "env": devapp.read_env(name, devapp.MAIN)}
+    return {"compose": redact_keys(compose), "env": devapp.read_env(name, devapp.MAIN),
+            "managed": devapp.owner_of(name, devapp.MAIN) == devapp.SYSTEM}
 
 
 def listed_owner(c):

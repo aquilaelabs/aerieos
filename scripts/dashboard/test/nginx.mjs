@@ -459,6 +459,12 @@ await section("The private key goes to the node inside that file and never into 
     && /AerieOS manages this one/.test(document.getElementById('cNameHint').textContent);
   ok(await page.waitForFunction(locked, null, { timeout: 15000 }).then(() => true, () => false),
      '...and its Edit dialog is for reading: name, compose file and env locked, Save ghosted');
+  // ...and so it is opened while the list is put away for a re-read, with no
+  // row to say who manages it: its own read says so (B810).
+  await page.evaluate(() => { document.getElementById('cmodal').hidden = true; window.__keptList = dockerList; dockerList = null; openEditContainer('nginx-sandbox'); });
+  ok(await page.waitForFunction(locked, null, { timeout: 15000 }).then(() => true, () => false),
+     '...and so it is when opened while the list is being read again');
+  await page.evaluate(() => { if (!dockerList) dockerList = window.__keptList; });
   await page.evaluate(() => { document.getElementById('cmodal').hidden = true; openNginxTab(); });
   await api('/api/nginx', { action: 'save', node: sandbox.node, routes: kept, drop_cert: 'www.example.com' });
 });

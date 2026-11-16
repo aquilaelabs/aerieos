@@ -1311,6 +1311,8 @@ function cLock(running){
   $("cGo").disabled = running;
 }
 
+// What the editor says of a container AerieOS deploys itself.
+const C_MANAGED = "AerieOS manages this one: its name, compose file and env are written where it was deployed from (the nginx page).";
 async function openEditContainer(name){
   cEditing = name;
   $("cTabForm").hidden = false;
@@ -1332,7 +1334,7 @@ async function openEditContainer(name){
   const jb = dockerJob(), jobOn = !!(jb?.running && jb.project === name && jb.instance === "main");
   $("cName").disabled = !down || managed || jobOn;
   $("cNameHint").textContent = managed
-    ? "AerieOS manages this one: its name, compose file and env are written where it was deployed from (the nginx page)."
+    ? C_MANAGED
     : jobOn && down
     ? "A job is running on it: its name can change once that has ended."
     : down
@@ -1352,6 +1354,13 @@ async function openEditContainer(name){
     if (cEditing !== name) return;          // reopened on another one meanwhile
     $("cYml").value = j.compose || "";
     $("cEnv").value = j.env || "";
+    // Opened while the list was put away, it had no row to say AerieOS
+    // manages it: the read says so (B810), and it is for reading.
+    if (j.managed && !managed){
+      $("cName").disabled = true;
+      $("cNameHint").textContent = C_MANAGED;
+      cLock(true);
+    }
   }catch(e){ $("cErr").textContent = "could not read it: " + e;
              $("cErrWrap").hidden = false; }
 }
