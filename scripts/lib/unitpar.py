@@ -130,7 +130,7 @@ def main(argv):
     # Once more, alone, for each module that failed: in a process of its own,
     # one at a time, with the machine to itself. What it says then is its
     # result; what it said in company is above, for whoever reads why.
-    flaky = []
+    flaky, still = [], []
     for m in sorted(failed):
         was = failed[m]
         print(f"== {m} failed in the whole run: once more, alone")
@@ -147,6 +147,7 @@ def main(argv):
         failures += rep.get("failures", 0)
         errors += rep.get("errors", 0)
         if rep.get("failures") or rep.get("errors"):
+            still.append(m)
             if "\n".join(lines[:-1]).strip():
                 sys.stdout.write("\n".join(lines[:-1]) + "\n")
         else:
@@ -170,9 +171,14 @@ def main(argv):
     if failures or errors or broke:
         parts = [f"failures={failures}"] if failures else []
         parts += [f"errors={errors}"] if errors else []
-        print(f"FAILED ({', '.join(parts) or 'a bucket ended without its report'})")
+        # The modules on the last line, which is the one a reader piping
+        # through tail keeps: a FAILED with no name left a failure nobody
+        # could find again (B785).
+        print(f"FAILED ({', '.join(parts) or 'a bucket ended without its report'})"
+              + (f": {', '.join(still)}" if still else ""))
         return 1
-    print("OK" + (f" (skipped={skipped})" if skipped else ""))
+    print("OK" + (f" (skipped={skipped})" if skipped else "")
+          + (f"; flaky, passed alone: {', '.join(flaky)}" if flaky else ""))
     return 0
 
 

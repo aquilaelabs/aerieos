@@ -47,7 +47,9 @@ class Alone(unittest.TestCase):
         self.assertIn("left on by the module before", r.stdout, "what it said in company is kept above")
         self.assertIn("== test_b_minds failed in the whole run: once more, alone", r.stdout)
         self.assertIn("flaky: test_b_minds failed in the whole run and passed again alone", r.stdout)
-        self.assertTrue(r.stdout.rstrip().endswith("OK"), r.stdout[-200:])
+        # ...named on the last line too, which is the one a reader piping
+        # through tail keeps (B785).
+        self.assertTrue(r.stdout.rstrip().endswith("OK; flaky, passed alone: test_b_minds"), r.stdout[-200:])
 
     def test_a_module_that_fails_alone_too_fails_the_tier_with_its_own_count(self):
         r = self.tier({"test_a_leaks": LEAKS, "test_b_minds": MINDS, "test_c_broken": BROKEN})
@@ -55,7 +57,7 @@ class Alone(unittest.TestCase):
         self.assertIn("flaky: test_b_minds", r.stdout)
         self.assertNotIn("test_c_broken failed in the whole run and passed", r.stdout)
         self.assertEqual(r.stdout.count("AssertionError: 1 != 2"), 2, "said in the whole run and again alone")
-        self.assertTrue(r.stdout.rstrip().endswith("FAILED (failures=1)"), r.stdout[-200:])
+        self.assertTrue(r.stdout.rstrip().endswith("FAILED (failures=1): test_c_broken"), r.stdout[-200:])
 
     def test_a_tier_with_nothing_wrong_runs_nothing_twice(self):
         r = self.tier({"test_a_fine": FINE, "test_b_fine": FINE}, workers=2)
