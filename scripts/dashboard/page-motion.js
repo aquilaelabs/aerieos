@@ -261,8 +261,13 @@ function foldHeight(el, from, to, done){
 // the end, whichever direction it went.
 function slideDetails(el, willOpen){
   const sum = el.querySelector("summary");
-  if (!sum || noMotion()){ el.open = willOpen; return; }
+  // A slide still running is this one's to replace, from where it has got
+  // to: left to finish, its end wrote its own open or shut over this press
+  // (a fold opened while its closing slide ran shut again a moment later).
+  const running = el.getAnimations().filter(a => a.id === "fold");
+  if (!sum || noMotion()){ running.forEach(a => a.cancel()); el.open = willOpen; return; }
   const from = el.offsetHeight;
+  running.forEach(a => a.cancel());
   el.open = true;
   const to = willOpen ? el.offsetHeight : sum.offsetHeight;
   if (from === to){ el.open = willOpen; return; }

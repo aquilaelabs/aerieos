@@ -561,6 +561,28 @@ await section("opening one is a slide, not a snap", async () => {
   ok(!back.open && back.inline === "" && Math.abs(back.box - back.want) < 0.05,
      `...and closes back to exactly its shut height, nothing of the tween left (${back.box} vs ${back.want}px)`);
 });
+// A press that lands while a slide still runs is the one that counts: the
+// slide before it is replaced, not left to finish and write its own open or
+// shut over the press. A fold opened while its closing slide ran, which a
+// redraw had shut under that slide, shut again a moment later.
+await section("a fold pressed while it still slides keeps that press", async () => {
+  await page.waitForSelector('#bugList .bug', { timeout: 15000 });
+  const s = `#bugList .bug[data-id="${await page.$eval('#bugList .bug', d => d.dataset.id)}"]`;
+  const got = await page.evaluate(async s => {
+    const el = document.querySelector(s);
+    el.open = true;
+    await new Promise(r => setTimeout(r, 50));
+    el.querySelector('summary').click();          // sliding shut
+    const sliding = el.getAnimations().length > 0;
+    el.open = false;                              // ...shut under it, as a redraw does
+    el.querySelector('summary').click();          // and opened again mid-slide
+    await new Promise(r => setTimeout(r, 500));   // past the first slide's end
+    const open = el.open;
+    el.open = false;
+    return { sliding, open };
+  }, s);
+  ok(got.sliding && got.open, `a fold opened while its closing slide still runs stays open after that slide would have ended (${JSON.stringify(got)})`);
+});
 
 // ---- handing one to a session ----------------------------------------------
 // A bug goes over as a NUMBER and an instruction to look it up, never as a
