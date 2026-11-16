@@ -259,11 +259,27 @@ def _watch(look, was, auth, job_id=""):
                 print(tail)
             sys.exit(f"[builderbot] ERROR: the {what} failed: {str(job['error'])[:200]}")
         if seen or (st.get("built_rev") or "") != was:
+            # Running is looked at again a few seconds on before it is said:
+            # a container that exits as it starts (a dashboard refusing its
+            # state, a crash on boot) reads running for that moment, and was
+            # called up with exit 0 (B804).
+            stopped = False
+            if st.get("running"):
+                for _ in range(2):
+                    time.sleep(3)
+                    again = look(patient=True)
+                    if again is not None and not again.get("running"):
+                        st, stopped = again, True
+                        break
             print(f"[builderbot] {'rebuilt' if was else 'built'} from {built_from(st)}; "
                   f"{st.get('name') or 'the instance'} is "
                   + ("up" if st.get("running")
+                     else "not running: it started and stopped within seconds" if stopped
                      else "built and not running" if st.get("await_env")
                      else "not running"))
+            if stopped:
+                sys.exit("[builderbot] ERROR: its container stopped right after it started; "
+                         "aerie devapp log says why")
             if st.get("await_env"):
                 print("[builderbot] its env is not filled in: aerie devapp env set FILE writes it where "
                       "the space's settings allow, else the operator's Env on the Containers page",

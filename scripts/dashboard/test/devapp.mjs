@@ -5307,8 +5307,10 @@ import importlib.util, json, os, sys, time
 sys.path.insert(0, ${JSON.stringify(LIB)})
 spec = importlib.util.spec_from_file_location("dv", ${JSON.stringify(LIB + '/devapp-verbs.py')})
 m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
-looks = iter([{"built_rev": "aaa"}, {"job": {"running": True, "step": "building"}},
-              {"built_rev": "bbb", "running": True, "name": "alpha-dev"}])
+import itertools
+# The last state held: up is looked at again a few seconds on (B804).
+looks = itertools.chain([{"built_rev": "aaa"}, {"job": {"running": True, "step": "building"}}],
+                        itertools.repeat({"built_rev": "bbb", "running": True, "name": "alpha-dev"}))
 asked = []
 def call(path, body=None, auth="", method="", timeout=30):
     asked.append([body.get("action"), timeout])
@@ -5428,7 +5430,7 @@ print(json.dumps({"ran": ran, "out": out}))`], { encoding: 'utf8' });
 await section("aerie devapp new sends the project to Docker the way Send does", async () => {
   const LIB = new globalThis.URL('../../lib', import.meta.url).pathname;
   const run = spawnSync('python3', ['-c', `
-import importlib.util, json, os, sys, time
+import importlib.util, itertools, json, os, sys, time
 sys.path.insert(0, ${JSON.stringify(LIB)})
 spec = importlib.util.spec_from_file_location("dv", ${JSON.stringify(LIB + '/devapp-verbs.py')})
 m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
@@ -5437,8 +5439,9 @@ m.waits.outcome = lambda auth, rid, no: {"code": 0, "out": "j1"}
 out = {}
 for dial in ("auto", "ask"):
     bodies = []
-    looks = iter(([{"built_rev": ""}] if dial == "auto" else [])
-                 + [{"built_rev": "ccc", "running": True, "name": "alpha-2"}])
+    # The last state held: up is looked at again a few seconds on (B804).
+    looks = itertools.chain([{"built_rev": ""}] if dial == "auto" else [],
+                            itertools.repeat({"built_rev": "ccc", "running": True, "name": "alpha-2"}))
     def call(path, body=None, auth="", method="", timeout=30, dial=dial, bodies=bodies, looks=looks):
         if body is None:
             bodies.append({"action": "job", "instance": path.split("=")[-1], "ref": None})
@@ -5463,10 +5466,10 @@ print(json.dumps(out))`], { encoding: 'utf8' });
   const got = JSON.parse((run.stdout || '').trim().split('\n').pop() || '{}');
   const acts = d => (got[d]?.bodies || []).map(b => b.action + (b.instance ? ':' + b.instance : '')).join(' ');
   ok(got.auto?.code === 0 && got.auto.bodies[0].action === 'new' && !got.auto.bodies[0].instance
-     && got.auto.bodies[0].ref === 'sendbranch' && acts('auto') === 'new state:alpha-2 rebuild:alpha-2 job:j1 state:alpha-2'
+     && got.auto.bodies[0].ref === 'sendbranch' && acts('auto') === 'new state:alpha-2 rebuild:alpha-2 job:j1 state:alpha-2 state:alpha-2 state:alpha-2'
      && /created alpha-2/.test(run.stderr || '') && /built from commit ccc; alpha-2 is up/.test(run.stdout || ''),
      `aerie devapp new on auto makes the container and builds that one, waiting for the verdict (${acts('auto')})`);
-  ok(got.ask?.code === 0 && acts('ask') === 'new job:j1 state:alpha-2'
+  ok(got.ask?.code === 0 && acts('ask') === 'new job:j1 state:alpha-2 state:alpha-2 state:alpha-2'
      && /asked the administrators \(#7\) to send it to Docker as alpha-2/.test(run.stderr || ''),
      `...and on ask it follows the build Allow starts instead of asking for another (${acts('ask')})`);
 });
