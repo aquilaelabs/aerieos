@@ -32,13 +32,16 @@ function loadUsers(){
   return reading("users", async () => {
     try{
       const j = await getJSON("/api/users");
+      // One that never landed keeps what the page had (the poll says the
+      // controller is away), as a read that threw always did.
+      if (j.unreached) throw new Error(j.error);
       usersErr = j.error || "";
       usersList = j.users || [];
       usersMeta = {owner: j.owner || "", me: j.me || "",
                    roles: j.roles || [], role_names: j.role_names || [], projects: j.projects || [],
                    role_labels: j.role_labels || {}};
     }catch(e){
-      usersErr = String(e);
+      usersErr = failWords(e);
       usersList = usersList || [];
     }
   });

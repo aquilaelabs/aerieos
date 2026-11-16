@@ -29,10 +29,13 @@ function loadVms(){
   return reading("vms", async () => {
     try{
       const j = await getJSON("/api/vms");
+      // One that never landed keeps what the page had (the poll says the
+      // controller is away), as a read that threw always did.
+      if (j.unreached) throw new Error(j.error);
       vmsErr = j.error || "";
       vmsData = j;
     }catch(e){
-      vmsErr = String(e);
+      vmsErr = failWords(e);
       vmsData = vmsData || {vms: [], images: [], hosts: [], can: {}};
     }
     vmReapConsoles();

@@ -43,6 +43,9 @@ function loadJobs(){
   return reading("jobs", async () => {
     try{
       const j = await getJSON("/api/v1/jobs?n=100");
+      // One that never landed keeps what the page had (the poll says the
+      // controller is away), as a read that threw always did.
+      if (j.unreached) throw new Error(j.error);
       jobsErr = j.error || "";
       jobsList = j.jobs || [];
       jobsNodes = j.nodes || {};
@@ -57,7 +60,7 @@ function loadJobs(){
         if (r.id) jobsLogs[id] = r.log || "";
       }));
     }catch(e){
-      jobsErr = String(e);
+      jobsErr = failWords(e);
       jobsList = jobsList || [];
     }
   });
