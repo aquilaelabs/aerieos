@@ -88,6 +88,37 @@ class RelayApply(unittest.TestCase):
         self.assertIn("could not follow it by a fast-forward", r.stderr)
         self.assertEqual(self.git("rev-parse", "HEAD"), self.a, "never moved under a change")
 
+    def upstream(self):
+        self.git("remote", "add", "origin", os.path.join(self.tmp, "nowhere"))
+        self.git("config", "branch.topic.remote", "origin")
+        self.git("config", "branch.topic.merge", "refs/heads/topic")
+
+    def test_a_push_that_left_a_commit_here_behind_says_so_and_fails(self):
+        # B805: the controller pushed its copy, a commit short of this tree.
+        self.upstream()
+        with open(os.path.join(self.repo, "new.txt"), "w") as f:
+            f.write("made here\n")
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "here")
+        Controller.refs = [["refs/remotes/origin/topic", self.a]]
+        r = self.relay("git", "push")
+        self.assertNotEqual(r.returncode, 0, r.stderr)
+        self.assertIn(f"the controller pushed {self.a[:9]}", r.stderr)
+        self.assertIn("had not reached the controller's copy", r.stderr)
+
+    def test_a_push_of_this_trees_head_is_quiet(self):
+        self.upstream()
+        Controller.refs = [["refs/remotes/origin/topic", self.a]]
+        r = self.relay("git", "push", "-u", "origin")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        # ...and a push naming another branch is not held to this one.
+        with open(os.path.join(self.repo, "new.txt"), "w") as f:
+            f.write("made here\n")
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "here")
+        r = self.relay("git", "push", "origin", "other")
+        self.assertEqual(r.returncode, 0, r.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
