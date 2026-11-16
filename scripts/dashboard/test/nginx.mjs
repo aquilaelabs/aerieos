@@ -368,6 +368,22 @@ ok(await page.evaluate(() => {
 await page.click('.pane .bar.page [data-shellback]');
 await page.waitForFunction(() => tabOf(panes[0])?.kind === 'docker', null, { timeout: 10000 });
 ok(await page.evaluate(() => /^#\/containers(\/|$)/.test(location.hash) && !location.hash.includes('nginx')), '...and Back returns to the Containers page');
+// ...and from a space's page, whose address is #/spaces/NAME: Back names the
+// space and returns to it, and a reload there waits as that space's page.
+await section("The nginx page opens from a space's page, and Back names the space", async () => {
+  await page.evaluate(() => openNotebook('alpha'));
+  await page.waitForFunction(() => tabOf(panes[0])?.kind === 'notebook' && /^#\/spaces\/alpha(\/|$)/.test(location.hash), null, { timeout: 10000 });
+  const errs = page.errors.length;
+  await page.evaluate(() => { location.hash = '#/containers/nginx'; });
+  await page.waitForFunction(() => tabOf(panes[0])?.kind === 'nginx'
+    && /alpha/.test(document.querySelector('.pane .bar.page .backhead [data-shellback]')?.textContent || ''), null, { timeout: 10000 });
+  ok(page.errors.length === errs, `the nginx page opens from a space's page with Back naming the space, and nothing throws (${page.errors.slice(errs).join(' | ') || 'no errors'})`);
+  await page.click('.pane .bar.page [data-shellback]');
+  await page.waitForFunction(() => tabOf(panes[0])?.kind === 'notebook' && /^#\/spaces\/alpha(\/|$)/.test(location.hash), null, { timeout: 10000 });
+  ok(true, '...and Back returns to the space');
+  const boot = await page.evaluate(() => { const pg = bootPage('#/spaces/alpha/roadmap'); return { rail: pg.rail, proj: /bar proj/.test(pg.bar) }; });
+  ok(boot.rail === 'projects' && boot.proj, `a reload on a space's address waits as that space's page, not as Home (${JSON.stringify(boot)})`);
+});
 ok(await page.$eval('.dmtab .row[data-inst="nginx-sandbox|main"]', r => /1\.29-alpine is out/.test(r.querySelector('.dmnginx').textContent)
      && r.querySelector('[data-dm="nginx-update"]').textContent.trim() === 'Update'),
    'the Containers page\'s row of a node\'s nginx says the line is out, with Update as on every row');

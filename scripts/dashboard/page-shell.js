@@ -439,7 +439,7 @@ function kindOfRoute(hash){
 // What a person calls the page at an address: its tool's name, or the project's.
 function routeLabel(hash){
   const k = kindOfRoute(hash);
-  if (k === "notebook") return projLabel(decodeURIComponent(/^#\/projects\/([^/]+)/.exec(hash)[1]));
+  if (k === "notebook") return projLabel(decodeURIComponent(/^#\/projects\/([^/]+)/.exec(routeIn(hash))[1]));
   if (k === "notifications") return "Notifications";
   for (const g of RAIL) for (const [key, label] of g.tools || []) if (key === k) return label;
   return "";
