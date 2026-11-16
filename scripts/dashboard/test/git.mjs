@@ -792,6 +792,11 @@ print(json.dumps(g._done(said, "fetched", ${JSON.stringify(`${DIR}/ws/beta`)})))
   await openFold(page, '.nb .nbview[data-view="git"] [data-sect="git:history"]');   // one section open at a time (the operator, 5 Oct)
   await page.click('.nb .nbview[data-view="git"] .grow[data-sha]');
   await page.waitForSelector('.nb .nbview[data-view="git"] #gitDetail [data-gitrevert]', { timeout: 10000 });
+  // ...and its read is in: a commit picked earlier in this file left its
+  // detail drawn, so the Revert above can be that one's, and the read for
+  // this press, landing a moment later, takes the page down to the detail,
+  // which shut the picker opened below it.
+  await page.waitForFunction(() => !readBusy('beta:commit'), null, { timeout: 15000 });
   ok(true, "a picked commit's detail carries Revert and Branch here");
   // The branch picker in the head row (R269 step 3), on a clean tree: the branch the tree is
   // on, opening the local branches under a box; a name nobody has offers
