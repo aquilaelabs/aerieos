@@ -36,7 +36,7 @@ class Shebangs(unittest.TestCase):
         out = subprocess.run([sys.executable, os.path.join(LIB, "embedded.py"), "shebangs"],
                              input="\0".join(names).encode(), capture_output=True, check=True).stdout
         parts = out.split(b"\0")[:-1]
-        got = {os.path.basename(p.decode()): k.decode() for k, p in zip(parts[::2], parts[1::2])}
+        got = {os.path.basename(p.decode()): k.decode() for k, p in zip(parts[::2], parts[1::2], strict=True)}
         self.assertEqual(got, {"a": "sh", "b": "sh", "c": "py", "d": "py", "sp ace": "sh"})
 
 
