@@ -924,11 +924,23 @@ class WorkspaceSync:
                 p.files[rel] = [sha, *e]          # touched, not changed
                 changed = True
                 continue
-            if self.put(p, top, rel, e, base, sha):
+            try:
+                sent = self.put(p, top, rel, e, base, sha)
+            except Exception as ex:                  # noqa: BLE001 (one path never stops the rest)
+                # One path that cannot be sent is that path's: said as the
+                # project's error, counted as pending, and the pass goes on
+                # to the paths after it. Raised out of here, it ended the
+                # pass with nothing counted, so every change sorted after it
+                # waited unsaid and the state said nothing pending (B806).
+                p.error = f"{rel}: {type(ex).__name__}: {ex}"[:200]
+                p.denied = p.denied or isinstance(ex, PermissionError)
+                log_once(f"sync-put-{p.name}-{rel}", f"sync: {p.name}: {p.error}")
+                sent = False
+            if sent:
                 changed = True
             else:
-                # Not sent (the controller away, a refusal): still waiting,
-                # tried again next tick and counted as pending meanwhile.
+                # Not sent (the controller away, a refusal, a failure here):
+                # still waiting, tried again next tick and counted as pending.
                 p.moving[rel] = e
         if changed:
             p.save()

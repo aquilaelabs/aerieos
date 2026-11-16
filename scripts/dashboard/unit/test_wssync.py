@@ -512,6 +512,34 @@ class Sync(unittest.TestCase):
         self.turn("n1", times=3)
         self.assertEqual(read(f"{self.ws}/alpha/a.txt"), "offline\n")
 
+    def test_one_path_that_cannot_be_sent_stops_nothing_after_it_and_is_said(self):
+        # B806: an exception in one path's put ended the pass, the path was
+        # not counted, and every change sorted after it waited unsaid.
+        self.turn()
+        s = self.n["n1"]
+        real = s.put
+
+        def put(p, top, rel, e, base, sha):
+            if rel == "a.txt":
+                raise PermissionError(13, "Permission denied", rel)
+            return real(p, top, rel, e, base, sha)
+        s.put = put
+        write(self.at("n1", "a.txt"), "stuck\n")
+        write(self.at("n1", "z.txt"), "after it\n")
+        self.turn("n1", times=3)
+        self.assertEqual(read(f"{self.ws}/alpha/z.txt"), "after it\n")
+        self.assertEqual(read(f"{self.ws}/alpha/a.txt"), "one\n")
+        st = s.status()["alpha"]
+        self.assertEqual(st["pending"], 1)
+        self.assertIn("a.txt", st["error"])
+        self.assertIn("PermissionError", st["error"])
+        # ...and once it can be sent, it goes and the error with it.
+        s.put = real
+        self.turn("n1", times=3)
+        self.assertEqual(read(f"{self.ws}/alpha/a.txt"), "stuck\n")
+        self.assertEqual(s.status()["alpha"]["pending"], 0)
+        self.assertEqual(s.status()["alpha"]["error"], "")
+
     def test_a_file_already_there_and_different_is_kept_not_overwritten(self):
         write(self.at("n1", "a.txt"), "was here first\n")
         self.turn("n1", times=3)
