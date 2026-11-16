@@ -36,6 +36,17 @@ REPO = "aquilaelabs/aerieos"
 # beside the ISO and verifies it against the trusted root this image was
 # built with, with no network.
 ATTEST_URL = "https://api.github.com/repos/{repo}/attestations/sha256:{digest}"
+# Who may have built an image an update takes (B729): the release workflow,
+# build-image.yml, run on a version's tag, as a published release's
+# attestation names it (read off v0.9.0-dev.5341's ISO, 16 Nov: its
+# certificate's identity is .../build-image.yml@refs/tags/v0.9.0-dev.5341).
+# The repository alone passed any workflow on any branch that attested one.
+
+
+def signer_identity(repo):
+    return rf"^https://github\.com/{re.escape(repo)}/\.github/workflows/build-image\.yml@refs/tags/v"
+
+
 TRUSTED_ROOT = "/usr/lib/aerieos-os/trusted-root.jsonl"
 # Who may sign a release (R199): the running controller's own copy of
 # config/release-signers, so a key is trusted because this install already
@@ -534,7 +545,8 @@ class OsImageMixin:
                 return False
             with open(bundle, "w", encoding="utf-8") as f:
                 f.write("\n".join(lines) + "\n")
-        rc = self._sh(job, [gh, "attestation", "verify", iso, "--bundle", bundle, "--repo", repo, *extra], timeout=120)
+        rc = self._sh(job, [gh, "attestation", "verify", iso, "--bundle", bundle, "--repo", repo,
+                            "--cert-identity-regex", signer_identity(repo), *extra], timeout=120)
         if rc != 0:
             say("the image's build attestation did not verify: nothing written\n")
             return False

@@ -210,6 +210,10 @@ class TheAgent(unittest.TestCase):
         self.assertTrue(got["trial"])
         self.assertEqual(got["fell_back"], "")
         self.assertIn("gh attestation verify", text)
+        # ...held to the release workflow on a version's tag, not the
+        # repository alone (B729).
+        self.assertIn("--cert-identity-regex", text)
+        self.assertIn("build-image", text)
         self.assertFalse(os.path.exists(os.path.join(w.work, "update")), "the working files are gone")
 
     def test_a_write_cut_short_leaves_the_slot_reading_as_empty(self):
