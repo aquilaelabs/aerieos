@@ -398,9 +398,26 @@ await section("A redraw must not take an open menu with it", async () => {
                                 window.__heldTab = document.querySelector('.dmtab'); });
     await sel.click();
     const open = await page.evaluate(() => window.__heldSel.matches(':open'));
+    // What was drawn before the news below: once the menu shuts, the page
+    // shows the news (B816). Kept before the news and not after it: a draw
+    // of its own (a read landing, the stats) may put it on screen while
+    // the menu is open, which leaves the menu alone, and the owed redraw
+    // then has nothing new to write.
+    await page.evaluate(() => { window.__heldHtml = painted.get(document.querySelector('.dmtab').parentElement)?.html; });
     // A redraw with something new to say: one with nothing new leaves the
-    // page alone anyway (the operator, 26 Oct).
-    await page.evaluate(() => { if (dockerList) dockerList.images_at = Math.floor(Date.now() / 1000) - 3 * 86400; readMoved('docker'); drawPanes(); });
+    // page alone anyway (the operator, 26 Oct). Said in every answer read
+    // from here too: the news the revisions poll holds back while the menu
+    // is open starts a read when it shuts, and that read, landing first,
+    // would draw the list as it was before.
+    const planted = Math.floor(Date.now() / 1000) - 3 * 86400;
+    const dockerAnswer = u => u.pathname === '/api/docker';
+    await page.route(dockerAnswer, async r => {
+      const real = await r.fetch();
+      const j = await real.json().catch(() => null);
+      if (!j || typeof j !== 'object') return r.fulfill({ response: real });
+      await r.fulfill({ response: real, json: { ...j, images_at: planted } });
+    });
+    await page.evaluate(p => { if (dockerList) dockerList.images_at = p; readMoved('docker'); drawPanes(); }, planted);
     const kept = await page.evaluate(() => ({
       same: window.__heldSel.isConnected && document.querySelector('.dmtab') === window.__heldTab,
       open: window.__heldSel.matches(':open') }));
@@ -414,7 +431,6 @@ await section("A redraw must not take an open menu with it", async () => {
     ok(polled === 0, `...and the revisions poll waits rather than firing a watch under it (${polled} asked)`);
     // The owed redraw is seen in what was drawn: the page is patched, not
     // written again, so its elements are the same ones before and after.
-    await page.evaluate(() => { window.__heldHtml = painted.get(document.querySelector('.dmtab').parentElement)?.html; });
     await page.keyboard.press('Escape');
     const drawn = () => painted.get(document.querySelector('.dmtab').parentElement)?.html !== window.__heldHtml;
     // Given the suites' own patience: the owed redraw waits on a 250 ms
@@ -422,7 +438,17 @@ await section("A redraw must not take an open menu with it", async () => {
     // slower than five seconds (B816).
     await page.waitForFunction(drawn, null, { timeout: patience(15000) }).catch(() => {});
     const after = await page.evaluate(drawn);
-    ok(after, '...and the redraw it was owed happens once the menu shuts');
+    // What held it, said when it did not come (B816): the page's holders, the
+    // tab's revision against its stamp, and how many lists there are.
+    const held = after ? '' : await page.evaluate(() => {
+      const pane = $('pane0'), spec = TABKINDS.docker;
+      return JSON.stringify({ popup: openPopup()?.className || null, card: !!cardBox(document), timer: !!menuTimer,
+        lists: document.querySelectorAll('.dmtab').length, stamp: pane?.dataset.rev,
+        live: typeof spec?.live === 'function' ? 'docker:' + spec.live() : spec?.live, at: dockerList?.images_at,
+        busy: readBusy('docker') });
+    }).catch(e => String(e));
+    await page.unroute(dockerAnswer);
+    ok(after, `...and the redraw it was owed happens once the menu shuts${held ? ` (held: ${held})` : ''}`);
   }
 });
 

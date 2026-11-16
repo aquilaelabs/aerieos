@@ -303,7 +303,8 @@ const tripped = await page.evaluate(() => ({
 ok(/fails on its answer/.test(tripped.title) && /layout boom/.test(tripped.title)
    && tripped.loading.length > 0 && tripped.loading.every(t => /could not read the server's answer/.test(t)),
    `a page that fails on the container's answer says that, not "not reaching the container" (${
-     tripped.title.slice(0, 70)})`);
+     tripped.title.slice(0, 160)}; ${tripped.loading.length} placeholders${
+     tripped.loading.length ? ': ' + JSON.stringify(tripped.loading.slice(0, 2).map(t => t.slice(0, 60))) : ''})`);
 page.errors = [];
 
 await done(browser);
