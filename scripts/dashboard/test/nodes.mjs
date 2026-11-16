@@ -130,7 +130,7 @@ ok(await page.evaluate(() => !document.querySelector('.nodestab [data-cap], .nod
 // what it dialed in from, reported by the node rather than written here.
 const sandbox = list.find(n => n.name === 'sandbox');
 ok(sandbox && /^n_[0-9a-f]{8}$/.test(sandbox.id) && sandbox.kind === 'agent'
-   && sandbox.agent.addr === 'stub' && sandbox.config.user === 'bb'
+   && sandbox.agent.addr === '127.0.0.2' && sandbox.config.user === 'bb'
    && ['docker-host', 'package-build', 'deploy-target'].every(c => sandbox.capabilities.includes(c)),
    'the sandbox VM has a minted identity that is not its address, and does everything');
 ok(!list.some(n => n.kind === 'ssh'),
@@ -291,7 +291,7 @@ await section("aerie nodes", async () => {
   const out = execFileSync('bash', ['scripts/aerie', 'nodes'],
     { encoding: 'utf8', cwd: REPO,
       env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
-  ok(!/\blocal\b/.test(out) && /sandbox · stub/.test(out),
+  ok(!/\blocal\b/.test(out) && /sandbox · 127\.0\.0\.2/.test(out),
      'aerie nodes prints the enrolled machines, read-only. Never the controller, which is registry plumbing');
 });
 

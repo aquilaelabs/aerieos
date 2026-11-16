@@ -6969,15 +6969,10 @@ class Handler(BaseHTTPRequestHandler):
         return u
 
     def _client_ip(self):
-        """The address this request came from, as the proxy in front says
-        where there is one (the tunnel, nginx), else the socket's."""
-        fwd = self.headers.get("X-Forwarded-For", "")
-        if fwd:
-            return fwd.split(",")[0].strip()[:45]
-        try:
-            return str(self.client_address[0])[:45]
-        except (AttributeError, IndexError, TypeError):
-            return ""
+        """The address this request came from, as a sign-in's row keeps it:
+        the socket's, or what a proxy this install trusts passes on (_peer).
+        A header anybody can send is not where they are."""
+        return self._peer()
 
     def _peer(self):
         """What wrong passwords are counted against (users.authenticate):
@@ -10638,12 +10633,11 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json({"ok": True, "token": got})
             return self._json({"error": auth["error"]}, 401)
         # Where the node is, as seen from here: informational on the row,
-        # and the address docker-over-ssh goes to for an agent node (see
-        # nodes._addr). A proxy in front says so in the usual header, whose
-        # last hop is the one the proxy wrote: the first is the client's own
-        # word, and a node that named a LAN address there was let into it (R92).
-        addr = (self.headers.get("X-Forwarded-For", "").split(",")[-1].strip()
-                or self.client_address[0])
+        # and the address docker-over-ssh, a route's host and the router's
+        # peers go to (nodes._addr). The socket's, or what a proxy this
+        # install trusts passes on (_peer: its own tunnel, a proxy named in
+        # Settings); a node's own X-Forwarded-For named any address it liked.
+        addr = self._peer()
         if verb == "work":
             got = channel.work(auth, req, addr, alive=lambda: not client_gone(self.connection))
             if got is None:

@@ -667,7 +667,7 @@ ok(!r.rebuild && /the code has moved since/.test(r.text) === false,
 await section("the route (phase 8)", async () => {
   await openManager();
   await dmEditAll();
-  await page.waitForFunction(sel => /http:\/\/stub:7475\//.test(
+  await page.waitForFunction(sel => /http:\/\/127\.0\.0\.2:7475\//.test(
     document.querySelector(sel + ' .dmroute')?.textContent || ''), DM, { timeout: 20000 });
   const opts = await page.$$eval(`${DM} [data-route="mode"] option`, os => os.map(o => [o.value, o.disabled]));
   ok(opts.some(([v, d]) => v === 'lan' && !d) && opts.some(([v, d]) => v === 'funnel' && d)
@@ -687,7 +687,7 @@ await section("the route (phase 8)", async () => {
   ok(/no tailscale/.test(fun.error || ''),
      `a funnel says what it actually lacks: tailscale, not a provisioner (${fun.error})`);
   const lan = await rapi({ project: 'ep.silon', instance: 'main', action: 'route', mode: 'lan', port: 7475 });
-  ok(lan.ok && lan.state.route.mode === 'lan' && lan.state.route.url === 'http://stub:7475/' && lan.state.route.ready,
+  ok(lan.ok && lan.state.route.mode === 'lan' && lan.state.route.url === 'http://127.0.0.2:7475/' && lan.state.route.ready,
      'lan on a published port is a record with the URL that follows from the node');
 });
 
@@ -807,7 +807,7 @@ await section("moving the project leaves a built instance where it is running", 
 // what is being asserted is that the RECORD is read against today's daemon.
 const devapps = `${DIR}/state/devapps.json`;
 const wasBuilt = JSON.parse(readFileSync(devapps, 'utf8'));
-ok(wasBuilt['ep.silon'].main.daemon === 'ssh://bb@stub',
+ok(wasBuilt['ep.silon'].main.daemon === 'ssh://bb@127.0.0.2',
    'a build records which daemon it landed on');
 writeFileSync(devapps, JSON.stringify({ ...wasBuilt, 'ep.silon': {
   ...wasBuilt['ep.silon'],
@@ -2171,9 +2171,9 @@ ok(/\/config/.test(wire) && /↔/.test(wire),
 // It used to be built from location.hostname (the machine serving this page,
 // which is the Unraid box and not the sandbox VM), so every port label and
 // every Open link named a host where either nothing answers or something else
-// does. The sandbox node dialed in from `stub`, so the answer is `stub`.
+// does. The sandbox node dialed in from 127.0.0.2, so the answer is that.
 ok(await page.$eval(`${DM} .sect .wport a`, a => a.getAttribute('href'))
-     === 'http://stub:7475/',
+     === 'http://127.0.0.2:7475/',
    'a published port is a link, to the machine its daemon runs on');
 
 // A stack of more than one container says whose each port is (B252, the

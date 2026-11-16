@@ -395,11 +395,17 @@ await section("a strip each", async () => {
     // sends, with no wait so nothing is held.
     // ...and its answer is a 204 when there is no job for the node, so the
     // body is not read.
-    const census = sessions => bare('/api/v1/agent/work', { method: 'POST',
-      headers: { ...H, Authorization: 'Bearer ' + agent.token },
+    const census = (sessions, more = {}) => bare('/api/v1/agent/work', { method: 'POST',
+      headers: { ...H, Authorization: 'Bearer ' + agent.token, ...more },
       body: JSON.stringify({ sample: { cpu_pct: 1, mem_mb: 4096,
         // ...with each project's synced copy there (R163), as an agent says.
         mem_used_mb: 512, sessions, sync: { alpha: { ready: true, rev: 1 }, beta: { ready: true, rev: 1 }, gamma: { ready: true, rev: 1 }, delta: { ready: true, rev: 1 } } }, running: [], wait: 0 }) });
+    // A node's address is where its call came from: an X-Forwarded-For it
+    // sends itself, with no proxy this install trusts in front, names
+    // nothing (B722), here or on a sign-in's row.
+    await census([], { 'X-Forwarded-For': '10.0.0.99' });
+    const talkbox = ((await napi('/api/v1/nodes')).nodes || []).find(n => n.id === box.id);
+    ok(talkbox?.agent?.addr === '127.0.0.1', `a node's own X-Forwarded-For does not set its address (${talkbox?.agent?.addr})`);
     await census([]);
     await napi('/api/prefs', { project: 'beta', node: box.id });
     const mine = async h => ((await as(h, '/api/status')).claude_auth || {}).nodes || {};
