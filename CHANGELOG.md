@@ -42,6 +42,7 @@
 - The dashboard answers faster and holds less up: its status read costs about a quarter of what it did, the check every open page makes every second and a half a tenth, a browser keeps one connection between requests, job lists and a node's last job read from indexes, and a connection that sends nothing no longer holds every other request for five seconds. A notebook left open no longer fills the audit with its presence, and a node's numbers and its census no longer write over each other (c32326f)
 - aerie's commands start sooner and aerie status answers in about half the time, aerie map find answers in a third of the time with a quarter of the memory, a coding agent other than Claude waits less on AerieOS's checks before each tool it runs, and a node's agent hands out jobs without waiting on its container statistics and starts fewer processes while it waits (44323cb)
 - The dashboard is a third smaller to download, and does less while you are not looking: a page you have left, a space's notebook not on show and a terminal not in front no longer redraw or read again in the background, and a long list builds only the rows it shows (7e05263)
+- Cutting a release or moving the version dates the changelog's entries in about a second, where each entry took half a second and one that ran past thirty seconds kept the commit it was first stamped with; aerie lint takes about a third less time (218ba7c)
 
 ### Fixed
 
