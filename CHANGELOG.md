@@ -53,6 +53,7 @@
 - A hostname being typed on the nginx page is no longer wiped when the page re-reads (e688169)
 - Ending a session just before the controller restarts still ends it, and a sign-in to a coding agent that was in progress is on its row again after the restart, its link shown and its code taken: both were forgotten with the restart. (ff55bda)
 - A node's token is checked and rotated in one step. Two of a node's calls arriving together could each retire its token, and enrolling a node again or locking it down left a token it had been handed and not yet used able to come alive later. Upgrading: `/config` moves to state 24, so a build from before this one no longer starts on it; there is nothing to do (ff55bda)
+- A container's Agent pill on the Containers page says a space's Run its container setting as soon as it is changed, rather than after the list is next read (eb4e0a5)
 
 ### Security
 
