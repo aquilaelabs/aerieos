@@ -75,6 +75,8 @@
 - One file a node cannot sync no longer holds back every change after it without a word: it is said as the space's sync error and counted as waiting, and the rest go up. (501a681)
 - aerie git push on a node says when a commit made there had not reached the controller yet, and fails, where it pushed the older tree and said nothing. (5d08d15)
 - The changelog editor shows what Save kept. (6cab345)
+- A node holding a space as a synced copy catches up in moments after git packs its objects, where its sync sent thousands of removals one at a time and every aerie verb on it waited and was refused for many minutes. (5412515)
+- New container, New space and four other dialogs keep their buttons at the right of the dialog's foot like every other, where a notice in the corner could lie over Create and Cancel. (4dd850e)
 
 ### Security
 
