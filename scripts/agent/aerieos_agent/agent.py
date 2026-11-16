@@ -581,6 +581,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             # started by the new launcher under the old helper (B377).
             if self.session_bundle != before:
                 self.refresh_session_tool()
+                self.refresh_virtiofsd_wrap()
             self.runner_env_sync()
             # A bundle that moved carries a catalog that may have moved with
             # it, and the census read that catalog before the fetch: one more

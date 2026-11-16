@@ -618,6 +618,28 @@ class ConfigPlaneMixin:
         if wrote:
             log(f"cutting the network for a pack's install: {', '.join(wrote)} written from the bundle")
 
+    def refresh_virtiofsd_wrap(self):
+        """AerieOS's virtiofsd wrapper kept as the bundle's provisioner writes
+        it, where the VM host feature put one: it checks a shared folder at
+        every start (R247 step 5), and a node that turned the feature on
+        before would otherwise keep the old one until the feature was
+        applied again by hand."""
+        from .vmhw import VIRTIOFSD_WRAP
+        if os.geteuid() != 0 or not os.path.isfile(VIRTIOFSD_WRAP):
+            return
+        try:
+            with open(os.path.join(TOOLS_DIR, "current", "nodes", "provision-linux.sh"), encoding="utf-8") as f:
+                prov = f.read()
+        except OSError:
+            return
+        m = re.search(r"cat > \"\$VIRTIOFSD_WRAP\" <<'WRAP'\n(.*?\n)WRAP\n", prov, re.S)
+        if not m:
+            return
+        with self.tool_lock:
+            wrote = self._write_root_files(((VIRTIOFSD_WRAP, m.group(1), 0o755, False),))
+        if wrote:
+            log(f"a VM's shared folder: {', '.join(wrote)} written from the bundle")
+
     @staticmethod
     def _write_root_files(rows):
         """Each (path, text, mode, sudoers) written as root's own where it

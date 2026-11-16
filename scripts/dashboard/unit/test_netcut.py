@@ -178,3 +178,35 @@ class Installed(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class VirtiofsdWrap(unittest.TestCase):
+    """The VM host feature's virtiofsd wrapper kept as the bundle's
+    provisioner writes it (R247 step 5): it checks a shared folder at every
+    start, and a node that had the feature kept the old one otherwise."""
+
+    def test_a_node_with_the_wrapper_takes_the_bundles_and_one_without_gets_none(self):
+        root = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, root, True)
+        tools = os.path.join(root, "tools", "current", "nodes")
+        os.makedirs(tools)
+        shutil.copy(os.path.join(os.path.dirname(TOOL), "provision-linux.sh"), tools)
+        wrap = os.path.join(root, "builderbot-virtiofsd")
+        cp, hw = agent.module("configplane"), agent.module("vmhw")
+        a = object.__new__(agent.Agent)
+        a.tool_lock = threading.Lock()
+        for target, name, value in ((cp, "TOOLS_DIR", os.path.join(root, "tools")), (hw, "VIRTIOFSD_WRAP", wrap),
+                                    (cp.os, "geteuid", lambda: 0), (cp.os, "chown", lambda *x: None)):
+            p = mock.patch.object(target, name, value)
+            p.start()
+            self.addCleanup(p.stop)
+        a.refresh_virtiofsd_wrap()
+        self.assertFalse(os.path.exists(wrap), "no feature, no wrapper")
+        with open(wrap, "w") as f:
+            f.write("#!/bin/sh\nexec virtiofsd \"$@\"\n")
+        a.refresh_virtiofsd_wrap()
+        with open(wrap) as f:
+            got = f.read()
+        self.assertIn('[ "$here" = "$dir" ]', got)
+        self.assertIn("--modcaps=-fowner:-fsetid:-setfcap:-mknod", got)
+        self.assertEqual(stat.S_IMODE(os.stat(wrap).st_mode), 0o755)
