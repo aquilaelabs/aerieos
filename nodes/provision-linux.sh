@@ -3015,8 +3015,19 @@ for a in "$@"; do
     prev="$a"
 done
 [ -n "$dir" ] || exec "$real" "$@"
-u=$(stat -c %u "$dir") g=$(stat -c %g "$dir")
-exec "$real" "$@" \
+# Checked at every start, not only when the folder was picked: the agent
+# gave the domain the folder's real path, so a link put anywhere along it
+# since (the space's tree is its account's) would have virtiofsd serve where
+# it leads, / included. And never a folder of root's, whose files the guest
+# would write as root.
+here=$(realpath -e -- "$dir" 2>/dev/null) || { echo "builderbot-virtiofsd: $dir is not there" >&2; exit 1; }
+[ "$here" = "$dir" ] || { echo "builderbot-virtiofsd: $dir now leads to $here: not shared" >&2; exit 1; }
+u=$(stat -c %u -- "$dir") g=$(stat -c %g -- "$dir")
+[ "$u" != 0 ] || { echo "builderbot-virtiofsd: $dir is root's: not shared" >&2; exit 1; }
+# Without the capabilities that let a guest chmod or set the setuid bit on a
+# file it does not own, or make a device node: a root-owned file left in the
+# folder would otherwise become a setuid program here.
+exec "$real" "$@" --modcaps=-fowner:-fsetid:-setfcap:-mknod \
     --translate-uid "squash-guest:0:$u:4294967295" --translate-gid "squash-guest:0:$g:4294967295" \
     --translate-uid "squash-host:0:2000:4294967295" --translate-gid "squash-host:0:2000:4294967295"
 WRAP
