@@ -932,7 +932,10 @@ await section("the configuration plane on the row", async () => {
   // row rather than a second one.
   await runnerCensus({ runners: [{ slot: GH, installed: true, active: false, busy: false,
                                    name: '', labels: ['builderbot', 'shed'] }] });
-  await page.evaluate(id => { delete nodesConf[id]; loadNodes(); }, minted.id);
+  // A node's draft dropped as a save drops it: once the page's own read of
+  // the list is in, so the draft is made from the list as of now (every
+  // call below does the same).
+  await page.evaluate(async id => { await loadNodes(); delete nodesConf[id]; readMoved('nodes'); drawPanes(); }, minted.id);
   await page.waitForFunction(sel => /not listening/.test(
     document.querySelector(sel + ' .ndrunstate')?.textContent || ''), RUN, { timeout: 10000 });
   // Its state a pill, and why under it as notices (R218 step 28).
@@ -943,7 +946,7 @@ await section("the configuration plane on the row", async () => {
   await runnerCensus({ runners: [{ slot: GH, installed: true, active: true, busy: true,
                                    name: 'shed', url: 'https://github.com/example-org',
                                    labels: ['builderbot', 'shed'] }] });
-  await page.evaluate(id => { delete nodesConf[id]; loadNodes(); }, minted.id);
+  await page.evaluate(async id => { await loadNodes(); delete nodesConf[id]; readMoved('nodes'); drawPanes(); }, minted.id);
   await page.waitForFunction(sel => document.querySelector(sel + ' .ndrunbusy'), RUN, { timeout: 10000 });
   ok(await page.$eval(RUN, r => /running a job/.test(r.querySelector('.ndrunstate').textContent)
        && /registered as shed/.test(r.querySelector('.ndrunfacts')?.textContent || '')),
@@ -1192,7 +1195,7 @@ await section("the configuration plane on the row", async () => {
        && !told.some(m => /a folder for this node inside it/.test(m)),
        `a store pointed into a mount not on the node yet says so, and no folder is picked from what the node's disk holds now (${told.length} asked)`);
     await napi('/api/v1/nodes', { action: 'config', id: minted.id, config: after });
-    await page.evaluate(id => { const c = nodesConf[id]; if (c){ c.draft = null; c.dirty = false; } return loadNodes(); }, minted.id);
+    await page.evaluate(async id => { await loadNodes(); const c = nodesConf[id]; if (c){ c.draft = null; c.dirty = false; } readMoved('nodes'); drawPanes(); }, minted.id);
     // A system folder is refused before anything is asked or saved.
     page.dialogs.length = 0;
     await page.fill(`${ROW} [data-k="store:data"]`, '/etc/builderbot');
@@ -1216,7 +1219,7 @@ await section("the configuration plane on the row", async () => {
        `a folder under /var/log is allowed, /var/log itself and a mount on /etc are not (${bare.error}; ${mnt.error})`);
     await napi('/api/v1/nodes', { action: 'config', id: minted.id, config: rec.config.desired });
     // ...and the refused draft dropped, so the editor reads the record again.
-    await page.evaluate(id => { const c = nodesConf[id]; if (c){ c.draft = null; c.dirty = false; } return loadNodes(); }, minted.id);
+    await page.evaluate(async id => { await loadNodes(); const c = nodesConf[id]; if (c){ c.draft = null; c.dirty = false; } readMoved('nodes'); drawPanes(); }, minted.id);
   }
   answering = false;
   await answerer;
@@ -2458,7 +2461,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
   await pickNode(page, minted.id);
   // Read again while waiting: a list the poll asked for before the save can
   // land after this read and say the record's old changes (B606).
-  await page.evaluate(id => { delete nodesConf[id]; loadNodes(); }, minted.id);
+  await page.evaluate(async id => { await loadNodes(); delete nodesConf[id]; readMoved('nodes'); drawPanes(); }, minted.id);
   await nodesUntil(page, sel => /matches what is saved/.test(
     document.querySelector(sel + ' .ndconfstate')?.textContent || ''), ROW);
   ok(await page.$eval(`${ROW} [data-napply="storage"]`, b => b.disabled),
@@ -2468,7 +2471,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
     mounts: [{ path: '/mnt/old', source: 'nas:/mnt/user/old', type: 'nfs', ro: false },
              { path: '/mnt/new', source: 'nas:/mnt/user/new', type: 'nfs', ro: false }],
     stores: {}, network: { mode: 'dhcp' } } });
-  await page.evaluate(id => { delete nodesConf[id]; loadNodes(); }, minted.id);
+  await page.evaluate(async id => { await loadNodes(); delete nodesConf[id]; readMoved('nodes'); drawPanes(); }, minted.id);
   await nodesUntil(page, sel => !document.querySelector(sel + ' [data-napply="storage"]')?.disabled, ROW);
   ok(await page.$eval(`${ROW} .ndconfstate`, e => /1 change to apply.*\/mnt\/new/.test(e.textContent)),
      `...and says how many changes are waiting and what they are (${
@@ -2515,7 +2518,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
     await napi('/api/v1/jobs', { action: 'cancel', id: ap.job });
     await page.waitForFunction(sel => !/applying/.test(
       document.querySelector(sel + ' .ndconfstate')?.textContent || ''), ROW, { timeout: 10000 });
-    await page.evaluate(id => { delete nodesConf[id]; loadNodes(); }, minted.id);
+    await page.evaluate(async id => { await loadNodes(); delete nodesConf[id]; readMoved('nodes'); drawPanes(); }, minted.id);
     await page.waitForFunction(sel => /last storage apply/.test(
       document.querySelector(sel + ' .ndconfstate')?.textContent || ''), ROW, { timeout: 10000 });
     ok(await page.$eval(`${ROW} .ndconfstate`, e =>
@@ -2531,7 +2534,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
       mounts: [{ path: '/mnt/old', source: 'nas:/mnt/user/old', type: 'nfs', ro: false },
                { path: '/mnt/new2', source: 'nas:/mnt/user/new2', type: 'nfs', ro: false }],
       stores: {}, network: { mode: 'dhcp' } } });
-    await page.evaluate(id => { delete nodesConf[id]; loadNodes(); }, minted.id);
+    await page.evaluate(async id => { await loadNodes(); delete nodesConf[id]; readMoved('nodes'); drawPanes(); }, minted.id);
     let said = '';
     await page.waitForFunction(sel => { const e = document.querySelector(sel + ' .ndconfstate');
       return e && !/last storage apply/.test(e.textContent); }, ROW, { timeout: 15000 }).catch(() => {});
@@ -2546,7 +2549,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
   await fetch(base + '/api/v1/agent/hello', { method: 'POST',
     headers: { Authorization: 'Bearer ' + en.token, 'Content-Type': 'application/json' },
     body: JSON.stringify({ census: CENSUS, version: '3', digest: 'sha256:' + '0'.repeat(64) }) });
-  await page.evaluate(id => { delete nodesConf[id]; loadNodes(); }, minted.id);
+  await page.evaluate(async id => { await loadNodes(); delete nodesConf[id]; readMoved('nodes'); drawPanes(); }, minted.id);
   await page.waitForFunction(sel => document.querySelector(sel + ' .ndstale'), ROW, { timeout: 10000 });
   ok(await page.$eval(`${ROW} .ndstale`, (e, v) => e.textContent.includes(`update available → ${v}`), shipped.version)
      && await page.$(`${ROW} [data-nd="update-agent"]`) !== null,
@@ -2613,7 +2616,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
   await fetch(base + '/api/v1/agent/hello', { method: 'POST',
     headers: { Authorization: 'Bearer ' + en.token, 'Content-Type': 'application/json' },
     body: JSON.stringify({ census: CENSUS, version: shipped.version, digest: 'sha256:' + '0'.repeat(64) }) });
-  await page.evaluate(id => { delete nodesConf[id]; loadNodes(); }, minted.id);
+  await page.evaluate(async id => { await loadNodes(); delete nodesConf[id]; readMoved('nodes'); drawPanes(); }, minted.id);
   await page.waitForFunction(sel => /has an older build of agent \S+ \(/.test(document.querySelector(sel + ' .ndconfstate')?.textContent || ''), ROW, { timeout: 10000 });
   const sameTc = await napi('/api/toolchains', { action: 'install', names: ['jdk'], node: minted.id });
   ok(/runs agent \S+ \(00000000\) and this controller ships the same number as a newer file \([0-9a-f]{8}\)/.test(sameTc.error || ''),
@@ -2621,7 +2624,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
   await fetch(base + '/api/v1/agent/hello', { method: 'POST',
     headers: { Authorization: 'Bearer ' + en.token, 'Content-Type': 'application/json' },
     body: JSON.stringify({ census: CENSUS, version: '3', digest: 'sha256:' + '0'.repeat(64) }) });
-  await page.evaluate(id => { delete nodesConf[id]; loadNodes(); }, minted.id);
+  await page.evaluate(async id => { await loadNodes(); delete nodesConf[id]; readMoved('nodes'); drawPanes(); }, minted.id);
   await page.waitForFunction(sel => /runs agent 3 /.test(document.querySelector(sel + ' .ndconfstate')?.textContent || ''), ROW, { timeout: 10000 });
   await page.evaluate(id => openLibraryOn(id), minted.id);
   await page.waitForSelector('.doc .librarytab .libstale', { timeout: 15000 });
@@ -2641,7 +2644,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
   await page.evaluate(() => openNodesTab());
   await page.waitForSelector('.pane .bar #ndPick', { timeout: 15000 });
   await pickNode(page, minted.id);
-  await page.evaluate(id => { delete nodesConf[id]; loadNodes(); }, minted.id);
+  await page.evaluate(async id => { await loadNodes(); delete nodesConf[id]; readMoved('nodes'); drawPanes(); }, minted.id);
   await page.waitForFunction(sel => /Updating/.test(
     document.querySelector(sel + ' [data-nd="update-agent"]')?.textContent || ''),
     ROW, { timeout: 10000 });
@@ -2658,7 +2661,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
     await route.fulfill({ response: r, json: j });
   };
   await page.route('**/api/v1/nodes', busyList);
-  await page.evaluate(id => { delete nodesConf[id]; loadNodes(); }, minted.id);
+  await page.evaluate(async id => { await loadNodes(); delete nodesConf[id]; readMoved('nodes'); drawPanes(); }, minted.id);
   await page.waitForFunction(sel => /waits for 1 running job to finish/.test(
     document.querySelector(sel + ' .ndagent .lead')?.textContent || ''), ROW, { timeout: 10000 })
     .then(() => ok(true, '...and while a job still runs there, the row says the update waits for it'),
@@ -2757,7 +2760,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
   await napi('/api/v1/nodes', { action: 'config', id: minted.id, config: {
     mounts: [...staleMounts, { path: '/devdata', source: 'nas:/mnt/user/bb-sandbox/devdata', type: 'nfs', ro: false }],
     stores: {}, network: { mode: 'dhcp' } } });
-  await page.evaluate(id => { delete nodesConf[id]; loadNodes(); }, minted.id);
+  await page.evaluate(async id => { await loadNodes(); delete nodesConf[id]; readMoved('nodes'); drawPanes(); }, minted.id);
   await page.waitForFunction(id => [...document.querySelectorAll(`.nodestab .ndrow[data-node="${id}"] .ndmount .ndmwhy`)]
                                      .some(e => /devdata/.test(e.textContent)), minted.id, { timeout: 15000 }).catch(() => {});
   ok(await page.$eval(ROW, r =>
@@ -2779,7 +2782,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
     await atWidth(page, vp.width);
   }
   await napi('/api/v1/nodes', { action: 'config', id: minted.id, config: { mounts: staleMounts, stores: {}, network: { mode: 'dhcp' } } });
-  await page.evaluate(id => { delete nodesConf[id]; loadNodes(); }, minted.id);
+  await page.evaluate(async id => { await loadNodes(); delete nodesConf[id]; readMoved('nodes'); drawPanes(); }, minted.id);
   // Whether a session there is kept to its own project (R35): on the
   // Sessions section's status when it is not, since a folded section shows
   // nothing else, and why; and said plainly when it is.

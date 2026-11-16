@@ -27,7 +27,7 @@ let toolchains = null;
 let tcSizeTimer = null;
 function loadToolchains(){
   return reading("toolchains", async () => {
-    if (nodesList === null || nodesStale) await loadNodes();
+    if (nodesList === null || nodesStale) await nodesKnown();
     if (!tcPick()){
       toolchains = {nonode: true};
       clearTimeout(tcSizeTimer); tcSizeTimer = null;

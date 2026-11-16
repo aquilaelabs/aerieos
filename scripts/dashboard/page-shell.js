@@ -583,7 +583,9 @@ function toolOff(kind, nid){
 }
 function groupHeader(t, g){
   if (nodesList === null){
-    loadNodes();
+    // Drawn on every paint until the list lands: the read out is shared, not
+    // asked again behind on each.
+    nodesKnown();
     // A page that has its nodes before the list lands (Storage, nginx) is
     // drawn from them, so its picker is there with its rows.
     const have = t.kind === "storage" ? (typeof storageList !== "undefined" && storageList || []).map(n => ({id: n.node, name: n.name, live: n.live}))
@@ -750,7 +752,7 @@ function wireJump(){
   said();
   if (window.ResizeObserver) new ResizeObserver(said).observe(inp);
   onTyping(inp, drawJump);
-  inp.onfocus = () => { (nodesList === null ? loadNodes() : Promise.resolve()).then(dmJumpLoad).then(drawJump); drawJump(); };
+  inp.onfocus = () => { (nodesList === null ? nodesKnown() : Promise.resolve()).then(dmJumpLoad).then(drawJump); drawJump(); };
   inp.onkeydown = e => {
     if (e.key === "Enter"){ e.preventDefault(); jumpGo(jumpAt); }
     else if (e.key === "ArrowDown" || e.key === "ArrowUp"){ e.preventDefault(); jumpMove(e.key === "ArrowDown" ? 1 : -1); }

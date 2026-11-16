@@ -28,7 +28,7 @@ function renderDebugInto(i){
   const d = docSurface(i, "debug");
   if (!d) return;
   d.setBar("");
-  if (nodesList === null) loadNodes();
+  if (nodesList === null) nodesKnown();
   const nodes = (nodesList || []).filter(n => n.kind === "agent" && n.state !== "retired");
   const dev = debugDev ?? !!state?.settings?.settings?.offer_unvetted?.value;
   // A project with a repository: the grants are saved through it, as its

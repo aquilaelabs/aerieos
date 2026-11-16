@@ -303,7 +303,7 @@ const TABKINDS = {
                             if (!dockerNode && t?.arg && t.arg !== "__docker")
                               dockerNode = t.arg;
                             if (!dockerList && !readBusy("docker")) loadDocker();
-                            if (nodesList === null) loadNodes(); } },
+                            if (nodesList === null) nodesKnown(); } },
   nodes:    { multi: false, label: () => "Nodes",
               icon: TOOL_ICONS.nodes,
               render: (i) => renderNodesInto(i), live: () => `${readRev("nodes")}/${signinRev()}/${readRev("phone")}`,

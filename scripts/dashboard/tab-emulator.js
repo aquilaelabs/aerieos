@@ -55,7 +55,7 @@ async function emuOnNodes(){
 
 function loadEmulator(){
   return reading("emulator", async () => {
-    if (nodesList === null || nodesStale) await loadNodes();
+    if (nodesList === null || nodesStale) await nodesKnown();
     if (!emuPick()){ emu = {nonode: true}; return; }
     const node = emuNode;
     const got = await getJSON("/api/emulator?node=" + encodeURIComponent(node));

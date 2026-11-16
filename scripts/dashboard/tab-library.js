@@ -92,7 +92,7 @@ function libPick(){
 // it was asked about is missed.
 function loadLibrary(){
   return reading("library", async () => {
-    if (nodesList === null || nodesStale) await loadNodes();
+    if (nodesList === null || nodesStale) await nodesKnown();
     if (!libPick()){ lib = {nonode: true}; return; }
     // A reply is kept while it is still about the node on show.
     const node = libNode;

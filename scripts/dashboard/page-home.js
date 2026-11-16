@@ -276,6 +276,6 @@ function renderHomeInto(i){
   });
   // The Claude step's state is the nodes list's, read on open and again
   // when the nodes move (index.html's watch).
-  if (homeStartReadsNodes() && (nodesList === null || nodesStale)) loadNodes().then(() => drawPanes());
+  if (homeStartReadsNodes() && (nodesList === null || nodesStale)) nodesKnown().then(() => drawPanes());
   wireNeeds(root);
 }

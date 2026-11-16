@@ -57,16 +57,15 @@ function openNodesTab(nid, what){
 
 // One read at a time (reading), so an answer asked for before a later one (a
 // poll's, in flight when a save asked again) cannot land after it and stay
-// drawn until the nodes next move (B849), and one a newer ask has overtaken
-// is left unlanded. A caller awaiting a read that is out waits for the
-// newest, so what it reads after is the list.
-function loadNodes(){
-  return reading("nodes", async overtaken => {
+// drawn until the nodes next move (B849). Every answer lands, in order: the
+// list is polled, and on a controller whose reads take seconds an answer
+// left unlanded for each newer ask kept every page that waits on the list on
+// its shapes. A caller asking while a read is out waits for the read made
+// after its ask, so what it reads after is the list as of then, which is why
+// a save drops its node's draft only once nodeAct's own read is in.
+function loadNodes(opts){
+  return reading("nodes", async () => {
     const j = await getJSON("/api/v1/nodes");
-    // An answer a newer ask has overtaken is not drawn: a node's draft is
-    // made from what is drawn, and one made from the moment before a save
-    // stayed (B849).
-    if (overtaken()) return false;
     nodesErr = j.error || "";
     if (!j.error){
       nodesList = j.nodes || [];
@@ -76,7 +75,18 @@ function loadNodes(){
       nodesSystems = Array.isArray(j.systems) ? j.systems : [];
     } else nodesList = nodesList || [];
     nodesStale = false;
-  });
+  }, opts);
+}
+
+// The list for a page that needs it before it can ask its own read (the
+// Library, Installed, Files, the emulator, a node's toolchains, Containers),
+// and for a draw that asks for it while it is missing (the group header,
+// drawn on every paint until it lands): a read already out is shared rather
+// than asked again behind it, one slow read rather than a run of them on a
+// controller whose reads take seconds. A list marked stale since is asked
+// for anew.
+function nodesKnown(){
+  return loadNodes(nodesStale ? undefined : {join: 120000});
 }
 
 async function nodeAct(body){

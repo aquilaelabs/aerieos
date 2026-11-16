@@ -519,7 +519,7 @@ function fillNodeSelect(sel, wrap, prefer, again, allow){
   // ...and drawn again when they land: loadNodes repaints only a Nodes tab,
   // so a draw here during a node-list reload lost the picker until something
   // else moved the containers' revision (B69's nodes.mjs sibling).
-  if (nodesList === null || nodesStale) loadNodes().then(() => { readMoved("docker"); drawPanes(); if (again) again(); });
+  if (nodesList === null || nodesStale) nodesKnown().then(() => { readMoved("docker"); drawPanes(); if (again) again(); });
   const known = dnodes.some(n => n.id === prefer);
   wrap.hidden = allow ? dnodes.length < 1 : dnodes.length < 2;
   sel.disabled = dnodes.length < 2;
@@ -2883,7 +2883,7 @@ function renderDockerInto(i){
   // whose daemon it is. No Refresh: the page follows its node's containers
   // by the fingerprint each heartbeat carries (the operator, 17 Oct).
   const dnodes = (nodesList || []).filter(n => n.kind !== "local");
-  if (nodesList === null || nodesStale) loadNodes();
+  if (nodesList === null || nodesStale) nodesKnown();
   const picker = dmBar({nodes: dnodes, blind});
   const status = blind ? "" : dmStatus(dockerList);
   // What a session is waiting on, above everything else: somebody is blocked

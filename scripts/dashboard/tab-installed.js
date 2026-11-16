@@ -56,7 +56,7 @@ function instPick(){
 
 function loadInstalled(){
   return reading("installed", async () => {
-    if (nodesList === null || nodesStale) await loadNodes();
+    if (nodesList === null || nodesStale) await nodesKnown();
     if (!instPick()){ inst = {nonode: true}; return; }
     // A reply is kept while it is still about the node on show.
     const node = instNode;

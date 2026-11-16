@@ -47,47 +47,64 @@ function bootReadsDone(){
 const readings = new Map();
 function readingOf(key){
   let r = readings.get(key);
-  if (!r){ r = {rev: 0, busy: null, again: null}; readings.set(key, r); }
+  if (!r){ r = {rev: 0, seq: 0, busy: null, again: null, waiting: []}; readings.set(key, r); }
   return r;
 }
 // `join`, a number of milliseconds, lets an ask about the same thing (`about`)
 // within that long of the read's start share it rather than read again: the
 // Library's open, its node's census and the revisions poll each asked at
 // once, and the page waited on three reads where one would do.
+// Each ask is answered by its own read: the one it started, the one out when
+// it joined, or, asked while one was out, the next to start, which is made
+// once however many asked meanwhile. Never by the reads asked after it: a
+// kind asked again before each slow read is in (the nodes on a controller
+// that takes seconds, polled every few) kept every caller waiting on a chain
+// that did not end, and the pages behind it on their shapes.
 function reading(key, fn, {join = 0, about = ""} = {}){
   const r = readingOf(key);
   if (r.busy){
-    if (join && r.about === about && Date.now() - r.at < join) return r.busy;
+    if (join && r.about === about && Date.now() - r.at < join) return readFor(r, r.seq);
     r.again = fn; r.againAbout = about;
-    return r.busy;
+    return readFor(r, r.seq + 1);
   }
   r.at = Date.now(); r.about = about;
-  // A read that throws still lets the one asked meanwhile be made; the
-  // first failure is raised at the end, where the page says it (sayUnheard).
+  // A read that throws still lets the one asked meanwhile be made, and its
+  // failure is its own asker's, said where nobody catches it (sayUnheard).
   // A read may leave its answer unlanded when a newer ask is already
   // waiting (overtaken(): its answer is about an earlier moment, and a page
   // that builds a draft from what it reads would build it from that), but
   // never two in a row, so a page asked faster than it answers still lands
-  // one answer in two (B154). It says so by returning false.
+  // one answer in two (B154). It says so by returning false, and whoever it
+  // was for is answered by the read after it.
   r.busy = (async () => {
-    let failed = null;
     try{
       for (let f = fn; f; f = r.again){
         if (f !== fn){ r.at = Date.now(); r.about = r.againAbout; }
         r.again = null;
+        const seq = ++r.seq;
         const overtaken = () => !!r.again && !r.skipped;
-        let landed = true;
+        let landed = true, failed = null;
         try{ landed = (await f(overtaken)) !== false; }
-        catch(e){ failed = failed || e; }
-        finally{
-          r.skipped = !landed;
-          if (landed){ r.rev++; drawPanes(); }
-        }
+        catch(e){ failed = e; }
+        r.skipped = !landed;
+        if (landed){ r.rev++; drawPanes(); }
+        readSettle(r, seq, landed, failed);
       }
-    }finally{ r.busy = null; }
-    if (failed) throw failed;
+    }finally{ r.busy = null; readSettle(r, Infinity, true, null); }
   })();
-  return r.busy;
+  return readFor(r, r.seq);
+}
+// The promise an ask holds: settled when read number `seq` is in.
+function readFor(r, seq){
+  return new Promise((res, rej) => (r.waiting || (r.waiting = [])).push({seq, res, rej}));
+}
+function readSettle(r, seq, landed, failed){
+  r.waiting = (r.waiting || []).filter(w => {
+    if (w.seq > seq) return true;
+    if (!landed){ w.seq = seq + 1; return true; }     // left unlanded: the next read is its
+    if (failed && w.seq === seq) w.rej(failed); else w.res();
+    return false;
+  });
 }
 const readRev = key => readings.get(key)?.rev || 0;
 // Whether a read of this kind is out now (a page that says it is reading).

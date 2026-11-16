@@ -422,7 +422,7 @@ await section("a request that never lands answers in words, and so does one answ
      `postJSON and getJSON answer {error} in words, never throw, and say when nothing landed (${JSON.stringify(r)})`);
 });
 
-await section("a kind of read is one at a time: the last asked is made once more, in order, a failure keeping none back", async () => {
+await section("a kind of read is one at a time: the last asked is made once more, in order, a failure its own asker's", async () => {
   const r = await page.evaluate(async () => {
     const seen = [], gates = [];
     const step = (name, fail) => async () => {
@@ -431,22 +431,45 @@ await section("a kind of read is one at a time: the last asked is made once more
       seen.push('land ' + name);
       if (fail) throw new Error('r9 read failed');
     };
+    const settled = {};
+    const mark = (name, p) => p.then(() => { settled[name] = 'in after ' + seen.at(-1); }, e => { settled[name] = 'threw ' + e.message; });
     const rev0 = readRev('r9.test');
-    const first = reading('r9.test', step('a', true));
-    const second = reading('r9.test', step('b'));            // asked while a is out
-    const third = reading('r9.test', step('c'));             // asked again: replaces b
-    const same = first === second && second === third;
+    const first = mark('first', reading('r9.test', step('a', true)));
+    const second = mark('second', reading('r9.test', step('b')));   // asked while a is out
+    const third = mark('third', reading('r9.test', step('c')));     // asked again: replaces b
     gates.shift()();                                         // a lands (and throws)
     await new Promise(res => setTimeout(res, 20));
-    const busy = readBusy('r9.test');
+    const busy = readBusy('r9.test'), early = {...settled};
     gates.shift()();                                         // c lands
-    let thrown = '';
-    try { await first; } catch (e) { thrown = e.message; }
-    return { same, seen, busy, after: readBusy('r9.test'), revs: readRev('r9.test') - rev0, thrown };
+    await Promise.all([first, second, third]);
+    return { seen, busy, early, settled, after: readBusy('r9.test'), revs: readRev('r9.test') - rev0 };
   });
-  ok(r.same && JSON.stringify(r.seen) === JSON.stringify(['start a', 'land a', 'start c', 'land c']) && r.busy && !r.after
-     && r.revs === 2 && r.thrown === 'r9 read failed',
-     `two asks while a read is out make one more read, the newest, after it lands; a failure still lets it be made, and is raised at the end (${JSON.stringify(r)})`);
+  ok(JSON.stringify(r.seen) === JSON.stringify(['start a', 'land a', 'start c', 'land c']) && r.busy && !r.after && r.revs === 2,
+     `two asks while a read is out make one more read, the newest, after it lands, a failure still letting it be made (${JSON.stringify(r.seen)})`);
+  ok(r.early.first === 'threw r9 read failed' && !r.early.second && !r.early.third
+     && r.settled.second === 'in after land c' && r.settled.third === 'in after land c',
+     `...the first ask is answered by its own read, its failure with it, and the two after it by the read made for them (${JSON.stringify(r.early)} ${JSON.stringify(r.settled)})`);
+});
+
+// What held a page on its shapes on a controller whose reads take seconds:
+// every ask was handed the whole chain, and a kind asked again before each
+// read was in never let its first caller go.
+await section("an ask is not held by the asks after it", async () => {
+  const r = await page.evaluate(async () => {
+    const gates = [];
+    const step = () => async () => { await new Promise(res => gates.push(res)); };
+    let mineIn = false;
+    reading('r9.chain', step()).then(() => { mineIn = true; });    // mine, out now
+    reading('r9.chain', step());                                   // asked meanwhile
+    gates.shift()();                                               // mine lands
+    await new Promise(res => setTimeout(res, 20));
+    const afterMine = mineIn;
+    reading('r9.chain', step());                                   // asked again while the next is out
+    gates.shift()(); await new Promise(res => setTimeout(res, 20));
+    gates.shift()(); await new Promise(res => setTimeout(res, 20));
+    return { afterMine, busy: readBusy('r9.chain') };
+  });
+  ok(r.afterMine && !r.busy, `the first caller is answered when its own read lands, with more asked behind it (${JSON.stringify(r)})`);
 });
 
 await section("an answer a newer ask has overtaken may be left unlanded, never two in a row", async () => {
@@ -458,19 +481,20 @@ await section("an answer a newer ask has overtaken may be left unlanded, never t
       landed.push(name);
     };
     const rev0 = readRev('r9.skip');
-    const p = reading('r9.skip', step('a'));
+    let aIn = '';
+    const p = reading('r9.skip', step('a')).then(() => { aIn = landed.join(','); });
     reading('r9.skip', step('b'));                          // overtakes a
     gates.shift()();                                        // a lands: skipped
     await new Promise(res => setTimeout(res, 20));
-    reading('r9.skip', step('c'));                          // overtakes b
+    const c = reading('r9.skip', step('c'));                // overtakes b
     gates.shift()();                                        // b lands: landed anyway, a was skipped
     await new Promise(res => setTimeout(res, 20));
     gates.shift()();                                        // c lands
-    await p;
-    return { landed, revs: readRev('r9.skip') - rev0 };
+    await Promise.all([p, c]);
+    return { landed, aIn, revs: readRev('r9.skip') - rev0 };
   });
-  ok(JSON.stringify(r.landed) === JSON.stringify(['b', 'c']) && r.revs === 2,
-     `an overtaken answer is skipped, the one after it lands though it is overtaken too, and only landings move the revision (${JSON.stringify(r)})`);
+  ok(JSON.stringify(r.landed) === JSON.stringify(['b', 'c']) && r.revs === 2 && r.aIn === 'b',
+     `an overtaken answer is skipped, the one after it lands though it is overtaken too, only landings move the revision, and whoever asked for the skipped one is answered by the next (${JSON.stringify(r)})`);
 });
 
 await section("a press's ring is its own work, and a read the page makes after it holds no button", async () => {

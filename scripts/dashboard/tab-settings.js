@@ -924,7 +924,7 @@ function tunnelStatus(s){
 // each node's (chosen in Enroll node, kept on its record), and this is the
 // one place the controller's side of it is set.
 function tunnelNodes(){
-  if (nodesList === null){ loadNodes(); return ""; }
+  if (nodesList === null){ nodesKnown(); return ""; }
   const via = (nodesList || []).filter(n => n.config?.tunnel?.kind === "public").map(n => n.name);
   return via.length ? `; ${via.join(", ")} come${via.length === 1 ? "s" : ""} in through it` : "; no node comes in through it yet";
 }

@@ -41,7 +41,7 @@ function flQuery(extra = {}){
 
 function loadFiles(){
   return reading("files", async overtaken => {
-    if (nodesList === null || nodesStale) await loadNodes();
+    if (nodesList === null || nodesStale) await nodesKnown();
     if (!flPick()){ fl = {nonode: true}; return; }
     const node = flNode, root = flRoot, path = flPath;
     const got = await getJSON("/api/node-files?" + flQuery());
