@@ -563,7 +563,7 @@ function termConnect(rec){
   const ws = new WebSocket(termUrl(rec.t, rec.term.cols, rec.term.rows));
   ws.binaryType = "arraybuffer";
   rec.ws = ws;
-  ws.onmessage = e => { if (rec.ws === ws && !rec.gone) rec.term.write(new Uint8Array(e.data)); };
+  ws.onmessage = e => { if (rec.ws === ws && !rec.gone) termOut(rec, new Uint8Array(e.data)); };
   ws.onclose = e => {
     if (rec.ws !== ws) return;
     termEnded(rec, e.reason || (e.code === 1006 ? "the connection dropped" : "the terminal ended"));
@@ -638,8 +638,35 @@ function termKey(t, key){
 function termSweep(){
   for (const [key, rec] of TERMS){
     if (!rec.el.isConnected) termDrop(key);
-    else termRestyle(rec);
+    else { termRestyle(rec); termShow(rec, rec.el.classList.contains("on") && !!rec.el.offsetParent); }
   }
+}
+
+// A terminal not on show draws nothing (R228 step 14): what its session
+// writes meanwhile is kept, in order, and written when it is shown again;
+// hidden but still laid out, xterm drew every byte a busy session sent. Its
+// box is never hidden, so its size and its session's stay as they were.
+// Past TERM_HOLD_MAX it keeps nothing more and opens again when shown,
+// which has tmux draw its screen whole.
+const TERM_HOLD_MAX = 4 << 20;
+function termOut(rec, bytes){
+  if (!rec.away){ rec.term.write(bytes); return; }
+  if (!rec.held) return;
+  rec.held.push(bytes);
+  rec.heldN += bytes.length;
+  if (rec.heldN > TERM_HOLD_MAX) rec.held = null;
+}
+function termShow(rec, on){
+  if (!on){
+    if (!rec.away){ rec.away = true; rec.held = []; rec.heldN = 0; }
+    return;
+  }
+  if (!rec.away) return;
+  rec.away = false;
+  const held = rec.held;
+  rec.held = null;
+  if (held) held.forEach(b => rec.term.write(b));
+  else if (rec.term && !rec.ended) termConnect(rec);
 }
 
 // The page back in view, or its panes resized: every terminal sized to its

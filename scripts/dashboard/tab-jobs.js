@@ -22,6 +22,7 @@ let jobsShow = "";
 const jobsOpen = new Set();      // ids whose log is unfolded
 const jobsLogs = {};             // id -> the log fetched for an unfolded row
 let jobsFocus = "";              // a row to bring into view on the next draw (openJob)
+const jobsLogsEnded = new Set();  // open rows whose log was read after their job ended
 let jobsMarked = "";             // ...and to mark, across redraws, until another is opened
 
 function openJobsTab(){
@@ -52,7 +53,14 @@ function loadJobs(){
       // An unfolded log follows its job: refetched with the list, so a running
       // job's tail moves on the same revision that moves its row.
       await Promise.all([...jobsOpen].map(async id => {
-        const r = await getJSON(`/api/v1/jobs?id=${encodeURIComponent(id)}`);
+        // One that has ended and been read already writes no more (R228
+        // step 13): its row was read again on every read of the list.
+        const row = jobsList.find(x => x.id === id);
+        if (row && ["succeeded", "failed", "canceled"].includes(row.state) && jobsLogs[id] !== undefined
+            && jobsLogsEnded.has(id)) return;
+        if (row && ["succeeded", "failed", "canceled"].includes(row.state)) jobsLogsEnded.add(id);
+        // Its last 4,000 characters, which is all a row draws (R228 step 13).
+        const r = await getJSON(`/api/v1/jobs?id=${encodeURIComponent(id)}&tail=4000`);
         // A job answers with its own fields, `error` among them for one that
         // failed; a refused request has no id. Reading a failed job's error
         // as the request's kept its log out, so every failed job read "(this
@@ -263,7 +271,11 @@ function renderJobsInto(i){
   // page's top).
   d.setBar("");
   const shown = jobsShown(jobsList);
-  const rows = shown.map(j => {
+  // Only the rows on show are built, a page at a time (pageLimit, R228 step
+  // 13), and as far as the row a link asked for (openJob).
+  const focusAt = jobsFocus ? shown.findIndex(j => j.id === jobsFocus) : -1;
+  const lim = Math.max(pageLimit(d.list, "jbList", shown.length), focusAt + 1);
+  const rows = shown.slice(0, lim).map(j => {
     const open = jobsOpen.has(j.id);
     const over = ["succeeded", "failed", "canceled"].includes(j.state);
     return `
@@ -324,7 +336,7 @@ function renderJobsInto(i){
   // Its section stands open at a desk and takes its turn on a phone.
   wireSections(d.list);
   const tbl = d.list.querySelector(".jbtbl");
-  if (tbl) paginate(tbl, ":scope > .jbrow", {key: "jbList", noun: "jobs"});
+  if (tbl) paginate(tbl, ":scope > .jbrow", {key: "jbList", noun: "jobs", total: shown.length, more: () => renderJobsInto(i)});
   if (jobsFocus){
     const row = d.list.querySelector(`.jbrow[data-job="${CSS.escape(jobsFocus)}"]`);
     if (row){ row.scrollIntoView({block: "nearest"}); jobsFocus = ""; }

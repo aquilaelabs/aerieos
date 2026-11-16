@@ -28,10 +28,12 @@ function nbArtifactsView({$, nb, project, root, sheet}){
   // only while a push is live: the one time it changes on its own.
   let art = null, artTimer = null;
 
-  function loadArtifacts(){
+  // `kept`: drawn again from the read in hand, which is what Show more
+  // asks (R228 step 13), rather than read again.
+  function loadArtifacts(kept){
     return reading(`${project}:artifacts`, async () => {
       const hint = $("artHint"), list = $("artList");
-      try{
+      if (!(kept === true && art)) try{
         art = await getJSON("/api/artifacts?project=" + encodeURIComponent(project));
       }catch(e){ viewGlance(hint, [], esc("artifacts: " + e), "", "bad"); return; }
       if (art.error){ viewGlance(hint, [], esc("artifacts: " + art.error), "", "bad"); return; }
@@ -180,9 +182,13 @@ function nbArtifactsView({$, nb, project, root, sheet}){
       // Write; nothing says why (the operator, 21 Oct: what a role does not
       // give is not advertised).
       const ro = projWriteWhy(project), relWhy = projReleaseWhy(project);
+      // Only the files on show are built, a page at a time (pageLimit, R228
+      // step 13); each row is named by its place in `rows`, which a page from
+      // the top keeps.
+      const artLim = pageLimit(list, "artList", rows.length);
       const filesBody = !rows.length
         ? `<div class="hint">Nothing in <b>dist/</b> yet: a build copies what it keeps there.</div>`
-        : devNote + jobHtml + instHtml + rows.map((a, i) => `
+        : devNote + jobHtml + instHtml + rows.slice(0, artLim).map((a, i) => `
           <div class="artrow">
             <span class="grow">
               <span class="top"><span class="pill">${esc(a.kind)}</span>
@@ -248,7 +254,8 @@ function nbArtifactsView({$, nb, project, root, sheet}){
                                               : `${cfFiles.length} compose file${cfFiles.length === 1 ? "" : "s"}`, devHtml) : "")
         + docSection("artifacts", "files", artTitle("files"), rows.length ? `${rows.length} in dist/` : "none yet", filesBody, {prime: true}));
       wireSections(list);
-      paginate(list.querySelector('[data-sect="artifacts:files"] > .body'), ":scope > .artrow", {key: "artList", noun: "files"});
+      paginate(list.querySelector('[data-sect="artifacts:files"] > .body'), ":scope > .artrow",
+               {key: "artList", noun: "files", total: rows.length, more: () => loadArtifacts(true)});
       // What a session looked with (R96): a reel's sheet, an emulator shot.
       // One fold apart from the files, since they are not what ships, each
       // row saying whose it is and when. They go by age (the project's
@@ -298,10 +305,13 @@ function nbArtifactsView({$, nb, project, root, sheet}){
       if (brList){
         brList.hidden = !brRows.length;
         let at = 0;
+        // A page at a time too, numbered across the groups (R228 step 13): a
+        // group with nothing on the page leaves its heading out.
+        const brLim = pageLimit(brList, "artBranches", brRows.length);
         patch(brList, !brRows.length ? "" : docSection("artifacts", "branches", "Branch builds", String(brRows.length),
           `<div class="hint">Built on a branch. Merge it to main to put its build in dist/.</div>`
-          + groups.map(g => `<div class="sub dim ggroup">${esc(g.who === state?.me ? "your" : `${g.who}'s`)} branch builds${
-              g.branch ? `, on ${esc(g.branch)}` : ""}</div>` + g.artifacts.map(a => { const i = at++; return `
+          + groups.map(g => at >= brLim ? "" : `<div class="sub dim ggroup">${esc(g.who === state?.me ? "your" : `${g.who}'s`)} branch builds${
+              g.branch ? `, on ${esc(g.branch)}` : ""}</div>` + g.artifacts.map(a => { const i = at++; if (i >= brLim) return ""; return `
             <div class="artrow">
               <span class="grow">
                 <span class="top"><span class="pill">${esc(a.kind)}</span> <b>${esc(a.name)}</b></span>
@@ -315,7 +325,8 @@ function nbArtifactsView({$, nb, project, root, sheet}){
             </div>`; }).join("")).join("")));
         if (brRows.length){
           wireSections(brList);
-          paginate(brList.querySelector('[data-sect="artifacts:branches"] > .body'), ":scope > .artrow", {key: "artBranches", noun: "files"});
+          paginate(brList.querySelector('[data-sect="artifacts:branches"] > .body'), ":scope > .artrow",
+                   {key: "artBranches", noun: "files", total: brRows.length, more: () => loadArtifacts(true)});
         }
         brList.querySelectorAll("[data-artbview]").forEach(b => b.onclick = async () => {
           const a = brRows[Number(b.dataset.artbview)];

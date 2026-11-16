@@ -330,9 +330,11 @@ function loadMove(){
     if (JSON.stringify(moveData) !== was) readMoved("settings");
     // ...and read again every poll while a move is armed (B646): how many
     // nodes have heard it, the last packing and the ask's answer move on
-    // their own, while the page is open and only then.
+    // their own, while the page is on show and only then (R228 step 10: a
+    // page left kept its tab, and this went on for good); shown again, its
+    // open reads it at once.
     clearTimeout(moveTimer); moveTimer = null;
-    if (moveData?.prepared && tabs.some(t => t.kind === "settings")) moveTimer = setTimeout(loadMove, 15000);
+    if (moveData?.prepared && shown("settings")) moveTimer = setTimeout(loadMove, 15000);
   });
 }
 let moveTimer = null;

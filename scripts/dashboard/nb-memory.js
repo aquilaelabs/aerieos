@@ -106,7 +106,11 @@ function nbMemoryView({$, nb}){
     const ro = projWriteWhy(nb.memProj);
     // Patched (R244), each memory by its file: one being edited keeps its
     // fields, caret and fold when another memory or the index moves.
-    patch($("memList"), j.memories.map(m => `
+    // Only the rows on show are built, a page at a time (pageLimit, R228
+    // step 13); one being edited is always among them, kept in the first
+    // pages it was opened from.
+    const lim = pageLimit($("memList"), "memList", j.memories.length);
+    patch($("memList"), j.memories.slice(0, lim).map(m => `
     <details class="mem chev" data-file="${esc(m.file)}" data-key="${esc(m.file)}"${open.has(m.file) ? " open" : ""}>
       <summary>
         ${m.type ? `<span class="tag mtype ${esc(m.type)}">${esc(m.type)}</span>` : ""}
@@ -162,7 +166,8 @@ function nbMemoryView({$, nb}){
       // Said in the list, where every other view says it, rather than by
       // hiding the list and leaving a heading over nothing.
       || `<div class="empty">none yet: sessions write these as they learn the space; Write a memory adds one by hand</div>`);
-    paginate($("memList"), ":scope > .mem", {noun: "memories"});
+    paginate($("memList"), ":scope > .mem", {key: "memList", noun: "memories", total: j.memories.length,
+                                            more: () => drawMemory(nb.memLast || j)});
     // The fold, driven rather than left to the browser's instant one: the same
     // height tween every fold uses (slideDetails), so a memory opens the way a
     // section does.

@@ -212,9 +212,24 @@ function scrollHint(el){
   el.classList.toggle("scrollup", more && el.scrollTop > 2);
   el.classList.toggle("scrolldown", more && el.scrollTop + el.clientHeight < el.scrollHeight - 2);
 }
+// Without a root, the parts on show alone: a pane's page, an open dialog, an
+// open menu (R228 step 14). A box in a page left behind the one on show is
+// one content-visibility spares laying out, and measuring it laid it out
+// again, every look.
+const HINT_ROOTS = ".pane .doc.on, .modal:not([hidden]), .mpanel.show";
 function scrollHints(root){
-  (root || document).querySelectorAll(SCROLL_HINTED).forEach(scrollHint);
-  if (root?.matches?.(SCROLL_HINTED)) scrollHint(root);
+  if (!root){ document.querySelectorAll(HINT_ROOTS).forEach(scrollHints); return; }
+  root.querySelectorAll(SCROLL_HINTED).forEach(scrollHint);
+  if (root.matches?.(SCROLL_HINTED)) scrollHint(root);
+}
+// ...and once a frame after a draw, however many parts it drew (drawHTML
+// and patch ask), so a box a draw made long says so at once rather than at
+// the clock's next look. The clock stays for what grows without a draw of
+// either (a notebook moved into its pane, a fold's last frame, a log).
+let hintFrame = 0;
+function hintSoon(){
+  if (hintFrame) return;
+  hintFrame = requestAnimationFrame(() => { hintFrame = 0; if (!document.hidden) scrollHints(); });
 }
 
 // Things that move to a new place slide there from the old one: their

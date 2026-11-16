@@ -239,7 +239,10 @@ function nbTestsView({$, nb, project}){
       for (const ch of JSON.stringify([t.protects, t.notes, t.accepted, t.sits_on, t.was, t.history, tstEditing.has(t.key)]))
         h = (h * 31 + ch.charCodeAt(0)) | 0;
       return String(h); };
-    patch($("tstList"), shown.length ? shown.map(t => `
+    // Only the rows on show are built, a page at a time (pageLimit, R228
+    // step 13): every row was built and all but 25 hidden.
+    const lim = pageLimit($("tstList"), "tstList", shown.length);
+    patch($("tstList"), shown.length ? shown.slice(0, lim).map(t => `
       <details class="tst${t.suspect ? " flagged" : ""}" data-key="${esc(t.key)}"${
         openRows.has(t.key) ? " open" : ""}>
         <summary>
@@ -258,7 +261,7 @@ function nbTestsView({$, nb, project}){
         <div class="body" data-own></div>
       </details>`).join("")
       : `<div class="empty">nothing matches the filters</div>`);
-    paginate($("tstList"), ":scope > .tst", {key: "tstList", noun: "tests"});
+    paginate($("tstList"), ":scope > .tst", {key: "tstList", noun: "tests", total: shown.length, more: () => drawTests()});
     // The editor, built on the way open. Every row has one; there is a place
     // to describe every test in the project, but a row nobody has opened is
     // a summary line and an empty div until they do.

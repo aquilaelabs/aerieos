@@ -358,16 +358,21 @@ function nbRoadmapView({$, nb}){
     if (nb.roadmapLogOn) nb.drawHistory();
     // A role that reads the project and does not write it (B86).
     const ro = projWriteWhy(nb.memProj);
+    // Only the items the band shows are built, a page at a time (pageLimit,
+    // R228 step 13): every item was built, those the band left out hidden,
+    // and all but 25 of the rest.
+    const vis = rows.filter(shown);
     {
     // A group is a fold, like a bug's row (the operator, 29 Sep): its own
     // row is the summary, its steps open under it on a tap. Which were
     // open before this redraw stay open, so acting on one does not fold
     // it, and a group whose step is armed is open to show it.
     const held = new Set([...$("roadmapList").querySelectorAll("details.grp[open]")].map(d => d.dataset.id));
-    drawHTML($("roadmapList"), rows.map(r =>
+    const lim = pageLimit($("roadmapList"), "roadmapList", vis.length);
+    drawHTML($("roadmapList"), vis.slice(0, lim).map(r =>
       // The group's own row gets the same `live` as its steps now: its arrow
       // stands for the next one, so it is as clickable as that one is.
-      `<details class="grp${r.shelved ? " shelved" : ""}${shown(r) ? "" : " off"}" data-id="${r.id}"${
+      `<details class="grp${r.shelved ? " shelved" : ""}" data-id="${r.id}"${
         held.has(String(r.id)) || (nb.roadmapSel && String(nb.roadmapSel.id) === String(r.id)) ? " open" : ""}>
         <summary>${stepRow(r, -1, live)}</summary>${
         (r.steps || []).map((_, i) => stepRow(r, i, live)).join("")}${
@@ -496,7 +501,8 @@ function nbRoadmapView({$, nb}){
     drawSendBox(live);
     // Groups, not steps: a plan cut in half by a page boundary is a plan
     // nobody can read.
-    paginate($("roadmapList"), ":scope > .grp:not(.off)", {noun: "items"});
+    paginate($("roadmapList"), ":scope > .grp", {key: "roadmapList", noun: "items", total: vis.length,
+                                                 more: () => redrawRoadmap()});
   }
 
   // What a session can be switched to on the way in. Tables, not free text:

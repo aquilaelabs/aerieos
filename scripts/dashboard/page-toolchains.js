@@ -87,7 +87,11 @@ function tcTickDots(){
   const spans = document.querySelectorAll(".dots");
   if (!spans.length){ clearInterval(tcDotsTimer); tcDotsTimer = null; return; }
   tcDots = (tcDots + 1) % 4;
-  spans.forEach(e => e.textContent = ".".repeat(tcDots));
+  // Only the ones on show are written (R228 step 10): a page left behind
+  // with a job still running there was written to every 400 ms. Kept going
+  // while any is on the page, so that page's dots move again when it is.
+  const dots = ".".repeat(tcDots);
+  spans.forEach(e => { if (e.checkVisibility?.({ visibilityProperty: true }) ?? true) e.textContent = dots; });
 }
 
 // What a row pulls onto the picked machine from its own package manager,

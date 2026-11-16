@@ -220,7 +220,11 @@ const TABKINDS = {
   term:     { multi: true },
   notebook:     { multi: true, label: t => "Notebook: " + projLabel(t.arg),
               icon: TOOL_ICONS.notebook,
-              render: (i, t) => renderNotebookInto(i, t.arg), live: "always" },
+              render: (i, t) => renderNotebookInto(i, t.arg), live: "always",
+              // Shown again: its tokens asked for now, since the poll left a
+              // notebook not on show out (R228 step 10) and may be a few
+              // seconds from its next tick.
+              open: () => pollRevs() },
   // The Library (R170): one list of everything an AerieOS installs or
   // runs, for one node; its own read, the node list, and the sign-in,
   // which rides the status poll (an agent's row carries it).
@@ -375,7 +379,9 @@ const TABKINDS = {
               open: () => loadNodes() },
   settings: { multi: false, label: () => "Controller settings",
               render: (i) => renderSettingsInto(i), live: settingsLive,
-              open: () => loadApps() },
+              // ...and an armed move read again, whose clock stops while
+              // another page is on show (R228 step 10).
+              open: () => { loadApps(); if (moveData?.prepared && !moveTimer) loadMove(); } },
   users:    { multi: false, label: () => "Users",
               render: (i) => renderUsersInto(i), live: () => readRev("users"),
               open: () => loadUsers() },

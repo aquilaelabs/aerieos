@@ -480,7 +480,17 @@ async function pollRevsOnce(){
     // whole share's would be a directory walk per project per second and a
     // half for panes nobody has open. Always sent, empty included: an absent
     // `p` means "all of them", which is what `aerie` and the tests want.
-    const ps = [...new Set(tabs.filter(t => t.kind === "notebook").map(t => t.arg))];
+    // ...and of those, the one on show and any holding work a person has not
+    // saved, whose moved-under-you note still has to be said (R228 steps 10
+    // and 11): every notebook visited stayed on this list, and each re-read
+    // on every write to its space while another page was on show. One
+    // shown again is asked for at once (its shown()), and a token that
+    // appears is news.
+    const front = tabOf(panes[0]);
+    const ps = [...new Set(tabs.filter(t => t.kind === "notebook"
+                                          && (t.id === front?.id || notebooks.get(t.arg)?.held?.()
+                                              || notebooks.get(t.arg)?.unsaved?.()))
+                               .map(t => t.arg))];
     const r = await fetch("/api/revs?p=" + encodeURIComponent(ps.join(",")));
     if (!r.ok) return;
     now = await r.json();

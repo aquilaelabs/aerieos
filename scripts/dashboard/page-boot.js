@@ -189,8 +189,9 @@ function bootMotion(){
     if (e.target.closest?.(".chip.on[aria-pressed='true']")){ e.stopPropagation(); e.preventDefault(); }
   }, true);
   // Scroll hints (scrollHints): on any scroll, which does not bubble but is
-  // seen on its way down, and on a slow clock for content that grows under a
-  // box nobody is scrolling. Only the few hinted boxes are measured.
+  // seen on its way down, after any draw (hintSoon), and on a slow clock for
+  // content that grows under a box nobody is scrolling. Only the few hinted
+  // boxes on show are measured.
   addEventListener("scroll", e => { if (e.target?.matches?.(SCROLL_HINTED)) scrollHint(e.target); }, true);
   setInterval(() => { if (!document.hidden) scrollHints(); }, 700);
 }
@@ -618,7 +619,7 @@ function bootAway(){
   // Pull to refresh on a touch screen (page-pull.js): the header's ↻ it replaced.
   wirePull();
   // A lent phone, live (R113): a session's screenshot reaches the Phone tab.
-  onRev("phone.lease", () => { if (tabs.some(t => t.kind === "phone")) phFetch(); });
+  onRev("phone.lease", () => { if (shown("phone")) phFetch(); });
   // Who has a session where, and whether it is working: the light fetch, so
   // the dot beside a name follows a session within seconds.
   onRev("live", () => liveRefresh());
@@ -704,7 +705,7 @@ function bootAway(){
   // The badge follows the count directly rather than waiting for the fetch, so
   // the tab strip is right even if the page is throttled too hard to redraw.
   onRev("phone.asks", k => setBadge(revs[k] || 0));
-  onRev("phone.dev", () => { if (tabs.some(t => t.kind === "phone")) phFetch(); });
+  onRev("phone.dev", () => { if (shown("phone")) phFetch(); });
   phFetch();
 }
 

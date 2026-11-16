@@ -107,7 +107,7 @@ const src = ['../index.html', ...readdirSync(new globalThis.URL('..', import.met
 for (const [what, call] of [
   // Less what the list's band leaves out (R254 step 1), so a page holds
   // what is shown.
-  ['the roadmap', 'paginate($("roadmapList"), ":scope > .grp:not(.off)"'],
+  ['the roadmap', 'paginate($("roadmapList"), ":scope > .grp", {key: "roadmapList", noun: "items", total: vis.length'],
   ['memory', 'paginate($("memList"), ":scope > .mem"'],
   ['bugs', 'paginate(list, ":scope > .bug", {key: "bugList", noun: "reports", total: vis.length'],
   // ...in the Files section's body, since the files are a section (6 Oct).
@@ -146,8 +146,10 @@ await section("one bucket per notebook, not one for all of them", async () => {
   await page.evaluate(() => { openNotebook('alpha'); openNotebook('beta'); });
   await page.waitForSelector('.nb[data-project="beta"]', { timeout: 20000 });
   await page.evaluate(() => { for (const p of ['alpha', 'beta']) getNotebook(p)?.view('artifacts'); });
-  await page.waitForFunction(() => (document.querySelectorAll(
-    '.nb[data-project="alpha"] .nbview[data-view="artifacts"] .artrow') || []).length > 25,
+  // A page of rows built and the rest offered (R228 step 13: the rows past
+  // a page are not built until they are asked for).
+  await page.waitForFunction(() => document.querySelector(
+    '.nb[data-project="alpha"] .nbview[data-view="artifacts"] .pagemore .next'),
     null, { timeout: 20000 });
   const shown = () => page.evaluate(() => {
     const rows = [...document.querySelectorAll(

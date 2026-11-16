@@ -7183,11 +7183,12 @@ def job_forget(job_id):
     _probe_ids.discard(job_id)
 
 
-def job_tail(job_id, n=4000):
-    """The end of a job's log, for a row that shows where it got to."""
+def job_tail(job_id, n=4000, chunks=40):
+    """The end of a job's log, for a row that shows where it got to: the
+    last `chunks` of what it posted, cut to the last n characters."""
     text = "".join(r["chunk"] for r in _rows(
         "SELECT chunk FROM job_logs WHERE job_id = ? ORDER BY seq DESC "
-        "LIMIT 40", (job_id,))[::-1])
+        "LIMIT ?", (job_id, int(chunks)))[::-1])
     return text[-n:]
 
 
@@ -8254,7 +8255,16 @@ def jobs_view(jid, q, mine, system=None, hidden=None):
             return j
         return {k: scrub(v) if k in ("log", "error", "label", "spec") else v for k, v in j.items()}
     if jid:
-        j = job(jid)
+        # ...or its log's last `tail` characters alone (R228 step 13): the
+        # Jobs page draws a row's last 4,000 and asked for the whole log of
+        # every row it had open on every read of the list.
+        try:
+            tail = max(0, min(1 << 20, int(q.get("tail", ["0"])[0])))
+        except ValueError:
+            tail = 0
+        j = job(jid, with_log=not tail)
+        if j and tail:
+            j["log"], j["tail"] = job_tail(jid, tail, chunks=400), True
         if j and not seen(j):
             j = None
         return (shown(job_read(j)), 200) if j else ({"error": "no such job"}, 404)

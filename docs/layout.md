@@ -272,6 +272,7 @@ scripts/
     unlocks.py                   a person's tokens opened per use for the window they pick and logged, git's handout of an opened one, and a store under a key of the person's own opened only while unlocked (R158 step 5, R157)
     hardening.py                 the dashboard's process kept from core files and swap, not dumpable, and wipe() for a key let go (R158 step 6)
     csp.py                       the page's Content-Security-Policy, its inline blocks allowed by hash and its scripts by integrity, and what a browser refused under it, kept for the Doctor (R158 step 4)
+    leanpage.py                  the page as it is served, without its comments: a tokenizer for its scripts, stylesheets and page, which keep theirs in the tree (R228 step 15)
     tls.py                       the dashboard's own TLS: one port serving https and http by the first byte, the install's own certificate or Let's Encrypt's, its key sealed under the install key (R158 step 2)
     phone.py                     a paired handset on a node: install, push, and the asking
     phonelease.py                a phone lent to a project (R113): the lease, and what its sessions may do on the phone without asking

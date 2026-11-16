@@ -2651,6 +2651,12 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
 .pane .stack{position:relative;flex:1;min-height:0}
 .pane .stack > *{position:absolute;inset:0}
 .pane .stack > *:not(.on){visibility:hidden;pointer-events:none}
+/* A page left behind the one on show (kept with its scroll, its view and
+   what is typed in it) is not laid out or painted (R228 step 10):
+   visibility kept every one of them laid out on every change to the page.
+   Only the page's pane: the dock's terminals measure their box while
+   hidden. Not the page fading out, which is still on show. */
+#pane0 .stack > *:not(.on):not(.leaving){content-visibility:hidden}
 .pane .slot{display:flex}
 /* The console bar (roadmap #27), under a read-only Claude terminal for an
    account with no shell. Column, so the frame keeps its flex:1 and the row

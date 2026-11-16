@@ -93,6 +93,8 @@ function renderNoticesInto(i){
     return;
   }
   const all = noticesData, rows = noticesShown(), waiting = noticesWaitingRows();
+  // Only the rows on show are built, a page at a time (pageLimit, R228 step 13).
+  const lim = pageLimit(d.list, "ntList", rows.length);
   const groups = [...Object.entries(NOTICE_KINDS).map(([k, label]) => ({key: k, label, count: all.filter(n => n.kind === k).length})),
                   {key: "bad", label: "Failures", count: all.filter(n => n.level === "bad").length}];
   // In an action bar as every page's bar action is, which keeps it at the
@@ -108,7 +110,7 @@ function renderNoticesInto(i){
     + docSection("notices", "history", "History", String(rows.length),
                  // Failures overlap the kinds, so All is what is kept.
                  chipBar(groups, noticesChip, "data-ntchip", all.length)
-                 + (rows.length ? `<div class="ntlist">${rows.map(n => `<div class="row ntrow ${esc(n.level)}" data-nt="${esc(n.id)}">
+                 + (rows.length ? `<div class="ntlist">${rows.slice(0, lim).map(n => `<div class="row ntrow ${esc(n.level)}" data-nt="${esc(n.id)}">
                        <span class="tic">${TOAST_ICONS[n.level] || TOAST_ICONS.info}</span>
                        <span class="grow"><span class="nttext">${esc(n.text)}</span>
                          <span class="sub dim">${esc(NOTICE_KINDS[n.kind] || n.kind)} · ${esc(ago(n.at))}</span></span>
@@ -119,7 +121,7 @@ function renderNoticesInto(i){
                  {prime: !waiting.length});
   if (!patch(d.list, html)) return;
   const list = d.list.querySelector(".ntlist");
-  if (list) paginate(list, ":scope > .ntrow", {key: "ntList", noun: "notices"});
+  if (list) paginate(list, ":scope > .ntrow", {key: "ntList", noun: "notices", total: rows.length, more: () => renderNoticesInto(i)});
   wireNotices(d.el);
 }
 

@@ -37,12 +37,15 @@ function nbAnalysisView({$, nb, project}){
       // narrowing shared by both surfaces, so learning one is learning the
       // other. The bar only appears when there is something to narrow.
       const shown = fxFilter(rows, anaFx);
+      // Built a rule at a time, a page of rules (pageLimit, R228 step 13).
+      const nRules = new Set(shown.map(f => f.rule ?? "none")).size;
+      const lim = pageLimit(list, "anaList", nRules);
       // Patched (R244): the find box in the bar keeps its caret while the list
       // under it narrows, and a scan landing leaves it as it is.
       patch(list, (rows.length ? fxBarBand(rows, anaFx) : "")
         + (rows.length && !shown.length
             ? `<div class="empty">nothing matches the filters</div>` : "")
-        + findingsRulesHtml(shown));
+        + findingsRulesHtml(shown, lim));
       fxWireBar(list, anaFx, loadAnalysis);
       // By rule group, which is how the report is read: a rule split across a
       // page boundary would separate its own occurrences.
@@ -50,7 +53,7 @@ function nbAnalysisView({$, nb, project}){
       // per-file renderer, so this matched nothing and paginate returned early:
       // a project with hundreds of findings drew every one of them at once while
       // every list beside it paged.
-      paginate(list, ":scope > .rule", {key: "anaList", noun: "rules"});
+      paginate(list, ":scope > .rule", {key: "anaList", noun: "rules", total: nRules, more: () => loadAnalysis()});
     });
   }
 

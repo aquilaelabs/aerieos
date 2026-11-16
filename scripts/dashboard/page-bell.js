@@ -729,12 +729,15 @@ function drawBell(){
   // ...headed as the doctor's and the gear's are (the operator, 22 Oct),
   // See all at the head's right where the eye starts.
   const head = `<div class="popbar"><b>Notifications</b><button type="button" id="bellAll">See all</button></div>`;
-  drawHTML(panel, head + (answer.length + needs.length + said.length
+  // Patched, and left alone when nothing in it moved (R228 step 14): it was
+  // written whole on every poll, open or not, and every press bound again.
+  // What is bound below is set as a property, so a row kept keeps its own.
+  if (!patch(panel, head + (answer.length + needs.length + said.length
     ? group("Waiting on you", answer) + group("Needs attention", needs)
       + group("Recent", said.slice(0, 5), `<button type="button" id="bellClear">Clear</button>`, said.length)
     // Before the first status read nothing is known yet, which is not
     // nothing to report.
-    : !state ? `<div class="bempty">${skRows(2)}</div>` : `<div class="bempty">nothing to report</div>`) + putAway);
+    : !state ? `<div class="bempty">${skRows(2)}</div>` : `<div class="bempty">nothing to report</div>`) + putAway, true)) return;
   // Any press in the drawer closes it, after the press's own handler has
   // run (the operator, 7 Oct): Approve, Deny, an invitation's answer, Clear,
   // a link to where a row is about. One listener on the drawer, so a row

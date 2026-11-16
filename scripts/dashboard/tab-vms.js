@@ -39,7 +39,7 @@ function loadVms(){
       vmsData = vmsData || {vms: [], images: [], hosts: [], can: {}};
     }
     vmReapConsoles();
-    if (tabs.some(t => t.kind === "vms")) drawPanes();
+    if (shown("vms")) drawPanes();
   });
 }
 // A console tab is the account's and outlives the page, so one whose VM was

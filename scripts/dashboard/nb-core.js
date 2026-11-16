@@ -793,8 +793,15 @@ function makeNotebook(project){
      k => nb.pendRev !== null && revs[k] !== nb.pendRev,
      () => loadPending()],
   ];
+  // ...while this notebook is the page on show: one left behind another
+  // page marks the half and reads it when it is shown again, if it is still
+  // news then (R228 step 11).
+  const staleHalves = new Set();
   for (const [key, news, read] of HALVES)
-    watch(key, k => { if (!nbWriting && news(k)) read(); });
+    watch(key, k => {
+      if (nbWriting || !news(k)) return;
+      if (nbOnShow()) read(); else staleHalves.add(key);
+    });
   // ...and the other half of each guard: the token moved and the panel did NOT
   // re-read, because it is holding work. That is the moment to say so (B199).
   const MOVED = [
@@ -905,6 +912,15 @@ function makeNotebook(project){
     shown(){
       if (!nb.loaded){ nb.loaded = true; openMemory(project); loadPending(); }
       if (nb.away){ nb.away = false; beat(); }
+      // What moved while another page was on show, read now that it is not
+      // (staleHalves). Called on every draw of the page on show, so it asks
+      // for nothing else: the poll names this notebook from its next tick,
+      // and a token that comes back is news to the watches that compare it.
+      if (staleHalves.size){
+        for (const [key, news, read] of HALVES)
+          if (staleHalves.has(key) && news(key())) read();
+        staleHalves.clear();
+      }
     },
     reloadPending: loadPending,
     reload(){ return loadRoadmap(nb.memGen); },

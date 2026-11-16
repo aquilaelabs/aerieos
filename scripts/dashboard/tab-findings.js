@@ -127,7 +127,7 @@ function fxRemember(e){
   if (!(d instanceof HTMLDetailsElement) || !d.classList.contains("rule") || !d.dataset.key) return;
   if (d.open) fxOpen.add(d.dataset.key); else fxOpen.delete(d.dataset.key);
 }
-function findingsRulesHtml(rows){
+function findingsRulesHtml(rows, limit = Infinity){
   const by = (xs, k) => xs.reduce((m, x) => ((m[x[k] ?? "none"] ??= []).push(x), m), {});
   const rules = by(rows, "rule");
   for (const k of Object.keys(rules))
@@ -139,8 +139,10 @@ function findingsRulesHtml(rows){
   // the rule, how many places and the first of them; open, every place, the
   // description, the message whole and the CVEs. The whole message on every
   // closed row made a report a wall.
+  // `limit`: the first so many rules alone, a list built a page at a time
+  // (pageLimit, R228 step 13).
   let html = "";
-  for (const rid of order){
+  for (const rid of order.slice(0, limit)){
     const hits = rules[rid];
     const f = hits[0];
     const cves = [...new Set(hits.flatMap(h => h.cves))];

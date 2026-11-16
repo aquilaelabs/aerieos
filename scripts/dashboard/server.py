@@ -3580,17 +3580,25 @@ _static_kept = {}
 
 
 def _integrity_of(name, version):
-    """csp.integrity of a page script, kept by its version."""
+    """csp.integrity of a page script as it is served (leanpage), kept by
+    its version."""
     key = (name, version)
     if key not in _sri:
         try:
-            _sri[key] = csp.integrity((HERE / name).read_bytes())
+            _sri[key] = csp.integrity(leanpage.served(HERE / name))
         except OSError:
             return ""
         if len(_sri) > 512:
             _sri.clear()
-            _sri[key] = csp.integrity((HERE / name).read_bytes())
+            _sri[key] = csp.integrity(leanpage.served(HERE / name))
     return _sri[key]
+
+
+def _lean(rel):
+    """Whether a file is the page's own and is served without its comments
+    (leanpage, R228 step 15): the page, its scripts and its stylesheets.
+    Not a vendor's file, whose comments carry its license."""
+    return rel == "index.html" or rel in page_scripts() or rel in page_styles()
 
 
 def _versioned_page(raw, tag):
@@ -4318,6 +4326,7 @@ tls.configure(state=STATE, seal_fn=signing.seal, unseal_fn=signing.unseal,
 # The page's Content-Security-Policy and what the browser reports against
 # it (R158 step 4, csp.py).
 import csp                                                       # noqa: E402
+import leanpage                                                  # noqa: E402
 csp.configure(state=STATE)
 try:
     if (_sealed := gitcreds.seal_all()):
@@ -8290,7 +8299,7 @@ class Handler(BaseHTTPRequestHandler):
         raw = None
         if page:
             try:
-                raw = (HERE / rel).read_bytes()
+                raw = leanpage.served(HERE / rel)
             except OSError:
                 return self._json({"error": "not found"}, 404)
             raw, tag = _versioned_page(raw, tag)
@@ -8306,7 +8315,7 @@ class Handler(BaseHTTPRequestHandler):
         else:
             if raw is None:
                 try:
-                    raw = (HERE / rel).read_bytes()
+                    raw = leanpage.served(HERE / rel) if _lean(rel) else (HERE / rel).read_bytes()
                 except OSError:
                     return self._json({"error": "not found"}, 404)
             if page:

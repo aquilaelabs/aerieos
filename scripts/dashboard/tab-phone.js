@@ -93,7 +93,7 @@ function phFetch(body, probe){
   if (body && (body.action === "allow" || body.action === "deny") && ph?.asks){
     ph.asks = ph.asks.filter(a => a.id !== body.id);
     readMoved("phone");
-    if (tabs.some(t => ["phone", "nodes", "docker"].includes(t.kind))) drawPanes();
+    if (["phone", "nodes", "docker"].some(shown)) drawPanes();
     drawBell();
   }
   if (body) return phSend(body);
@@ -104,7 +104,7 @@ async function phSend(body){
   readMoved("phone");
   // The Nodes tab draws the root asks from the same answer, and the Docker
   // tab the rebuild ones.
-  if (tabs.some(t => ["phone", "nodes", "docker"].includes(t.kind))) drawPanes();
+  if (["phone", "nodes", "docker"].some(shown)) drawPanes();
   drawBell();
 }
 async function phRead(probe){

@@ -59,6 +59,7 @@ function drawHTML(el, html){
   if (!el) return;
   el.innerHTML = html;
   drawn(el);
+  hintSoon();
 }
 // The FIRST real content fades in: nothing drawn here yet, or what was here
 // a placeholder saying it had not arrived. First only, deliberately: fading
@@ -114,6 +115,7 @@ function patch(el, html, quiet = false){
     drawn(el);
   }
   painted.set(el, {html, first: paintedFirst(el), n: paintedKids(el)});
+  hintSoon();
   // ...but never fading while the card around it is folding. contentIn
   // starts at opacity 0 and takes 180ms, which is exactly the fold's
   // duration, so a draw landing on a collapsing card blanked its body at

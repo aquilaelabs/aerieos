@@ -75,7 +75,13 @@ function nbHistoryView({$, nb, project}){
          and drop lands here from now on.`}</div>`);
       return;
     }
-    patch($("roadmapHist"), nb.roadmapLog.map((e, k, all) => {
+    // Only the entries on show are built, a page at a time (pageLimit, R228
+    // step 13); each day's heading reads the one before it, so a page is the
+    // log's first rows and not a slice from its middle.
+    const lim = pageLimit($("roadmapHist"), "roadmapHist", nb.roadmapLog.length);
+    const logAll = nb.roadmapLog;
+    patch($("roadmapHist"), logAll.slice(0, lim).map((e, k) => {
+      const all = logAll;
       const [word, tone] = ACT[e.act] || [e.act || "changed", ""];
       // R on the number, as everywhere an item is named (ids.py): a log line
       // is exactly where a bare number could be read against the bug tracker.
@@ -107,7 +113,8 @@ function nbHistoryView({$, nb, project}){
     });
     wireIds($("roadmapHist"));
     // Paged like the other three, now that it has a pane to page.
-    paginate($("roadmapHist"), ":scope > .hist", {key: "roadmapHist", noun: "entries"});
+    paginate($("roadmapHist"), ":scope > .hist", {key: "roadmapHist", noun: "entries", total: logAll.length,
+                                                  more: () => drawHistory()});
   }
   const onList = id => nb.roadmapItems.some(r => String(r.id) === String(id));
 
@@ -188,7 +195,7 @@ function nbHistoryView({$, nb, project}){
              || bar.querySelector(".hwhen").value !== "0"
              ? "Nothing in the log matches that. Widen the window, or clear the search."
              : emptyText || "Nothing has happened here through the notebook yet."}</div>`
-        : rows.map((e, k) => `<div class="hist">${dayHead(e, rows[k - 1], releases())}
+        : rows.slice(0, pageLimit(pane, paneId, rows.length)).map((e, k) => `<div class="hist">${dayHead(e, rows[k - 1], releases())}
             <span class="when">${esc(stamp(e.at || 0))}</span>
             <span class="tag act ${LOG_ACTS[e.act] || ""}">${esc(LOG_WORDS[e.act] || e.act || "changed")}</span>
             <span class="what">${e.id != null ? `${letter ? idLink(letter + e.id) : esc(String(e.id))} · ` : ""}${esc(e.text || "")}
@@ -197,8 +204,10 @@ function nbHistoryView({$, nb, project}){
               e.note ? `<span class="note">${esc(e.note)}</span>` : ""}</span>
           </div>`).join(""));
       if (rows) wireIds(pane);
-      // Every history through one pane means one place to page them.
-      paginate(pane, ":scope > .hist", {key: paneId, noun: "entries"});
+      // Every history through one pane means one place to page them, built
+      // a page at a time (R228 step 13).
+      paginate(pane, ":scope > .hist", rows ? {key: paneId, noun: "entries", total: rows.length, more: () => draw(rows)}
+                                            : {key: paneId, noun: "entries"});
     };
     const load = async () => {
       draw(null);
