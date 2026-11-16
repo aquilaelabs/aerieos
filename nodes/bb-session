@@ -799,21 +799,19 @@ def plan(c, a, uid, wall=None):
     # session account under a read-only store: a clean Android build and a
     # Playwright Chromium launch both work.
     #
-    # Flutter is the exception, because it writes under its own tree on every
-    # run (the lock and the update stamps in bin/cache, the version check in
-    # .git). So its tree stays writable except bin/, which is what PATH holds:
-    # nothing can be planted there under a command's name, and bin/cache, which
-    # only flutter itself runs from, is given back. What is left is a session
-    # changing what a flutter command runs, on a node that has flutter.
+    # Flutter writes under its own tree on every run (the lock and the update
+    # stamps in bin/cache, the version check in .git), so a session is given
+    # a layer of its own over it (below, once /tmp is the session's): what it
+    # writes is its own and goes with it. The tree itself stays read-only: it
+    # was writable but for bin/, and a session that changed bin/cache's dart
+    # had other spaces' sessions and the jobs run it (B888, R247 step 5).
+    flutter = ""
     if store and _real_dir(store):
         steps.append(("bindro", store_from, store))
         if beside:
             steps.append(("bindro", beside_from, beside))
-        flutter = f"{store}/flutter"
-        if _real_dir(f"{flutter}/bin/cache"):
-            steps.append(("bindrw", flutter, flutter))
-            steps.append(("bindro", f"{flutter}/bin", f"{flutter}/bin"))
-            steps.append(("bindrw", f"{flutter}/bin/cache", f"{flutter}/bin/cache"))
+        if _real_dir(f"{store}/flutter/bin/cache"):
+            flutter = f"{store}/flutter"
     # ...and the claude every account's session runs, for the same reason and
     # the other half of B157. `.local` is one of the shared dotfiles, so every
     # account's ~/.local is a link to the base home's: one session could
@@ -883,6 +881,8 @@ def plan(c, a, uid, wall=None):
     for t in ("/tmp", "/var/tmp", "/dev/shm"):
         if _real_dir(t):
             steps.append(("tmpfs", t, "mode=1777"))
+    if flutter:
+        steps.append(("overlay", flutter, "/tmp/.bb-flutter"))
     # The host's per-user runtime folders: a user manager's bus there runs
     # a command as the session account outside every view (systemd-run
     # --user), and podman's and an ssh agent's sockets are there too (R247
@@ -1202,6 +1202,22 @@ def _apply(step, uid, gid):
         src = step[1]
         _mount(src, target, None, MS_BIND | MS_REC)
         _mount(src, target, None, MS_BIND | MS_REMOUNT)
+    elif kind == "overlay":
+        # The session's own layer over a read-only tree (flutter, B888): its
+        # upper and work folders in the session's own /tmp, root's, which the
+        # overlay writes as its mounter. A filesystem that will not have it
+        # leaves the tree read-only, said, never writable.
+        over = step[2]
+        try:
+            for d in (over, f"{over}/upper", f"{over}/work"):
+                os.makedirs(d, mode=0o700, exist_ok=True)
+                os.chown(d, 0, 0)
+                os.chmod(d, 0o700)
+            _mount("overlay", target, "overlay", MS_NOSUID | MS_NODEV,
+                   f"lowerdir={target},upperdir={over}/upper,workdir={over}/work")
+        except OSError as e:
+            print(f"bb-session: {target} is read-only in this session ({e.strerror or e}): "
+                  "a flutter command that writes its lock will say so", file=sys.stderr)
     elif kind == "hide":
         _mount("tmpfs", target, "tmpfs", MS_RDONLY | MS_NOSUID | MS_NODEV | MS_NOEXEC, "mode=0500")
     elif kind == "make":

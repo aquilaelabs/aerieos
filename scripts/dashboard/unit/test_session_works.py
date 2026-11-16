@@ -76,3 +76,20 @@ class Works(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Flutter(Works):
+    """Flutter writes under its own tree on every run: a session gets a layer
+    of its own over it, and the tree itself stays read-only (B888, R247 step
+    5: a session that changed bin/cache's dart had others run it)."""
+
+    def test_the_tree_is_read_only_and_the_session_writes_a_layer_of_its_own(self):
+        store = f"{self.d}/store"
+        os.makedirs(f"{store}/flutter/bin/cache")
+        self.c["TOOLCHAINS_STORE"] = store
+        steps = self.plan()
+        flutter = os.path.realpath(f"{store}/flutter")
+        self.assertFalse([s for s in steps if s[0] == "bindrw" and "flutter" in s[-1]], "nothing of flutter bound writable")
+        self.assertIn(("overlay", flutter, "/tmp/.bb-flutter"), steps)
+        tmp = next(i for i, s in enumerate(steps) if s[:2] == ("tmpfs", "/tmp"))
+        self.assertGreater(steps.index(("overlay", flutter, "/tmp/.bb-flutter")), tmp, "the layer is in the session's own /tmp")
