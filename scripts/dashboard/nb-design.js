@@ -167,7 +167,10 @@ function nbDesignView({$, nb, project, root}){
     if (!nb.dsData){ body.innerHTML = skel("design"); return; }
     const sh = shown();
     nb.dsRuleLists = {};
-    body.innerHTML = pagesSection(sh.page) + themesSection(sh.theme);
+    // Patched (R244): an edit draws the view again, and the control it was
+    // made in keeps its focus, a field its caret, a fold its state. Every
+    // handler below is set rather than added, the patch keeping the element.
+    patch(body, pagesSection(sh.page) + themesSection(sh.theme));
     wireSections(body);
     wireAdd();
     wireLanguage(body);
@@ -178,10 +181,12 @@ function nbDesignView({$, nb, project, root}){
     // is not drawn (the operator, 21 Oct), so every press that would change
     // it is gone, a fold's own toggle kept, and the fields stay to read,
     // dead, the pulldowns that pick what is shown live (B293).
+    // Marked, so a project that is yours to change again gives them back:
+    // a patch keeps what the code did to an element its markup did not.
     if (dsRo()){
-      body.querySelectorAll("input,select:not([data-dspick]),textarea").forEach(e => e.disabled = true);
-      body.querySelectorAll("button").forEach(b => { if (!b.closest("summary") && !b.hasAttribute("aria-expanded")){ b.hidden = true; b.disabled = true; } });
-    }
+      body.querySelectorAll("input,select:not([data-dspick]),textarea").forEach(e => { e.disabled = true; e.dataset.roOff = ""; });
+      body.querySelectorAll("button").forEach(b => { if (!b.closest("summary") && !b.hasAttribute("aria-expanded")){ b.hidden = true; b.disabled = true; b.dataset.roOff = ""; } });
+    } else body.querySelectorAll("[data-ro-off]").forEach(e => { delete e.dataset.roOff; pressBack(e); e.hidden = !!e.__markup && "hidden" in e.__markup; });
     drawHint();
   }
 
@@ -710,12 +715,13 @@ function nbDesignView({$, nb, project, root}){
       touched(); drawDesign();
       root.querySelector(`[data-dspage="${key}"] [data-dsb="label"]`)?.focus();
     };
-    el.querySelector("[data-dsblockrm]")?.addEventListener("click", () => removeBlock(p));
-    el.querySelector('[data-dsb="kind"]')?.addEventListener("change", e => {
+    const set = (sel, kind, fn) => { const x = el.querySelector(sel); if (x) x["on" + kind] = fn; };
+    set("[data-dsblockrm]", "click", () => removeBlock(p));
+    set('[data-dsb="kind"]', "change", e => {
       const b = p.blocks[nb.dsSel[key]]; if (!b) return;
       b.kind = e.target.value; touched(); repaintBoard(p);
     });
-    el.querySelector('[data-dsb="in"]')?.addEventListener("change", e => {
+    set('[data-dsb="in"]', "change", e => {
       const i = nb.dsSel[key], b = p.blocks[i]; if (!b) return;
       if (e.target.value) b.in = +e.target.value; else delete b.in;
       // Brought within its parent now, here and on every other frame's
@@ -729,7 +735,7 @@ function nbDesignView({$, nb, project, root}){
       touched(); drawDesign();
     });
     wireLayers(el, p);
-    el.querySelector('[data-dsb="label"]')?.addEventListener("input", e => {
+    set('[data-dsb="label"]', "input", e => {
       const b = p.blocks[nb.dsSel[key]]; if (!b) return;
       b.label = e.target.value; touched();
       const on = el.querySelector(".dsblock.on");
@@ -769,7 +775,10 @@ function nbDesignView({$, nb, project, root}){
     if (!board) return;
     const key = keyOf(p);
     const P = presets();
-    board.addEventListener("pointerdown", e => {
+    // Set rather than added, the board being kept from one draw to the next;
+    // focusin has no property of its own, so its one listener calls the
+    // handler this draw left on the board.
+    board.onpointerdown = e => {
       const el = e.target.closest(".dsblock");
       if (!el || dsRo()) return;
       const i = +el.dataset.i, b = p.blocks[i];
@@ -810,13 +819,14 @@ function nbDesignView({$, nb, project, root}){
       el.addEventListener("pointerup", up);
       el.addEventListener("pointercancel", up);
       e.preventDefault();
-    });
-    board.addEventListener("focusin", e => {
+    };
+    board.__focusIn = e => {
       const el = e.target.closest(".dsblock");
       if (el && nb.dsSel[key] !== +el.dataset.i){ nb.dsSel[key] = +el.dataset.i; drawDesign();
         root.querySelector(`[data-dspage="${key}"] .dsblock.on`)?.focus(); }
-    });
-    board.addEventListener("keydown", e => {
+    };
+    if (!board.__focusWired){ board.__focusWired = true; board.addEventListener("focusin", e => board.__focusIn?.(e)); }
+    board.onkeydown = e => {
       const el = e.target.closest(".dsblock");
       if (!el || dsRo()) return;
       const b = p.blocks[+el.dataset.i];
@@ -835,7 +845,7 @@ function nbDesignView({$, nb, project, root}){
         if (kid) kid.style.cssText = blockStyle(p.blocks[j]);
       }
       touched();
-    });
+    };
   }
 
   // ---- the language's controls ------------------------------------------------------
@@ -903,6 +913,10 @@ function nbDesignView({$, nb, project, root}){
     band.querySelector('[data-dst="from"]').onchange = e => {
       if (!e.target.value) return;
       const f = fromScheme(e.target.value, t.name);
+      // An action, not a setting: the pulldown goes back to keeping the
+      // colors once they are filled. Its markup always draws that first
+      // line, so a patch alone would leave the pick showing (R244).
+      e.target.value = "";
       t.mode = f.mode; t.colors = f.colors; touched(); drawDesign();
     };
     band.querySelectorAll("[data-dstc]").forEach(row => {
@@ -922,10 +936,11 @@ function nbDesignView({$, nb, project, root}){
       t.colors.push({name: "", hex: paint("accent"), means: ""}); touched(); drawDesign();
       root.querySelector(`#dst-${i}-name-${t.colors.length - 1}`)?.focus();
     };
-    band.querySelector("[data-dstladd]")?.addEventListener("click", () => {
+    const press = (sel, fn) => { const b = band.querySelector(sel); if (b) b.onclick = fn; };
+    press("[data-dstladd]", () => {
       t.light = t.colors.map(c => ({name: c.name, hex: c.hex, means: c.means})); touched(); drawDesign();
     });
-    band.querySelector("[data-dstlrm]")?.addEventListener("click", () => { t.light = []; touched(); drawDesign(); });
+    press("[data-dstlrm]", () => { t.light = []; touched(); drawDesign(); });
     band.querySelectorAll("[data-dstl]").forEach(row => {
       const c = (t.light || [])[+row.dataset.dstl]; if (!c) return;
       row.querySelector('[data-dslm="name"]').oninput = e => { c.name = e.target.value; touched(); };
@@ -935,7 +950,7 @@ function nbDesignView({$, nb, project, root}){
         c.hex = v; e.target.previousElementSibling.style.background = v; touched();
       };
     });
-    band.querySelector("[data-dstdefault]")?.addEventListener("click", () => {
+    press("[data-dstdefault]", () => {
       L.themes.splice(i, 1); L.themes.unshift(t); nb.dsShow.theme = 0; touched(); drawDesign();
     });
     band.querySelector("[data-dstrm]").onclick = () => {

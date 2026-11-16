@@ -135,7 +135,12 @@ function drawInto(el, html, quiet, keyed){
 // markup draws, its children (a fold read when it is opened), and on one the
 // code puts in, the element itself (patchOwn).
 const PATCH_PRESS = ["disabled", "aria-busy"];
-function patchAttrs(n){ const o = {}; for (const at of n.attributes) o[at.name] = at.value; return o; }
+// ...never its style attribute, which no markup writes (the content policy
+// draws none: data-style is the markup's, applied through the CSSOM). Read
+// off an element the markup never recorded (a part a press drew by its own
+// hand), it was taken for the markup's and removed, the block's place and
+// color with it, while its data-style said nothing had changed.
+function patchAttrs(n){ const o = {}; for (const at of n.attributes) if (at.name !== "style") o[at.name] = at.value; return o; }
 function patchRecord(root){
   if (root.nodeType !== 1) return;
   root.__markup = patchAttrs(root);

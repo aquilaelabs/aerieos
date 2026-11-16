@@ -33,7 +33,6 @@ let nodesPick = "";              // which node the tab is showing, "" until the 
 // the DOM because the tab repaints on every heartbeat: a field that lived
 // only in the row would lose its text every 25 seconds.
 const nodesConf = {};
-let nodesFocus = null;           // {id, key, i}: the field to refocus after a repaint
 // When Update agent was pressed per node, so the button stays busy until the
 // agent comes back with the new digest (see renderNodesInto).
 const nodesUpdating = {};
@@ -47,7 +46,6 @@ let nodesReveal = null;
 function openNodesTab(nid, what){
   if (nid){
     nodesPick = nid;
-    nodesFocus = null;
     if (what && what !== "agent") sectOpen["nodes:" + what] = true;
     nodesReveal = what === "agent" ? '[data-nd="update-agent"], .ndagent'
                 : what ? `[data-sect="nodes:${what}"]` : null;
@@ -2956,9 +2954,7 @@ function wireNodesTab(root){
     wireNodeConf(box, id);
     const pi = box.querySelector('.ndpaths [data-k="paths"]');
     if (pi){
-      pi.onfocus = () => { nodesFocus = {id, key: "paths", pos: pi.selectionStart ?? undefined}; };
-      pi.oninput = () => { const c = nodeDraft(nodesList.find(x => x.id === id)); c.draft.pathsText = pi.value;
-                           nodesFocus = {id, key: "paths", pos: pi.selectionStart ?? undefined}; };
+      pi.oninput = () => { const c = nodeDraft(nodesList.find(x => x.id === id)); c.draft.pathsText = pi.value; };
     }
     // ...and the name under Advanced: without it a heartbeat's repaint
     // between typing a new name and pressing Rename put the old one back,
@@ -2966,9 +2962,7 @@ function wireNodesTab(root){
     // on exactly that, now and then).
     const ni = box.querySelector('.ndname [data-k="name"]');
     if (ni){
-      ni.onfocus = () => { nodesFocus = {id, key: "name", pos: ni.selectionStart ?? undefined}; };
       ni.oninput = () => { const c = nodeDraft(nodesList.find(x => x.id === id)); c.draft.nameText = ni.value;
-                           nodesFocus = {id, key: "name", pos: ni.selectionStart ?? undefined};
                            // Rename wakes on a new name (the operator, 18 Oct).
                            const rn = box.querySelector('[data-nd="rename"]'), v = ni.value.trim();
                            if (rn) rn.disabled = !v || v === (nodesList.find(x => x.id === id)?.name || ""); };
@@ -2998,58 +2992,23 @@ function wireNodesTab(root){
     if (gc) gc.onchange = () => { const c = nodeDraft(nodesList.find(x => x.id === id)); c.draft.gpuComp = gc.checked; };
     const ti = box.querySelector('[data-k="turns"]');
     if (ti){
-      ti.onfocus = () => { nodesFocus = {id, key: "turns"}; };
-      ti.oninput = () => { const c = nodeDraft(nodesList.find(x => x.id === id)); c.draft.turnsText = ti.value;
-                           nodesFocus = {id, key: "turns"}; sessWake(); };
+      ti.oninput = () => { const c = nodeDraft(nodesList.find(x => x.id === id)); c.draft.turnsText = ti.value; sessWake(); };
     }
     const wi = box.querySelector('[data-k="workers"]');
     if (wi){
-      wi.onfocus = () => { nodesFocus = {id, key: "workers"}; };
-      wi.oninput = () => { const c = nodeDraft(nodesList.find(x => x.id === id)); c.draft.workersText = wi.value;
-                           nodesFocus = {id, key: "workers"}; sessWake(); };
+      wi.oninput = () => { const c = nodeDraft(nodesList.find(x => x.id === id)); c.draft.workersText = wi.value; sessWake(); };
     }
   });
-  // The field that had the caret before this repaint gets it back: the
-  // tab redraws on every heartbeat, and a form that drops the caret every
-  // 25 seconds is not a form anybody can type into.
-  if (nodesFocus && nodesFocus.id){
-    const f = nodesFocus;
-    const el = root.querySelector(`.ndrow[data-node="${CSS.escape(f.id)}"] ${
-      f.i === undefined ? "" : `.ndmount[data-i="${f.i}"] `}[data-k="${CSS.escape(f.key)}"]`);
-    // ...only when the repaint took it, which leaves the caret on nothing:
-    // one the person moved on (the enroll or VM dialog, another field) stays
-    // where they put it, and the memory goes (B848: the rename box, which
-    // never forgot, took every keystroke typed in the enroll dialog).
-    const at = document.activeElement;
-    const lost = !at || at === document.body || !at.isConnected;
-    if (el && at !== el && lost){
-      el.focus();
-      if (el.setSelectionRange && typeof f.pos === "number")
-        try{ el.setSelectionRange(f.pos, f.pos); }catch(e){ /* a select has no caret */ }
-    }else if (at !== el && !lost) nodesFocus = null;
-  }
 }
 function wireNodeConf(row, id){
   const fold = row.querySelector(".ndconf");
   if (!fold) return;
   const c = nodesConf[id];
   const touch = () => { c.dirty = true; };
-  const remember = (el) => {
-    const m = el.closest(".ndmount");
-    nodesFocus = {id, key: el.dataset.k, i: m ? Number(m.dataset.i) : undefined,
-                  pos: el.selectionStart ?? undefined};
-  };
+  // The page is patched (R244), so a field keeps its caret through the
+  // heartbeat's redraw with nothing kept by hand.
   fold.querySelectorAll("[data-k]").forEach(el => {
-    el.onfocus = () => remember(el);
-    // Forgotten only when the operator left the field, not when a repaint
-    // took the field away from under the caret: the browser fires blur for
-    // both, and the second is the case this memory exists for.
-    el.onblur = () => setTimeout(() => {
-      if (el.isConnected && nodesFocus && nodesFocus.id === id && nodesFocus.key === el.dataset.k)
-        nodesFocus = null;
-    }, 0);
     const on = () => {
-      remember(el);
       const k = el.dataset.k;
       const m = el.closest(".ndmount");
       const d = c.draft;
@@ -3097,13 +3056,16 @@ function wireNodeConf(row, id){
   const add = fold.querySelector("[data-madd]");
   if (add) add.onclick = () => {
     c.draft.mounts.push({type: "nfs", source: "", path: "", ro: false});
-    touch(); nodesFocus = {id, key: "source", i: c.draft.mounts.length - 1};
-    nodesRev++; drawPanes();
+    touch(); nodesRev++; drawPanes();
+    // ...and the new mount's first field takes the keyboard, the press's
+    // button being kept by the patch rather than thrown away.
+    const i = c.draft.mounts.length - 1;
+    document.querySelector(`.ndrow[data-node="${CSS.escape(id)}"] .ndmount[data-i="${i}"] [data-k="source"]`)?.focus();
   };
   fold.querySelectorAll("[data-mrm]").forEach(b => b.onclick = () => {
     const i = Number(b.closest(".ndmount").dataset.i);
     c.draft.mounts.splice(i, 1);
-    touch(); nodesFocus = null; nodesRev++; drawPanes();
+    touch(); nodesRev++; drawPanes();
   });
   fold.querySelectorAll("[data-nrunner]").forEach(b => b.onclick = async () => {
     const n = nodesList.find(x => x.id === id);

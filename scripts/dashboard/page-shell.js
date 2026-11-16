@@ -547,7 +547,7 @@ function groupPick(g, nid){
     if (GROUP_KEEP[k]){ try{ localStorage.setItem(GROUP_KEEP[k], nid); }catch(e){ /* private */ } }
     if (k === "docker" && typeof dockerNodeKeep === "function") dockerNodeKeep();
   });
-  if (g.key === "machines"){ nodesFocus = null; nodesRev++; storageRev++; instRev++; }
+  if (g.key === "machines"){ nodesRev++; storageRev++; instRev++; }
   if (g.key === "build"){ libRev++; emuRev++; nodesRev++; }
   if (g.key === "containers"){ dockerRev++; nginxRev++; }
   drawPanes();

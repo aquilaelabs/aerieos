@@ -950,6 +950,12 @@ typed, a box ticked, a fold turned) stay, while a press's own state
 (`disabled`, `aria-busy`, a button's label) is the markup's again at the
 next draw, and `pressBack()` and `unbusy()` give a press's button back as
 its markup has it then, never the label kept from before the press. A
+pulldown that is an action rather than a setting (fill a theme from a
+preset) puts itself back on its first line when it has acted, since its
+markup always draws that line and the person's pick would otherwise stay.
+An element's `style` is never the markup's (the content policy draws none;
+`data-style` is, applied through the CSSOM), so a part a press drew by its
+own hand keeps its place and color when the surface around it is patched. A
 patch is not held by an open menu, which it keeps where it is with what is
 typed in it; a document's whole draw still is, in `renderDoc`. What the
 page's code puts into a drawn surface carries `data-own` and is left where
@@ -965,7 +971,8 @@ keeps is set (`onclick =`), never added, or a second draw would run it
 twice. Every page's bar and foot, the rail, the dock's line, a space's
 header, a view's glance, the Spaces grid, the Containers, Nodes, VMs,
 Files, nginx, Library, Home, Sessions and Installed pages, the first-run
-page, and the notebook's Git, bugs, roadmap and Sessions views draw through it, none keeping a caret
+page, and the notebook's Git, Design, bugs, roadmap and Sessions views draw
+through it, none keeping a caret
 or a focus by hand; `patch.mjs` holds every rule.
 
 ### words-on-the-screen

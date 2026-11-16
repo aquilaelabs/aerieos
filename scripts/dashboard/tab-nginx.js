@@ -464,7 +464,8 @@ function nginxReadDraft(sect, n){
   d.certFor = sect.querySelector('[data-ng="certfor"]')?.value.trim() || "";
   // ...and the hostname being typed to add, which is every node's list's
   // and no node's draft: a re-read drew its box empty under the typing. The
-  // box is named (its id), so the pane gives it its caret back (typingIn).
+  // page is patched, so the box keeps its caret (R244); this keeps the text
+  // for a draw that writes the page whole.
   const typed = sect.querySelector("[data-nghostnew]");
   if (typed) nginxHostTyped = typed.value;
 }

@@ -365,5 +365,22 @@ await section("the page's own bar at the top of a surface is not another writer'
      `the same markup is still no change with a jump bar put in at the top, and a change is patched around it, the typing kept (${JSON.stringify(r)})`);
 });
 
+await section("a part a press drew by hand keeps the style its data-style gave it", async () => {
+  // The Design view draws a board again by its own hand when a color moves
+  // (repaintBoard's outerHTML); the next patch read the applied style as an
+  // attribute the markup no longer had, and took every block's place away.
+  await fresh('<div class="page"><div class="board"><div class="blk" data-style="grid-column:1 / span 4">one</div></div></div><i>1</i>');
+  const r = await page.evaluate(async () => {
+    const el = document.querySelector('#r244');
+    el.querySelector('.board').outerHTML = '<div class="board"><div class="blk" data-style="grid-column:2 / span 3">one</div></div>';
+    await new Promise(res => setTimeout(res, 0));                       // the page applies data-style as it lands
+    const blk = el.querySelector('.blk'), applied = blk.style.gridColumn;
+    patch(el, '<div class="page"><div class="board"><div class="blk" data-style="grid-column:2 / span 3">one</div></div></div><i>2</i>');
+    return { applied, kept: el.querySelector('.blk') === blk, after: blk.style.gridColumn, read: el.querySelector('i').textContent };
+  });
+  ok(r.applied === '2 / span 3' && r.kept && r.after === '2 / span 3' && r.read === '2',
+     `its place stays when the surface around it is patched (${JSON.stringify(r)})`);
+});
+
 await page.evaluate(() => document.querySelector('#r244')?.remove());
 await done(browser);

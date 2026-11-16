@@ -222,12 +222,31 @@ await page.click(`${NB} #dsThemeAdd`);
 await page.waitForSelector(`${NB} [data-dstheme="0"] [data-dst="from"]`, { timeout: 5000 });
 await page.selectOption(`${NB} [data-dstheme="0"] [data-dst="from"]`, 'moss');
 await page.waitForFunction(() => document.querySelector('.nb #dst-0-hex-5')?.value === '#63c98a', null, { timeout: 5000 });
-ok(await page.$eval(`${NB} [data-dspage] .dsboard`, e => e.style.backgroundColor.replace(/\s/g, '')) === 'rgb(22,31,27)'
-   && await page.$eval(`${NB} [data-dstheme="0"] [data-dst="from"]`, e => e.value) === '',
-   'filling a theme from a preset sets its ten colors and repaints the boards in it, and the picker goes back to keeping them');
+await section("filling a theme from a preset", async () => {
+  const filled = { board: await page.$eval(`${NB} [data-dspage] .dsboard`, e => e.style.backgroundColor.replace(/\s/g, '')),
+                   from: await page.$eval(`${NB} [data-dstheme="0"] [data-dst="from"]`, e => e.value) };
+  ok(filled.board === 'rgb(22,31,27)' && filled.from === '',
+     `filling a theme from a preset sets its ten colors and repaints the boards in it, and the picker goes back to keeping them (${JSON.stringify(filled)})`);
+});
 await page.fill(`${NB} #dst-0-hex-5`, '#ff8800');
 await page.waitForFunction(() => document.querySelector('.nb [data-dspage] .dsblock[data-i="0"]')?.style.backgroundColor === 'rgb(29, 41, 32)', null, { timeout: 5000 }).catch(() => {});
 await page.fill(`${NB} #dst-0-name-0`, 'page');
+// An edit draws the view again (R244: patched), and what the person is in
+// stays: the pulldown picked from keeps the focus, and a field being typed
+// in keeps its caret when another edit draws the view under it.
+await section("an edit drawing the view again keeps what the person is in", async () => {
+  const r = await page.evaluate(() => {
+    const mode = document.querySelector('.nb [data-dstheme="0"] [data-dst="mode"]'), name = document.querySelector('.nb #dst-0-name-0');
+    mode.focus();
+    mode.value = mode.value === 'dark' ? 'light' : 'dark'; mode.dispatchEvent(new Event('change', { bubbles: true }));
+    const picked = { kept: mode.isConnected, focus: document.activeElement === mode, value: mode.value };
+    name.focus(); name.setSelectionRange(2, 2);
+    mode.value = mode.value === 'dark' ? 'light' : 'dark'; mode.dispatchEvent(new Event('change', { bubbles: true }));
+    return { picked, typed: { kept: name.isConnected, focus: document.activeElement === name, value: name.value, caret: name.selectionStart } };
+  });
+  ok(r.picked.kept && r.picked.focus && r.typed.kept && r.typed.focus && r.typed.value === 'page' && r.typed.caret === 2,
+     `an edit that draws the view again keeps the pulldown it was made in focused, and a field's caret where it was (${JSON.stringify(r)})`);
+});
 await page.selectOption(`${NB} #dsThemeFrom`, 'paper');
 await page.click(`${NB} #dsThemeAdd`);
 await page.waitForSelector(`${NB} [data-dstheme="1"]`, { timeout: 5000 });
@@ -247,8 +266,9 @@ await section("A frame changed and changed back is where it was", async () => {
   const phone = await places();
   await page.selectOption(`${NB} [data-dspage] [data-dsf="frame"]`, 'desktop');
   await page.waitForFunction(() => document.querySelector('.nb [data-dspage] .dsboard')?.dataset.frame === 'desktop', null, { timeout: 5000 });
-  ok(phone !== desk && await places() === desk,
-     `a page put on the phone frame and back on the desktop one has its blocks where they were (${desk.split('; ')[4]})`);
+  const back = await places();
+  ok(phone !== desk && back === desk,
+     `a page put on the phone frame and back on the desktop one has its blocks where they were (${JSON.stringify({ desk, phone, back })})`);
   await page.selectOption(`${NB} [data-dspage] [data-dsf="frame"]`, 'phone');
   await page.waitForFunction(() => document.querySelector('.nb [data-dspage] .dsboard')?.dataset.frame === 'phone', null, { timeout: 5000 });
   ok(await places() === phone, '...and the phone frame keeps its own layout for the next visit');
