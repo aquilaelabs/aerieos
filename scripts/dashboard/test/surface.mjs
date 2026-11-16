@@ -119,7 +119,7 @@ const SURFACE = [ 'adoptLayout', 'adoptMode', 'adoptMotion', 'applyMotion', 'ado
   'setProjectPinned', 'shortUptime', 'shortUptime', 'show', 'showInStack', 'holdLeaving',
   'signIn', 'signOut', 'slideDetails', 'foldOpen',
   'slideHidden', 'fadeIn', 'ghostOf', 'ghostOut', 'fadeThrough', 'moveKey', 'onScreen', 'chipMove', 'slideMark', 'swapBox', 'startClaude', 'sendSure', 'launchClaude',   'openBrief', 'closeBrief', 'briefGo', 'pArchivePicked',
-  'tabLabel', 'tabLabels', 'tabTitle', 'untitle', 'untitleIn', 'helpToggle', 'helpShow', 'helpHide', 'cLock', 'C_MANAGED', 'dmUnrouted', 'nodeDoorConfig', 'nginxUndeployed', 'resumePicker', 'toggleBell', 'toggleUiMenu', 'unveil', 'watchSignin', 'wireConsole', 'wireLogSection', 'wireJobsTab', 'wireNodeConf', 'wireNodesTab', 
+  'tabLabel', 'tabLabels', 'tabTitle', 'untitle', 'untitleIn', 'helpToggle', 'helpShow', 'helpHide', 'cLock', 'dmUnrouted', 'nodeDoorConfig', 'nginxUndeployed', 'resumePicker', 'toggleBell', 'toggleUiMenu', 'unveil', 'watchSignin', 'wireConsole', 'wireLogSection', 'wireJobsTab', 'wireNodeConf', 'wireNodesTab', 
   'wireProjectRows'
 ];
 
