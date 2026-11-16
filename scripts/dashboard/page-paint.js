@@ -45,9 +45,18 @@ function setTitle(el, s){ if (el && saidOf(el) !== String(s)) el.title = String(
 // "First" means: nothing has been painted here yet, or what was here was a
 // placeholder saying it had not arrived.
 const WAITING = /class="(loading|empty)[ "]|loading…/;
-const paintedKids = el => { let n = el.childNodes.length;
-  for (const c of el.children) if (c.classList.contains("slmark")) n--;
+// What a draw wrote into a surface, as its record knows it: its children
+// but the page's own (patchOwn: a slide marker, a section's jump bar put
+// before its first section), which the page's code puts in beside them and
+// which make the markup no staler. Counted with them, the Git view's jump
+// bar at the top of its list read as another writer's every time, and the
+// list was written whole, a commit message being typed with it (R244).
+const paintedKids = el => { let n = 0;
+  for (const c of el.childNodes) if (!patchOwn(c)) n++;
   return n; };
+const paintedFirst = el => { let c = el.firstChild;
+  while (patchOwn(c)) c = c.nextSibling;
+  return c; };
 function paint(el, html, quiet = false){ return drawInto(el, html, quiet, false); }
 
 // The same, with the new markup patched into what is there rather than
@@ -70,7 +79,7 @@ function drawInto(el, html, quiet, keyed){
   // replaces nothing and still reads as unchanged.
   // ...counting the children it wrote: a slide marker (slideMark) put in
   // beside them is the motion's, not a write that makes the markup stale.
-  const was = rec && rec.first === el.firstChild && rec.n === paintedKids(el) ? rec.html : undefined;
+  const was = rec && rec.first === paintedFirst(el) && rec.n === paintedKids(el) ? rec.html : undefined;
   // ...unless a button in it was marked busy since (busy(): "Asking..."):
   // the press rewrote it in place, and the same markup painted again is what
   // takes the mark off. Skipped, Measure now said Asking until a reload (the
@@ -91,7 +100,7 @@ function drawInto(el, html, quiet, keyed){
     // What the markup gave each element, for the first patch after it.
     if (keyed) for (const c of el.children) patchRecord(c);
   }
-  painted.set(el, {html, first: el.firstChild, n: paintedKids(el)});
+  painted.set(el, {html, first: paintedFirst(el), n: paintedKids(el)});
   // ...but never while the card around it is folding. contentIn starts at
   // opacity 0 and takes 180ms, which is exactly the fold's duration, so a
   // repaint landing on a collapsing card blanks its body at full height and
@@ -243,8 +252,15 @@ function patchNode(a, b){
 // its own hand) follows the markup like the rest, so nothing stale stays.
 function patchOwn(n){ return !!n && n.nodeType === 1 && !n.__markup && n.hasAttribute("data-own"); }
 function patchKids(from, to){
+  // A key two siblings share is matched in their order, the first old one to
+  // the first new one, so neither is taken for the other.
   const named = new Map();
-  for (const n of from.childNodes){ const k = patchKey(n); if (k && !patchOwn(n)) named.set(n.tagName + "#" + k, n); }
+  for (const n of from.childNodes){
+    const k = patchKey(n);
+    if (!k || patchOwn(n)) continue;
+    const id = n.tagName + "#" + k;
+    if (named.has(id)) named.get(id).push(n); else named.set(id, [n]);
+  }
   let cur = from.firstChild;
   for (const want of [...to.childNodes]){
     while (patchOwn(cur)) cur = cur.nextSibling;
@@ -255,9 +271,10 @@ function patchKids(from, to){
         && !patchKey(cur.nextSibling) && patchSame(cur.nextSibling, want)){
       const gone = cur; cur = cur.nextSibling; from.removeChild(gone);
     }
-    const old = k ? named.get(want.tagName + "#" + k) : cur && !patchKey(cur) ? cur : null;
+    const same = k ? named.get(want.tagName + "#" + k) : null;
+    const old = k ? same?.[0] || null : cur && !patchKey(cur) ? cur : null;
     if (old && patchSame(old, want)){
-      if (k) named.delete(want.tagName + "#" + k);
+      if (k) same.shift();
       if (old !== cur && patchHeld(old)){
         // Moving it would blur what has the focus and close an open
         // dialog, so the ones before it are moved past it instead, in
@@ -303,19 +320,6 @@ function pressBack(btn){
   if (!btn?.isConnected) return;
   const want = !!btn.__markup && "disabled" in btn.__markup;
   if (btn.disabled !== want) btn.disabled = want;
-}
-
-// A change a press already made in place (a card turned over: its class and
-// its faces' inert) written into what paint() remembers, so the next paint
-// of the same markup is no change and the element is left alone. Replacing
-// it instead, as the turn ends, flashed the card in Firefox (the operator,
-// 29 Oct). Only where the record still holds `from`, so a poll's change
-// since is still drawn.
-function paintAdopt(el, from, to){
-  const rec = painted.get(el);
-  if (!rec || rec.first !== el.firstChild || rec.n !== paintedKids(el) || from === to || !rec.html.includes(from)) return false;
-  rec.html = rec.html.replace(from, to);
-  return true;
 }
 
 // A terminal at some directory, always a new one. "" is the workspace root.

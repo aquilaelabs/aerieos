@@ -259,7 +259,7 @@ function makeNotebook(project){
     if (el.hidden){ if (el.firstChild) el.innerHTML = ""; return; }
     const n = nb.roadmapBatch?.changes || 0;
     const mins = nb.roadmapBatch?.at ? Math.max(1, Math.round((Date.now() / 1000 - nb.roadmapBatch.at) / 60)) : 0;
-    paint(el, nb.roadmapBatch?.stale
+    patch(el, nb.roadmapBatch?.stale
       ? `<div>A session started changing this notebook ${mins} min ago and never closed it.
          Nothing is held: your saves go through.${
          state?.can?.admin ? ` <button type="button" id="roadmapBatchClose">Close it</button>` : ""}</div>`
@@ -1253,7 +1253,7 @@ async function reposAlso(el, project, kind){
       <span class="pid">${tag}${x.id}</span><span class="alsotext">${esc(x.text)}</span></div>`).join("")
     : `<div class="empty">nothing open in its other repositories</div>`;
   const html = docSection(kind, "also", `Also in ${r.name}`, `${rows.length} ${noun}${rows.length === 1 ? "" : "s"}`, body, {open: true});
-  if (paint(el, html)){
+  if (patch(el, html)){
     wireSections(el);
     el.querySelectorAll("[data-also]").forEach(b => b.onclick = () => openNotebook(b.dataset.also, kind === "bugs" ? "bugs" : "roadmap"));
   }

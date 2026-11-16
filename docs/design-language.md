@@ -938,24 +938,35 @@ over it: every element the new markup can be matched to is kept and brought
 up to date, so a field being typed in keeps its value, its caret and an IME
 composition, and a dialog open in the surface stays open. A list's rows
 carry `data-key`, so a row added, taken away or moved takes nothing of its
-neighbors'; a form control or a button is matched only to one with the
-same type, name and `data-*`, so typing is never handed to another field
-and a press never writes to another action's button. It changes only what
-the markup changed since it last drew: what the page puts on an element
-itself (the password managers' ignore marks, a title moved to
-`aria-description`, a class it added) and what a person changed (a value
+neighbors'; rows that share a key are matched in their order, and a key
+says which row it is (a file's fold is its path, not only its state). A
+form control or a button is matched only to one with the same type, name
+and `data-*`, so typing is never handed to another field and a press never
+writes to another action's button. It changes only what the markup changed
+since it last drew: what the page puts on an element itself (the password
+managers' ignore marks, a title moved to `aria-description`, a class it
+added, a card turned over by a press) and what a person changed (a value
 typed, a box ticked, a fold turned) stay, while a press's own state
 (`disabled`, `aria-busy`, a button's label) is the markup's again at the
 next draw, and `pressBack()` and `unbusy()` give a press's button back as
 its markup has it then, never the label kept from before the press. A
 patch is not held by an open menu, which it keeps where it is with what is
-typed in it; a document's whole draw still is, in `renderDoc`. What the page's code puts into a drawn surface carries `data-own`
-(a jump bar, a slide marker, a status it fills into a summary) and is left
-where it is; on an element the markup draws, `data-own` says its children
-are its code's (a fold read when it is opened). The Containers, Nodes, VMs,
-Files, nginx and Library pages, the Git view's branch picker, the Sessions
-view's conversations and the first-run page draw through it, none keeping a
-caret or a focus by hand; `patch.mjs` holds every rule.
+typed in it; a document's whole draw still is, in `renderDoc`. What the
+page's code puts into a drawn surface carries `data-own` and is left where
+it is: a jump bar, a slide marker, a status it fills into a summary, a box
+asking for a name (`askInline`), a card's color swatches, and a copy of a
+part fading out (`.fghost`), which a patch landing while it fades never
+takes for the part it copies. The record of a draw steps over them too, so
+a jump bar put before a surface's first section is not another writer's
+and the next draw is still a patch. On an element the markup draws,
+`data-own` says its children are its code's (a fold read when it is opened,
+a commit's detail read when it is picked). A handler on an element a patch
+keeps is set (`onclick =`), never added, or a second draw would run it
+twice. Every page's bar and foot, the rail, the dock's line, a space's
+header, a view's glance, the Spaces grid, the Containers, Nodes, VMs,
+Files, nginx, Library, Home, Sessions and Installed pages, the first-run
+page, and the notebook's Git, bugs, roadmap and Sessions views draw through it, none keeping a caret
+or a focus by hand; `patch.mjs` holds every rule.
 
 ### words-on-the-screen
 

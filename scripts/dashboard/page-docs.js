@@ -47,7 +47,7 @@ function nodePick(id, nodes, cur, why = () => ""){
 // What a list, a grid or a page is waiting with (R218 step 15, the operator
 // 16 Oct): shapes laid out the way its content will land, shimmering, where
 // a "loading…" line said the same in words. Still a .loading, so everything
-// that knew a placeholder knows this one: paint() fades in what replaces it,
+// that knew a placeholder knows this one: a draw fades in what replaces it,
 // the poll's failure notice writes its words over it, a suite waits for it
 // to go. The words stay for a screen reader. A shape: rows (a list), cards
 // (a grid of cards), tiles (a row of numbers), home (Home's tiles and two
@@ -323,6 +323,10 @@ function askInline(after, {label, value = "", ok = "OK", options = [], allowEmpt
     if (was?.classList.contains("askline") && was.__label === label){ resolve(null); return; }
     const box = document.createElement("div");
     box.className = "field askline";
+    // The page's own while it is open: a redraw of the surface it is in
+    // (a card's back, a group's head) leaves it where it is, with what is
+    // typed in it (R244).
+    box.setAttribute("data-own", "");
     // With options, the field is one to type in and a pulldown of every
     // option at once (the operator, 26 Oct: a datalist hinted only once
     // something was typed): its chevron opens the whole list, typing narrows
@@ -433,8 +437,9 @@ function docSurface(i, kind){
   // every draw, a page drawn by the poll was born again each time, its list
   // fading in as if it had just arrived, its scroll and whatever was under
   // the pointer lost, though nothing in it had changed. A draw that changes
-  // nothing now writes nothing: the list goes through paint(), and the bar
-  // and the foot are written only when what they say moved.
+  // nothing now writes nothing: the list goes through paint() or patch(),
+  // and the bar and the foot are patched only where what they say moved, a
+  // picker or a search in the bar kept as it is (R244).
   let box = el.firstElementChild;
   if (!box || el.children.length !== 1 || !box.classList.contains("doctab") || !box.classList.contains(`${kind}tab`)
       || !box.querySelector(":scope > .doclist")){
@@ -449,7 +454,7 @@ function docSurface(i, kind){
   const foot = box.querySelector(":scope > .fnote");
   const slot = (node, html) => {
     const s = String(html);
-    paint(node, s, true);
+    patch(node, s, true);
     const off = !s.trim();
     if (node.hidden !== off) node.hidden = off;
   };
@@ -1114,7 +1119,7 @@ function glanceWaiting(el){
   const was = glanceSeen[el.id];
   const n = was ? was.tiles : +el.dataset.tiles || 0;
   const said = was ? was.said : "said" in el.dataset;
-  return paint(el, statTiles(Array.from({length: n}, () => ({value: GHOST, label: "\u00a0"})))
+  return patch(el, statTiles(Array.from({length: n}, () => ({value: GHOST, label: "\u00a0"})))
                + (said ? viewSaid(skel("word")) : ""));
 }
 // What a view has to say beside its tiles, in the notice voice (the operator,
@@ -1137,9 +1142,9 @@ function viewGlance(el, tiles = [], said = "", actions = "", tone = ""){
   const slot = el.closest(".nbview")?.querySelector(":scope > .nbhead > .nbsaidslot");
   let wrote;
   if (slot){
-    wrote = paint(el, html);
-    wrote = paint(slot, said || actions ? `<div class="notice ${esc(tone || "note")}">${said}${actions ? `<div class="actbar">${actions}</div>` : ""}</div>` : "") || wrote;
-  } else wrote = paint(el, html + viewSaid(said, actions, tone));
+    wrote = patch(el, html);
+    wrote = patch(slot, said || actions ? `<div class="notice ${esc(tone || "note")}">${said}${actions ? `<div class="actbar">${actions}</div>` : ""}</div>` : "") || wrote;
+  } else wrote = patch(el, html + viewSaid(said, actions, tone));
   // Marked once: a poll that brings nothing new writes nothing (uniform).
   if (!el.dataset.drawn) el.dataset.drawn = "1";
   glanceSeen[el.id] = {tiles: el.querySelectorAll(".tile").length, said: !!(said || actions)};

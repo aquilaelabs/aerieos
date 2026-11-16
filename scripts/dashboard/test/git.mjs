@@ -715,8 +715,12 @@ print(json.dumps(g._done(said, "fetched", ${JSON.stringify(`${DIR}/ws/beta`)})))
   await page.waitForFunction(() => [...document.querySelectorAll('.nb .nbview[data-view="git"] .gbranch:not([hidden])')].every(r => r.dataset.kind === 'remote'), null, { timeout: 5000 });
   await page.click('.nb .nbview[data-view="git"] [data-gbchip=""]');
   await page.fill('.nb .nbview[data-view="git"] #gitBranchFind', 'old-w');
-  ok(await page.$$eval('.nb .nbview[data-view="git"] .gbranch:not([hidden])', rs => rs.map(r => r.dataset.branch).join()) === 'old-work',
-     'a chip narrows the table to its kind, and the search to the names holding what is typed');
+  // ...the rows on show, not the copies of the ones a chip took away while
+  // they fade (.fghost, which every reader of the parts skips).
+  const narrowed = await page.$$eval('.nb .nbview[data-view="git"] .gbranch:not([hidden]):not(.fghost)', rs => rs.map(r => r.dataset.branch).join());
+  const ghosts = await page.$$eval('.nb .nbview[data-view="git"] .gbranch.fghost', rs => rs.length);
+  ok(narrowed === 'old-work',
+     `a chip narrows the table to its kind, and the search to the names holding what is typed (${JSON.stringify({ narrowed, ghosts })})`);
   await page.fill('.nb .nbview[data-view="git"] #gitBranchFind', '');
   await page.click('.nb .nbview[data-view="git"] [data-gbchip="active"]');
   // R69 step 1 in the view: the fold lists what is only on the host, and
@@ -763,6 +767,24 @@ print(json.dumps(g._done(said, "fetched", ${JSON.stringify(`${DIR}/ws/beta`)})))
        `a new branch made and switched to with changes not committed takes them along (${JSON.stringify({ error: j.error, on, dirty, still })})`);
   }
   await openFold(page, '.nb .nbview[data-view="git"] [data-sect="git:changes"]');   // one section open at a time
+  // A message being typed outlives the view drawn again under it (R244): a
+  // session's commit moves the view (its token is HEAD's log) while a person
+  // writes the words of their own.
+  {
+    const V = '.nb .nbview[data-view="git"]';
+    await page.click(`${V} #gitMsg`);
+    await page.keyboard.type('From the', { delay: 30 });
+    const box = await page.$(`${V} #gitMsg`);
+    git('commit', '-q', '--allow-empty', '-m', 'A session commits meanwhile');
+    const moved = await refreshUntil(page, () => /A session commits meanwhile/.test(document.querySelector('.nb .nbview[data-view="git"] .gitgraph')?.textContent || ''), { timeout: 15000 })
+      .then(() => true, () => false);
+    await page.keyboard.type(' view', { delay: 30 });
+    const r = await page.evaluate(b => ({ kept: b.isConnected, focus: document.activeElement === b, value: b.value, caret: b.selectionStart }), box);
+    ok(moved && r.kept && r.focus && r.value === 'From the view' && r.caret === 13,
+       `a commit message being typed keeps its box, its focus and its caret while a commit draws the view again (${JSON.stringify({ moved, ...r })})`);
+    git('reset', '-q', '--soft', 'HEAD~1');
+    await refreshUntil(page, () => !/A session commits meanwhile/.test(document.querySelector('.nb .nbview[data-view="git"] .gitgraph')?.textContent || ''), { timeout: 15000 }).catch(() => {});
+  }
   await page.fill('.nb .nbview[data-view="git"] #gitMsg', 'From the view');
   await page.click('.nb .nbview[data-view="git"] #gitCommit');
   await refreshUntil(page, () => /From the view/.test(document.querySelector('.nb .nbview[data-view="git"] .gitgraph')?.textContent || ''), { timeout: 20000 });

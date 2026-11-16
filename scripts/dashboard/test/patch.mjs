@@ -281,5 +281,89 @@ await section("a style the markup changes is applied to the element it keeps", a
      `a band given its space's color by the markup takes the new one, and none once the markup draws none (${JSON.stringify(r)})`);
 });
 
+await section("a box open on a card stays in its card while the cards move", async () => {
+  // The Spaces grid's shape: cards keyed by their space, a rename's box
+  // (askInline, the page's own) open on one of them, and the poll bringing
+  // the cards back in another order with that card's words changed.
+  const card = (k, name) => `<div class="pcard" data-pkey="${k}" data-key="${k}"><div class="pcname">${name}</div><div class="pcrepos">${k} repos</div></div>`;
+  await fresh(`<div class="pgrid">${card('alpha', 'alpha')}${card('beta', 'beta')}</div>`);
+  const r = await page.evaluate(([a2, b]) => {
+    const el = document.querySelector('#r244'), a = el.querySelector('[data-key="alpha"]');
+    askInline(a.querySelector('.pcname'), { label: 'Rename alpha to', value: 'alpha' });
+    const box = a.querySelector('.askline'), inp = box?.querySelector('input');
+    if (inp){ inp.focus(); inp.value = 'alpha-renamed'; }
+    patch(el, `<div class="pgrid">${b}${a2}</div>`);
+    const now = el.querySelector('[data-key="alpha"]');
+    return { same: now === a, order: [...el.querySelectorAll('.pcard')].map(c => c.dataset.key).join(','), words: now.querySelector('.pcname').textContent,
+             box: !!box && box.isConnected && box.closest('.pcard') === a, value: inp?.value, focus: document.activeElement === inp };
+  }, [card('alpha', 'alpha, pinned'), card('beta', 'beta')]);
+  ok(r.same && r.order === 'beta,alpha' && r.words === 'alpha, pinned' && r.box && r.value === 'alpha-renamed',
+     `a card is kept by its key when the grid comes back in another order, and the box open on it stays there with what was typed (${JSON.stringify(r)})`);
+  await page.evaluate(() => document.querySelectorAll('.askline').forEach(x => x.__done?.(null)));
+});
+
+await section("a copy fading out is never taken for the part it copies", async () => {
+  // A press that draws a part again fades a copy of the old one out over it
+  // (fadeThrough, chipMove); a poll landing meanwhile matches by key, and the
+  // copy carries the key it was copied with.
+  await fresh('<div class="list"><div class="row" data-key="r1">one</div><div class="row" data-key="r2">two</div></div>');
+  const r = await page.evaluate(() => {
+    const el = document.querySelector('#r244'), r1 = el.querySelector('[data-key="r1"]');
+    ghostOut(ghostOf(r1), r1.parentNode);
+    const ghost = el.querySelector('.fghost');
+    patch(el, '<div class="list"><div class="row" data-key="r1">one, changed</div><div class="row" data-key="r2">two</div></div>');
+    const rows = [...el.querySelectorAll('.row:not(.fghost)')];
+    return { ghost: !!ghost, real: rows[0] === r1, words: r1.textContent, ghostWords: ghost?.textContent, rows: rows.length };
+  });
+  ok(r.ghost && r.real && r.words === 'one, changed' && r.ghostWords === 'one' && r.rows === 2,
+     `the row is brought up to date and the copy fading over it is left to fade (${JSON.stringify(r)})`);
+});
+
+await section("the rail keeps the button pressed when the group on show moves", async () => {
+  const r = await page.evaluate(() => new Promise(res => {
+    const rail = document.getElementById('rail'), was = rail?.querySelector('.ritem.on')?.dataset.rail;
+    const go = [...(rail?.querySelectorAll('[data-rail]') || [])].find(b => b.dataset.rail !== was);
+    if (!go){ res({ none: true }); return; }
+    const btns = [...rail.querySelectorAll('[data-rail]')];
+    go.focus(); go.click();
+    setTimeout(() => res({ to: go.dataset.rail, on: go.classList.contains('on'), focus: document.activeElement === go,
+                            kept: btns.every(b => b.isConnected), back: was }), 600);
+  }));
+  ok(r.on && r.focus && r.kept, `a group pressed on the rail wears the mark on the same button, which keeps the keyboard's focus (${JSON.stringify(r)})`);
+  if (r.back) await page.evaluate(k => railGo(k), r.back);
+});
+
+await section("rows that share a key are matched in their order", async () => {
+  // Two files in the same state once drew the same key: the second old row
+  // was taken for the first new one, its fold and its read with it.
+  await fresh('<div class="list"><details class="gfile" data-key="m|1"><summary>a.txt</summary></details><details class="gfile" data-key="m|1"><summary>b.txt</summary></details></div>');
+  const r = await page.evaluate(() => {
+    const el = document.querySelector('#r244'), [a, b] = el.querySelectorAll('.gfile');
+    a.open = true;
+    patch(el, '<div class="list"><details class="gfile" data-key="m|1"><summary>a.txt, now</summary></details><details class="gfile" data-key="m|1"><summary>b.txt</summary></details></div>');
+    const [a2, b2] = el.querySelectorAll('.gfile');
+    return { first: a2 === a, second: b2 === b, open: [a2.open, b2.open], words: [a2.textContent, b2.textContent] };
+  });
+  ok(r.first && r.second && r.open[0] && !r.open[1] && r.words[0] === 'a.txt, now',
+     `the first stays the first and the second the second, the fold turned on the first kept on it (${JSON.stringify(r)})`);
+});
+
+await section("the page's own bar at the top of a surface is not another writer's", async () => {
+  // A section's jump bar is put before the first section, which in the Git
+  // view is the surface's first child: read as another writer's, every draw
+  // of the view was written whole, a message being typed with it.
+  await fresh('<details class="sect" open><summary><span class="t">Changes</span></summary><textarea id="r244msg"></textarea></details><details class="sect"><summary><span class="t">History</span></summary><i>1</i></details>');
+  const r = await page.evaluate(() => {
+    const el = document.querySelector('#r244'), t = el.querySelector('#r244msg');
+    const nav = document.createElement('nav'); nav.className = 'sectjump'; nav.setAttribute('data-own', ''); el.prepend(nav);
+    t.focus(); t.value = 'typed';
+    const same = patch(el, '<details class="sect" open><summary><span class="t">Changes</span></summary><textarea id="r244msg"></textarea></details><details class="sect"><summary><span class="t">History</span></summary><i>1</i></details>');
+    patch(el, '<details class="sect" open><summary><span class="t">Changes</span></summary><textarea id="r244msg"></textarea></details><details class="sect"><summary><span class="t">History</span></summary><i>2</i></details>');
+    return { same, kept: t.isConnected, focus: document.activeElement === t, value: t.value, nav: nav.isConnected && el.firstChild === nav, read: el.querySelector('i').textContent };
+  });
+  ok(!r.same && r.kept && r.focus && r.value === 'typed' && r.nav && r.read === '2',
+     `the same markup is still no change with a jump bar put in at the top, and a change is patched around it, the typing kept (${JSON.stringify(r)})`);
+});
+
 await page.evaluate(() => document.querySelector('#r244')?.remove());
 await done(browser);

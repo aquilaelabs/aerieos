@@ -275,7 +275,10 @@ function nbGitView({$, nb, project}){
     const local = (git.branches || []).filter(b => !b.remote), remote = (git.branches || []).filter(b => b.remote);
     const locked = shut();
     const tree = treeOf();
-    const fileKey = f => `${f.state}|${f.staged ? 1 : 0}|${f.at || ""}`;
+    // A file's fold by its path and its state: the diff is read again when the
+    // state moves, and two files in the same state are never one another's
+    // when the list is patched (R244).
+    const fileKey = f => `${f.path}|${f.state}|${f.staged ? 1 : 0}|${f.at || ""}`;
     const fileRows = files.map(f => `<details class="sect gfile" data-path="${esc(f.path)}" data-key="${esc(fileKey(f))}"${
         gitOpenFiles.has(f.path) ? " open" : ""}>
         <summary><span class="t"><code>${esc(f.path)}</code></span>
@@ -422,12 +425,14 @@ function nbGitView({$, nb, project}){
         <button type="button" class="primary" data-gitask="conflicts"
           title="hand the merge to the space's session to finish">Resolve with ${esc(sendAgent(project).name)}</button>
       </div>` : "";
-    body.innerHTML = docSection("git", "changes", gitTitle("changes"), files.length ? String(files.length) : "none",
+    // Patched (R244): a commit message being typed, a branch being found and
+    // a fold turned stay as they are when a session's work moves the view.
+    patch(body, docSection("git", "changes", gitTitle("changes"), files.length ? String(files.length) : "none",
         conflictBar + (files.length ? treeNote : "") + commitBar + (files.length ? fileRows : `<div class="empty">nothing changed since the last commit</div>`))
       + docSection("git", "history", gitTitle("history"), commits.length ? `${commits.length}${commits.length >= 100 ? "+" : ""}` : "none",
-        graph + `<div id="gitDetail"${gitPick ? "" : " hidden"}></div>`)
+        graph + `<div id="gitDetail"${gitPick ? "" : " hidden"} data-own></div>`)
       + docSection("git", "branches", gitTitle("branches"), String(local.length), (branchRows || `<div class="empty">no branches</div>`))
-      + ciSection();
+      + ciSection());
     wireSections(body);
     wireMore(body);
     gitBranchShow(body);
@@ -494,11 +499,12 @@ function nbGitView({$, nb, project}){
       const name = b.dataset.gitdelete;
       if (await askYes(`Delete the branch ${name}?`)) gitAct("delete", {name}, gitBusy(b), "Deleting");
     });
+    // Set, not added: the patch keeps a fold from one draw to the next.
     body.querySelectorAll(".gfile").forEach(d => {
-      d.addEventListener("toggle", () => {
+      d.ontoggle = () => {
         if (d.open) gitOpenFiles.add(d.dataset.path); else gitOpenFiles.delete(d.dataset.path);
         if (d.open && d.querySelector(".loading")) loadGitFile(d);
-      });
+      };
       if (d.open && d.querySelector(".loading")) loadGitFile(d);
     });
     body.querySelectorAll(".grow[data-sha]").forEach(r => r.onclick = () => {
@@ -683,12 +689,12 @@ function nbGitView({$, nb, project}){
         ${barred || !commits.length ? "" : `<button type="button" class="primary" data-gitmerge="${esc(name)}" data-gitinto="${esc(main)}"${
           theirs ? ` data-gitwho="${esc(b.who)}"` : ""} title="merge ${esc(name)} into ${esc(main)}">Merge into ${esc(main)}</button>`}
       </div>`;
-    box.innerHTML = back
+    patch(box, back
       + `<div class="field gcmpsum"><div class="sub">${esc(name)}${b.who ? `, ${b.who === state?.me ? "your session's" : `${esc(b.who)}'s session's`}` : ""}: ${
           commits.length} commit${s_(commits.length)}, ${files.length} file${s_(files.length)} changed, <span class="gadd">+${added}</span> <span class="gdel">−${removed}</span></div></div>`
       + docSection("git", "cmp-commits", "Commits", String(commits.length), commitRows)
       + docSection("git", "cmp-files", "Files changed", String(files.length), fileRows)
-      + foot;
+      + foot);
     wireSections(box);
         wireBranchActs(box);
   }
@@ -697,7 +703,10 @@ function nbGitView({$, nb, project}){
     let box = $("gitDetail");
     if (!box) return;
     box.hidden = false;
-    box.innerHTML = `${skel("lines", 6)}`;
+    // Read again in place when it is this commit's already (a poll, a draw
+    // of the view): its ask pulldown and a branch's name being typed under
+    // it stay (R244). Another commit starts from the waiting shape.
+    if (box.dataset.sha !== sha || !box.querySelector(".gcommit")){ box.innerHTML = `${skel("lines", 6)}`; box.dataset.sha = sha; }
     try{
       const r = await fetch("/api/git?project=" + encodeURIComponent(project) + "&what=show&sha=" + encodeURIComponent(sha));
       const c = await r.json();
@@ -710,7 +719,8 @@ function nbGitView({$, nb, project}){
       box.hidden = false;
       if (c.error){ box.innerHTML = `<div class="hint bad">${esc(c.error)}</div>`; return; }
       const when = c.when ? fmtTime(c.when * 1000) : "";
-      box.innerHTML = `<div class="gcommit">
+      box.dataset.sha = sha;
+      patch(box, `<div class="gcommit">
         <div class="name"><code>${esc(c.short)}</code> ${esc(c.message.split("\n")[0])}</div>
         <div class="sub">${esc(c.author)} &lt;${esc(c.email)}&gt; · ${esc(when)}${
           c.parents.length > 1 ? " · merge" : ""}${c.refs.length ? " · " + c.refs.map(esc).join(", ") : ""}</div>
@@ -727,7 +737,7 @@ function nbGitView({$, nb, project}){
           <button type="button" data-gitrevert="${esc(c.sha)}" title="a new commit that undoes this one; nothing is rewritten">Revert</button>`}
         </div>`}
         ${renderDiff(c.diff)}
-      </div>`;
+      </div>`);
       revealCommit(box, sha);
       box.querySelectorAll("[data-gitrevert]").forEach(b => b.onclick = async () => {
         if (await askYes(`Revert ${c.short}: ${c.message.split("\n")[0]}?\n\nA new commit undoes it; the history keeps both.`))

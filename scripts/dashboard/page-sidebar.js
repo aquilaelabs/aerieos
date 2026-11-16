@@ -330,6 +330,9 @@ function pickProjectColor(btn){
   if (open || !line) return;
   const pop = document.createElement("div");
   pop.className = "pcpop pcpick";
+  // The page's own while it is open, which a redraw of the card or the
+  // header it is in leaves where it is (R244).
+  pop.setAttribute("data-own", "");
   pop.setAttribute("role", "radiogroup");
   pop.setAttribute("aria-label", `your color for ${projectName(key)}`);
   pop.innerHTML = PROJECT_COLORS.map(([n, tone]) => `<button type="button" role="radio" data-color="${n}" aria-checked="${n === cur}"

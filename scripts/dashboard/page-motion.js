@@ -324,7 +324,9 @@ function fadeIn(els){
 // stood, in the parent the redraw left (or drew again) there, so the page's
 // rules still dress it, and fades out on docOut's .09s while the new part
 // fades in. The copy is inert, has no ids and wears .fghost, which every
-// reader of the parts skips.
+// reader of the parts skips, and is the page's own (data-own), which a
+// patch landing while it fades steps over: matched by the key it was
+// copied with, it would be taken for the part it copies (R244).
 function ghostOf(el){
   if (!el || !el.offsetParent) return null;
   return { g: el.cloneNode(true), r: el.getBoundingClientRect(), home: el.parentNode };
@@ -339,6 +341,7 @@ function ghostOut(w, home){
   g.querySelectorAll("[id]").forEach(e => e.removeAttribute("id"));
   g.inert = true;
   g.setAttribute("aria-hidden", "true");
+  g.setAttribute("data-own", "");
   Object.assign(g.style, { position: "absolute", left: "0", top: "0", margin: "0", boxSizing: "border-box",
                            width: `${w.r.width}px`, height: `${w.r.height}px`, pointerEvents: "none", zIndex: "1" });
   at.appendChild(g);
@@ -427,6 +430,7 @@ function chipMove(scope, items, swap){
     g.querySelectorAll("[id]").forEach(e => e.removeAttribute("id"));
     g.inert = true;
     g.setAttribute("aria-hidden", "true");
+    g.setAttribute("data-own", "");
     Object.assign(g.style, {position: "absolute", left: "0", top: "0", margin: "0", boxSizing: "border-box",
                             width: `${was.r.width}px`, height: `${was.r.height}px`, pointerEvents: "none", zIndex: "1"});
     ghosts.push([g, was]);

@@ -182,7 +182,7 @@ const pjEditing = new Set();
 // the repositories' notebooks.
 function projectCard(c){
   const pc = colorAttrs(c.color), on = pjEditing.has(c.key);
-  return `<div class="pcard pflip${pc.cls}${on ? " flipped" : ""}" data-pkey="${esc(c.key)}"${c.first ? ` data-row="${esc(c.first.name)}"` : ""}${pc.style}>
+  return `<div class="pcard pflip${pc.cls}${on ? " flipped" : ""}" data-pkey="${esc(c.key)}" data-key="${esc(c.key)}"${c.first ? ` data-row="${esc(c.first.name)}"` : ""}${pc.style}>
     <div class="pcface pcfront"${on ? " inert" : ""}>${cardFront(c)}</div>
     <div class="pcface pcback"${on ? "" : " inert"}>${cardBack(c)}</div>
   </div>`;
@@ -308,8 +308,7 @@ function pjFadeArm(e){
 // Turn a card over, or back, in place: the class moves and the faces trade
 // which one a press and a screen reader reach; the next paint draws it so.
 function flipCard(key){
-  const on = !pjEditing.has(key), c = projectList().find(x => x.key === key);
-  const was = c ? projectCard(c) : "";
+  const on = !pjEditing.has(key);
   // One card on its back at a time (the operator, 26 Oct): another turned
   // over goes back to its front, a box open on it canceled, as Back does.
   if (on) [...pjEditing].filter(k => k !== key).forEach(k => {
@@ -324,11 +323,11 @@ function flipCard(key){
   card.querySelector(".pcfront").inert = on;
   card.querySelector(".pcback").inert = !on;
   card.querySelectorAll("[data-pedit]").forEach(b => b.setAttribute("aria-expanded", String(on)));
-  // What paint() remembers says so too, so the next poll finds nothing
-  // changed and leaves the card, and a box open on its back (Group, a
-  // rename, a move), alone. Drawn again only where that cannot be said.
-  const grid = card.closest("#pjGrid");
-  if (c && grid && paintAdopt(grid, was, projectCard(c))) return;
+  // The grid is drawn again once the turn is over, which patches the card
+  // to what was done to it here and finds nothing else to change: the card,
+  // and a box open on its back (Group, a rename, a move), stay as they are
+  // (R244). Replacing the card as the turn ended flashed it in Firefox (the
+  // operator, 29 Oct).
   clearTimeout(flipCard.t);
   flipCard.t = setTimeout(() => drawProjects(state?.projects || []), 450);
 }
@@ -572,7 +571,7 @@ function renderProjectsInto(i){
   // The empty case says what to do: an empty workspace is exactly where
   // somebody is about to make their first project.
   if (!ps.length){
-    paint(grid, `<div class="empty">${state.admin ? "no space yet: New space makes one"
+    patch(grid, `<div class="empty">${state.admin ? "no space yet: New space makes one"
                                        : "no spaces are yours yet: an administrator grants them on the Users page"}</div>`);
     return;
   }
@@ -606,7 +605,7 @@ function renderProjectsInto(i){
         if (!g) return grid_(list);
         // The pencil renames the group for this account alone: a group is a
         // person's own label, so it is never anybody else's to move (R273).
-        return `<section class="pjgroup" data-group="${esc(g)}"><h3 class="pjgname">${esc(g)} <span class="dim">${list.length}</span>${
+        return `<section class="pjgroup" data-group="${esc(g)}" data-key="group:${esc(g)}"><h3 class="pjgname">${esc(g)} <span class="dim">${list.length}</span>${
           state.session ? "" : `<button type="button" class="eye bare" data-pjgrename="${esc(g)}" aria-label="Rename the group ${esc(g)}" title="Rename">${PENCIL}</button>`
         }</h3>${grid_(list)}</section>`;
       }).join("")
@@ -628,7 +627,7 @@ function renderProjectsInto(i){
   const fade = fc && projectCard(fc) !== pjFade.was && was.indexOf(fc.key) === now.indexOf(esc(fc.key));
   if (fc && projectCard(fc) !== pjFade.was) pjFade = null;
   let drawn = false;
-  const draw = () => { drawn = paint(grid, html || `<div class="empty">nothing matches ${esc(pjQuery)}</div>`); };
+  const draw = () => { drawn = patch(grid, html || `<div class="empty">nothing matches ${esc(pjQuery)}</div>`); };
   if (fade) fadeThrough(() => grid.querySelectorAll(`.pcard[data-pkey="${CSS.escape(fc.key)}"] > .pcface:not([inert])`), draw);
   else draw();
   if (drawn && play) play();

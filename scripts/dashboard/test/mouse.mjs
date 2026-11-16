@@ -86,8 +86,13 @@ await page.evaluate(() => { document.querySelector('#pane1 .dtab[data-id]').data
 await page.evaluate(() => refresh());
 ok(await page.$eval('#pane1 .dtab[data-id]', el => el.dataset.mark === 'kept'),
    'an unchanged poll leaves the dock\'s line alone');
-await page.evaluate(() => newShell(''));
-ok(await page.$eval('#pane1 .dtab[data-id]', el => el.dataset.mark !== 'kept'), '...while a real change repaints');
+// ...and a real change lands in the line while the tabs already on it stay
+// the elements they were (R244: the line is patched, each tab kept by its id).
+const tabsBefore = await page.$$eval('#pane1 .dtab[data-id]', ts => ts.length);
+await page.evaluate(() => { window.__dtab = document.querySelector('#pane1 .dtab[data-id]'); newShell(''); });
+const landed = await page.waitForFunction(n => document.querySelectorAll('#pane1 .dtab[data-id]').length > n, tabsBefore, { timeout: 5000 }).then(() => true, () => false);
+const dockKept = await page.evaluate(() => ({ same: window.__dtab.isConnected && window.__dtab.dataset.mark === 'kept', tabs: document.querySelectorAll('#pane1 .dtab[data-id]').length }));
+ok(landed && dockKept.same, `...while a real change lands, the new terminal's tab drawn and the ones already there kept (${JSON.stringify({ before: tabsBefore, ...dockKept })})`);
 
 // Focus landing in the dock's terminal gives the dock the keyboard; a press
 // on the page gives it back; shut, the dock keeps its terminal.

@@ -22,20 +22,21 @@ function paintBar(pane, t, i){
   if (i === 1){
     setClass(bar, "bar dockbar");
     bar.style.removeProperty("--pc");
-    // Painted only when it changed: a poll that moves nothing leaves the
-    // line's buttons where they are, and a pointer over one keeps its hover.
-    // A line drawn again keeps where it was scrolled to (B322), and one
-    // with a tab held in it is not drawn at all: a poll bringing a session
-    // dot replaced the tab under the finger and dropped it; the drag's end
-    // draws it.
+    // Patched only where it changed: a poll that moves nothing leaves the
+    // line's buttons where they are, a pointer over one keeps its hover,
+    // and one that moves something keeps the line and each tab by its id
+    // (R244). A line written whole keeps where it was scrolled to (B322),
+    // and one with a tab held in it is not drawn at all: a poll bringing a
+    // session dot replaced the tab under the finger and dropped it; the
+    // drag's end draws it.
     const old = bar.querySelector(".dockline"), kept = old?.scrollLeft || 0;
     const ends = ["chl", "chr"].filter(c => old?.classList.contains(c));
-    if (!ddrag && paint(bar, dockBar())){
+    if (!ddrag && patch(bar, dockBar())){
       const line = bar.querySelector(".dockline");
       // ...with the ends' arrows it had before the scroll is put back: an
       // arrow moves the tabs by the line's gap (B318), so one added after
       // moved a line scrolled along by that much at every redraw.
-      if (line){ line.classList.add(...ends); line.scrollLeft = kept; }
+      if (line && line !== old){ line.classList.add(...ends); line.scrollLeft = kept; }
       wireDockBar(bar); dockReveal(bar);
     }
     return;
@@ -53,10 +54,11 @@ function paintBar(pane, t, i){
   // Which project the front pane is on, so a band put away there comes back
   // once it is left (pnoteOnShow).
   if (i === 0) pnoteOnShow(proj ? t.arg : "");
-  // Painted, and wired, only when it changed (R218 step 10): assigned on
+  // Patched, and wired, only when it changed (R218 step 10): assigned on
   // every draw, the page's sub-nav and a project's header were rebuilt by
-  // each poll under the pointer that was about to press them.
-  const fresh = paint(bar, isToolKind(t.kind) ? shellBar(t, i) + reload
+  // each poll under the pointer that was about to press them; patched, the
+  // header's repository pulldown and its menus are kept as they are (R244).
+  const fresh = patch(bar, isToolKind(t.kind) ? shellBar(t, i) + reload
     : proj ? projectHeader(t)
     : `<span title="${esc(tabTitle(t))}">${esc(tabLabel(t))}</span>${reload}`, true);
   bar.classList.toggle("page", isToolKind(t.kind));

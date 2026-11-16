@@ -343,11 +343,12 @@ function drawRail(){
   const item = g => `<button type="button" class="ritem${g.key === on ? " on" : ""}" data-rail="${esc(g.key)}" aria-label="${esc(g.label)}"${
       g.key === on ? ' aria-current="page"' : ""}>${RAIL_ICONS[g.icon] || TOOL_ICONS[g.icon] || ""}<span class="rlbl">${esc(g.label)}</span></button>`;
   const html = groups.map(item).join("");
-  // Through paint(), which remembers what it wrote: compared against
+  // Through patch(), which remembers what it wrote: compared against
   // innerHTML, which the browser writes back its own way (an SVG's
   // attributes, an entity), it never matched, and the rail was rebuilt on
-  // every draw with the pointer on it (R218 step 10).
-  if (paint(rail, html, true)){
+  // every draw with the pointer on it (R218 step 10); patched, a group
+  // pressed keeps its button and the keyboard's focus on it (R244).
+  if (patch(rail, html, true)){
     rail.querySelectorAll("[data-rail]").forEach(b => {
       b.onclick = () => railGo(b.dataset.rail);
       // A pointer resting on a group reads ahead what its page waits on
@@ -362,15 +363,18 @@ function drawRail(){
   const moreOn = rest.some(g => g.key === on);
   const bhtml = five.map(item).join("") + (rest.length
     ? `<button type="button" class="ritem${moreOn ? " on" : ""}" data-railmore aria-haspopup="menu" aria-expanded="${railMoreOpen}" aria-label="More">${RAIL_ICONS.more}<span class="rlbl">More</span></button>` : "");
-  if (paint(bar, bhtml, true)){
+  if (patch(bar, bhtml, true)){
     bar.querySelectorAll("[data-rail]").forEach(b => b.onclick = () => { railMoreShow(false); railGo(b.dataset.rail); });
-    bar.querySelector("[data-railmore]")?.addEventListener("click", () => railMoreShow(!railMoreOpen));
+    // Set, not added: the patch keeps the button, and a second listener
+    // would open More and shut it again in one press.
+    const mb = bar.querySelector("[data-railmore]");
+    if (mb) mb.onclick = () => railMoreShow(!railMoreOpen);
   }
   const more = $("railmore");
   if (more){
     const mhtml = rest.map(g => `<button type="button" class="ritem${g.key === on ? " on" : ""}" data-rail="${esc(g.key)}">${
         RAIL_ICONS[g.icon] || TOOL_ICONS[g.icon] || ""}<span class="rlbl">${esc(g.label)}</span></button>`).join("");
-    if (paint(more, mhtml, true)){
+    if (patch(more, mhtml, true)){
       more.querySelectorAll("[data-rail]").forEach(b => b.onclick = () => { railMoreShow(false); railGo(b.dataset.rail); });
     }
   }
