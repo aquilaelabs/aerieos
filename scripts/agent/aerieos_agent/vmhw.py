@@ -189,7 +189,11 @@ def net_ok(net):
     if net in ("project", "lan"):
         return True
     kind, _, name = str(net or "").partition(":")
-    return kind in ("br", "net") and bool(NET_NAME.fullmatch(name)) and not name.startswith("bbvm-")
+    # Never a container network's bridge (docker0, br-<id>), which the
+    # listing leaves out: picked by name, it put a VM on another space's
+    # containers' network (R247 step 5).
+    return kind in ("br", "net") and bool(NET_NAME.fullmatch(name)) and not name.startswith("bbvm-") \
+        and not (kind == "br" and DOCKER_BR.fullmatch(name))
 
 
 def _mounts():

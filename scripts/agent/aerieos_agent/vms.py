@@ -918,7 +918,7 @@ class VmsMixin:
                                             check=False, **who).stdout:
             job.say("refused: stop the VM first; its hardware changes while it is off\n")
             return "failed", 75
-        xml = subprocess.run(VIRSH + ["dumpxml", name, "--inactive"], capture_output=True, text=True,
+        xml = subprocess.run(VIRSH + ["dumpxml", name, "--inactive", "--security-info"], capture_output=True, text=True,
                              check=False, **who).stdout
         m_v = re.search(r"<vcpu[^>]*>(\d+)</vcpu>", xml)
         cur = re.search(r"<currentMemory unit='KiB'>(\d+)</currentMemory>", xml) or re.search(r"<memory unit='KiB'>(\d+)</memory>", xml)
@@ -977,7 +977,18 @@ class VmsMixin:
         self.own_dir(iso_dir(), who)
         path = os.path.join(iso_dir(), fname)
         if os.path.isfile(path):
-            job.say(f"{fname} is here already\n")
+            # The same name is not the same file: ISOs are the node's, so one
+            # a person added from their own address answered another's ask
+            # for the official one with success (R247 step 5).
+            h = hashlib.sha256()
+            with open(path, "rb") as f:
+                for chunk in iter(lambda: f.read(1 << 20), b""):
+                    h.update(chunk)
+            if h.hexdigest() != want:
+                job.say(f"refused: {fname} is here already as another file (SHA-256 {h.hexdigest()[:16]}…, not the "
+                        "one given): remove that one first, or give this one another name\n")
+                return "failed", 65
+            job.say(f"{fname} is here already, and is the file given\n")
             return "succeeded", 0
         part = path + ".part"
         if upload:
@@ -1045,7 +1056,7 @@ class VmsMixin:
         # where it is now before the VM starts, by its serial or its port.
         kept = usb_kept(name)
         if kept and self._vm_exists(name, who):
-            xml = subprocess.run(VIRSH + ["dumpxml", name, "--inactive"], capture_output=True, text=True,
+            xml = subprocess.run(VIRSH + ["dumpxml", name, "--inactive", "--security-info"], capture_output=True, text=True,
                                  check=False, **who).stdout
             fresh = vmhw.usb_refresh(xml, kept, vmhw.host_hw()["usb"])
             if fresh:
@@ -1154,7 +1165,7 @@ class VmsMixin:
         if info.stdout.strip() not in ("shut off", "crashed"):
             job.say(f"refused: {src} is {info.stdout.strip()}: shut it down first, so its disks are copied whole\n")
             return "failed", 75
-        xml = subprocess.run(VIRSH + ["dumpxml", src, "--inactive"], capture_output=True, text=True, check=False, **who).stdout
+        xml = subprocess.run(VIRSH + ["dumpxml", src, "--inactive", "--security-info"], capture_output=True, text=True, check=False, **who).stdout
         try:
             dom = ET.fromstring(xml)
         except ET.ParseError:
@@ -1266,7 +1277,7 @@ class VmsMixin:
         """A UEFI VM made before 0.6.1 keeps its firmware variables raw, which
         libvirt will not snapshot: moved to qcow2 while it is off, the domain
         defined again on the new file. True when nothing is in the way."""
-        xml = subprocess.run(VIRSH + ["dumpxml", name, "--inactive"], capture_output=True, text=True,
+        xml = subprocess.run(VIRSH + ["dumpxml", name, "--inactive", "--security-info"], capture_output=True, text=True,
                              check=False, **who).stdout
         m = re.search(r"<nvram([^>]*)>([^<]+)</nvram>", xml)
         if not m or "qcow2" in m.group(1):

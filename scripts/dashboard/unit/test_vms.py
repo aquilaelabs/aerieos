@@ -561,6 +561,27 @@ class Agent(unittest.TestCase):
             self.assertFalse(os.path.lexists(os.path.join(d, "iso")))
             self.assertEqual(open(target).read(), "root:x:0:0\n", "the file it named untouched")
 
+    def test_an_iso_already_here_is_taken_only_when_it_is_the_file_given(self):
+        # R247 step 5: ISOs are the node's, and the same name from another
+        # person's own address answered an ask for the official one.
+        import hashlib
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as d:
+            os.makedirs(os.path.join(d, "iso"))
+            with open(os.path.join(d, "iso", "ubuntu.iso"), "wb") as f:
+                f.write(b"someone else's image")
+            theirs = hashlib.sha256(b"someone else's image").hexdigest()
+            a = self.agent.Agent.__new__(self.agent.Agent)
+            a.own_dir = lambda *a_, **k: None
+            job = mock.Mock()
+            with mock.patch.object(self.av, "VM_DIR", d):
+                got = a._vm_iso_add(job, {"iso": {"name": "ubuntu.iso", "url": "https://x/ubuntu.iso", "sha256": "b" * 64}}, "", {})
+                said = "".join(c.args[0] for c in job.say.call_args_list)
+                self.assertEqual(got, ("failed", 65), said)
+                self.assertIn("as another file", said)
+                got = a._vm_iso_add(job, {"iso": {"name": "ubuntu.iso", "url": "https://x/ubuntu.iso", "sha256": theirs}}, "", {})
+                self.assertEqual(got, ("succeeded", 0))
+
     def test_on_the_controllers_own_machine_a_vm_job_runs_as_the_agent(self):
         # R165 step 1: the wall's file says the machine is the controller's
         # own, and there the job keeps root rather than dropping to the jobs

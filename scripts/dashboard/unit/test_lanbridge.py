@@ -157,7 +157,8 @@ class Picked(unittest.TestCase):
     def test_the_names_are_checked(self):
         for good in ("project", "lan", "br:br1", "net:default"):
             self.assertTrue(self.hw.net_ok(good), good)
-        for bad in ("br:", "net:bbvm-n2", "br:a b", "host", "net:../x"):
+        # ...and never a container network's bridge picked by name (R247 step 5).
+        for bad in ("br:", "net:bbvm-n2", "br:a b", "host", "net:../x", "br:docker0", "br:br-08a7d334e448"):
             self.assertFalse(self.hw.net_ok(bad), bad)
 
 

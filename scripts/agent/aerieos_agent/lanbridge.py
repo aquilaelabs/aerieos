@@ -224,7 +224,7 @@ def move_domains(iface):
         return []
     moved = []
     for name in (_run(["virsh", "-c", "qemu:///system", "list", "--all", "--name"], timeout=20) or "").split():
-        xml = _run(["virsh", "-c", "qemu:///system", "dumpxml", "--inactive", name], timeout=20) or ""
+        xml = _run(["virsh", "-c", "qemu:///system", "dumpxml", "--inactive", "--security-info", name], timeout=20) or ""
         if not xml:
             continue
         try:
