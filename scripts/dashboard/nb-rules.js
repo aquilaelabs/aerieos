@@ -339,7 +339,7 @@ function nbRulesView({$, nb, project}){
       if (sum) sum.onclick = e => {
         e.preventDefault();
         if (row.open) nb.ruleOpen.delete(i); else nb.ruleOpen.add(i);
-        slideDetails(row, !row.open);
+        slideDetails(row, !foldOpen(row));
       };
     });
     const add = $("rlAdd");

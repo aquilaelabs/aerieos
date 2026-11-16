@@ -2203,7 +2203,7 @@ function dmWireRows(el, list = dockerList){
     if (!sum) return;
     sum.onclick = (e) => {
       e.preventDefault();
-      const willOpen = !d.open;
+      const willOpen = !foldOpen(d);
       slideDetails(d, willOpen);
       if (willOpen && d.querySelector(".dmimgbox")) loadDockerImages(d);
       // Read on every opening: the page keeps the fold across its redraws

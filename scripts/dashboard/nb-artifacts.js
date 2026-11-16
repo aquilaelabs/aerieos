@@ -836,7 +836,7 @@ function nbArtifactsView({$, nb, project, root, sheet}){
     box.querySelectorAll("details.veradd > summary").forEach(sum => {
       sum.onclick = e => {
         e.preventDefault();
-        slideDetails(sum.parentElement, !sum.parentElement.open);
+        slideDetails(sum.parentElement, !foldOpen(sum.parentElement));
       };
     });
     box.querySelectorAll("[data-verask]").forEach(b => b.onclick = async () => {

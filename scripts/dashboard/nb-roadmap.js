@@ -388,7 +388,7 @@ function nbRoadmapView({$, nb}){
       sm.onclick = e => {
         e.preventDefault();
         if (e.target.closest("button, a, input, textarea, select, .dtog, .dinfo")) return;
-        slideDetails(sm.parentElement, !sm.parentElement.open);
+        slideDetails(sm.parentElement, !foldOpen(sm.parentElement));
       };
     });
     $("roadmapList").querySelectorAll(".addstep").forEach(box => {

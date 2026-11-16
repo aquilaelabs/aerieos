@@ -174,7 +174,7 @@ function nbMemoryView({$, nb}){
     $("memList").querySelectorAll(".mem > summary").forEach(sum => {
       sum.onclick = e => {
         e.preventDefault();                       // the browser's snap, replaced
-        slideDetails(sum.parentElement, !sum.parentElement.open);
+        slideDetails(sum.parentElement, !foldOpen(sum.parentElement));
       };
     });
     // What is stored is what the markup drew (a field's default), not what

@@ -280,13 +280,21 @@ function slideDetails(el, willOpen){
   // to: left to finish, its end wrote its own open or shut over this press
   // (a fold opened while its closing slide ran shut again a moment later).
   const running = el.getAnimations().filter(a => a.id === "fold");
-  if (!sum || noMotion()){ running.forEach(a => a.cancel()); el.open = willOpen; return; }
+  if (!sum || noMotion()){ running.forEach(a => a.cancel()); el.open = willOpen; delete el.dataset.slideTo; return; }
   const from = el.offsetHeight;
   running.forEach(a => a.cancel());
   el.open = true;
   const to = willOpen ? el.offsetHeight : sum.offsetHeight;
-  if (from === to){ el.open = willOpen; return; }
-  foldHeight(el, from, to, () => { el.open = willOpen; });
+  if (from === to){ el.open = willOpen; delete el.dataset.slideTo; return; }
+  el.dataset.slideTo = willOpen ? "1" : "0";
+  foldHeight(el, from, to, () => { el.open = willOpen; delete el.dataset.slideTo; });
+}
+// Whether a fold reads as open to a press: where its slide is headed while
+// one runs, since it is held open for the tween, else its own flag. Read as
+// open mid-slide, a second press to open a fold sliding shut shut it (B838).
+function foldOpen(el){
+  return el.dataset.slideTo && el.getAnimations().some(a => a.id === "fold" && a.playState === "running")
+    ? el.dataset.slideTo === "1" : el.open;
 }
 
 // A plain block that is shown and hidden. Same tween, collapsed height zero.

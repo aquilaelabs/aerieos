@@ -344,7 +344,7 @@ function nbDesignView({$, nb, project, root}){
       if (sum) sum.onclick = e => {
         e.preventDefault();
         if (row.open) ui.open.delete(i); else ui.open.add(i);
-        slideDetails(row, !row.open);
+        slideDetails(row, !foldOpen(row));
       };
     });
   }

@@ -733,7 +733,7 @@ function bootDocs(){
     // detached element nobody heard and the new fold drew open again. The
     // press is the choice; `toggle` below confirms it for the other ways a
     // fold can move.
-    sectOpen[d.dataset.sect] = !d.open;
+    sectOpen[d.dataset.sect] = !foldOpen(d);
   }, true);
   document.addEventListener("toggle", e => {
     fxRemember(e);                        // a finding's rule, open or shut (tab-findings.js)

@@ -347,7 +347,7 @@ function nbTestsView({$, nb, project}){
         // Filled BEFORE the tween, which measures the height it is animating
         // to: an empty body would animate to nothing and then jump.
         if (!box.open) fill(box);
-        slideDetails(box, !box.open);
+        slideDetails(box, !foldOpen(box));
       };
     });
     // ...and the ones that came back open need their editor back with them.

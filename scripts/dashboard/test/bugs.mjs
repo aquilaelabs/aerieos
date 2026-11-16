@@ -582,6 +582,22 @@ await section("a fold pressed while it still slides keeps that press", async () 
     return { sliding, open };
   }, s);
   ok(got.sliding && got.open, `a fold opened while its closing slide still runs stays open after that slide would have ended (${JSON.stringify(got)})`);
+  // ...and a second press with nothing under it means the other way: held
+  // open for its closing slide, the fold read as open and took the second
+  // press as shut too (B838).
+  const twice = await page.evaluate(async s => {
+    const el = document.querySelector(s);
+    el.open = true;
+    await new Promise(r => setTimeout(r, 50));
+    el.querySelector('summary').click();          // sliding shut
+    const sliding = el.getAnimations().length > 0;
+    el.querySelector('summary').click();          // pressed again to reopen it
+    await new Promise(r => setTimeout(r, 500));
+    const open = el.open;
+    el.open = false;
+    return { sliding, open };
+  }, s);
+  ok(twice.sliding && twice.open, `a fold pressed again while it slides shut opens again (${JSON.stringify(twice)})`);
 });
 
 // ---- handing one to a session ----------------------------------------------

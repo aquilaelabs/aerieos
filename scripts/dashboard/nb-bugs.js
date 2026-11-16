@@ -348,7 +348,7 @@ function nbBugsView({$, nb, project}){
       // the summary rather than the details' toggle event, because toggle
       // fires after the browser has already snapped it open.
       const sum = d.querySelector("summary");
-      if (sum) sum.onclick = e => { e.preventDefault(); slideDetails(d, !d.open); };
+      if (sum) sum.onclick = e => { e.preventDefault(); slideDetails(d, !foldOpen(d)); };
       // The closing note typed in the row (R254 step 6), the box the Delete
       // below and the roadmap's drop open, not the browser's prompt: one
       // shape for every question this view asks, and one a phone lays out.

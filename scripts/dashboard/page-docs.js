@@ -704,7 +704,7 @@ function wireSections(root){
     // `:scope > summary` because a section can contain folds of its own, and
     // the section must not answer for theirs.
     const sum = d.querySelector(":scope > summary");
-    if (sum) sum.onclick = e => { e.preventDefault(); if (sectFixed(d)) return; if (!d.open) soleOpen(d); slideDetails(d, !d.open); };
+    if (sum) sum.onclick = e => { e.preventDefault(); if (sectFixed(d)) return; const will = !foldOpen(d); if (will) soleOpen(d); slideDetails(d, will); };
   });
   const view = root.closest?.(".nbview, .doctab") || root.querySelector?.(".doctab");
   if (view){
