@@ -41,6 +41,7 @@
 - What you type, pick or open stays put when a page or a space's view updates under you, on every page now: Settings, Profile, Users, Roles, Jobs, Schedules, Storage, Network and the rest, and a space's Artifacts, Signing, Memory, Tests, Permissions, Analysis and Wiki views; a search box waits for the word an input method is composing before it narrows the list (21fd9f6)
 - The dashboard answers faster and holds less up: its status read costs about a quarter of what it did, the check every open page makes every second and a half a tenth, a browser keeps one connection between requests, job lists and a node's last job read from indexes, and a connection that sends nothing no longer holds every other request for five seconds. A notebook left open no longer fills the audit with its presence, and a node's numbers and its census no longer write over each other (c32326f)
 - aerie's commands start sooner and aerie status answers in about half the time, aerie map find answers in a third of the time with a quarter of the memory, a coding agent other than Claude waits less on AerieOS's checks before each tool it runs, and a node's agent hands out jobs without waiting on its container statistics and starts fewer processes while it waits (44323cb)
+- The dashboard is a third smaller to download, and does less while you are not looking: a page you have left, a space's notebook not on show and a terminal not in front no longer redraw or read again in the background, and a long list builds only the rows it shows (7e05263)
 
 ### Fixed
 
