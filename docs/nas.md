@@ -95,7 +95,11 @@ the bell, and a dead SSD is restored from last night's.
   of fixed addresses on the LAN is made once with Make the network, and one
   the old Docker made for its containers alone is made as a bridge of its
   own. Its VMs are defined on this machine's QEMU and firmware with their
-  disks where they are. All of it is on this machine's Containers page,
+  disks where they are, and only with what is theirs to run: settings the
+  old system gave QEMU or dnsmasq, a shared folder or an ISO off the adopted
+  disks, and a console to a file are left out and said, and a VM whose disk
+  or firmware is not on the adopted disks or this machine's own is not
+  defined, saying why. All of it is on this machine's Containers page,
   under Containers and VMs from the old system, and a VM that was one of
   the controller's nodes comes back as that node once it runs. The
   containers' settings are kept on the controller for an administrator

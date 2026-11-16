@@ -712,6 +712,122 @@ def rewrite_domain(xml, emulator, ovmf_pair, nvram_path, lan, nets=None):
     return ET.tostring(dom, encoding="unicode"), said
 
 
+# What an adopted domain or network may carry (R247 step 5, B843): its XML
+# is a backup's, which anybody could have written, and libvirt runs what it
+# says as root. What is optional (the old system's extra QEMU settings, a
+# shared folder, an ISO, a console to a file, dnsmasq's options) is left out
+# and said; what the VM cannot run without, when it is not on the adopted
+# disks or this machine's own firmware, keeps that VM from being defined.
+ADOPTED = "/mnt/"
+FIRMWARE = ("/usr/share/", "/usr/lib/")
+KEPT_PATHS = ("/var/lib/libvirt/", "/run/libvirt/")
+
+
+def _under(path, roots):
+    real = os.path.realpath(path)
+    return any(real.startswith(r) for r in roots) and ".." not in path.split("/")
+
+
+def _mounted_from():
+    """The devices this machine has mounted, by their real paths."""
+    out = set()
+    with contextlib.suppress(OSError):
+        with open("/proc/self/mounts") as f:
+            for line in f:
+                dev = line.split(" ", 1)[0]
+                if dev.startswith("/dev/"):
+                    out.add(os.path.realpath(dev))
+    return out
+
+
+def _drop_foreign(root, said, what):
+    """Elements and attributes in a namespace of their own taken out of the
+    tree, but for a <metadata>'s, which libvirt keeps and never acts on."""
+    skip = {id(e) for m in root.iter("metadata") for e in m.iter()}
+    for parent in list(root.iter()):
+        if id(parent) in skip:
+            continue
+        for child in list(parent):
+            if isinstance(child.tag, str) and child.tag.startswith("{"):
+                parent.remove(child)
+                skip.update(id(e) for e in child.iter())
+                said.append(f"left out: {child.tag.split('}', 1)[1]} ({what})")
+        for k in [k for k in parent.attrib if k.startswith("{")]:
+            del parent.attrib[k]
+    return root
+
+
+def vet_domain(xml):
+    """An adopted domain, rewritten, as it may be defined here: (xml, [what
+    was left out], "" or why it is not defined at all)."""
+    dom = ET.fromstring(xml)
+    said = []
+    _drop_foreign(dom, said, "a setting the old system's QEMU was given")
+    dev = dom.find("devices")
+    taken = None
+    for disk in dev.findall("disk") if dev is not None else []:
+        src = disk.find("source")
+        if src is None:
+            continue
+        if disk.get("type") == "network":
+            return xml, said, "a disk on the network, which is not adopted"
+        if src.get("file"):
+            if _under(src.get("file"), (ADOPTED,)):
+                continue
+            if disk.get("device") in ("cdrom", "floppy"):
+                disk.remove(src)
+                said.append(f"its {disk.get('device')} {src.get('file')} is ejected: it is not on the adopted disks")
+                continue
+            return xml, said, f"its disk {src.get('file')} is not on the adopted disks"
+        if src.get("dev"):
+            path = src.get("dev")
+            taken = _mounted_from() if taken is None else taken
+            real = os.path.realpath(path)
+            if not path.startswith("/dev/disk/by-id/") or any(m == real or m.startswith(real) for m in taken):
+                return xml, said, f"its disk {path} is not a whole disk named by its id that this machine leaves alone"
+            continue
+        if src.get("dir") and not _under(src.get("dir"), (ADOPTED,)):
+            return xml, said, f"its disk {src.get('dir')} is not on the adopted disks"
+    for fs in dev.findall("filesystem") if dev is not None else []:
+        src = fs.find("source")
+        where = (src.get("dir") or src.get("file") or src.get("name") or "") if src is not None else ""
+        real = os.path.realpath(where) if where else ""
+        if not where or not _under(where, (ADOPTED,)) or real.rstrip("/") == ADOPTED.rstrip("/"):
+            dev.remove(fs)
+            said.append(f"its shared folder {where or '(none named)'} is left out: only a folder on the adopted disks is shared")
+    for kind in ("serial", "console", "channel", "parallel"):
+        for el in dev.findall(kind) if dev is not None else []:
+            src = el.find("source")
+            path = src.get("path", "") if src is not None else ""
+            if path and not _under(path, KEPT_PATHS):
+                dev.remove(el)
+                said.append(f"its {kind} to {path} is left out")
+    for tag in ("loader", "nvram", "kernel", "initrd", "dtb"):
+        el = dom.find(f"os/{tag}")
+        path = (el.text or "").strip() if el is not None else ""
+        if not path:
+            continue
+        ok = _under(path, FIRMWARE) if tag in ("loader", "dtb") else \
+            _under(path, KEPT_PATHS) if tag == "nvram" else _under(path, (ADOPTED,))
+        if not ok:
+            return xml, said, f"its {tag} {path} is not this machine's own" + ("" if tag in ("kernel", "initrd") else " (no UEFI firmware here to boot it with)")
+    return ET.tostring(dom, encoding="unicode"), said, ""
+
+
+def vet_network(xml):
+    """An adopted network as it may be defined here: dnsmasq's options (a
+    dhcp-script runs as root) and a TFTP root (a folder served to the LAN)
+    left out. (xml, [what was left out])."""
+    net = ET.fromstring(xml)
+    said = []
+    _drop_foreign(net, said, "an option the old system gave dnsmasq")
+    for ip in net.findall("ip"):
+        for t in ip.findall("tftp"):
+            ip.remove(t)
+            said.append(f"left out: its TFTP root {t.get('root', '')}")
+    return ET.tostring(net, encoding="unicode"), said
+
+
 def domain_networks(xml, bybridge, names):
     """The old system's libvirt networks a domain's interfaces are on."""
     out = set()
@@ -732,8 +848,14 @@ def ensure_network(runner, job, virsh, net):
     machine where it was. What happened, in words."""
     name = net["name"]
     if subprocess.run(virsh + ["net-info", name], capture_output=True, timeout=30, check=False).returncode != 0:
+        try:
+            xml, left = vet_network(net["xml"])
+        except ET.ParseError as e:
+            return f"the network {name} is not one this machine can read ({e}): not defined"
+        for x in left:
+            job.say(f"the network {name}: {x}\n")
         with tempfile.NamedTemporaryFile("w", suffix=".xml", delete=False) as f:
-            f.write(net["xml"])
+            f.write(xml)
         try:
             rc = runner._sh(job, virsh + ["net-define", f.name], timeout=60)
         finally:
@@ -1045,6 +1167,15 @@ class AdoptMixin:
                 continue
             nv = os.path.join(NVRAM_DIR, re.sub(r"[^A-Za-z0-9._-]", "_", n) + "_VARS.fd")
             xml, said = rewrite_domain(x["xml"], emulator, pair, nv, lan, bybridge)
+            try:
+                xml, left, why = vet_domain(xml)
+            except ET.ParseError as e:
+                left, why = [], f"its definition does not read ({e})"
+            if why:
+                say(f"{n}: not defined here: {why}\n")
+                bad.append(n)
+                continue
+            said += left
             if "<tpm" in xml and not vmhw.tpm_here():
                 # libvirt refuses a TPM it cannot emulate at define: the VM
                 # is defined without it rather than not at all.

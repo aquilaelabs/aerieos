@@ -282,3 +282,61 @@ class SharesFromTheStick(unittest.TestCase):
         # Nobody on its lists: still a share, a folder, and not exported.
         self.assertFalse(by["lonely"]["smb"]["on"])
         self.assertEqual({n["name"] for n in notes}, {"lonely"})
+
+
+class Vetted(unittest.TestCase):
+    """An adopted domain or network, from a backup anybody could have
+    written, as it may be defined here (R247 step 5, B843)."""
+    ad = agent.module("adopt")
+    PLAIN = ("<domain type='kvm' xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0'><name>w</name>"
+             "<metadata><vmtemplate xmlns='unraid' name='Windows 11' icon='w.png'/></metadata>"
+             "<os><loader readonly='yes' type='pflash'>/usr/share/OVMF/OVMF_CODE_4M.fd</loader>"
+             "<nvram>/var/lib/libvirt/qemu/nvram/w_VARS.fd</nvram></os><devices>"
+             "<disk type='file' device='disk'><source file='/mnt/user/domains/w/vdisk1.img'/><target dev='hdc'/></disk>"
+             "<disk type='file' device='cdrom'><source file='/mnt/user/isos/virtio.iso'/><target dev='hda'/></disk>"
+             "<disk type='block' device='disk'><source dev='/dev/disk/by-id/nvme-X'/><target dev='vdb'/></disk>"
+             "%s</devices>%s</domain>")
+
+    def vet(self, devices="", tail=""):
+        return self.ad.vet_domain(self.PLAIN % (devices, tail))
+
+    def test_an_old_systems_ordinary_vm_is_kept_as_it_was(self):
+        xml, said, why = self.vet()
+        self.assertEqual((said, why), ([], ""))
+        self.assertIn("vmtemplate", xml, "its metadata kept")
+        self.assertIn("/dev/disk/by-id/nvme-X", xml)
+
+    def test_extra_qemu_settings_a_shared_root_and_a_console_to_a_file_are_left_out_and_said(self):
+        xml, said, why = self.vet(
+            "<filesystem type='mount'><driver type='virtiofs'/><source dir='/'/><target dir='r'/></filesystem>"
+            "<serial type='file'><source path='/etc/cron.d/x'/></serial>",
+            "<qemu:commandline><qemu:arg value='-x'/></qemu:commandline>")
+        self.assertEqual(why, "")
+        self.assertNotIn("commandline", xml)
+        self.assertNotIn("<filesystem", xml)
+        self.assertNotIn("/etc/cron.d", xml)
+        self.assertEqual(len(said), 3, said)
+
+    def test_an_iso_off_the_adopted_disks_is_ejected(self):
+        xml, said, why = self.ad.vet_domain(self.PLAIN.replace("/mnt/user/isos/virtio.iso", "/etc/shadow") % ("", ""))
+        self.assertEqual(why, "")
+        self.assertNotIn("/etc/shadow", xml)
+        self.assertIn("ejected", said[0])
+
+    def test_what_the_vm_cannot_run_without_from_anywhere_else_keeps_it_from_being_defined(self):
+        for old, new in (("/mnt/user/domains/w/vdisk1.img", "/etc/shadow"),
+                         ("/dev/disk/by-id/nvme-X", "/dev/sda"),
+                         ("/usr/share/OVMF/OVMF_CODE_4M.fd", "/mnt/user/evil.fd"),
+                         ("/var/lib/libvirt/qemu/nvram/w_VARS.fd", "/root/.ssh/authorized_keys")):
+            _xml, _said, why = self.ad.vet_domain(self.PLAIN.replace(old, new) % ("", ""))
+            self.assertTrue(why, f"{new} was let through")
+
+    def test_a_networks_dnsmasq_options_and_tftp_root_are_left_out(self):
+        xml, said = self.ad.vet_network(
+            "<network xmlns:dnsmasq='http://libvirt.org/schemas/network/dnsmasq/1.0'><name>n</name>"
+            "<ip address='10.0.0.1' netmask='255.255.255.0'><tftp root='/'/><dhcp><range start='10.0.0.2' end='10.0.0.9'/></dhcp></ip>"
+            "<dnsmasq:options><dnsmasq:option value='dhcp-script=/mnt/user/x.sh'/></dnsmasq:options></network>")
+        self.assertNotIn("dhcp-script", xml)
+        self.assertNotIn("tftp", xml)
+        self.assertIn("<range", xml)
+        self.assertEqual(len(said), 2, said)
