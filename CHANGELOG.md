@@ -77,12 +77,20 @@
 - The changelog editor shows what Save kept. (6cab345)
 - A node holding a space as a synced copy catches up in moments after git packs its objects, where its sync sent thousands of removals one at a time and every aerie verb on it waited and was refused for many minutes. (5412515)
 - New container, New space and four other dialogs keep their buttons at the right of the dialog's foot like every other, where a notice in the corner could lie over Create and Cancel. (4dd850e)
+- A VM keeps its console password through a hardware change, a start and a move to the LAN bridge. (3df960a)
 
 ### Security
 
 - A coding agent's session reaches only what its own verbs use. Its token is refused on every other route of the controller, with the verb that is a session's way to the same thing where there is one; it could read the list of accounts, its person's chat and tab layout, and the controller's settings in the page's own status read, and could type into or end its person's other sessions. A session's token also opens none of the dashboard: `aerie capture shot` and `reel` of the controller's own address say so, and photograph a dev instance, any other page, the emulator or a display as before. Upgrading: nothing to do; a session that photographed the controller's own dashboard photographs a dev instance of it instead (`aerie devapp`). (2241625)
 - A node's recorded address is where its calls come from: an X-Forwarded-For header the node sends itself no longer sets it, nor where a sign-in came from, unless a proxy this install trusts (its own tunnel, one named in Settings) passed it on. (f578e79)
 - An OS update takes only an image whose build attestation names AerieOS's release workflow run on a version tag, where any workflow of the repository passed. (14a575e)
+- A CI runner on a node can no longer be used to take root there: AerieOS writes and starts the runner's service itself, and never runs the runner's own scripts or opens its files as root. (d9f36a9)
+- Clearing an idle phone's quick-boot snapshot, or removing a phone, works as the account whose phone it is, so a link left in that account's folder can no longer have AerieOS remove files outside it. (2ff2d4e)
+- A VM's shared folder is checked every time the VM starts, and the guest can no longer make setuid programs or device files on the host through it; a node that hosts VMs takes this with its next update. (398fe52, 460dd69)
+- A VM can no longer be put on a container network's bridge, and adding an ISO under a name already on the node checks the file there against the SHA-256 given. (3df960a)
+- Shares mounted from other machines, the array's disks and an adopted system's disks no longer honor setuid programs or device files on them. (3e758c5)
+- A share can no longer be named global, homes or printers, which reopened Samba's own settings for every share after it, and FTP never runs as root. (1013735)
+- A coding session can no longer reach another account's sign-in through links in its own cache folder, nor the host's per-user runtime folder. (9c8f0c4)
 
 ## 0.9.0-dev.5341: 2026-11-12
 
