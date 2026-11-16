@@ -2195,7 +2195,10 @@ await section("which asks, names the bin, and moves nothing when declined", asyn
   let asked = '';
   page.answers.push(q => { asked = q.text; return -1; });
   await page.click('#rnDelete');
-  await page.waitForFunction(() => document.getElementById('rnmodal').hidden, { timeout: 15000 });
+  await page.waitForFunction(() => document.getElementById('rnmodal').hidden, null, { timeout: 15000 });
+  // The settings close before the question is put: read once it has been
+  // asked and answered, not in the moment between (B817, 'asked: nothing').
+  await until(() => asked, 15000, 100);
   await page.waitForFunction(() => !document.querySelector('.askdlg'), null, { timeout: 5000 });
   ok(/moves to \/workspace\/\.trash\/alpha/.test(asked) && existsSync(`${DIR}/ws/alpha/.git`),
      `...which asks, names the bin, and moves nothing when declined (asked: ${asked.replace(/\s+/g, ' ').slice(0, 90) || 'nothing'})`);
