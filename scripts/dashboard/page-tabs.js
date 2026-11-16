@@ -293,8 +293,12 @@ const TABKINDS = {
               icon: TOOL_ICONS.docker,
               render: (i) => renderDockerInto(i),
               // ...and phRev, because a session's rebuild request is answered
-              // on this tab and arrives on the phone payload's ask list.
-              live: () => `${dockerRev}/${dmNodesKey()}/${phRev}`,
+              // on this tab and arrives on the phone payload's ask list;
+              // and each space's Run its container dial, which a row's Agent
+              // pill says and which arrives on the status read, not with
+              // the list (a dial changed kept the old words until the
+              // containers were read again).
+              live: () => `${dockerRev}/${dmNodesKey()}/${phRev}/${(state?.projects || []).map(p => p.prefs?.devbuild || "").join(",")}`,
               open: () => { const t = dockerTab();
                             if (!dockerNode && t?.arg && t.arg !== "__docker")
                               dockerNode = t.arg;
