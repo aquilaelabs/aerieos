@@ -91,6 +91,7 @@
 - Shares mounted from other machines, the array's disks and an adopted system's disks no longer honor setuid programs or device files on them. (3e758c5)
 - A share can no longer be named global, homes or printers, which reopened Samba's own settings for every share after it, and FTP never runs as root. (1013735)
 - A coding session can no longer reach another account's sign-in through links in its own cache folder, nor the host's per-user runtime folder. (9c8f0c4)
+- Adopting an old system's VMs defines each only with what it needs to run: extra QEMU settings, dnsmasq options, shared folders and ISOs outside the adopted disks are left out and listed, and a VM whose disk or firmware is outside the adopted disks or this machine's own folders is not defined, with the reason. (afd45dd)
 
 ## 0.9.0-dev.5341: 2026-11-12
 
