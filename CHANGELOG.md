@@ -60,6 +60,7 @@
 - A press whose request never reaches the controller says so: the toast reads that the controller did not answer, where about a hundred and twenty presses did nothing and said nothing, and a release draft's Save the notes and Publish said they were done over a refusal. Anything else the page meets and nothing catches is said as a toast, once a minute for the same words (2df776a)
 - A button's spinning ring follows its own press: it no longer spins on for a page's refresh that happened to start just after it on a slow link, and a press that asks a question and then sends wears it while it sends (2df776a)
 - A page whose data moves quickly (the Jobs page while a job writes its log, Storage, VMs, Users, Schedules, Scanners) reads it one read at a time, never drawing an older answer over a newer one, and while a job runs it reads once more rather than once for every line of its log (2df776a)
+- Less motion, the device's or the one in your Preferences, now also stills a dialog's box as it opens and the page a press leaves, which still moved (7f0448c)
 
 ### Security
 
