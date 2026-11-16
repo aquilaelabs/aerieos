@@ -211,3 +211,51 @@ class Artifacts(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Runners(unittest.TestCase):
+    """A CI runner's folder is the jobs account's, and so is all a CI job
+    leaves in it (R247 step 5): root wrote, read and pruned there through
+    whatever was at the name."""
+    runners = AGENT.module("runners")
+    WHO_KW = {"user": UID, "group": GID}
+
+    def test_a_file_of_the_runners_own_is_written_as_the_account(self):
+        w = world.World(self)
+        d = w.folder("runner", WHO)
+        planted(d, ".env", w.secret)
+        self.runners.RunnersMixin._runner_write(self.WHO_KW, d, ".env", "PATH=/usr/bin\n")
+        self.assertEqual(w.intact(), "")
+        st = os.lstat(os.path.join(d, ".env"))
+        self.assertTrue(os.path.isfile(os.path.join(d, ".env")) and not os.path.islink(os.path.join(d, ".env")))
+        self.assertEqual((st.st_uid, st.st_gid), WHO)
+
+    def test_a_file_of_the_runners_folder_is_read_only_as_a_regular_file(self):
+        w = world.World(self)
+        d = w.folder("runner", WHO)
+        planted(d, ".service", w.secret)
+        os.mkfifo(os.path.join(d, ".builderbot-url"))
+        planted(d, ".runner", "/dev/zero")
+        for name in (".service", ".builderbot-url", ".runner"):
+            with self.assertRaises(OSError, msg=name):
+                self.runners.read_small(os.path.join(d, name))
+        self.assertEqual(self.runners.unit_of(d), "")
+
+    def test_a_linked_diag_is_pruned_as_the_account_and_root_keeps_its_files(self):
+        w = world.World(self)
+        d = w.folder("runner", WHO)
+        roots = w.folder("roots-logs")
+        for i in range(25):
+            with open(os.path.join(roots, f"f{i}"), "w") as f:
+                f.write("root's\n")
+        planted(d, "_diag", roots)
+        with base.fs_holds(WHO):
+            base.prune_dir(os.path.join(d, "_diag"), 20)
+        self.assertEqual(len(os.listdir(roots)), 25, "nothing of root's removed through the link")
+
+    def test_a_log_cut_to_size_is_never_one_reached_by_a_link(self):
+        w = world.World(self)
+        d = w.folder("data", WHO)
+        planted(d, "runner.log", w.secret)
+        self.assertFalse(base.cap_file(os.path.join(d, "runner.log"), limit=1))
+        self.assertEqual(w.intact(), "")

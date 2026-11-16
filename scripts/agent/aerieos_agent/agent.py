@@ -12,7 +12,7 @@ import threading
 import time
 from . import AGENT_VERSION
 from .coverage import _COV_OUT, _cov_write
-from .base import BEAT_S, RUNNER_DIAG_KEEP, SESSION_WALL, TRIAL_S, cap_file, log, log_once, own_digest, own_path, prune_dir
+from .base import BEAT_S, RUNNER_DIAG_KEEP, SESSION_WALL, TRIAL_S, cap_file, fs_holds, log, log_once, own_digest, own_path, prune_dir
 from .base import back_note, selfcheck, trial_begin, trial_give_way, trial_note, trial_passed
 from .controller import Controller
 from .stores import console_said, load_state, save_state, use_scope
@@ -607,7 +607,10 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             if out.startswith("/") and os.path.isfile(out):
                 files.append(out)
         cut = [f for f in files if cap_file(f)]
-        trimmed = sum(prune_dir(os.path.join(d, "_diag"), RUNNER_DIAG_KEEP) for d, _ in runner_dirs())
+        # Each runner's _diag is the jobs account's, and pruned as it: a CI
+        # job that made it a link had root delete through it (R247 step 5).
+        with fs_holds(self.drop_privileges({})):
+            trimmed = sum(prune_dir(os.path.join(d, "_diag"), RUNNER_DIAG_KEEP) for d, _ in runner_dirs())
         if cut or trimmed:
             log(f"logs: kept to size: {', '.join(os.path.basename(f) for f in cut) or 'nothing'} cut, "
                 f"{trimmed} old runner diagnostics removed")

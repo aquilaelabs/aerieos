@@ -240,6 +240,15 @@ while [ $# -gt 0 ]; do case "$1" in --name) name="$2"; shift;; --url) url="$2"; 
 # .runner fine in the suite and returned an empty name on a real node.
 printf '\\357\\273\\277{"agentName":"%s","gitHubUrl":"%s"}' "$name" "$url" > "$(dirname "$0")/.runner"
 `, { mode: 0o755 });
+// The runner's own service wrapper, which the agent puts at the folder's top
+// for the unit it writes; and a systemctl that records what it is asked.
+writeFileSync(`${DIR}/runner-src/bin/runsvc.sh`, `#!/bin/sh
+exec ./run.sh
+`, { mode: 0o755 });
+mkdirSync(`${DIR}/units`, { recursive: true });
+writeFileSync(`${DIR}/bin/runner-systemctl`, `#!/bin/sh
+echo "systemctl $*" >> "${DIR}/runner-systemctl.log"
+`, { mode: 0o755 });
 writeFileSync(`${DIR}/runner-src/svc.sh`, `#!/bin/sh
 # The real svc.sh resolves everything relative to the working directory and
 # refuses anywhere but the runner root. Recorded, because running it from
@@ -344,6 +353,9 @@ const agentEnv = { ...process.env, HOME: `${DIR}/agenthome`, BUILDERBOT_NODE_JSO
   BUILDERBOT_SYSTEMD: '1',      // this agent takes the service path whichever box runs the suite
   BUILDERBOT_TAILSCALE_BIN: `${DIR}/bin/tailscale`,
   BUILDERBOT_RUNNER_DIR: `${DIR}/runner`, BUILDERBOT_RUNNER_TARBALL: `${DIR}/runner.tar.gz`,
+  // The runner's unit is written by the agent and driven with systemctl,
+  // both stood in for here (R247 step 5: never the runner's own svc.sh).
+  BUILDERBOT_UNIT_DIR: `${DIR}/units`, BUILDERBOT_SYSTEMCTL_BIN: `${DIR}/bin/runner-systemctl`,
   BUILDERBOT_ACT_RUNNER_BIN: `${DIR}/bin/act_runner`,
   BUILDERBOT_SANDBOX_BIN: `${DIR}/bin/bb-sandbox`, BB_SANDBOX_STATE: SANDBOX_STATE,
   BB_GPU_STATE: `${DIR}/gpu-state`, BUILDERBOT_GPU_DISPLAY_STATE: `${DIR}/gpu-state`,
@@ -2833,9 +2845,18 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
     ok(ifin && ifin.state === 'succeeded' && /registering agentbox with https:\/\/github.com\/example-org/.test(ifin.log),
        `the agent unpacks the runner into the runner's own directory and registers it (${ifin?.state}: ${(ifin?.log || '').slice(-200).replace(/\n/g, ' / ')})`);
     ok(/config --unattended --replace --url https:\/\/github.com\/example-org --token AAAREGTOKEN --name agentbox --labels builderbot,self-hosted,linux,x64,agentbox,gpu,badlabel --work _work/.test(calls)
-       && /svc install/.test(calls) && /svc start/.test(calls)
-       && /RUNNER_ROOT_OK/.test(calls),
-       'config.sh gets the minted token, the node\'s name, the default labels plus its own name, and svc.sh installs and starts it');
+       && !/svc /.test(calls),
+       'config.sh gets the minted token, the node\'s name, the default labels plus its own name, and the runner\'s own svc.sh is never run');
+    // The unit is the agent's, from GitHub's template: the runner's folder is
+    // the jobs account's, and root ran svc.sh from it (R247 step 5).
+    const unitName = existsSync(`${DIR}/runner/${GH}/.service`) ? readFileSync(`${DIR}/runner/${GH}/.service`, 'utf8').trim() : '';
+    const unitText = unitName && existsSync(`${DIR}/units/${unitName}`) ? readFileSync(`${DIR}/units/${unitName}`, 'utf8') : '';
+    const sysctl = existsSync(`${DIR}/runner-systemctl.log`) ? readFileSync(`${DIR}/runner-systemctl.log`, 'utf8') : '';
+    ok(/^actions\.runner\.[A-Za-z0-9._-]+\.service$/.test(unitName)
+       && unitText.includes(`ExecStart=${DIR}/runner/${GH}/runsvc.sh`) && /^User=\S+$/m.test(unitText)
+       && existsSync(`${DIR}/runner/${GH}/runsvc.sh`)
+       && sysctl.includes('systemctl daemon-reload') && sysctl.includes(`systemctl enable ${unitName}`) && sysctl.includes(`systemctl start ${unitName}`),
+       `...and the agent writes the runner's unit itself and starts it with systemctl (${unitName}; ${sysctl.trim().split('\n').slice(-3).join(' | ')})`);
     ok(!/AAAREGTOKEN/.test(ifin?.log || ''), '...and the token never reaches the job log');
     const renv = existsSync(`${DIR}/runner/${GH}/.env`) ? readFileSync(`${DIR}/runner/${GH}/.env`, 'utf8') : '';
     ok(/^BB_CI_LOG_DIR=.*agentdata\/ci-logs$/m.test(renv) && existsSync(`${DIR}/agentdata/ci-logs`),

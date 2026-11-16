@@ -590,16 +590,32 @@ RUNNER_DIAG_KEEP = 20       # newest files in a runner's _diag
 def cap_file(path, limit=NODE_LOG_MAX):
     """Copy-truncate `path` into `path`.1 once it passes `limit`: the
     writers hold it open with O_APPEND, so they go on at the new end. True
-    when it was cut."""
+    when it was cut. Only a regular file, through no link at either name:
+    runner.log sits in a store the jobs account may write (R247 step 5)."""
+    import stat
     try:
-        if os.path.getsize(path) <= limit:
+        fd = os.open(path, os.O_RDWR | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_NOCTTY)
+    except OSError:
+        return False
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode) or st.st_size <= limit:
             return False
-        shutil.copyfile(path, path + ".1")
-        with open(path, "r+b") as f:
-            f.truncate(0)
+        with contextlib.suppress(FileNotFoundError):
+            if os.path.islink(path + ".1"):
+                os.remove(path + ".1")
+        out = os.open(path + ".1", os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o640)
+        try:
+            with open(fd, "rb", closefd=False) as src, open(out, "wb", closefd=False) as dst:
+                shutil.copyfileobj(src, dst)
+        finally:
+            os.close(out)
+        os.ftruncate(fd, 0)
         return True
     except OSError:
         return False
+    finally:
+        os.close(fd)
 
 
 def prune_dir(d, keep):
