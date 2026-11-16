@@ -2523,8 +2523,14 @@ async function dialogShape(pg = page){
     const nested = scrolls(box) && inner.length
       ? `the box scrolls ${box.scrollHeight - box.clientHeight}px around ${inner[0].id || inner[0].className || inner[0].tagName}, which scrolls too` : '';
     // A dialog of prose (About) may have headings; one of fields may not.
+    // The verbs at the foot's right, after its .sp (the dialog's layout
+    // rule): six dialogs had none and drew them at the left, under the
+    // toast stack's corner (B749).
+    const fb = box.querySelector('.foot');
+    const btns = fb ? [...fb.querySelectorAll('button')].filter(b => b.offsetWidth) : [];
+    const gap = btns.length ? Math.round(fb.getBoundingClientRect().right - Math.max(...btns.map(b => b.getBoundingClientRect().right))) : 0;
     return { nested, loose: loose.slice(0, 3), h4: box.classList.contains('prose') ? 0 : box.querySelectorAll('h4').length,
-             foot: !!box.querySelector('.foot') && box.querySelector('.foot').offsetHeight > 0 };
+             foot: !!fb && fb.offsetHeight > 0, gap };
   });
 }
 for (const [name, open] of Object.entries(DIALOGS)) {
@@ -2541,6 +2547,7 @@ for (const [name, open] of Object.entries(DIALOGS)) {
      `[dialog ${name}] its lines in .field bands, no h4, buttons in a .foot${
        d.err ? ` (${d.err})` : d.loose.length ? `: loose ${d.loose.join(', ')}` : d.h4 ? `: ${d.h4} h4` : !d.foot ? ': no foot' : ''}`);
   ok(!d.nested, `[dialog ${name}] scrolls in one place${d.nested ? `: ${d.nested}` : ''}`);
+  ok(!d.err && d.gap <= 32, `[dialog ${name}] its verbs sit at the foot's right (${d.gap}px from its edge)`);
   // The jump bar's chips sit in a row (the operator, 11 Oct): the dialog's
   // field rule stacks a band's children, and the bar is a band.
   const jump = await page.evaluate(() => {
