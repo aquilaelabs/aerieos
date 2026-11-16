@@ -10,7 +10,7 @@
 // every five seconds. The command goes through a launcher file now, and this is the test
 // that says so.
 import { ok, done, sleep, until, URL, DIR, tmuxKill, tmuxNew, tmuxFmt, takeOn, member, section } from './lib.mjs';
-import { execFileSync } from 'child_process';
+import { execFileSync, spawn } from 'child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, chmodSync, readFileSync, existsSync, lstatSync, readlinkSync, rmSync, statSync, symlinkSync, realpathSync, readdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { dirname, join } from 'path';
@@ -146,6 +146,18 @@ const launcher = () => existsSync(LAUNCHER) ? readFileSync(LAUNCHER, 'utf8') : '
 // file not there yet throws, which until() reads as not yet.
 const wrote = (file, run = LAUNCHER) =>
   statSync(file).size > 0 && statSync(file).mtimeMs >= statSync(run).mtimeMs;
+
+// A launcher's --respawn run until its stub has written `argvFile`, then
+// ended with all it started (its process group). A fixed `timeout 5` cost
+// the whole five seconds every time, left the stub's sleep behind, and under
+// load ended Codex's launcher before it had run the stub at all (B819).
+async function respawnRun(script, env, argvFile){
+  rmSync(argvFile, { force: true });
+  const ch = spawn('bash', [script, '--respawn'], { env, detached: true, stdio: 'ignore' });
+  await until(() => existsSync(argvFile) && statSync(argvFile).size > 0, 30000);
+  try { process.kill(-ch.pid, 'SIGTERM'); } catch { /* already gone */ }
+  return existsSync(argvFile) ? readFileSync(argvFile, 'utf8') : '';
+}
 
 // A roadmap of 40KB. Under the old code this was `command too long` and no
 // session at all: the operator's report was a pane filling with that line as
@@ -314,8 +326,10 @@ ok(/locked/.test(out) && !alive('claude-alpha'),
 // A refusal holds the terminal open for ten seconds so the browser can show
 // the reason: the terminal closes the moment this exits. Only when
 // something is holding one: called from here, with stderr on a pipe, there is
-// nobody to show it to, and five tests in this suite were paying it.
-ok(refusedIn < 5000,
+// nobody to show it to, and five tests in this suite were paying it. The
+// bound is under that pause, not a guess at how fast a loaded machine runs
+// bb-tty (B819: five seconds was missed with nothing wrong).
+ok(refusedIn < 9000,
    `...promptly, rather than pausing for a terminal nobody is holding open (${refusedIn}ms)`);
 ok(/card's menu/.test(out) && /locked by its owner/.test(out),
    '...and says whose lock it is and where it is lifted, rather than only that it said no');
@@ -403,13 +417,7 @@ mkdirSync(tdir, { recursive: true });
 writeFileSync(join(tdir, 'old-one.jsonl'), '');
 await sleep(1100);                       // ls -t sorts by mtime, at 1s here
 writeFileSync(join(tdir, 'the-live-one.jsonl'), '');
-try {
-  execFileSync('timeout', ['5', 'bash', LAUNCHER, '--respawn'], {
-    encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, FAKE_CLAUDE_QUICK: '1' },
-  });
-} catch { /* a stub that hangs is ended by the timeout, and its argv still read */ }
-a = existsSync(argvOut) ? readFileSync(argvOut, 'utf8') : '';
+a = await respawnRun(LAUNCHER, { ...process.env, PATH: `${bin}:${process.env.PATH}`, FAKE_CLAUDE_QUICK: '1' }, argvOut);
 ok(/--model\0opus\0/.test(a) && /--effort\0low\0/.test(a),
    'a respawn re-reads the setting rather than repeating the one it started on');
 ok(/--resume\0the-live-one\0/.test(a),
@@ -433,14 +441,8 @@ await section("a new project's brief, handed to its first session once", async (
      `a new session is handed the staged brief as its first prompt, after --, verbatim (${JSON.stringify(args.slice(-2)).slice(0, 80)})`);
   ok(!existsSync(join(DIR, 'home', '.cache', 'builderbot', 'u', '_none', 'project', 'alpha', 'first-prompt.txt')),
      '...and the copy the launcher read is gone once it has');
-  try {
-    execFileSync('timeout', ['5', 'bash', LAUNCHER, '--respawn'], {
-      encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, FAKE_CLAUDE_QUICK: '1' },
-    });
-  } catch { /* a stub that hangs is ended by the timeout, and its argv still read */ }
-  a = existsSync(argvOut) ? readFileSync(argvOut, 'utf8') : '';
-  ok(!a.includes('armor stats'), 'a respawn of that session is not handed the brief again');
+  a = await respawnRun(LAUNCHER, { ...process.env, PATH: `${bin}:${process.env.PATH}`, FAKE_CLAUDE_QUICK: '1' }, argvOut);
+  ok(a && !a.includes('armor stats'), 'a respawn of that session is not handed the brief again');
   connect(0);
   await until(() => wrote(argvOut));
   a = existsSync(argvOut) ? readFileSync(argvOut, 'utf8') : '';
@@ -660,14 +662,9 @@ sleep 60
          `a model and an effort picked at Start reach Codex as its own flags (${cx2.slice(0, 6).join(' ')})`);
       // A respawn onto a changed setting goes on with the conversation, as
       // Claude's resumes its newest transcript (R95 step 19).
-      const respawn = ag => {
-        try {
-          execFileSync('timeout', ['5', 'bash', join(HOMEDIR, '.cache', 'builderbot', 'u', ownerUid, 'project', proj, `${ag}-run.sh`), '--respawn'],
-            { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, HOME: HOMEDIR, PATH: `${bin}:${process.env.PATH}` } });
-        } catch { /* the stub sleeps; the timeout ends it and its argv is still read */ }
-        return (existsSync(join(bin, `${ag}-argv`)) ? readFileSync(join(bin, `${ag}-argv`), 'utf8') : '').split('\0');
-      };
-      const rcx = respawn('codex');
+      const respawn = async ag => (await respawnRun(join(HOMEDIR, '.cache', 'builderbot', 'u', ownerUid, 'project', proj, `${ag}-run.sh`),
+        { ...process.env, HOME: HOMEDIR, PATH: `${bin}:${process.env.PATH}` }, join(bin, `${ag}-argv`))).split('\0');
+      const rcx = await respawn('codex');
       ok(rcx.includes('resume') && rcx[rcx.indexOf('resume') + 1] === '--last',
          `...and a respawn resumes Codex's newest conversation in its folder (${rcx.slice(-4).join(' ')})`);
       // A Codex conversation resumes in Codex (R95 step 8): its kept log is
@@ -736,7 +733,7 @@ sleep 60
       const cpa = cp.indexOf('shell(aerie version:*)');
       ok(cpa > 0 && cp[cpa - 1] === '--allow-tool' && !cp.some(a => /shell\(aerie (run|build)\b/.test(a)),
          `...told with its own option that the aerie verbs the controller decides need no asking (${cp.filter(a => a === '--allow-tool').length} rules)`);
-      const rcp = respawn('copilot');
+      const rcp = await respawn('copilot');
       ok(rcp.includes('--continue'), `...and a respawn continues Copilot's newest session (${rcp.slice(-3).join(' ')})`);
       const cph = existsSync(join(HOMEDIR, '.copilot', 'hooks', 'builderbot.json'))
         ? JSON.parse(readFileSync(join(HOMEDIR, '.copilot', 'hooks', 'builderbot.json'), 'utf8')) : {};
@@ -777,7 +774,7 @@ sleep 60
         ok(gka > 0 && gk[gka - 1] === '--allow', `Grok is told the same with its own option (${gk.filter(a => a === '--allow').length} rules)`);
         ok(alive(`grok-${proj}`) && ri >= 0 && /THE HOUSE RULES/.test(gk[ri + 1] || '') && genv === '0 1',
            `signed in, a Grok session starts with the briefing appended to its prompt, Claude's hooks and its own updater off (${genv})`);
-        const rgk = respawn('grok');
+        const rgk = await respawn('grok');
         ok(rgk.includes('-c'), `...and a respawn goes on with Grok's newest session (${rgk.slice(-2).join(' ')})`);
         const gkh = existsSync(join(HOMEDIR, '.grok', 'hooks', 'builderbot.json'))
           ? JSON.parse(readFileSync(join(HOMEDIR, '.grok', 'hooks', 'builderbot.json'), 'utf8')) : {};
@@ -844,7 +841,7 @@ sleep 60
         ok(/THE HOUSE RULES/.test(handed.injectSteps?.[0]?.systemMessage?.systemMessage || '') && !Object.keys(hookSays()).length,
            `...and its start hook puts the briefing into the conversation as a system message, once (${
              handed.error || `${(handed.injectSteps?.[0]?.systemMessage?.systemMessage || '').length} characters`})`);
-        const rgm = respawn('gemini');
+        const rgm = await respawn('gemini');
         ok(rgm.includes('--continue'), `...a respawn goes on with its newest conversation (${rgm.filter(Boolean).slice(-2).join(' ')})`);
         tmuxKill(`gemini-${proj}`);
         // Its pack off for the space (a pack is, until the space's settings
