@@ -58,6 +58,11 @@ class FtpServers:
         except RuntimeError as e:
             rec["why"] = str(e)
             return rec
+        # Never as root: with no session account to be, as_user gives
+        # nothing to drop to, and the server ran on the LAN as root (R247 step 5).
+        if not who and os.geteuid() == 0:
+            rec["why"] = "this node has no session account to serve files as, so FTP is not started"
+            return rec
         exe = shutil.which("bb-ftpd", path=env.get("PATH"))
         if not exe:
             rec["why"] = "the ftp toolchain is not installed on this node: install it from the Library"

@@ -305,6 +305,20 @@ class TheAgent(unittest.TestCase):
         self.assertEqual(self.ran, [])
 
 
+class SambaOwn(unittest.TestCase):
+    def test_samba_s_own_section_names_are_never_a_share(self):
+        # R247 step 5: [global] in the included file reopened Samba's own
+        # section, its path, guest ok and force user every share's after it.
+        sh = agentpkg.load("aerieos_agent_shares_names").module("shares")
+        for bad in ("global", "Global", "HOMES", "printers"):
+            self.assertFalse(sh.name_ok(bad), bad)
+        for good in ("media", "TV Shows", "globals", "home"):
+            self.assertTrue(sh.name_ok(good), good)
+        text = sh.render([{"name": "global", "path": "/mnt/user/x", "smb": {"on": True, "ro": False, "guest": True, "users": []},
+                           "nfs": {"on": False}}])[0]
+        self.assertNotIn("[global]", text)
+
+
 class TheController(unittest.TestCase):
     def test_the_census_keeps_each_share_to_its_shape(self):
         import nodes

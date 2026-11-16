@@ -38,6 +38,13 @@ SMB_USERS_FILE = "/run/builderbot/smbusers"
 # (TV Shows, as another NAS names one), never a leading, trailing or doubled
 # one, nor a character Samba's or NFS's file would read as its own.
 NAME_RE = re.compile(r"(?=.{1,63}$)[A-Za-z0-9][A-Za-z0-9_.-]*(?: [A-Za-z0-9_.-]+)*")
+# Samba's own sections, which a share of that name would reopen: [global]'s
+# path, guest ok and force user would be every share's after it (R247 step 5).
+SAMBA_OWN = {"global", "homes", "printers"}
+
+
+def name_ok(name):
+    return bool(NAME_RE.fullmatch(name)) and name.lower() not in SAMBA_OWN
 PATH_RE = re.compile(r"(?:/[A-Za-z0-9._+@-]+(?: [A-Za-z0-9._+@-]+)*)+/?")
 USER_RE = re.compile(r"[a-z_][a-z0-9_-]{0,31}")
 CLIENT_RE = re.compile(r"[A-Za-z0-9*][A-Za-z0-9*./:_-]{0,80}")
@@ -206,7 +213,7 @@ def render(shares):
     smb = ["# Written by AerieOS (the Storage page): every share here is one it makes. Do not edit; the page writes it whole.\n"]
     nfs = ["# Written by AerieOS (the Storage page): do not edit; the page writes it whole.\n"]
     for s in shares:
-        if s["smb"]["on"]:
+        if s["smb"]["on"] and name_ok(s["name"]):
             smb.append(f"[{s['name']}]\n    path = {s['path']}\n    browseable = yes\n    read only = {'yes' if s['smb']['ro'] or (s['smb']['guest'] and s['smb']['users']) else 'no'}\n")
             readers = list(s["smb"].get("readers") or [])
             if s["smb"]["guest"]:
@@ -362,8 +369,9 @@ class SharesMixin:
         if action not in ("set", "remove"):
             say(f"refused: {action or 'no action'} is not a share action (set, remove)\n")
             return "failed", 64
-        if not NAME_RE.fullmatch(name):
-            say(f"refused: {name or 'no name'} is not a share name (letters, digits, dots, hyphens and underscores, 63 at most)\n")
+        if not name_ok(name):
+            say(f"refused: {name or 'no name'} is not a share name (letters, digits, dots, hyphens and underscores, 63 at most, "
+                "and not global, homes or printers, which are Samba's own)\n")
             return "failed", 64
         have = shares_now()
         rest = [s for s in have if s["name"] != name]
