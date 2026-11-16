@@ -328,6 +328,8 @@ def _sync(nid, req):
         return wssync.state(nid, project)
     if act == "since":
         return wssync.since(nid, project, req.get("rev"))
+    if act == "gone":
+        return wssync.gone(nid, project, req.get("paths"))
     return {"error": f"no such sync action: {act}"}, 400
 
 

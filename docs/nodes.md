@@ -689,7 +689,10 @@ controller is.
   rather than the tree; the whole tree is walked when a directory comes or
   goes, when the kernel's queue overflows, and once a minute regardless. A
   file that has changed and then held still for a tick goes up as a put
-  naming the hash it was changed from.
+  naming the hash it was changed from. Removals go up together, up to five
+  hundred to a call (the sync verb's `gone`), since a `git gc` that packs
+  the loose objects removes thousands at once. One path that cannot be sent
+  is that path's error, counted as waiting, and the rest go on.
 - **Down.** A put, a write from VS Code (files.py tells wssync.py) or a
   change a scan of the share finds bumps the space's revision and leaves
   a hint the node's held work request takes at once; the agent then asks

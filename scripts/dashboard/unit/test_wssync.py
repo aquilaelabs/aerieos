@@ -50,6 +50,9 @@ class Wire:
             out, code = ctl_sync.projects(self.nid), 200
         elif act == "state":
             out, code = ctl_sync.state(self.nid, project)
+        elif act == "gone":
+            self.gone_calls = getattr(self, "gone_calls", 0) + 1
+            out, code = ctl_sync.gone(self.nid, project, body.get("paths"))
         else:
             out, code = ctl_sync.since(self.nid, project, body.get("rev"))
         return code, json.loads(json.dumps(out))
@@ -539,6 +542,45 @@ class Sync(unittest.TestCase):
         self.assertEqual(read(f"{self.ws}/alpha/a.txt"), "stuck\n")
         self.assertEqual(s.status()["alpha"]["pending"], 0)
         self.assertEqual(s.status()["alpha"]["error"], "")
+
+    def test_many_removals_go_up_in_one_call(self):
+        # B789: after a git gc a tick holds thousands of removals, one
+        # request each; they go together, and each is applied.
+        self.turn()
+        os.makedirs(self.at("n1", "src/many"), exist_ok=True)
+        for i in range(30):
+            write(self.at("n1", f"src/many/f{i}.txt"), f"{i}\n")
+        self.turn("n1", times=3)
+        self.assertTrue(os.path.exists(f"{self.ws}/alpha/src/many/f29.txt"))
+        uploads = []
+        real = self.n["n1"].agent.ctl.upload
+        self.n["n1"].agent.ctl.upload = lambda path, src, timeout=0: uploads.append(path) or real(path, src, timeout)
+        for i in range(30):
+            os.remove(self.at("n1", f"src/many/f{i}.txt"))
+        self.turn("n1", times=3)
+        self.assertFalse(any(os.path.exists(f"{self.ws}/alpha/src/many/f{i}.txt") for i in range(30)))
+        self.assertEqual(self.n["n1"].agent.ctl.gone_calls, 1)
+        self.assertEqual(uploads, [], "no removal went up on its own")
+        st = self.n["n1"].status()["alpha"]
+        self.assertEqual((st["pending"], st["error"]), (0, ""))
+        # ...and the other node takes them as it takes any change.
+        self.turn("n2", times=3)
+        self.assertFalse(os.path.exists(self.at("n2", "src/many/f0.txt")))
+
+    def test_a_controller_without_the_batch_is_sent_removals_one_at_a_time(self):
+        self.turn()
+        for i in range(3):
+            write(self.at("n1", f"old{i}.txt"), f"{i}\n")
+        self.turn("n1", times=3)
+        ctl = self.n["n1"].agent.ctl
+        real = ctl.call
+        ctl.call = lambda verb, body, timeout=0: ((400, {"error": "no such sync action: gone"})
+                                                  if body.get("action") == "gone" else real(verb, body, timeout))
+        for i in range(3):
+            os.remove(self.at("n1", f"old{i}.txt"))
+        self.turn("n1", times=3)
+        self.assertFalse(any(os.path.exists(f"{self.ws}/alpha/old{i}.txt") for i in range(3)))
+        self.assertEqual(self.n["n1"].status()["alpha"]["pending"], 0)
 
     def test_a_file_already_there_and_different_is_kept_not_overwritten(self):
         write(self.at("n1", "a.txt"), "was here first\n")

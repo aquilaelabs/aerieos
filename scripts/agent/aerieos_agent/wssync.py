@@ -47,6 +47,7 @@ SKIP_DIRS = {"node_modules", ".gradle", "__pycache__", ".venv", "venv", ".next",
 SKIP_UNDER = (".claude/worktrees",)
 TMP = ".bbsync-"
 MAX_FILE = 512 * 1024 * 1024
+GONE_EACH = 500                  # removals a call, under the controller's GONE_MAX
 TICK = 1.0
 # The fallback only: a project that moved on the controller is said in the
 # held work request and pulled at once. Every ten seconds per project was
@@ -907,6 +908,19 @@ class WorkspaceSync:
         ready = {k: v for k, v in moved.items() if k in p.moving and p.moving[k] == v}
         p.moving = {k: v for k, v in moved.items() if k not in ready}
         changed = False
+        # Removals go up together when there are several (B789): after a
+        # git gc packs the loose objects a tick holds thousands, and one
+        # request each kept every relayed verb waiting for many minutes.
+        gone = [(rel, e) for rel, e in sorted(ready.items()) if e is None and rel in p.files]
+        if len(gone) > 1:
+            try:
+                changed = self.put_gone(p, top, gone)
+            except Exception as ex:                  # noqa: BLE001 (as one path's failure, B806)
+                p.error = f"removals: {type(ex).__name__}: {ex}"[:200]
+                for rel, e in gone:
+                    p.moving[rel] = e
+            sent = {rel for rel, _ in gone}
+            ready = {k: v for k, v in ready.items() if k not in sent}
         for rel, e in sorted(ready.items()):
             rec = p.files.get(rel)
             base = rec[0] if rec else ""
@@ -967,6 +981,43 @@ class WorkspaceSync:
                 code, r = self.agent.ctl.upload(url, empty, timeout=60)
         else:
             code, r = self.agent.ctl.upload(url, path, timeout=600)
+        return self.took(p, top, rel, e, sha, code, r)
+
+    def put_gone(self, p, top, gone):
+        """Several removals in one call each GONE_EACH (the controller's
+        sync action gone), each answer taken as a single put's is. A
+        controller without the action is sent them one at a time. Whether
+        any was taken."""
+        changed = False
+        for i in range(0, len(gone), GONE_EACH):
+            chunk = gone[i:i + GONE_EACH]
+            code, r = self.agent.ctl.call("sync", {"action": "gone", "project": p.name,
+                                                   "paths": [[rel, p.files[rel][0]] for rel, _ in chunk]}, timeout=300)
+            res = r.get("results") if code == 200 and isinstance(r, dict) else None
+            if isinstance(res, list) and len(res) == len(chunk):
+                pairs = [(rel, e, int(x.get("code") or 0) if isinstance(x, dict) else 0, x if isinstance(x, dict) else {})
+                         for (rel, e), x in zip(chunk, res, strict=True)]
+            elif code in (200, 400):
+                # No such action there: one at a time, as before.
+                for rel, e in chunk:
+                    if self.put(p, top, rel, e, p.files[rel][0], ""):
+                        changed = True
+                    else:
+                        p.moving[rel] = e
+                continue
+            else:
+                pairs = [(rel, e, code, r if isinstance(r, dict) else {}) for rel, e in chunk]
+            for rel, e, c, x in pairs:
+                if self.took(p, top, rel, e, "", c, x):
+                    changed = True
+                else:
+                    p.moving[rel] = e
+        return changed
+
+    def took(self, p, top, rel, e, sha, code, r):
+        """The controller's answer to one change sent up, taken: the record
+        moved on, a conflict taken in, or the error kept. Whether it went."""
+        path = os.path.join(top, rel)
         if code != 200:
             p.error = f"{rel}: {r.get('error') or code}"[:200]
             return False
