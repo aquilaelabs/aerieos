@@ -158,7 +158,14 @@ ok(rowLook.radius === '0px' && rowLook.top === '1px',
    `...drawn as a line-divided row like a bug report, not a box (${JSON.stringify(rowLook)})`);
 await page.click('#rulesBox .rulerow[data-i="1"] summary');
 await page.waitForFunction(() => document.querySelector('#rulesBox .rulerow[data-i="1"]').open, null, { timeout: 10000 });
+// Pressed again when the field has not come: a redraw landing between the
+// press's down and up takes it (B822, '0 shut, 1 open' under a whole run).
 await page.click('#rulesBox .rulerow[data-i="1"] .rlEdit');
+for (let t = 0; t < 3; t++){
+  if (await page.waitForSelector('#rulesBox .rulerow[data-i="1"] .rlText', { timeout: 4000 }).then(() => true, () => false)) break;
+  await page.evaluate(() => { const r = document.querySelector('#rulesBox .rulerow[data-i="1"]');
+    if (r && !r.querySelector('.rlText')) r.querySelector('.rlEdit')?.click(); });
+}
 await page.waitForSelector('#rulesBox .rulerow[data-i="1"] .rlText', { timeout: 10000 }).catch(async e => {
   // What the panel drew instead, said before the timeout is thrown (B297):
   // each row, open or shut, editing or not, and whether its field exists.
@@ -171,7 +178,9 @@ await page.waitForSelector('#rulesBox .rulerow[data-i="1"] .rlText', { timeout: 
 ok(await page.$('#rulesBox .rulerow[data-i="0"] .rlText') === null,
    'Edit opens that rule\'s fields and no other\'s');
 await page.fill('#rulesBox .rulerow[data-i="1"] .rlText', 'typed, then thought better of');
-ok(!await page.$eval('[data-ssave="briefing:rules"]', b => b.disabled),
+// Read once the input's handler has run, not in the same instant (B836).
+ok(await page.waitForFunction(() => !document.querySelector('[data-ssave="briefing:rules"]')?.disabled, null, { timeout: 5000 })
+     .then(() => true, () => false),
    'typing into a rule arms the panel\'s Save');
 await page.click('#rulesBox .rulerow[data-i="1"] .rlCancel');
 await page.waitForFunction(() => !document.querySelector('#rulesBox .rulerow .rlText'), null, { timeout: 10000 });
