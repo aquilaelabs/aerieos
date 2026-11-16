@@ -196,7 +196,7 @@ function nbTestsView({$, nb, project}){
     const nDrift = (d.n_added ?? (d.added || []).length)
                  + (d.n_gone ?? (d.gone || []).length)
                  + (d.n_renamed ?? (d.renamed || []).length);
-    $("tstFolds").innerHTML =
+    drawHTML($("tstFolds"),
       // Closed by default: the list sorted by duration is what this tab is
       // for, and a fold that opens over it is one somebody has to shut before
       // they can read the thing they came for. The status carries the number
@@ -209,7 +209,7 @@ function nbTestsView({$, nb, project}){
                     + (nDrift > driftRows.length
                        ? `<div class="sub dim">…and ${nDrift - driftRows.length} more</div>` : "")
                   : `<div class="sub">the list and the last run agree.</div>`,
-           {cls: nDrift ? "warn" : ""}) : "");
+           {cls: nDrift ? "warn" : ""}) : ""));
     wireSections($("tstFolds"));
     // ---- the filter --------------------------------------------------------
     const suites = [...new Set(all.map(t => t.suite))].sort();

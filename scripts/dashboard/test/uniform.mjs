@@ -1087,20 +1087,24 @@ if (runs('a')) {
 await section("colors and corners are tokens", async () => {
   const { readFileSync } = await import('node:fs');
   const path = await import('node:path');
-  const html = readFileSync(path.resolve(import.meta.dirname, '..', 'index.html'), 'utf8');
-  const css = html.slice(html.indexOf('<style>'), html.indexOf('</style>'));
-  const lines = css.split('\n');
-  const schemes = lines.findIndex(l => /^\*\{box-sizing:border-box\}/.test(l));
+  // The stylesheet's files, a cascade layer each (R9 step 4), rule by rule:
+  // a scheme's own rules (its tokens, and a hull of its own like Nostromo's,
+  // scoped by data-theme or data-mode) define hex; nothing else does.
+  const dir = path.resolve(import.meta.dirname, '..');
   const off = [];
-  lines.forEach((l, i) => {
-    if (i <= schemes) return;                      // the tokens and the schemes define hex
-    const t = l.replace(/\/\*.*?\*\//g, '');
-    // Black and white inside a color-mix() are not colors of a scheme, and
-    // #2b2b2b is the terminal's own ground (see .slot.ownterm), never a page color.
-    const hex = t.replace(/#000000|#ffffff|#2b2b2b/g, '');
-    if (/#[0-9a-fA-F]{6}\b/.test(hex)) off.push(`${i + 1}: ${t.trim().slice(0, 60)}`);
-    if (/border-radius:(8|6|4|10)px/.test(t)) off.push(`${i + 1}: ${t.trim().slice(0, 60)}`);
-  });
+  for (const name of ['page-skin.css', 'page-components.css', 'page-surfaces.css', 'page-overrides.css']){
+    const css = readFileSync(path.join(dir, name), 'utf8').replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '));
+    for (const m of css.matchAll(/([^{};]*)\{([^{}]*)\}/g)){
+      const sel = m[1].trim();
+      if (/data-theme|data-mode|^:root\b|^html\b/.test(sel)) continue;
+      const line = css.slice(0, m.index + m[1].length).split('\n').length;
+      // Black and white inside a color-mix() are not colors of a scheme, and
+      // #2b2b2b is the terminal's own ground (see .slot.ownterm), never a page color.
+      const hex = m[2].replace(/#000000|#ffffff|#2b2b2b/g, '');
+      if (/#[0-9a-fA-F]{6}\b/.test(hex)) off.push(`${name}:${line}: ${sel.slice(0, 50)}`);
+      if (/border-radius:(8|6|4|10)px/.test(m[2])) off.push(`${name}:${line}: ${sel.slice(0, 50)}`);
+    }
+  }
   ok(off.length === 0, `no hex color and no numbered corner outside the scheme blocks (${off.length ? off.slice(0, 4).join('; ') : 'none'})`);
 });
 }
@@ -1203,6 +1207,19 @@ for (const kind of kinds){
     return [...new Set(window.__lsn.got.filter(x => before.has(x.el)).map(x => `${name(x.el)} ${x.type}`))];
   }, kind.startsWith('notebook:') ? kind.slice('notebook:'.length) : '');
   ok(wired.length === 0, `[${kind}] a draw adds no listener to what the last draw kept${wired.length ? ': ' + wired.slice(0, 6).join('; ') : ''}`);
+  // What a draw brings is the draw's own (R9 step 6, drawn): on the page as
+  // drawn, every proseline is wired, no title is left to show as a
+  // tooltip, and every data-style is applied. A draw that writes markup
+  // some way that does not call drawn() leaves one of these behind.
+  const brought = await page.evaluate(() => {
+    const on = e => !e.closest('template') && !(e instanceof SVGElement);
+    const prose = [...document.querySelectorAll('textarea.proseline:not([data-prose])')].filter(on);
+    const titled = [...document.querySelectorAll('[title]')].filter(on).filter(e => !e.closest('#termwin, .xterm'));
+    const unstyled = [...document.querySelectorAll('[data-style]')].filter(on).filter(e => !e.style.cssText);
+    const name = e => e.tagName.toLowerCase() + (e.id ? '#' + e.id : typeof e.className === 'string' && e.className ? '.' + e.className.trim().split(/\s+/)[0] : '');
+    return [...prose.map(e => 'proseline ' + name(e)), ...titled.map(e => 'title ' + name(e)), ...unstyled.map(e => 'data-style ' + name(e))];
+  });
+  ok(brought.length === 0, `[${kind}] what a draw brings is there: proselines wired, no title left, every data-style applied${brought.length ? ': ' + brought.slice(0, 6).join('; ') : ''}`);
 }
 }
 

@@ -3503,7 +3503,23 @@ def app_apk_sha():
 # the same thing its ETag is; the page's own tag covers them all, so a change
 # to one script alone is still a new page.
 _SCRIPT_TAG = re.compile(rb'<script src="((?:tab|nb|page)-[a-z-]+\.js)">')
-_page_scripts = {"mtime": None, "names": frozenset()}
+# ...and its stylesheet, a file a layer (R9 step 4), named and versioned the
+# same way.
+_STYLE_TAG = re.compile(rb'<link rel="stylesheet" href="(page-[a-z-]+\.css)">')
+_page_scripts = {"mtime": None, "names": frozenset(), "styles": frozenset()}
+
+
+def _page_files():
+    p = HERE / "index.html"
+    try:
+        m = p.stat().st_mtime_ns
+    except OSError:
+        return _page_scripts
+    if _page_scripts["mtime"] != m:
+        raw = p.read_bytes()
+        _page_scripts.update(mtime=m, names=frozenset(n.decode() for n in _SCRIPT_TAG.findall(raw)),
+                             styles=frozenset(n.decode() for n in _STYLE_TAG.findall(raw)))
+    return _page_scripts
 
 
 def page_scripts():
@@ -3512,15 +3528,13 @@ def page_scripts():
     file is added in one place, the page, and nothing else is served. Read
     again when index.html changes. The page-*.js files were missing from the
     versioning pattern above until this read it the same way (R77)."""
-    p = HERE / "index.html"
-    try:
-        m = p.stat().st_mtime_ns
-    except OSError:
-        return frozenset()
-    if _page_scripts["mtime"] != m:
-        names = {n.decode() for n in _SCRIPT_TAG.findall(p.read_bytes())}
-        _page_scripts.update(mtime=m, names=frozenset(names))
-    return _page_scripts["names"]
+    return _page_files()["names"]
+
+
+def page_styles():
+    """The stylesheets index.html links, by name, read off its own link
+    tags as the scripts are."""
+    return _page_files()["styles"]
 
 
 _sri = {}
@@ -3557,6 +3571,17 @@ def _versioned_page(raw, tag):
         return (b'<script src="' + m.group(1) + b"?v=" + v.encode() + b'" integrity="'
                 + _integrity_of(m.group(1).decode(), v).encode() + b'">')
     out = _SCRIPT_TAG.sub(named, raw)
+
+    def styled(m):
+        try:
+            st = (HERE / m.group(1).decode()).stat()
+        except OSError:
+            return m.group(0)
+        v = f"{st.st_size:x}-{st.st_mtime_ns:x}"
+        parts.append(v)
+        return (b'<link rel="stylesheet" href="' + m.group(1) + b"?v=" + v.encode() + b'" integrity="'
+                + _integrity_of(m.group(1).decode(), v).encode() + b'">')
+    out = _STYLE_TAG.sub(styled, out)
     # The install's banner (R88), at its place under the header; part of the
     # page's tag, so a banner changed at a restart is not served from a copy.
     # ...and maintenance mode's, shown to the owner by the page while it is on,
@@ -8380,6 +8405,8 @@ class Handler(BaseHTTPRequestHandler):
         # grows into a general file server by accident.
         if path.startswith("/") and path[1:] in page_scripts():
             return self._static(path[1:], "text/javascript; charset=utf-8")
+        if path.startswith("/") and path[1:] in page_styles():
+            return self._static(path[1:], "text/css; charset=utf-8")
         if self.path.split("?")[0] in ("/", "/index.html"):
             return self._static("index.html", "text/html; charset=utf-8")
         if fav := self.FAVICONS.get(self.path.split("?")[0]):

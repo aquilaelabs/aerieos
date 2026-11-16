@@ -148,16 +148,18 @@ scripts/
   lib/lint-checks.py             aerie lint's own checks: runner label pinning, XML well-formedness, settings agreement
   startup.d/*.sh                 startup hooks
   dashboard/                     web dashboard: server.py (the routes, the transport and the gates, each handler one call
-                                 into a module beside it); index.html (markup, stylesheet, the wiring that runs at load);
+                                 into a module beside it); index.html (the markup); page-*.css (the stylesheet, a cascade layer a file);
                                  one tab-*.js per document tab, one nb-*.js per notebook view (nb-core.js is the
                                  notebook itself), one page-*.js per part of the page that is neither, all strict,
                                  all pure declarations, served by name from the page's own script tags (R77)
     server.py                    the routes, the transport and the gates; each handler one call into a module beside it
-    index.html                   the markup, the stylesheet and the wiring that runs at load
+    index.html                   the markup, and the head's script that reads the theme before the first paint
+    page-*.css                   the stylesheet, a cascade layer a file (R9): page-skin.css (the tokens, the schemes, bare elements), page-components.css, page-surfaces.css, page-overrides.css
     terminal.html                one terminal on a page of its own: a tab popped out of the dock, and the Android app's session screen (R133)
     tab-*.js                     one per document tab (Docker, Nodes, Jobs, Schedules, nginx, Scanners, Storage, Library, a Library entry's own page, Installed, an installed thing's own page, Files, Toolchains, Agents, Emulator, Phone, Apps, Settings, Keys, Audit, Users, Profile, Findings, Projects)
     nb-*.js                      one per notebook view; nb-core.js is the notebook itself
     page-*.js                    one per part of the page that is neither: the state, the tabs, the panes and the dock, a project's rows, the polls, the bell, the doctor and the rest
+    page-boot.js                 what runs as the page loads, a function a part, called in order by boot(), which index.html runs once every script is in (R9)
     static/                      the favicon set and the SVG marks the page draws
     vendor/                      xterm.js 5.5.0 and its fit addon 0.10.0 as npm publishes them, with xterm's MIT license (R133), served by name under /vendor/
     bb-tty                       what a terminal runs: which tmux session it is, and whose

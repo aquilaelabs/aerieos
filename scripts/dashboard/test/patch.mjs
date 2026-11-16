@@ -406,5 +406,88 @@ await section("what the code takes away for a role it gives back as the markup h
      `taken away by each draw for a role that does not give them, and given back as the markup draws them by the first that does (${JSON.stringify(r)})`);
 });
 
+// ---- R9: what a press sends, what a page reads, what a draw brings -----------
+
+await section("a request that never lands answers in words, and so does one answered in other words", async () => {
+  await page.route('**/api/r9-gone', r => r.abort('failed'));
+  await page.route('**/api/r9-text', r => r.fulfill({ status: 502, contentType: 'text/html', body: '<h1>Bad Gateway</h1>' }));
+  const r = await page.evaluate(async () => ({
+    gone: await postJSON('/api/r9-gone', {}),
+    read: await getJSON('/api/r9-gone'),
+    text: await postJSON('/api/r9-text', {}),
+  }));
+  await page.unroute('**/api/r9-gone'); await page.unroute('**/api/r9-text');
+  ok(r.gone.error === 'the controller did not answer' && r.gone.unreached && r.read.error === 'the controller did not answer'
+     && /^the controller answered 502/.test(r.text.error) && !r.text.unreached,
+     `postJSON and getJSON answer {error} in words, never throw, and say when nothing landed (${JSON.stringify(r)})`);
+});
+
+await section("a kind of read is one at a time: the last asked is made once more, in order, a failure keeping none back", async () => {
+  const r = await page.evaluate(async () => {
+    const seen = [], gates = [];
+    const step = (name, fail) => async () => {
+      seen.push('start ' + name);
+      await new Promise(res => gates.push(res));
+      seen.push('land ' + name);
+      if (fail) throw new Error('r9 read failed');
+    };
+    const rev0 = readRev('r9.test');
+    const first = reading('r9.test', step('a', true));
+    const second = reading('r9.test', step('b'));            // asked while a is out
+    const third = reading('r9.test', step('c'));             // asked again: replaces b
+    const same = first === second && second === third;
+    gates.shift()();                                         // a lands (and throws)
+    await new Promise(res => setTimeout(res, 20));
+    const busy = readBusy('r9.test');
+    gates.shift()();                                         // c lands
+    let thrown = '';
+    try { await first; } catch (e) { thrown = e.message; }
+    return { same, seen, busy, after: readBusy('r9.test'), revs: readRev('r9.test') - rev0, thrown };
+  });
+  ok(r.same && JSON.stringify(r.seen) === JSON.stringify(['start a', 'land a', 'start c', 'land c']) && r.busy && !r.after
+     && r.revs === 2 && r.thrown === 'r9 read failed',
+     `two asks while a read is out make one more read, the newest, after it lands; a failure still lets it be made, and is raised at the end (${JSON.stringify(r)})`);
+});
+
+await section("a press's ring is its own work, and a read the page makes after it holds no button", async () => {
+  await page.route('**/api/r9-slow', async r => { await new Promise(res => setTimeout(res, 900)); await r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }); });
+  const r = await page.evaluate(async () => {
+    const host = document.createElement('div');
+    host.id = 'r9ring'; host.style.cssText = 'position:fixed;left:300px;top:300px;width:420px;display:flex;gap:6px;z-index:99';
+    document.body.append(host);
+    patch(host, '<button type="button" id="r9a">Send it</button><button type="button" id="r9b">Read it</button>');
+    const a = host.querySelector('#r9a'), b = host.querySelector('#r9b');
+    a.onclick = async () => { await new Promise(res => setTimeout(res, 50)); await postJSON('/api/r9-slow', {}); };
+    const gotBack = a.onclick;
+    a.click();
+    const late = getJSON('/api/r9-slow');                   // the page's own read, after the click
+    await new Promise(res => setTimeout(res, 500));
+    const held = { a: a.classList.contains('working'), b: b.classList.contains('working') };
+    await late; await new Promise(res => setTimeout(res, 700));
+    const after = a.classList.contains('working');
+    host.remove();
+    return { held, after, own: typeof gotBack === 'function' && !/pressRun/.test(String(gotBack)) };
+  });
+  await page.unroute('**/api/r9-slow');
+  ok(r.held.a && !r.held.b && !r.after && r.own,
+     `the pressed button wears its ring through what its handler awaits, a later read holds no button, and the handler read back is the one set (${JSON.stringify(r)})`);
+});
+
+await section("what a draw brings is the draw's own, at once", async () => {
+  const r = await page.evaluate(() => {
+    const el = document.createElement('div'); el.id = 'r9drawn'; document.body.append(el);
+    drawHTML(el, '<span data-style="color:rgb(1, 2, 3)" title="said">x</span><textarea class="proseline">one line</textarea><input type="text" id="r9f">');
+    const sp = el.querySelector('span'), t = el.querySelector('textarea'), f = el.querySelector('input');
+    const out = { color: sp.style.color, title: sp.getAttribute('title'), said: sp.getAttribute('aria-description') || sp.getAttribute('aria-label'),
+                  prose: t.dataset.prose === '1', fitted: t.style.height !== '', quiet: f.hasAttribute('data-bwignore') };
+    patch(el, '<span data-style="color:rgb(1, 2, 3)" title="said">x</span><textarea class="proseline">one line</textarea><input type="text" id="r9f"><b title="new words">y</b>');
+    out.later = el.querySelector('b').getAttribute('aria-description') || el.querySelector('b').getAttribute('aria-label');
+    el.remove();
+    return out;
+  });
+  ok(r.color === 'rgb(1, 2, 3)' && r.title === null && r.said === 'said' && r.prose && r.fitted && r.quiet && r.later === 'new words',
+     `a draw applies data-style, wires and fits a proseline, quiets a field and turns a title into words before it returns, and a patch does the same for what it adds (${JSON.stringify(r)})`);
+});
+
 await page.evaluate(() => document.querySelector('#r244')?.remove());
 await done(browser);

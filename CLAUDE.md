@@ -134,12 +134,13 @@ pass before anything is published; `aerie ci-log` reads a run's output.
   the routes, the transport and the gates; each handler checks who may ask
   and makes one call into the feature's module beside it, which answers
   `(payload, status)` and is handed what it needs by `configure()`.
-  `index.html` is the markup, the stylesheet and the wiring that runs at
-  load; `tab-*.js` one per document tab, `nb-*.js` one per notebook view
-  (`nb-core.js` the notebook), `page-*.js` one per part of the page that is
-  neither; all pure declarations, all `"use strict"`, served only by name
-  from the page's own script tags (`server.page_scripts`). A tab kind
-  declares `multi`, `live` and `open`.
+  `index.html` is the markup; `page-*.css` the stylesheet, a file a cascade
+  layer (skin, components, surfaces, overrides); `tab-*.js` one per document
+  tab, `nb-*.js` one per notebook view (`nb-core.js` the notebook),
+  `page-*.js` one per part of the page that is neither, `page-boot.js` what
+  runs at load; all pure declarations, all `"use strict"`, served only by
+  name from the page's own tags (`server.page_scripts`, `page_styles`). A
+  tab kind declares `multi`, `live` and `open`.
 - **The design language** is `docs/design-language.md`, written by this
   project's own Design view (`aerie design file > docs/design-language.md`,
   or `--from FILE` with the branch's own record, committed with the

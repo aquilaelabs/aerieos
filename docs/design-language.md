@@ -618,10 +618,9 @@ dropped runs to three hundred: on a phone every one of those was a field you
 could not read what you were editing in. A proseline wraps, grows to its
 content and never scrolls inside itself. It is still one line: Enter does
 not make a newline in one, and the surface's own Enter handler still runs.
-`proseline()` does the growing and a MutationObserver wires every one that
-appears, so there is nothing for a new surface to remember; `arriveBox` is
-the one caller that asks by hand, because it measures a box's height in the
-same tick. The rule the suite enforces: no `<input>` on a document tab
+`proseline()` does the growing, and the draw that writes one wires it
+(`drawn`, which `patch()` and `drawHTML()` call), so there is nothing for a
+new surface to remember, and it is fitted in the same tick it is drawn. The rule the suite enforces: no `<input>` on a document tab
 carries a `maxlength` over 120, because that is a sentence and a sentence is
 a proseline.
 
@@ -687,26 +686,42 @@ are actions, not settings, and act on the press.
 
 ### files
 
-Applies to: scripts/dashboard/index.html; script, module, file, load
+Applies to: scripts/dashboard/index.html, scripts/dashboard/page-*.css, scripts/dashboard/page-boot.js; script, module, file, load, stylesheet, layer
 
-The page is `index.html` (the markup, the stylesheet, and the wiring that
-runs at load) and classic scripts beside it, loaded before its own
-script: `tab-*.js` for a document tab, `nb-*.js` for a notebook view
-(`nb-core.js` is the notebook itself, the frame the views draw into), and
-`page-*.js` for a part of the page that is neither: the state and the
-helpers everything reaches for, the tabs, the panes and the dock, a space's
-rows, a space's settings, the doctor, the polls, the bell, and so on.
-Each is pure declarations and starts with `"use strict"`, as the page's
-own script does, since it runs before the page and its helpers exist;
-wiring that must run at load stays in `index.html` under the section's
-`// ---- name ----` header, with a line saying which file holds its
-declarations. A declaration whose initializer reads the page at load
-(the favicon's element, a set kept in localStorage) stays there too. The
-server serves a script only by name: the list is the page's own script
-tags (`page_scripts` in `server.py`), so a new file is added once, as a
-tag in `index.html`. `aerie map sections FILE` reads a file by its
-headers, with each section's outside callers, what runs at load and what
-the suite covers.
+The page is `index.html` (the markup, and the head's one script, which reads
+the theme before the first paint), its stylesheet, and classic scripts
+beside it.
+
+The stylesheet is four files, a cascade layer each, linked in their order:
+`page-skin.css` (the tokens, the twelve schemes and what a bare element
+looks like), `page-components.css` (what more than one page draws: rows,
+sections and their bars, tiles, facts, chips, pills, menus, dialogs,
+toasts), `page-surfaces.css` (what one page or one part of the page draws:
+the header, the rail, the dock, a page, a notebook view) and
+`page-overrides.css` (what must win whatever else says: hidden is hidden,
+less motion is none, a theme's crossfade while it runs). A later layer
+wins over every rule of an earlier one, whatever either's specificity or
+place in its file, so a rule goes in the layer of what it styles and is
+written as plainly as that allows: never lengthened, and never moved down
+the file, to win. xterm's own stylesheet stays outside the layers, so its
+rules for its own parts win over the page's for bare elements.
+
+The scripts: `tab-*.js` for a document tab, `nb-*.js` for a notebook view
+(`nb-core.js` is the notebook itself, the frame the views draw into),
+`page-*.js` for a part of the page that is neither (the state and the
+helpers everything reaches for, the tabs, the panes and the dock, a
+space's rows, a space's settings, the doctor, the polls, the bell, and so
+on), and `page-boot.js`, what runs at load: a function a part, under the
+part's `// ---- name ----` header, called in order by `boot()`, which the
+page's last line runs once every script is in. Every other file is pure
+declarations and starts with `"use strict"`; a declaration whose
+initializer reads the page at load (the favicon's element) is
+`page-boot.js`'s, at its top level. The server serves a script or a
+stylesheet only by name: the lists are the page's own tags (`page_scripts`
+and `page_styles` in `server.py`), so a new file is added once, as a tag in
+`index.html`. `aerie map sections FILE` reads a file by its headers, with
+each section's outside callers, what runs at load and what the suite
+covers.
 
 ### sections-and-action-bars
 
@@ -834,7 +849,7 @@ Applies to: scripts/dashboard/page-docs.js; progress, busy, spinner, percentage
 
 Something that is running says so with a word and an animated ellipsis, `busy(btn, verb)`, and no bar or percentage of the page's own guessing: nothing here can honestly measure how far along a build or a pull is, and a bar that guesses is a lie with a scale on it. Where the thing running reports an honest measure of its own (the operator, 8 Nov: SnapRAID's percentage on a sync, scrub or parity check; the bytes of a bundle sent from the browser), a bar is drawn under the word with `pctBar`: a thin track in the line color, the accent as far as it has come, capped at a control's width, the word still saying what runs. Never a bar for a job whose only measure is time.
 
-**A press still waiting wears a ring, where a ring has room.** A press that started a request and has no answer after 200ms shows a small spinning ring after its word, or in place of its picture on a button that is a picture alone, so it reads as taken rather than missed (the operator, 8 Nov). Never where it would disrupt a small space (the operator, 13 Nov: like the rail's icons): a group on the rail or the phone's bar, a page of a sub-nav or any segmented control, a notebook's view tab, a tab on the dock, a chip and a button of the header wear none, the page arriving being the answer there; and anywhere else the ring is tried and taken back off if it made its button taller, or its row taller or wider than its box (`pressRing`, page-motion.js). A new strip of presses packed side by side joins `PRESS_TIGHT`.
+**A press still waiting wears a ring, where a ring has room.** A press whose work is not done after 200ms shows a small spinning ring after its word, or in place of its picture on a button that is a picture alone, so it reads as taken rather than missed (the operator, 8 Nov). Its work is what it asked for: a request sent while its click is handled (`postJSON`, `getJSON`, `postFile`) and the promise its handler returns, the questions it asks on the way included, the ring waiting while a dialog the button is not in is open; never a request that only started near it, so a poll on a slow link holds no button (`pressTie`, `pressHold`, page-motion.js). Never where it would disrupt a small space (the operator, 13 Nov: like the rail's icons): a group on the rail or the phone's bar, a page of a sub-nav or any segmented control, a notebook's view tab, a tab on the dock, a chip and a button of the header wear none, the page arriving being the answer there; and anywhere else the ring is tried and taken back off if it made its button taller, or its row taller or wider than its box (`pressRing`, page-motion.js). A new strip of presses packed side by side joins `PRESS_TIGHT`.
 
 ### meters
 
@@ -857,7 +872,21 @@ Three ways a view changes, and each has one answer.
 
 **Something the person just pressed** is redrawn by the handler that sent it,
 from the answer it got back. Nobody waits on a clock for a button they are
-looking at.
+looking at. An answer that never comes is said: `postJSON` answers a
+request that never landed with `{error: "the controller did not answer"}`,
+so the handler's own `if (j.error)` says it, and what nothing caught is
+said by the page (`sayUnheard`) rather than lost.
+
+**A read is one at a time.** Every read a page or a view makes for what it
+draws goes through `reading(key, fn)`: one read of a kind at a time, a
+read asked for while one is out made once more when it lands rather than
+stacked beside it (a token moves with every step of a job), and every
+answer drawn in the order asked, so a page whose reads are asked for faster
+than they answer still draws each. Its landing moves the kind's revision,
+which the page's live key reads (`readRev`); a change no read brought (a
+pick, a draft) moves it with `readMoved`. No page keeps a counter of its
+own, and a press's own request never goes through it, since an ask asked
+again would take its place.
 
 **Something that arrived from elsewhere** is the revisions poll:
 `/api/revs`, which is stats and in-memory counters and nothing that shells
@@ -898,7 +927,10 @@ asks it to, and a draw that finds nothing new touches nothing: a page's
 skeleton (`docSurface`) outlives its draws, every list, bar, foot and the
 rail go through `patch()`, and the frame's small writes through `setText`,
 `setAttr`, `setClass`, `setHidden` and `setDisabled`, each a no-op when the
-value is already there. Written unconditionally, a status read rewrote two
+value is already there. What a draw brings is the draw's own, at once: a
+data-style applied, a proseline wired, a field kept from password managers,
+a title turned into words, a chip row's scroll put back (`drawn`), never an
+observer's after it. Written unconditionally, a status read rewrote two
 hundred nodes of the frame and faded the Home page in again each time, the
 pointer losing its hover on whatever it rested on. `uniform.mjs` reads every
 kind through a status read that brings nothing new and fails any write.

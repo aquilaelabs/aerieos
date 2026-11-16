@@ -87,10 +87,15 @@ await section("Approve is read at a glance", async () => {
     const out = [];
     const was = document.documentElement.dataset.theme;
     const themes = new Set(['default']);
+    // Into the cascade layers and any block inside them, where the schemes are.
+    const walk = rules => { for (const r of rules){
+      for (const m of (r.selectorText || '').matchAll(/html\[data-theme="([a-z]+)"\]/g)) themes.add(m[1]);
+      if (r.cssRules) walk(r.cssRules);
+    } };
     for (const sh of document.styleSheets){
       let rules = [];
       try { rules = [...sh.cssRules]; } catch { rules = []; }
-      for (const r of rules) for (const m of (r.selectorText || '').matchAll(/html\[data-theme="([a-z]+)"\]/g)) themes.add(m[1]);
+      walk(rules);
     }
     for (const t of themes){
       document.documentElement.dataset.theme = t;
@@ -259,7 +264,7 @@ await section("the jump bar finds a container on any node", async () => {
   const at = await page.evaluate(() => ({ node: dockerNode, search: document.querySelector('#dmSearch')?.value, kind: tabOf(panes[0])?.kind }));
   ok(at.node === sandbox.id && at.search === 'zz-picked' && at.kind === 'docker',
      `...and a pick opens Containers on its node, narrowed to it (${JSON.stringify(at)})`);
-  await page.evaluate(() => { dmSearch = ''; dockerRev++; drawPanes(); });
+  await page.evaluate(() => { dmSearch = ''; readMoved('docker'); drawPanes(); });
 });
 
 ok(page.errors.length === 0, 'zero console errors');

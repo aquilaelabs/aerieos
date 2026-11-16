@@ -2640,6 +2640,14 @@ def _decorated(f, line):
 
 
 _STYLE = re.compile(r"<style[^>]*>(.*?)</style>", re.S)
+_LINKED = re.compile(r'<link rel="stylesheet" href="([\w./-]+\.css)">')
+
+
+def _read(p):
+    try:
+        return Path(p).read_text(errors="replace")
+    except OSError:
+        return ""
 _CSS_NOTE = re.compile(r"/\*.*?\*/", re.S)
 _CSS_PRELUDE = re.compile(r"([^{}]*)\{")   # a rule's selector, or an @media's condition
 _CSS_CLASS = re.compile(r"\.(-?[A-Za-z_][\w-]*)")
@@ -2664,10 +2672,17 @@ def unused_classes(idx, path=None, root="."):
             text = (Path(root) / f).read_text(errors="replace")
         except OSError:
             continue
-        if Path(f).suffix in (".html", ".htm") and (not path or f == path or f.endswith("/" + path)):
-            css = _CSS_NOTE.sub("", "\n".join(_STYLE.findall(text)))
-            if css.strip():
-                sheets.append((f, set(_CSS_CLASS.findall(" ".join(_CSS_PRELUDE.findall(css))))))
+        if Path(f).suffix in (".html", ".htm"):
+            # Its own <style>, and the stylesheets beside it that it links
+            # (the dashboard's, a file a cascade layer since R9 step 4), each
+            # said by its own file.
+            linked = [(str(Path(f).parent / h), Path(root) / Path(f).parent / h) for h in _LINKED.findall(text)]
+            for name, css in [(f, "\n".join(_STYLE.findall(text)))] + [(n, _read(q)) for n, q in linked]:
+                if path and not (f == path or f.endswith("/" + path) or name == path or name.endswith("/" + path)):
+                    continue
+                css = _CSS_NOTE.sub("", css)
+                if css.strip():
+                    sheets.append((name, set(_CSS_CLASS.findall(" ".join(_CSS_PRELUDE.findall(css))))))
         text = _STYLE.sub("", text)
         words.update(re.findall(r"[\w-]+", text))
         heads.update(_TPL_HEAD.findall(text))
@@ -2683,10 +2698,10 @@ def unused_classes(idx, path=None, root="."):
 
 
 def q_unused(idx, path=None, root="."):
-    css = [] if path and not path.endswith((".html", ".htm")) else unused_classes(idx, path, root)
+    css = [] if path and not path.endswith((".html", ".htm", ".css")) else unused_classes(idx, path, root)
     css_out = [f"{len(css)} class{'es' if len(css) != 1 else ''} the stylesheet styles and nothing names,"
                " whole or as a template's head or tail:"] + [f"  {f}  .{c}" for f, c in css] if css else []
-    if path and path.endswith((".html", ".htm")):
+    if path and path.endswith((".html", ".htm", ".css")):
         return css_out or [f"nothing in this page's stylesheet is unused by this measure ({path})"]
     out = q_functions_unused(idx, path, root)
     return out + css_out

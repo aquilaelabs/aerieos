@@ -1,0 +1,87 @@
+/* What must win whatever else says (R9 step 4; page-skin.css says how the
+   four layers stand). */
+@layer overrides {
+/* hidden means hidden, whatever display a class gives the element. Without
+   this, any rule that sets display (.uadd's flex, .modal label's block) beats
+   the attribute: the Debug settings fold never closed and the approval
+   dialog's Select all showed with nothing to select. Everything here that
+   animates a fold already treats hidden as display:none. */
+[hidden]{display:none !important}
+@media(prefers-reduced-motion:reduce){
+  .logo{transition:none}
+  .modal:not([hidden]):not(.inline),.modal:not([hidden]):not(.inline)>.box,.pinmenu{animation:none}
+}
+/* The theme crossfade, in force only while one is happening; see applyTheme.
+   Color properties only: opacity is left alone so a tooltip or a fold mid-
+   flight is not dragged into it, and `*` is affordable because it lasts 320ms
+   rather than being the page's standing behavior. */
+html.theming,html.theming *,html.theming *::before,html.theming *::after{
+  transition:background-color .3s ease,color .3s ease,border-color .3s ease,
+    outline-color .3s ease,fill .3s ease,stroke .3s ease,
+    box-shadow .3s ease !important}
+/* Still unmistakable without the animation: it is filled either way, and the
+   fill is the part doing the work. */
+@media(prefers-reduced-motion:reduce){
+  #bBell.waiting{animation:none;background:var(--warn)}
+}
+@media(prefers-reduced-motion:reduce){ .tourring{transition:none}
+}
+html[data-motion="reduce"] .tourring{transition:none}
+/* ...and at a desk, where the list and the section stand side by side, the
+   section picked fades through as a rail page does (fadeThrough, the
+   operator 17 and 18 Oct). */
+@media(prefers-reduced-motion:reduce){ .ssplit[data-move]>*{animation:none}
+}
+@media(prefers-reduced-motion:reduce){ .rsplit[data-move]>*{animation:none}
+}
+@media(prefers-reduced-motion:reduce){
+  button,.pane .bar .x{transition:none}
+}
+@media(prefers-reduced-motion:reduce){
+  select::picker-icon{transition:none}
+  select::picker(select){animation:none}
+}
+@media (prefers-reduced-motion: reduce){ #pullHint.spin svg{animation:none} #pullHint.back{transition:none}
+}
+@media(prefers-reduced-motion:reduce){
+  .pcard.pflip>.pcface{transition:none}
+  .pcard.pflip>.pcface[inert]{visibility:hidden}
+}
+@media (prefers-reduced-motion: reduce){.pcard.pjnew{animation:none;outline:2px solid var(--accent);outline-offset:-1px}
+}
+/* A menu floated over the page (floatAt in page-docs.js, the operator, 18
+   Oct): the ⋯ menus and the Claude chooser, fixed to the screen so no fold
+   or card it sits in can cut it off, scrolling inside itself when it is
+   taller than the room it has. One that opens above its button rises into
+   place and one below drops, at every width (the operator, 18 Oct). */
+/* A menu floated is placed where floatAt puts it whatever its own rule
+   says (the chooser is a .pinmenu, absolute against its pane). */
+.floatm{position:fixed;z-index:60;overflow-y:auto;overscroll-behavior:contain}
+@media(prefers-reduced-motion:reduce){ .st.working{animation:none}
+}
+@media(prefers-reduced-motion:reduce){ button.working::after,a.btn.working::after{animation:none;border-right-color:currentColor;opacity:.6}
+}
+@media(prefers-reduced-motion:reduce){
+  .loading{animation:none} .justpainted{animation:none} .skel .sk-b,.skv{animation:none}
+}
+/* ...and the same less motion where the account asked for it in the gear's
+   menu (the operator, 19 Oct; noMotion reads it too): every animation
+   and transition ends where it would have, at once, and the two the
+   device's rules above give a still state of their own keep it. */
+html[data-motion="reduce"] *,html[data-motion="reduce"] *::before,html[data-motion="reduce"] *::after{
+  animation-duration:0s !important;animation-delay:0s !important;animation-iteration-count:1 !important;
+  transition-duration:0s !important;transition-delay:0s !important}
+html[data-motion="reduce"] #bBell.waiting{background:var(--warn)}
+html[data-motion="reduce"] .pane .stack > .doc.leaving{visibility:hidden}
+@media(prefers-reduced-motion:reduce){ .helppop,.bellpanel,.uimenu,.actmenu,.railmore,.pane .doc.on,.panes.dockup .pane.dock,.panes.dockdown .pane.dock{animation:none} .pane .stack > .doc.leaving{visibility:hidden;animation:none} .help{transition:none}
+}
+/* A reason line in red wherever it is drawn (B426), whatever color a
+   surface gives its plain .sub: it was red in a project row and a toolchain
+   row only, and the dialog's "never backed up", the Claude chooser's
+   reasons and a sign-in's refusals were not. */
+.sub.bad{color:var(--bad)}
+/* ...and a warning the same everywhere: what has to happen first (end the
+   sessions before signing out) is a warning, never red, which is for what
+   failed (the operator, 22 Oct). */
+.sub.warn{color:var(--warn)}
+}

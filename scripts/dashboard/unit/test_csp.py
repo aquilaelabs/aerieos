@@ -36,9 +36,11 @@ class Header(unittest.TestCase):
 
     def test_the_dashboard_page_itself_hashes_to_its_blocks(self):
         raw = pathlib.Path(HERE, "index.html").read_bytes()
-        scripts, styles = csp.hashes(raw)
-        self.assertGreaterEqual(len(scripts), 1, "the page's head script and its wiring are inline")
-        self.assertGreaterEqual(len(styles), 1, "the page's stylesheet is inline (read, though styles are not held to a hash)")
+        scripts, _styles = csp.hashes(raw)
+        self.assertGreaterEqual(len(scripts), 1, "the page's head script and its boot() are inline")
+        # The stylesheet is the page's own files, a cascade layer each (R9
+        # step 4), which 'self' allows.
+        self.assertRegex(raw, rb'<link rel="stylesheet" href="page-[a-z-]+\.css">', "the stylesheet is linked from the page's own files")
         # Nothing in the page runs by an inline handler or sets a style
         # attribute, which the policy would refuse.
         import re

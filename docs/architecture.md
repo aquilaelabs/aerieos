@@ -32,10 +32,10 @@ hooks* and *Security model*, and its settings and logs in
 
 `scripts/dashboard/server.py` is the routes, the transport and the gates;
 each handler checks who may ask and makes one call into the module beside
-it. `index.html` is the markup, the stylesheet and the wiring that runs at
-load; one `tab-*.js` per page on the rail, one `nb-*.js` per view of a
-space's page, one `page-*.js` per part of the page that is neither. No framework, no
-build step. The page's design language is `docs/design-language.md`; its
+it. `index.html` is the markup; the stylesheet is four `page-*.css` files,
+a cascade layer each; one `tab-*.js` per page on the rail, one `nb-*.js` per
+view of a space's page, one `page-*.js` per part of the page that is
+neither, and `page-boot.js` what runs at load. No framework, no build step. The page's design language is `docs/design-language.md`; its
 suite is `scripts/dashboard/test/` (CONTRIBUTING.md says how to run it).
 Explained in [dashboard.md](dashboard.md), with a doc per group on the rail
 ([how-it-works.md](how-it-works.md#where-each-part-is-explained) lists them).

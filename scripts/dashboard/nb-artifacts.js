@@ -611,7 +611,7 @@ function nbArtifactsView({$, nb, project, root, sheet}){
           + `<option value="\u0000new">new category…</option>`;
         const box = scroller();
         const top = box ? box.scrollTop : null;
-        pane.innerHTML =
+        drawHTML(pane,
           `<div class="clog">
              <div class="hint">Sessions add the lines; the order and the words are yours. Save writes CHANGELOG.md.</div>
              ${gs.length ? gs.map((g, gi) => `
@@ -643,7 +643,7 @@ function nbArtifactsView({$, nb, project, root, sheet}){
              ${projWriteWhy(project) ? "" : `<div class="actbar"><span class="state" id="clState"></span>
                <button type="button" class="primary" id="clSave">Save</button></div>`}
            </div>
-           ${dated ? `<div class="verlogpane">${clLinks(dated)}</div>` : ""}`;
+           ${dated ? `<div class="verlogpane">${clLinks(dated)}</div>` : ""}`);
         wire();
         if (top != null && box) box.scrollTop = top;
         if (keep){
@@ -672,8 +672,8 @@ function nbArtifactsView({$, nb, project, root, sheet}){
         });
         q(".clrow", row => {
           const g = gs[Number(row.dataset.g)], e = g.entries[Number(row.dataset.e)];
-          // The growing is proseline()'s, wired by the observer when the row
-          // appears; this only has to hear the words change.
+          // The growing is proseline()'s, wired by the draw that wrote the
+          // row (drawHTML); this only has to hear the words change.
           row.querySelector(".cltext").onchange = ev => { e.text = ev.target.value; };
           row.querySelector("[data-erm]").onclick = () => {
             g.entries.splice(g.entries.indexOf(e), 1);

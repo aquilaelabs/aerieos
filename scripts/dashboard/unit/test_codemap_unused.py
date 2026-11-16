@@ -75,9 +75,10 @@ class UnusedClasses(unittest.TestCase):
 
     def test_the_git_graph_lanes_are_styled_and_not_read_as_dead(self):
         repo = Path(__file__).resolve().parents[3]
-        html = (repo / "scripts/dashboard/index.html").read_text()
+        # The stylesheet is the page's linked files, a cascade layer each.
+        css = "".join(p.read_text() for p in sorted((repo / "scripts/dashboard").glob("page-*.css")))
         for n in range(5):
-            self.assertRegex(html, rf"\.gl{n}\{{stroke:var\(--", f".gl{n} gives lane {n} its color")
+            self.assertRegex(css, rf"\.gl{n}\{{stroke:var\(--", f".gl{n} gives lane {n} its color")
         idx = {"files": {f: {} for f in ("scripts/dashboard/index.html", "scripts/dashboard/nb-git.js")}}
         self.assertFalse([c for _, c in codemap.unused_classes(idx, None, str(repo)) if c.startswith("gl")])
 
