@@ -1182,8 +1182,9 @@ print(json.dumps({"kept": [s["title"] for s in kept], "held": held, "series": se
 
   await page.click('#aboutClose');
   await page.waitForSelector('#aboutModal', { state: 'hidden' });
-  await page.waitForFunction(async () => (await (await fetch('/api/status')).json()).welcome.seen === true, null, { timeout: 10000 });
-  ok(true, 'closing it marks the guide read, so it does not open again');
+  const seen = await page.waitForFunction(async () => (await (await fetch('/api/status')).json()).welcome.seen === true, null, { timeout: 10000 })
+    .then(() => true, () => false);
+  ok(seen, 'closing it marks the guide read, so it does not open again');
   await page.reload(); await ready(page);
   await quiet(800);
   ok(await page.$eval('#aboutModal', e => e.hidden), '...and a reload leaves it shut');

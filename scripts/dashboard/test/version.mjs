@@ -5,7 +5,7 @@
 // allowed, and a bump must not sweep unrelated work into its commit. Both are
 // reachable through `aerie version`, which is the same module the notebook will
 // call, so testing the CLI tests the thing.
-import { launch, newPage, ready, ok, done, until, quiet, settled, SLOW, tmuxCapture, DIR, URL as DURL, refreshUntil, saveDialog, takeOn, openFold, registerProject, nbGo, asSession, mint, section } from './lib.mjs';
+import { launch, newPage, ready, ok, done, until, quiet, settled, SLOW, tmuxCapture, DIR, URL as DURL, refreshUntil, saveDialog, takeOn, openFold, registerProject, nbGo, asSession, mint, section, call } from './lib.mjs';
 import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, chmodSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -1166,6 +1166,13 @@ ok(await page.$(`${NB} #verBox .veradd .vdir`) !== null,
 await initWith('v1.2');
 await quiet(400);
 ok(!existsSync(`${B}/VERSION`), 'a malformed starting version is refused, not written');
+// ...by the server too, not only by the page's pattern, which sends nothing
+// for it (B820): asked directly, it says no and writes nothing.
+// Asked from here, not the page, whose console would carry the refusal.
+const malformed = await call('/api/version', { project: 'beta', action: 'init', value: 'v1.2', component: '' });
+malformed.body = malformed.body || {};
+ok(!!malformed.body.error && !existsSync(`${B}/VERSION`),
+   `...and the server refuses it asked directly (${malformed.status}: ${malformed.body.error || JSON.stringify(malformed.body)})`);
 
 await initWith('0.2.0');
 await waitTarget('0.2.0');
@@ -1323,6 +1330,9 @@ await section("the editor: the arrangement is a gesture, not a file to hand-edit
      '...with the file untouched until Save: the section is applied whole, or not at all');
 
   const arranged = await shape();
+  // A mark on a row the editor drew before the Save: a redraw from the
+  // answer replaces the rows, so the mark going is the proof it drew (B820).
+  await page.$eval(`${NB} .clog .clrow`, r => { r.dataset.beforeSave = '1'; });
   await page.click(`${NB} .clog #clSave`);
   await until(async () => /saved/.test(
     await page.$eval(`${NB} #clState`, e => e.textContent).catch(() => '')), 20000, 100);
@@ -1338,7 +1348,7 @@ await section("the editor: the arrangement is a gesture, not a file to hand-edit
   // And the editor is still showing what the file now holds: it redraws from
   // the section the server answers with, not from the one it sent, so a
   // refusal or a tidy-up on the way in cannot leave the two disagreeing.
-  ok(await shape() === arranged,
+  ok(await shape() === arranged && !(await page.$(`${NB} .clog .clrow[data-before-save]`)),
      `the editor redraws from what came back (${await shape()})`);
   const back = written.slice(0, written.indexOf('## 0.1.0'));
   const fromFile = back.split('\n').filter(l => l.startsWith('### ') || l.startsWith('- '))

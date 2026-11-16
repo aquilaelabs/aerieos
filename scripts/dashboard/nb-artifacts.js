@@ -729,9 +729,13 @@ function nbArtifactsView({$, nb, project, root, sheet}){
           try{
             const a = await postJSON("/api/changelog", {project, component: comp, groups: gs});
             if (a.error){ notify(a.error, true); return; }
+            // Drawn again from what the server kept, not what was sent: a
+            // tidy-up on the way in shows (B820: it set the list and never
+            // drew it).
             gs = a.groups || [];
-            pane.querySelector("#clState").textContent =
-              `saved: ${a.entries} line${a.entries === 1 ? "" : "s"}`;
+            draw();
+            const st = pane.querySelector("#clState");
+            if (st) st.textContent = `saved: ${a.entries} line${a.entries === 1 ? "" : "s"}`;
             loadVersion();
           }catch(e){ notify("changelog: " + failWords(e), true); }
           finally{ if (save.isConnected) unbusy(save, "Save"); }
