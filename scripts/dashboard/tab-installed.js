@@ -325,7 +325,7 @@ function renderInstalledInto(i){
   const may = inst.may || {};
   d.setBar("");    // the node is picked in the Machines group's header (R177)
   if (inst.error){
-    paint(d.list, `<div class="field"><div class="notice bad">${esc("could not read what is installed: " + inst.error)}</div></div>`);
+    patch(d.list, `<div class="field"><div class="notice bad">${esc("could not read what is installed: " + inst.error)}</div></div>`);
     return;
   }
   const rows = (inst.rows || []).filter(instHere);
@@ -348,7 +348,7 @@ function renderInstalledInto(i){
     const body = `<div class="rows">${here.map(r => instRow(r, may)).join("")}</div>`;
     return docSection("installed", k, title, k === "agent" ? `${here.filter(r => r.installed).length} of ${here.length}` : String(here.length), body);
   }).join("") || `<div class="empty">Nothing installed on ${esc(inst.name || "this node")} yet: the Library installs toolchains, coding agents and packs there.</div>`;
-  paint(d.list, `<div data-instnode="${esc(instNode)}">${notes}${head}${sects}</div>`);
+  patch(d.list, `<div data-instnode="${esc(instNode)}">${notes}${head}${sects}</div>`);
   wireInstalled(d.el);
 }
 

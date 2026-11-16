@@ -567,7 +567,7 @@ function renderProjectsInto(i){
   // The project job (a clone, a first push) running or failed, its own
   // band above the grid, where its result will appear.
   const jb = el.querySelector("#pjJob"), jh = projectJobHtml();
-  if (paint(jb, jh)) pJobWire();
+  if (patch(jb, jh)) pJobWire();
   setHidden(jb, !jh);
   // The empty case says what to do: an empty workspace is exactly where
   // somebody is about to make their first project.
@@ -592,7 +592,7 @@ function renderProjectsInto(i){
   const chips = byProjectGroup(all).map(({group: g, list}) => ({key: g || "none", label: g || "No group", count: list.length}));
   if (pjChip && !chips.some(c => c.key === pjChip)) pjChip = "";
   const cb = el.querySelector("#pjChips");
-  if (paint(cb, chips.some(c => c.key !== "none") ? chipBar(chips, pjChip, "data-pjchip") : ""))
+  if (patch(cb, chips.some(c => c.key !== "none") ? chipBar(chips, pjChip, "data-pjchip") : ""))
     cb.querySelectorAll("[data-pjchip]").forEach(c => c.onclick = () =>
       // The cards and the groups' headings, never a group's box itself: a
       // card in a group that moved slid twice as far, and a group left out

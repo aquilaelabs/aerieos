@@ -328,7 +328,7 @@ function nbRoadmapView({$, nb}){
     nb.roadmapChip = ["", "open", "shelved"].includes(nb.roadmapChip) ? nb.roadmapChip : "";
     const chips = chipButtons([{key: "open", label: "Open", count: rows.length - parked},
                                {key: "shelved", label: "Shelved", count: parked}], nb.roadmapChip, "data-rmchip");
-    if (paint($("roadmapChips"), chips, true))
+    if (patch($("roadmapChips"), chips, true))
       $("roadmapChips").querySelectorAll("[data-rmchip]").forEach(b => b.onclick = () => {
         chipMove(() => $("roadmapList")?.closest(".nbview"), "#roadmapList > details.grp",
                  () => { nb.roadmapChip = b.dataset.rmchip; redrawRoadmap(); }); });
@@ -341,7 +341,7 @@ function nbRoadmapView({$, nb}){
     const verChips = chipButtons(vers, nb.roadmapVer, "data-rmver", undefined, "Any version");
     // One band for every group (R109), drawn while any group has two.
     setHidden($("roadmapFilter"), !chips && !verChips);
-    if (paint($("roadmapVers"), verChips, true))
+    if (patch($("roadmapVers"), verChips, true))
       $("roadmapVers").querySelectorAll("[data-rmver]").forEach(b => b.onclick = () => {
         chipMove(() => $("roadmapList")?.closest(".nbview"), "#roadmapList > details.grp, #roadmapDoneList > details.grp", () => {
           nb.roadmapVer = b.dataset.rmver; redrawRoadmap(); if (nb.roadmapDone) nb.drawFinished(); }); });
