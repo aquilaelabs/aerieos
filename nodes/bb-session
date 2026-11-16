@@ -15,7 +15,8 @@ mount, PID and IPC namespace in which:
   * /tmp, /var/tmp and /dev/shm are the session's own, made new with every
     start, but for what Claude Code keeps there between the turns of one
     conversation (/tmp/claude-<uid>), which is kept in the project's cache
-    folder and outlives a restart of the session;
+    folder and outlives a restart of the session; /run/user is an empty
+    folder, so no user manager's bus or socket of the host's is reached;
   * the agent's stores show only what a session reads: its own CI logs and
     artifacts, and the emulator's logs; jobs, compose files, the runner's
     checkouts and the terminal log are gone, and so is everything else in
@@ -577,7 +578,14 @@ def plan(c, a, uid, wall=None):
         if os.path.lexists(path) and not _real_dir(path):
             raise Refused(f"bb-session: {path} is not a directory, so the view could not leave other spaces out of it")
         if _real_dir(path):
-            caches.setdefault(os.path.realpath(path), set()).update(keep)
+            # Where it really is, which is one of the two places it can be:
+            # the home's own .cache, or the base home's that an account's
+            # .cache links to. A .cache the account pointed anywhere else
+            # chose what the view binds from (R247 step 5).
+            real = os.path.realpath(path)
+            if real not in {f"{os.path.realpath(x)}/.cache/builderbot" for x in (home, home_root) if x}:
+                raise Refused(f"bb-session: {path} leads to {real}, not to a home's own cache")
+            caches.setdefault(real, set()).update(keep)
     caches = sorted(caches.items())
     data, art = _real(c["DATA_STORE"]), _real(c["ARTIFACTS_STORE"])
     store = _real(c.get("TOOLCHAINS_STORE"))
@@ -875,6 +883,12 @@ def plan(c, a, uid, wall=None):
     for t in ("/tmp", "/var/tmp", "/dev/shm"):
         if _real_dir(t):
             steps.append(("tmpfs", t, "mode=1777"))
+    # The host's per-user runtime folders: a user manager's bus there runs
+    # a command as the session account outside every view (systemd-run
+    # --user), and podman's and an ssh agent's sockets are there too (R247
+    # step 5). Covered; nothing in a session uses them.
+    if _real_dir("/run/user"):
+        steps.append(("tmpfs", "/run/user", "mode=0755"))
     # The container daemons' sockets (B308): the daemon is the node's and
     # its group keeps a session out today, and the briefing says a session
     # has no socket at all, which was not so. One usermod or chmod on the
@@ -1052,6 +1066,44 @@ def _bind_idmapped(src, target, userns):
 
 # The mapping's namespace for this session's view, made by main() before
 # the view's own namespaces when a bindmap step asks for it.
+AT_RECURSIVE = 0x8000
+
+
+def _src_fd(path):
+    """`path` opened a part at a time, each through no link, as an O_PATH
+    descriptor; OSError at a link or a .. along it."""
+    fd = os.open("/", os.O_PATH | os.O_DIRECTORY | os.O_CLOEXEC)
+    try:
+        for part in [x for x in path.split("/") if x]:
+            if part in (".", ".."):
+                raise OSError(errno.EINVAL, f"{path} climbs with {part}")
+            nfd = os.open(part, os.O_PATH | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=fd)
+            os.close(fd)
+            fd = nfd
+            if stat.S_ISLNK(os.fstat(fd).st_mode):
+                raise OSError(errno.ELOOP, f"{path} has a link along it, at {part}")
+        return fd
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+def _bind_nofollow(src, target):
+    """src bound onto target (with what is mounted under it) from a
+    descriptor opened through no link: never re-resolved by its name."""
+    sfd = _src_fd(src)
+    try:
+        tfd = _sys(SYS_OPEN_TREE, ctypes.c_int(sfd), b"",
+                   ctypes.c_uint(OPEN_TREE_CLONE | OPEN_TREE_CLOEXEC | AT_EMPTY_PATH | AT_RECURSIVE))
+        try:
+            _sys(SYS_MOVE_MOUNT, ctypes.c_int(tfd), b"", ctypes.c_int(AT_FDCWD), target.encode(),
+                 ctypes.c_uint(MOVE_MOUNT_F_EMPTY_PATH))
+        finally:
+            os.close(tfd)
+    finally:
+        os.close(sfd)
+
+
 _USERNS = None
 
 
@@ -1097,7 +1149,14 @@ def _apply(step, uid, gid):
         src = step[1]
         if not os.path.isdir(target):
             _mkdirs(target, uid, gid)
-        _mount(src, target, None, MS_BIND | MS_REC)
+        if src.startswith(STAGE + "/"):
+            # From the staged host, through folders the account owns: a
+            # link it left along the path led the bind to another account's
+            # token and session (R247 step 5). Opened a part at a time
+            # through no link, and bound from what was opened.
+            _bind_nofollow(src, target)
+        else:
+            _mount(src, target, None, MS_BIND | MS_REC)
     elif kind == "bindmap":
         # A tree of the session's project, its worktrees and its works,
         # with their owner read as the account's own user and written as
