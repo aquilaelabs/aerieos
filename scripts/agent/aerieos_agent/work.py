@@ -309,26 +309,29 @@ class WorkMixin:
             days = 7.0
         now, freed, n = time.time(), 0, 0
         for _uid, d in storage.avd_homes(storage.SESSION.get("home") or ""):
-            for proj in sorted(os.listdir(d))[:300]:
-                pd = os.path.join(d, proj)
-                if not storage.NAME_RE.match(proj) or not os.path.isdir(pd):
-                    continue
-                for x in sorted(os.listdir(pd)):
-                    avd = os.path.join(pd, x)
-                    snaps = os.path.join(avd, "snapshots")
-                    if not x.endswith(".avd") or not os.path.isdir(snaps) or storage.avd_running(avd):
+            # As the home's owner: the folder is theirs, and a link they left
+            # at snapshots had root remove whatever it led to (R247 step 5).
+            with fs_holds(storage.home_owner(os.path.dirname(os.path.dirname(d)))):
+                for proj in sorted(os.listdir(d))[:300]:
+                    pd = os.path.join(d, proj)
+                    if not storage.NAME_RE.match(proj) or not os.path.isdir(pd):
                         continue
-                    ran = next((os.path.getmtime(os.path.join(avd, f)) for f in ("hardware-qemu.ini", "emulator-user.ini")
-                                if os.path.exists(os.path.join(avd, f))), os.path.getmtime(avd))
-                    if (now - ran) / 86400 < days or not os.listdir(snaps):
-                        continue
-                    mb = (storage._du_children(snaps) or {}).get("", 0)
-                    for s in os.listdir(snaps):
-                        shutil.rmtree(os.path.join(snaps, s), ignore_errors=True)
-                    freed += mb or 0
-                    n += 1
-                    job.say(f"{proj}'s {x[:-4]}: quick-boot snapshot removed, {mb} MB (not started for "
-                            f"{int((now - ran) / 86400)} days)\n")
+                    for x in sorted(os.listdir(pd)):
+                        avd = os.path.join(pd, x)
+                        snaps = os.path.join(avd, "snapshots")
+                        if not x.endswith(".avd") or not os.path.isdir(snaps) or storage.avd_running(avd):
+                            continue
+                        ran = next((os.path.getmtime(os.path.join(avd, f)) for f in ("hardware-qemu.ini", "emulator-user.ini")
+                                    if os.path.exists(os.path.join(avd, f))), os.path.getmtime(avd))
+                        if (now - ran) / 86400 < days or not os.listdir(snaps):
+                            continue
+                        mb = (storage._du_children(snaps) or {}).get("", 0)
+                        for s in os.listdir(snaps):
+                            shutil.rmtree(os.path.join(snaps, s), ignore_errors=True)
+                        freed += mb or 0
+                        n += 1
+                        job.say(f"{proj}'s {x[:-4]}: quick-boot snapshot removed, {mb} MB (not started for "
+                                f"{int((now - ran) / 86400)} days)\n")
         job.say(f"{n} snapshot{'' if n == 1 else 's'} removed, {freed} MB freed\n")
         if n:
             storage.measure(self.state)
@@ -354,9 +357,10 @@ class WorkMixin:
         if storage.avd_running(avd):
             job.say(f"{name} is running: stop it (aerie emu stop in the space's session) and remove it then\n")
             return "failed", 75
-        shutil.rmtree(avd, ignore_errors=True)
-        with contextlib.suppress(OSError):
-            os.remove(os.path.join(d, project, name + ".ini"))
+        with fs_holds(storage.home_owner(os.path.dirname(os.path.dirname(d)))):
+            shutil.rmtree(avd, ignore_errors=True)
+            with contextlib.suppress(OSError):
+                os.remove(os.path.join(d, project, name + ".ini"))
         if os.path.isdir(avd):
             job.say(f"could not remove all of {avd}\n")
             return "failed", 1
