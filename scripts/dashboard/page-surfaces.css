@@ -25,8 +25,7 @@ html[data-theme="nostromo"]:not([data-mode="light"]) header::after{
 /* Brushed metal, not drawn: a sheen down each button and a cold highlight
    along its top edge, the way light catches a machined plate. */
 html[data-theme="nostromo"]:not([data-mode="light"]) button:not(.link){
-  background-image:linear-gradient(180deg, rgba(200,220,240,.06), rgba(0,0,0,.14));
-  box-shadow:inset 0 1px 0 0 rgba(200,220,240,.14)}
+  background-image:linear-gradient(180deg, rgba(200,220,240,.06), rgba(0,0,0,.14))}
 
 /* Square, not rounded: the corner tokens are 0 in this half. The title in
    stencil, amber as the lamps are, and the tab in front lit by one: a soft
@@ -319,7 +318,7 @@ body:has(.modal:not([hidden])) :is(.tourcard,.tourring){display:none}
    quiet link beside its name that opens the instances under it, each a
    line of its own indented under the area, its two boxes in the columns. */
 .rareahead{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px}
-.rareas .rexp{background:none;--sheen:none;border:0;padding:0;min-height:0;color:var(--note);font:var(--f-note);cursor:pointer}
+.rareas .rexp{--sheen:none;padding:0;min-height:0;color:var(--note);font:var(--f-note);cursor:pointer}
 .rareas .rexp::after{content:" \25B8";display:inline-block}
 .rareas .rexp[aria-expanded="true"]::after{content:" \25BE"}
 @media(hover:hover){ .rareas .rexp:hover{text-decoration:underline}
@@ -366,8 +365,7 @@ body:has(.modal:not([hidden])) :is(.tourcard,.tourring){display:none}
    .sw[data-theme=...] as well as for the page, so this is the palette itself
    at 1cm rather than a hand-kept copy of it. */
 .sw{position:relative;display:block;padding:0;overflow:hidden;
-  height:44px;border-radius:var(--r-control);cursor:pointer;
-  background:var(--bg);border:var(--hair) solid var(--line)}
+  height:44px;border-radius:var(--r-control);cursor:pointer;border:var(--hair) solid var(--line)}
 .sw .swp{position:absolute;left:0;right:0;bottom:0;height:16px;
   background:var(--panel);border-top:var(--hair) solid var(--line)}
 .sw .swa{position:absolute;left:6px;top:7px;width:10px;height:10px;
@@ -504,7 +502,7 @@ body.firstrun #panes{display:none}
 .setfinish>.actbar{justify-content:flex-end}
 /* What un-enrolling does, in the reset dialog and a node's Un-enroll: a sunk box, the
    same ground as a public key's, so it reads as a note and not a control. */
-.resetwhat{margin:8px 0;background:var(--sunk);border:var(--hair) solid var(--line);
+.resetwhat{background:var(--sunk);border:var(--hair) solid var(--line);
   border-radius:var(--r-control);padding:8px 10px;font-size:12px;color:var(--dim)}
 .resetwhat ul{margin:4px 0 8px;padding-left:18px}
 .resetwhat b{color:var(--ink)}
@@ -517,8 +515,7 @@ body.firstrun #panes{display:none}
 .hsrow{display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:var(--hair) solid var(--line);min-height:var(--tap)}
 .hsrow.done{color:var(--dim)}
 .hsrow.done .setnum{color:var(--pass);border-color:var(--green2-edge)}
-.hcard .hjob{width:100%;text-align:left;background:none;--sheen:none;border:0;border-radius:0;padding:8px 16px;
-  border-bottom:var(--hair) solid var(--line);white-space:normal;justify-content:flex-start;min-height:var(--tap)}
+.hcard .hjob{width:100%;text-align:left;--sheen:none;border-radius:0;padding:8px 16px;white-space:normal;justify-content:flex-start;min-height:var(--tap)}
 .hcard .hjob:last-child{border-bottom:0}
 .hcard .hjob .sub{display:block}
 .hglance{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;padding:12px 16px 16px}
@@ -563,15 +560,13 @@ body.firstrun #panes{display:none}
 .ntrow .sub{display:block}
 .runnersall{display:flex;flex-direction:column;border:var(--hair) solid var(--line);
   border-radius:var(--r-surface);margin:0 0 10px;overflow:hidden}
-.runnersall .row{width:100%;text-align:left;background:none;--sheen:none;border:0;border-radius:0;
-  border-bottom:var(--hair) solid var(--line);justify-content:flex-start;min-height:var(--tap);
+.runnersall .row{width:100%;text-align:left;--sheen:none;border-radius:0;justify-content:flex-start;min-height:var(--tap);
   white-space:normal}
 /* The state on a line of its own, and a long host wraps: on a phone the
    row was one line cut at the screen's edge (B745). */
 .runnersall .row .grow{min-width:0;overflow-wrap:anywhere}
 .runnersall .row .sub{display:block}
 .runnersall .row:last-child{border-bottom:0}
-.runnersall .row.on{box-shadow:inset 3px 0 var(--accent)}
 /* The padlock beside the name. Sized to the text it follows rather than to the
    icon buttons, because it is a word in the name's sentence, not a control. */
 /* Wherever it stands (a row, a project's card, its page's header): drawn as
@@ -717,14 +712,14 @@ body.firstrun #panes{display:none}
 /* A signed build's certificate fingerprint on its Artifacts row (R106):
    the whole of it, wrapping on a phone rather than cut off. */
 .artfp{font:var(--f-note);color:var(--dim);overflow-wrap:anywhere}
-.artfp .link{background:none;--sheen:none;border:0;color:var(--warn);text-decoration:underline;cursor:pointer;padding:0 0 0 8px;font:inherit}
+.artfp .link{--sheen:none;color:var(--warn);text-decoration:underline;cursor:pointer;padding:0 0 0 8px;font:inherit}
 /* A project's signing keys (R106), its notebook's Signing view (R103): a
    row per route, its form when opened, and its actions in one line, each a
    line of text you can press as in a dialog. */
 .rnsign{padding:6px 0;border-top:var(--hair) solid var(--line)}
 .rnsign:first-child{border-top:0}
 .rnsignform{display:grid;gap:6px;margin:6px 0}
-.sgview .link{background:none;--sheen:none;border:0;color:var(--warn);padding:2px 0;
+.sgview .link{--sheen:none;color:var(--warn);padding:2px 0;
   font:12px/1.4 system-ui,sans-serif;min-height:var(--tap);text-align:left;
   text-decoration:underline;cursor:pointer}
 .sgview a.link{display:inline-flex;align-items:center}
@@ -831,11 +826,10 @@ body.firstrun #panes{display:none}
 .fxcols{display:grid;grid-template-columns:13rem minmax(0,1fr);gap:var(--card-gap);align-items:start}
 .fxplaces{display:flex;flex-direction:column;gap:2px;min-width:0}
 .fxplaces .fxphead{font:var(--f-tag);letter-spacing:.6px;text-transform:uppercase;color:var(--dim);padding:6px 8px}
-.fxplace{display:flex;align-items:center;gap:8px;min-width:0;min-height:var(--ctl);padding:4px 8px;text-align:left;
-  border:var(--hair) solid transparent;border-radius:var(--r-control);background:transparent;--sheen:none;color:var(--ink);font:var(--f-ui)}
+.fxplace{display:flex;align-items:center;gap:8px;min-width:0;min-height:var(--ctl);padding:4px 8px;text-align:left;border-radius:var(--r-control);--sheen:none;color:var(--ink);font:var(--f-ui)}
 .fxplace .fxpname{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fxplace .fxpkind{flex:0 0 auto;font:var(--f-note);color:var(--dim)}
-.fxplace.on{background:color-mix(in srgb, var(--accent) 14%, transparent);border-color:color-mix(in srgb, var(--accent) 40%, var(--line))}
+.fxplace.on{}
 .fxplace.fxtrash{margin-top:var(--card-gap)}
 /* A place is a row of a list, not a button that lights: its hover is the
    list's quiet one, and the one on show keeps its tint under the pointer
@@ -884,7 +878,7 @@ body.firstrun #panes{display:none}
   .fxplaces{flex-direction:row;overflow-x:auto;scrollbar-width:none;gap:6px;padding-inline:var(--row-x)}
   .fxplaces::-webkit-scrollbar{display:none}
   .fxplaces .fxphead{display:none}
-  .fxplace{flex:0 0 auto;border-color:var(--line);min-height:var(--tap)}
+  .fxplace{flex:0 0 auto;min-height:var(--tap)}
   .fxplace .fxpname{flex:0 0 auto;overflow:visible}
   .fxplace.fxtrash{margin-top:0}
   .fxmain{border-inline:0;border-radius:0}
@@ -1086,7 +1080,7 @@ body.firstrun #panes{display:none}
   border:2px solid var(--line);background:var(--pc, transparent)}
 .pcpick button[data-color=""]{background:transparent;--sheen:none;
   background-image:linear-gradient(135deg, transparent 45%, var(--dim) 45%, var(--dim) 55%, transparent 55%)}
-.pcpick button[aria-checked="true"]{border-color:var(--ink);box-shadow:0 0 0 2px var(--bg), 0 0 0 4px var(--ink)}
+.pcpick button[aria-checked="true"]{border-color:var(--ink)}
 /* A finger, not a pointer: the small controls that measured under 32px in the
    polish tour (18 Sep, 344 to 840px wide) grow to a thumb's size on a touch
    screen, and a desktop keeps its tighter strip. The bell stays bare (see its
@@ -1321,7 +1315,7 @@ body.firstrun #panes{display:none}
 /* The details fold under a line: the row's words are the decision, this is
    the workings (files, functions, approach) wanted when the work starts
    and noise until then. */
-.roadmap .dtog{background:none;--sheen:none;border:0;color:var(--dim);padding:2px 0;
+.roadmap .dtog{--sheen:none;color:var(--dim);padding:2px 0;
   font:11px/1.4 system-ui,sans-serif;align-self:flex-start;min-height:0}
 @media(hover:hover){ .roadmap .dtog:hover{color:var(--ink)}
 }
@@ -1389,7 +1383,7 @@ body.firstrun #panes{display:none}
 .wkreader>.wkpick>select{flex:1 1 auto;min-width:0}
 .wktabs{display:flex;gap:4px;align-items:flex-end;border-bottom:var(--hair) solid var(--line);margin-bottom:12px}
 .wktabs .sp{flex:1}
-.wktabs .wktab{background:none;--sheen:none;border:var(--hair) solid transparent;border-bottom:0;border-radius:var(--r-small) var(--r-small) 0 0;
+.wktabs .wktab{--sheen:none;border-radius:var(--r-small) var(--r-small) 0 0;
   padding:6px 12px;color:var(--dim);margin-bottom:-1px}
 .wktabs .wktab.on{color:var(--ink);border-color:var(--line);background:var(--bg)}
 .wktabs .wktab.danger{color:var(--bad)}
@@ -1443,7 +1437,7 @@ body.firstrun #panes{display:none}
    marked as its block is; a row is the way to a block another covers, and
    its two arrows move it up or down the stack. A child sits indented
    under its parent's depth. */
-.dslayers{flex:0 1 24em;min-width:16em;max-height:85vh}
+.dslayers{flex:0 1 24em;min-width:16em}
 .dslayers .dslayer{display:flex;gap:6px;align-items:center;min-height:var(--tap);padding:0 6px 0 10px;
   border-bottom:var(--hair) solid var(--line);cursor:pointer}
 .dslayers .dslayer:last-child{border-bottom:0}
@@ -1506,8 +1500,7 @@ body.firstrun #panes{display:none}
 .nbsaid .stg{color:var(--ink)}
 /* A head's toggle standing on (History) is lit as a switch's pick is
    (.pseg), never the accent fill of a main action. */
-.nb .vbar button.on{background:color-mix(in srgb, var(--ink) 11%, var(--btn));border-color:var(--line);color:var(--ink);
-  box-shadow:inset 0 -2px 0 var(--accent)}
+.nb .vbar button.on{background:color-mix(in srgb, var(--ink) 11%, var(--btn));border-color:var(--line);color:var(--ink)}
 .nb .vbar button{flex:0 0 auto}
 /* Rewording is not a deletion; it borrows the box and not the red. */
 .editbox{border-color:var(--line);
@@ -1522,7 +1515,7 @@ body.firstrun #panes{display:none}
 /* Giving an item a step, which is how a plain one becomes a plan. */
 .addstep{padding:0 0 9px 26px;display:flex;gap:8px}
 .addstep[hidden]{display:none}
-.addstep .link{background:none;--sheen:none;border:0;color:var(--dim);padding:2px 0;
+.addstep .link{--sheen:none;color:var(--dim);padding:2px 0;
   font:12px/1.4 system-ui,sans-serif;min-height:24px}
 @media(hover:hover){ .addstep .link:hover{color:var(--accent)}
 }
@@ -1748,6 +1741,9 @@ body.firstrun #panes{display:none}
 .pane .bar.proj .pnote.dim{color:var(--dim)}
 /* The Projects page (R218 step 3): a searchable grid of cards with status. */
 .projtab .docbarrow #bTrashTab,.skboot .docbarrow button.ic{min-width:var(--tap);padding:4px 8px}
+/* The Claude chooser drawn in a project page's pane (R218 step 3): as wide
+   as its words, never the pane. */
+.pane>.resumemenu{max-width:min(440px,calc(100% - 8px));width:max-content}
 /* A group of this account's under its name (the operator, 18 Oct), and the
    archived projects folded at the foot; both in the band's own inset. */
 #pjGrid>.pjgroup{margin-top:20px}
@@ -1831,9 +1827,8 @@ body.firstrun #panes{display:none}
   background:var(--panel);border:var(--hair) solid var(--line);border-radius:var(--r-surface);
   box-shadow:0 10px 24px rgba(0,0,0,.5);overflow:hidden}
 .jumplist[hidden]{display:none}
-.jrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border:0;
-  background:transparent;--sheen:none;color:var(--ink);font:var(--f-ui);text-align:left;min-height:var(--tap)}
-.jrow.on,.jrow:hover{background:var(--btn-hi)}
+.jrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;--sheen:none;color:var(--ink);font:var(--f-ui);text-align:left;min-height:var(--tap)}
+.jrow.on,.jrow:hover{}
 .jrow .jw{color:var(--dim);font:var(--f-note);white-space:nowrap}
 .jnone{padding:8px 10px;color:var(--dim);font:var(--f-ui);overflow-wrap:anywhere}
 /* On a phone the field takes the width between the brand and the buttons:
@@ -2103,7 +2098,7 @@ body.firstrun #panes{display:none}
 .ndmeter.warn .fill{background:var(--warn)}
 .ndmeter.bad .fill{background:var(--bad)}
 .ndmeter .val{color:var(--ink);font:var(--f-note);white-space:nowrap;text-align:right}
-.ndlabels{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.ndlabels{display:flex;gap:6px;flex-wrap:wrap}
 .ndtools{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .lbox label.lrow{display:flex;gap:8px;align-items:center;min-height:var(--tap);padding:0 10px;
   margin:0;font:var(--f-ui);color:var(--ink);border-bottom:var(--hair) solid var(--line);cursor:pointer}
@@ -2115,7 +2110,7 @@ body.firstrun #panes{display:none}
 .ndtest.warn{color:var(--warn)}
 /* The one-time enrollment command: a pre, because a wrapped shell line lies
    about what runs, with the page's pre skin, inset like a field. */
-.ndcmd{margin:6px 0;border:var(--hair) solid var(--line);border-radius:var(--r-control);
+.ndcmd{border:var(--hair) solid var(--line);border-radius:var(--r-control);
   background:var(--sunk);user-select:all}
 /* The generated domain XML. `pre` wraps by default, which is right for a
    shell line and wrong for a file somebody is about to paste into a
@@ -2126,7 +2121,7 @@ body.firstrun #panes{display:none}
 /* The steps beside it: one line each, in the order they happen. A numbered
    list rather than prose; it is a procedure being followed at a keyboard,
    not an explanation to read once. */
-.vmsteps{margin:10px 0 0;padding-left:22px;display:flex;flex-direction:column;gap:7px;
+.vmsteps{padding-left:22px;display:flex;flex-direction:column;gap:7px;
   font:var(--f-ui);color:var(--ink)}
 .vmsteps code{font:var(--f-note);color:var(--dim)}
 /* Room between a block of text and the buttons under it (the operator, 18
@@ -2260,7 +2255,7 @@ body.firstrun #panes{display:none}
 /* What a node has beside its numbers (its tools, git, GPU, sound, labels):
    one band that flows across the width, not five lines under the charts. */
 .ndhmore{display:flex;flex-wrap:wrap;align-items:center;gap:8px 20px}
-.ndhmore>*{margin:0}
+.ndhmore>*{}
 /* At a desk the Nodes page is cards, as a notebook view is (the operator,
    18 Oct): the node's head one card and each of its sections one of its
    own on the page's margin; the row that holds them draws nothing but
@@ -2345,7 +2340,7 @@ body.firstrun #panes{display:none}
    container row was five settings each with its own Apply or Move, wrapping
    into a form of their own on a phone (the operator, 13 Oct). */
 .setgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(15em,1fr));
-  gap:8px 16px;align-items:end;margin:6px 0 2px}
+  gap:8px 16px;align-items:end}
 .setgrid:empty{display:none}
 .setgrid .setcell{display:flex;flex-direction:column;gap:var(--label-gap);min-width:0}
 .setgrid .setcell .val{font:var(--f-ui);color:var(--ink);min-height:var(--ctl);
@@ -2386,7 +2381,7 @@ body.firstrun #panes{display:none}
 :is(.dmtab,.dkview,.vmtab) .sect .li{overflow-wrap:anywhere}
 /* A repair on a toolchain row, in the words of the line it follows: a link
    rather than a button, since the line is the control's whole context. */
-.tcs .link{background:none;--sheen:none;border:0;color:var(--note);padding:0;font:inherit;
+.tcs .link{--sheen:none;color:var(--note);padding:0;font:inherit;
   cursor:pointer;text-decoration:underline;min-height:0}
 .tcs .link:hover{color:var(--ink)}
 /* The header's icon buttons, the gear (settings) and the sign-out door,
@@ -2432,7 +2427,7 @@ body.firstrun #panes{display:none}
   border-radius:var(--r-small);white-space:nowrap}
 /* The first paint (bootPage): the pane's bar and a document's frame, laid
    out as the pane lays them, the doc filling what is left under the bar. */
-.skboot{display:flex;flex-direction:column;height:100%;min-height:0;padding:0;margin:0}
+.skboot{flex-direction:column;height:100%;min-height:0;margin:0}
 /* On a phone a ticked row's facts start under its name, not at the row's
    edge (the operator's phone, 18 Oct): the box is one size in every browser
    so the inset is its width and the gap. */
@@ -2490,6 +2485,12 @@ body.firstrun #panes{display:none}
   gap:5px;box-shadow:0 6px 18px rgba(0,0,0,.5);
   animation:menuIn .22s cubic-bezier(.33,1,.68,1)}
 .pinmenu button{min-height:var(--tap)}
+/* The session box (the Perch pass, the operator, 17 Oct): a popover
+   of one column, each node a block of its name, what it has on a quiet mono
+   line, how this account stands there and its action bar; the model and
+   effort step two labeled fields side by side over Back and the press. */
+.resumemenu{flex-direction:column;flex-wrap:nowrap;gap:12px;padding:12px 14px;
+  width:min(360px,calc(100vw - 32px));max-width:calc(100% - 8px)}
 .resumemenu .rmnode{display:flex;flex-direction:column;gap:8px}
 .resumemenu .rmnode+.rmnode{border-top:var(--hair) solid var(--line);padding-top:12px}
 .resumemenu .rmhead{display:flex;flex-direction:column;gap:2px;min-width:0}
@@ -2626,14 +2627,13 @@ body.booting .panes.dockup .pane.dock{animation:none}
   .chattab.open .chatlist,.chattab:not(.open) .chatthread{display:none}
   #chatBack{display:inline-flex}
 }
-.chatrow{display:flex;align-items:center;gap:8px;width:100%;text-align:left;
-  background:none;--sheen:none;border:0;border-bottom:var(--hair) solid var(--line);padding:8px 10px}
+.chatrow{display:flex;align-items:center;gap:8px;width:100%;text-align:left;--sheen:none;padding:8px 10px}
 /* The channel on show is a quiet tint of the accent, and stays that under
    the pointer; every other channel answers the pointer with a fainter tint
    of the ink (the operator, 16 Oct: the open one lit up bright on hover and
    the rest did nothing). Above the page's button hover, which is a
    control's and too loud for a row of a list. */
-.chattab .chatrow{background:none;--sheen:none}
+.chattab .chatrow{--sheen:none}
 @media(hover:hover){ .chattab .chatrow:hover:not(.on){background:color-mix(in srgb,var(--ink) 6%,transparent)}
 }
 .chattab .chatrow.on,.chattab .chatrow.on:hover{background:color-mix(in srgb,var(--accent) 13%,transparent)}

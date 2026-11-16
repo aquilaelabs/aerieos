@@ -4,6 +4,9 @@
 @layer components {
 html[data-theme="nostromo"]:not([data-mode="light"]) .pane{background:transparent;--sheen:none}
 html[data-theme="nostromo"]:not([data-mode="light"]) .pane .stack:has(> .doc.on){background-color:var(--glass)}
+/* The nostromo scheme's raised edge on a button, under the rules a page's
+   own bars give their buttons, which outrank it. */
+html[data-theme="nostromo"]:not([data-mode="light"]) button:not(.link){box-shadow:inset 0 1px 0 0 rgba(200,220,240,.14)}
 html[data-mode="light"][data-theme="nostromo"] .pane{background:transparent;--sheen:none}
 html[data-mode="light"][data-theme="nostromo"] .pane .stack:has(> .doc.on){background-color:var(--glass)}
 html[data-mode="light"][data-theme="nostromo"] button:not(.link){
@@ -143,6 +146,9 @@ html:not([data-theme]) .logo.off{color:var(--bad)}
 @media(max-width:900px){
   .rlist{border-right:0}
 }
+/* Its colors sit under the look a disabled button keeps when pointed at (a
+   press leaves its button disabled while it works), which outranks them. */
+.rareas .rexp{background:none;border:0}
 /* A node that was un-enrolled, kept on the one project still set to it
    (page-projsettings.js): italic in the list and in the closed picker. */
 /* One class over the field skin's .nb select and .modal select, whose font
@@ -172,6 +178,10 @@ html:not([data-theme]) .logo.off{color:var(--bad)}
 .setrow input:not([type=checkbox]):not([type=number]){flex:1 1 12em;min-width:0;width:auto}
 .logset .setrow select{width:auto;flex:0 1 auto}
 .setrow .pill{flex:0 0 auto}
+/* A swatch's own background sits under the hover every button has, so a tile
+   pointed at takes the hover tint in its own scheme's note color; the
+   nostromo tiles' own backgrounds outrank that hover. */
+.sw{background:var(--bg)}
 .bnote{padding:8px 12px;border-bottom:var(--hair) solid var(--line);font:var(--f-ui)}
 .bnote:last-of-type{border-bottom:0}
 .bnote .bwhy{overflow-wrap:anywhere}
@@ -280,6 +290,9 @@ body.firstrun .rail, body.firstrun .railbar, body.firstrun .railmore{display:non
 /* A hint beside a button in an action bar sits level with it, not a hint's
    gap below the line above. */
 .actbar>.hint{margin:0;min-width:0}
+/* The reset dialog's list keeps its band's rhythm: a dialog's field sets its
+   children's margins, which outranks this one. */
+.resetwhat{margin:8px 0}
 
 /* Finger-sized where a finger is what presses it. */
 @media(max-width:900px){
@@ -308,7 +321,14 @@ body.firstrun .rail, body.firstrun .railbar, body.firstrun .railmore{display:non
    too (the operator, 17 Oct: the headings sat 4px left of the tiles'). */
 .hcard h3,.hsect h3{margin:0;padding:12px 16px;min-height:46px;box-sizing:border-box;display:flex;align-items:center;
   font:var(--f-sect);border-bottom:var(--hair) solid var(--line);background:var(--head-bg)}
+/* Its colors sit under the look a disabled button keeps when pointed at (a
+   press leaves its button disabled while it works), which outranks them. */
+.hcard .hjob{background:none;border:0;border-bottom:var(--hair) solid var(--line)}
 .hcard.focus{border-color:var(--accent);transition:border-color .2s}
+/* Its colors sit under the look a disabled button keeps when pointed at (a
+   press leaves its button disabled while it works), which outranks them. */
+.runnersall .row{background:none;border:0;border-bottom:var(--hair) solid var(--line)}
+.runnersall .row.on{box-shadow:inset 3px 0 var(--accent)}
 /* A row nothing here can act on: a container this dashboard did not start, or
    any instance while the daemon is not answering. Dimmed rather than dropped;
    it is still the answer to "what is on record", and a row you cannot act on
@@ -691,7 +711,13 @@ button.danger[disabled]{background:color-mix(in srgb, var(--bad) 8%, var(--panel
 .sectjump a{color:var(--note);text-decoration:none;white-space:nowrap;padding:3px 10px;
   border:var(--hair) solid var(--line);border-radius:99px;line-height:1.2}
 .sectjump a:hover{text-decoration:none;border-color:var(--note)}
+/* Its colors sit under the look a disabled button keeps when pointed at (a
+   press leaves its button disabled while it works), which outranks them. */
+.artfp .link{background:none;border:0}
 .rnsignbar{display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center}
+/* Its colors sit under the look a disabled button keeps when pointed at (a
+   press leaves its button disabled while it works), which outranks them. */
+.sgview .link{background:none;border:0}
 .sgadds{display:flex;flex-wrap:wrap;gap:var(--field-gap)}
 .modal a.link{display:inline-flex;align-items:center}
 @media(hover:hover){ .modal .link:hover{color:var(--accent)}
@@ -715,6 +741,19 @@ button.danger[disabled]{background:color-mix(in srgb, var(--bad) 8%, var(--panel
    machine's From the stick, R161 step 8). */
 .facts dd.ok{color:var(--pass)}
 .facts dd.warn{color:var(--warn)}
+/* Its colors sit under the look a disabled button keeps when pointed at (a
+   press leaves its button disabled while it works), which outranks them. */
+.fxplace{border:var(--hair) solid transparent;background:transparent}
+/* Its colors sit under the look a disabled button keeps when pointed at (a
+   press leaves its button disabled while it works), which outranks them. */
+.fxplace.on{background:color-mix(in srgb, var(--accent) 14%, transparent);border-color:color-mix(in srgb, var(--accent) 40%, var(--line))}
+/* On a phone, one column: the places a line that scrolls over the listing,
+   the bar's path on a line of its own over its filter and buttons, and a
+   row one line, its name and a file's size or a folder's day. */
+@media(max-width:900px){
+/* Its edge color sits under the place on show's, which outranks it. */
+.fxplace{border-color:var(--line)}
+}
 :is(.thingtab,.entrytab) .pghead .name{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px}
 :is(.thingtab,.entrytab) .pghead .actbar .state{margin-right:auto;font:var(--f-note)}
 /* A placeholder's chips wait on the one line the page's own scroll on. */
@@ -760,6 +799,9 @@ details.grp[open]>summary .roadmap .fold::before{content:"\25BE"}
 .pagemore span{color:var(--dim);font:var(--f-note)}
 .pagemore button{margin-left:auto}
 .pagemore button+button{margin-left:0}
+/* The picked color's ring sits under the nostromo schemes' raised edge on a
+   button, which outranks it. */
+.pcpick button[aria-checked="true"]{box-shadow:0 0 0 2px var(--bg), 0 0 0 4px var(--ink)}
 /* The swatches a card's Color unrolls under its name (the operator, 18 Oct:
    picked from its menu, this account's own color for the project). */
 .pcard .pcpop,.phead~.pcpop,.pname~.pcpop{margin:6px 0 2px}
@@ -943,6 +985,9 @@ a.btn svg{width:12px;height:12px;flex:0 0 auto}
    readability of the row. */
 .roadmap .body{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
 .roadmap .tags{display:flex;gap:5px;flex-wrap:wrap}
+/* Its colors sit under the look a disabled button keeps when pointed at (a
+   press leaves its button disabled while it works), which outranks them. */
+.roadmap .dtog{background:none;border:0}
 /* pre-wrap, because a step may be written across a few lines: one step is one
    message the operator sends by hand, so the cheap unit has to be able to hold
    a paragraph rather than pushing a plan into more steps than it needs. */
@@ -1069,6 +1114,9 @@ a.btn svg{width:12px;height:12px;flex:0 0 auto}
 @media(hover:hover){ .helphit:hover .name{text-decoration:underline}
 }
 .helphits mark{background:color-mix(in srgb,var(--accent) 30%,transparent);color:inherit;border-radius:2px;padding:0 1px}
+/* Its colors sit under the look a disabled button keeps when pointed at (a
+   press leaves its button disabled while it works), which outranks them. */
+.wktabs .wktab{background:none;border:var(--hair) solid transparent;border-bottom:0}
 .wktitle{font:400 1.75em/1.25 var(--serif);color:var(--ink);margin:4px 0 2px;padding-bottom:4px;border-bottom:var(--hair) solid var(--line)}
 .wkmeta{color:var(--dim);font:var(--f-note);margin:4px 0 14px}
 .wktoc{display:inline-block;min-width:180px;max-width:100%;border:var(--hair) solid var(--line);border-radius:var(--r-small);
@@ -1119,6 +1167,9 @@ a.btn svg{width:12px;height:12px;flex:0 0 auto}
   .wktitle{font-size:1.5em}
 }
 .dsboardwrap{flex:1 1 520px;min-width:0;max-height:85vh;overflow-y:auto}
+/* The layers list's height, under the list box's own, which keeps it to four
+   rows. */
+.dslayers{max-height:85vh}
 /* The roadmap's summary is a full sentence where the other three are a few
    words, so it is the one that has to be allowed to wrap inside the header
    rather than shoving History off the end. */
@@ -1193,6 +1244,9 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
    the one under it together, never one alone. */
 @media(max-width:600px){ .nbsaid>.actbar>.state{flex-basis:100%}
 }
+/* Its underline sits under the nostromo light scheme's raised edge, which
+   every button but a link wears. */
+.nb .vbar button.on{box-shadow:inset 0 -2px 0 var(--accent)}
 /* Long lists scroll inside the panel rather than pushing the Add field and the
    footer off the screen. A cap in rough proportion to the window, so a desktop
    shows more of it than a phone does, and a shadowless inset edge to say there
@@ -1227,6 +1281,9 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
 .roadmap.dragging{opacity:.5}
 .dropbox .acts{display:flex;gap:8px;margin-top:8px}
 .dropbox .acts .sp{flex:1}
+/* Its colors sit under the look a disabled button keeps when pointed at (a
+   press leaves its button disabled while it works), which outranks them. */
+.addstep .link{background:none;border:0}
 /* Moving things about: dim until it can, like every other row control. */
 .roadmap .mv{color:var(--dim)}
 .roadmap .mv[disabled]{opacity:.3}
@@ -1530,9 +1587,6 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
 }
 @media(max-width:600px){ .pane .bar.proj .pfacts{flex:1 1 100%;max-width:none}
 }
-/* The Claude chooser drawn in a project page's pane (R218 step 3): as wide
-   as its words, never the pane. */
-.pane>.resumemenu{max-width:min(440px,calc(100% - 8px));width:max-content}
 .pgridband{padding-top:12px;padding-bottom:12px}
 .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
 .pgrid .empty{grid-column:1/-1}
@@ -1670,6 +1724,12 @@ button:has(> svg:only-child),a.btn:has(> svg:only-child){display:inline-flex;ali
 .jump input::placeholder{color:var(--dim)}
 @media(max-width:1000px){ .jump{flex:0 1 150px} .meta.host{display:none}
 }
+/* Its colors sit under the look a disabled button keeps when pointed at (a
+   press leaves its button disabled while it works), which outranks them. */
+.jrow{border:0;background:transparent}
+/* Its colors sit under the look a disabled button keeps when pointed at (a
+   press leaves its button disabled while it works), which outranks them. */
+.jrow.on,.jrow:hover{background:var(--btn-hi)}
 /* On a phone the field takes the width between the brand and the buttons:
    the spacer beside it grew too and took half (the operator, 18 Oct: the
    hint cut off beside a blank gap). */
@@ -2024,6 +2084,9 @@ button.eye.bare{background:none;--sheen:none;border:0;padding:5px 4px;min-width:
 /* Vertical only: the shorthand wiped the band's horizontal inset, which is
    the one rule uniform.mjs measures across every tab. */
 .nodestab .ndrow{padding-top:10px;padding-bottom:10px}
+/* Its margin sits under the fold's own for its lines, which comes later and
+   sets them flush. */
+.ndlabels{margin-top:4px}
 .ndcap{display:inline-flex;gap:6px;align-items:center;font:var(--f-ui);
   color:var(--ink)}
 /* ...in a notebook or a dialog too, whose label{display:block} outranked
@@ -2054,6 +2117,12 @@ button.eye.bare{background:none;--sheen:none;border:0;padding:5px 4px;min-width:
    with every bar control below. */
 .docbarrow>input[type=search]{flex:1 1 12rem;min-width:8rem}
 .docbarrow[hidden]{display:none}
+/* A command's margin, under the dialog field's own for its children, which
+   outranks it there. */
+.ndcmd{margin:6px 0}
+/* Its margin sits under a dialog field's own for its children, which
+   outranks it there. */
+.vmsteps{margin:10px 0 0}
 /* ---- sections and action bars, for every document tab -------------------
    Two more pieces of the document language, added when the Nodes tab was
    one long column of editors and a wall of buttons on a phone.
@@ -2297,6 +2366,9 @@ label.pick.nodepick{display:inline-flex;align-items:center;gap:var(--field-gap)}
    row (opacity) is a stacking context of its own, and the menu, z-indexed
    inside it, drew under the next row's words. */
 .row:has(.actmenu:not([hidden])){position:relative;z-index:41}
+button[aria-busy="true"]{opacity:.75}
+/* Under a reason line's own margin, which keeps its space inside the fold. */
+.ndhmore>*{margin:0}
 /* At a desk the Nodes page is cards, as a notebook view is (the operator,
    18 Oct): the node's head one card and each of its sections one of its
    own on the page's margin; the row that holds them draws nothing but
@@ -2330,6 +2402,9 @@ label.pick.nodepick{display:inline-flex;align-items:center;gap:var(--field-gap)}
 /* The mapping's row is an action bar (its field, then Save and Check), so
    it lays out like every other bar; the input takes the room before them. */
 .ndpaths input,.ndname input{flex:1 1 auto;min-width:0}
+/* Its margin sits under a dialog field's own for its children, which
+   outranks it there. */
+.setgrid{margin:6px 0 2px}
 @media (max-width:600px){
   .ndnet,.ndstore{grid-template-columns:minmax(0,1fr)}
   .ndstore .sub{grid-column:1}
@@ -2344,6 +2419,9 @@ label.pick.nodepick{display:inline-flex;align-items:center;gap:var(--field-gap)}
   background:var(--sunk);border:var(--hair) solid var(--line);border-radius:var(--r-control);
   color:var(--dim);font:11px/1.5 var(--mono);white-space:pre-wrap;
   overflow-wrap:anywhere}
+/* Its colors sit under the look a disabled button keeps when pointed at (a
+   press leaves its button disabled while it works), which outranks them. */
+.tcs .link{background:none;border:0}
 /* Every icon button draws the same way, whichever class it wears. Keyed to
    .eye alone, the Projects card's trash button (an .ic) got the browser's
    default fill:black/stroke:none, and these paths are open strokes, so it
@@ -2474,6 +2552,9 @@ button.working:has(> svg):not(:has(> :not(svg, .dot, .meta))){position:relative}
    a second one in. A section's body is not: its bands carry their own. */
 .field>.skel:not(.warn){padding-left:0;padding-right:0}
 .skel .sk-row:nth-child(3n+3) .sk-b{animation-delay:.12s} .skel .sk-row:nth-child(3n+4) .sk-b{animation-delay:.24s}
+/* The boot placeholder's row and its box, under .skel.warn, which makes it a
+   line of words once the first poll fails. */
+.skboot{display:flex;padding:0}
 .skpcard .skv{height:.9em} .skpcard .skv.name{height:1.1em}
 .sk-cards,.sk-tiles{display:grid;gap:12px;padding:var(--row-y) 0}
 .sk-cards{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
@@ -2500,12 +2581,6 @@ span.skel.sk-word{display:inline-block;vertical-align:middle;padding:0}
    line, which would push the column past the viewport on a phone. No gap
    between its parts: the panes and the bottom bar are one frame. */
 .col.term{min-height:0;min-width:0;gap:0}
-/* The session box (the Perch pass, the operator, 17 Oct): a popover
-   of one column, each node a block of its name, what it has on a quiet mono
-   line, how this account stands there and its action bar; the model and
-   effort step two labeled fields side by side over Back and the press. */
-.resumemenu{flex-direction:column;flex-wrap:nowrap;gap:12px;padding:12px 14px;
-  width:min(360px,calc(100vw - 32px));max-width:calc(100% - 8px)}
 
 /* Panes -------------------------------------------------------------- */
 /* Closed on every side (the operator, 16 Oct): its top was left open for
@@ -2589,6 +2664,13 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
    field skin and .row/.pill/.dot are the page's own, so a chat row looks
    like every other row on the dashboard. */
 .pane .doc:has(> .chattab){overflow:hidden;padding:0}
+/* A chat row's rule line, under the rules every row and every button has:
+   the last row draws none, and a row pointed at takes the hover's edge
+   color. */
+.chatrow{background:none;border:0;border-bottom:var(--hair) solid var(--line)}
+/* Its colors sit under the look a disabled button keeps when pointed at (a
+   press leaves its button disabled while it works), which outranks them. */
+.chattab .chatrow{background:none}
 .chatlog{flex:1;overflow:auto;padding:6px 10px;min-height:0;
   -webkit-overflow-scrolling:touch}
 

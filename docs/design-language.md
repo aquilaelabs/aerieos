@@ -703,7 +703,12 @@ less motion is none, a theme's crossfade while it runs). A later layer
 wins over every rule of an earlier one, whatever either's specificity or
 place in its file, so a rule goes in the layer of what it styles and is
 written as plainly as that allows: never lengthened, and never moved down
-the file, to win. xterm's own stylesheet stays outside the layers, so its
+the file, to win. Where a shared rule has to keep winning over a page's own on one
+property (a dialog field's margins for its children, the look a disabled
+button keeps under the pointer, the nostromo schemes' raised edge on a
+button), the page's declarations of that property sit in the components
+layer beside the shared rules, under a note naming what outranks them,
+and the rest of the page's rule stays in surfaces. xterm's own stylesheet stays outside the layers, so its
 rules for its own parts win over the page's for bare elements.
 
 The scripts: `tab-*.js` for a document tab, `nb-*.js` for a notebook view

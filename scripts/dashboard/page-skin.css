@@ -608,7 +608,6 @@ select:focus{outline-offset:-2px}
 /* A row's own inset is tighter on a phone, every row on every tab. */
 @media(max-width:900px){ :root{--row-y:8px}
 }
-button[aria-busy="true"]{opacity:.75}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 @keyframes spin{to{transform:rotate(360deg)}}
 
