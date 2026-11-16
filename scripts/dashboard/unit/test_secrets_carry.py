@@ -164,6 +164,12 @@ class Moved(unittest.TestCase):
 
     def test_with_no_helper_to_run_nothing_is_asked_of_root(self):
         os.environ.pop("BB_SECRETS_CARRY")
+        # Pinned here, not left to what a module run earlier in the same
+        # process set (B808): bare_metal() true and a helper file in place
+        # would have this ask sudo.
+        was = move.bare_metal
+        self.addCleanup(setattr, move, "bare_metal", was)
+        move.bare_metal = lambda: False
         self.assertEqual(move._carry("--can")[0], 127, "not a machine of its own here: sudo is never run")
         self.assertEqual(move._land_carried(self.d), [])
 
