@@ -64,15 +64,15 @@ function nbHistoryView({$, nb, project}){
 
   function drawHistory(){
     if (!nb.roadmapLog){
-      $("roadmapHist").innerHTML = `${skel("rows")}`;
+      drawHTML($("roadmapHist"), `${skel("rows")}`);
       return;
     }
     if (!nb.roadmapLog.length){
       const narrowed = $("histFind").value.trim() || $("histWhen").value !== "0";
-      $("roadmapHist").innerHTML = `<div class="hint">${narrowed
+      drawHTML($("roadmapHist"), `<div class="hint">${narrowed
         ? "Nothing in the log matches that. Widen the window, or clear the search."
         : `Nothing has happened to this list yet. Every add, reword, send, shelve
-         and drop lands here from now on.`}</div>`;
+         and drop lands here from now on.`}</div>`);
       return;
     }
     patch($("roadmapHist"), nb.roadmapLog.map((e, k, all) => {
@@ -122,14 +122,16 @@ function nbHistoryView({$, nb, project}){
   }
 
   nb.histTimer = null;
-  async function loadHistory(){
-    nb.roadmapLog = null;
-    nb.redrawRoadmap();
-    // quiet, because the answer is not a list payload and drawRoadmap must not be
-    // handed one that has no items in it.
-    const j = await nb.postRoadmap(histQuery(), true);
-    nb.roadmapLog = j?.history || [];
-    nb.redrawRoadmap();
+  function loadHistory(){
+    return reading(`${project}:history`, async () => {
+      nb.roadmapLog = null;
+      nb.redrawRoadmap();
+      // quiet, because the answer is not a list payload and drawRoadmap must not be
+      // handed one that has no items in it.
+      const j = await nb.postRoadmap(histQuery(), true);
+      nb.roadmapLog = j?.history || [];
+      nb.redrawRoadmap();
+    });
   }
 
   // Typing searches, but not on every keystroke: each one is a round trip, and
@@ -179,7 +181,7 @@ function nbHistoryView({$, nb, project}){
     const btn = $(btnId), bar = $(barId), pane = $(paneId);
     let on = false, timer = null;
     const draw = rows => {
-      pane.innerHTML = rows === null
+      drawHTML(pane, rows === null
         ? `${skel("rows")}`
         : !rows.length
         ? `<div class="hint">${bar.querySelector("input").value.trim()
@@ -193,7 +195,7 @@ function nbHistoryView({$, nb, project}){
               <span class="who${e.by === "you" ? " you" : ""}">${esc(whoSays(e))}${
               e.approved ? ", approved by you" : ""}</span>${
               e.note ? `<span class="note">${esc(e.note)}</span>` : ""}</span>
-          </div>`).join("");
+          </div>`).join(""));
       if (rows) wireIds(pane);
       // Every history through one pane means one place to page them.
       paginate(pane, ":scope > .hist", {key: paneId, noun: "entries"});
@@ -240,8 +242,7 @@ function nbHistoryView({$, nb, project}){
            emptyText: "Nothing has changed between scans yet. Changes show "
              + "from the second scan on.",
            fetchLog: async q => {
-             const r = await postJSON("/api/findings", {project, action: "history", ...q});
-             const j = await r.json();
+             const j = await postJSON("/api/findings", {project, action: "history", ...q});
              return j.error ? (notify(j.error, true), {history: []}) : j;
            }});
 

@@ -238,7 +238,7 @@ await section("The tab at a glance", async () => {
   await page.evaluate(() => {
     const y = { id: 'j_yesterday', type: 'exec', state: 'failed', queued: jobsToday() - 7200, ended: jobsToday() - 3600, spec: {} };
     if (!jobsList.some(j => j.id === y.id)) jobsList.push(y);
-    jobsRev++;
+    readMoved('jobs');
     location.hash = '#/jobs/failed-today';
   });
   await page.waitForFunction(() => document.querySelector('.jobstab [data-jbshow="failed-today"].on'), null, { timeout: 10000 });
@@ -249,7 +249,7 @@ await section("The tab at a glance", async () => {
   ok(today.rows.length && today.rows.every(([id, s]) => s === 'failed' && id !== 'j_yesterday')
      && Number(today.chip) === today.rows.length && Number(today.failed) === today.rows.length + 1,
      `#/jobs/failed-today lists today's failures alone, under a chip whose count is the rows shown (${JSON.stringify(today)})`);
-  await page.evaluate(() => { jobsList = jobsList.filter(j => j.id !== 'j_yesterday'); jobsRev++; jobsShowSet(''); drawPanes(); shellSync(); });
+  await page.evaluate(() => { jobsList = jobsList.filter(j => j.id !== 'j_yesterday'); readMoved('jobs'); jobsShowSet(''); drawPanes(); shellSync(); });
 
   // A kind with no command of its own says what it did, where a storage
   // walk read as a bare "exec" (B70).

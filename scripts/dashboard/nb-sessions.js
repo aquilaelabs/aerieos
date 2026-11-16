@@ -71,18 +71,20 @@ function nbSessionsView({$, nb, project, root}){
   // The one row whose fields are in, and what the list is narrowed to.
   let editing = "", find = "";
   const matches = r => !find || [r.label, r.note, r.first, agentById(r.agent)?.name].some(x => String(x || "").toLowerCase().includes(find.toLowerCase()));
-  async function loadSessions(){
-    try{
-      const j = await (await fetch("/api/transcripts?project=" + encodeURIComponent(project))).json();
-      rows = j.error ? {error: j.error} : {rows: j.rows || [], visible: j.visible || []};
-    }catch(e){ rows = {error: "could not reach the controller: " + e}; }
-    drawSessions();
+  function loadSessions(){
+    return reading(`${project}:sessions`, async () => {
+      try{
+        const j = await getJSON("/api/transcripts?project=" + encodeURIComponent(project));
+        rows = j.error ? {error: j.error} : {rows: j.rows || [], visible: j.visible || []};
+      }catch(e){ rows = {error: "could not reach the controller: " + e}; }
+      drawSessions();
+    });
   }
   function drawSessions(){
     const v = view(), list = v?.querySelector(".sesslist"), hint = v?.querySelector(".nbglance");
     if (!list) return;
-    if (rows === null){ glanceWaiting(hint); list.innerHTML = skel("rows"); return; }
-    if (rows.error){ viewGlance(hint, []); list.innerHTML = `<div class="field"><div class="notice bad">${esc(rows.error)}</div></div>`; return; }
+    if (rows === null){ glanceWaiting(hint); drawHTML(list, skel("rows")); return; }
+    if (rows.error){ viewGlance(hint, []); drawHTML(list, `<div class="field"><div class="notice bad">${esc(rows.error)}</div></div>`); return; }
     const mine = rows.rows, theirs = rows.visible;
     const week = mine.filter(r => r.at * 1000 > Date.now() - 7 * 86400000).length;
     const open = mine.filter(r => r.shared).length;
@@ -148,7 +150,7 @@ function nbSessionsView({$, nb, project, root}){
     busy(b, "Saving");
     try{
       for (const s of steps){
-        const j = await (await postJSON("/api/transcripts", {project, id, ...s})).json();
+        const j = await postJSON("/api/transcripts", {project, id, ...s});
         if (j.error){ notify(j.error, true); unbusy(b, "Save"); return; }
       }
     }catch(e){ notify("could not reach the controller: " + failWords(e), true); unbusy(b, "Save"); return; }
@@ -160,7 +162,7 @@ function nbSessionsView({$, nb, project, root}){
     closeMore();
     busy(b, {delete: "Deleting", share: "Making visible", unshare: "Making private"}[action]);
     try{
-      const j = await (await postJSON("/api/transcripts", {project, id, action})).json();
+      const j = await postJSON("/api/transcripts", {project, id, action});
       if (j.error) notify(j.error, true);
       else notify({delete: "deleted", share: "visible to every session on this space", unshare: "yours alone again"}[action]);
     }catch(e){ notify("could not reach the controller: " + failWords(e), true); }

@@ -7,8 +7,8 @@
 // or a node.
 //
 // One classic script beside index.html (docs/design-language.md, Files):
-// pure declarations, nothing runs at load. What runs at load stays in
-// index.html under the section's header.
+// pure declarations, nothing runs at load. What runs at load is
+// page-boot.js's, under the section's header.
 
 "use strict";
 
@@ -271,10 +271,10 @@ function openRoute(hash){
     // #/help/help is the page by its tool's name, as #/group/tool is for any
     // group: its front page, not a doc called help.
     const doc = a && a !== "help" ? decodeURIComponent(a) : helpIndex?.home || "";
-    if (doc && doc !== helpCur){ helpCur = doc; helpQ = ""; helpHits = null; helpRev++; }
+    if (doc && doc !== helpCur){ helpCur = doc; helpQ = ""; helpHits = null; readMoved("help"); }
     // ...at a section of it when the address names one (#/help/reference/
     // the-install-key): the doctor's links land on the fix itself.
-    if (b){ helpAnchor = decodeURIComponent(b); helpRev++; }
+    if (b){ helpAnchor = decodeURIComponent(b); readMoved("help"); }
     openHelp();
     if (helpIndex && helpCur) helpRead(helpCur);
     return true;
@@ -547,9 +547,9 @@ function groupPick(g, nid){
     if (GROUP_KEEP[k]){ try{ localStorage.setItem(GROUP_KEEP[k], nid); }catch(e){ /* private */ } }
     if (k === "docker" && typeof dockerNodeKeep === "function") dockerNodeKeep();
   });
-  if (g.key === "machines"){ nodesRev++; storageRev++; instRev++; }
-  if (g.key === "build"){ libRev++; emuRev++; nodesRev++; }
-  if (g.key === "containers"){ dockerRev++; nginxRev++; }
+  if (g.key === "machines"){ readMoved("nodes"); readMoved("storage"); readMoved("installed"); }
+  if (g.key === "build"){ readMoved("library"); readMoved("emulator"); readMoved("nodes"); }
+  if (g.key === "containers"){ readMoved("docker"); readMoved("nginx"); }
   drawPanes();
   const on = tabOf(panes[0])?.kind;
   if (on && GROUP_LOAD[on]) GROUP_LOAD[on]();

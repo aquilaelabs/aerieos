@@ -520,7 +520,7 @@ await section("a bare-metal install's first run", async () => {
         const sent = [], keep = postJSON, keepAsk = ask; let shown = null;
         const keepLoad = loadNodes; let read = false;
         ask = async o => { shown = o; return true; }; loadNodes = async () => { read = true; };
-        postJSON = async (u, b) => { sent.push(b); return new Response('{"ok":true}'); };
+        postJSON = async (u, b) => { sent.push(b); return {ok: true}; };
         top().querySelector('[data-setconsole]').click();
         for (let t = 0; t < 40 && !shown; t++) await new Promise(r => setTimeout(r, 50));
         out.conShown = shown?.field?.value;
@@ -629,7 +629,7 @@ await section("a bare-metal install's first run", async () => {
     own: ownMachine()?.id }));
   ok(/Release/.test(mp.head) && /Sessions kept apart/.test(mp.head) && mp.updates && !mp.row && mp.link === `#/machines/nodes/${mp.own}`,
      `This controller draws the head and the Updates section, no node row, and links to the machine's row on the Nodes page (${mp.link})`);
-  await page.evaluate(() => { openNodesTab(ownMachine().id); nodesRev++; drawPanes(); });
+  await page.evaluate(() => { openNodesTab(ownMachine().id); readMoved('nodes'); drawPanes(); });
   await page.waitForSelector('.nodestab .ndrow[data-node]', { timeout: 15000 });
   const np = await page.evaluate(() => ({
     tag: !!document.querySelector('.nodestab .ndrow .tag.ndown'),
@@ -654,7 +654,7 @@ await section("a bare-metal install's first run", async () => {
   // (R161 step 11), ticked while armed, the head's button gone.
   {
     await bmApi('/api/v1/nodes', { action: 'hold-next', on: true });
-    await page.evaluate(async () => { await refresh(); nodesRev++; drawPanes(); });
+    await page.evaluate(async () => { await refresh(); readMoved('nodes'); drawPanes(); });
     const box = await page.evaluate(() => ({
       row: !!document.querySelector('.nodestab details[data-sect="nodes:advanced"] [data-holdnextbox]:checked'),
       head: !!document.querySelector('.nodestab .pghead [data-holdnext]') }));
@@ -668,7 +668,7 @@ await section("a bare-metal install's first run", async () => {
       const n = ownMachine();
       n.reported = { ...n.reported, os_stick: { stick: true, pool: '', ready: false, on_stick: ['projects'], written_kb: 3145728, boot_written_kb: 20480 },
                      pools: [{ name: 'fast', mount: '/mnt/pools/fast' }] };
-      nodesRev++; drawPanes();
+      readMoved('nodes'); drawPanes();
       const sect = document.querySelector('.nodestab details[data-sect="nodes:stick"]');
       return { there: !!sect, text: sect?.textContent.replace(/\s+/g, ' ') || '', pick: [...(sect?.querySelectorAll('#stickPool option') || [])].map(o => o.value) };
     });
@@ -697,7 +697,7 @@ await section("a bare-metal install's first run", async () => {
                          parity: [{ slot: 'parity', id: 'ST_P_SERPPP' }], pools: [{ name: 'cache', fs: 'btrfs', uuid: 'u-1' }] },
                  skipped: [{ slot: 'disk3', id: 'WDC_Z_LOCK33', why: 'encrypted: its key is not asked for yet' }] } };
       window.__fbPlan = state.firstboot;
-      nodesRev++; drawPanes();
+      readMoved('nodes'); drawPanes();
       const sect = document.querySelector('.nodestab details[data-sect="nodes:adopt"]');
       window.__machineSections = [...document.querySelectorAll('.nodestab details.sect')].map(d => `${d.dataset.sect}: ${d.querySelector('summary')?.textContent.replace(/\s+/g, ' ').trim()}`);
       return { there: !!sect, text: sect?.textContent.replace(/\s+/g, ' ') || '',
@@ -728,7 +728,7 @@ await section("a bare-metal install's first run", async () => {
       // since the step above: the plan is set again with its shares.
       state.firstboot = { ...(state.firstboot || window.__fbPlan), shares: { rows: [{ name: 'media', path: '/mnt/user/media', smb: { on: true, guest: true, ro: false, tm: false, users: [] }, nfs: { on: false, ro: false, clients: [] } }],
                                  notes: [{ name: 'docs', said: 'secure: its writers by name' }] } };
-      nodesRev++; drawPanes();
+      readMoved('nodes'); drawPanes();
       const sect = document.querySelector('.nodestab details[data-sect="nodes:adopted"]');
       return { there: !!sect, gone: !document.querySelector('.nodestab details[data-sect="nodes:adopt"]'), text: sect?.textContent.replace(/\s+/g, ' ') || '',
                release: !!sect?.querySelector('[data-adopt="release"]'), serve: !!sect?.querySelector('[data-adoptshares]') };
@@ -746,7 +746,7 @@ await section("a bare-metal install's first run", async () => {
     const folders = await page.evaluate(() => {
       const n = ownMachine();
       n.reported = { ...n.reported, adopted: { ...n.reported.adopted, folders: ['media', 'TV Shows', 'appdata'] }, shares: [{ name: 'appdata', path: '/mnt/user/appdata', smb: { on: true }, nfs: { on: false } }] };
-      nodesRev++; drawPanes();
+      readMoved('nodes'); drawPanes();
       const sect = document.querySelector('.nodestab details[data-sect="nodes:adopted"]');
       return { offered: [...(sect?.querySelectorAll('[data-adoptfolder]') || [])].map(x => x.dataset.adoptfolder),
                ticked: [...(sect?.querySelectorAll('[data-adoptfolder]:checked') || [])].length, btn: !!sect?.querySelector('[data-adoptfolders]') };
@@ -756,7 +756,7 @@ await section("a bare-metal install's first run", async () => {
     // Taking the array over (R163 step 3) and the way back (step 5).
     const take = await page.evaluate(() => {
       const n = ownMachine(), was = n.reported.adopted;
-      const read = () => { nodesRev++; drawPanes();
+      const read = () => { readMoved('nodes'); drawPanes();
         const sect = document.querySelector('.nodestab details[data-sect="nodes:adopted"]');
         const back = document.querySelector('.nodestab details[data-sect="nodes:adoptback"]');
         return { take: [...(sect?.querySelectorAll('[data-adopttake]') || [])].map(x => x.dataset.adopttake), release: !!sect?.querySelector('[data-adopt="release"]'),
@@ -780,7 +780,7 @@ await section("a bare-metal install's first run", async () => {
       n.reported.adopted = { ...was, taken: true, writable: true };
       const taken = read();
       n.reported.adopted = was;
-      nodesRev++; drawPanes();
+      readMoved('nodes'); drawPanes();
       return { old, offered, taken };
     });
     ok(JSON.stringify(take.offered.moves) === '["TV Shows:cache:cache>array","isos:array:"]' && take.offered.when[0] === '0 4 * * *' && take.offered.when.includes('')
@@ -795,14 +795,14 @@ await section("a bare-metal install's first run", async () => {
         const n = ownMachine(), was = [n.reported.adopted, state.firstboot];
         n.reported.adopted = { ...n.reported.adopted, taken: false };
         state.firstboot = { ...state.firstboot, moves: [{ share: 'TV Shows', land: 'cache', from: 'cache', to: 'array' }, { share: 'isos', land: 'array', from: '', to: '' }] };
-        nodesRev++; drawPanes();
+        readMoved('nodes'); drawPanes();
         const sect = document.querySelector('.nodestab details[data-sect="nodes:adopted"]'); sect.open = true;
         const take = sect.querySelector('#adoptTake'), lbl = take.querySelector('label, .lblrow, .ctllbl') || take.firstElementChild;
         const left = el => Math.round(el.getBoundingClientRect().left);
         const bars = [...sect.querySelectorAll('.actbar')].map(b => { const bs = [...b.querySelectorAll(':scope > button')].map(x => x.getBoundingClientRect());
           return { n: bs.length, tops: new Set(bs.map(r => Math.round(r.top))).size, gaps: bs.slice(1).map((r, i) => Math.round(r.left - bs[i].right)) }; });
         const out = { label: left(lbl), groups: [...take.querySelectorAll('[data-admove]')].map(left), bars };
-        [n.reported.adopted, state.firstboot] = was; nodesRev++; drawPanes();
+        [n.reported.adopted, state.firstboot] = was; readMoved('nodes'); drawPanes();
         return out;
       });
       await page.setViewportSize(vp);
@@ -819,11 +819,11 @@ await section("a bare-metal install's first run", async () => {
         await page.evaluate(() => { const n = ownMachine();
           n.reported.adopted = { ...window.__adWas[0], taken: false };
           state.firstboot = { ...window.__adWas[1], moves: [{ share: 'TV Shows', land: 'cache', from: 'cache', to: 'array' }, { share: 'appdata', land: 'cache', from: '', to: '' }, { share: 'isos', land: 'array', from: '', to: '' }], mover_cron: '0 4 * * *', mover_words: 'daily at 4:00' };
-          nodesRev++; drawPanes(); const d = document.querySelector('.nodestab details[data-sect="nodes:adopted"]'); if (d) d.open = true; }); await painted();
+          readMoved('nodes'); drawPanes(); const d = document.querySelector('.nodestab details[data-sect="nodes:adopted"]'); if (d) d.open = true; }); await painted();
         await page.locator('.nodestab details[data-sect="nodes:adopted"]').screenshot({ path: `${process.env.BB_SHOTS}/moves-${name}.png` });
       }
       await page.setViewportSize(vp);
-      await page.evaluate(() => { const n = ownMachine(); [n.reported.adopted, state.firstboot] = window.__adWas; nodesRev++; drawPanes(); });
+      await page.evaluate(() => { const n = ownMachine(); [n.reported.adopted, state.firstboot] = window.__adWas; readMoved('nodes'); drawPanes(); });
     }
     ok(!take.old.take.length && JSON.stringify(take.offered.take) === '["dry","go"]',
        `an agent that has the takeover offers Check the takeover and Take the array over; an older one offers neither (${JSON.stringify([take.old.take, take.offered.take])})`);
@@ -845,7 +845,7 @@ await section("a bare-metal install's first run", async () => {
       // poll landing while the page's reads were waited out puts the
       // server's own back, as the steps below know and say again too.
       state.firstboot = state.firstboot || window.__fbKeep;
-      storageRev++; drawPanes(); await till(() => document.querySelector('.storagetab details[data-sect="storage:adopted"]'));
+      readMoved('storage'); drawPanes(); await till(() => document.querySelector('.storagetab details[data-sect="storage:adopted"]'));
       const sect = document.querySelector('.storagetab details[data-sect="storage:adopted"]');
       return { there: !!sect, release: !!sect?.querySelector('[data-adopt="release"]'), folder: !!sect?.querySelector('[data-adoptfolder="TV Shows"]') };
     });
@@ -857,7 +857,7 @@ await section("a bare-metal install's first run", async () => {
       openNodesTab(ownMachine().id); state.firstboot = state.firstboot || window.__fbKeep;
       state.firstboot.apps_from = { docker: { image: '/mnt/user/system/docker/docker.img', autostart_file: 'auto' }, vms: { image: '/mnt/user/system/libvirt/libvirt.img' },
                                     networks: { br0: { subnet: '192.168.1.0/24', gateway: '192.168.1.1' } }, containers: 1 };
-      window.__fbKeep = state.firstboot; nodesRev++; drawPanes();
+      window.__fbKeep = state.firstboot; readMoved('nodes'); drawPanes();
       const p = document.querySelector('.nodestab details[data-sect="nodes:adoptapps"]');
       return { there: !!p, button: !!p?.querySelector('[data-oldapps]'), read: !!p?.querySelector('[data-adoptapp]') };
     });
@@ -874,17 +874,17 @@ await section("a bare-metal install's first run", async () => {
       state.firstboot = state.firstboot || window.__fbKeep;
       state.firstboot.apps_from = { docker: { image: '/mnt/user/system/docker/docker.img', autostart_file: 'auto' }, vms: { image: '/mnt/user/system/libvirt/libvirt.img' },
                                     networks: { br0: { subnet: '192.168.1.0/24', gateway: '192.168.1.1' } }, containers: 1 };
-      nodesRev++; drawPanes();
+      readMoved('nodes'); drawPanes();
       const unread = document.querySelector('.dmtab details[data-sect="docker:oldapps"]')?.textContent.replace(/\s+/g, ' ') || '';
       n.reported = { ...n.reported, vms_other: [{ name: 'Windows 11', state: 'shut off', autostart: false, vcpus: 4, mem_mb: 8192 }],
         adopted: { ...n.reported.adopted, apps: { docker: { autostart: ['plex'], digests: { plex: 'x@sha256:' + 'a'.repeat(64) } },
                                                    vms: [{ name: 'Windows 11', autostart: true, nvram: true }, { name: 'Ubuntu', autostart: false, nvram: false }],
                                                    said: ['Docker: 1 container ran, 1 started with the machine'] } } };
-      nodesRev++; drawPanes();
+      readMoved('nodes'); drawPanes();
       // The rows as the controller answers them, laid over the fetch this
       // draw made (it lands after this evaluate).
       adoptPlan = [{ name: 'plex', file: 'plex.yaml', autostart: true, notes: [], network: 'br0', ok: true }];
-      nodesRev++; drawPanes();
+      readMoved('nodes'); drawPanes();
       const sect = document.querySelector('.dmtab details[data-sect="docker:oldapps"]');
       return { unread, text: sect?.textContent.replace(/\s+/g, ' ') || '',
                acts: [...(sect?.querySelectorAll('[data-adoptapp], [data-adoptnet], [data-adoptvm]') || [])].map(x => x.dataset.adoptapp || x.dataset.adoptnet || x.dataset.adoptvm),

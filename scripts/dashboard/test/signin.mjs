@@ -46,7 +46,7 @@ await ready(page);
 // Since R170 a node's sign-in lives on the Library, on the agent's card, opened by the door that names it.
 // Since R181 step 2 it is on Claude Code's own page on that node.
 const block = () => page.$eval(`.thingtab [data-instnode="${box.id}"][data-thing="agent:claude-code"] [data-signin="${box.id}"][data-siagent="claude"]`, e => e.textContent.replace(/\s+/g, ' ').trim());
-const redraw = () => page.evaluate(async () => { await refresh(); nodesRev++; drawPanes(); });
+const redraw = () => page.evaluate(async () => { await refresh(); readMoved('nodes'); drawPanes(); });
 
 // ---- a Claude press on a node with no sign-in offers that node's sign-in ----
 await refreshUntil(page, () => (state?.projects || []).find(p => p.name === 'beta')?.session_node);
@@ -133,7 +133,7 @@ ok(await page.$eval('[data-signin] a', a => a.target === '_blank' && /authorize\
 // What is half typed survives the repaint a heartbeat brings, focus included.
 await page.click('#authCode');
 await page.keyboard.type('abc#de');
-await page.evaluate(() => { nodesRev++; drawPanes(); });
+await page.evaluate(() => { readMoved('nodes'); drawPanes(); });
 const kept = await page.evaluate(() => ({ value: document.getElementById('authCode').value, active: document.activeElement?.id || document.activeElement?.tagName,
   n: document.querySelectorAll('#authCode').length, held: signinCode }));
 ok(kept.value === 'abc#de' && kept.active === 'authCode',

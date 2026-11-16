@@ -4,8 +4,8 @@
 // one does.
 //
 // One classic script beside index.html (docs/design-language.md, Files):
-// pure declarations, nothing runs at load. What runs at load stays in
-// index.html under the section's header.
+// pure declarations, nothing runs at load. What runs at load is
+// page-boot.js's, under the section's header.
 
 "use strict";
 
@@ -32,6 +32,57 @@ function bootReadsDone(){
   bootDrawn = true;
   setTimeout(() => { for (const k of Object.keys(preGets)) delete preGets[k]; }, 5000);
 }
+
+// ---- what a page reads (R9 step 2) ----------------------------------------
+// Every read a page or a notebook view makes for what it draws goes through
+// reading(), so each has the same sequence guard: one read of a kind at a
+// time, and a read asked for while one is out made once more when it lands
+// (the newest ask's), never stacked beside it: a token can move several
+// times a second while a job runs, and every move asked again. Each answer
+// lands and is drawn in the order asked, so a page whose reads are asked for
+// faster than they answer still draws each (B154). Landing moves the kind's
+// revision, which a page's live key reads with readRev() in place of a
+// counter of its own; readMoved() moves it for a change the page draws
+// that no read brought (a pick, a draft, a fold).
+const readings = new Map();
+function readingOf(key){
+  let r = readings.get(key);
+  if (!r){ r = {rev: 0, busy: null, again: null}; readings.set(key, r); }
+  return r;
+}
+// `join`, a number of milliseconds, lets an ask about the same thing (`about`)
+// within that long of the read's start share it rather than read again: the
+// Library's open, its node's census and the revisions poll each asked at
+// once, and the page waited on three reads where one would do.
+function reading(key, fn, {join = 0, about = ""} = {}){
+  const r = readingOf(key);
+  if (r.busy){
+    if (join && r.about === about && Date.now() - r.at < join) return r.busy;
+    r.again = fn; r.againAbout = about;
+    return r.busy;
+  }
+  r.at = Date.now(); r.about = about;
+  // A read that throws still lets the one asked meanwhile be made; the
+  // first failure is raised at the end, where the page says it (sayUnheard).
+  r.busy = (async () => {
+    let failed = null;
+    try{
+      for (let f = fn; f; f = r.again){
+        if (f !== fn){ r.at = Date.now(); r.about = r.againAbout; }
+        r.again = null;
+        try{ await f(); }
+        catch(e){ failed = failed || e; }
+        finally{ r.rev++; drawPanes(); }
+      }
+    }finally{ r.busy = null; }
+    if (failed) throw failed;
+  })();
+  return r.busy;
+}
+const readRev = key => readings.get(key)?.rev || 0;
+// Whether a read of this kind is out now (a page that says it is reading).
+const readBusy = key => !!readings.get(key)?.busy;
+function readMoved(key){ readingOf(key).rev++; }
 
 // Terminal tabs whose session we have actually watched running.
 //

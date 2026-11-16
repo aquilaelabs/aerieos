@@ -18,25 +18,24 @@
 
 let scannersData = null;          // {nodes, schedule, latest, uncovered}, or null before the first read
 let scannersErr = "";
-let scannersRev = 0;
 let scannersCustom = null;        // the Custom timetable being typed, or null
 
 function openScannersTab(){
   openTab({kind: "scanners", arg: "__scanners", label: "Scanners"});
 }
 
-async function loadScanners(){
-  try{
-    const j = await (await bootFetch("/api/scanners")).json();
-    scannersErr = j.error || "";
-    if (!j.error) scannersData = j;
-  }catch(e){ scannersErr = "scanners: " + failWords(e); }
-  scannersRev++;
-  if (tabs.some(t => t.kind === "scanners")) drawPanes();
+function loadScanners(){
+  return reading("scanners", async () => {
+    try{
+      const j = await getJSON("/api/scanners");
+      scannersErr = j.error || "";
+      if (!j.error) scannersData = j;
+    }catch(e){ scannersErr = "scanners: " + failWords(e); }
+  });
 }
 
 async function scannersAct(body){
-  const j = await (await postJSON("/api/scanners", body)).json().catch(() => ({error: "no answer"}));
+  const j = await postJSON("/api/scanners", body);
   if (j.error) notify(j.error, true);
   else if (j.note) notify(j.note, true);
   else if (body.action === "deploy") notify("deploying the scanners: the pull is a job on the Jobs page");
@@ -137,13 +136,13 @@ function renderScannersInto(i){
   if (!d) return;
   if (scannersData === null){
     d.setBar("");
-    d.list.innerHTML = scannersErr ? `<div class="hint bad">${esc(scannersErr)}</div>`
+    drawHTML(d.list, scannersErr ? `<div class="hint bad">${esc(scannersErr)}</div>`
       : skTpl(pageHead({facts: [["Newest known", GHOST], ["Checked", GHOST]], actions: scannersActs(null)})
         + docSection("scanners", "schedule", "Schedule", "", `<div class="field">${skRows(2)}</div>`)
         // A node's section before its name is read: a word, since a
         // section's title is words and the ghost is a fact's value.
         + docSection("scanners", "node-", "Nodes", "", `<div class="field">${skRows(3)}</div>`)
-        + docSection("scanners", "uncovered", "Not covered", "", `<div class="field">${skRows(1)}</div>`));
+        + docSection("scanners", "uncovered", "Not covered", "", `<div class="field">${skRows(1)}</div>`)));
     if (!scannersErr) loadScanners();
     return;
   }
@@ -181,7 +180,7 @@ function wireScannersTab(root){
   const when = root.querySelector("#scanWhen");
   if (when) when.onchange = () => {
     if (when.value){ scannersCustom = null; scannersAct({action: "schedule", cron: when.value}); }
-    else { scannersCustom = root.querySelector("#scanCron")?.value || scannersData?.schedule?.cron || "0 4 * * 0"; scannersRev++; drawPanes(); }
+    else { scannersCustom = root.querySelector("#scanCron")?.value || scannersData?.schedule?.cron || "0 4 * * 0"; readMoved("scanners"); drawPanes(); }
   };
   const cron = root.querySelector("#scanCron");
   if (cron) cron.oninput = () => { scannersCustom = cron.value; };

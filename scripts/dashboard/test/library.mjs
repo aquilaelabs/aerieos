@@ -37,12 +37,12 @@ ok(await page.evaluate(async () => {
   const drawn = async f => { for (const end = Date.now() + 10000; !f() && Date.now() < end;) await new Promise(r => setTimeout(r, 50)); };
   const pack = '.doc .librarytab .libgroup[data-libgroup="pack"]';
   lib = {...lib, rows: keep.filter(r => libGroup(r) !== 'pack'), catalog_error: 'no index'};
-  libRev++; drawPanes(); await drawn(() => !document.querySelector(pack));
+  readMoved('library'); drawPanes(); await drawn(() => !document.querySelector(pack));
   const gone = !document.querySelector('.doc .librarytab .libgroup[data-libgroup="pack"]');
-  libKind = 'pack'; libRev++; drawPanes(); await drawn(() => document.querySelector(pack + ' .empty'));
+  libKind = 'pack'; readMoved('library'); drawPanes(); await drawn(() => document.querySelector(pack + ' .empty'));
   const chip = !!document.querySelector('.doc .librarytab .libgroup[data-libgroup="pack"] .empty');
   // Every card back, which is what the checks after this count.
-  libKind = ''; lib = {...lib, rows: keep, catalog_error: ''}; libRev++; drawPanes();
+  libKind = ''; lib = {...lib, rows: keep, catalog_error: ''}; readMoved('library'); drawPanes();
   await drawn(() => document.querySelectorAll('.doc .librarytab .lcard').length === lib.rows.filter(r => !r.wrong_platform && !r.too_new).length);
   return gone && chip;
 }), 'with no tool pack the Tool packs group is not drawn, and its chip still opens it empty');

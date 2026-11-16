@@ -51,20 +51,21 @@ function nbBugsView({$, nb, project}){
   nb.bugs = null;
   nb.bugRev = null;      // the tracker's revision as of the last read
 
-  async function loadBugs(again = false){
-    try{
-      const r = await fetch("/api/bugs?project=" + encodeURIComponent(project));
-      const j = await r.json();
-      nb.bugs = j.error ? {bugs: [], error: j.error} : j;
-    }catch(e){ nb.bugs = {bugs: [], error: String(e)}; }
-    // The answer's own revision, not the page's token as of now (B201); an
-    // answer that failed carries none, and the token stands in.
-    nb.bugRev = nb.bugs.rev ?? revs[`bug:${project}`] ?? nb.bugRev;
-    drawBugs();
-    reposAlso($("bugRepos"), project, "bugs");
-    // Already behind (see nb-tests.js): read once more now.
-    if (!again && nb.bugs.rev !== undefined && revs[`bug:${project}`] !== undefined
-        && revs[`bug:${project}`] !== nb.bugs.rev) return loadBugs(true);
+  function loadBugs(again = false){
+    return reading(`${project}:bugs`, async () => {
+      try{
+        const j = await getJSON("/api/bugs?project=" + encodeURIComponent(project));
+        nb.bugs = j.error ? {bugs: [], error: j.error} : j;
+      }catch(e){ nb.bugs = {bugs: [], error: String(e)}; }
+      // The answer's own revision, not the page's token as of now (B201); an
+      // answer that failed carries none, and the token stands in.
+      nb.bugRev = nb.bugs.rev ?? revs[`bug:${project}`] ?? nb.bugRev;
+      drawBugs();
+      reposAlso($("bugRepos"), project, "bugs");
+      // Already behind (see nb-tests.js): read once more now.
+      if (!again && nb.bugs.rev !== undefined && revs[`bug:${project}`] !== undefined
+          && revs[`bug:${project}`] !== nb.bugs.rev) loadBugs(true); return;
+    });
   }
 
   // Wrapped so the poll can tell this panel's own write from somebody
@@ -80,8 +81,7 @@ function nbBugsView({$, nb, project}){
       return null;
     }
     try{
-      const r = await postJSON("/api/bugs", {project, ...body});
-      const j = await r.json();
+      const j = await postJSON("/api/bugs", {project, ...body});
       // Somebody else edited this report first (roadmap #26). The tracker
       // that came back with the refusal is drawn; it is what the report now
       // says, but the FORM is left alone, holding what was typed, and the
@@ -220,7 +220,7 @@ function nbBugsView({$, nb, project}){
       btn.setAttribute("aria-expanded", "true");
       swapBox(box, () => {
         box.hidden = false;
-        box.innerHTML = bugForm(null);
+        drawHTML(box, bugForm(null));
         reprPick(box);
         box.querySelector(".bfCancel").onclick = shut;
         box.querySelector(".bfGo").onclick = async () => {
@@ -248,7 +248,7 @@ function nbBugsView({$, nb, project}){
     const list = $("bugList"), hint = $("bugHint");
     if (!nb.bugs){
       // Waiting as it lands: Report a bug above the list, which needs no list.
-      glanceWaiting(hint); list.innerHTML = skel("rows");
+      glanceWaiting(hint); drawHTML(list, skel("rows"));
       drawBugAdd();
       return;
     }
@@ -301,7 +301,7 @@ function nbBugsView({$, nb, project}){
     // A role that reads the project and does not write it (B86): a report
     // carries no verbs, and Report a bug says why above the list.
     const ro = projWriteWhy(project);
-    list.innerHTML = vis.slice(0, lim).map(b => `
+    drawHTML(list, vis.slice(0, lim).map(b => `
       <details class="bug chev" data-id="${b.id}"${held.has(String(b.id)) ? " open" : ""}>
         <summary>
           <span class="tag sev ${esc(b.severity)}">${esc(b.severity)}</span>
@@ -339,7 +339,7 @@ function nbBugsView({$, nb, project}){
         </div>
       </details>`).join("")
       // What the tracker is for, as its empty state (R119 step 4).
-      || (rows.length ? "" : `<div class="hint nbempty">What goes here reaches every session in this space.</div>`);
+      || (rows.length ? "" : `<div class="hint nbempty">What goes here reaches every session in this space.</div>`));
     paginate(list, ":scope > .bug", {key: "bugList", noun: "reports", total: vis.length, more: () => drawBugs()});
     wireMore(list);
     list.querySelectorAll(".bug").forEach(d => {
@@ -429,7 +429,7 @@ function nbBugsView({$, nb, project}){
       onPress(d, ".bEdit", () => {
         const body = d.querySelector(".body");
         const b = (nb.bugs.bugs || []).find(x => x.id === id);
-        body.innerHTML = bugForm(b);
+        drawHTML(body, bugForm(b));
         reprPick(body);
         // The revision this form was opened over, so a write that would go
         // over somebody else's is refused rather than applied. On the form

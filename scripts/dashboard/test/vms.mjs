@@ -118,11 +118,11 @@ ok(true, '...and the list goes with the next census that has none');
 
 // A Stop its system did not take (an installer with no ACPI daemon) is said
 // on the row after a while, pointing at Force stop (B308).
-await page.evaluate(() => { vmStopAsked['alpha/db'] = Date.now() - 60000; vmsRev++; drawPanes(); });
+await page.evaluate(() => { vmStopAsked['alpha/db'] = Date.now() - 60000; readMoved('vms'); drawPanes(); });
 await page.waitForFunction(() => /asked to shut down/.test(document.querySelector('.vmtab [data-vm-key="alpha/db"]')?.textContent || ''), null, { timeout: 10000 }).catch(() => {});
 const ignored = await page.evaluate(() => {
   const t = document.querySelector('.vmtab [data-vm-key="alpha/db"]')?.textContent || '';
-  delete vmStopAsked['alpha/db']; vmsRev++; drawPanes();
+  delete vmStopAsked['alpha/db']; readMoved('vms'); drawPanes();
   return t;
 });
 ok(/asked to shut down .* still running/.test(ignored) && /Force stop/.test(ignored),
@@ -217,7 +217,7 @@ await call('/api/prefs', { project: 'alpha', makevms: 'deny' });
 page.dialogs.length = 0;
 await page.evaluate(async () => { await loadVms(); });
 await page.click('.vmtab [data-vm-key="alpha/db"] .actbar .more > button, .vmtab [data-vm-key="alpha/db"] [data-more]').catch(() => {});
-const removed = await page.evaluate(async () => (await (await postJSON('/api/vms', { action: 'remove', project: 'alpha', name: 'db' })).json()));
+const removed = await page.evaluate(async () => (await postJSON('/api/vms', { action: 'remove', project: 'alpha', name: 'db' })));
 ok(removed.ok, 'Remove queues its vm job');
 for (let i = 0; i < 4; i++){
   const w = await agent('work', { running: [], wait: 0 });

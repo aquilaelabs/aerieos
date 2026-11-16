@@ -18,9 +18,7 @@
 "use strict";
 
 let homeData = null;             // /api/home's last answer, or null before the first
-let homeRev = 0;                 // bumped when it lands, so the page repaints
-let homeFetching = false;
-let homeAgain = null;            // a read asked while one was out: null, "light" or "whole"
+let homeWhole = false;           // a whole read asked and not yet made
 
 function openHome(){
   openTab({kind: "home", arg: "__home", label: "Home"});
@@ -33,24 +31,17 @@ function homeOpen(){
   loadHome(false);
 }
 
-// One out at a time, and never dropped (as refresh() is): a read asked
-// while one is out is remembered, the whole one outranking a light one,
-// and asked when that one lands, or the queue's last move went unread.
-async function loadHome(light = false){
-  if (homeFetching){ homeAgain = homeAgain === "whole" || !light ? "whole" : "light"; return; }
-  homeFetching = true;
-  try{
-    const j = await (await bootFetch("/api/home" + (light ? "?light=1" : ""))).json();
+// One out at a time (reading), and a whole read asked while one is out
+// outranks a light one asked after it: the read made then is whole.
+function loadHome(light = false){
+  if (!light) homeWhole = true;
+  return reading("home", async () => {
+    const whole = homeWhole;
+    homeWhole = false;
+    const j = await getJSON("/api/home" + (whole ? "" : "?light=1"));
     homeData = j.error ? {error: j.error}
-      : light && homeData && !j.containers ? {...j, containers: homeData.containers} : j;
-  }catch(e){
-    homeData = {error: "could not read Home: " + e};
-  }finally{
-    homeFetching = false;
-  }
-  homeRev++;
-  drawPanes();
-  if (homeAgain){ const whole = homeAgain === "whole"; homeAgain = null; loadHome(!whole); }
+      : !whole && homeData && !j.containers ? {...j, containers: homeData.containers} : j;
+  });
 }
 
 // The updates due across the install, each thing behind counted once: each
@@ -253,9 +244,9 @@ function renderHomeInto(i){
     const tiles = homeTiles().map(t => t.key === "jobs" ? {...t, wait: true, sub: ""} : t);
     if (railAllows("nodes")) tiles.unshift({key: "nodes", label: "nodes online", wait: true},
                                            {key: "containers", label: "containers running", wait: true});
-    d.list.innerHTML = skTpl(homeTilesHtml(tiles) + homeCards(skRows(3)), {live: true});
+    drawHTML(d.list, skTpl(homeTilesHtml(tiles) + homeCards(skRows(3)), {live: true}));
     wireNeeds(d.list);
-    if (!homeFetching) homeOpen();
+    if (!readBusy("home")) homeOpen();
     return;
   }
   // Painted only when it changed: Home redraws on every poll (its rows are

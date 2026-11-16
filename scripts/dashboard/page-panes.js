@@ -4,8 +4,8 @@
 // kept warm per pane, and a terminal nudged when the page comes back.
 //
 // One classic script beside index.html (docs/design-language.md, Files):
-// pure declarations, nothing runs at load. What runs at load stays in
-// index.html under the section's header.
+// pure declarations, nothing runs at load. What runs at load is
+// page-boot.js's, under the section's header.
 
 "use strict";
 
@@ -168,9 +168,7 @@ function wireConsole(root){
       inp.value = ""; consDraft[sess] = "";
       let r = {};
       try{
-        r = await (await fetch("/api/say", { method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ session: sess, text }) })).json();
+        r = await postJSON("/api/say", { session: sess, text });
       }catch(e){ r = { error: "could not reach the container" }; }
       // Put it back on failure rather than losing it: a message somebody
       // typed is worth more than a tidy field.
@@ -207,7 +205,7 @@ function drawPanes(){
       // a hidden frame is still a live tmux client, and one that
       // reattachTerminals would reload, recreating a session since ended.
       if (pane.dataset.tab || !pane.querySelector(".bar")){
-        pane.innerHTML = `<div class="bar dockbar"></div>`;
+        drawHTML(pane, `<div class="bar dockbar"></div>`);
         pane.dataset.tab = pane.dataset.kind = pane.dataset.arg = pane.dataset.popped = pane.dataset.own = "";
       }
       paintBar(pane, null, 1);
@@ -381,7 +379,7 @@ let stackClock = 0;
 function paneStack(pane){
   let st = pane.querySelector(".stack");
   if (!st){
-    pane.innerHTML = `<div class="bar"></div><div class="stack"></div>`;
+    drawHTML(pane, `<div class="bar"></div><div class="stack"></div>`);
     st = pane.querySelector(".stack");
   }
   return st;
@@ -392,7 +390,7 @@ function showInStack(st, key, html){
   const fresh = !el;
   if (fresh){
     st.insertAdjacentHTML("beforeend", html());
-    el = st.lastElementChild;
+    el = drawn(st.lastElementChild);
     el.dataset.key = key;
   }
   el.dataset.seen = String(++stackClock);

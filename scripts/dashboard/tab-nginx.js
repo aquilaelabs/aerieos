@@ -22,7 +22,6 @@
 
 let nginxList = null;             // last answer, or null before the first
 let nginxErr = "";
-let nginxRev = 0;
 let nginxNode = "";               // the node the tab shows
 let nginxWant = "";               // a node asked for that the last read did not list yet
 let nginxLatest = {};             // the registry's newest line, from the same answer
@@ -42,29 +41,21 @@ function openNginxTab(node){
   openTab({kind: "nginx", arg: "__nginx", label: "nginx"});
 }
 
-// Which read is the newest asked: a read started before a Save and slowed by
+// One read at a time (reading): a read started before a Save and slowed by
 // a node's daemon landed after the Save's own and put the old port and the
-// plain "deployed" back for seconds (B99, B65). A read older than the last
-// one drawn is dropped.
-let nginxAsked = 0, nginxDrawn = 0;
-async function loadNginx(){
-  const asked = ++nginxAsked;
-  try{
-    const j = await (await bootFetch("/api/nginx")).json();
-    if (asked < nginxDrawn) return;
-    nginxDrawn = asked;
+// plain "deployed" back for seconds (B99, B65).
+function loadNginx(){
+  return reading("nginx", async () => {
+    const j = await getJSON("/api/nginx");
     nginxErr = j.error || "";
-    nginxList = j.nodes || [];
-    nginxLatest = j.latest || {};
-    nginxHostnames = j.hostnames || [];
-    if (nginxWant && nginxList.some(n => n.node === nginxWant)){ nginxNode = nginxWant; nginxWant = ""; }
-  }catch(e){
-    if (asked < nginxDrawn) return;
-    nginxErr = String(e);
-    nginxList = nginxList || [];
-  }
-  nginxRev++;
-  if (tabs.some(t => t.kind === "nginx")){ nginxKeepTyping(); drawPanes(); }
+    if (!j.error){
+      nginxList = j.nodes || [];
+      nginxLatest = j.latest || {};
+      nginxHostnames = j.hostnames || [];
+      if (nginxWant && nginxList.some(n => n.node === nginxWant)){ nginxNode = nginxWant; nginxWant = ""; }
+    } else nginxList = nginxList || [];
+    if (tabs.some(t => t.kind === "nginx")) nginxKeepTyping();
+  });
 }
 
 // What is being typed survives a re-read (B729): the rows are read into the
@@ -80,7 +71,7 @@ function nginxKeepTyping(){
 }
 
 async function nginxAct(body){
-  const j = await (await postJSON("/api/nginx", body)).json().catch(() => ({error: "no answer"}));
+  const j = await postJSON("/api/nginx", body);
   if (j.error) notify(j.error, true);
   else if (j.note) notify(j.note, true);
   else if (j.job) notify(`${body.action === "deploy" ? "deploying" : body.action === "update" ? `updating nginx to ${j.to}` : "rebuilding nginx"}${
@@ -100,7 +91,7 @@ async function nginxAct(body){
   if (n){
     n.routes = Array.isArray(j.routes) ? j.routes : (body.routes || []).map(r => ({...r}));
     if (j.job) n.state = {...(n.state || {}), job: {...(n.state?.job || {}), id: j.job, running: true}};
-    nginxRev++;
+    readMoved("nginx");
     loadNginx();
     return j;
   }
@@ -233,7 +224,7 @@ function nginxRoutesTable(n){
 
 // A repaint of the tab: its live key is the revision, so a draft's change
 // moves it (drawPanes repaints a tab only when its key has).
-function nginxRedraw(){ nginxRev++; drawPanes(); }
+function nginxRedraw(){ readMoved("nginx"); drawPanes(); }
 
 // Routes are filled from the node when they are not drafted (null), so
 // Routes' Save and Revert can let go of the routes and keep a pair half
@@ -431,13 +422,13 @@ function renderNginxInto(i){
     // Its template (R218 step 16): the bar and the state row's words are
     // the page's own; the node and its routes are on their way.
     d.setBar(nginxBar(null));
-    d.list.innerHTML = skTpl(`${pageHead({cls: "toolstate", facts: [["Container", GHOST], ["Routes", GHOST]]})}${
-      ["image", "hostnames", "routes", "certs"].map(k => ngSect(k, "", `<div class="field">${skRows(2)}</div>`)).join("")}`);
+    drawHTML(d.list, skTpl(`${pageHead({cls: "toolstate", facts: [["Container", GHOST], ["Routes", GHOST]]})}${
+      ["image", "hostnames", "routes", "certs"].map(k => ngSect(k, "", `<div class="field">${skRows(2)}</div>`)).join("")}`));
     loadNginx();
     return;
   }
   if (nginxErr){
-    d.list.innerHTML = `<div class="hint bad">${esc(nginxErr)}</div>`;
+    drawHTML(d.list, `<div class="hint bad">${esc(nginxErr)}</div>`);
     return;
   }
   const n = nginxPick();

@@ -233,7 +233,7 @@ function dockDragStart(ev, id){
 }
 
 // Once a tab is lifted the line must not scroll under the finger: the move
-// itself is refused (wired at load in index.html).
+// itself is refused (wired at load by page-boot.js).
 function dockNoScroll(e){ if (ddrag?.armed) e.preventDefault(); }
 
 function dockHeld(on){

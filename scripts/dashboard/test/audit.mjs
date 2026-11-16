@@ -33,7 +33,7 @@ const me = await page.evaluate(async () => (await (await fetch('/api/profile')).
 const rows = (me.signins || []);
 const mine = rows.find(r => r.agent === 'Chrome on Windows');
 ok(rows.length >= 1 && !!mine, `Profile lists the browser signed in, by name (${rows.map(r => r.agent).join(', ') || 'none'})`);
-const ended = await page.evaluate(async id => (await (await postJSON('/api/profile', { action: 'signin-out', id })).json()), mine ? mine.id : 'x');
+const ended = await page.evaluate(async id => (await postJSON('/api/profile', { action: 'signin-out', id })), mine ? mine.id : 'x');
 ok(ended.ok === true && ended.this === false, 'Sign out on another browser\'s row answers that it is not this one');
 ok(await status(c1, CHROME) === 401, '...and that browser\'s cookie is nobody\'s from its next request');
 

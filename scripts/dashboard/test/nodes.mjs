@@ -315,12 +315,12 @@ await section("phase 2: the Nodes tab", async () => {
   const bare = await page.evaluate(async () => {
     const was = nodesList;
     nodesList = was.filter(n => n.kind === 'local');
-    nodesRev++; drawPanes();
+    readMoved('nodes'); drawPanes();
     const out = { none: !!document.querySelector('.nodestab .ndnone'),
                   rows: document.querySelectorAll('.nodestab .ndrow').length,
                   picker: !!document.querySelector('.pane .bar #ndPick'),
                   enroll: !!document.querySelector('.pane .bar #ndEnroll') };
-    nodesList = was; nodesRev++; drawPanes();
+    nodesList = was; readMoved('nodes'); drawPanes();
     return out;
   });
   ok(bare.none && bare.rows === 0 && !bare.picker && bare.enroll,
@@ -518,7 +518,7 @@ await section("phase 2: the docker manager's picker", async () => {
   }, null, { timeout: 15000 });
   await page.waitForFunction(() => dockerList && dockerList.blind === true,
                              null, { timeout: 30000 });
-  await page.evaluate(() => { dockerRev++; drawPanes(); });
+  await page.evaluate(() => { readMoved('docker'); drawPanes(); });
   // Waited for and read in one go: the tab repaints from the poll, and this
   // read used to land between two draws about one run in several.
   const emptyWhy = await page.waitForFunction(() => {
@@ -899,11 +899,11 @@ await section("the configuration plane on the row", async () => {
     const keep = { f: n.runner_failed, s: n.services };
     n.runner_failed = { id: 'j_x', slot: 'github.com-example-org', ended: 1789350000, why: "Libicu's dependencies is missing for Dotnet Core 6.0" };
     n.services = { ...(n.services || {}), runners: { 'github.com-example-org': { want: true, labels: [], url: 'https://github.com/example-org' } } };
-    nodesRev++; drawPanes();
+    readMoved('nodes'); drawPanes();
     const r = document.querySelector(sel + ' .ndrun[data-slot="github.com-example-org"]');
     const note = r?.querySelector('.ndrunnote.bad');
     const out = { text: `${r?.querySelector('.ndrunstate')?.textContent || ''} | ${note?.textContent || ''}`, bad: !!note };
-    n.runner_failed = keep.f; n.services = keep.s; nodesRev++; drawPanes();
+    n.runner_failed = keep.f; n.services = keep.s; readMoved('nodes'); drawPanes();
     return out;
   }, { id: minted.id, sel: RROW });
   ok(/^install failed \| install failed (?!: )\S/.test(failedVerdict.text) && /Libicu/.test(failedVerdict.text) && failedVerdict.bad,
@@ -913,10 +913,10 @@ await section("the configuration plane on the row", async () => {
     const keep = { a: n.applying, s: n.services };
     n.applying = { id: 'j_y', what: 'runner', slot: 'github.com-example-org' };
     n.services = { ...(n.services || {}), runners: { 'github.com-example-org': { want: false, labels: [], url: 'https://github.com/example-org' } } };
-    nodesRev++; drawPanes();
+    readMoved('nodes'); drawPanes();
     const e = document.querySelector(sel + ' .ndrun[data-slot="github.com-example-org"] .ndrunstate');
     const out = e?.textContent || '';
-    n.applying = keep.a; n.services = keep.s; nodesRev++; drawPanes();
+    n.applying = keep.a; n.services = keep.s; readMoved('nodes'); drawPanes();
     return out;
   }, { id: minted.id, sel: RROW });
   ok(/removing now/.test(removingVerdict), `...and a remove in flight says removing now (${removingVerdict.slice(0, 60)})`);
@@ -2566,7 +2566,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
   // Its link goes to THIS node, whichever the tab was on, with Update agent
   // brought into view (the operator, 4 Oct).
   const other = await page.evaluate(id => nodesList.find(n => n.id !== id && n.kind === 'agent' && n.state !== 'retired')?.id, minted.id);
-  if (other) await page.evaluate(o => { nodesPick = o; nodesRev++; drawPanes(); }, other);
+  if (other) await page.evaluate(o => { nodesPick = o; readMoved('nodes'); drawPanes(); }, other);
   await page.click(`#bellPanel [data-bnode="${minted.id}"]`);
   await page.waitForFunction(id => nodesPick === id && document.getElementById('bellPanel').hidden
     && document.querySelector('.nodestab [data-nd="update-agent"]'), minted.id, { timeout: 10000 });
@@ -3472,7 +3472,7 @@ await section("Uninstall from the row", async () => {
     // section below is drawn from.
     await page.evaluate(() => loadNodes());
     await page.waitForFunction(id => !(nodesList || []).find(n => n.id === id)?.jobs?.some(j => j.apply === 'gpu'), shed.id, { timeout: 15000 });
-    await page.evaluate(id => { const c = nodesConf[id]; if (c?.draft){ c.draft.gpuEmu = undefined; } nodesRev++; drawPanes(); }, shed.id);
+    await page.evaluate(id => { const c = nodesConf[id]; if (c?.draft){ c.draft.gpuEmu = undefined; } readMoved('nodes'); drawPanes(); }, shed.id);
     // What the card is for (R102): a GPU section with two switches and one
     // Apply. Neither writes on the click; Apply sends each only where its
     // tick differs from what the node has.

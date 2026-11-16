@@ -33,7 +33,33 @@ function setHidden(el, off){ if (el && el.hidden !== !!off) el.hidden = !!off; }
 function setDisabled(el, off){ if (el && el.disabled !== !!off) el.disabled = !!off; }
 // A title is taken off by untitle() and kept for a screen reader as the
 // element's description or name, so it is compared against what was kept.
-function setTitle(el, s){ if (el && saidOf(el) !== String(s)) el.title = String(s); }
+function setTitle(el, s){ if (el && saidOf(el) !== String(s)){ el.title = String(s); untitle(el); } }
+
+// ---- what a draw brings (R9 step 6) ------------------------------------------
+// What an element a draw writes needs once it is there, done by the draw
+// itself and at once rather than by observers watching the whole document
+// after it: its data-style applied through the CSSOM (the page's content
+// policy draws no style attribute), a proseline wired and fitted, a field
+// kept from password managers, a title turned into words for a screen
+// reader, and a row of chips put back where it was scrolled. At once, so
+// whatever measures the page right after a draw (arriveBox) measures what
+// it will show.
+function drawn(root){
+  if (!root || root.nodeType !== 1) return root;
+  const all = sel => root.matches(sel) ? [root, ...root.querySelectorAll(sel)] : root.querySelectorAll(sel);
+  for (const el of all("[data-style]")) el.style.cssText = el.getAttribute("data-style");
+  proselines(root);
+  quietFields(root);
+  untitleIn(root);
+  chipsBack(root);
+  return root;
+}
+// A part drawn whole from its markup: what a draw that is not a patch does.
+function drawHTML(el, html){
+  if (!el) return;
+  el.innerHTML = html;
+  drawn(el);
+}
 // The FIRST real content fades in: nothing drawn here yet, or what was here
 // a placeholder saying it had not arrived. First only, deliberately: fading
 // on every change would flicker a list every time a poll moved one word in
@@ -82,8 +108,10 @@ function patch(el, html, quiet = false){
   if (was !== undefined) patchInto(el, html);
   else {
     el.innerHTML = html;
-    // What the markup gave each element, for the first patch after it.
+    // What the markup gave each element, for the first patch after it, and
+    // then what a draw brings (drawn), which is the page's, not the markup's.
     for (const c of el.children) patchRecord(c);
+    drawn(el);
   }
   painted.set(el, {html, first: paintedFirst(el), n: paintedKids(el)});
   // ...but never fading while the card around it is folding. contentIn
@@ -201,8 +229,10 @@ function patchNode(a, b){
       a.setAttribute(name, now[name]);
       // A style is written as data-style (the page's content policy draws
       // no style attribute) and applied through the CSSOM as an element
-      // lands (index.html); one that stays and changes is applied here.
+      // lands (drawn); one that stays and changes is applied here, and a
+      // title that changes is turned into words again.
       if (name === "data-style") a.style.cssText = now[name];
+      else if (name === "title") untitle(a);
     }
   }
   if ("data-style" in was && !("data-style" in now)) a.style.cssText = "";
@@ -216,7 +246,7 @@ function patchNode(a, b){
   }
   a.__markup = now;
   if (a.tagName === "BUTTON"){
-    if (a.innerHTML !== b.innerHTML){ a.innerHTML = b.innerHTML; for (const c of a.children) patchRecord(c); }
+    if (a.innerHTML !== b.innerHTML){ a.innerHTML = b.innerHTML; for (const c of a.children) patchRecord(c); drawn(a); }
     a.__markupHtml = b.innerHTML;
   } else if (a.tagName === "TEXTAREA"){
     // Its text is its default value: a person's typing is its value, which
@@ -272,6 +302,7 @@ function patchKids(from, to){
     } else {
       patchRecord(want);
       from.insertBefore(want, cur);
+      drawn(want);
     }
   }
   while (cur){ const next = cur.nextSibling; if (!patchOwn(cur)) from.removeChild(cur); cur = next; }

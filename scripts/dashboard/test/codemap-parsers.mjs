@@ -137,7 +137,9 @@ if (!babel) {
   ok(Object.keys(bad).length === 0 && files > 50,
      `the map agrees with babel on every definition, end, call and caller in this tree's ${files} scripts${
        Object.keys(bad).length ? ': ' + Object.entries(bad).slice(0, 3).map(([f, b]) => `${f} ${show(b)}`).join(' | ') : ''}`);
-  // The page's inline scripts, at their own lines.
+  // The page's inline scripts, at their own lines: the head's, which reads
+  // the theme before the first paint and begins the page's reads, and the
+  // one line that runs boot() (page-boot.js holds the rest since R9 step 5).
   const page = 'scripts/dashboard/index.html';
   const html = readFileSync(join(REPO, page), 'utf8');
   const only = html.replace(/[^\n]/g, ' ').split('');
@@ -147,7 +149,7 @@ if (!babel) {
   }
   const tp = truth(only.join(''), 'page.js');
   const bp = tp ? compare(idx.files[page], tp) : [{ babel: 'could not parse' }];
-  ok(bp.length === 0 && tp.defs.length > 20,
+  ok(bp.length === 0 && tp.defs.length > 0,
      `...and on index.html's inline scripts (${tp ? tp.defs.length : 0} definitions)${bp.length ? ': ' + show(bp) : ''}`);
 }
 

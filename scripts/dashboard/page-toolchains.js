@@ -17,7 +17,7 @@
 
 "use strict";
 
-let toolchains = null, tcRev = 0;
+let toolchains = null;
 
 // The sizes are measured by a worker on the server, so the first draw after
 // an install (or after a restart) carries the catalog's estimates and the
@@ -25,39 +25,30 @@ let toolchains = null, tcRev = 0;
 // not a poll: the flag clears when the measurement finishes, and nothing else
 // on this tab changes on its own.
 let tcSizeTimer = null;
-async function loadToolchains(){
-  const asked = ++tcLoadSeq;
-  if (nodesList === null || nodesStale) await loadNodes();
-  if (asked !== tcLoadSeq) return;           // a later load asks instead
-  if (!tcPick()){
-    toolchains = {nonode: true};
-    clearTimeout(tcSizeTimer); tcSizeTimer = null;
-    tcRev++; drawPanes();
-    return;
-  }
-  // A reply is kept when it is still about the node on show and nothing
-  // asked after it has landed first. Dropping every reply a later ask had
-  // overtaken was a livelock on a loaded box: the revision watch, the
-  // sizing timer and the settling poll each ask again, and when they asked
-  // faster than one read came back, every reply was overtaken, the page sat
-  // on its template, and Forward to a node never said what it held (B154).
-  const node = tcNode;
-  const keep = () => tcNode === node && asked > tcLanded;
-  try{
-    const r = await fetch("/api/toolchains" + (node !== "local" ? `?node=${encodeURIComponent(node)}` : ""));
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    const got = await r.json();
-    if (!keep()) return;
+function loadToolchains(){
+  return reading("toolchains", async () => {
+    if (nodesList === null || nodesStale) await loadNodes();
+    if (!tcPick()){
+      toolchains = {nonode: true};
+      clearTimeout(tcSizeTimer); tcSizeTimer = null;
+      return;
+    }
+    // A reply is kept while it is still about the node on show; reading()
+    // lands every other one in the order asked, since dropping each reply
+    // a later ask had overtaken was a livelock on a loaded box: the revision
+    // watch, the sizing timer and the settling poll each ask again, and when
+    // they asked faster than one read came back, the page sat on its
+    // template, and Forward to a node never said what it held (B154).
+    const node = tcNode;
+    const got = await getJSON("/api/toolchains" + (node !== "local" ? `?node=${encodeURIComponent(node)}` : ""));
+    if (tcNode !== node) return;
     toolchains = got;
-  }catch(e){ if (!keep()) return; toolchains = {error: String(e)}; }
-  tcLanded = asked;
-  clearTimeout(tcSizeTimer); tcSizeTimer = null;
-  // ...and while Claude Code's own job runs (R145), which is not a toolchain
-  // job and so moves nothing the tab waits on otherwise.
-  if (toolchains && toolchains.sizing) tcSizeTimer = setTimeout(loadToolchains, 1500);
-  else if ((toolchains?.machine || []).some(m => m.running)) tcSizeTimer = setTimeout(loadToolchains, 3000);
-  tcRev++;
-  drawPanes();
+    clearTimeout(tcSizeTimer); tcSizeTimer = null;
+    // ...and while Claude Code's own job runs (R145), which is not a toolchain
+    // job and so moves nothing the tab waits on otherwise.
+    if (toolchains && toolchains.sizing) tcSizeTimer = setTimeout(loadToolchains, 1500);
+    else if ((toolchains?.machine || []).some(m => m.running)) tcSizeTimer = setTimeout(loadToolchains, 3000);
+  });
 }
 
 // The animated ellipsis. One counter for the tab, ticked on its own timer and
@@ -75,8 +66,6 @@ let tcDots = 0, tcDotsTimer = null;
 // "local" is still what that installer is called (`aerie toolchains install`
 // from a shell and the suite address it) but no page sets it.
 let tcNode = "";
-let tcLoadSeq = 0;         // each load's number, in the order asked
-let tcLanded = 0;          // the newest load drawn: an older reply landing after it is dropped
 
 // The node the store is read for: the one a page showed last (remembered
 // in this browser), else the first live agent node, else nothing. Re-asked
@@ -203,10 +192,11 @@ const TP_BLANK = () => ({url: "", seen: null, error: "", busy: "", from: "repo",
 // The vetted catalog (R169 step 4): its index as /api/catalog answers it,
 // read when the page opens and on Refresh, never polled.
 let tpCatalog = null;
-async function loadCatalog(fresh){
-  try{ tpCatalog = await (await fetch("/api/catalog" + (fresh ? "?fresh=1" : ""))).json(); }
-  catch(e){ tpCatalog = {error: "the catalog: " + failWords(e)}; }
-  tcRev++; drawPanes();
+function loadCatalog(fresh){
+  return reading("catalog", async () => {
+    tpCatalog = await getJSON("/api/catalog" + (fresh ? "?fresh=1" : ""));
+    if (tpCatalog.error) tpCatalog = {error: "the catalog: " + tpCatalog.error};
+  });
 }
 
 // What a pack would install and give a session, from the manifest a look
@@ -282,7 +272,7 @@ function tpAppSeen(seen){
 async function tpAppLook(){
   const f = tpForm;
   f.busy = "look"; f.error = ""; tpDraw();
-  const j = await (await postJSON("/api/nasapps", {action: "preview", compose: f.app.compose})).json().catch(() => ({error: "no answer"}));
+  const j = await postJSON("/api/nasapps", {action: "preview", compose: f.app.compose});
   if (tpEdit === null) return;
   f.busy = ""; f.seen = j.error ? null : j; f.error = j.error || ""; tpDraw();
 }
@@ -290,7 +280,7 @@ async function tpAppLook(){
 async function tpOpenApp(id){
   tpEdit = ""; tpForm = TP_BLANK(); tpForm.what = "app"; tpForm.app.editing = id; tpForm.app.id = id;
   tpDraw(true);
-  const j = await (await postJSON("/api/nasapps", {action: "source", app: id})).json().catch(() => ({error: "no answer"}));
+  const j = await postJSON("/api/nasapps", {action: "source", app: id});
   if (tpEdit === null || tpForm.app.editing !== id) return;
   if (j.error) tpForm.error = j.error;
   else Object.assign(tpForm.app, {name: j.name, what: j.what, port: j.port, compose: j.compose});
@@ -407,7 +397,7 @@ function tpPinOf(name, pack){
 // A pack made here opens on its bbtool.json as kept, to change in place.
 async function tpSource(){
   const name = tpEdit;
-  const j = await (await postJSON("/api/toolpacks", {action: "source", name})).json().catch(() => ({error: "no answer"}));
+  const j = await postJSON("/api/toolpacks", {action: "source", name});
   if (tpEdit !== name) return;
   if (j.error) tpForm.error = j.error; else tpForm.text = j.text;
   tpDraw();
@@ -428,15 +418,14 @@ async function tpLook(){
   else if (f.file){
     // The archive goes up on its own first, as New project's does, and the
     // look quotes the id the spool hands back.
-    const u = await fetch("/api/upload-archive?name=" + encodeURIComponent(f.file.name), {method: "POST", body: f.file});
-    const uj = await u.json().catch(() => ({}));
-    if (!u.ok || uj.error){
+    const uj = await postFile("/api/upload-archive?name=" + encodeURIComponent(f.file.name), f.file);
+    if (uj.error){
       if (tpEdit !== name) return;
-      f.busy = ""; f.error = uj.error || `the upload failed (HTTP ${u.status})`; tpDraw(); return;
+      f.busy = ""; f.error = `the upload failed: ${uj.error}`; tpDraw(); return;
     }
     body = {action: "preview", archive: uj.id};
   } else body = {action: "preview", text: f.text};
-  const j = await (await postJSON("/api/toolpacks", body)).json().catch(() => ({error: "no answer"}));
+  const j = await postJSON("/api/toolpacks", body);
   if (tpEdit !== name) return;                 // closed, or another opened, meanwhile
   f.busy = ""; f.seen = j.error ? null : j; f.error = j.error || ""; tpDraw();
 }
@@ -461,7 +450,7 @@ function tpDraw(first){
     document.body.appendChild(m);
     armModal(m);
   }
-  m.innerHTML = tpModalHtml();
+  drawHTML(m, tpModalHtml());
   m.hidden = false;
   if (first){
     tpHeld = 0;
@@ -470,11 +459,11 @@ function tpDraw(first){
       let h = 0;
       for (const k of [...m.querySelectorAll("[data-tpfrom]")].map(x => x.dataset.tpfrom)){
         tpForm.from = k;
-        m.innerHTML = tpModalHtml();
+        drawHTML(m, tpModalHtml());
         h = Math.max(h, m.querySelector(".box").getBoundingClientRect().height);
       }
       tpForm.from = was;
-      m.innerHTML = tpModalHtml();
+      drawHTML(m, tpModalHtml());
       tpHeld = Math.ceil(h);
     }
   }
@@ -503,7 +492,7 @@ function tpDraw(first){
   if (rmApp) rmApp.onclick = async () => {
     const id = rmApp.dataset.tprmapp;
     if (!await askYes(`Remove the app ${tpForm.app.name || id}? It leaves the catalog; a container made from it keeps its own compose file.`)) return;
-    const j = await (await postJSON("/api/nasapps", {action: "remove", app: id})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/nasapps", {action: "remove", app: id});
     if (j.error){ tpForm.error = j.error; tpDraw(); return; }
     notify(`${tpForm.app.name || id} removed from the catalog`);
     tpClose(); if (typeof loadLibrary === "function") loadLibrary();
@@ -524,7 +513,7 @@ function tpDraw(first){
   m.querySelector("[data-tpfile]")?.addEventListener("click", () => file?.click());
   if (file) file.onchange = () => { tpForm.file = file.files[0] || null; tpForm.seen = null; tpForm.error = ""; tpDraw(); };
   m.querySelector("[data-tpcancel]").onclick = tpClose;
-  const post = async body => (await postJSON("/api/toolpacks", body)).json().catch(() => ({error: "no answer"}));
+  const post = body => postJSON("/api/toolpacks", body);
   const packUrl = () => tpEdit ? (toolchains?.items || []).find(i => i.name === tpEdit)?.pack?.url || "" : tpForm.url.trim();
   const look = m.querySelector("[data-tplook]");
   if (look) look.onclick = tpForm.what === "app" && !tpEdit ? tpAppLook : tpLook;
@@ -533,7 +522,7 @@ function tpDraw(first){
     tpForm.busy = "add"; tpDraw();
     if (tpForm.what === "app" && !tpEdit){
       const a = tpForm.app;
-      const j = await (await postJSON("/api/nasapps", {action: "add", app: a.id, name: a.name, what: a.what, port: a.port, compose: a.compose, replace: !!a.editing})).json().catch(() => ({error: "no answer"}));
+      const j = await postJSON("/api/nasapps", {action: "add", app: a.id, name: a.name, what: a.what, port: a.port, compose: a.compose, replace: !!a.editing});
       if (j.error){ tpForm.busy = ""; tpForm.error = j.error; tpDraw(); return; }
       notify(a.editing ? `${a.name} saved` : `${a.name} added: Install on its card opens New container with it picked`);
       tpClose(); if (typeof loadLibrary === "function") loadLibrary();
@@ -643,16 +632,14 @@ async function tcAct(action, only){
     return;
   try{
     const body = {action, names, node: tcNode, ...(drv && tcDriverPick ? {driver: tcDriverPick} : {})};
-    let r = await postJSON("/api/toolchains", body);
-    let j = await r.json().catch(() => ({}));
+    let j = await postJSON("/api/toolchains", body);
     // An agreement a toolchain installs under (Google's Android SDK terms,
     // NVIDIA's CUDA license) is the person's to accept, named, before
     // anything is fetched: the server says which, and keeps who accepted.
-    if (r.status === 409 && Array.isArray(j.accept) && j.accept.length){
+    if (Array.isArray(j.accept) && j.accept.length){
       if (!await askYes(`Installing ${names.join(", ")} accepts ${j.accept.map(t => t.label).join(" and ")}.\n\n${
             j.accept.map(t => `${t.label}: ${t.url}`).join("\n")}\n\nAccept and install?`)) return;
-      r = await postJSON("/api/toolchains", {...body, accept: j.accept.map(t => t.label)});
-      j = await r.json().catch(() => ({}));
+      j = await postJSON("/api/toolchains", {...body, accept: j.accept.map(t => t.label)});
     }
     // A toolchain that needs another used to be installed without it and fail
     // inside it: android-tools with no jdk, from sdkmanager, naming
@@ -660,7 +647,7 @@ async function tcAct(action, only){
     // extra name appearing in the queue unexplained.
     if (j?.added?.length)
       notify(`also installing ${j.added.join(", ")}: needed by what you picked`);
-    if (!r.ok) return notify(j.error || `could not start (HTTP ${r.status})`, true);
+    if (j.error) return notify(j.error, true);
     // The job's own toast where there is one (R218 step 6): it follows the
     // job to its end, which is kept on the record.
     const on = tcNode !== "local" ? " on " + ((nodesList || []).find(n => n.id === tcNode)?.name || "the node") : "";

@@ -155,7 +155,7 @@ await section("The deployed page in sections", async () => {
   // page again under it (B158): the focus went with the old box, and a
   // paste landing in that moment went nowhere, leaving Add asleep.
   await page.focus(`${sect} #ngKey`);
-  await page.evaluate(() => { nginxRev++; drawPanes(); });
+  await page.evaluate(() => { readMoved('nginx'); drawPanes(); });
   await page.keyboard.press('End');
   await page.keyboard.type('x');
   const caret = await page.evaluate(id => ({ at: document.activeElement?.id, key: nginxDraft[id]?.key }), sandbox.node);
@@ -178,7 +178,7 @@ await section("The deployed page in sections", async () => {
 await page.click(`${sect} [data-nghostnew]`);
 await page.keyboard.type('api.exam');
 await page.evaluate(() => loadNginx());
-await page.evaluate(() => { nginxRev++; drawPanes(); });
+await page.evaluate(() => { readMoved('nginx'); drawPanes(); });
 await section("a hostname being typed is still in its box after the page is read and drawn again, and typ", async () => {
   const half = await page.$eval(`${sect} [data-nghostnew]`, b => b.value);
   await page.evaluate(() => loadNginx());

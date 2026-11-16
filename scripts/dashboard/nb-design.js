@@ -48,21 +48,23 @@ function nbDesignView({$, nb, project, root}){
   // the project and does not write it (B101).
   const dsRo = () => root.classList.contains("ro") || !!projWriteWhy(project);
 
-  async function loadDesign(){
-    try{
-      const j = await (await fetch(`/api/design?project=${encodeURIComponent(project)}`)).json();
-      if (j.error){ viewGlance($("dsHint"), [], esc("design: " + j.error), "", "bad"); return; }
-      nb.dsData = j;
-    }catch(e){ viewGlance($("dsHint"), [], esc("design: " + e), "", "bad"); return; }
-    // A re-read never takes what is being edited: the working copies stay
-    // until Save or Revert, and only the file's state and the vocabulary
-    // come in fresh.
-    if (!nb.dsDirty || !nb.dsLang){
-      nb.dsLang = clone(nb.dsData.language);
-      nb.dsPages = clone(nb.dsData.pages);
-      nb.dsDirty = false;
-    }
-    drawDesign();
+  function loadDesign(){
+    return reading(`${project}:design`, async () => {
+      try{
+        const j = await getJSON(`/api/design?project=${encodeURIComponent(project)}`);
+        if (j.error){ viewGlance($("dsHint"), [], esc("design: " + j.error), "", "bad"); return; }
+        nb.dsData = j;
+      }catch(e){ viewGlance($("dsHint"), [], esc("design: " + e), "", "bad"); return; }
+      // A re-read never takes what is being edited: the working copies stay
+      // until Save or Revert, and only the file's state and the vocabulary
+      // come in fresh.
+      if (!nb.dsDirty || !nb.dsLang){
+        nb.dsLang = clone(nb.dsData.language);
+        nb.dsPages = clone(nb.dsData.pages);
+        nb.dsDirty = false;
+      }
+      drawDesign();
+    });
   }
 
   // ---- the glance and the add bar ---------------------------------------------
@@ -81,15 +83,15 @@ function nbDesignView({$, nb, project, root}){
     const w = $("dsWrite");
     w.disabled = !!nb.dsDirty;
     w.hidden = dsRo();
-    w.title = nb.dsDirty ? "Save first: the file is written from what is saved"
-      : "write docs/design-language.md into the space from what is saved here; a session commits it with the work";
+    setTitle(w, nb.dsDirty ? "Save first: the file is written from what is saved"
+      : "write docs/design-language.md into the space from what is saved here; a session commits it with the work");
   }
 
   function drawAdd(){
     const P = presets();
     const plat = $("dsPlatform"), tpl = $("dsTemplate");
     const was = plat.value;
-    plat.innerHTML = (P.platforms || []).map(p => `<option value="${esc(p.key)}">${esc(p.label)}</option>`).join("");
+    drawHTML(plat, (P.platforms || []).map(p => `<option value="${esc(p.key)}">${esc(p.label)}</option>`).join(""));
     if (was && byKey(P.platforms, was)) plat.value = was;
     fillTemplates();
   }
@@ -100,7 +102,7 @@ function nbDesignView({$, nb, project, root}){
     const frames = byKey(P.platforms, $("dsPlatform").value)?.frames || [];
     const tpl = $("dsTemplate"), was = tpl.value;
     const rows = (P.templates || []).filter(t => frames.includes(t.frame));
-    tpl.innerHTML = rows.map(t => `<option value="${esc(t.key)}">${esc(t.label)}</option>`).join("");
+    drawHTML(tpl, rows.map(t => `<option value="${esc(t.key)}">${esc(t.label)}</option>`).join(""));
     if (was && rows.some(t => t.key === was)) tpl.value = was;
   }
   // The add bar is drawn at the top of the Pages section on every draw
@@ -130,7 +132,7 @@ function nbDesignView({$, nb, project, root}){
     const b = $("dsWrite");
     busy(b, "Writing");
     try{
-      const j = await (await postJSON("/api/design", {project, action: "write"})).json();
+      const j = await postJSON("/api/design", {project, action: "write"});
       if (j.error) notify(j.error, true);
       else{
         if (nb.dsData) nb.dsData.file = j.file;
@@ -164,7 +166,7 @@ function nbDesignView({$, nb, project, root}){
 
   function drawDesign(){
     const body = $("dsBody");
-    if (!nb.dsData){ body.innerHTML = skel("design"); return; }
+    if (!nb.dsData){ drawHTML(body, skel("design")); return; }
     const sh = shown();
     nb.dsRuleLists = {};
     // Patched (R244): an edit draws the view again, and the control it was
@@ -584,7 +586,7 @@ function nbDesignView({$, nb, project, root}){
     const row = root.querySelector(`[data-dspage="${keyOf(p)}"] .dsboardrow`);
     if (row){
       row.outerHTML = boardHtml(p);
-      const el = root.querySelector(`[data-dspage="${keyOf(p)}"]`);
+      const el = drawn(root.querySelector(`[data-dspage="${keyOf(p)}"]`));
       wireBoard(el.querySelector(".dsboard"), p);
       wireLayers(el, p);
     }
@@ -989,8 +991,8 @@ function nbDesignView({$, nb, project, root}){
     const keepLang = part === "pages" && langDirty(), keepPages = part === "themes" && pagesDirty();
     let j;
     try{
-      j = await (await postJSON("/api/design", {project, action: "save", language: lang,
-                                                  pages: pages.map(p => ({...p, id: p.id > 0 ? p.id : undefined}))})).json();
+      j = await postJSON("/api/design", {project, action: "save", language: lang,
+                                                  pages: pages.map(p => ({...p, id: p.id > 0 ? p.id : undefined}))});
     }catch(e){ notify("design: " + failWords(e), true); return null; }
     if (j.error){ notify("design: " + j.error, true); return null; }
     // The saved pages come back with their ids, and a board keyed by a

@@ -26,7 +26,7 @@ function openReport(project, repos = []){
   // From a project's row, or the header's about no project in particular.
   $("reportTitle").textContent = project ? `Report a bug, from ${projectName(project)}` : "Report a bug";
   const pick = $("reportRepo");
-  pick.innerHTML = repos.map(r => `<option value="${esc(r)}">${esc(projLabel(r))}</option>`).join("");
+  drawHTML(pick, repos.map(r => `<option value="${esc(r)}">${esc(projLabel(r))}</option>`).join(""));
   pick.value = project;
   $("reportRepoField").hidden = repos.length < 2;
   pick.onchange = () => { reportProject = pick.value; reportConvFor(pick.value); };
@@ -35,7 +35,7 @@ function openReport(project, repos = []){
     : "It goes to the diagnostics with the build it was seen on, where whoever maintains AerieOS reads it. A problem in one space is better sent from that space's row.";
   const cat = $("reportCat");
   if (!cat.options.length)
-    cat.innerHTML = REPORT_CATS.map(c => `<option>${esc(c)}</option>`).join("");
+    drawHTML(cat, REPORT_CATS.map(c => `<option>${esc(c)}</option>`).join(""));
   $("reportText").value = "";
   $("reportRepro").value = "";
   $("reportErrWrap").hidden = true;
@@ -52,8 +52,7 @@ function openReport(project, repos = []){
 function reportConvFor(project){
   $("reportConv").checked = false;
   $("reportConvField").hidden = true;
-  if (project) fetch("/api/transcripts?project=" + encodeURIComponent(project))
-    .then(r => r.json()).then(j => {
+  if (project) getJSON("/api/transcripts?project=" + encodeURIComponent(project)).then(j => {
       const c = (j.rows || [])[0];
       if (!c || reportProject !== project) return;
       // Its first words when it has any; a conversation that opened with
@@ -72,11 +71,10 @@ async function sendReport(){
   const btn = $("reportSend");
   busy(btn, "Sending");
   try{
-    const r = await postJSON("/api/reports", {action: "add", project: reportProject, text,
+    const j = await postJSON("/api/reports", {action: "add", project: reportProject, text,
       area: $("reportCat").value, repro: $("reportRepro").value.trim(),
       include_conversation: !!reportProject && $("reportConv").checked});
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || j.error) return fail(j.error || `the controller answered ${r.status}`);
+    if (j.error) return fail(j.error);
     $("reportModal").hidden = true;
     notify(`reported as #${j.id ?? j.report?.id ?? "?"}: it is in the diagnostics`);
   }catch(e){ fail("could not reach the controller: " + e); }

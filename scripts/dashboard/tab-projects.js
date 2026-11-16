@@ -5,13 +5,6 @@
 
 "use strict";
 
-async function postTrash(path, body){
-  try{
-    const r = await postJSON(path, body);
-    return await r.json();
-  }catch(e){ return {error: String(e)}; }
-}
-
 async function openTrash(){
   $("tmodal").hidden = false;
   await drawTrash();
@@ -19,18 +12,18 @@ async function openTrash(){
 
 async function drawTrash(){
   const el = $("tList");
-  el.innerHTML = `${skel("rows", 3)}`;
+  drawHTML(el, `${skel("rows", 3)}`);
   let j;
-  try{ j = await (await fetch("/api/trash")).json(); }
-  catch(e){ el.innerHTML = `<div class="hint bad">${esc(String(e))}</div>`; return; }
+  try{ j = await getJSON("/api/trash"); }
+  catch(e){ drawHTML(el, `<div class="hint bad">${esc(String(e))}</div>`); return; }
   // A refusal is said, never read as an empty bin (B87).
-  if (j?.error){ el.innerHTML = `<div class="hint bad">${esc(j.error)}</div>`; return; }
+  if (j?.error){ drawHTML(el, `<div class="hint bad">${esc(j.error)}</div>`); return; }
   const items = j?.items || [];
   if (!items.length){
-    el.innerHTML = `<div class="empty">nothing deleted</div>`;
+    drawHTML(el, `<div class="empty">nothing deleted</div>`);
     return;
   }
-  el.innerHTML = items.map(t => `<div class="row trow" data-t="${esc(t.name)}">
+  drawHTML(el, items.map(t => `<div class="row trow" data-t="${esc(t.name)}">
       <div class="grow"><div class="name">${esc(t.was || t.name)}</div>
         <div class="sub">deleted ${esc(ago(t.at))}${t.project ? ` from ${esc(t.project)}` : ""}${t.was && t.was !== t.name
           ? ` · directory ${esc(t.name)}` : ""}${t.taken
@@ -42,10 +35,10 @@ async function drawTrash(){
             : "move it back to /workspace, as " + esc(t.was || t.name)}">Put back</button>
         <button type="button" class="ic danger" data-tpurge="${esc(t.name)}" aria-label="delete for good"
           title="delete it and every file in it, for good">${BIN}</button>
-      </span></div>`).join("");
+      </span></div>`).join(""));
   el.querySelectorAll("[data-trestore]").forEach(b => b.onclick = async () => {
     b.disabled = true;
-    let r = await postTrash("/api/trash-restore", {name: b.dataset.trestore});
+    let r = await postJSON("/api/trash-restore", {name: b.dataset.trestore});
     // Its project is gone (R138): which one it goes back into is asked.
     if (r?.pick){
       const to = projectList().filter(c => c.may && !c.archived);
@@ -53,7 +46,7 @@ async function drawTrash(){
                                                                    options: to.map(c => c.name)}) : null;
       const c = got && to.find(x => x.name.toLowerCase() === got.toLowerCase());
       if (!c){ if (!to.length) notify(r.error, true); b.disabled = false; return; }
-      r = await postTrash("/api/trash-restore", {name: b.dataset.trestore, project: c.key});
+      r = await postJSON("/api/trash-restore", {name: b.dataset.trestore, project: c.key});
     }
     if (r?.error) notify(r.error, true);
     else notify(`${r.label || r.name} is back`);
@@ -73,14 +66,14 @@ function askPurge(name){
   // The type-to-confirm shape Reset AerieOS has: what goes, then the
   // word to type labeled over its field, then the drop box's Keep it and
   // the red verb.
-  box.innerHTML = `<div class="hint bad">This deletes every file in
+  drawHTML(box, `<div class="hint bad">This deletes every file in
       <b>${esc(name)}</b>. It is not moved anywhere and there is nothing to
       undo it with.</div>
     <label class="lbl" for="purgeWord">Type ${esc(name)} to confirm</label>
     <input id="purgeWord" autocomplete="off" placeholder="${esc(name)}">
     <div class="foot"><span class="sp"></span>
       <button type="button" class="stop">Keep it</button>
-      <button type="button" class="danger" disabled>Delete for good</button></div>`;
+      <button type="button" class="danger" disabled>Delete for good</button></div>`);
   row.appendChild(box);
   const input = box.querySelector("input"), go = box.querySelector(".danger");
   input.oninput = () => { go.disabled = input.value.trim() !== name; };
@@ -88,7 +81,7 @@ function askPurge(name){
   box.querySelector(".stop").onclick = () => box.remove();
   go.onclick = async () => {
     go.disabled = true;
-    const r = await postTrash("/api/trash-purge", {name, confirm: input.value.trim()});
+    const r = await postJSON("/api/trash-purge", {name, confirm: input.value.trim()});
     if (r?.error){ notify(r.error, true); go.disabled = false; return; }
     notify(`${name} is gone`);
     await drawTrash();
@@ -340,7 +333,7 @@ async function newProjectByName(){
   const got = said?.text?.trim();
   if (!got) return;
   try{
-    const j = await (await postJSON("/api/repos", {action: "create", name: got})).json();
+    const j = await postJSON("/api/repos", {action: "create", name: got});
     if (j.error){ notify(j.error, true); return; }
     pjEditing.delete(j.key);
     notify(`${j.name} made: Add repository on its card makes or clones its first one`);
@@ -379,7 +372,7 @@ async function renameProjectCard(btn){
   const got = await askInline(btn.closest(".pcname"), {label: `Rename ${was} to`, value: was, ok: "Rename"});
   if (got === null || got === was) return;
   try{
-    const j = await (await postJSON("/api/repos", {action: "rename", key, to: got})).json();
+    const j = await postJSON("/api/repos", {action: "rename", key, to: got});
     if (j.error){ notify(j.error, true); return; }
     slideCards(key, () => applyNow((x, k) => { if (k === key && "members" in x) x.name = j.name || got; }));
     notify(`${was} is now ${j.name || got}`);
@@ -395,7 +388,7 @@ async function renameRepository(btn){
   const got = await askInline(btn.closest(".pcback")?.querySelector(".pcname") || btn.closest(".pcrepo"), {label: `Rename ${was} to`, value: was, ok: "Rename"});
   if (got === null || got === was) return;
   try{
-    const j = await (await postJSON("/api/rename", {name, to: got})).json();
+    const j = await postJSON("/api/rename", {name, to: got});
     if (j.error){ notify(j.error, true); return; }
     notify(`${was} is now ${j.label || got}`);
   }catch(e){ notify("renaming failed: " + failWords(e), true); }
@@ -415,13 +408,13 @@ async function moveRepository(btn){
   if (!c){ notify(`${got} is not a space it can move to`, true); return; }
   let plan;
   try{
-    plan = await (await postJSON("/api/repos", {action: "move-check", name, to: c.key})).json();
+    plan = await postJSON("/api/repos", {action: "move-check", name, to: c.key});
   }catch(e){ notify("checking the move failed: " + failWords(e), true); return; }
   if (plan.error){ notify(plan.error, true); return; }
   const picked = await moveConfirm(plan);
   if (picked === null) return;
   try{
-    const j = await (await postJSON("/api/repos", {action: "move", name, to: c.key, add_nodes: picked.nodes, give: picked.give})).json();
+    const j = await postJSON("/api/repos", {action: "move", name, to: c.key, add_nodes: picked.nodes, give: picked.give});
     if (j.error){ notify(j.error, true); return; }
     const nn = id => plan.nodes.find(n => n.id === id)?.name || id;
     notify(`${projLabel(name)} is in ${j.project}${
@@ -458,7 +451,7 @@ function moveConfirm(plan){
     const offer = plan.nodes.filter(n => !n.have), had = plan.nodes.filter(n => n.have);
     const things = plan.things || [];
     const ctrs = things.filter(t => t.kind === "container"), vms_ = things.filter(t => t.kind === "vm");
-    m.innerHTML = `<div class="box"><h3 id="mvTitle">Move ${esc(plan.label)} to ${esc(plan.to)}?</h3>
+    drawHTML(m, `<div class="box"><h3 id="mvTitle">Move ${esc(plan.label)} to ${esc(plan.to)}?</h3>
       <div class="field"><p class="asksaid">It leaves ${esc(plan.from || "no space")}: from now on ${esc(plan.to)}'s node, people and settings apply to it. Its notebook goes with it.</p></div>
       ${plan.nodes.length ? `<div class="field"><div class="lbl">${esc(plan.from)}'s nodes</div>
         ${had.map(n => `<div class="ndcap dim">${esc(n.name)}: ${esc(plan.to)} has it already</div>`).join("")}
@@ -472,7 +465,7 @@ function moveConfirm(plan){
         ${vms_.map(t => `<div class="ndcap" data-mvvm="${esc(t.node)}" data-reach="${t.reach ? 1 : 0}">${esc(t.name)}<span class="dim"> (on ${esc(t.node_name)})</span><span class="sub warn" data-mvvmwhy hidden> ${esc(plan.to)} will not have ${esc(t.node_name)}: its sessions cannot reach it</span></div>`).join("")}</div>` : ""}
       ${plan.lose.length ? `<div class="field"><div class="sub warn">${esc(plan.lose.join(", "))} ${plan.lose.length === 1 ? "reaches" : "reach"} it through ${esc(plan.from)} alone and ${plan.lose.length === 1 ? "loses" : "lose"} it: a role on ${esc(plan.to)} keeps it.</div></div>` : ""}
       ${busy ? `<div class="field"><div class="sub warn">${esc(plan.busy.join(", "))} running on ${esc(plan.from)} or ${esc(plan.to)}: end ${plan.busy.length === 1 ? "it" : "them"} first, then move it.</div></div>` : ""}
-      ${dlgFoot(`<button type="button" id="mvCancel">Cancel</button>`, `<button type="button" class="primary" id="mvGo"${busy ? " disabled" : ""}>Move</button>`)}</div>`;
+      ${dlgFoot(`<button type="button" id="mvCancel">Cancel</button>`, `<button type="button" class="primary" id="mvGo"${busy ? " disabled" : ""}>Move</button>`)}</div>`);
     // A container or VM is in reach when the new project has its node, or
     // that node is ticked to bring along; out of reach, a container's box is
     // ghosted and unticked, and a VM says so.
@@ -509,12 +502,12 @@ function moveConfirm(plan){
 async function deleteProjectCard(key){
   const n = projectName(key);
   // What was given to it keeps running with no project (the operator, 26 Oct).
-  const own = await postJSON("/api/repos", {action: "owned", name: key}).then(r => r.json()).catch(() => ({}));
+  const own = await postJSON("/api/repos", {action: "owned", name: key});
   const left = own.containers?.length ? `\n\nThe container${own.containers.length === 1 ? "" : "s"} given to it, ${own.containers.join(", ")}, keep${
     own.containers.length === 1 ? "s" : ""} running, given to no space.` : "";
   if (!await askYes(`Delete the space ${n}?\n\nIt has no repository in it, so nothing on disk goes.${left}`)) return;
   try{
-    const j = await (await postJSON("/api/repos", {action: "delete", key})).json();
+    const j = await postJSON("/api/repos", {action: "delete", key});
     if (j.error){ notify(j.error, true); return; }
     pjEditing.delete(key);
     notify(`${n} is gone`);
@@ -549,7 +542,7 @@ function renderProjectsInto(i){
         <span class="sp"></span>
         <span class="actbar"><button type="button" id="bTrashTab" aria-label="the trash" title="spaces you deleted: still on disk under .trash, and still recoverable">${BIN}</button>
         <button type="button" class="primary" id="bNewProjTab" title="a space, by its name: its repositories are added on its card">New space</button></span>`);
-    d.list.innerHTML = `<div class="field pjjob" id="pjJob" hidden></div><div id="pjChips"></div><div class="field pgridband"><div id="pjGrid"></div></div>`;
+    drawHTML(d.list, `<div class="field pjjob" id="pjJob" hidden></div><div id="pjChips"></div><div class="field pgridband"><div id="pjGrid"></div></div>`);
     el.querySelector("#pjGrid").addEventListener("click", pjFadeArm, true);
     el.querySelector("#bNewProjTab").onclick = newProjectByName;
     el.querySelector("#bTrashTab").onclick = openTrash;
@@ -661,7 +654,7 @@ async function renameProjectGroup(btn){
   if (got === null || got === was) return;
   const gone = got?.also === "delete";
   try{
-    const j = await (await postJSON("/api/project-group", gone ? {delete: was} : {rename: was, to: got})).json();
+    const j = await postJSON("/api/project-group", gone ? {delete: was} : {rename: was, to: got});
     if (j.error){ notify(j.error, true); return; }
     applyNow((x, k) => { x.group = (j.groups || {})[k] || ""; });
     notify(gone ? `${was} is gone: its spaces are in no group` : `${was} is now ${got}`);
@@ -816,8 +809,8 @@ function pDrawForge(){
   if ($("pForgeField").hidden) return;
   const sel = $("pForge");
   if (sel.dataset.built !== String(pForges.length)){
-    sel.innerHTML = `<option value="" hidden>from the address</option>` + pForges.map(f =>
-      `<option value="${esc(f.id)}">${f.dev ? devOpt(esc(f.name)) : esc(f.name)}</option>`).join("");
+    drawHTML(sel, `<option value="" hidden>from the address</option>` + pForges.map(f =>
+      `<option value="${esc(f.id)}">${f.dev ? devOpt(esc(f.name)) : esc(f.name)}</option>`).join(""));
     sel.dataset.built = String(pForges.length);
   }
   // One row under the address in both modes, always there, so nothing pops
@@ -920,7 +913,7 @@ function pFillGates(){
     const el = $(id);
     if (el.dataset.built !== "1"){
       // A report has nothing to hold for approval: auto or deny.
-      el.innerHTML = optionList((id === "pGateWiki" ? gateChoices("wiki") : GATE_MODES).filter(([v]) => id !== "pGateReport" || v !== "ask"));
+      drawHTML(el, optionList((id === "pGateWiki" ? gateChoices("wiki") : GATE_MODES).filter(([v]) => id !== "pGateReport" || v !== "ask")));
       el.dataset.built = "1";
     }
     el.value = P_GATE_DEFAULT[id] || "auto";
@@ -956,7 +949,7 @@ function pOpen(mode){
   // with a new /secrets/ssh, and a stale list here would offer a key the
   // agent no longer holds. The submit handler awaits pFetch directly, so an
   // early Create still judges auth on the real answer, not the defaults.
-  pFetch = fetch("/api/pubkeys").then(r => r.json()).catch(() => null);
+  pFetch = getJSON("/api/pubkeys");
   pFetch.then(j => {
     if (gen !== pGen || !j) return;
     pKeys = j.keys || []; pPat = !!j.pat;
@@ -964,8 +957,8 @@ function pOpen(mode){
     pForgeHosts = j.hosts || {};
     pTakenDirs = new Set(j.dirs || []);
     if (!pForges.some(f => f.id === pForgeId)) pForgeId = (pForges[0] || {}).id || "";
-    $("pKey").innerHTML = optionList([["", `none: ${pPat ? "use the configured access token" : "public repository"}`],
-                                      ...pKeys.map(k => k.name)]);
+    drawHTML($("pKey"), optionList([["", `none: ${pPat ? "use the configured access token" : "public repository"}`],
+                                      ...pKeys.map(k => k.name)]));
     pShowKey(); pDraw(); pNameShow();
   });
 }
@@ -986,9 +979,9 @@ function pFillNode(){
   wrap.hidden = !shown;
   if (!shown){ sel.innerHTML = ""; return; }
   const was = sel.value;
-  sel.innerHTML = pick.map(n => `<option value="${esc(n.id)}">${esc(n.name)}${
+  drawHTML(sel, pick.map(n => `<option value="${esc(n.id)}">${esc(n.name)}${
       n.config?.own ? " (this machine)" : ""}${n.live === false ? " (quiet)" : ""}</option>`).join("")
-    + `<option value="">none: no builds, tests or sessions until one is picked</option>`;
+    + `<option value="">none: no builds, tests or sessions until one is picked</option>`);
   // Several: the node most projects are bound to, not none. A project born
   // with no node had nowhere to send its container and used to land on the
   // newest enrolled node instead (the operator, 25 Sep).
@@ -1081,7 +1074,7 @@ function repoOfUrl(url){
 // it on the next keystroke of the URL would fight whoever did it.
 let pNameTyped = false;
 
-// Create, clone or link: the dialog's one submit, wired to #pCreate in index.html.
+// Create, clone or link: the dialog's one submit, wired to #pCreate by page-boot.js.
 async function createProject() {
   // Captured at the click: the dialog can be closed, reopened and switched
   // to another mode while this request runs, and everything below must keep
@@ -1127,22 +1120,16 @@ async function createProject() {
     let archive = "";
     if (file){
       busy(b, "Uploading");
-      const u = await fetch("/api/upload-archive?name=" + encodeURIComponent(file.name),
-                            {method: "POST", body: file});
-      const uj = await u.json().catch(() => ({}));
-      if (!u.ok) return fail(uj.error || `upload failed (HTTP ${u.status})`);
+      const uj = await postFile("/api/upload-archive?name=" + encodeURIComponent(file.name), file);
+      if (uj.error) return fail(`upload failed: ${uj.error}`);
       archive = uj.id;
       busy(b, "Creating");
     }
-    const r = mode === "link"
-      ? await fetch("/api/link", {method:"POST",
-          headers:{"Content-Type":"application/json"},
-          body: JSON.stringify({name: linkName, url, forge,
+    const j = mode === "link"
+      ? await postJSON("/api/link", {name: linkName, url, forge,
                                 key: pLinkAuth === "key" ? key : "",
-                                token: linkToken})})
-      : await fetch("/api/create", {method:"POST",
-          headers:{"Content-Type":"application/json"},
-          body: JSON.stringify({name, mode, url, project: into, about: $("pAboutField").hidden ? "" : $("pAbout").value, archive,
+                                token: linkToken})
+      : await postJSON("/api/create", {name, mode, url, project: into, about: $("pAboutField").hidden ? "" : $("pAbout").value, archive,
                                 node: $("pNodeField").hidden ? "" : $("pNode").value,
                                 // A starting version, for a fresh tree only: a
                                 // clone keeps the history it came with.
@@ -1156,9 +1143,8 @@ async function createProject() {
                                 key: mode === "clone" ? key : "",
                                 forge: mode === "clone" ? forge : "",
                                 token: mode === "clone" ? $("pToken").value.trim() : "",
-                                push: mode === "clone" && $("pPush").checked})});
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) return fail(j.error || `${mode} failed (HTTP ${r.status})`);
+                                push: mode === "clone" && $("pPush").checked});
+    if (j.error) return fail(j.error);
     if (gen === pGen) closeNewProject();
     // Everything that touches the network is a background job now, and it is
     // accepted, not finished. The dialog gets out of the way and the Projects

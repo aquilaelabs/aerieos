@@ -6,15 +6,13 @@
 "use strict";
 
 function nbMemoryView({$, nb}){
-  async function loadMemory(gen){
-    let j;
-    try{
-      const r = await bootFetch("/api/memory?project=" + encodeURIComponent(nb.memProj));
-      j = await r.json();
-    }catch(e){ j = {error: String(e)}; }
-    if (gen !== nb.memGen) return;              // closed, or reopened elsewhere
-    if (j.error){ viewGlance($("memWhere"), [], esc("memory: " + j.error), "", "bad"); return; }
-    drawMemory(j);
+  function loadMemory(gen){
+    return reading(`${nb.memProj}:memory`, async () => {
+      const j = await getJSON("/api/memory?project=" + encodeURIComponent(nb.memProj));
+      if (gen !== nb.memGen) return;              // closed, or reopened elsewhere
+      if (j.error){ viewGlance($("memWhere"), [], esc("memory: " + j.error), "", "bad"); return; }
+      drawMemory(j);
+    });
   }
 
   // The digest of the index as it was loaded, for the write that regenerates
@@ -45,7 +43,7 @@ function nbMemoryView({$, nb}){
     if (j.rev !== undefined) nb.memRev = j.rev;
     nb.memN = j.exists ? n : 0;
     briefingHead();
-    $("memWhere").title = j.dir;
+    setTitle($("memWhere"), j.dir);
     nb.memTypes = j.types || nb.memTypes;
     // The index and the files disagreeing is the one thing on this tab that is
     // not a memory, so it is a section rather than two loose orange paragraphs
@@ -233,7 +231,7 @@ function nbMemoryView({$, nb}){
     box.hidden = !nb.memClash;
     if (!nb.memClash){ box.innerHTML = ""; return; }
     const c = nb.memClash;
-    box.innerHTML = `
+    drawHTML(box, `
     <div class="hint bad">${esc(c.what)} changed on disk while you had it
       open${c.at ? " " + esc(ago(c.at)) : ""}. Nothing has been written; your version is still in the editor.</div>
     <div class="clashwho">What is on disk now</div>
@@ -241,7 +239,7 @@ function nbMemoryView({$, nb}){
     <div class="actbar">
       <button type="button" id="memClashDrop" title="reload what is on disk now; what you typed here is dropped">Keep theirs</button>
       <button type="button" id="memClashMine" class="primary" title="write your version over what is on disk now">Use mine</button>
-    </div>`;
+    </div>`);
     $("memClashDrop").onclick = () => { nb.memClash = null; drawMemClash();
                                         nb.memEditing.clear(); loadMemory(nb.memGen); };
     $("memClashMine").onclick = async () => {
@@ -264,8 +262,7 @@ function nbMemoryView({$, nb}){
       return null;
     }
     try{
-      const r = await postJSON("/api/memory", {project: nb.memProj, ...body});
-      const j = await r.json();
+      const j = await postJSON("/api/memory", {project: nb.memProj, ...body});
       if (j.conflict){
         nb.memClash = {body, what: body.action === "index" ? "The index" : body.file,
                     ...j.conflict};
@@ -340,8 +337,8 @@ function nbMemoryView({$, nb}){
   function drawMemAdd(){
     const box = $("memAdd");
     if (projWriteWhy(nb.memProj)){ box.innerHTML = ""; return; }
-    box.innerHTML = `<div class="addbar ctlrow" data-add="memory">
-    <button type="button">Write a memory</button></div>`;
+    drawHTML(box, `<div class="addbar ctlrow" data-add="memory">
+    <button type="button">Write a memory</button></div>`);
     box.querySelector("button").onclick = openMemAdd;
   }
 
@@ -361,7 +358,7 @@ function nbMemoryView({$, nb}){
   }
 
   function paintMemAdd(box){
-    box.innerHTML = `<div class="memadd ctlrow">
+    drawHTML(box, `<div class="memadd ctlrow">
     <label for="naTitle">Title<span class="help" data-help="how it reads in the index" tabindex="0">?</span></label>
     <input id="naTitle" maxlength="80" autocomplete="off" placeholder="No parsed progress">
     <div class="two">
@@ -381,7 +378,7 @@ function nbMemoryView({$, nb}){
     <div class="actbar">
       <button type="button" class="stop" id="naCancel">Cancel</button>
       <button type="button" class="primary" id="naGo">Write it</button></div>
-  </div>`;
+  </div>`);
     // The file name follows the title until it is typed in, and then stops:
     // renaming a memory is a thing people do deliberately, once.
     const t = $("naTitle"), n = $("naName");

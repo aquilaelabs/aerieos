@@ -104,10 +104,10 @@ function termHotBar(t){
 // open and a press to copy; `shut` puts the list away once one is opened.
 function termLinksFill(rec, box, shut){
   const found = termLinks(rec);
-  box.innerHTML = `<div class="xlhead">Links on this terminal</div>` + (found.length
+  drawHTML(box, `<div class="xlhead">Links on this terminal</div>` + (found.length
     ? found.map((u, i) => `<div class="xlrow"><a href="${esc(u)}" target="_blank" rel="noopener noreferrer" title="${esc(u)}">${esc(u.length > 64 ? u.slice(0, 44) + "…" + u.slice(-16) : u)}</a><button
         type="button" data-hcopy="${i}">Copy</button></div>`).join("")
-    : `<div class="xlnone">None on its screen or in the lines before it.</div>`);
+    : `<div class="xlnone">None on its screen or in the lines before it.</div>`));
   box.querySelectorAll("[data-hcopy]").forEach(b => b.onclick = async () => { await termCopyText(found[+b.dataset.hcopy]); notify("Copied"); });
   box.querySelectorAll("a").forEach(a => a.onclick = () => shut());
 }
@@ -131,7 +131,7 @@ function termHotWire(rec){
     tog.textContent = folded ? "‹" : "›";
     tog.setAttribute("aria-expanded", String(!folded));
     const says = folded ? "show the terminal's keys" : "hide these keys";
-    tog.title = says; tog.setAttribute("aria-label", says);
+    tog.setAttribute("aria-label", says);
     if (folded) shut();
   };
   const shut = () => { links.hidden = true; lb.setAttribute("aria-expanded", "false"); };
@@ -452,8 +452,8 @@ function termSelectDraw(rec){
   if (!layer){
     layer = document.createElement("div");
     layer.className = "xsel";
-    layer.innerHTML = `<span class="xgrip" data-end="a"></span><span class="xgrip" data-end="b"></span>
-      <span class="xselbar"><button type="button" class="xcopy">Copy</button><button type="button" class="xdone">Done</button></span>`;
+    drawHTML(layer, `<span class="xgrip" data-end="a"></span><span class="xgrip" data-end="b"></span>
+      <span class="xselbar"><button type="button" class="xcopy">Copy</button><button type="button" class="xdone">Done</button></span>`);
     host.append(layer);
     layer.querySelector(".xcopy").onclick = () => termCopy(rec);
     layer.querySelector(".xdone").onclick = () => termSelectEnd(rec);

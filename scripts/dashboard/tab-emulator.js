@@ -12,7 +12,7 @@
 
 "use strict";
 
-let emu = null, emuRev = 0, emuPoll = null, emuLoadSeq = 0;
+let emu = null, emuPoll = null;
 // Which node the tab shows, remembered in this browser, and which flavor the
 // picker is on: a question being asked, not a fact about the node.
 let emuNode = "", emuFlavor = "";
@@ -53,20 +53,14 @@ async function emuOnNodes(){
   loadEmulator();
 }
 
-async function loadEmulator(){
-  const asked = ++emuLoadSeq;
-  if (nodesList === null || nodesStale) await loadNodes();
-  if (asked !== emuLoadSeq) return;
-  if (!emuPick()){ emu = {nonode: true}; emuRev++; drawPanes(); return; }
-  try{
-    const r = await fetch("/api/emulator?node=" + encodeURIComponent(emuNode));
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    const got = await r.json();
-    if (asked !== emuLoadSeq) return;
-    emu = got;
-  }catch(e){ if (asked !== emuLoadSeq) return; emu = {error: String(e)}; }
-  emuRev++;
-  drawPanes();
+function loadEmulator(){
+  return reading("emulator", async () => {
+    if (nodesList === null || nodesStale) await loadNodes();
+    if (!emuPick()){ emu = {nonode: true}; return; }
+    const node = emuNode;
+    const got = await getJSON("/api/emulator?node=" + encodeURIComponent(node));
+    if (emuNode === node) emu = got;
+  });
 }
 
 // Adding images is Toolchains' gesture (R121, the operator 4 Oct): tick
@@ -195,16 +189,16 @@ function renderEmulatorInto(i){
     // In the page's order: its head, its tiles, the images it holds,
     // then the ones to add.
     const tile = (l, sub) => `<div class="tile"><span class="tv">${skv(1.4)}</span><span class="tl">${l}</span>${sub ? `<span class="ts">${sub}</span>` : ""}</div>`;
-    surf.list.innerHTML = skTpl(`${pageHead({facts: [["System images", GHOST]]})}
+    drawHTML(surf.list, skTpl(`${pageHead({facts: [["System images", GHOST]]})}
       <div class="field"><div class="tiles">${tile("images")}${tile("AVDs", "built on them")}${tile("free", "on the store")}</div></div>
-      ${emuSections(`<div class="tcs">${skRows(2)}</div>`, "", `<div class="tcs">${skRows(2)}</div>`)}`);
+      ${emuSections(`<div class="tcs">${skRows(2)}</div>`, "", `<div class="tcs">${skRows(2)}</div>`)}`));
     return;
   }
-  if (d.error){ surf.list.innerHTML = `<div class="empty">${
-    esc("could not read the images: " + d.error)}</div>`; return; }
+  if (d.error){ drawHTML(surf.list, `<div class="empty">${
+    esc("could not read the images: " + d.error)}</div>`); return; }
   if (d.nonode){
     surf.setBar("");
-    surf.list.innerHTML = noNodeYet("the emulator runs on a node");
+    drawHTML(surf.list, noNodeYet("the emulator runs on a node"));
 
     return;
   }
@@ -269,10 +263,10 @@ function renderEmulatorInto(i){
   const toTc = el.querySelector("#emuToTc");
   if (toTc) toTc.onclick = e => { e.preventDefault(); openLibraryOn(emuNode); };
   const fl = el.querySelector("#imgFlavor");
-  if (fl) fl.onchange = () => { emuFlavor = fl.value; emuRev++; drawPanes(); };
+  if (fl) fl.onchange = () => { emuFlavor = fl.value; readMoved("emulator"); drawPanes(); };
   el.querySelectorAll(".tc.emnew input").forEach(b => b.onchange = () => {
     b.checked ? emuTicked.add(b.value) : emuTicked.delete(b.value);
-    emuRev++; drawPanes();          // the button counts them
+    readMoved("emulator"); drawPanes();          // the button counts them
   });
   const add = el.querySelector('[data-emu="install"]');
   // Straight in, no confirmation: a download into free space, and each
@@ -287,7 +281,7 @@ function renderEmulatorInto(i){
     if (!await askYes(`Remove ${avd}, ${projLabel(project)}'s phone on ${emu?.name || "this node"}?\n\nIts next aerie emu start makes it again, empty: what was installed and signed in on it goes.`,
                       {verb: "Remove"})) return;
     busy(b, "Removing");
-    const j = await (await postJSON("/api/emulator", {action: "phone-remove", node: emuNode, project, uid, name: avd})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/emulator", {action: "phone-remove", node: emuNode, project, uid, name: avd});
     if (j.error) notify(j.error, true);
     else notify(`removing ${avd}: the list follows once the node has measured again`);
     loadEmulator();
@@ -328,9 +322,8 @@ async function emuAct(action, image, btn){
   if (btn) busy(btn, action === "add" ? "Adding" : "Removing");
   const many = Array.isArray(image);
   try{
-    const r = await postJSON("/api/emulator", {action, node: emuNode, ...(many ? {images: image} : {image})});
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || j.error) notify(j.error || `could not start (HTTP ${r.status})`, true);
+    const j = await postJSON("/api/emulator", {action, node: emuNode, ...(many ? {images: image} : {image})});
+    if (j.error) notify(j.error, true);
     else {
       if (many) image.forEach(id => emuTicked.delete(id));
       notify(`${action === "add" ? "adding" : "removing"} ${many && image.length > 1

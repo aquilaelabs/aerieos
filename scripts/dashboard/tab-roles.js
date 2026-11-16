@@ -16,7 +16,6 @@
 // uniform.mjs; this file fills slots, one fold per section.
 "use strict";
 let rolesData = null;            // GET /api/roles, or null before the first load
-let rolesRev = 0;
 let rolesErr = "";
 let rolesWho = "";               // the account the People section is on
 let rolesPeopleDraft = null;     // {roles, project_roles} being edited
@@ -28,26 +27,23 @@ function openRolesTab(){
   openTab({kind: "roles", arg: "__roles", label: "Roles"});
 }
 
-async function loadRoles(){
-  try{
-    const r = await bootFetch("/api/roles");
-    const j = await r.json();
-    rolesErr = j.error || "";
-    rolesData = j.error ? {roles: {}, areas: [], people: [], projects: [], admin: false} : j;
-  }catch(e){
-    rolesErr = String(e);
-    rolesData = rolesData || {roles: {}, areas: [], people: [], projects: [], admin: false};
-  }
-  rolesRev++;
-  drawPanes();
+function loadRoles(){
+  return reading("roles", async () => {
+    try{
+      const j = await getJSON("/api/roles");
+      rolesErr = j.error || "";
+      rolesData = j.error ? {roles: {}, areas: [], people: [], projects: [], admin: false} : j;
+    }catch(e){
+      rolesErr = String(e);
+      rolesData = rolesData || {roles: {}, areas: [], people: [], projects: [], admin: false};
+    }
+  });
 }
 
 async function rolesAct(body, said){
   try{
-    const r = await fetch("/api/roles", {method: "POST",
-      headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || j.error){ notify(j.error || `failed (HTTP ${r.status})`, true); return false; }
+    const j = await postJSON("/api/roles", body);
+    if (j.error){ notify(j.error, true); return false; }
     notify(said);
   }catch(e){ notify(String(e), true); return false; }
   await loadRoles();
@@ -225,10 +221,10 @@ async function rolesAccessOpen(name, saved = () => {}){
     armModal(m);
   }
   rolesWho = ""; rolesPeopleDraft = null;
-  m.innerHTML = `<div class="box"><h3>${esc(name)}'s roles</h3><div id="raFields"></div>
-    ${dlgFoot(`<button type="button" id="raCancel">Cancel</button>`, `<button type="button" id="raSave" class="primary">Save</button>`)}</div>`;
+  drawHTML(m, `<div class="box"><h3>${esc(name)}'s roles</h3><div id="raFields"></div>
+    ${dlgFoot(`<button type="button" id="raCancel">Cancel</button>`, `<button type="button" id="raSave" class="primary">Save</button>`)}</div>`);
   const draw = () => { const box = m.querySelector("#raFields");
-    box.innerHTML = rolesAccessFields(name); wireRolesAccess(box, draw); };
+    drawHTML(box, rolesAccessFields(name)); wireRolesAccess(box, draw); };
   draw();
   m.hidden = false;
   m.onclick = e => { if (e.target === m) m.hidden = true; };
@@ -382,11 +378,11 @@ function rolesNewOpen(){
     document.body.appendChild(m);
     armModal(m);
   }
-  m.innerHTML = `<div class="box"><h3>New role</h3>
+  drawHTML(m, `<div class="box"><h3>New role</h3>
     <div class="field">${lbl("rolesNewName", "Its name")}<input id="rolesNewName" autocomplete="off"></div>
     <div class="field">${lbl("rolesNewScope", "Kind", "On a space: given per space, and holds there. Everywhere: holds on every space and is the only kind that reaches the nodes, toolchains and the controller")}
       <select id="rolesNewScope"><option value="projects">On a space</option><option value="global">Everywhere</option></select></div>
-    ${dlgFoot(`<button type="button" id="rolesNewCancel">Cancel</button>`, `<button type="button" id="rolesAdd" class="primary" disabled>Make it</button>`)}</div>`;
+    ${dlgFoot(`<button type="button" id="rolesNewCancel">Cancel</button>`, `<button type="button" id="rolesAdd" class="primary" disabled>Make it</button>`)}</div>`);
   // Make it wakes once a name is typed that no role has (the operator, 18
   // Oct).
   const nm = m.querySelector("#rolesNewName");
@@ -425,12 +421,12 @@ function renderRolesInto(i){
     // are the page's own; who holds what is on its way.
     const split = detail => `<div class="rsplit"><div class="rlist">${skRows(4)}</div><div class="rdetail">${detail}</div></div>`;
     const field = skField;
-    d.list.innerHTML = skTpl(pageHead({facts: [["Roles", GHOST], ["For spaces", GHOST]], actions: newRole}) + split(field("Kind", 12) + skTable(ROLE_AREA_COLS, 4, "rareas")));
+    drawHTML(d.list, skTpl(pageHead({facts: [["Roles", GHOST], ["For spaces", GHOST]], actions: newRole}) + split(field("Kind", 12) + skTable(ROLE_AREA_COLS, 4, "rareas"))));
     loadRoles();
     return;
   }
   if (refused){
-    d.list.innerHTML = `<div class="row bad"><div class="grow">${esc(rolesErr)}</div></div>`;
+    drawHTML(d.list, `<div class="row bad"><div class="grow">${esc(rolesErr)}</div></div>`);
     return;
   }
   const ro = rolesRoleBody();
@@ -449,7 +445,7 @@ function renderRolesInto(i){
 }
 
 // Repaint the tab, keeping the drafts: the sections read them.
-function rolesRedraw(){ rolesRev++; drawPanes(); }
+function rolesRedraw(){ readMoved("roles"); drawPanes(); }
 
 function wireRoles(el){
   // A role picked from its list (on a phone, the detail comes over the

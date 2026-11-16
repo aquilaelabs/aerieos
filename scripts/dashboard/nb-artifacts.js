@@ -28,393 +28,394 @@ function nbArtifactsView({$, nb, project, root, sheet}){
   // only while a push is live: the one time it changes on its own.
   let art = null, artTimer = null;
 
-  async function loadArtifacts(){
-    const hint = $("artHint"), list = $("artList");
-    try{
-      const r = await fetch("/api/artifacts?project=" + encodeURIComponent(project));
-      art = await r.json();
-    }catch(e){ viewGlance(hint, [], esc("artifacts: " + e), "", "bad"); return; }
-    if (art.error){ viewGlance(hint, [], esc("artifacts: " + art.error), "", "bad"); return; }
-    const rows = art.artifacts || [], job = art.push || {}, dev = art.phone;
-    const groups = art.branches || [];
-    // The code base itself, as a zip through the browser: a navigation, so
-    // the browser's own download handles it, cookie and all.
-    const src = $("artSource");
-    if (src) src.onclick = () => { location.href = "/api/source?project=" + encodeURIComponent(project); };
-    // Why Push and Install are ghosted, when they are: the phone is on the
-    // project's node and belongs to whoever connected it there.
-    const phoneWhy = !dev ? "no phone is connected on this space's node: connect one in the Phone page, on its node"
-      : !art.mine ? `connected by ${art.owner?.name || "somebody else"}: only they can push to it or install on it`
-      : "";
-    const inst = art.install || {};
-    // The glance (R109): what this project ships, in dist/, and its size;
-    // what was built on a branch, in each account's worktree; and the
-    // captures sessions looked with, kept apart from both.
-    const caps = art.captures || [], onBranches = groups.reduce((n, g) => n + (g.artifacts || []).length, 0);
-    viewGlance(hint, [
-      {label: "in dist/", value: rows.length, sub: rows.length ? humanBytes(rows.reduce((n, a) => n + (a.size || 0), 0)) : ""},
-      {label: "built on branches", value: onBranches, omit: !onBranches},
-      {label: caps.length === 1 ? "capture" : "captures", value: caps.length, omit: !caps.length},
-      // The room the last build used on its node, workspace and cache (R110
-      // step 7), which the next one is checked against. Said as room: "last
-      // build took 2kB" read as a time; a label short enough for a phone's
-      // tile, the build it was under it.
-      {label: "build room", value: humanBytes(art.build?.took?.workspace || 0),
-       sub: art.build?.took?.cache ? `the last build's, cache ${humanBytes(art.build.took.cache)}` : "the last build's", omit: !art.build?.took?.workspace}],
-      // Its status line, on the control row beside Download source (the
-      // operator, 29 Oct: never a button alone on its line).
-      "the code base as a zip, without build output");
-    {
-      // Where this project compiles, as a section rather than a loose band:
-      // this tab is three subjects stacked, where it builds, what it is
-      // called, and what it shipped, and on a phone they arrived as one
-      // scroll with nothing naming any of them. The status is the answer on
-      // its own, so a shut section still says which node.
-      const b = art.build || {};
-      const el = $("artBuild");
-      if (el){
-        el.hidden = false;
-        el.className = "";
-        patch(el, docSection("artifacts", "build", artTitle("build"),
-          b.node ? (b.gap ? "agent behind" : b.name) : "no node",
-          b.node && b.gap
-            ? `<div class="hint bad">Nothing runs on <b>${esc(b.name)}</b> until its agent is
-               updated: ${esc(b.gap)}</div>`
-            : b.node
-            ? `<div class="hint">Builds run on <b>${esc(b.name)}</b>${b.tools?.length
-                ? `; it carries ${b.tools.map(esc).join(", ")}`
-                : "; it reports no toolchains yet, so a compile will not find one"}.
-               ${railAllows("library") ? `Add to it from the ${pageLink("library", "Library")}.`
-                 // Not offered a page their grants keep them from (B114).
-                 : "An account that may open the Library adds to it there."}</div>`
-            : `<div class="hint">No node: nothing can be compiled for this space here.
-               ${esc(b.why || "")}</div>`,
-          {cls: b.node ? (b.gap ? "bad" : "") : "warn"}));
-        wireSections(el);
+  function loadArtifacts(){
+    return reading(`${project}:artifacts`, async () => {
+      const hint = $("artHint"), list = $("artList");
+      try{
+        art = await getJSON("/api/artifacts?project=" + encodeURIComponent(project));
+      }catch(e){ viewGlance(hint, [], esc("artifacts: " + e), "", "bad"); return; }
+      if (art.error){ viewGlance(hint, [], esc("artifacts: " + art.error), "", "bad"); return; }
+      const rows = art.artifacts || [], job = art.push || {}, dev = art.phone;
+      const groups = art.branches || [];
+      // The code base itself, as a zip through the browser: a navigation, so
+      // the browser's own download handles it, cookie and all.
+      const src = $("artSource");
+      if (src) src.onclick = () => { location.href = "/api/source?project=" + encodeURIComponent(project); };
+      // Why Push and Install are ghosted, when they are: the phone is on the
+      // project's node and belongs to whoever connected it there.
+      const phoneWhy = !dev ? "no phone is connected on this space's node: connect one in the Phone page, on its node"
+        : !art.mine ? `connected by ${art.owner?.name || "somebody else"}: only they can push to it or install on it`
+        : "";
+      const inst = art.install || {};
+      // The glance (R109): what this project ships, in dist/, and its size;
+      // what was built on a branch, in each account's worktree; and the
+      // captures sessions looked with, kept apart from both.
+      const caps = art.captures || [], onBranches = groups.reduce((n, g) => n + (g.artifacts || []).length, 0);
+      viewGlance(hint, [
+        {label: "in dist/", value: rows.length, sub: rows.length ? humanBytes(rows.reduce((n, a) => n + (a.size || 0), 0)) : ""},
+        {label: "built on branches", value: onBranches, omit: !onBranches},
+        {label: caps.length === 1 ? "capture" : "captures", value: caps.length, omit: !caps.length},
+        // The room the last build used on its node, workspace and cache (R110
+        // step 7), which the next one is checked against. Said as room: "last
+        // build took 2kB" read as a time; a label short enough for a phone's
+        // tile, the build it was under it.
+        {label: "build room", value: humanBytes(art.build?.took?.workspace || 0),
+         sub: art.build?.took?.cache ? `the last build's, cache ${humanBytes(art.build.took.cache)}` : "the last build's", omit: !art.build?.took?.workspace}],
+        // Its status line, on the control row beside Download source (the
+        // operator, 29 Oct: never a button alone on its line).
+        "the code base as a zip, without build output");
+      {
+        // Where this project compiles, as a section rather than a loose band:
+        // this tab is three subjects stacked, where it builds, what it is
+        // called, and what it shipped, and on a phone they arrived as one
+        // scroll with nothing naming any of them. The status is the answer on
+        // its own, so a shut section still says which node.
+        const b = art.build || {};
+        const el = $("artBuild");
+        if (el){
+          el.hidden = false;
+          el.className = "";
+          patch(el, docSection("artifacts", "build", artTitle("build"),
+            b.node ? (b.gap ? "agent behind" : b.name) : "no node",
+            b.node && b.gap
+              ? `<div class="hint bad">Nothing runs on <b>${esc(b.name)}</b> until its agent is
+                 updated: ${esc(b.gap)}</div>`
+              : b.node
+              ? `<div class="hint">Builds run on <b>${esc(b.name)}</b>${b.tools?.length
+                  ? `; it carries ${b.tools.map(esc).join(", ")}`
+                  : "; it reports no toolchains yet, so a compile will not find one"}.
+                 ${railAllows("library") ? `Add to it from the ${pageLink("library", "Library")}.`
+                   // Not offered a page their grants keep them from (B114).
+                   : "An account that may open the Library adds to it there."}</div>`
+              : `<div class="hint">No node: nothing can be compiled for this space here.
+                 ${esc(b.why || "")}</div>`,
+            {cls: b.node ? (b.gap ? "bad" : "") : "warn"}));
+          wireSections(el);
+        }
       }
-    }
-    // Sizes as a person reads them; the bytes are nobody's unit.
-    const human = n => n >= 1 << 30 ? (n / (1 << 30)).toFixed(1) + " GB"
-                     : n >= 1 << 20 ? (n / (1 << 20)).toFixed(1) + " MB"
-                     : n >= 1 << 10 ? Math.round(n / (1 << 10)) + " KB"
-                     : n + " B";
-    // Sending to Docker: a row a compose file in the repository, each with
-    // its own Send, which makes a new container from that file on the Docker
-    // tab, as many as are wanted under as many names (the operator, 10 Oct).
-    // Nothing here follows a container once it is made: whether it is up,
-    // built, or answering is the Docker tab's, and a row here that said
-    // "down" read as a second place to run it. What a row says is about the
-    // FILE: what will not work as written, what reaches beyond its folder,
-    // a port already taken on the node.
-    const cf = art.compose_files || {files: []};
-    const cfFiles = cf.files || [];
-    const devLines = (label, items, cls) => !items?.length ? "" :
-      `<div class="dim ${cls}">${label}</div>`
-      + items.map(x => `<div class="dim ${cls} li">${esc(x)}</div>`).join("");
-    const rowFor = (c, i) => `
-      <div class="artrow"${i ? ` data-devrow="${i}"` : ' id="devRow"'}>
-        <div class="grow">
-          <div class="top"><span class="pill">docker</span>
-            <b>${esc(c.path)}</b></div>
-          ${devLines("will not work as written", c.problems, "bad")}${
-          // Variables the file requires: its env's to set once it is sent
-          // (the Docker tab's Env), not a fault, so the quiet voice.
-          c.needs?.length ? `<div class="dim li">needs ${esc(c.needs.join(", "))} set in its env before it starts</div>` : ""}
-          ${devLines("asks for more than its own directory", c.risks, "risk")}${
-          // A port another container holds is not a fault in the file: the
-          // container Send makes gets an env of its own, and the port goes in
-          // it. So a note, in the quiet voice, not a verdict in red.
-          c.port_clash?.length ? `<div class="dim li">port ${esc(c.port_clash.join(", "))} ${
-            c.port_clash.length === 1 ? "is" : "are"} already published on this node</div>` : ""}
-        </div>
-        <span class="acts">
-          <button type="button" data-devsend="${i}"${i ? "" : ' id="devSend"'} class="primary"
-            title="make a new container from ${esc(c.path)} and manage it on the Containers page"
-            >Send to Docker manager</button>
-        </span>
-      </div>`;
-    const devHtml = !cfFiles.length ? "" : !cf.available ? `
-      <div class="artrow job"><span class="pill">docker</span>
-        <span class="grow">${esc(cf.why || "docker is not reachable")}${
-          // The machine it asked: a project's containers live on its own
-          // node, and the refusal is about that one.
-          cf.daemon || cf.where ? ` <span class="dim">(${esc(cf.daemon || cf.where)})</span>` : ""}</span>
-      </div>` + cfFiles.map(rowFor).join("") : cfFiles.map(rowFor).join("");
-    // An install is one shot rather than a session, so it reports its own
-    // line: what it is doing, and what went wrong in words when it does.
-    // The push session, as a row: live once web-ext says the add-on is on
-    // the phone, with Stop, which is how the session ends.
-    const jobHtml = job.running || (job.state === "stopped" && job.error) ? `
-      <div class="artrow job">
-        <span class="pill ${job.state === "running" ? "ok" : job.error ? "bad" : "go"}">${
-          job.state === "running" ? "live" : job.error ? "stopped" : "starting"}${
-          job.running && job.state !== "running" ? `<span class="dots"></span>` : ""}</span>
-        <span class="grow">${esc(job.what)}${job.error ? `: ${esc(job.error)}`
-          : `: temporary, gone when Firefox restarts; changes do <b>not</b>
-          push themselves, so rebuild the .xpi and push again.`}</span>
-        ${job.running && !projWriteWhy(project) ? `<button type="button" id="artStop">Stop</button>` : ""}
-      </div>` : "";
-    const instHtml = inst.running || inst.state === "failed" ? `
-      <div class="artrow job">
-        <span class="pill ${inst.state === "failed" ? "bad" : "go"}">${
-          inst.state === "failed" ? "failed" : "installing"}${
-          inst.running ? `<span class="dots"></span>` : ""}</span>
-        <span class="grow">${esc(inst.what)}${
-          inst.error ? `: ${esc(inst.error)}` : ""}</span>
-      </div>` : "";
-    // Dev builds go on their own past the newest few of each (R105): said
-    // once, over the list, where there are any.
-    const keep = art.dev_keep ?? 3;
-    const devNote = rows.some(a => /\d+\.\d+\.\d+-dev\.\d+-[0-9a-f]{7}/.test(a.name))
-      ? `<div class="hint dim">${keep
-          ? `Each product keeps its newest ${keep} builds; a release and anything pinned stay${
-              helpIcon("The space's settings say how many (Dev builds kept). A signed build counts by its signed copy alone, and older ones are removed as new ones arrive.")}`
-          : "Every dev build is kept: this space's settings say so (Dev builds kept)."}</div>` : "";
-    // Sections like the rest of the view (the operator, 6 Oct): the files
-    // were a band of their own under Version, the one part of the tab that
-    // did not fold, and a long list pushed Captures off the screen. The dev
-    // instance is its own; the files are the one a person opens this view
-    // for, so the one left open when nobody has chosen.
-    // A role that reads the project and does not write it (B101): no
-    // Install, Push, Remove or pin on a file, no Sign without Releases and versions
-    // Write; nothing says why (the operator, 21 Oct: what a role does not
-    // give is not advertised).
-    const ro = projWriteWhy(project), relWhy = projReleaseWhy(project);
-    const filesBody = !rows.length
-      ? `<div class="hint">Nothing in <b>dist/</b> yet: a build copies what it keeps there.</div>`
-      : devNote + jobHtml + instHtml + rows.map((a, i) => `
-        <div class="artrow">
-          <span class="grow">
-            <span class="top"><span class="pill">${esc(a.kind)}</span>
-              <b>${esc(a.name)}</b>${a.pinned ? ` <span class="pill on">pinned</span>` : ""}${
-              a.prov?.signed ? ` <span class="pill ok">signed</span>` : ""}</span>
-            <span class="dim">${esc(human(a.size))} · ${esc(ago(a.at))}${
-              a.path !== a.name ? ` · ${esc(a.path)}` : ""}${
-              a.pinned && a.pinned_by ? ` · pinned by ${esc(a.pinned_by)}` : ""}</span>${
-            // A build named with no version (the operator, 6 Oct): the
-            // sweep cannot tell when it is out of date, so it says so, in
-            // the warning color, and offers Remove.
-            a.unversioned ? `<span class="vermark">named with no version, so nothing can tell when it is out of date: name builds with aerie version --file</span>` : ""}${
-            // What built it, when a job did (docs/nodes.md §6): the job,
-            // the node, the snapshot. A file somebody copied in says nothing.
-            a.prov ? `<span class="dim">built by ${esc(a.prov.job)} on ${
-              esc((nodesList || []).find(n => n.id === a.prov.node)?.name || a.prov.node || "?")}${
-              a.prov.source?.digest ? ` from snapshot ${esc(a.prov.source.digest.slice(7, 19))}` : ""}${
-              a.prov.sha256 ? ` · sha256 ${esc(a.prov.sha256.slice(0, 12))}` : ""}</span>` : ""}${
-            // What signed it (R106 step 4): the key, what verified, and the
-            // certificate's whole fingerprint, which a store's metadata asks
-            // for (F-Droid's AllowedAPKSigningKeys) and a person compares.
-            a.prov?.signed ? `<span class="dim">signed with the ${
-              a.prov.signed.key && a.prov.signed.key !== "default" ? `${esc(a.prov.signed.key)} key's ` : ""}${
-              a.prov.signed.route === "play" ? "Play upload key" : "sideload signing key"}${
-              a.prov.signed.from ? ` from ${esc(a.prov.signed.from)}` : ""}${
-              a.prov.signed.schemes?.length ? `, verified ${esc(a.prov.signed.schemes.join(", "))}` : ""}${
-              a.prov.signed.rotated_from ? `, rotated from ${esc(a.prov.signed.rotated_from)}: Android 8.1 and older still see ${esc(a.prov.signed.rotated_from)}` : ""}</span>
-              <span class="artfp">SHA-256 ${esc(a.prov.signed.cert.match(/../g).join(":"))}
-                <button type="button" class="link" data-artfp="${i}" title="the fingerprint as F-Droid's AllowedAPKSigningKeys takes it: lowercase, no colons">Copy for F-Droid</button></span>` : ""}</span>
+      // Sizes as a person reads them; the bytes are nobody's unit.
+      const human = n => n >= 1 << 30 ? (n / (1 << 30)).toFixed(1) + " GB"
+                       : n >= 1 << 20 ? (n / (1 << 20)).toFixed(1) + " MB"
+                       : n >= 1 << 10 ? Math.round(n / (1 << 10)) + " KB"
+                       : n + " B";
+      // Sending to Docker: a row a compose file in the repository, each with
+      // its own Send, which makes a new container from that file on the Docker
+      // tab, as many as are wanted under as many names (the operator, 10 Oct).
+      // Nothing here follows a container once it is made: whether it is up,
+      // built, or answering is the Docker tab's, and a row here that said
+      // "down" read as a second place to run it. What a row says is about the
+      // FILE: what will not work as written, what reaches beyond its folder,
+      // a port already taken on the node.
+      const cf = art.compose_files || {files: []};
+      const cfFiles = cf.files || [];
+      const devLines = (label, items, cls) => !items?.length ? "" :
+        `<div class="dim ${cls}">${label}</div>`
+        + items.map(x => `<div class="dim ${cls} li">${esc(x)}</div>`).join("");
+      const rowFor = (c, i) => `
+        <div class="artrow"${i ? ` data-devrow="${i}"` : ' id="devRow"'}>
+          <div class="grow">
+            <div class="top"><span class="pill">docker</span>
+              <b>${esc(c.path)}</b></div>
+            ${devLines("will not work as written", c.problems, "bad")}${
+            // Variables the file requires: its env's to set once it is sent
+            // (the Docker tab's Env), not a fault, so the quiet voice.
+            c.needs?.length ? `<div class="dim li">needs ${esc(c.needs.join(", "))} set in its env before it starts</div>` : ""}
+            ${devLines("asks for more than its own directory", c.risks, "risk")}${
+            // A port another container holds is not a fault in the file: the
+            // container Send makes gets an env of its own, and the port goes in
+            // it. So a note, in the quiet voice, not a verdict in red.
+            c.port_clash?.length ? `<div class="dim li">port ${esc(c.port_clash.join(", "))} ${
+              c.port_clash.length === 1 ? "is" : "are"} already published on this node</div>` : ""}
+          </div>
           <span class="acts">
-            ${a.kind === "apk" && !ro ? `<button type="button" data-artinstall="${i}"${
-                inst.running || phoneWhy ? " disabled" : ""} title="${
-                phoneWhy ? esc(phoneWhy)
-                : inst.running ? "one install at a time"
-                : "install it on the phone, replacing any copy already there"
-                }">Install</button>` : ""}
-            ${a.kind === "xpi" && !ro ? `<button type="button" data-artpush="${i}"${
-                job.running || phoneWhy || !art.webext ? " disabled" : ""} title="${
-                phoneWhy ? esc(phoneWhy)
-                : !art.webext ? `web-ext is not on ${esc(art.node_name || "the node")}: install it there first`
-                : job.running ? "one push at a time"
-                : "install it on the phone, temporarily"}">Push</button>` : ""}
-            ${(a.kind === "apk" || a.kind === "aab") && !relWhy && !/-signed\.(apk|aab)$/.test(a.name)
-              ? (art.sign_routes || []).map(r => `<button type="button" data-artsign="${i}" data-route="${r}"
-                title="sign it on the space's node with its ${r === "play" ? "Play upload key" : "sideload signing key"}; it arrives beside it as -signed">Sign${
-                  (art.sign_routes || []).length > 1 ? (r === "play" ? " for Play" : " to sideload") : ""}</button>`).join("") : ""}
-            ${a.view ? `<button type="button" data-artview="${i}"
-                title="read it here, without downloading it">View</button>` : ""}
-            ${a.unversioned && !ro ? `<button type="button" class="danger" data-artunnamed="${i}"
-                title="remove it from dist/ now, for everybody">Remove</button>` : ""}
-            <a class="btn" href="/api/artifact?project=${encodeURIComponent(project)
-              }&path=${encodeURIComponent(a.path)}" download>Download</a>${ro ? "" : `
-            <button type="button" class="eye pin${a.pinned ? " on" : ""}" data-artpin="${i}"
-              aria-label="${a.pinned ? "unpin" : "pin"}" title="${a.pinned
-                ? "unpin: it goes like any other build when newer ones arrive"
-                : "pin: keep it, whatever builds come after it"}">${TACK}</button>`}
+            <button type="button" data-devsend="${i}"${i ? "" : ' id="devSend"'} class="primary"
+              title="make a new container from ${esc(c.path)} and manage it on the Containers page"
+              >Send to Docker manager</button>
           </span>
-        </div>`).join("");
-    // Patched (R244): a field or a fold in the list stays as the person left
-    // it when a build lands or the dev instance moves.
-    patch(list, (devHtml ? docSection("artifacts", "dev", "Docker",
-                                            cf.available === false ? "unreachable"
-                                            : `${cfFiles.length} compose file${cfFiles.length === 1 ? "" : "s"}`, devHtml) : "")
-      + docSection("artifacts", "files", artTitle("files"), rows.length ? `${rows.length} in dist/` : "none yet", filesBody, {prime: true}));
-    wireSections(list);
-    paginate(list.querySelector('[data-sect="artifacts:files"] > .body'), ":scope > .artrow", {key: "artList", noun: "files"});
-    // What a session looked with (R96): a reel's sheet, an emulator shot.
-    // One fold apart from the files, since they are not what ships, each
-    // row saying whose it is and when. They go by age (the project's
-    // "captures kept" days, swept by the server on this read) or by Remove
-    // here: never by need, because nothing can tell whether another
-    // session is still reading one. Hidden when there are none: nothing to
-    // act on.
-    const capBox = $("artCaptures");
-    if (capBox){
-      capBox.hidden = !caps.length;
-      const days = art.capture_days ?? 7;
-      patch(capBox, !caps.length ? "" : docSection("artifacts", "captures", "Captures",
-        `${caps.length}, kept ${days ? `${days} day${days === 1 ? "" : "s"}` : "until removed"}`,
-        `<div class="hint">What a session looked with: a reel's sheet (<b>aerie capture reel</b>) or an
-           emulator shot, not what the space ships. ${days
-             ? `Each is removed ${days} day${days === 1 ? "" : "s"} after it was taken`
-             : "Kept until somebody removes one"}; the space's settings say how long.</div>`
-        + caps.map((c, i) => `
-        <div class="artrow">
-          <span class="grow">
-            <span class="top"><span class="pill">${esc(c.kind)}</span> <b>${esc(c.name)}</b></span>
-            <span class="dim">${esc(c.by ? `by ${c.by}` : "by nobody known")} · ${esc(ago(c.at))} · ${esc(human(c.size))}${
-              c.kind === "reel" ? ` · ${c.frames} frame${c.frames === 1 ? "" : "s"}` : ""}</span></span>
-          <span class="acts">
-            <a class="btn" href="/api/artifact?project=${encodeURIComponent(project)
-              }&path=${encodeURIComponent(c.path)}" download>Download</a>
-            ${projWriteWhy(project) ? "" : `<button type="button" data-artcap="${i}" title="remove it from dist/ now, for everybody">Remove</button>`}
-          </span>
-        </div>`).join("")));
-      wireSections(capBox);
-      capBox.querySelectorAll("[data-artcap]").forEach(b => b.onclick = async () => {
-        const c = caps[+b.dataset.artcap];
-        if (!c) return;
-        busy(b, "Removing");
-        try{
-          const j = await (await postJSON("/api/artifacts", {project, action: "forget-capture", name: c.name})).json();
-          if (j.error) return notify(j.error, true);
-        }catch(e){ return notify(String(e), true); }
-        loadArtifacts();
-      });
-    }
-    // Builds made on a branch, in each account's worktree (B237): Download
-    // and View, carrying the tree. Install and Push stay with dist/, whose
-    // files the phone's node is sent by their path in the project.
-    const brList = $("artBranches");
-    const brRows = groups.flatMap(g => g.artifacts.map(a => ({...a, tree: g.uid})));
-    if (brList){
-      brList.hidden = !brRows.length;
-      let at = 0;
-      patch(brList, !brRows.length ? "" : docSection("artifacts", "branches", "Branch builds", String(brRows.length),
-        `<div class="hint">Built on a branch. Merge it to main to put its build in dist/.</div>`
-        + groups.map(g => `<div class="sub dim ggroup">${esc(g.who === state?.me ? "your" : `${g.who}'s`)} branch builds${
-            g.branch ? `, on ${esc(g.branch)}` : ""}</div>` + g.artifacts.map(a => { const i = at++; return `
+        </div>`;
+      const devHtml = !cfFiles.length ? "" : !cf.available ? `
+        <div class="artrow job"><span class="pill">docker</span>
+          <span class="grow">${esc(cf.why || "docker is not reachable")}${
+            // The machine it asked: a project's containers live on its own
+            // node, and the refusal is about that one.
+            cf.daemon || cf.where ? ` <span class="dim">(${esc(cf.daemon || cf.where)})</span>` : ""}</span>
+        </div>` + cfFiles.map(rowFor).join("") : cfFiles.map(rowFor).join("");
+      // An install is one shot rather than a session, so it reports its own
+      // line: what it is doing, and what went wrong in words when it does.
+      // The push session, as a row: live once web-ext says the add-on is on
+      // the phone, with Stop, which is how the session ends.
+      const jobHtml = job.running || (job.state === "stopped" && job.error) ? `
+        <div class="artrow job">
+          <span class="pill ${job.state === "running" ? "ok" : job.error ? "bad" : "go"}">${
+            job.state === "running" ? "live" : job.error ? "stopped" : "starting"}${
+            job.running && job.state !== "running" ? `<span class="dots"></span>` : ""}</span>
+          <span class="grow">${esc(job.what)}${job.error ? `: ${esc(job.error)}`
+            : `: temporary, gone when Firefox restarts; changes do <b>not</b>
+            push themselves, so rebuild the .xpi and push again.`}</span>
+          ${job.running && !projWriteWhy(project) ? `<button type="button" id="artStop">Stop</button>` : ""}
+        </div>` : "";
+      const instHtml = inst.running || inst.state === "failed" ? `
+        <div class="artrow job">
+          <span class="pill ${inst.state === "failed" ? "bad" : "go"}">${
+            inst.state === "failed" ? "failed" : "installing"}${
+            inst.running ? `<span class="dots"></span>` : ""}</span>
+          <span class="grow">${esc(inst.what)}${
+            inst.error ? `: ${esc(inst.error)}` : ""}</span>
+        </div>` : "";
+      // Dev builds go on their own past the newest few of each (R105): said
+      // once, over the list, where there are any.
+      const keep = art.dev_keep ?? 3;
+      const devNote = rows.some(a => /\d+\.\d+\.\d+-dev\.\d+-[0-9a-f]{7}/.test(a.name))
+        ? `<div class="hint dim">${keep
+            ? `Each product keeps its newest ${keep} builds; a release and anything pinned stay${
+                helpIcon("The space's settings say how many (Dev builds kept). A signed build counts by its signed copy alone, and older ones are removed as new ones arrive.")}`
+            : "Every dev build is kept: this space's settings say so (Dev builds kept)."}</div>` : "";
+      // Sections like the rest of the view (the operator, 6 Oct): the files
+      // were a band of their own under Version, the one part of the tab that
+      // did not fold, and a long list pushed Captures off the screen. The dev
+      // instance is its own; the files are the one a person opens this view
+      // for, so the one left open when nobody has chosen.
+      // A role that reads the project and does not write it (B101): no
+      // Install, Push, Remove or pin on a file, no Sign without Releases and versions
+      // Write; nothing says why (the operator, 21 Oct: what a role does not
+      // give is not advertised).
+      const ro = projWriteWhy(project), relWhy = projReleaseWhy(project);
+      const filesBody = !rows.length
+        ? `<div class="hint">Nothing in <b>dist/</b> yet: a build copies what it keeps there.</div>`
+        : devNote + jobHtml + instHtml + rows.map((a, i) => `
           <div class="artrow">
             <span class="grow">
-              <span class="top"><span class="pill">${esc(a.kind)}</span> <b>${esc(a.name)}</b></span>
-              <span class="dim">${esc(human(a.size))} · ${esc(ago(a.at))}</span></span>
+              <span class="top"><span class="pill">${esc(a.kind)}</span>
+                <b>${esc(a.name)}</b>${a.pinned ? ` <span class="pill on">pinned</span>` : ""}${
+                a.prov?.signed ? ` <span class="pill ok">signed</span>` : ""}</span>
+              <span class="dim">${esc(human(a.size))} · ${esc(ago(a.at))}${
+                a.path !== a.name ? ` · ${esc(a.path)}` : ""}${
+                a.pinned && a.pinned_by ? ` · pinned by ${esc(a.pinned_by)}` : ""}</span>${
+              // A build named with no version (the operator, 6 Oct): the
+              // sweep cannot tell when it is out of date, so it says so, in
+              // the warning color, and offers Remove.
+              a.unversioned ? `<span class="vermark">named with no version, so nothing can tell when it is out of date: name builds with aerie version --file</span>` : ""}${
+              // What built it, when a job did (docs/nodes.md §6): the job,
+              // the node, the snapshot. A file somebody copied in says nothing.
+              a.prov ? `<span class="dim">built by ${esc(a.prov.job)} on ${
+                esc((nodesList || []).find(n => n.id === a.prov.node)?.name || a.prov.node || "?")}${
+                a.prov.source?.digest ? ` from snapshot ${esc(a.prov.source.digest.slice(7, 19))}` : ""}${
+                a.prov.sha256 ? ` · sha256 ${esc(a.prov.sha256.slice(0, 12))}` : ""}</span>` : ""}${
+              // What signed it (R106 step 4): the key, what verified, and the
+              // certificate's whole fingerprint, which a store's metadata asks
+              // for (F-Droid's AllowedAPKSigningKeys) and a person compares.
+              a.prov?.signed ? `<span class="dim">signed with the ${
+                a.prov.signed.key && a.prov.signed.key !== "default" ? `${esc(a.prov.signed.key)} key's ` : ""}${
+                a.prov.signed.route === "play" ? "Play upload key" : "sideload signing key"}${
+                a.prov.signed.from ? ` from ${esc(a.prov.signed.from)}` : ""}${
+                a.prov.signed.schemes?.length ? `, verified ${esc(a.prov.signed.schemes.join(", "))}` : ""}${
+                a.prov.signed.rotated_from ? `, rotated from ${esc(a.prov.signed.rotated_from)}: Android 8.1 and older still see ${esc(a.prov.signed.rotated_from)}` : ""}</span>
+                <span class="artfp">SHA-256 ${esc(a.prov.signed.cert.match(/../g).join(":"))}
+                  <button type="button" class="link" data-artfp="${i}" title="the fingerprint as F-Droid's AllowedAPKSigningKeys takes it: lowercase, no colons">Copy for F-Droid</button></span>` : ""}</span>
             <span class="acts">
-              ${a.view ? `<button type="button" data-artbview="${i}"
+              ${a.kind === "apk" && !ro ? `<button type="button" data-artinstall="${i}"${
+                  inst.running || phoneWhy ? " disabled" : ""} title="${
+                  phoneWhy ? esc(phoneWhy)
+                  : inst.running ? "one install at a time"
+                  : "install it on the phone, replacing any copy already there"
+                  }">Install</button>` : ""}
+              ${a.kind === "xpi" && !ro ? `<button type="button" data-artpush="${i}"${
+                  job.running || phoneWhy || !art.webext ? " disabled" : ""} title="${
+                  phoneWhy ? esc(phoneWhy)
+                  : !art.webext ? `web-ext is not on ${esc(art.node_name || "the node")}: install it there first`
+                  : job.running ? "one push at a time"
+                  : "install it on the phone, temporarily"}">Push</button>` : ""}
+              ${(a.kind === "apk" || a.kind === "aab") && !relWhy && !/-signed\.(apk|aab)$/.test(a.name)
+                ? (art.sign_routes || []).map(r => `<button type="button" data-artsign="${i}" data-route="${r}"
+                  title="sign it on the space's node with its ${r === "play" ? "Play upload key" : "sideload signing key"}; it arrives beside it as -signed">Sign${
+                    (art.sign_routes || []).length > 1 ? (r === "play" ? " for Play" : " to sideload") : ""}</button>`).join("") : ""}
+              ${a.view ? `<button type="button" data-artview="${i}"
                   title="read it here, without downloading it">View</button>` : ""}
+              ${a.unversioned && !ro ? `<button type="button" class="danger" data-artunnamed="${i}"
+                  title="remove it from dist/ now, for everybody">Remove</button>` : ""}
               <a class="btn" href="/api/artifact?project=${encodeURIComponent(project)
-                }&path=${encodeURIComponent(a.path)}&tree=${encodeURIComponent(g.uid)}" download>Download</a>
+                }&path=${encodeURIComponent(a.path)}" download>Download</a>${ro ? "" : `
+              <button type="button" class="eye pin${a.pinned ? " on" : ""}" data-artpin="${i}"
+                aria-label="${a.pinned ? "unpin" : "pin"}" title="${a.pinned
+                  ? "unpin: it goes like any other build when newer ones arrive"
+                  : "pin: keep it, whatever builds come after it"}">${TACK}</button>`}
             </span>
-          </div>`; }).join("")).join("")));
-      if (brRows.length){
-        wireSections(brList);
-        paginate(brList.querySelector('[data-sect="artifacts:branches"] > .body'), ":scope > .artrow", {key: "artBranches", noun: "files"});
+          </div>`).join("");
+      // Patched (R244): a field or a fold in the list stays as the person left
+      // it when a build lands or the dev instance moves.
+      patch(list, (devHtml ? docSection("artifacts", "dev", "Docker",
+                                              cf.available === false ? "unreachable"
+                                              : `${cfFiles.length} compose file${cfFiles.length === 1 ? "" : "s"}`, devHtml) : "")
+        + docSection("artifacts", "files", artTitle("files"), rows.length ? `${rows.length} in dist/` : "none yet", filesBody, {prime: true}));
+      wireSections(list);
+      paginate(list.querySelector('[data-sect="artifacts:files"] > .body'), ":scope > .artrow", {key: "artList", noun: "files"});
+      // What a session looked with (R96): a reel's sheet, an emulator shot.
+      // One fold apart from the files, since they are not what ships, each
+      // row saying whose it is and when. They go by age (the project's
+      // "captures kept" days, swept by the server on this read) or by Remove
+      // here: never by need, because nothing can tell whether another
+      // session is still reading one. Hidden when there are none: nothing to
+      // act on.
+      const capBox = $("artCaptures");
+      if (capBox){
+        capBox.hidden = !caps.length;
+        const days = art.capture_days ?? 7;
+        patch(capBox, !caps.length ? "" : docSection("artifacts", "captures", "Captures",
+          `${caps.length}, kept ${days ? `${days} day${days === 1 ? "" : "s"}` : "until removed"}`,
+          `<div class="hint">What a session looked with: a reel's sheet (<b>aerie capture reel</b>) or an
+             emulator shot, not what the space ships. ${days
+               ? `Each is removed ${days} day${days === 1 ? "" : "s"} after it was taken`
+               : "Kept until somebody removes one"}; the space's settings say how long.</div>`
+          + caps.map((c, i) => `
+          <div class="artrow">
+            <span class="grow">
+              <span class="top"><span class="pill">${esc(c.kind)}</span> <b>${esc(c.name)}</b></span>
+              <span class="dim">${esc(c.by ? `by ${c.by}` : "by nobody known")} · ${esc(ago(c.at))} · ${esc(human(c.size))}${
+                c.kind === "reel" ? ` · ${c.frames} frame${c.frames === 1 ? "" : "s"}` : ""}</span></span>
+            <span class="acts">
+              <a class="btn" href="/api/artifact?project=${encodeURIComponent(project)
+                }&path=${encodeURIComponent(c.path)}" download>Download</a>
+              ${projWriteWhy(project) ? "" : `<button type="button" data-artcap="${i}" title="remove it from dist/ now, for everybody">Remove</button>`}
+            </span>
+          </div>`).join("")));
+        wireSections(capBox);
+        capBox.querySelectorAll("[data-artcap]").forEach(b => b.onclick = async () => {
+          const c = caps[+b.dataset.artcap];
+          if (!c) return;
+          busy(b, "Removing");
+          try{
+            const j = await postJSON("/api/artifacts", {project, action: "forget-capture", name: c.name});
+            if (j.error) return notify(j.error, true);
+          }catch(e){ return notify(String(e), true); }
+          loadArtifacts();
+        });
       }
-      brList.querySelectorAll("[data-artbview]").forEach(b => b.onclick = async () => {
-        const a = brRows[Number(b.dataset.artbview)];
+      // Builds made on a branch, in each account's worktree (B237): Download
+      // and View, carrying the tree. Install and Push stay with dist/, whose
+      // files the phone's node is sent by their path in the project.
+      const brList = $("artBranches");
+      const brRows = groups.flatMap(g => g.artifacts.map(a => ({...a, tree: g.uid})));
+      if (brList){
+        brList.hidden = !brRows.length;
+        let at = 0;
+        patch(brList, !brRows.length ? "" : docSection("artifacts", "branches", "Branch builds", String(brRows.length),
+          `<div class="hint">Built on a branch. Merge it to main to put its build in dist/.</div>`
+          + groups.map(g => `<div class="sub dim ggroup">${esc(g.who === state?.me ? "your" : `${g.who}'s`)} branch builds${
+              g.branch ? `, on ${esc(g.branch)}` : ""}</div>` + g.artifacts.map(a => { const i = at++; return `
+            <div class="artrow">
+              <span class="grow">
+                <span class="top"><span class="pill">${esc(a.kind)}</span> <b>${esc(a.name)}</b></span>
+                <span class="dim">${esc(human(a.size))} · ${esc(ago(a.at))}</span></span>
+              <span class="acts">
+                ${a.view ? `<button type="button" data-artbview="${i}"
+                    title="read it here, without downloading it">View</button>` : ""}
+                <a class="btn" href="/api/artifact?project=${encodeURIComponent(project)
+                  }&path=${encodeURIComponent(a.path)}&tree=${encodeURIComponent(g.uid)}" download>Download</a>
+              </span>
+            </div>`; }).join("")).join("")));
+        if (brRows.length){
+          wireSections(brList);
+          paginate(brList.querySelector('[data-sect="artifacts:branches"] > .body'), ":scope > .artrow", {key: "artBranches", noun: "files"});
+        }
+        brList.querySelectorAll("[data-artbview]").forEach(b => b.onclick = async () => {
+          const a = brRows[Number(b.dataset.artbview)];
+          const pane = document.createElement("div");
+          pane.className = "verlogpane";
+          nb.openSheet(a.name, [pane]);
+          drawHTML(pane, `${skel("rows", 4)}`);
+          try{
+            const r = await fetch(`/api/artifact?project=${encodeURIComponent(project)
+                                  }&path=${encodeURIComponent(a.path)}&tree=${encodeURIComponent(a.tree)}`);
+            pane.textContent = r.ok ? await r.text() : `could not read ${a.name}`;
+          }catch(e){ pane.textContent = String(e); }
+        });
+      }
+      if (!tcDotsTimer && list.querySelector(".dots"))
+        tcDotsTimer = setInterval(tcTickDots, 400);
+      list.querySelectorAll("[data-devsend]").forEach(b => b.onclick = () => {
+        const c = cfFiles[+b.dataset.devsend] || {};
+        openSendToDocker(project, c.send_as || art.send_as, art.containers || 0, c.path || "");
+      });
+      // THIS project's daemon, which is its node's and need not be the default
+      // one the poll asked about. The row above already draws the reason when
+      // there is one, so what is passed here is the same answer the row is
+      // wearing rather than a second opinion about another machine.
+      gateDocker(list, !cfFiles.length || cf.available ? "" : (cf.why || "docker is not reachable"));
+      list.querySelectorAll("[data-artpush]").forEach(b => b.onclick = async () => {
+        const a = rows[Number(b.dataset.artpush)];
+        busy(b, "Pushing");
+        await postArtifacts({action: "push", path: a.path,
+                             apk: (art.apks || [])[0] || ""});
+      });
+      list.querySelectorAll("[data-artinstall]").forEach(b => b.onclick = async () => {
+        const a = rows[Number(b.dataset.artinstall)];
+        busy(b, "Installing");
+        await postArtifacts({action: "install", path: a.path});
+      });
+      // A shipped script is a thing people read before they run it, and on a
+      // phone a download is the end of that. Over the panel like a History, the
+      // text as it is; nothing here runs it, and the tab has no way to.
+      // Sign (R106): a job on the project's node with the project's key,
+      // which never comes near the page either; the signed build arrives in
+      // dist/ beside this one, and the list picks it up when it lands.
+      list.querySelectorAll("[data-artsign]").forEach(b => b.onclick = async () => {
+        const a = rows[+b.dataset.artsign];
+        if (!a) return;
+        b.disabled = true;
+        const j = await postJSON("/api/signing", {action: "sign", project, file: a.path,
+                                                         route: b.dataset.route});
+        if (j.error){ b.disabled = false; return notify(j.error, true); }
+        notify(`signing ${a.name} on the node: it arrives here as ${a.name.replace(/(-unsigned)?\.(apk|aab)$/, "-signed.$2")}`);
+      });
+      list.querySelectorAll("[data-artfp]").forEach(b => b.onclick = async () => {
+        const a = rows[+b.dataset.artfp];
+        const fp = String(a?.prov?.signed?.cert || "").toLowerCase();
+        try{ await navigator.clipboard.writeText(fp); notify(`copied ${a.name}'s signing fingerprint`); }
+        catch(e){ notify(`copy it by hand: ${fp}`, "warn"); }
+      });
+      list.querySelectorAll("[data-artunnamed]").forEach(b => b.onclick = async () => {
+        const a = rows[+b.dataset.artunnamed];
+        if (!a || !await askYes(`Remove ${a.name} from dist/?\n\nIt is gone for everybody.`)) return;
+        b.disabled = true;
+        try{
+          const j = await postJSON("/api/artifacts", {project, action: "forget-unnamed", path: a.path});
+          if (j.error){ b.disabled = false; return notify(j.error, true); }
+          notify(`removed ${a.name}`);
+        }catch(e){ b.disabled = false; return notify(String(e), true); }
+        loadArtifacts();
+      });
+      list.querySelectorAll("[data-artpin]").forEach(b => b.onclick = async () => {
+        const a = rows[+b.dataset.artpin];
+        if (!a) return;
+        b.disabled = true;
+        try{
+          const j = await postJSON("/api/artifacts", {project, action: a.pinned ? "unpin" : "pin", path: a.path});
+          if (j.error){ b.disabled = false; return notify(j.error, true); }
+          notify(j.pinned ? `pinned ${a.name}: it stays` : `unpinned ${a.name}`);
+        }catch(e){ b.disabled = false; return notify(String(e), true); }
+        loadArtifacts();
+      });
+      list.querySelectorAll("[data-artview]").forEach(b => b.onclick = async () => {
+        const a = rows[Number(b.dataset.artview)];
         const pane = document.createElement("div");
         pane.className = "verlogpane";
         nb.openSheet(a.name, [pane]);
-        pane.innerHTML = `${skel("rows", 4)}`;
+        drawHTML(pane, `${skel("rows", 4)}`);
         try{
           const r = await fetch(`/api/artifact?project=${encodeURIComponent(project)
-                                }&path=${encodeURIComponent(a.path)}&tree=${encodeURIComponent(a.tree)}`);
+                                }&path=${encodeURIComponent(a.path)}`);
           pane.textContent = r.ok ? await r.text() : `could not read ${a.name}`;
         }catch(e){ pane.textContent = String(e); }
       });
-    }
-    if (!tcDotsTimer && list.querySelector(".dots"))
-      tcDotsTimer = setInterval(tcTickDots, 400);
-    list.querySelectorAll("[data-devsend]").forEach(b => b.onclick = () => {
-      const c = cfFiles[+b.dataset.devsend] || {};
-      openSendToDocker(project, c.send_as || art.send_as, art.containers || 0, c.path || "");
+      const stop = $("artStop");
+      if (stop) stop.onclick = () => postArtifacts({action: "stop"});
+      clearInterval(artTimer); artTimer = null;
+      // Polled while either thing is in flight. An install is the slower of the
+      // two (a 24MB APK over wifi) and is the reason this exists at all.
+      if ((job.running || inst.running)
+          && !root.querySelector('[data-view="artifacts"]').hidden)
+        artTimer = setTimeout(loadArtifacts, 2000);
     });
-    // THIS project's daemon, which is its node's and need not be the default
-    // one the poll asked about. The row above already draws the reason when
-    // there is one, so what is passed here is the same answer the row is
-    // wearing rather than a second opinion about another machine.
-    gateDocker(list, !cfFiles.length || cf.available ? "" : (cf.why || "docker is not reachable"));
-    list.querySelectorAll("[data-artpush]").forEach(b => b.onclick = async () => {
-      const a = rows[Number(b.dataset.artpush)];
-      busy(b, "Pushing");
-      await postArtifacts({action: "push", path: a.path,
-                           apk: (art.apks || [])[0] || ""});
-    });
-    list.querySelectorAll("[data-artinstall]").forEach(b => b.onclick = async () => {
-      const a = rows[Number(b.dataset.artinstall)];
-      busy(b, "Installing");
-      await postArtifacts({action: "install", path: a.path});
-    });
-    // A shipped script is a thing people read before they run it, and on a
-    // phone a download is the end of that. Over the panel like a History, the
-    // text as it is; nothing here runs it, and the tab has no way to.
-    // Sign (R106): a job on the project's node with the project's key,
-    // which never comes near the page either; the signed build arrives in
-    // dist/ beside this one, and the list picks it up when it lands.
-    list.querySelectorAll("[data-artsign]").forEach(b => b.onclick = async () => {
-      const a = rows[+b.dataset.artsign];
-      if (!a) return;
-      b.disabled = true;
-      const j = await (await postJSON("/api/signing", {action: "sign", project, file: a.path,
-                                                       route: b.dataset.route})).json().catch(() => ({}));
-      if (j.error){ b.disabled = false; return notify(j.error, true); }
-      notify(`signing ${a.name} on the node: it arrives here as ${a.name.replace(/(-unsigned)?\.(apk|aab)$/, "-signed.$2")}`);
-    });
-    list.querySelectorAll("[data-artfp]").forEach(b => b.onclick = async () => {
-      const a = rows[+b.dataset.artfp];
-      const fp = String(a?.prov?.signed?.cert || "").toLowerCase();
-      try{ await navigator.clipboard.writeText(fp); notify(`copied ${a.name}'s signing fingerprint`); }
-      catch(e){ notify(`copy it by hand: ${fp}`, "warn"); }
-    });
-    list.querySelectorAll("[data-artunnamed]").forEach(b => b.onclick = async () => {
-      const a = rows[+b.dataset.artunnamed];
-      if (!a || !await askYes(`Remove ${a.name} from dist/?\n\nIt is gone for everybody.`)) return;
-      b.disabled = true;
-      try{
-        const j = await (await postJSON("/api/artifacts", {project, action: "forget-unnamed", path: a.path})).json();
-        if (j.error){ b.disabled = false; return notify(j.error, true); }
-        notify(`removed ${a.name}`);
-      }catch(e){ b.disabled = false; return notify(String(e), true); }
-      loadArtifacts();
-    });
-    list.querySelectorAll("[data-artpin]").forEach(b => b.onclick = async () => {
-      const a = rows[+b.dataset.artpin];
-      if (!a) return;
-      b.disabled = true;
-      try{
-        const j = await (await postJSON("/api/artifacts", {project, action: a.pinned ? "unpin" : "pin", path: a.path})).json();
-        if (j.error){ b.disabled = false; return notify(j.error, true); }
-        notify(j.pinned ? `pinned ${a.name}: it stays` : `unpinned ${a.name}`);
-      }catch(e){ b.disabled = false; return notify(String(e), true); }
-      loadArtifacts();
-    });
-    list.querySelectorAll("[data-artview]").forEach(b => b.onclick = async () => {
-      const a = rows[Number(b.dataset.artview)];
-      const pane = document.createElement("div");
-      pane.className = "verlogpane";
-      nb.openSheet(a.name, [pane]);
-      pane.innerHTML = `${skel("rows", 4)}`;
-      try{
-        const r = await fetch(`/api/artifact?project=${encodeURIComponent(project)
-                              }&path=${encodeURIComponent(a.path)}`);
-        pane.textContent = r.ok ? await r.text() : `could not read ${a.name}`;
-      }catch(e){ pane.textContent = String(e); }
-    });
-    const stop = $("artStop");
-    if (stop) stop.onclick = () => postArtifacts({action: "stop"});
-    clearInterval(artTimer); artTimer = null;
-    // Polled while either thing is in flight. An install is the slower of the
-    // two (a 24MB APK over wifi) and is the reason this exists at all.
-    if ((job.running || inst.running)
-        && !root.querySelector('[data-view="artifacts"]').hidden)
-      artTimer = setTimeout(loadArtifacts, 2000);
   }
 
   // ---- the version, in the head of the tab whose files carry it ----------
@@ -435,26 +436,27 @@ function nbArtifactsView({$, nb, project, root, sheet}){
   let verPending = {};
   let verPolicyPending = null;   // a picked policy, until Save writes it
 
-  async function loadVersion(){
-    const box = $("verBox");
-    try{
-      const r = await fetch("/api/version?project=" + encodeURIComponent(project));
-      ver = await r.json();
-    }catch(e){ box.textContent = "version: " + e; return; }
-    if (ver.error && !ver.target){
-      // A malformed VERSION is worth saying out loud: everything downstream
-      // assumes the shape, so this is the one place it can be reported, in
-      // the section the number itself lives in, or it would be the one band
-      // on this tab with nothing naming it. "unavailable" rather than a
-      // guess at which, because this branch is both a malformed VERSION and
-      // a project with no git behind it; the body says which.
-      patch(box, docSection("artifacts", "version", artTitle("version"), "unavailable",
-        `<div class="verln"><span>version</span><code>${esc(ver.error)}</code></div>`,
-        {cls: "warn"}));
-      wireSections(box);
-      return;
-    }
-    drawVersion();
+  function loadVersion(){
+    return reading(`${project}:version`, async () => {
+      const box = $("verBox");
+      try{
+        ver = await getJSON("/api/version?project=" + encodeURIComponent(project));
+      }catch(e){ box.textContent = "version: " + e; return; }
+      if (ver.error && !ver.target){
+        // A malformed VERSION is worth saying out loud: everything downstream
+        // assumes the shape, so this is the one place it can be reported, in
+        // the section the number itself lives in, or it would be the one band
+        // on this tab with nothing naming it. "unavailable" rather than a
+        // guess at which, because this branch is both a malformed VERSION and
+        // a project with no git behind it; the body says which.
+        patch(box, docSection("artifacts", "version", artTitle("version"), "unavailable",
+          `<div class="verln"><span>version</span><code>${esc(ver.error)}</code></div>`,
+          {cls: "warn"}));
+        wireSections(box);
+        return;
+      }
+      drawVersion();
+    });
   }
 
   // A repo can ship two products, and then one number is a lie: an extension
@@ -714,8 +716,7 @@ function nbArtifactsView({$, nb, project, root, sheet}){
         if (save) save.onclick = async () => {
           busy(save, "Saving");
           try{
-            const r = await postJSON("/api/changelog", {project, component: comp, groups: gs});
-            const a = await r.json();
+            const a = await postJSON("/api/changelog", {project, component: comp, groups: gs});
             if (a.error){ notify(a.error, true); return; }
             gs = a.groups || [];
             pane.querySelector("#clState").textContent =
@@ -747,25 +748,23 @@ function nbArtifactsView({$, nb, project, root, sheet}){
       b.classList.add("on");
       nb.openSheet(`Changelog${comp ? ": " + comp : ""}`, [pane],
                 () => b.classList.remove("on"));
-      pane.innerHTML = `${skel("lines")}`;
+      drawHTML(pane, `${skel("lines")}`);
       try{
-        const r = await fetch(`/api/changelog?project=${encodeURIComponent(project)}`
+        const j = await getJSON(`/api/changelog?project=${encodeURIComponent(project)}`
                               + `&component=${encodeURIComponent(comp)}`);
-        const j = await r.json();
         if (j.error){ pane.textContent = `changelog: ${j.error}`; return; }
         if (j.text == null){
           // No file yet. The first line can be written here as well as by
           // a session's `aerie changelog add`: the editor used to sit dead
           // until Claude made the file.
-          pane.innerHTML = `<div class="sub">no CHANGELOG.md yet: write the first line, or a session's first entry creates it</div>
+          drawHTML(pane, `<div class="sub">no CHANGELOG.md yet: write the first line, or a session's first entry creates it</div>
             <div class="actbar"><input id="clFirst" maxlength="300" autocomplete="off"
               placeholder="what changed for the person using it, in their words">
-              <button type="button" class="primary" id="clFirstGo">Create</button></div>`;
+              <button type="button" class="primary" id="clFirstGo">Create</button></div>`);
           pane.querySelector("#clFirstGo").onclick = async () => {
             const text = pane.querySelector("#clFirst").value.trim();
             if (!text) return notify("write the line first", true);
-            const r2 = await postJSON("/api/changelog", {project, component: comp, action: "first", text});
-            const j2 = await r2.json();
+            const j2 = await postJSON("/api/changelog", {project, component: comp, action: "first", text});
             if (j2.error) return notify(j2.error, true);
             notify("CHANGELOG.md written; the next bump dates it");
             drawChangelog(pane, comp, j2);
@@ -836,8 +835,7 @@ function nbArtifactsView({$, nb, project, root, sheet}){
       if (!await sendSure(project, comp ? `the version question for ${comp}` : "the version question")) return;
       busy(b, "Sending");
       try{
-        const r = await postJSON("/api/version", {project, action: "ask", component: comp});
-        const j = await r.json();
+        const j = await postJSON("/api/version", {project, action: "ask", component: comp});
         if (j.error){ notify(j.error, true); b.disabled = false; return; }
         if (!j.sent){
           notify("Not sent: the session is busy. Press Enter in its tab when it is free.",
@@ -1048,55 +1046,56 @@ this directory">Send to ${esc(sendAgent(project).name)}</button>
   // Drafts (the operator, 1 Nov): every release CI makes waits as a draft,
   // seen by the repository's own people alone, its notes read and corrected
   // here, then published. A role that may not release reads them.
-  async function loadDrafts(force){
-    const box = $("verDrafts");
-    if (!box) return;
-    // Notes being corrected are never redrawn under the person typing them.
-    if (!force && box.querySelector("textarea[data-dirty]")) return;
-    const j = await (await postJSON("/api/version", {project, action: "release-drafts"})).json().catch(() => ({drafts: []}));
-    const ds = j.drafts || [];
-    if (!ds.length){ box.innerHTML = ""; return; }
-    const may = !projReleaseWhy(project);
-    patch(box, docSection("artifacts", "drafts", "Drafts", `${ds.length} waiting`, ds.map(d => {
-      const miss = d.missing || [];
-      // What keeps it from being published, each said on its row (R206 step
-      // 3): a tag that is not on the git host stops the press; placeholder
-      // notes are put right in the box, so the press stays and is checked.
-      const holds = d.holds || [], stop = miss.length || holds.some(h => h.what !== "notes");
-      return `<div class="field verdraft" data-draft="${esc(d.tag)}" data-key="${esc(d.tag)}">
-        <div class="verln"><span>${d.prerelease ? "dev build" : "release"}</span><a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer">${esc(d.tag)}</a></div>
-        ${miss.length ? `<div class="hint warn">Not whole yet: ${esc(miss.join(", "))} still missing; CI may still be building it.</div>` : ""}
-        ${holds.map(h => `<div class="hint warn" data-drafthold="${esc(h.what)}">Not published yet: ${esc(h.why)}.</div>`).join("")}
-        <textarea rows="12" aria-label="${esc(d.tag)}'s notes"${may ? "" : " readonly"}>${esc(d.notes)}</textarea>
-        ${may ? `<div class="actbar"><span class="sp"></span><button type="button" data-draftsave>Save the notes</button><button type="button" class="primary" data-draftpub${stop ? " disabled" : ""}>Publish</button></div>` : ""}
-      </div>`;
-    }).join("") + `<div class="hint">Only this repository's own people see a draft. Read its notes and correct them, then Publish: the release goes public, the dev channel and the containers following :dev take it, and a stable one becomes :latest. Publish it here: the git host's own form checks none of this, and one published there with its tag field emptied went out under a name nothing reads.</div>`, {cls: "warn"}));
-    wireSections(box);
-    box.querySelectorAll("[data-draft]").forEach(row => {
-      const tag = row.dataset.draft, ta = row.querySelector("textarea");
-      const save = row.querySelector("[data-draftsave]"), pub = row.querySelector("[data-draftpub]");
-      ta.oninput = () => { ta.dataset.dirty = "1"; };
-      if (save) save.onclick = () => pressing(save, async () => {
-        const r = await (await postJSON("/api/version", {project, action: "release-draft-notes", tag, notes: ta.value})).json().catch(() => ({error: "no answer"}));
-        notify(r.error || `${tag}'s notes saved; it is still a draft`, !!r.error);
-        if (!r.error) delete ta.dataset.dirty;
-      });
-      if (pub) pub.onclick = () => pressing(pub, async () => {
-        if (!await askYes(`Publish ${tag}?\n\nIts notes as they stand in the box go out with it, and everybody can see and take it from then on: ${
-            tag.includes("-dev.") ? "the dev channel and the containers following :dev" : "every install following releases, and :latest"}. A published release is taken back with Withdraw.`,
-            {title: "Publish it?", verb: "Publish"})) return;
-        busy(pub, "Publishing");
-        const r = await (await postJSON("/api/version", {project, action: "release-publish", tag, notes: ta.value})).json().catch(() => ({error: "no answer"}));
-        notify(r.error || `${tag} is published`, !!r.error);
-        if (!r.error) await loadDrafts(true);
+  function loadDrafts(force){
+    return reading(`${project}:drafts`, async () => {
+      const box = $("verDrafts");
+      if (!box) return;
+      // Notes being corrected are never redrawn under the person typing them.
+      if (!force && box.querySelector("textarea[data-dirty]")) return;
+      const j = await postJSON("/api/version", {project, action: "release-drafts"});
+      const ds = j.drafts || [];
+      if (!ds.length){ box.innerHTML = ""; return; }
+      const may = !projReleaseWhy(project);
+      patch(box, docSection("artifacts", "drafts", "Drafts", `${ds.length} waiting`, ds.map(d => {
+        const miss = d.missing || [];
+        // What keeps it from being published, each said on its row (R206 step
+        // 3): a tag that is not on the git host stops the press; placeholder
+        // notes are put right in the box, so the press stays and is checked.
+        const holds = d.holds || [], stop = miss.length || holds.some(h => h.what !== "notes");
+        return `<div class="field verdraft" data-draft="${esc(d.tag)}" data-key="${esc(d.tag)}">
+          <div class="verln"><span>${d.prerelease ? "dev build" : "release"}</span><a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer">${esc(d.tag)}</a></div>
+          ${miss.length ? `<div class="hint warn">Not whole yet: ${esc(miss.join(", "))} still missing; CI may still be building it.</div>` : ""}
+          ${holds.map(h => `<div class="hint warn" data-drafthold="${esc(h.what)}">Not published yet: ${esc(h.why)}.</div>`).join("")}
+          <textarea rows="12" aria-label="${esc(d.tag)}'s notes"${may ? "" : " readonly"}>${esc(d.notes)}</textarea>
+          ${may ? `<div class="actbar"><span class="sp"></span><button type="button" data-draftsave>Save the notes</button><button type="button" class="primary" data-draftpub${stop ? " disabled" : ""}>Publish</button></div>` : ""}
+        </div>`;
+      }).join("") + `<div class="hint">Only this repository's own people see a draft. Read its notes and correct them, then Publish: the release goes public, the dev channel and the containers following :dev take it, and a stable one becomes :latest. Publish it here: the git host's own form checks none of this, and one published there with its tag field emptied went out under a name nothing reads.</div>`, {cls: "warn"}));
+      wireSections(box);
+      box.querySelectorAll("[data-draft]").forEach(row => {
+        const tag = row.dataset.draft, ta = row.querySelector("textarea");
+        const save = row.querySelector("[data-draftsave]"), pub = row.querySelector("[data-draftpub]");
+        ta.oninput = () => { ta.dataset.dirty = "1"; };
+        if (save) save.onclick = () => pressing(save, async () => {
+          const r = await postJSON("/api/version", {project, action: "release-draft-notes", tag, notes: ta.value});
+          notify(r.error || `${tag}'s notes saved; it is still a draft`, !!r.error);
+          if (!r.error) delete ta.dataset.dirty;
+        });
+        if (pub) pub.onclick = () => pressing(pub, async () => {
+          if (!await askYes(`Publish ${tag}?\n\nIts notes as they stand in the box go out with it, and everybody can see and take it from then on: ${
+              tag.includes("-dev.") ? "the dev channel and the containers following :dev" : "every install following releases, and :latest"}. A published release is taken back with Withdraw.`,
+              {title: "Publish it?", verb: "Publish"})) return;
+          busy(pub, "Publishing");
+          const r = await postJSON("/api/version", {project, action: "release-publish", tag, notes: ta.value});
+          notify(r.error || `${tag} is published`, !!r.error);
+          if (!r.error) await loadDrafts(true);
+        });
       });
     });
   }
 
   async function postVersion(body, quiet){
     try{
-      const r = await postJSON("/api/version", {project, ...body});
-      const j = await r.json();
+      const j = await postJSON("/api/version", {project, ...body});
       if (j.error){ notify(j.error, true); }
       else if (j.bumped){
         if (!quiet) notify(`version ${j.bumped.was} → ${j.bumped.target}`);
@@ -1113,8 +1112,7 @@ this directory">Send to ${esc(sendAgent(project).name)}</button>
 
   async function postArtifacts(body){
     try{
-      const r = await postJSON("/api/artifacts", {project, ...body});
-      const j = await r.json();
+      const j = await postJSON("/api/artifacts", {project, ...body});
       if (j.error){ notify(j.error, true); }
     }catch(e){ notify("artifacts: " + failWords(e), true); }
     await loadArtifacts();

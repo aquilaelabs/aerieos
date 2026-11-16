@@ -119,7 +119,7 @@ await section("The array's parity check", async () => {
     const ARR = { mount: '/mnt/array', mounted: true, policy: 'mfs', data: [{ slot: 1, id: 'ata-A', mounted: true, size_mb: 10, used_mb: 1 }], parity: [{ slot: 1, id: 'ata-P', mounted: true }],
                   running: 'verify', progress: '45%, 120 MB/s', verify: { at: Math.floor(Date.now() / 1000) - 3600, ok: true, found: 3, fixed: 2, unfixed: 1, corrected: true } };
     const lay = arr => { const n = (storageList || []).find(x => x.name === 'diskbox');
-      Object.assign(n, { own: true, mergerfs: true, snapraid: true, live: true, may_measure: true, array: arr }); storageRev++; drawPanes(); };
+      Object.assign(n, { own: true, mergerfs: true, snapraid: true, live: true, may_measure: true, array: arr }); readMoved('storage'); drawPanes(); };
     const sectOf = async () => { for (let i = 0; i < 20; i++){ await new Promise(r => setTimeout(r, 100));
       const x = document.querySelector('.storagetab details[data-sect="storage:array"]'); if (x) return x; } return null; };
     openStorageTab();
@@ -147,7 +147,7 @@ await section("The array's parity check", async () => {
       const m = (storageList || []).find(x => x.name === 'diskbox');
       Object.assign(m, { own: true, mergerfs: true, snapraid: true, live: true, may_measure: true, array: ARR, zfs: true });
       m.pools_importable = [{ name: 'tank', id: '1234', state: 'online', said: 'The pool can be imported using its name or numeric identifier.' }];
-      storageRev++; drawPanes(); await new Promise(r => setTimeout(r, 150));
+      readMoved('storage'); drawPanes(); await new Promise(r => setTimeout(r, 150));
       out.found = [...document.querySelectorAll('.storagetab [data-poolfound]')].map(r => r.dataset.poolfound + ':' + !!r.querySelector('[data-stpool="import"]'));
     }
     const { verify, ...older } = ARR;
@@ -175,12 +175,12 @@ await section("Each share's places on an array taken over", async () => {
     const keepOwn = ownMachine, keepPost = postJSON, posted = [];
     ownMachine = () => ({ id: 'x', reported: { adopted: { mounts: [{ where: '/mnt/disk1' }, { where: '/mnt/cache' }, { where: '/mnt/fast' }] } } });
     // Only the presses under test: the page posts its own things too (its layout).
-    postJSON = async (url, body) => { if (/^storage-/.test(body?.action || "")) posted.push(body); else return keepPost(url, body); return { json: async () => ({ ok: true }) }; };
+    postJSON = async (url, body) => { if (/^storage-/.test(body?.action || "")) posted.push(body); else return keepPost(url, body); return { ok: true }; };
     const n = (storageList || []).find(x => x.name === 'diskbox');
     const lay = () => { Object.assign(n, { own: true, smb: true, nfs: false, live: true, may_measure: true, mergerfs: true, snapraid: true,
       array: { mount: '/mnt/user', mounted: true, adopted: true, policy: 'adopted', data: [{ slot: 1, id: 'ata-A', mounted: true }], parity: [{ slot: 1, id: 'ata-P', mounted: true }],
                moves: [{ share: 'TV Shows', land: 'cache', from: 'cache', to: 'array' }, { share: 'isos', land: 'array', from: '', to: '' }] },
-      shares: [{ name: 'TV Shows', path: '/mnt/user/TV Shows', smb: { on: true, guest: true }, nfs: { on: false } }] }); storageRev++; drawPanes(); };
+      shares: [{ name: 'TV Shows', path: '/mnt/user/TV Shows', smb: { on: true, guest: true }, nfs: { on: false } }] }); readMoved('storage'); drawPanes(); };
     const out = {};
     try {
       let row = null;
@@ -217,7 +217,7 @@ await section("Each share's places on an array taken over", async () => {
           array: { mount: '/mnt/user', mounted: true, adopted: true, policy: 'adopted', data: [{ slot: 1, id: 'ata-A', mounted: true }], parity: [{ slot: 1, id: 'ata-P', mounted: true }],
                    moves: [{ share: 'TV Shows', land: 'cache', from: 'cache', to: 'array' }] },
           shares: [{ name: 'TV Shows', path: '/mnt/user/TV Shows', smb: { on: true, guest: true }, nfs: { on: false } }] });
-        storageRev++; drawPanes();
+        readMoved('storage'); drawPanes();
         for (let i = 0; i < 100 && !document.querySelector('.storagetab [data-stshareedit="TV Shows"]'); i++) await new Promise(r => setTimeout(r, 50));
         const d = document.querySelector('.storagetab details[data-sect="storage:shares"]'); if (d) d.open = true;
         document.querySelector('.storagetab [data-stshareedit="TV Shows"]')?.click();

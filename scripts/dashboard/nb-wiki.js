@@ -195,12 +195,11 @@ function nbWikiView({$, nb, project}){
   const articles = () => pages().filter(p => !SPECIAL.includes(p.name));
   const byName = n => pages().find(p => p.name.toLowerCase() === String(n).replace(/ /g, "-").toLowerCase());
 
-  let inFlight = null;
+  // A read on its way is shared by whoever asks while it is out.
   function loadWiki(){
-    if (inFlight) return inFlight;
-    inFlight = (async () => {
-      try{ nb.wkData = await (await fetch("/api/wiki" + q)).json(); }
-      catch(e){ nb.wkData = {error: String(e), pages: []}; }
+    return reading(`${project}:wiki`, async () => {
+      nb.wkData = await getJSON("/api/wiki" + q);
+      if (nb.wkData.error) nb.wkData = {error: nb.wkData.error, pages: []};
       nb.wkRev = nb.wkData.rev ?? nb.wkRev;
       // A page that moved is read again.
       const now = new Map(pages().map(p => [p.name, p.rev]));
@@ -211,13 +210,12 @@ function nbWikiView({$, nb, project}){
       drawWiki();
       const want = [nb.wkCur, ...SPECIAL.filter(n => now.has(n))].filter(n => n && !nb.wkPages[n]);
       await Promise.all(want.map(readPage));
-    })().finally(() => { inFlight = null; });
-    return inFlight;
+    }, {join: Infinity});
   }
 
   async function readPage(name){
     try{
-      const r = await (await fetch("/api/wiki" + q + "&page=" + encodeURIComponent(name))).json();
+      const r = await getJSON("/api/wiki" + q + "&page=" + encodeURIComponent(name));
       nb.wkPages[name] = r.error ? {error: r.error} : r;
     }catch(e){ nb.wkPages[name] = {error: String(e)}; }
     drawWiki();
@@ -325,7 +323,7 @@ function nbWikiView({$, nb, project}){
     head();
     const d = nb.wkData;
     if (!d){ box.innerHTML = ""; return; }
-    if (d.error){ box.innerHTML = `<div class="field"><div class="hint bad">${esc(d.error)}</div></div>`; return; }
+    if (d.error){ drawHTML(box, `<div class="field"><div class="hint bad">${esc(d.error)}</div></div>`); return; }
     const ro = projWriteWhy(project);
     const a = ro ? null : nb.wkAdding;
     const add = a
@@ -353,10 +351,8 @@ function nbWikiView({$, nb, project}){
   function failed(msg){ notify(msg, true); }
 
   async function post(body){
-    const r = await postJSON("/api/wiki", {project, ...body});
-    let j = {};
-    try{ j = await r.json(); }catch{ j = {error: `the controller answered ${r.status}`}; }
-    if (!r.ok || j.error){ failed(j.error || `the controller answered ${r.status}`); return null; }
+    const j = await postJSON("/api/wiki", {project, ...body});
+    if (j.error){ failed(j.error); return null; }
     return j;
   }
 
@@ -439,15 +435,13 @@ function nbWikiView({$, nb, project}){
   $("wkPush").onclick = async ev => {
     if (wikiDirty() && !await askYes("Push what is saved?\n\nA page is being edited and is not saved; its edits stay here.", {verb: "Push"})) return;
     busy(ev.target, "Pushing");
-    const r = await postJSON("/api/wiki", {project, action: "push"});
-    let j = await r.json().catch(() => ({}));
+    let j = await postJSON("/api/wiki", {project, action: "push"});
     // The forge has something this wiki has not: most often the one page
     // GitHub makes you save before a wiki exists. Replacing it is offered,
     // said for what it is.
     if (j.error && /has not taken in/.test(j.error)
         && await askYes(`${j.error}.\n\nReplace the forge's wiki with this one? Pages there that are not here are removed from it (its own history keeps them). Cancel, then Pull, to merge instead.`)){
-      const r2 = await postJSON("/api/wiki", {project, action: "push", replace: true});
-      j = await r2.json().catch(() => ({}));
+      j = await postJSON("/api/wiki", {project, action: "push", replace: true});
     }
     unbusy(ev.target, "Push");
     if (j.error) failed(j.error); else if (j.to) notify(`pushed the wiki to ${j.to}`);

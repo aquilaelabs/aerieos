@@ -20,7 +20,7 @@
 
 "use strict";
 
-let ph = null, phBusy = "", phRev = 0, phFetching = false, phRefreshing = false;
+let ph = null, phBusy = "", phRefreshing = false;
 let phNode = "";                 // the picked node's id; "" until the first answer
 // Held outside the render, because the tab is rebuilt whole on every draw and
 // a field that emptied itself mid-sentence would be unusable.
@@ -53,12 +53,12 @@ function renderPhoneInto(i){
     const fld = (label, em, grow = false) => skField(label, em, grow ? "grow" : "");
     d.setBar("");
     // In the card the rows land in (.phonetab).
-    d.list.innerHTML = skTpl(`<div class="phonetab"><div class="row toolstate"><div class="grow"><div class="name">Phone ${skv(6)}</div>
+    drawHTML(d.list, skTpl(`<div class="phonetab"><div class="row toolstate"><div class="grow"><div class="name">Phone ${skv(6)}</div>
         <div class="sub">${skv(10)}</div></div><span class="acts actbar">${phoneCheckBtn(true)}</span></div>
       <div class="row">${fld("Phone IP address", 18, true)}${fld("Port", 7)}<span class="acts"><button type="button" class="primary" disabled>Connect</button></span></div>
       <div class="row"><div class="grow prefrow ctlrow">${fld("Pairing port", 9)}${fld("Pairing code", 9)}</div>
         <span class="acts"><button type="button" disabled>Pair</button></span>
-        <div class="sub">On the phone: Wireless debugging, then <b>Pair device with pairing code</b>. Keep that dialog open.</div></div></div>`);
+        <div class="sub">On the phone: Wireless debugging, then <b>Pair device with pairing code</b>. Keep that dialog open.</div></div></div>`));
     return;
   }
   const nodes = ph.nodes || [];
@@ -83,42 +83,46 @@ function renderPhoneInto(i){
 // question they ask.
 const mayPhone = () => true;
 
-async function phFetch(body, probe){
-  const knew = phNode;
+// A press's ask is sent at once and its answer drawn; a read of the list
+// goes through reading(), one at a time.
+function phFetch(body, probe){
   // An answer leaves the list the moment it is given (B641): the server
   // drops an allowed or denied ask at once, but this request returns only
   // when what was allowed has run, which for a root command is minutes.
   // The answer that comes back is the list either way.
   if (body && (body.action === "allow" || body.action === "deny") && ph?.asks){
     ph.asks = ph.asks.filter(a => a.id !== body.id);
-    phRev++;
+    readMoved("phone");
     if (tabs.some(t => ["phone", "nodes", "docker"].includes(t.kind))) drawPanes();
     drawBell();
   }
-  try{
-    const q = `?node=${encodeURIComponent(phNode)}${probe ? "&probe=1" : ""}`;
-    const r = body
-      ? await fetch("/api/phone", {method: "POST",
-          headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({node: phNode, ...body})})
-      : await fetch("/api/phone" + q);
-    const j = await r.json();
-    if (j.error){ notify(j.error, true); if (!ph) return; }
-    else ph = j;
-  // A read of its own that met a controller not answering is the poll's to
-  // say (its light and the line under the header), not a failure to keep;
-  // a press is told either way (B301).
-  }catch(e){ if (body || !unreached(e)) notify("phone: " + failWords(e), true); }
-  phBusy = ""; phRefreshing = false;
-  if (ph && !ph.nodes.some(n => n.id === phNode)) phNode = ph.nodes[0]?.id || "";
-  // A probe asked for before any node was known went nowhere: now one is,
-  // ask it once.
-  if (probe && !body && !knew && phNode) return phFetch(null, true);
-  phRev++;
+  if (body) return phSend(body);
+  return reading("phone", () => phRead(probe));
+}
+async function phSend(body){
+  phLanded(await postJSON("/api/phone", {node: phNode, ...body}), true);
+  readMoved("phone");
   // The Nodes tab draws the root asks from the same answer, and the Docker
   // tab the rebuild ones.
   if (tabs.some(t => ["phone", "nodes", "docker"].includes(t.kind))) drawPanes();
+  drawBell();
+}
+async function phRead(probe){
+  const knew = phNode;
+  phLanded(await getJSON(`/api/phone?node=${encodeURIComponent(phNode)}${probe ? "&probe=1" : ""}`), false);
+  // A probe asked for before any node was known went nowhere: now one is,
+  // ask it once (read when this one lands).
+  if (probe && !knew && phNode) phFetch(null, true);
   drawBell();          // the same asks, in the header
+}
+// A read of its own that met a controller not answering is the poll's to
+// say (its light and the line under the header), not a failure to keep;
+// a press is told either way (B301).
+function phLanded(j, pressed){
+  if (j.error){ if (pressed || !j.unreached) notify(j.unreached ? "phone: " + j.error : j.error, true); }
+  else ph = j;
+  phBusy = ""; phRefreshing = false;
+  if (ph && !ph.nodes.some(n => n.id === phNode)) phNode = ph.nodes[0]?.id || "";
 }
 
 // Why Connect or Pair cannot be pressed, said under its row in red (B114:
@@ -353,7 +357,7 @@ function wirePhoneTab(root){
   on("phConnect", () => {
     if (!phIp.trim()) return notify("the phone's IP, from its wireless debugging screen", true);
     if (!phConnPort.trim()) return notify("the port too: after the colon under IP address & port on its wireless debugging screen", true);
-    phBusy = "connecting"; phRev++; drawPanes();
+    phBusy = "connecting"; readMoved("phone"); drawPanes();
     phFetch({action: "connect", ip: phIp.trim(), port: phConnPort.trim()});
   });
   on("phDisconnect", async () => {
@@ -361,11 +365,11 @@ function wirePhoneTab(root){
     // is, and that its lease goes with it (R120).
     const other = document.getElementById("phDisconnect")?.dataset.other;
     if (other && !await askYes(`Disconnect ${other}'s phone? Its lease to a space ends too.`)) return;
-    phBusy = "disconnecting"; phRev++; drawPanes();
+    phBusy = "disconnecting"; readMoved("phone"); drawPanes();
     phFetch({action: "disconnect"});
   });
   on("phPair", () => {
-    phBusy = "pairing"; phRev++; drawPanes();
+    phBusy = "pairing"; readMoved("phone"); drawPanes();
     phFetch({action: "pair", ip: phIp.trim(), port: phPort.trim(), code: phCode.trim()});
   });
   root.querySelectorAll("[data-kconnect]").forEach(b => b.onclick = () => {
@@ -376,13 +380,13 @@ function wirePhoneTab(root){
       $$("phConnPort")?.focus();
       return notify("type today's port: after the colon under IP address & port on its wireless debugging screen", true);
     }
-    phBusy = "connecting"; phRev++; drawPanes();
+    phBusy = "connecting"; readMoved("phone"); drawPanes();
     phFetch({action: "connect", ip: phIp, port: phConnPort.trim()});
   });
   root.querySelectorAll("[data-kforget]").forEach(b => b.onclick = () =>
     phFetch({action: "forget", ip: b.dataset.kforget}));
   root.querySelectorAll("[data-allow]").forEach(b => b.onclick = () => {
-    phBusy = "running it"; phRev++; drawPanes();
+    phBusy = "running it"; readMoved("phone"); drawPanes();
     phFetch({action: "allow", id: Number(b.dataset.allow), session: !!b.dataset.session});
   });
   root.querySelectorAll("[data-untrust]").forEach(b => b.onclick = () =>
@@ -395,9 +399,9 @@ function wirePhoneTab(root){
   on("phLend", () => {
     const project = lt?.value || "";
     if (!project) return notify("pick the space to lend it to", true);
-    phBusy = "lending"; phRev++; drawPanes();
+    phBusy = "lending"; readMoved("phone"); drawPanes();
     phFetch({action: "lend", project, hours: Number(lf?.value || 1)});
   });
-  on("phTakeBack", () => { phBusy = "taking it back"; phRev++; drawPanes(); phFetch({action: "take-back"}); });
-  on("phLook", () => { phBusy = "looking"; phRev++; drawPanes(); phFetch({action: "look"}); });
+  on("phTakeBack", () => { phBusy = "taking it back"; readMoved("phone"); drawPanes(); phFetch({action: "take-back"}); });
+  on("phLook", () => { phBusy = "looking"; readMoved("phone"); drawPanes(); phFetch({action: "look"}); });
 }

@@ -4,8 +4,8 @@
 // from the chooser the Claude button opens.
 //
 // One classic script beside index.html (docs/design-language.md, Files):
-// pure declarations, nothing runs at load. What runs at load stays in
-// index.html under the section's header.
+// pure declarations, nothing runs at load. What runs at load is
+// page-boot.js's, under the section's header.
 
 "use strict";
 
@@ -64,14 +64,16 @@ let rmAgent = {project: "", agent: ""};
 let rmConvs = {project: "", rows: null, error: ""};
 // ...and the one its pulldown is on, the newest until another is picked.
 let rmConv = {project: "", id: ""};
-async function loadRmConvs(name){
-  rmConvs = {project: name, rows: null, error: ""};
-  try{
-    const j = await (await fetch("/api/transcripts?project=" + encodeURIComponent(name))).json();
-    if (rmConvs.project !== name) return;
-    rmConvs = j.error ? {project: name, rows: [], error: j.error} : {project: name, rows: j.rows || [], error: ""};
-  }catch(e){ if (rmConvs.project === name) rmConvs = {project: name, rows: [], error: "could not read your conversations: " + failWords(e)}; }
-  if (resumeFor === name && !resumePick) placeResumeMenu();
+function loadRmConvs(name){
+  return reading("rmconvs", async () => {
+    rmConvs = {project: name, rows: null, error: ""};
+    try{
+      const j = await getJSON("/api/transcripts?project=" + encodeURIComponent(name));
+      if (rmConvs.project !== name) return;
+      rmConvs = j.error ? {project: name, rows: [], error: j.error} : {project: name, rows: j.rows || [], error: ""};
+    }catch(e){ if (rmConvs.project === name) rmConvs = {project: name, rows: [], error: "could not read your conversations: " + failWords(e)}; }
+    if (resumeFor === name && !resumePick) placeResumeMenu();
+  });
 }
 
 // `ps -o etime=` gives MM:SS under an hour, HH:MM:SS under a day, and
@@ -390,19 +392,19 @@ async function openBrief(name, node, agent = "claude"){
   if (agent === "claude"){
     for (const [id, table, cur] of [["briefModel", MODELS, p?.yours?.model || ""],
                                     ["briefEffort", EFFORTS, p?.yours?.effort || ""]]){
-      $(id).innerHTML = optionList(table, cur);
+      drawHTML($(id), optionList(table, cur));
     }
   } else {
     const t = agent === "open" ? routerModels(p) : (AGENT_MODELS[agent] || {models: [], efforts: []});
     for (const [id, xs, cur] of [["briefModel", t.models, p?.yours?.[`${agent}_model`] || ""],
                                  ["briefEffort", t.efforts, p?.yours?.[`${agent}_effort`] || ""]]){
-      $(id).innerHTML = optionList([["", `${a.name}'s default`], ...xs.map(v => Array.isArray(v) ? v : [v, v])], cur);
+      drawHTML($(id), optionList([["", `${a.name}'s default`], ...xs.map(v => Array.isArray(v) ? v : [v, v])], cur));
     }
   }
   for (const b of ["briefGo", "briefSkip"]) $(b).disabled = true;
   $("briefModal").hidden = false;
   try{
-    const j = await (await fetch("/api/brief?project=" + encodeURIComponent(name))).json();
+    const j = await getJSON("/api/brief?project=" + encodeURIComponent(name));
     if (briefFor?.name !== name) return;
     if (j.error) throw new Error(j.error);
     $("briefText").value = j.text || "";
@@ -432,11 +434,11 @@ async function briefGo(skip){
   try{
     const mk = f.agent === "claude" ? "model" : `${f.agent}_model`, ek = f.agent === "claude" ? "effort" : `${f.agent}_effort`;
     if (model !== (p?.yours?.[mk] || "") || effort !== (p?.yours?.[ek] || "")){
-      const j = await (await postJSON("/api/prefs", {project: f.name, [mk]: model, [ek]: effort})).json();
+      const j = await postJSON("/api/prefs", {project: f.name, [mk]: model, [ek]: effort});
       if (j.error) throw new Error(j.error);
     }
-    const j = await (await postJSON("/api/brief", skip ? {project: f.name, action: "aside"}
-                                                       : {project: f.name, action: "stage", text})).json();
+    const j = await postJSON("/api/brief", skip ? {project: f.name, action: "aside"}
+                                                       : {project: f.name, action: "stage", text});
     if (j.error) throw new Error(j.error);
   }catch(e){
     unbusy(b, was);
@@ -478,7 +480,7 @@ function resumePicker(p, m, card, anchor, ns, several){
   // The head names the agent and its product, as the other agents' does.
   // Which of your Claude sessions it is, past the first (R143).
   const as = (r.slot || 1) > 1 ? ` as ${agentSlotName(agentById("claude"), r.slot)}` : "";
-  m.innerHTML = `<div class="rmhead"><b>${r.restart ? `Restart your ${esc(agentSlotName(agentById("claude"), r.slot || 1))} session`
+  drawHTML(m, `<div class="rmhead"><b>${r.restart ? `Restart your ${esc(agentSlotName(agentById("claude"), r.slot || 1))} session`
       : r.sessionId ? "Resume the Claude conversation" : "A new Claude conversation"}</b><span class="rmfacts">${
       r.restart ? (r.when ? `ending the one running, resuming the one from ${esc(ago(r.when))} · ` : "ending the one running, resuming its conversation · ")
         : r.sessionId ? `from ${esc(ago(r.when ?? p.last_claude?.when))} · ` : ""}Claude Code${
@@ -489,7 +491,7 @@ function resumePicker(p, m, card, anchor, ns, several){
     </div>
     <div class="actbar rmacts"><span class="state" id="rmSay"></span><span class="sp"></span>
       <button type="button" data-back>Back</button>
-      <button type="button" class="${r.restart ? "danger" : "primary"}" data-start>${r.restart ? "Restart" : "Start"}</button></div>`;
+      <button type="button" class="${r.restart ? "danger" : "primary"}" data-start>${r.restart ? "Restart" : "Start"}</button></div>`);
   m.dataset.pick = p.name;
   card.appendChild(m);
   const say = () => { if (r.agent === "open"){ const w = routerSays(p, r.model); const el = m.querySelector("#rmSay"); el.textContent = w; el.classList.toggle("warn", !!w); } };
@@ -504,8 +506,7 @@ function resumePicker(p, m, card, anchor, ns, several){
                   : "It ends now and resumes the same conversation, starting fresh so it sees what changed since it started."))) return;
     busy(e.target, r.restart ? "Restarting" : "Starting");
     if (r.model !== (p.yours?.model || "") || r.effort !== (p.yours?.effort || "")){
-      const j = await (await postJSON("/api/prefs", {project: p.name, model: r.model, effort: r.effort})).json()
-        .catch(() => ({error: "no answer"}));
+      const j = await postJSON("/api/prefs", {project: p.name, model: r.model, effort: r.effort});
       if (j.error){ unbusy(e.target, label); m.querySelector("#rmSay").textContent = j.error; return; }
       if (p.yours) Object.assign(p.yours, {model: r.model, effort: r.effort});
     }
@@ -519,7 +520,7 @@ function resumePicker(p, m, card, anchor, ns, several){
   // What the last session here answered on, for Claude's default to name.
   if (resumeModelNow.project !== p.name){
     resumeModelNow = {project: p.name, model: ""};
-    fetch(`/api/claude-now?project=${encodeURIComponent(p.name)}`).then(x => x.json())
+    getJSON(`/api/claude-now?project=${encodeURIComponent(p.name)}`)
       .then(j => {
         if (!j.model || resumeModelNow.project !== p.name) return;
         resumeModelNow.model = j.model;
@@ -568,7 +569,7 @@ function agentPicker(p, m, card, anchor, n, several){
   const said = agentSlotName(a, r.slot || 1), as = (r.slot || 1) > 1 ? ` as ${said}` : "";
   const opts = (xs, cur) => [`<option value="">${esc(a.name)}'s default</option>`]
     .concat(xs.map(v => { const [val, label] = Array.isArray(v) ? v : [v, v]; return `<option value="${esc(val)}"${val === cur ? " selected" : ""}>${esc(label)}</option>`; })).join("");
-  m.innerHTML = `<div class="rmhead"><b>${r.restart ? `Restart your ${esc(said)} session`
+  drawHTML(m, `<div class="rmhead"><b>${r.restart ? `Restart your ${esc(said)} session`
       : r.sessionId ? `Resume the ${esc(a.name)} conversation` : `A new ${esc(a.name)} conversation`}</b><span class="rmfacts">${
       r.restart ? (r.sessionId ? "ending the one running, resuming its conversation · " : "ending the one running · ")
         : r.sessionId && r.when ? `from ${esc(ago(r.when))} · ` : ""}${esc(a.product)}${
@@ -579,7 +580,7 @@ function agentPicker(p, m, card, anchor, n, several){
     </div>
     <div class="actbar rmacts"><span class="state" id="rmSay"></span><span class="sp"></span>
       <button type="button" data-back>Back</button>
-      <button type="button" class="${r.restart ? "danger" : "primary"}" data-start>${r.restart ? "Restart" : "Start"}</button></div>`;
+      <button type="button" class="${r.restart ? "danger" : "primary"}" data-start>${r.restart ? "Restart" : "Start"}</button></div>`);
   m.dataset.pick = p.name;
   card.appendChild(m);
   const say = () => { if (r.agent === "open"){ const w = routerSays(p, r.model); const el = m.querySelector("#rmSay"); el.textContent = w; el.classList.toggle("warn", !!w); } };
@@ -596,7 +597,7 @@ function agentPicker(p, m, card, anchor, n, several){
     const mk = `${r.agent}_model`, ek = `${r.agent}_effort`;
     busy(e.target, r.restart ? "Restarting" : "Starting");
     if (r.model !== (p.yours?.[mk] || "") || r.effort !== (p.yours?.[ek] || "")){
-      const j = await (await postJSON("/api/prefs", {project: p.name, [mk]: r.model, [ek]: r.effort})).json().catch(() => ({error: "no answer"}));
+      const j = await postJSON("/api/prefs", {project: p.name, [mk]: r.model, [ek]: r.effort});
       if (j.error){ unbusy(e.target, label); m.querySelector("#rmSay").textContent = j.error; return; }
       if (p.yours) Object.assign(p.yours, {[mk]: r.model, [ek]: r.effort});
     }
@@ -756,7 +757,7 @@ function placeResumeMenu(){
   was?.remove();
   m.dataset.for = p.name;
   m.dataset.sig = html;
-  m.innerHTML = html;
+  drawHTML(m, html);
   card.appendChild(m);
   const nsel = m.querySelector("#rmNodeSel");
   if (nsel) nsel.onchange = () => { rmNode = {project: p.name, node: nsel.value}; placeResumeMenu(); };

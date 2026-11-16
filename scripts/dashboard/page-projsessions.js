@@ -12,17 +12,19 @@
 
 "use strict";
 
-async function rnSessionsLoad(name){
-  // Not asked for and refused (B89), and not drawn for a role that does
-  // not give it (the operator, 21 Oct).
-  if (rnSettingsWhy(name)) return;
-  let j;
-  try{
-    j = await (await fetch("/api/project-sessions?project=" + encodeURIComponent(name))).json();
-  }catch(e){ return; }
-  if (rnFor !== name || rnMode === "git") return;
-  if (j.error){ rnWhyOff($("rnSessField"), $("rnSessList"), j.error); return; }
-  rnSessionsDraw(name, j.sessions || []);
+function rnSessionsLoad(name){
+  return reading("rn.sessions", async () => {
+    // Not asked for and refused (B89), and not drawn for a role that does
+    // not give it (the operator, 21 Oct).
+    if (rnSettingsWhy(name)) return;
+    let j;
+    try{
+      j = await getJSON("/api/project-sessions?project=" + encodeURIComponent(name));
+    }catch(e){ return; }
+    if (rnFor !== name || rnMode === "git") return;
+    if (j.error){ rnWhyOff($("rnSessField"), $("rnSessList"), j.error); return; }
+    rnSessionsDraw(name, j.sessions || []);
+  });
 }
 
 // Whose, what and where on each row; "you" for the reader's own.
@@ -51,8 +53,8 @@ async function rnSessionEnd(name, r, btn){
       : `End ${whose} shell on ${projLabel(name)}?\n\nWhatever is running in it stops.`)) return;
   busy(btn, "Ending");
   try{
-    const j = await (await postJSON("/api/project-sessions",
-      {project: name, action: "end", session: r.name, node: r.node_id || ""})).json();
+    const j = await postJSON("/api/project-sessions",
+      {project: name, action: "end", session: r.name, node: r.node_id || ""});
     if (j.error){ notify(j.error, true); unbusy(btn, "End"); return; }
     notify(`ended ${whose} ${r.kind === "claude" ? "Claude session" : "shell"} on ${projLabel(name)}`);
   }catch(e){ notify("could not end it: " + failWords(e), true); unbusy(btn, "End"); return; }

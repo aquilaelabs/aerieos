@@ -13,7 +13,7 @@
 
 "use strict";
 
-let inst = null, instNode = "", instRev = 0, instSeq = 0, instLanded = 0, instFollow = null;
+let inst = null, instNode = "", instFollow = null;
 let instWantAgent = "";        // the agent whose page a door asked for, until the rows land
 const instDraft = {};          // what was typed into a Configure form and not saved yet, by row
 const INST_KINDS = [["agent", "Coding agents"], ["toolchain", "Toolchains"], ["pack", "Tool packs"], ["service", "Services"]];
@@ -33,7 +33,7 @@ function openInstalledOn(id, agent = "", row = ""){
   try{ localStorage.setItem("bb.instnode", id); }catch(e){ /* private */ }
   const was = location.hash;
   openInstalledTab();
-  instRev++;
+  readMoved("installed");
   const to = routeOf(tabOf(panes[0]));
   if (to && to !== was) shellPush(to);
   loadInstalled();
@@ -54,41 +54,30 @@ function instPick(){
   return live.find(n => n.id === want) || null;
 }
 
-async function loadInstalled(){
-  const asked = ++instSeq;
-  if (nodesList === null || nodesStale) await loadNodes();
-  if (asked !== instSeq) return;
-  if (!instPick()){
-    inst = {nonode: true};
-    instRev++; drawPanes();
-    return;
-  }
-  const node = instNode;
-  const keep = () => instNode === node && asked > instLanded;
-  try{
-    const r = await fetch("/api/library?node=" + encodeURIComponent(node));
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    const got = await r.json();
-    if (!keep()) return;
+function loadInstalled(){
+  return reading("installed", async () => {
+    if (nodesList === null || nodesStale) await loadNodes();
+    if (!instPick()){ inst = {nonode: true}; return; }
+    // A reply is kept while it is still about the node on show.
+    const node = instNode;
+    const got = await getJSON("/api/library?node=" + encodeURIComponent(node));
+    if (instNode !== node) return;
     inst = got;
-  }catch(e){ if (!keep()) return; inst = {error: failWords(e)}; }
-  instLanded = asked;
-  let wantPage = "";
-  if (!inst.error){
-    tcSandboxNow = !!inst.sandbox; agYours = inst.yours || {plugins: [], mcp: {}};
-    if (toolchains && !toolchains.nonode && !toolchains.error) toolchains.job = inst.job; else toolchains = {name: inst.name, job: inst.job, items: []};
-    if (instWantAgent){
-      const r = (inst.rows || []).find(x => x.kind === "agent" && x.agent === instWantAgent);
-      instWantAgent = "";
-      // The agent's own page, at its sign-in (R181 step 2), once drawn.
-      if (r) wantPage = `agent:${r.name}`;
+    let wantPage = "";
+    if (!inst.error){
+      tcSandboxNow = !!inst.sandbox; agYours = inst.yours || {plugins: [], mcp: {}};
+      if (toolchains && !toolchains.nonode && !toolchains.error) toolchains.job = inst.job; else toolchains = {name: inst.name, job: inst.job, items: []};
+      if (instWantAgent){
+        const r = (inst.rows || []).find(x => x.kind === "agent" && x.agent === instWantAgent);
+        instWantAgent = "";
+        // The agent's own page, at its sign-in (R181 step 2), once drawn.
+        if (r) wantPage = `agent:${r.name}`;
+      }
     }
-  }
-  clearTimeout(instFollow); instFollow = null;
-  if ((inst.rows || []).some(r => r.running)) instFollow = setTimeout(loadInstalled, 3000);
-  instRev++;
-  drawPanes();
-  if (wantPage) openThing(instNode, wantPage, "signin");
+    clearTimeout(instFollow); instFollow = null;
+    if ((inst.rows || []).some(r => r.running)) instFollow = setTimeout(loadInstalled, 3000);
+    if (wantPage) setTimeout(() => openThing(instNode, wantPage, "signin"));
+  });
 }
 
 // What is here: an installed row, the machine's own rows, a deployed
@@ -311,15 +300,15 @@ function renderInstalledInto(i){
   if (!d) return;
   if (inst === null){
     d.setBar("");    // the node is the Machines header's (R177)
-    d.list.innerHTML = skTpl(pageHead({facts: [["Installed", GHOST], ["Updates due", GHOST]]})
-      + INST_KINDS.map(([k, title]) => docSection("installed", k, title, "", skRows(2))).join(""));
-    if (!instSeq) loadInstalled();
+    drawHTML(d.list, skTpl(pageHead({facts: [["Installed", GHOST], ["Updates due", GHOST]]})
+      + INST_KINDS.map(([k, title]) => docSection("installed", k, title, "", skRows(2))).join("")));
+    if (!readRev("installed") && !readBusy("installed")) loadInstalled();
     return;
   }
   const pnodes = (nodesList || []).filter(x => x.kind === "agent" && x.state !== "retired").map(x => ({id: x.id, name: x.name, live: x.live}));
   if (inst.nonode){
     d.setBar("");
-    d.list.innerHTML = noNodeYet("toolchains and coding agents install on a node", "instnone");
+    drawHTML(d.list, noNodeYet("toolchains and coding agents install on a node", "instnone"));
     return;
   }
   const may = inst.may || {};
@@ -378,12 +367,12 @@ function wireInstalled(root){
     // Set, not added: a patched page keeps the form across its draws (R244).
     form.oninput = read;
     form.onchange = read;
-    form.querySelectorAll("[data-icadd]").forEach(b => b.onclick = () => { const v = read(); v[b.dataset.icadd] = [...(v[b.dataset.icadd] || []), {}]; instRev++; drawPanes(); });
-    form.querySelectorAll("[data-icrm]").forEach(b => b.onclick = () => { const v = read(); v[b.dataset.icrm].splice(Number(b.dataset.icrow), 1); instRev++; drawPanes(); });
+    form.querySelectorAll("[data-icadd]").forEach(b => b.onclick = () => { const v = read(); v[b.dataset.icadd] = [...(v[b.dataset.icadd] || []), {}]; readMoved("installed"); drawPanes(); });
+    form.querySelectorAll("[data-icrm]").forEach(b => b.onclick = () => { const v = read(); v[b.dataset.icrm].splice(Number(b.dataset.icrow), 1); readMoved("installed"); drawPanes(); });
     const save = form.querySelector("[data-icsave]");
     if (save) save.onclick = () => pressing(save, async () => {
       busy(save, "Saving");
-      const j = await (await postJSON("/api/library", {action: "configure", node: instNode, pack: r.name, values: read(), ...(scope === "person" ? {scope} : {})})).json().catch(() => ({error: "no answer"}));
+      const j = await postJSON("/api/library", {action: "configure", node: instNode, pack: r.name, values: read(), ...(scope === "person" ? {scope} : {})});
       if (j.error){ notify(j.error, true); return; }
       delete instDraft[dk];
       // Saved, the form is drawn fresh: a key is shown as set and its field
@@ -399,7 +388,7 @@ function wireInstalled(root){
     const act = b.dataset.instsvc;
     busy(b, act === "ollama-pull" ? "Pulling" : act === "ollama-remove" ? "Removing" : "Reading");
     const model = act === "ollama-pull" ? row.querySelector("[data-instpull]")?.value || "" : b.dataset.instmodel || "";
-    const j = await (await postJSON("/api/library", {action: act, node: instNode, pack: r.name, model})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/library", {action: act, node: instNode, pack: r.name, model});
     if (j.error) notify(j.error, true); else if (act === "ollama-pull") notify(`pulling ${model}: a job on the Jobs page`);
     await loadInstalled();
   }));
@@ -413,7 +402,7 @@ async function instAct(b, act, kind, name){
   if (kind === "service"){
     if (act === "remove" && !await askYes(`Remove ${r.label} from ${where}? Its keys stay here sealed; the spaces lose their way to it.`, {verb: "Remove", danger: true})) return;
     busy(b, act === "remove" ? "Removing" : "Deploying");
-    const j = await (await postJSON("/api/library", {action: act, node: instNode, pack: r.name})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/library", {action: act, node: instNode, pack: r.name});
     if (j.error) notify(j.error, true);
     else if (j.job) notify(`${act === "remove" ? "removing" : "deploying"} ${r.label}: its row on the Containers page has the build`);
     await loadInstalled();
@@ -423,7 +412,7 @@ async function instAct(b, act, kind, name){
     if (kind === "agent"){
       if (!await askYes(`Update ${r.label} on ${where}? Its sessions there end first; they start again from the space rows.`)) return;
       busy(b, "Asking");
-      const j = await (await postJSON("/api/agents", {action: "install", node: instNode, agent: r.agent || ""})).json().catch(() => ({error: "no answer"}));
+      const j = await postJSON("/api/agents", {action: "install", node: instNode, agent: r.agent || ""});
       if (j.error) notify(j.error, true);
     } else {
       busy(b, "Updating");
@@ -436,7 +425,7 @@ async function instAct(b, act, kind, name){
   if (kind === "agent"){
     if (!await askYes(`Remove ${r.label} from ${where}? Its sessions end, and none starts there until it is installed again.`)) return;
     busy(b, "Removing");
-    const j = await (await postJSON("/api/agents", {action: "remove", node: instNode, agent: r.agent || ""})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/agents", {action: "remove", node: instNode, agent: r.agent || ""});
     if (j.error) notify(j.error, true);
     await loadInstalled();
     return;

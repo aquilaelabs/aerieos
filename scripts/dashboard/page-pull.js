@@ -41,7 +41,7 @@ function wirePull(){
   const hint = document.createElement("div");
   hint.id = "pullHint";
   hint.setAttribute("aria-hidden", "true");
-  hint.innerHTML = `<svg viewBox="0 0 24 24"><path d="M19 12a7 7 0 1 1-2.05-4.95"/><path d="M19 4.5V8h-3.5"/></svg>`;
+  drawHTML(hint, `<svg viewBox="0 0 24 24"><path d="M19 12a7 7 0 1 1-2.05-4.95"/><path d="M19 4.5V8h-3.5"/></svg>`);
   document.body.appendChild(hint);
   // How far the button has come down for a pull of `dy`: with the finger at
   // first, then slower, the way an elastic edge gives.

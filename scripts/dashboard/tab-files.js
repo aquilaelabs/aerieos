@@ -15,7 +15,7 @@
 
 "use strict";
 
-let fl = null, flNode = "", flRoot = "", flPath = "", flRev = 0, flSeq = 0, flFilter = "";
+let fl = null, flNode = "", flRoot = "", flPath = "", flFilter = "";
 const flSel = new Set();          // the names ticked in the folder on show
 let flUp = null;                  // {name, done, size, i, n} while files go up
 
@@ -39,31 +39,19 @@ function flQuery(extra = {}){
   return new URLSearchParams({node: flNode, root: flRoot, path: flPath, ...extra}).toString();
 }
 
-async function loadFiles(){
-  const asked = ++flSeq;
-  if (nodesList === null || nodesStale) await loadNodes();
-  if (asked !== flSeq) return;
-  if (!flPick()){
-    fl = {nonode: true};
-    flRev++; drawPanes();
-    return;
-  }
-  const node = flNode, root = flRoot, path = flPath;
-  try{
-    const r = await fetch("/api/node-files?" + flQuery());
-    const got = await r.json();
-    if (asked !== flSeq) return;
-    if (!r.ok) throw new Error(got.error || "HTTP " + r.status);
-    // A root no longer there (a pool exported) gives way to the first one.
-    if (!root && got.roots?.length){ flRoot = got.roots[0].path; flPath = ""; return loadFiles(); }
-    if (root && !(got.roots || []).some(x => x.path === root)){ flRoot = ""; flPath = ""; return loadFiles(); }
+function loadFiles(){
+  return reading("files", async () => {
+    if (nodesList === null || nodesStale) await loadNodes();
+    if (!flPick()){ fl = {nonode: true}; return; }
+    const node = flNode, root = flRoot, path = flPath;
+    const got = await getJSON("/api/node-files?" + flQuery());
+    if (got.error){ fl = {error: got.error}; return; }
+    // A root no longer there (a pool exported) gives way to the first one,
+    // read next (reading() makes the read this one asks for once it lands).
+    if (!root && got.roots?.length){ flRoot = got.roots[0].path; flPath = ""; loadFiles(); return; }
+    if (root && !(got.roots || []).some(x => x.path === root)){ flRoot = ""; flPath = ""; loadFiles(); return; }
     fl = {...got, at: {node, root, path}};
-  }catch(e){
-    if (asked !== flSeq) return;
-    fl = {error: failWords(e)};
-  }
-  flRev++;
-  drawPanes();
+  });
 }
 
 function flGo(root, path){
@@ -168,14 +156,14 @@ function renderFilesInto(i){
   d.setBar("");    // the node is picked in the Machines group's header (R177)
   if (fl === null){
     // As it waits, the page it will be: the places, the bar and the rows.
-    d.list.innerHTML = skTpl(`<div class="fxpage"><div class="fxcols"><nav class="fxplaces"><div class="fxphead">Places</div>${
+    drawHTML(d.list, skTpl(`<div class="fxpage"><div class="fxcols"><nav class="fxplaces"><div class="fxphead">Places</div>${
       [GHOST, GHOST, GHOST].map(g => `<span class="fxplace">${FL_ICON.place}<span class="fxpname">${g}</span></span>`).join("")}</nav>
-      <div class="fxmain"><div class="flbar"><nav class="fxcrumbs"><span class="fxhere">${GHOST}</span></nav></div>${skRows(6)}</div></div></div>`);
-    if (!flSeq) loadFiles();
+      <div class="fxmain"><div class="flbar"><nav class="fxcrumbs"><span class="fxhere">${GHOST}</span></nav></div>${skRows(6)}</div></div></div>`));
+    if (!readRev("files") && !readBusy("files")) loadFiles();
     return;
   }
   if (fl.nonode){
-    d.list.innerHTML = noNodeYet("a node's disks, pools and shares are browsed here", "fxnone");
+    drawHTML(d.list, noNodeYet("a node's disks, pools and shares are browsed here", "fxnone"));
     return;
   }
   if (fl.error && !fl.roots){
@@ -225,7 +213,7 @@ function renderFilesInto(i){
 function flFull(name){ return (flPath ? flPath + "/" : "") + name; }
 
 async function flPost(body){
-  const j = await (await postJSON("/api/node-files", {node: flNode, root: flRoot, ...body})).json().catch(() => ({error: "no answer"}));
+  const j = await postJSON("/api/node-files", {node: flNode, root: flRoot, ...body});
   if (j.error) notify(j.error, true);
   return !j.error;
 }
@@ -237,14 +225,14 @@ function wireFiles(root){
   root.querySelectorAll("[data-fxopen]").forEach(b => b.onclick = () => b.dataset.fxdir ? flGo(flRoot, flFull(b.dataset.fxopen)) : flPreview(b.dataset.fxopen));
   root.querySelectorAll("[data-fxtick]").forEach(c => c.onchange = () => {
     c.checked ? flSel.add(c.dataset.fxtick) : flSel.delete(c.dataset.fxtick);
-    flRev++; drawPanes();
+    readMoved("files"); drawPanes();
   });
   const f = root.querySelector("#flFilter");
   // The patch keeps the box, its focus and its caret where the person put
   // it; a word an input method is still composing is filtered on once it
   // is chosen (R244 step 4).
   if (f){
-    onTyping(f, () => { flFilter = f.value; flRev++; drawPanes(); });
+    onTyping(f, () => { flFilter = f.value; readMoved("files"); drawPanes(); });
   }
   const pick = root.querySelector("#flPick");
   if (pick) pick.onchange = () => { flUpload([...pick.files]); pick.value = ""; };
@@ -260,7 +248,7 @@ function wireFiles(root){
 
 async function flAct(what, root){
   const ticked = [...flSel];
-  if (what === "none"){ flSel.clear(); flRev++; drawPanes(); return; }
+  if (what === "none"){ flSel.clear(); readMoved("files"); drawPanes(); return; }
   if (what === "upload"){ root.querySelector("#flPick")?.click(); return; }
   if (what === "mkdir"){
     const name = await askText("New folder", {verb: "Make folder", label: "Name"});
@@ -333,11 +321,11 @@ async function flUpload(list){
       replace = true;
     }
     flUp = {name: file.name, done: 0, size: file.size, i: i + 1, n: list.length};
-    flRev++; drawPanes();
+    readMoved("files"); drawPanes();
     const err = await new Promise(resolve => {
       const x = new XMLHttpRequest();
       x.open("POST", "/api/node-files/upload?" + new URLSearchParams({node, root, path, name: file.name, ...(replace ? {replace: "1"} : {})}));
-      x.upload.onprogress = e => { if (flUp){ flUp.done = e.loaded; flRev++; drawPanes(); } };
+      x.upload.onprogress = e => { if (flUp){ flUp.done = e.loaded; readMoved("files"); drawPanes(); } };
       x.onload = () => { let j = {}; try{ j = JSON.parse(x.responseText); }catch(e){ /* not JSON */ } resolve(x.status === 200 ? "" : j.error || "HTTP " + x.status); };
       x.onerror = () => resolve("the upload stopped");
       x.send(file);
@@ -345,7 +333,7 @@ async function flUpload(list){
     if (err){ notify(`${file.name}: ${err}`, true); break; }
   }
   flUp = null;
-  if (flNode === node && flRoot === root && flPath === path) loadFiles(); else { flRev++; drawPanes(); }
+  if (flNode === node && flRoot === root && flPath === path) loadFiles(); else { readMoved("files"); drawPanes(); }
 }
 
 // A file shown over the page: an image, a video, a sound or a PDF as
@@ -366,9 +354,9 @@ async function flPreview(name){
     : kind === "audio" ? `<audio src="${esc(src)}" controls preload="metadata"></audio>`
     : kind === "pdf" ? `<iframe src="${esc(src)}" title="${esc(name)}"></iframe>`
     : `<pre class="fxtext">${skRows(4)}</pre>`;
-  m.innerHTML = `<div class="box"><h3>${esc(name)}</h3><div class="field"><div class="sub dim">${esc(flSize(e.size || 0))}, changed ${esc(fmtTime((e.mtime || 0) * 1000))}${e.owner ? `, owned by ${esc(e.owner)}` : ""}</div></div>
+  drawHTML(m, `<div class="box"><h3>${esc(name)}</h3><div class="field"><div class="sub dim">${esc(flSize(e.size || 0))}, changed ${esc(fmtTime((e.mtime || 0) * 1000))}${e.owner ? `, owned by ${esc(e.owner)}` : ""}</div></div>
     <div class="field fxbody">${body}</div>
-    <div class="foot"><span class="sp"></span><a class="btn" href="${esc(src)}&dl=1" download="${esc(name)}">Download</a><button type="button" class="primary" data-fxclose>Close</button></div></div>`;
+    <div class="foot"><span class="sp"></span><a class="btn" href="${esc(src)}&dl=1" download="${esc(name)}">Download</a><button type="button" class="primary" data-fxclose>Close</button></div></div>`);
   document.body.appendChild(m);
   armModal(m);
   const done = () => { m.hidden = true; setTimeout(() => m.remove(), 400); };

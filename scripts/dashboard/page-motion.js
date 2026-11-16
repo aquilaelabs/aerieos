@@ -26,8 +26,7 @@ function applyMotion(reduce, {save = true} = {}){
   const use = reduce ? "reduce" : "system";
   try{ localStorage.setItem("bb.motion", use); localStorage.setItem("bb.motion.who", state?.me || ""); }catch(e){ /* private mode */ }
   motionSaved = use;
-  fetch("/api/users", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "prefs", prefs: { motion: use } }) }).catch(() => {});
+  postJSON("/api/users", { action: "prefs", prefs: { motion: use } }).catch(() => {});
 }
 // ...taken up only by a browser that has none of its own (adoptTheme's rule).
 function adoptMotion(m, who){
@@ -167,7 +166,7 @@ function dismissModal(m){
   if (!m.hidden) m.hidden = true;
 }
 
-// The page's one keydown listener for dialogs, wired at load in index.html
+// The page's one keydown listener for dialogs, wired at load by page-boot.js
 // ahead of the page's other Escape listeners: a dialog's Escape is its own,
 // and the menus and armed arrows under it are not closed with it. A field
 // that does something with Escape itself (a filter clearing its search)
@@ -512,14 +511,21 @@ function slideHidden(el, willShow, after){
 
 
 // ---- a press that is taken -------------------------------------------------
-// Any request a press starts holds its button until the answer comes, and a
-// button still waiting after a moment wears the spinner pressing() gives (the
-// operator, 8 Nov: buttons that answered nothing for a while read as missed).
-// The press is the last button or a.btn clicked; a question it asked passes
-// it on, so the request after the answer is still the asker's. Requests a
-// page makes on its own (the polls) come long after any press and are not tied.
-let pressEl = null, pressAt = 0;
-const PRESS_TIE_MS = 1500;
+// A press's own work holds its button until it is done, and a button still
+// waiting after a moment wears the ring (the operator, 8 Nov: buttons that
+// answered nothing for a while read as missed). Its work is what the press
+// asked for, never what happened to start near it: a request sent while a
+// click is being handled (postJSON, getJSON) asks for the clicked button's
+// ring, and a click handler set on an element (every press's, since R244
+// sets them as properties) holds it through the promise it returns, the
+// questions it asks on the way included. A poll that starts just after a
+// click on a slow link is the page's own and holds nothing.
+//
+// One mechanism for the three ways a press says it is taken: pressHold is
+// the ring, pressing() is a press that is also kept from being pressed again
+// while it runs, and busy() puts a word in the button's place, which the
+// ring stands down for.
+const PRESS_SHOW_MS = 200;
 // ...unless the ring has no room (the operator, 13 Nov: where the wheel would
 // disrupt a small space, like the rail's icons, none pops up). A strip of
 // presses packed side by side, or one over another, is that by its shape: a
@@ -538,33 +544,125 @@ function pressRing(b){
   b.classList.remove("working");
   return false;
 }
-function pressTrackDown(e){
-  const b = e.target.closest?.("button, a.btn");
-  if (!b) return;
-  // A button that opens a panel (the bell, the doctor, the gear) has answered
-  // the press when the panel shows: what the panel then reads is its own.
-  if (b.hasAttribute("aria-haspopup")){ pressEl = null; return; }
-  if (b.closest(".askdlg")){ if (pressEl) pressAt = performance.now(); return; }
-  pressEl = b; pressAt = performance.now();
+// The button a click is a press of: the button or a.btn it landed on. Not
+// one that opens a panel (the bell, the doctor, the gear), which has
+// answered when the panel shows, and not a question's answer, whose asker's
+// press goes on holding its own button.
+function pressOf(e, within){
+  const b = e?.target?.closest?.("button, a.btn");
+  if (!b || (within && !within.contains(b))) return null;
+  if (b.hasAttribute("aria-haspopup") || b.closest(".askdlg")) return null;
+  return b;
+}
+// The ring waits while something else has the person's attention: a word
+// busy() put in the button's place, or a dialog the button is not in (a
+// question the press asked, which is answered before anything is sent).
+function pressQuiet(b){
+  if (b.getAttribute("aria-busy") === "true" && !b.dataset.pressWorking) return true;
+  for (const m of document.querySelectorAll(".modal:not([hidden]):not(.inline)")) if (!m.contains(b)) return true;
+  return false;
 }
 function pressHold(b, p){
+  if (!b) return;
   b.__pending = (b.__pending || 0) + 1;
-  const t = setTimeout(() => {
-    if (!b.__pending || !b.isConnected || b.getAttribute("aria-busy") === "true") return;
-    if (pressRing(b)) b.dataset.pressWorking = "1";
+  const t = setInterval(() => {
+    if (!b.__pending || !b.isConnected || b.dataset.pressWorking || b.__noRing) return;
+    if (pressQuiet(b)) return;
+    if (pressRing(b)){ b.dataset.pressWorking = "1"; b.setAttribute("aria-busy", "true"); }
+    else b.__noRing = true;
   }, PRESS_SHOW_MS);
   const done = () => {
-    clearTimeout(t);
+    clearInterval(t);
     b.__pending -= 1;
-    if (b.__pending <= 0 && b.dataset.pressWorking){ b.classList.remove("working"); delete b.dataset.pressWorking; }
+    if (b.__pending > 0) return;
+    delete b.__noRing;
+    if (b.dataset.pressWorking){ b.classList.remove("working"); b.removeAttribute("aria-busy"); delete b.dataset.pressWorking; }
   };
-  p.then(done, done);
+  Promise.resolve(p).then(done, done);
 }
-function pressTrackFetch(orig){
-  return function(...args){
-    const p = orig.apply(this, args);
-    const b = pressEl;
-    if (b && b.isConnected && performance.now() - pressAt < PRESS_TIE_MS) pressHold(b, p);
-    return p;
-  };
+// A request asks for the ring of the press it was sent from: the button
+// whose handler is running, or the one the click being handled landed on
+// (window.event is that click while its listeners and what they await at
+// once run, and nothing after).
+let pressNow = null;
+function pressTie(p){
+  const ev = window.event;
+  const b = pressNow || (ev?.type === "click" ? pressOf(ev) : null);
+  if (b?.isConnected) pressHold(b, p);
+  return p;
+}
+// Every click handler set as a property runs as its press: requests it sends
+// at once ask for its button's ring, and the promise it returns holds it.
+// The handler read back is the one set, so a draw comparing it sees its own.
+function pressHook(){
+  const d = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "onclick");
+  if (!d?.set || HTMLElement.prototype.__pressHooked) return;
+  const own = new WeakMap();
+  Object.defineProperty(HTMLElement.prototype, "onclick", {
+    configurable: true, enumerable: d.enumerable,
+    get(){ return own.has(this) ? own.get(this) : d.get.call(this); },
+    set(fn){
+      if (typeof fn !== "function"){ own.delete(this); d.set.call(this, fn); return; }
+      own.set(this, fn);
+      d.set.call(this, function(e){ return pressRun(this, e, fn); });
+    }});
+  Object.defineProperty(HTMLElement.prototype, "__pressHooked", {value: true});
+}
+function pressRun(el, e, fn){
+  const b = pressOf(e, el), was = pressNow;
+  if (b) pressNow = b;
+  let out;
+  try{ out = fn.call(el, e); }finally{ pressNow = was; }
+  if (b && out && typeof out.then === "function") pressHold(b, out);
+  return out;
+}
+// A press kept from being pressed again until it has done. Disabled at once:
+// for the second or two of a round trip the control looked as it did before
+// the click, and a second press queued a second job or met a refusal of
+// "one at a time". The ring after a moment where it has room, and given back as
+// its markup has it at the end (pressBack): a surface the page patches
+// (R244) keeps the button the press began on, which a redraw during the
+// press may have drawn disabled, or made another button in its place. Put
+// an `await askYes()` BEFORE the call, so canceling leaves the button alive.
+async function pressing(btn, fn){
+  if (!btn || btn.disabled) return undefined;
+  btn.disabled = true;
+  const p = (async () => fn())();
+  pressHold(btn, p);
+  try{ return await p; }
+  finally{ pressBack(btn); }
+}
+
+// A press that says in a word what it set going (the progress rule: a word
+// and an animated ellipsis, never a bar of the page's own guessing), dead
+// while it runs; the ring stands down for it.
+function busy(btn, word){
+  if (!btn) return;
+  btn.disabled = true;
+  btn.setAttribute("aria-busy", "true");
+  drawHTML(btn, `${esc(word)}<span class="dots"></span>`);
+  // The one ticker every .dots on the page shares; it stops itself when
+  // the last one is repainted away.
+  if (!tcDotsTimer) tcDotsTimer = setInterval(tcTickDots, 400);
+}
+
+// ...and the other half, for a press that can fail without a repaint behind
+// it. Most busy() calls need none: the round trip redraws the surface and
+// the button with it, but the notebook's Send and Save both stay on screen
+// when the server says no, and a button left wearing "Sending…" over a
+// refusal is the worst of both.
+function unbusy(btn, word){
+  if (!btn) return;
+  btn.removeAttribute("aria-busy");
+  // A button a patched surface drew (R244) is given back as its markup has
+  // it now: the redraw the press brought may have drawn it with another
+  // label (a branch switched to) or disabled, and the word kept from before
+  // the press would undo that.
+  if (btn.__markupHtml !== undefined){
+    if (btn.innerHTML !== btn.__markupHtml){ btn.innerHTML = btn.__markupHtml; for (const c of btn.children) patchRecord(c); drawn(btn); }
+    pressBack(btn);
+    return;
+  }
+  btn.disabled = false;
+  btn.textContent = word;
 }

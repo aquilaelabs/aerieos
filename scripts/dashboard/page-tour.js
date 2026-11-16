@@ -284,7 +284,7 @@ function tourSample(s){
   const box = document.createElement("div");
   box.id = "tourSample"; box.className = "toursample"; box.inert = true;
   if (s.sampleKey) box.dataset.key = s.sampleKey;
-  box.innerHTML = `<div class="field"><span class="pill note">example</span> <span class="sub">what one looks like once there is one</span></div>${s.sample()}`;
+  drawHTML(box, `<div class="field"><span class="pill note">example</span> <span class="sub">what one looks like once there is one</span></div>${s.sample()}`);
   const bar = doc.querySelector(":scope > .docbarrow, :scope > .vbar");
   if (bar) bar.after(box); else doc.prepend(box);
   return box;
@@ -366,12 +366,12 @@ function tourDraw(){
   if (box?.dataset.turning){ box.dataset.turning = ""; ring.hidden = true; return setTimeout(() => { if (tourKind) tourDraw(); }, 480); }
   const el = (box && s.part && box.querySelector(s.at.replace(TOUR_PANE, "").trim())) || box || tourTarget(s.at);
   tourKeepSample(!!s.sample);
-  card.innerHTML = `<div class="tourstep">${tourI + 1} of ${tourSteps.length}</div>
+  drawHTML(card, `<div class="tourstep">${tourI + 1} of ${tourSteps.length}</div>
     <div class="toursay">${esc(s.say)}</div>
     <label class="ndcap tourall"><input type="checkbox" id="tourAll"> Skip the tour on every page</label>
     <div class="actbar"><button type="button" id="tourSkip">Skip tour</button><span class="sp"></span>
       ${tourI ? `<button type="button" id="tourBack">Back</button>` : ""}
-      <button type="button" class="primary" id="tourNext">${last ? "Done" : "Next"}</button></div>`;
+      <button type="button" class="primary" id="tourNext">${last ? "Done" : "Next"}</button></div>`);
   card.hidden = ring.hidden = false;
   $("tourNext").onclick = () => tourGo(1);
   if ($("tourBack")) $("tourBack").onclick = () => tourGo(-1);
@@ -430,8 +430,7 @@ function tourEnd(all){
   // A poll already out answers with the list from before this: dropped, as
   // an action's own answer drops it (B217).
   adoptSeq++;
-  fetch("/api/users", {method: "POST", headers: {"Content-Type": "application/json"},
-                       body: JSON.stringify({action: "prefs", prefs: {tour_seen: seen, tour_off: state.tour.off}})}).catch(() => {});
+  postJSON("/api/users", {action: "prefs", prefs: {tour_seen: seen, tour_off: state.tour.off}}).catch(() => {});
 }
 
 // A tour put away because its page was left: nothing is saved.
@@ -451,9 +450,7 @@ async function tourReset(){
   // ...and a reset the same way: a poll in flight put the old list back,
   // and the tours waited for a reload (B217).
   adoptSeq++;
-  const r = await fetch("/api/users", {method: "POST", headers: {"Content-Type": "application/json"},
-                                       body: JSON.stringify({action: "prefs", prefs: {tour_seen: [], tour_off: false}})});
-  const j = await r.json().catch(() => ({}));
+  const j = await postJSON("/api/users", {action: "prefs", prefs: {tour_seen: [], tour_off: false}});
   // ...and a poll sent while this was on its way read the list from before it.
   adoptSeq++;
   if (j.error) notify(j.error, true);

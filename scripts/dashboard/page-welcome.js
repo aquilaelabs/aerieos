@@ -4,7 +4,7 @@
 // leave the page's own script whole (R75, moved with aerie map sections in
 // hand: seven functions, one caller from outside, all covered). Pure
 // declarations: the wiring that runs at load (the About button, the
-// modal's own close, the welcome on the first poll) stays in index.html
+// modal's own close, the welcome on the first poll) is page-boot.js's,
 // under the section's header, since it needs the page and its helpers.
 
 "use strict";
@@ -34,18 +34,17 @@ function abGuideText(text, admin){
 async function abLoadGuide(){
   const el = $("abGuide");
   if (!abGuideDoc){
-    el.innerHTML = skel("lines", 8);
+    drawHTML(el, skel("lines", 8));
     try{
-      const [doc, index] = await Promise.all([fetch("/api/help?doc=" + AB_GUIDE_DOC), fetch("/api/help")]
-        .map(p => p.then(r => r.json())));
+      const [doc, index] = await Promise.all([getJSON("/api/help?doc=" + AB_GUIDE_DOC), getJSON("/api/help")]);
       abGuideDoc = doc;
       if (!index.error) abGuideTitles = helpTitles(index);
     }
     catch(e){ abGuideDoc = {error: "the guide could not be read: " + e}; }
   }
   if (abPage !== "guide") return;
-  if (abGuideDoc.error){ el.innerHTML = `<p class="hint bad">${esc(abGuideDoc.error)}</p>`; return; }
-  el.innerHTML = wikiMarkdown(abGuideText(abGuideDoc.text, state?.can?.admin !== false), abGuideTitles);
+  if (abGuideDoc.error){ drawHTML(el, `<p class="hint bad">${esc(abGuideDoc.error)}</p>`); return; }
+  drawHTML(el, wikiMarkdown(abGuideText(abGuideDoc.text, state?.can?.admin !== false), abGuideTitles));
   // A link to another doc opens it on the Help page.
   el.querySelectorAll("a.wklink[data-page]").forEach(a => a.onclick = e => {
     e.preventDefault();
@@ -132,20 +131,22 @@ function abDrawCredits(){
   if (el.dataset.drawn) return;
   el.dataset.drawn = "1";
   const cols = [{label: "What"}, {label: "Here for"}, {label: "License"}];
-  el.innerHTML = `<p>${state?.bare_metal ? "AerieOS" : "Aerie Workshop"} is made by <a href="https://aquilae.dev/" target="_blank" rel="noopener">aquilaeLabs LLC</a>, on other people's open work. Thank you to everyone behind it.</p>${
+  drawHTML(el, `<p>${state?.bare_metal ? "AerieOS" : "Aerie Workshop"} is made by <a href="https://aquilae.dev/" target="_blank" rel="noopener">aquilaeLabs LLC</a>, on other people's open work. Thank you to everyone behind it.</p>${
     AB_CREDITS.map(([head, rows]) => `<h4>${esc(head)}</h4>${tblWrap(cols, rows.map(([name, what, lic, url]) =>
       tblLine(cols, [url ? `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(name)}</a>` : esc(name), esc(what), esc(lic)])).join(""), "abcred")}`).join("")}
-    <p class="dim">The Android app is built with Kotlin and Jetpack Compose (Apache-2.0). AerieOS itself is Apache-2.0.</p>`;
+    <p class="dim">The Android app is built with Kotlin and Jetpack Compose (Apache-2.0). AerieOS itself is Apache-2.0.</p>`);
 }
 
-async function abLoadLog(){
-  const el = $("abLog");
-  el.innerHTML = `${skel("lines")}`;
-  let j;
-  try{ j = await (await fetch("/api/welcome")).json(); }
-  catch(e){ el.innerHTML = `<p class="dim">changelog: ${esc(String(e))}</p>`; return; }
-  abLogLoaded = true;
-  abDrawLog(j);
+function abLoadLog(){
+  return reading("welcome.log", async () => {
+    const el = $("abLog");
+    drawHTML(el, `${skel("lines")}`);
+    let j;
+    try{ j = await getJSON("/api/welcome"); }
+    catch(e){ drawHTML(el, `<p class="dim">changelog: ${esc(String(e))}</p>`); return; }
+    abLogLoaded = true;
+    abDrawLog(j);
+  });
 }
 // The draw, apart from the fetch: what this panel shows is the server's
 // answer, and the arrangement of it is worth being able to render from a
@@ -166,7 +167,7 @@ let abLogSeen = null;        // the last payload, to redraw from without refetch
 function abDrawLog(j){
   const el = $("abLog");
   abLogSeen = j;
-  if (!j.present){ el.innerHTML = `<p class="dim">This image carries no changelog.</p>`; return; }
+  if (!j.present){ drawHTML(el, `<p class="dim">This image carries no changelog.</p>`); return; }
   // Everything above the entry that carries the commit this account last
   // acknowledged is new to it; the line is drawn there. An image whose
   // commit is a logging commit matches no entry, and then nothing is marked
@@ -220,7 +221,7 @@ function abDrawLog(j){
   if (j.held)
     rows.push(`<p class="dim" id="abHeld">${j.held} earlier release${j.held === 1 ? "" : "s"}`
       + ` ${j.held === 1 ? "is" : "are"} in CHANGELOG.md.</p>`);
-  el.innerHTML = rows.join("") || `<p class="dim">Nothing logged yet.</p>`;
+  drawHTML(el, rows.join("") || `<p class="dim">Nothing logged yet.</p>`);
   el.querySelectorAll("[data-abmore]").forEach(a => a.onclick = e => {
     e.preventDefault();
     abAllOf.add(a.dataset.abmore);
@@ -249,8 +250,7 @@ function closeAbout(){
   if (rev && w.image_seen !== rev) patch.image_seen = rev;
   if (!Object.keys(patch).length) return;
   w.seen = true; w.image_seen = rev || w.image_seen;
-  fetch("/api/users", {method: "POST", headers: {"Content-Type": "application/json"},
-                       body: JSON.stringify({action: "prefs", prefs: patch})}).catch(() => {});
+  postJSON("/api/users", {action: "prefs", prefs: patch}).catch(() => {});
 }
 
 // ---- the build this container runs --------------------------------------

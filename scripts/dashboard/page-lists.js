@@ -51,8 +51,8 @@ function paginate(host, rowSel, opts = {}){
     const bar = document.createElement("div");
     bar.className = "pagemore";
     bar.setAttribute("data-own", "");      // the list's code's: a patch steps over it (R244)
-    bar.innerHTML = `<span>${rows.length} of ${opts.total}${opts.noun ? " " + esc(opts.noun) : ""}</span>
-      <button type="button" class="next">Show more</button>`;
+    drawHTML(bar, `<span>${rows.length} of ${opts.total}${opts.noun ? " " + esc(opts.noun) : ""}</span>
+      <button type="button" class="next">Show more</button>`);
     const more = () => {
       if (!bar.isConnected) return;
       bar.__io?.disconnect();
@@ -80,8 +80,8 @@ function paginate(host, rowSel, opts = {}){
   const bar = document.createElement("div");
   bar.className = "pagemore";
   bar.setAttribute("data-own", "");
-  bar.innerHTML = `<span>${shown} of ${rows.length}${opts.noun ? " " + esc(opts.noun) : ""}</span>
-    <button type="button" class="next">Show more</button>`;
+  drawHTML(bar, `<span>${shown} of ${rows.length}${opts.noun ? " " + esc(opts.noun) : ""}</span>
+    <button type="button" class="next">Show more</button>`);
   const more = () => {
     if (!bar.isConnected) return;
     pageState[key] = Math.ceil(shown / size) + 1;

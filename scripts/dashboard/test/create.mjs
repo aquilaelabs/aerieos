@@ -200,8 +200,8 @@ await section("projects first", async () => {
      `a new repository's Permissions start on "as the space" with the space's word beside it (${JSON.stringify(inh)})`);
   // Set one apart, and the project's default stays what it was.
   const over = await page.evaluate(async () => {
-    const a = await (await postJSON('/api/prefs', { project: 'webshop', makevms: 'auto' })).json();
-    const b = await (await postJSON('/api/prefs', { project: 'webshop', scope: 'project', makevms: 'deny', installpacks: 'auto' })).json();
+    const a = await postJSON('/api/prefs', { project: 'webshop', makevms: 'auto' });
+    const b = await postJSON('/api/prefs', { project: 'webshop', scope: 'project', makevms: 'deny', installpacks: 'auto' });
     await refresh();
     const p = state.projects.find(x => x.name === 'webshop');
     return { a: a.error || a.overrides, b: b.error || b.makevms, makevms: p.prefs.makevms, over: p.prefs.overrides, dflt: p.prefs.project_dials.makevms, packs: p.prefs.installpacks };
@@ -1520,7 +1520,7 @@ await section("A notebook on a project that is no longer there", async () => {
 // ...and one on show when its project goes (deleted from its Settings, or
 // elsewhere) gives way to Projects, not to the Profile (B94).
 await section("and one on show when its project goes", async () => {
-  const made = await page.evaluate(async () => (await (await postJSON('/api/create', { name: 'gone-front', mode: 'init' })).json()).name);
+  const made = await page.evaluate(async () => (await postJSON('/api/create', { name: 'gone-front', mode: 'init' })).name);
   await refreshUntil(page, () => state?.projects?.some(p => p.name === 'gone-front'), { timeout: 15000 });
   await page.evaluate(() => openNotebook('gone-front', 'settings'));
   await page.waitForFunction(() => location.hash.startsWith('#/spaces/gone-front'), null, { timeout: 10000 });

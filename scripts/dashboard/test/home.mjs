@@ -218,7 +218,7 @@ await section("no ring where it has no room", async () => {
     host.innerHTML = '<button type="button" id="ringProbe">Read it again</button>';
     document.body.append(host);
     const b = host.firstChild;
-    b.onclick = () => { fetch('/api/home'); };
+    b.onclick = () => { getJSON('/api/home'); };
     return true;
   });
   await page.click('#ringProbe');

@@ -73,7 +73,7 @@ function gateDocker(root, why){
     b.disabled = true;
     // Kept for a screen reader (untitle); what the page says is the
     // tab's own line that the daemon is not answering.
-    b.title = why;
+    setTitle(b, why);
   });
 }
 
@@ -83,7 +83,6 @@ function gateDocker(root, why){
 // exactly what you open a list like this to find out about, and a listing
 // that showed half would be lying by omission.
 let dockerList = null;                   // the picked node's last answer
-let dockerRev = 0;                       // bumped when it changes, so a pane
                                          // showing the same tab still repaints
 // Which node the manager is looking at ("" = the default), and
 // the last-known answer per node id: switching back to an offline node shows
@@ -128,7 +127,7 @@ function openDocker(){
   // Opening is a look: a tab already on screen is read again. Not while an
   // answer is on its way, which is the case the tab's own open hook just
   // made when the list was empty.
-  if (!dockerFetching) loadDocker();
+  if (!readBusy("docker")) loadDocker();
 }
 
 // ...on one node: the one a container was just made on, or the one a bell
@@ -142,11 +141,11 @@ function openDockerOn(node){
   if (moved){
     dockerNode = node;
     dockerList = dockerSeen[node] || null;
-    dockerRev++;
+    readMoved("docker");
   }
   openDocker();
   dockerNodeKeep();
-  if (moved && dockerFetching) loadDocker();
+  if (moved && readBusy("docker")) loadDocker();
 }
 
 // ...and remembered when it changes, which is the only moment it can be
@@ -179,63 +178,47 @@ function dmBootLoad(u){
 let dockerWarmAt = 0;
 function dockerWarm(){
   const node = dockerNode || "";
-  if (dockerSeen[node] || dockerFetching || Date.now() - dockerWarmAt < 10000) return;
+  if (dockerSeen[node] || readBusy("docker") || Date.now() - dockerWarmAt < 10000) return;
   dockerWarmAt = Date.now();
-  fetch("/api/docker" + (node ? "?node=" + encodeURIComponent(node) : ""))
-    .then(r => r.ok ? r.json() : null)
+  getJSON("/api/docker" + (node ? "?node=" + encodeURIComponent(node) : ""))
     .then(got => { if (got && !got.error){ const k = got.node || node; if (!dockerSeen[k]) dockerSeen[k] = got; if (!node && !dockerSeen[""]) dockerSeen[""] = got; } })
     .catch(() => {});
 }
 
-let dockerAsk = 0;                       // which ask is newest, so an older
-                                         // answer landing late cannot win
-let dockerFetching = false;        // an answer is on its way: the tab says so
-// ...but only said once it has been slow. A fetch here is one per revision
-// while a job runs, which is one per log line, and a word that appeared for
-// each of them blinked at the foot of the tab through every build. Under this
-// long, nothing is said: an answer that arrives at once needs no announcing.
+// A read on its way is said only once it has been slow. A read here is one
+// per revision while a job runs, which is one per log line, and a word that
+// appeared for each of them blinked at the foot of the tab through every
+// build. Under this long, nothing is said: an answer that arrives at once
+// needs no announcing.
 const DM_SLOW_MS = 600;
 // What a chip or Cards and List redraws: the groups' cards, or the list.
 const DM_PARTS = ".pane .doc.on .dmtab .dmcard, .pane .doc.on .dmtab > .tbl";
 let dmSlowTimer = null, dmSlow = false;
-async function loadDocker(){
-  const asked = dockerNode;
-  const ask = ++dockerAsk;
-  dockerFetching = true;
-  clearTimeout(dmSlowTimer);
-  dmSlowTimer = setTimeout(() => {
-    if (ask === dockerAsk && dockerFetching){ dmSlow = true; dockerRev++; drawPanes(); }
-  }, DM_SLOW_MS);
-  let got;
-  try{
-    got = await (await bootFetch("/api/docker"
-      + (asked ? "?node=" + encodeURIComponent(asked) : ""))).json();
-  }catch(e){ got = {error: String(e), containers: []}; }
-  // An answer for a node the operator has already picked away from must not
-  // repaint the view it no longer belongs to; it lands in that node's cache
-  // and nothing else.
-  // (an answer a newer ask has overtaken does not write over that node's
-  // cache either: the page falls back to the cache when it has no list, and
-  // drew the older answer again, B853)
-  if (ask === dockerAsk || asked !== dockerNode) dockerSeen[got.node || asked || ""] = got;
-  if (ask === dockerAsk){ dockerFetching = false; dmSlow = false; clearTimeout(dmSlowTimer); }
-  if (asked !== dockerNode) return;
-  // A newer ask is in flight or has landed: one revision's reload under
-  // another's. This answer is about an earlier moment, and a
-  // daemon that came back between the two would be painted as gone again
-  // (B69).
-  if (ask !== dockerAsk) return;
-  // First answer resolves "" to the default node's real id, so the picker
-  // and the cache speak one language.
-  if (!dockerNode && got.node) dockerNode = got.node;
-  // ...and kept in this browser for the next reload's early read (dmBootLoad).
-  if (dockerNode && !got.error) try{ localStorage.setItem("bb.dmnode", dockerNode); }catch(e){ /* private */ }
-  dockerList = got;
-  dockerRev++;
-  // drawPanes rather than reaching into a pane by index: which pane holds this
-  // tab is the layout's business, and toolchains already refreshes this way.
-  drawPanes();
-  loadDockerStats(got);
+function loadDocker(){
+  return reading("docker", async () => {
+    const asked = dockerNode;
+    clearTimeout(dmSlowTimer);
+    dmSlowTimer = setTimeout(() => {
+      if (readBusy("docker")){ dmSlow = true; readMoved("docker"); drawPanes(); }
+    }, DM_SLOW_MS);
+    const got = await getJSON("/api/docker" + (asked ? "?node=" + encodeURIComponent(asked) : ""));
+    if (got.error && !got.containers) got.containers = [];
+    // Every answer is that node's in the cache, the page falling back to it
+    // while it has no list; reading() lands them in the order asked, so an
+    // older one cannot write over a newer one (B853).
+    dockerSeen[got.node || asked || ""] = got;
+    dmSlow = false; clearTimeout(dmSlowTimer);
+    // An answer for a node the person has already picked away from must not
+    // repaint the view it no longer belongs to.
+    if (asked !== dockerNode) return;
+    // First answer resolves "" to the default node's real id, so the picker
+    // and the cache speak one language.
+    if (!dockerNode && got.node) dockerNode = got.node;
+    // ...and kept in this browser for the next reload's early read (dmBootLoad).
+    if (dockerNode && !got.error) try{ localStorage.setItem("bb.dmnode", dockerNode); }catch(e){ /* private */ }
+    dockerList = got;
+    loadDockerStats(got);
+  });
 }
 
 // ---- the jump bar's containers ----
@@ -248,7 +231,7 @@ function dmJumpLoad(){
   if (!nodesList || Date.now() - dmJumpAsked < 60000) return Promise.resolve();
   dmJumpAsked = Date.now();
   const ids = nodesList.filter(n => n.kind !== "local" && n.state !== "retired" && !dockerSeen[n.id]).map(n => n.id);
-  return Promise.all(ids.map(id => fetch("/api/docker?node=" + encodeURIComponent(id)).then(r => r.json())
+  return Promise.all(ids.map(id => getJSON("/api/docker?node=" + encodeURIComponent(id))
     .then(got => { const k = got.node || id; if (!dockerSeen[k]) dockerSeen[k] = got; }).catch(() => {})));
 }
 // [{name, node, where}]: each container with the node it is on, by name.
@@ -268,7 +251,7 @@ function dmJumpTo(nid, name){
   dmSearch = name; dmChip = "";
   railGo("containers", "docker");
   dockerNodeKeep();
-  dockerRev++; drawPanes();
+  readMoved("docker"); drawPanes();
 }
 
 // What each container is using now (R216): asked once the list has landed
@@ -279,13 +262,13 @@ let dockerStats = {};
 // ...and each container's last hour, where its node's agent samples it
 // once a minute (R218 step 9): {name: [[at, cpu %, memory %], ...]}.
 let dockerSpark = {};
-async function loadDockerStats(list){
+function loadDockerStats(list){
   const node = list?.node || dockerNode || "";
-  if (!list || list.blind || list.on === false || list.error || !(list.instances || []).some(d => d.running)) return;
-  let got;
-  try{
-    got = await (await fetch("/api/docker/stats" + (node ? "?node=" + encodeURIComponent(node) : ""))).json();
-  }catch(e){ return; }
+  if (!list || list.blind || list.on === false || list.error || !(list.instances || []).some(d => d.running)) return Promise.resolve();
+  return reading("docker.stats", () => dockerStatsRead(node));
+}
+async function dockerStatsRead(node){
+  const got = await getJSON("/api/docker/stats" + (node ? "?node=" + encodeURIComponent(node) : ""));
   if (!got || got.error || !got.stats) return;
   dockerStats[node] = got.stats;
   dockerSpark[node] = got.spark || {};
@@ -307,7 +290,7 @@ function dmStatsPatch(){
     t.innerHTML = dmStatStrip(d);
     const fresh = t.content.firstElementChild;
     // Recorded as markup, so the page's next patch takes it for its own.
-    if (fresh && fresh.outerHTML !== el.outerHTML){ patchRecord(fresh); el.replaceWith(fresh); }
+    if (fresh && fresh.outerHTML !== el.outerHTML){ patchRecord(fresh); el.replaceWith(fresh); drawn(fresh); }
   }
   for (const el of document.querySelectorAll("[data-dmcpu]")){
     const st = all[el.dataset.dmcpu];
@@ -490,14 +473,12 @@ function openSendToDocker(project, sendAs, have, compose){
   // nothing to fill.
   const refs = dockerList?.refs?.[project] || [];
   $("dnRefField").hidden = !refs.length;
-  $("dnRef").innerHTML = optionList([["", "whatever the space is on"], ...refs]);
+  drawHTML($("dnRef"), optionList([["", "whatever the space is on"], ...refs]));
   $("dnmodal").hidden = false;
   // Fetched per open, and only shown when the project actually declares an
   // example: a blank Environment box on a project with nothing to fill in is
   // a question with no answer.
-  fetch("/api/devapp", {method:"POST", headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({project, action:"starter", compose: dnCompose})})
-    .then(r => r.json()).then(j => {
+  postJSON("/api/devapp", {project, action:"starter", compose: dnCompose}).then(j => {
       if (dnFor !== project || !(j.text || "").trim()) return;
       $("dnEnv").value = j.text;
       $("dnEnvHint").textContent =
@@ -533,8 +514,8 @@ function fillNodeSelect(sel, wrap, prefer, again, allow){
     && (!allow || allow.includes(n.id)));
   // ...and drawn again when they land: loadNodes repaints only a Nodes tab,
   // so a draw here during a node-list reload lost the picker until something
-  // else moved dockerRev (B69's nodes.mjs sibling).
-  if (nodesList === null || nodesStale) loadNodes().then(() => { dockerRev++; drawPanes(); if (again) again(); });
+  // else moved the containers' revision (B69's nodes.mjs sibling).
+  if (nodesList === null || nodesStale) loadNodes().then(() => { readMoved("docker"); drawPanes(); if (again) again(); });
   const known = dnodes.some(n => n.id === prefer);
   wrap.hidden = allow ? dnodes.length < 1 : dnodes.length < 2;
   sel.disabled = dnodes.length < 2;
@@ -542,13 +523,13 @@ function fillNodeSelect(sel, wrap, prefer, again, allow){
   // An agent node carries its heartbeat's numbers, and this is the picker
   // the design says they belong beside (docs/nodes.md §9): the choice of
   // where to run a container is made on how busy the machine is.
-  sel.innerHTML = dnodes.map(n => {
+  drawHTML(sel, dnodes.map(n => {
     const s = n.kind === "agent" && n.live && n.reported?.sample;
     const nums = s ? ` · cpu ${s.cpu_pct}% · ${Math.round(s.mem_used_mb / 1024 * 10) / 10}/${
         Math.round(s.mem_mb / 1024)}GB` : n.kind === "agent" ? " · quiet" : "";
     return `<option value="${esc(n.id)}"${n.id === want ? " selected" : ""}>${
       esc(n.name)}: ${esc(n.state)}${nums}</option>`;
-  }).join("");
+  }).join(""));
 }
 
 // The project's own nodes first and named as such, the rest after them
@@ -602,9 +583,7 @@ function openRelocate(project, instance){
   $("rlEnv").value = "";
   $("rlEnvHint").textContent = "reading its env…";
   $("rlmodal").hidden = false;
-  fetch("/api/devapp", {method: "POST", headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({project, instance, action: "env-get"})})
-    .then(r => r.json()).then(j => {
+  postJSON("/api/devapp", {project, instance, action: "env-get"}).then(j => {
       if (!rlFor || rlFor.instance !== instance) return;
       $("rlEnv").value = j.text || "";
       rlFor.envWas = j.text || "";
@@ -660,17 +639,16 @@ async function rlSubmit(){
   $("rlGo").disabled = true;
   $("rlGo").textContent = mode === "move" ? "Moving…" : "Copying…";
   try{
-    const j = await (await fetch("/api/devapp", {method: "POST", headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({project, instance, action: "relocate", mode, node: $("rlNode").value, name,
+    const j = await postJSON("/api/devapp", {project, instance, action: "relocate", mode, node: $("rlNode").value, name,
                             data: document.querySelector('input[name="rlData"]:checked')?.value || "unpack",
                             // Its env as it stands goes with it anyway; sent
                             // only when there is something of the person's in it.
                             ...(rlFor.envWas === undefined || (rlFor.seeded && $("rlEnv").value === rlFor.envWas)
-                                ? {} : {text: $("rlEnv").value})})})).json();
+                                ? {} : {text: $("rlEnv").value})});
     if (j.error){ $("rlGo").disabled = false; rlSay(); return fail(j.error); }
     closeRelocate();
     notify(mode === "move" ? `moving ${j.name}: its row says each step` : `copying it as ${j.name}: its row says each step`);
-    dockerList = null; dockerRev++;
+    dockerList = null; readMoved("docker");
     loadDocker();
   }catch(e){ $("rlGo").disabled = false; rlSay(); fail(String(e)); }
 }
@@ -695,17 +673,14 @@ async function dnSubmit(){
   if ($("dnGo").disabled) return;
   busy($("dnGo"), "Creating");
   try{
-    const r = await fetch("/api/devapp", {method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({project, action:"new", instance:name,
+    const j = await postJSON("/api/devapp", {project, action:"new", instance:name,
                             owner: $("dnUnder").value,
                             node: $("dnNodeField").hidden ? "" : $("dnNode").value,
                             ship: !$("dnNodeField").hidden && !!$("dnNode").value
                               && !((state?.projects?.find(p => p.name === ($("dnUnder").value || project))?.prefs?.nodes) || []).includes($("dnNode").value),
                             ref: $("dnRefField").hidden ? "" : $("dnRef").value,
                             compose: dnCompose,
-                            text: $("dnEnvField").hidden ? "" : $("dnEnv").value})});
-    const j = await r.json();
+                            text: $("dnEnvField").hidden ? "" : $("dnEnv").value});
     if (j.error){ unbusy($("dnGo"), "Create");
                   return fail(j.error); }
     // Where it went: the node picked, else its project's primary, which is
@@ -735,9 +710,9 @@ async function dnSubmit(){
 async function openDevEnv(project, instance){
   let j;
   try{
-    const r = await postJSON("/api/devapp", {project, instance, action: "env-get"});
-    j = await r.json();
-  }catch(e){ notify("env: " + failWords(e), true); return; }
+    j = await postJSON("/api/devapp", {project, instance, action: "env-get"});
+  }catch(e){ j = {error: failWords(e)}; }
+  if (j.error){ notify("env: " + j.error, true); return; }
   const m = document.getElementById("devEnvModal");
   m.querySelector("textarea").value = j.text || "";
   // Both halves: whether this is a draft off the example, and what the STORED
@@ -751,15 +726,12 @@ async function openDevEnv(project, instance){
   m.hidden = false;
   m.querySelector(".primary").onclick = async () => {
     try{
-      const r = await fetch("/api/devapp", {method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({project, instance, action: "env-set",
-                              text: m.querySelector("textarea").value})});
-      const k = await r.json();
+      const k = await postJSON("/api/devapp", {project, instance, action: "env-set",
+                              text: m.querySelector("textarea").value});
       if (k.error){ notify(k.error, true); return; }
       m.hidden = true;
       notify("env saved");
-      dockerList = null; dockerRev++; loadDocker();
+      dockerList = null; readMoved("docker"); loadDocker();
     }catch(e){ notify("env: " + failWords(e), true); }
   };
 }
@@ -1096,11 +1068,11 @@ async function dmJobSettle(){
   const j = dockerList?.job;
   if (!j?.running || !j.id) return;
   let got;
-  try{ got = await (await fetch(`/api/v1/jobs?id=${encodeURIComponent(j.id)}`)).json(); }catch(e){ return; }
+  try{ got = await getJSON(`/api/v1/jobs?id=${encodeURIComponent(j.id)}`); }catch(e){ return; }
   if (!got || got.id !== j.id || !j.running || !["succeeded", "failed", "canceled"].includes(got.state)) return;
   Object.assign(j, {running: false, state: got.state, step: "", aborting: false,
                     error: got.state === "succeeded" ? "" : (got.error || got.state)});
-  dockerRev++; drawPanes();
+  readMoved("docker"); drawPanes();
 }
 
 // What a confirm or a notice calls a container: the name its row shows,
@@ -1134,7 +1106,7 @@ async function dmAction(project, instance, act, btn){
       await postJSON("/api/devapp", {project, instance, action: "abort"});
     }
     catch(e){ notify("could not stop it: " + failWords(e), true); }
-    dockerRev++; drawPanes(); loadDocker();
+    readMoved("docker"); drawPanes(); loadDocker();
     return;
   }
   // A node's nginx behind the newest line (R192): the nginx tab's verb,
@@ -1144,13 +1116,13 @@ async function dmAction(project, instance, act, btn){
     if (!await askYes(`Update nginx on this node to nginx:${d?.nginx_to || "the newest line"}?\n\nIt is rebuilt with the new image, so its sites are down while the node pulls it.`)) return;
     if (btn) busy(btn, "Updating");
     try{
-      const j = await (await postJSON("/api/nginx", {action: "update", node: dockerList?.node || dockerNode})).json();
+      const j = await postJSON("/api/nginx", {action: "update", node: dockerList?.node || dockerNode});
       if (j.error) notify(j.error, true);
       else if (j.note) notify(j.note, true);
       else notify(`updating nginx to ${j.to}: this row has the build`);
     }
     catch(e){ notify("could not update it: " + failWords(e), true); }
-    dockerRev++; drawPanes(); loadDocker();
+    readMoved("docker"); drawPanes(); loadDocker();
     return;
   }
   if (act === "update"){
@@ -1175,8 +1147,9 @@ async function dmAction(project, instance, act, btn){
     // config parse each, and the manager lists them all.
     let st;
     try{
-      const r = await postJSON("/api/devapp", {project, instance, action:"state"});
-      st = (await r.json()).state || {};
+      const j = await postJSON("/api/devapp", {project, instance, action:"state"});
+      if (j.error) throw new Error(j.error);
+      st = j.state || {};
     }catch(e){ notify("could not read its state: " + failWords(e), true); return; }
     if ((st.problems || []).length){
       notify(`${dmCalled(project, instance)} will not work as written: `
@@ -1216,15 +1189,14 @@ async function dmAction(project, instance, act, btn){
   }
   if (btn) btn.disabled = true;
   try{
-    const r = await postJSON("/api/devapp", {project, instance, action:act, ack, beside});
-    const j = await r.json();
+    const j = await postJSON("/api/devapp", {project, instance, action:act, ack, beside});
     if (j.error) notify(j.error, true);
     // What was done instead of what was asked: a remove whose daemon could
     // not be reached took the record and nothing else. Said, because the row
     // vanishing looks identical either way.
     else if (j.note) notify(j.note);
   }catch(e){ notify(`${act} failed: ` + e, true); }
-  dockerList = null; dockerRev++; loadDocker();
+  dockerList = null; readMoved("docker"); loadDocker();
 }
 
 // Where a container's published port actually answers.
@@ -1254,15 +1226,20 @@ function daemonHost(){
 // What each instance's Ports and mounts last said, by "project|instance",
 // drawn at once into a fold a redraw brought back open (B827).
 const dmWireSeen = {};
-async function loadWire(d){
+function loadWire(d){
   d.dataset.done = "1";
+  const inst = d.closest("[data-inst]")?.dataset.inst || "";
+  return reading("docker.wire:" + inst, () => wireRead(d));
+}
+async function wireRead(d){
   const [project, instance] = d.closest("[data-inst]").dataset.inst.split("|");
   const box = d.querySelector(".wire");
   let html;
   const key = `${project}|${instance}`;
   try{
-    const r = await postJSON("/api/devapp", {project, instance, action:"state"});
-    const st = (await r.json()).state || {};
+    const j = await postJSON("/api/devapp", {project, instance, action:"state"});
+    if (j.error) throw new Error(j.error);
+    const st = j.state || {};
     // An answer that could not read the compose (the daemon or compose not
     // answering in time, as under a loaded gate) says nothing about the
     // wiring: what was read before stays, and with nothing read before it
@@ -1309,12 +1286,12 @@ async function loadWire(d){
       `:is(.dmtab, .dkview) .row[data-inst="${CSS.escape(inst)}"] details.sect`);
     if (!nd || nd.dataset.done) return;
     nd.dataset.done = "1";
-    nd.querySelector(".wire").innerHTML = html;
+    drawHTML(nd.querySelector(".wire"), html);
     if (d.open) nd.open = true;
     return;
   }
   const before = d.offsetHeight;
-  box.innerHTML = html;
+  drawHTML(box, html);
   const after = d.offsetHeight;
   if (d.open && before !== after && !noMotion()) foldHeight(d, before, after, () => {});
 }
@@ -1367,8 +1344,7 @@ async function openEditContainer(name){
   $("cmodal").hidden = false;
   cHold();
   try{
-    const r = await postJSON("/api/container", {action:"read", name});
-    const j = await r.json();
+    const j = await postJSON("/api/container", {action:"read", name});
     if (cEditing !== name) return;          // reopened on another one meanwhile
     $("cYml").value = j.compose || "";
     $("cEnv").value = j.env || "";
@@ -1408,8 +1384,8 @@ async function openEditInstance(project, instance){
   cHold();
   try{
     const [c, e] = await Promise.all([
-      postJSON("/api/devapp", {project, instance, action: "compose-get"}).then(r => r.json()),
-      postJSON("/api/devapp", {project, instance, action: "env-get"}).then(r => r.json())]);
+      postJSON("/api/devapp", {project, instance, action: "compose-get"}),
+      postJSON("/api/devapp", {project, instance, action: "env-get"})]);
     if (cEditing !== key) return;           // reopened on another one meanwhile
     if (c.error || e.error) throw new Error(c.error || e.error);
     $("cYml").value = c.text || "";
@@ -1430,7 +1406,7 @@ async function cSaveInstance(key){
   const fail = m => ($("cErr").textContent = m, $("cErrWrap").hidden = false);
   const {project, instance} = key, compose = $("cYml").value, env = $("cEnv").value;
   busy($("cGo"), "Saving");
-  const send = body => postJSON("/api/devapp", {project, instance, ...body}).then(r => r.json());
+  const send = body => postJSON("/api/devapp", {project, instance, ...body});
   try{
     // The compose file first: compose reads it before it is kept, and a file
     // it refuses stops here with its words, before the env is touched.
@@ -1445,7 +1421,7 @@ async function cSaveInstance(key){
     $("cmodal").hidden = true;
     notify(n.job ? `renaming ${key.name} to ${n.name}: its row says when it is done`
            : c.ok || e.ok ? "saved: rebuild it to bring the change up" : "nothing changed");
-    dockerList = null; dockerRev++; loadDocker();
+    dockerList = null; readMoved("docker"); loadDocker();
   }catch(err){ unbusy($("cGo"), "Save"); fail("could not save: " + err); }
 }
 
@@ -1465,7 +1441,7 @@ function myProjectNames(keep){
 
 function fillUnderSelect(sel, picked){
   const names = myProjectNames(picked);
-  sel.innerHTML = optionList([["", "no space"], ...names.map(n => [n, projLabel(n)])], picked);
+  drawHTML(sel, optionList([["", "no space"], ...names.map(n => [n, projLabel(n)])], picked));
 }
 
 // The node follows the project picked: a container of a project belongs on
@@ -1505,9 +1481,7 @@ function openNewContainerApp(id, node = ""){
   openNewContainer();
 }
 async function loadNasApps(){
-  if (cApps) return cApps;
-  try{ cApps = (await (await fetch("/api/nasapps")).json()).apps || []; }
-  catch(e){ cApps = []; }
+  if (!cApps) await reading("nasapps", async () => { cApps = cApps || (await getJSON("/api/nasapps")).apps || []; });
   return cApps;
 }
 async function cAppPicked(){
@@ -1526,8 +1500,8 @@ async function cAppFill(){
   const b = $("cAppFill");
   busy(b, "Filling in");
   try{
-    const j = await (await postJSON("/api/nasapps", {app: id, data: $("cAppData").value.trim(), media: $("cAppMedia").value.trim(), ids: $("cAppIds").value.trim(),
-                                                      tz: $("cAppTz").value.trim(), port: parseInt($("cAppPort").value, 10)})).json();
+    const j = await postJSON("/api/nasapps", {app: id, data: $("cAppData").value.trim(), media: $("cAppMedia").value.trim(), ids: $("cAppIds").value.trim(),
+                                                      tz: $("cAppTz").value.trim(), port: parseInt($("cAppPort").value, 10)});
     if (j.error){ $("cErr").textContent = j.error; $("cErrWrap").hidden = false; return; }
     $("cErrWrap").hidden = true;
     $("cYml").value = j.compose; $("cEnv").value = j.env; cYmlTouched = true;
@@ -1550,7 +1524,7 @@ function openNewContainer(){
   if (want) loadNasApps().then(apps => {
     const a = apps.find(x => x.id === want);
     if ($("cmodal").hidden || !a) return;
-    $("cApp").innerHTML = `<option value="${esc(a.id)}">${esc(a.name)}</option>`;
+    drawHTML($("cApp"), `<option value="${esc(a.id)}">${esc(a.name)}</option>`);
     $("cApp").value = a.id;
     $("cAppName").textContent = a.name;
     $("cAppField").hidden = false;
@@ -1679,17 +1653,14 @@ async function cSubmit(){
   if (!$("cName").value.trim()) return fail("a name is needed");
   busy($("cGo"), editing ? "Saving" : "Creating");
   try{
-    const r = await fetch("/api/container", {method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({action: editing ? "save" : "create",
+    const j = await postJSON("/api/container", {action: editing ? "save" : "create",
                             name: editing || $("cName").value,
                             ...(editing && $("cName").value.trim() && $("cName").value.trim() !== editing
                                 ? {rename: $("cName").value.trim()} : {}),
                             node: editing ? "" : ($("cNodeField").hidden
                               ? (dockerNode || "") : $("cNode").value),
                             owner: editing ? "" : $("cUnder").value,
-                            compose: $("cYml").value, env: $("cEnv").value})});
-    const j = await r.json();
+                            compose: $("cYml").value, env: $("cEnv").value});
     if (j.error){
       unbusy($("cGo"), verb);
       // Compose's own complaint, which names the line: shown on the tab the
@@ -1704,12 +1675,12 @@ async function cSubmit(){
       // off the one on screen (B62).
       const made = $("cNodeField").hidden ? "" : $("cNode").value;
       if (made && made !== dockerNode){ openDockerOn(made); return; }
-      dockerList = null; dockerRev++; loadDocker();
+      dockerList = null; readMoved("docker"); loadDocker();
       return;
     }
     if (j.job && j.name && j.name !== editing){
       notify(`renaming ${editing} to ${j.name}: its row says each step, then Build it`);
-      dockerList = null; dockerRev++; loadDocker();
+      dockerList = null; readMoved("docker"); loadDocker();
       return;
     }
     // Saved. If it has been built, the change is on disk and not in the
@@ -1720,7 +1691,7 @@ async function cSubmit(){
     // to start on somebody's behalf because they pressed Save.
     const row = (dockerList?.instances || []).find(
       d => d.project === editing && d.instance === "main");
-    dockerList = null; dockerRev++; loadDocker();
+    dockerList = null; readMoved("docker"); loadDocker();
     if (row?.built_rev && await askYes(
           `${editing} is saved. Rebuild it now so the change takes effect?\n\n`
           + `Cancel keeps the change on disk for a later Rebuild.`)){
@@ -2088,24 +2059,22 @@ const dmRouteLink = r => {
 // A fold's loader fills whichever element holds its key when the answer
 // lands: the list redraws on every revision, and the fold a read was
 // started in is often not the fold on the page by the time it ends.
-const dmLoading = new Set();
 const DM_IMG_COLS = [{label: "Image"}, {label: "State", w: "6.5rem"}, {label: "ID", w: "8rem"},
                      {label: "Size", w: "6rem", num: true}, {label: "Created", w: "minmax(0,.6fr)"}];
 const DM_VOL_COLS = [{label: "Volume"}, {label: "Driver", w: "8rem"}];
 const dmFoldNow = key => document.querySelector(`:is(.dmtab, .dkview) details[data-sect="${CSS.escape(key)}"]`);
-async function loadDockerImages(det){
+function loadDockerImages(det){
   const key = det.dataset.sect;
-  if (!key || dmLoading.has(key)) return;
-  dmLoading.add(key);
+  if (!key) return Promise.resolve();
+  return reading("docker.images:" + key, () => dockerImagesRead(key));
+}
+async function dockerImagesRead(key){
   const node = dockerList?.node || dockerNode || "";
-  let j;
-  try{ j = await (await fetch("/api/docker/images" + (node ? "?node=" + encodeURIComponent(node) : ""))).json(); }
-  catch(e){ j = {error: String(e)}; }
-  finally{ dmLoading.delete(key); }
-  det = dmFoldNow(key);
+  const j = await getJSON("/api/docker/images" + (node ? "?node=" + encodeURIComponent(node) : ""));
+  const det = dmFoldNow(key);
   const box = det?.querySelector(".dmimgbox");
   if (!det || !box) return;
-  if (j.error){ box.innerHTML = `<div class="hint bad">${esc(j.error)}</div>`; return; }
+  if (j.error){ drawHTML(box, `<div class="hint bad">${esc(j.error)}</div>`); return; }
   const df = k => (j.df || []).find(x => x.kind === k) || {};
   const unused = (j.images || []).filter(i => !i.used).length;
   const dang = (j.images || []).filter(i => i.dangling).length;
@@ -2113,7 +2082,7 @@ async function loadDockerImages(det){
   let st = det.querySelector(":scope > summary .sst");
   if (!st){ st = document.createElement("span"); st.className = "sst"; st.setAttribute("data-own", ""); det.querySelector(":scope > summary")?.appendChild(st); }
   st.textContent = `${(j.images || []).length} image${(j.images || []).length === 1 ? "" : "s"}, ${(j.volumes || []).length} volume${(j.volumes || []).length === 1 ? "" : "s"}`;
-  box.innerHTML = statTiles([
+  drawHTML(box, statTiles([
     {label: "images", value: (j.images || []).length, sub: humanBytes(df("Images").size || (j.images || []).reduce((n, i) => n + i.size, 0))},
     {label: "not in use", value: unused, sub: `${dang} dangling`, tone: dang ? "warn" : ""},
     {label: "volumes", value: (j.volumes || []).length, sub: df("Local Volumes").size ? humanBytes(df("Local Volumes").size) : ""},
@@ -2149,7 +2118,7 @@ async function loadDockerImages(det){
   + ((j.volumes || []).length ? tblWrap(DM_VOL_COLS, j.volumes.map(v => `
       <div class="row dmvol">${tblLine(DM_VOL_COLS, [esc(v.name), esc(v.driver)])}</div>`).join(""), "dmvols")
       : `<div class="hint">no volumes on this daemon</div>`)
-;
+);
   box.querySelectorAll("[data-dmprune]").forEach(b => b.onclick = async () => {
     if (await dockerPrune(b.dataset.dmprune, node, dockerList?.name, b)) loadDockerImages(det);
   });
@@ -2166,7 +2135,7 @@ async function dockerPrune(kind, node, nodeName, b){
   if (!await askYes(`Prune ${kind === "cache" ? "the build cache" : kind === "unused" ? "unused images" : kind} on ${nodeName || "this node"}?\n\n${DOCKER_PRUNE_SAID[kind]}`,
                     {verb: "Prune", danger: kind === "unused" || kind === "volumes"})) return false;
   busy(b, "Pruning");
-  const r = await (await postJSON("/api/dockerctl", {action: "prune", container: kind, node})).json().catch(() => ({error: "no answer"}));
+  const r = await postJSON("/api/dockerctl", {action: "prune", container: kind, node});
   if (r.error) notify(r.error, true);
   else notify(`pruned ${kind}: ${(r.out || "").split("\n").filter(l => /reclaimed/i.test(l)).join(" ") || "nothing to remove"}`);
   return !r.error;
@@ -2202,7 +2171,7 @@ function dmSyncDialogs(el){
     }catch(e){ /* detached mid-draw */ }
     dlg.oncancel = e => {
       e.preventDefault();
-      dmDropDrafts(dlg.dataset.dmdlg); dmEditing.delete(dlg.dataset.dmdlg); dockerRev++; drawPanes();
+      dmDropDrafts(dlg.dataset.dmdlg); dmEditing.delete(dlg.dataset.dmdlg); readMoved("docker"); drawPanes();
     };
   });
 }
@@ -2233,7 +2202,7 @@ function dmWireRows(el, list = dockerList){
     // behind it, since the stats and every job step redraw the list.
     else if (d.open && d.querySelector(".wire") && !d.dataset.done){
       const inst = d.closest("[data-inst]")?.dataset.inst;
-      if (inst && dmWireSeen[inst]) d.querySelector(".wire").innerHTML = dmWireSeen[inst];
+      if (inst && dmWireSeen[inst]) drawHTML(d.querySelector(".wire"), dmWireSeen[inst]);
       loadWire(d);
     }
   });
@@ -2255,10 +2224,10 @@ function dmWireRows(el, list = dockerList){
     e.preventDefault();
     const [project, instance] = a.closest("[data-inst]").dataset.inst.split("|");
     if (!await askYes("Unpack its data into its volumes? It stops, the archive is written in over anything already in them, and it starts again.")) return;
-    const j = await (await postJSON("/api/devapp", {project, instance, action: "unpack"})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/devapp", {project, instance, action: "unpack"});
     if (j.error) return notify(j.error, true);
     notify(`unpacking ${j.name}: its row says when it is done`);
-    dockerList = null; dockerRev++;
+    dockerList = null; readMoved("docker");
     loadDocker();
   });
   // Whose Rebuild it is. Written at once, like the row's other controls, and
@@ -2286,10 +2255,10 @@ function dmWireRows(el, list = dockerList){
     const host = el.querySelector(`[data-dmnghost="${CSS.escape(key)}"]`)?.value.trim() || "";
     const port = el.querySelector(`[data-dmngport="${CSS.escape(key)}"]`)?.value || "";
     busy(b, "Adding");
-    const j = await (await postJSON("/api/nginx", {action: "route-add", node: dockerList?.node || dockerNode || "", cert, host, port})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/nginx", {action: "route-add", node: dockerList?.node || dockerNode || "", cert, host, port});
     if (j.error) notify(j.error, true);
     else { delete dmNginxDraft[key]; notify(`routed ${j.route?.host || "*"} to ${port} on this node's nginx${j.deployed === false ? " (applied once it is deployed)" : ""}`); }
-    dockerList = null; dockerRev++; loadDocker();
+    dockerList = null; readMoved("docker"); loadDocker();
   });
   // Every setting on a row is staged by its control and written by the
   // grid's one Apply (R210): a pick wakes the button when something differs
@@ -2324,7 +2293,7 @@ function dmWireRows(el, list = dockerList){
     const [project, instance] = key.split("|");
     const kind = dmGpuDraft[key];
     if (kind === undefined) return;
-    const j = await (await postJSON("/api/devapp", {project, instance, action: "gpu", kind})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/devapp", {project, instance, action: "gpu", kind});
     if (j.error){ notify(j.error, true); return; }
     delete dmGpuDraft[key];
     notify(kind ? `${dmCalled(project, instance)} gets the ${kind === "nvidia" ? "NVIDIA card" : "AMD card"} from the next build`
@@ -2334,7 +2303,7 @@ function dmWireRows(el, list = dockerList){
     const [project, instance] = key.split("|");
     const file = dmOvDraft[key];
     if (file === undefined) return;
-    const j = await (await postJSON("/api/devapp", {project, instance, action: "override", file})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/devapp", {project, instance, action: "override", file});
     if (j.error){ notify(j.error, true); return; }
     delete dmOvDraft[key];
     notify(file ? `${dmCalled(project, instance)} lays ${file} over its compose file from the next build`
@@ -2344,8 +2313,7 @@ function dmWireRows(el, list = dockerList){
     const [project, instance] = key.split("|");
     const ref = dmRefDraft[key];
     if (ref === undefined) return;
-    const r = await postJSON("/api/devapp", {project, instance, action: "ref", ref});
-    const j = await r.json();
+    const j = await postJSON("/api/devapp", {project, instance, action: "ref", ref});
     if (j.error){ notify(j.error, true); return; }
     delete dmRefDraft[key];
     notify(ref ? `${dmCalled(project, instance)} builds from ${ref} now`
@@ -2363,8 +2331,7 @@ function dmWireRows(el, list = dockerList){
     if (what === "stop" && !await askYes(`Stop ${ctr}?`)) return;
     busy(b, {start: "Starting", stop: "Stopping", restart: "Restarting"}[what]);
     try{
-      const r = await postJSON("/api/dockerctl", {action: what, container: ctr, node});
-      const j = await r.json();
+      const j = await postJSON("/api/dockerctl", {action: what, container: ctr, node});
       if (j.error) notify(j.error, true); else notify(j.out || `${what} sent`);
     }catch(e){ notify(`${what} ${ctr}: ` + e, true); }
     dockerList = null; loadDocker();
@@ -2388,7 +2355,7 @@ function dmWireRows(el, list = dockerList){
   const applyBoot = async name => {
     const on = dmBootDraft[name];
     if (on === undefined) return;
-    const j = await (await postJSON("/api/dockerctl", {action: on ? "boot-on" : "boot-off", container: name, node})).json();
+    const j = await postJSON("/api/dockerctl", {action: on ? "boot-on" : "boot-off", container: name, node});
     if (j.error){ notify(j.error, true); return; }
     delete dmBootDraft[name];
     notify(j.out || (on ? `${name} starts on boot` : `${name} no longer starts on boot`));
@@ -2402,7 +2369,7 @@ function dmWireRows(el, list = dockerList){
   const applyLan = async name => {
     const on = dmLanDraft[name];
     if (on === undefined) return;
-    const j = await (await postJSON("/api/dockerctl", {action: on ? "lan-on" : "lan-off", container: name, node})).json();
+    const j = await postJSON("/api/dockerctl", {action: on ? "lan-on" : "lan-off", container: name, node});
     if (j.error){ notify(j.error, true); return; }
     delete dmLanDraft[name];
     notify(j.out || (on ? `${name} reaches the network around its node` : `${name} no longer reaches the network around its node`));
@@ -2424,10 +2391,9 @@ function dmWireRows(el, list = dockerList){
     const [project, instance] = other ? [] : key.slice(5).split("|");
     const what = other ? key.slice(4) : (list?.instances || []).find(
       x => x.project === project && x.instance === instance)?.name || project;
-    const r = await postJSON(other ? "/api/dockerctl" : "/api/devapp", other
+    const j = await postJSON(other ? "/api/dockerctl" : "/api/devapp", other
       ? {action: "owner", container: key.slice(4), owner, node}
       : {action: "owner", project, instance, owner});
-    const j = await r.json();
     if (j.error){ notify(j.error, true); return; }
     delete dmOwnDraft[key];
     notify(owner ? `${what} belongs to ${projLabel(owner)} now` : `${what} belongs to no space now`);
@@ -2448,8 +2414,7 @@ function dmWireRows(el, list = dockerList){
       x => x.project === project && x.instance === instance)?.name || project;
     if (!await askYes(`Move ${what} to ${projLabel(to)}? It keeps its name, env and data, and builds from ${
         projLabel(to)}'s tree from its next rebuild.`)){ delete dmMoveDraft[key]; return; }
-    const r = await postJSON("/api/devapp", {action: "move", project, instance, to});
-    const j = await r.json();
+    const j = await postJSON("/api/devapp", {action: "move", project, instance, to});
     if (j.error){ notify(j.error, true); return; }
     delete dmMoveDraft[key];
     notify(`${what} is ${projLabel(to)}'s now` + (j.dropped_ref
@@ -2484,8 +2449,7 @@ function dmWireRows(el, list = dockerList){
           row.querySelectorAll("[data-route]").forEach(x => { x.value = x.dataset.was; });
           delete dmRouteDraft[row.dataset.inst]; return; }
     delete dmRouteDraft[row.dataset.inst];
-    const r = await postJSON("/api/devapp", {project, instance, action:"route", mode, port});
-    const j = await r.json();
+    const j = await postJSON("/api/devapp", {project, instance, action:"route", mode, port});
     if (j.error) notify(j.error, true);
   };
   // The grid's one Apply: every staged setting on the row, in turn, then
@@ -2498,10 +2462,10 @@ function dmWireRows(el, list = dockerList){
   // into it going nowhere (B852).
   dmSyncDialogs(el);
   el.querySelectorAll("[data-dmedit]").forEach(b => b.onclick = () => {
-    closeMore(); dmEditing.add(b.dataset.dmedit); dockerRev++; drawPanes();
+    closeMore(); dmEditing.add(b.dataset.dmedit); readMoved("docker"); drawPanes();
   });
   el.querySelectorAll("[data-dmcancel]").forEach(b => b.onclick = () => {
-    dmDropDrafts(b.dataset.dmcancel); dmEditing.delete(b.dataset.dmcancel); dockerRev++; drawPanes();
+    dmDropDrafts(b.dataset.dmcancel); dmEditing.delete(b.dataset.dmcancel); readMoved("docker"); drawPanes();
   });
   el.querySelectorAll("[data-dmapply]").forEach(btn => btn.onclick = async () => {
     const key = btn.dataset.dmapply, row = btn.closest(".row");
@@ -2515,7 +2479,7 @@ function dmWireRows(el, list = dockerList){
       if (name){ await applyBoot(name); await applyLan(name); }
     }catch(e){ notify("apply: " + failWords(e), true); }
     finally{ if (btn.isConnected) unbusy(btn, "Apply"); }
-    dockerList = null; dockerRev++; loadDocker();
+    dockerList = null; readMoved("docker"); loadDocker();
   });
   wireMore(el);
 }
@@ -2737,7 +2701,7 @@ function dmViewWire(el, redraw){
 async function dmCheck(btn, node, after){
   busy(btn, "Checking");
   try{
-    const j = await (await postJSON("/api/images", {action: "check", node})).json();
+    const j = await postJSON("/api/images", {action: "check", node});
     if (j.error) notify(j.error, true);
     else notify(j.behind ? `${j.behind} container${j.behind === 1 ? " has" : "s have"} a newer image: Update on ${j.behind === 1 ? "its row" : "their rows"}`
                          : `checked ${j.checked}: every registry image is current`);
@@ -2816,11 +2780,11 @@ function renderDockerInto(i){
     // The old system's containers and VMs need nothing of the daemon's
     // answer, so they are drawn while it is on its way.
     const old = dmOldApps();
-    el.innerHTML = `<div class="doctab dmtab">${skTpl(`${dmBar(null)}${dmTiles(null)}${dmStatus(null)}`)}${old}${skTpl(`
+    drawHTML(el, `<div class="doctab dmtab">${skTpl(`${dmBar(null)}${dmTiles(null)}${dmStatus(null)}`)}${old}${skTpl(`
       ${dmView === "list" ? skTable(DM_COLS, 4)
         // ...the rows in a project group's card, as they land (R262).
         : `<section class="dmcard"><div class="field dmgroup"><b>${skv(8)}</b></div>${skRows(3)}</section>`}
-      ${dmImagesSection()}`)}</div>`;
+      ${dmImagesSection()}`)}</div>`);
     if (old) wireAdoptApps(el);
     return;
   }
@@ -2900,12 +2864,12 @@ function renderDockerInto(i){
           ? `<br><span class="dim">${esc((src.strays || []).join(", "))} ${
               src.strays.length > 1 ? "are" : "is"} mapped but not mounted here</span>` : ""}</div>`
     : "";
-  // Slow, not merely in flight: dockerFetching alone is true for the whole
+  // Slow, not merely in flight: readBusy("docker") alone is true for the whole
   // of every fetch, and the timer in loadDocker is what decides it is worth
   // saying. A listing the server itself marked stale wears the same class
   // without the word: it is the last answer, and nothing is on its way that
   // the next revision will not bring.
-  const slow = dockerFetching && dmSlow;
+  const slow = readBusy("docker") && dmSlow;
   // The picker: every node, online or not: an offline node's view is its
   // last-known list in the ghosted state the blind path draws.
   // One tab, re-rendered per pick (docs/nodes.md §13), never a tab per node.
@@ -2981,7 +2945,7 @@ function renderDockerInto(i){
   el.querySelectorAll("[data-rdeny]").forEach(b => b.onclick = () =>
     phFetch({action: "deny", id: Number(b.dataset.rdeny)}));
   const ck = el.querySelector("#bDockerCheck");
-  if (ck) ck.onclick = () => dmCheck(ck, dockerList?.node || dockerNode || "", () => { dockerRev++; loadDocker(); });
+  if (ck) ck.onclick = () => dmCheck(ck, dockerList?.node || dockerNode || "", () => { readMoved("docker"); loadDocker(); });
   const nb = el.querySelector("#bDockerNew");
   if (nb) nb.onclick = openNewContainer;
   // A chip narrows the list to one project's group (the chips rule): a
@@ -2989,8 +2953,8 @@ function renderDockerInto(i){
   el.querySelectorAll("[data-dmchip]").forEach(c => c.onclick = () =>
     // ...the groups it leaves fading through, as a page does (fadeThrough).
     chipMove(() => document.querySelector(".pane .doc.on .dmtab"), ".dmcard, .tbl > .row, .tbl .rows > .row",
-             () => { dmChip = c.dataset.dmchip; dockerRev++; drawPanes(); }));
-  dmViewWire(el, () => fadeThrough(DM_PARTS, () => { dockerRev++; drawPanes(); }));
+             () => { dmChip = c.dataset.dmchip; readMoved("docker"); drawPanes(); }));
+  dmViewWire(el, () => fadeThrough(DM_PARTS, () => { readMoved("docker"); drawPanes(); }));
   // The search redraws as it is typed; the patch keeps the box, its focus
   // and its caret.
   const sb = el.querySelector("#dmSearch");
@@ -3000,7 +2964,7 @@ function renderDockerInto(i){
     onTyping(sb, () => {
       dmSearch = sb.value;
       clearTimeout(dmSearchTimer);
-      dmSearchTimer = setTimeout(() => { dockerRev++; drawPanes(); }, 120);
+      dmSearchTimer = setTimeout(() => { readMoved("docker"); drawPanes(); }, 120);
     });
   }
   // The wiring, fetched when the fold is opened and not before. It needs the

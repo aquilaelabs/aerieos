@@ -373,7 +373,7 @@ await section("a part a press drew by hand keeps the style its data-style gave i
   const r = await page.evaluate(async () => {
     const el = document.querySelector('#r244');
     el.querySelector('.board').outerHTML = '<div class="board"><div class="blk" data-style="grid-column:2 / span 3">one</div></div>';
-    await new Promise(res => setTimeout(res, 0));                       // the page applies data-style as it lands
+    drawn(el.querySelector('.board'));                                  // as repaintBoard does: what a draw brings, its data-style applied
     const blk = el.querySelector('.blk'), applied = blk.style.gridColumn;
     patch(el, '<div class="page"><div class="board"><div class="blk" data-style="grid-column:2 / span 3">one</div></div></div><i>2</i>');
     return { applied, kept: el.querySelector('.blk') === blk, after: blk.style.gridColumn, read: el.querySelector('i').textContent };

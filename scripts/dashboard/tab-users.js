@@ -15,7 +15,6 @@
 "use strict";
 
 let usersList = null;            // last answer, or null before the first
-let usersRev = 0;                // bumped when it changes, so panes repaint
 let usersErr = "";
 let usersMeta = {owner: "", me: "", roles: [], role_names: [], projects: [], role_labels: {}};
 // What is typed into Add somebody, kept across the repaints a reload brings:
@@ -29,20 +28,20 @@ function openUsersTab(){
   openTab({kind: "users", arg: "__users", label: "Users"});
 }
 
-async function loadUsers(){
-  try{
-    const j = await (await bootFetch("/api/users")).json();
-    usersErr = j.error || "";
-    usersList = j.users || [];
-    usersMeta = {owner: j.owner || "", me: j.me || "",
-                 roles: j.roles || [], role_names: j.role_names || [], projects: j.projects || [],
-                 role_labels: j.role_labels || {}};
-  }catch(e){
-    usersErr = String(e);
-    usersList = usersList || [];
-  }
-  usersRev++;
-  drawPanes();
+function loadUsers(){
+  return reading("users", async () => {
+    try{
+      const j = await getJSON("/api/users");
+      usersErr = j.error || "";
+      usersList = j.users || [];
+      usersMeta = {owner: j.owner || "", me: j.me || "",
+                   roles: j.roles || [], role_names: j.role_names || [], projects: j.projects || [],
+                   role_labels: j.role_labels || {}};
+    }catch(e){
+      usersErr = String(e);
+      usersList = usersList || [];
+    }
+  });
 }
 
 // `say`, when given, is where a refusal is written (a dialog's own line);
@@ -50,10 +49,8 @@ async function loadUsers(){
 async function usersAct(body, say = null){
   const refuse = t => { if (say) say(t); else notify(t, true); return false; };
   try{
-    const r = await fetch("/api/users", {method: "POST",
-      headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || j.error) return refuse(j.error || `failed (HTTP ${r.status})`);
+    const j = await postJSON("/api/users", body);
+    if (j.error) return refuse(j.error);
     if (body.action === "add"){ usersAddDraft = {name: "", pw: "", role: "user"}; usersPick = body.name; usersPhoneOpen = true; }
     if (body.action === "remove"){ usersPick = ""; usersPhoneOpen = false; }
     notify(body.action === "remove" ? `${body.name} removed`
@@ -90,7 +87,7 @@ function usersDirty(){
   const was = usersEdit ? usersEditFrom(u) : null;
   return (!!usersEdit && USER_KEYS.some(k => was[k] !== usersEdit[k])) || (typeof rolesPeopleDirty === "function" && rolesPeopleDirty());
 }
-function usersRedraw(){ usersRev++; drawPanes(); }
+function usersRedraw(){ readMoved("users"); drawPanes(); }
 // Accounts and roles Read without its Write: the page is there to read, its
 // fields dead and the reason said over them (B34).
 function usersReadOnly(){ return state?.can?.admin === false; }
@@ -167,14 +164,14 @@ function renderUsersInto(i){
     // Its template (R218 step 16): the list beside the settings, whose
     // labels are the page's own; the accounts are on their way.
     const field = label => skField(label, 16);
-    d.list.innerHTML = skTpl(`${pageHead({facts: [["Accounts", GHOST], ["Administrators", GHOST]], actions: addUser})}<div class="rsplit"><div class="rlist">${skRows(3)}</div><div class="rdetail">${
-      field("Account name") + field("Their name") + field("Roles and spaces")}</div></div>`);
+    drawHTML(d.list, skTpl(`${pageHead({facts: [["Accounts", GHOST], ["Administrators", GHOST]], actions: addUser})}<div class="rsplit"><div class="rlist">${skRows(3)}</div><div class="rdetail">${
+      field("Account name") + field("Their name") + field("Roles and spaces")}</div></div>`));
     loadUsers();
     wireUsersBar(d.el);
     return;
   }
   if (refused){
-    d.list.innerHTML = `<div class="row bad"><div class="grow">${esc(usersErr)}</div></div>`;
+    drawHTML(d.list, `<div class="row bad"><div class="grow">${esc(usersErr)}</div></div>`);
     return;
   }
   if (rolesData === null && !usersRolesAsked){ usersRolesAsked = true; loadRoles().then(usersRedraw); }
@@ -258,10 +255,8 @@ async function usersSave(el, btn){
     const body = {action: "edit", name: u.name, to: u.name === usersMeta.me ? "" : e.name.trim(),
                   profile: {full_name: e.full, email: e.email, git_name: e.git_name, git_email: e.git_email},
                   password: e.pw};
-    const r = await fetch("/api/users", {method: "POST",
-      headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || j.error) return say(j.error || `failed (HTTP ${r.status})`);
+    const j = await postJSON("/api/users", body);
+    if (j.error) return say(j.error);
     notify(`${body.to || u.name} saved`);
     usersPick = body.to || u.name; usersEdit = null;
     await loadUsers();
@@ -281,7 +276,7 @@ function usersAddOpen(){
     document.body.appendChild(m);
     armModal(m);
   }
-  m.innerHTML = `<div class="box"><h3>Add user</h3>
+  drawHTML(m, `<div class="box"><h3>Add user</h3>
     <div class="field">${lbl("uNewName", "Account name")}<input id="uNewName" autocomplete="off"></div>
     <div class="field">${lbl("uNewPw", "Password", "at least 8 characters. They can change it on their Profile")}
       <input id="uNewPw" type="password" autocomplete="new-password"></div>
@@ -291,7 +286,7 @@ function usersAddOpen(){
     <div class="field">${lbl("uNewEmail", "Email", "optional")}<input id="uNewEmail" type="email" autocomplete="off"></div>
     <div class="field"><div class="hint">A new account holds no role: give it one beside its account once it is added.</div></div>
     <div class="field" id="uAddWhyF" hidden><div class="hint bad" id="uAddWhy"></div></div>
-    ${dlgFoot(`<button type="button" id="uAddCancel">Cancel</button>`, `<button type="button" id="uAdd" class="primary" disabled>Add</button>`)}</div>`;
+    ${dlgFoot(`<button type="button" id="uAddCancel">Cancel</button>`, `<button type="button" id="uAdd" class="primary" disabled>Add</button>`)}</div>`);
   // Add wakes once there is a name and a password of 8 or more typed the
   // same twice (the operator, 18 Oct); why it sleeps is said in the dialog
   // once something is typed, and a refusal from the server lands there too.

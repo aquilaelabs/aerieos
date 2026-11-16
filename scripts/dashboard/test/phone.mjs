@@ -45,7 +45,7 @@ ok(!(await page.$('details.sect[data-sect="nodes:phone"]')),
 // operator, 21 Oct: not an error), and the
 // reason follows what is typed; it was a tooltip, which a phone never shows.
 await section("B114: a dead Connect or Pair says why under its row, in yellow", async () => {
-  await page.evaluate(() => { phIp = ''; phConnPort = ''; phPort = ''; phCode = ''; phRev++; drawPanes(); });
+  await page.evaluate(() => { phIp = ''; phConnPort = ''; phPort = ''; phCode = ''; readMoved('phone'); drawPanes(); });
   await page.waitForSelector('.doc.on [data-phwhy="connect"]:not([hidden])', { timeout: 10000 });
   const why = () => page.evaluate(() => Object.fromEntries([...document.querySelectorAll('.doc.on [data-phwhy]')]
     .map(e => [e.dataset.phwhy, e.hidden ? '' : e.textContent])));
@@ -64,13 +64,13 @@ await section("B114: a dead Connect or Pair says why under its row, in yellow", 
   // the focus with the old box, the keys went nowhere, and the port typed
   // was never there for the line to go.
   await page.focus('.doc.on #phConnPort');
-  await page.evaluate(() => { phRev++; drawPanes(); });
+  await page.evaluate(() => { readMoved('phone'); drawPanes(); });
   await page.keyboard.press('End');
   await page.keyboard.type('1');
   const kept = await page.evaluate(() => ({ at: document.activeElement?.id, port: phConnPort }));
   ok(kept.at === 'phConnPort' && kept.port === '55551',
      `...and the box being typed in keeps its caret across a redraw (${JSON.stringify(kept)})`);
-  await page.evaluate(() => { phIp = ''; phConnPort = ''; phRev++; drawPanes(); });
+  await page.evaluate(() => { phIp = ''; phConnPort = ''; readMoved('phone'); drawPanes(); });
 });
 // ...and a link to a page this account's grants keep it from is its words,
 // not an address that lands on another page of the group.

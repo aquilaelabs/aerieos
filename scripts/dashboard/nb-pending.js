@@ -7,20 +7,21 @@
 
 function nbPendingView({$, nb, project, root}){
   // ---- what a session has waiting for approval (roadmap #27) --------------
-  async function loadPending(again = false){
-    try{
-      const r = await fetch(`/api/pending?project=${encodeURIComponent(project)}`);
-      const j = await r.json();
-      if (j.error) return;
-      nb.pendData = j;
-    }catch(e){ return; }
-    // The answer's own revision, not the page's token as of now (B201), so
-    // the nb.watch above can tell a later move from what this copy holds.
-    nb.pendRev = nb.pendData.rev ?? revs[`pending:${project}`] ?? nb.pendRev ?? 0;
-    drawPending();
-    // Already behind (see nb-tests.js): read once more now.
-    if (!again && nb.pendData.rev !== undefined && revs[`pending:${project}`] !== undefined
-        && revs[`pending:${project}`] !== nb.pendData.rev) return loadPending(true);
+  function loadPending(again = false){
+    return reading(`${project}:pending`, async () => {
+      try{
+        const j = await getJSON(`/api/pending?project=${encodeURIComponent(project)}`);
+        if (j.error) return;
+        nb.pendData = j;
+      }catch(e){ return; }
+      // The answer's own revision, not the page's token as of now (B201), so
+      // the nb.watch above can tell a later move from what this copy holds.
+      nb.pendRev = nb.pendData.rev ?? revs[`pending:${project}`] ?? nb.pendRev ?? 0;
+      drawPending();
+      // Already behind (see nb-tests.js): read once more now.
+      if (!again && nb.pendData.rev !== undefined && revs[`pending:${project}`] !== undefined
+          && revs[`pending:${project}`] !== nb.pendData.rev) loadPending(true); return;
+    });
   }
   function drawPending(){
     const el = $("nbPending");
@@ -45,9 +46,9 @@ function nbPendingView({$, nb, project, root}){
     const c = nb.pendData.counts || {};
     const parts = [["roadmap", "roadmap"], ["bugs", "bug"], ["rules", "rule"], ["settings", "setting"], ["design", "design save"], ["wiki", "wiki change"]]
       .filter(([k]) => c[k]).map(([k, w]) => `${c[k]} ${w}${c[k] === 1 || w === "roadmap" ? "" : "s"}`);
-    el.innerHTML = `<div><span>${n} change${n === 1 ? "" : "s"} from a session
+    drawHTML(el, `<div><span>${n} change${n === 1 ? "" : "s"} from a session
         ${n === 1 ? "is" : "are"} waiting for your approval${parts.length ? ": " + esc(parts.join(", ")) : ""}.</span>
-        <button type="button" id="nbReview">Review</button></div>`;
+        <button type="button" id="nbReview">Review</button></div>`);
     $("nbReview").onclick = () => openPending(project);
   }
 
@@ -99,8 +100,7 @@ async function openPending(project){
   $("pendEmpty").hidden = true;
   $("pendHint").textContent = "Loading…";
   try{
-    const r = await fetch(`/api/pending?project=${encodeURIComponent(project)}`);
-    drawPendingModal(await r.json());
+    drawPendingModal(await getJSON(`/api/pending?project=${encodeURIComponent(project)}`));
   }catch(e){ $("pendHint").textContent = "Could not read what is waiting."; }
 }
 
@@ -165,7 +165,7 @@ function drawPendingModal(j){
         ${d && d !== r.summary ? `<details${sectAttr("pending:full:" + r.id)}><summary>full text</summary><pre>${esc(d)}</pre></details>` : ""}
       </span></label>`;
   }
-  $("pendList").innerHTML = html;
+  drawHTML($("pendList"), html);
   $("pendAllBox").checked = !!rows.length;
   $("pendAllBox").indeterminate = false;
   const boxes = () => [...$("pendList").querySelectorAll("input[data-pend]")];
@@ -191,8 +191,7 @@ async function pendAct(action){
   const btn = action === "approve" ? $("pendApprove") : $("pendDeny");
   busy(btn, action === "approve" ? "Approving" : "Denying");
   try{
-    const r = await postJSON("/api/pending", {project, action, ids});
-    const j = await r.json();
+    const j = await postJSON("/api/pending", {project, action, ids});
     if (j.error){ notify(j.error, true); return; }
     const said = [];
     if (j.approved?.length) said.push(`${j.approved.length} approved`);

@@ -11,44 +11,45 @@ function nbRoadmapView({$, nb}){
   // open items are appended to every Claude session bb-tty starts, which is why
   // something noticed mid-task and left undone survives the conversation.
 
-  async function loadRoadmap(gen){
-    // What the staging counter was when we asked. See the guard below.
-    const staged = nb.roadmapStaged;
-    let j;
-    try{
-      const r = await bootFetch("/api/roadmap?project=" + encodeURIComponent(nb.memProj));
-      j = await r.json();
-    }catch(e){ j = {error: String(e)}; }
-    if (gen !== nb.memGen) return;
-    // ...and never over something staged WHILE this was in flight. The guard
-    // above catches a reply meant for a different project; this catches one for
-    // this project that left before the operator typed and came back after.
-    //
-    // Every path that reloads does ask first: rereadRoadmap confirms, noteBatch
-    // checks that nothing is staged, but they ask BEFORE the fetch, and the
-    // answer stops being true while it is in flight. The list then came back
-    // from the server and quietly took what had been typed since.
-    //
-    // The test is "did anything stage since we asked", not "is anything staged
-    // now": an explicit re-read with work already staged is a request to
-    // replace it, and rereadRoadmap has confirmed that. Only the typing that
-    // happened DURING the round trip is unanswerable, because nobody was asked
-    // about it.
-    //
-    // Measured rather than reasoned: three concurrent runs of roadmap.mjs, two of
-    // them with #roadmapList empty and the hint back to "Nothing yet" a moment
-    // after a row was staged. Filed as a test race for weeks (bug #13) because
-    // it only showed under load, which is exactly when a fetch is slow enough
-    // to land on the wrong side of the typing.
-    //
-    // The batch marker still gets through: a session opening or closing one is
-    // news whether or not this list can be replaced.
-    if (nb.roadmapStaged !== staged){
-      if (j.batch !== undefined) nb.noteBatch(j.batch);
-      return;
-    }
-    drawRoadmap(j);
-    reposAlso($("roadmapRepos"), nb.memProj, "roadmap");
+  function loadRoadmap(gen){
+    return reading(`${nb.memProj}:roadmap`, async () => {
+      // What the staging counter was when we asked. See the guard below.
+      const staged = nb.roadmapStaged;
+      let j;
+      try{
+        j = await getJSON("/api/roadmap?project=" + encodeURIComponent(nb.memProj));
+      }catch(e){ j = {error: String(e)}; }
+      if (gen !== nb.memGen) return;
+      // ...and never over something staged WHILE this was in flight. The guard
+      // above catches a reply meant for a different project; this catches one for
+      // this project that left before the operator typed and came back after.
+      //
+      // Every path that reloads does ask first: rereadRoadmap confirms, noteBatch
+      // checks that nothing is staged, but they ask BEFORE the fetch, and the
+      // answer stops being true while it is in flight. The list then came back
+      // from the server and quietly took what had been typed since.
+      //
+      // The test is "did anything stage since we asked", not "is anything staged
+      // now": an explicit re-read with work already staged is a request to
+      // replace it, and rereadRoadmap has confirmed that. Only the typing that
+      // happened DURING the round trip is unanswerable, because nobody was asked
+      // about it.
+      //
+      // Measured rather than reasoned: three concurrent runs of roadmap.mjs, two of
+      // them with #roadmapList empty and the hint back to "Nothing yet" a moment
+      // after a row was staged. Filed as a test race for weeks (bug #13) because
+      // it only showed under load, which is exactly when a fetch is slow enough
+      // to land on the wrong side of the typing.
+      //
+      // The batch marker still gets through: a session opening or closing one is
+      // news whether or not this list can be replaced.
+      if (nb.roadmapStaged !== staged){
+        if (j.batch !== undefined) nb.noteBatch(j.batch);
+        return;
+      }
+      drawRoadmap(j);
+      reposAlso($("roadmapRepos"), nb.memProj, "roadmap");
+    });
   }
 
   // The send arrow. Crossing something out here does not mean "done"; it means
@@ -268,7 +269,7 @@ function nbRoadmapView({$, nb}){
   }
 
   function drawRoadmap(j, force){
-    if (j.error){ $("roadmapList").innerHTML = `<div class="hint bad">${esc(j.error)}</div>`; return; }
+    if (j.error){ drawHTML($("roadmapList"), `<div class="hint bad">${esc(j.error)}</div>`); return; }
     if (!force && boxHoldingSomething()) return;
     // Every read and every write hands back where the list has got to, so the
     // poll below can tell this panel's own change from somebody else's. Without
@@ -363,7 +364,7 @@ function nbRoadmapView({$, nb}){
     // open before this redraw stay open, so acting on one does not fold
     // it, and a group whose step is armed is open to show it.
     const held = new Set([...$("roadmapList").querySelectorAll("details.grp[open]")].map(d => d.dataset.id));
-    $("roadmapList").innerHTML = rows.map(r =>
+    drawHTML($("roadmapList"), rows.map(r =>
       // The group's own row gets the same `live` as its steps now: its arrow
       // stands for the next one, so it is as clickable as that one is.
       `<details class="grp${r.shelved ? " shelved" : ""}${shown(r) ? "" : " off"}" data-id="${r.id}"${
@@ -373,7 +374,7 @@ function nbRoadmapView({$, nb}){
         // How a plain item becomes a plan: give it a step. Hidden while
         // reordering, where the question is only where things sit.
         nb.roadmapOrdering || ro ? "" : `<div class="addstep" data-id="${r.id}"><button
-        type="button" class="link">Add a step</button></div>`}</details>`).join("");
+        type="button" class="link">Add a step</button></div>`}</details>`).join(""));
     // The row's ground and its words open and shut the fold, on the same
     // tween a bug's row uses; a control on the row acts and does not fold.
     // Bound on the summary rather than the toggle event, because toggle
@@ -519,13 +520,13 @@ function nbRoadmapView({$, nb}){
   function sendBoxEl({label, sub, placeholder, onSend, onCancel}){
     const box = document.createElement("div");
     box.className = "sendbox ctlown";
-    box.innerHTML = `<div class="q">${esc(label)}${
+    drawHTML(box, `<div class="q">${esc(label)}${
         sub ? ` <span>· ${esc(sub)}</span>` : ""}</div>
     <textarea id="sendMore" rows="2" maxlength="4000"
       placeholder="${esc(placeholder)}"></textarea>
     <div class="actbar">
       <button type="button" class="stop">Cancel</button>
-      <button type="button" class="primary" id="roadmapGo">Send</button></div>`;
+      <button type="button" class="primary" id="roadmapGo">Send</button></div>`);
     const more = box.querySelector("#sendMore");
     more.value = nb.sendNoteText;
     // Kept on every keystroke rather than read at the end: a redraw between the
@@ -701,8 +702,7 @@ function nbRoadmapView({$, nb}){
   async function postRoadmap(body, quiet){ return nb.writing(() => postRoadmapDo(body, quiet)); }
   async function postRoadmapDo(body, quiet){
     try{
-      const r = await postJSON("/api/roadmap", {project: nb.memProj, ...body});
-      const j = await r.json();
+      const j = await postJSON("/api/roadmap", {project: nb.memProj, ...body});
       // Somebody else wrote this item first (roadmap #26). Not a toast: the op
       // stays at the head of the queue and the band asks which version wins,
       // because the alternative (applying it) is how one of the two writers
@@ -762,7 +762,7 @@ function nbRoadmapView({$, nb}){
     const when = nb.clash.at ? " " + ago(nb.clash.at) : "";
     const theirs = String(nb.clash.current ?? "");
     const mine = op.action === "remove" ? "" : String(op.text || "");
-    box.innerHTML = `
+    drawHTML(box, `
     <div class="hint bad">${who} changed this while you had it open${esc(when)}.
       Nothing has been written: pick one.</div>
     <div class="clashpair">
@@ -775,7 +775,7 @@ function nbRoadmapView({$, nb}){
     <div class="actbar">
       <button type="button" id="clashTheirs">Keep theirs</button>
       <button type="button" id="clashMine" class="primary">Use mine</button>
-    </div>`;
+    </div>`);
     $("clashTheirs").onclick = () => settleClash(false);
     $("clashMine").onclick = () => settleClash(true);
   }
@@ -822,12 +822,12 @@ function nbRoadmapView({$, nb}){
     const r = findRow(id), steps = r?.steps || [];
     const box = document.createElement("div");
     box.className = "dropbox editbox splitbox ctlown";
-    box.innerHTML = `<div class="q">Split R${id}<span>: the ticked steps move to a new item, whole</span></div>
+    drawHTML(box, `<div class="q">Split R${id}<span>: the ticked steps move to a new item, whole</span></div>
     <div class="splitsteps">${steps.map((st, i) => `<label><input type="checkbox" value="${i + 1}"> <span class="n">${i + 1}</span> ${esc(st.text.slice(0, 160))}</label>`).join("")}</div>
     <input class="title" maxlength="4000" autocomplete="off" spellcheck="false" placeholder="the new item's title">
     <div class="actbar">
       <button type="button" class="stop">Cancel</button>
-      <button type="button" class="primary">Split</button></div>`;
+      <button type="button" class="primary">Split</button></div>`);
     row.after(box);
     arriveBox(box);
     const shut = () => box.remove();
@@ -860,7 +860,7 @@ function nbRoadmapView({$, nb}){
     const wasInfo = (step < 0 ? r0?.info : r0?.steps?.[step]?.info) || "";
     const box = document.createElement("div");
     box.className = "dropbox editbox ctlown";
-    box.innerHTML = `<div class="q">${step < 0 ? "Reword it"
+    drawHTML(box, `<div class="q">${step < 0 ? "Reword it"
         : `Reword step ${step + 1}`}<span>: Enter saves, shift+Enter is a new line</span></div>
     <textarea maxlength="4000" spellcheck="false"></textarea>
     <div class="q qd"><span>Details: the technical half: files, functions, approach</span></div>
@@ -871,7 +871,7 @@ function nbRoadmapView({$, nb}){
     <input class="tgt" maxlength="24" autocomplete="off" spellcheck="false" inputmode="decimal" placeholder="${step < 0 ? "0.6.0" : esc(r0?.target || "0.6.0")}">
     <div class="actbar">
       <button type="button" class="stop">Cancel</button>
-      <button type="button" class="primary">Save</button></div>`;
+      <button type="button" class="primary">Save</button></div>`);
     row.after(box);
     arriveBox(box);
     const ta = box.querySelector("textarea");
@@ -913,9 +913,9 @@ function nbRoadmapView({$, nb}){
   // rather than assembled a dialog at a time.
   function openStepInput(box){
     const id = box.dataset.id;
-    box.innerHTML = `<textarea class="proseline" rows="1" maxlength="4000"
+    drawHTML(box, `<textarea class="proseline" rows="1" maxlength="4000"
       placeholder="then…"></textarea><button type="button" class="primary">Add</button>
-      <button type="button" class="stop">Cancel</button>`;
+      <button type="button" class="stop">Cancel</button>`);
     const inp = box.querySelector("textarea"), btn = box.querySelector(".primary");
     // Escape closes it too, but a phone keyboard has no Escape, and a field
     // that only closes by being emptied first is a field you are stuck in.
@@ -942,7 +942,7 @@ function nbRoadmapView({$, nb}){
   }
 
   function closeStepInput(box){
-    box.innerHTML = `<button type="button" class="link">Add a step</button>`;
+    drawHTML(box, `<button type="button" class="link">Add a step</button>`);
     box.querySelector("button").onclick = () => openStepInput(box);
   }
 
@@ -1192,18 +1192,19 @@ function nbRoadmapView({$, nb}){
   // again when the notebook reopens.
   // The newest ask wins: one still out from before a reload or a reopen
   // would land a list from before it.
-  async function loadFinished(){
-    const seq = nb.roadmapDoneSeq = (nb.roadmapDoneSeq || 0) + 1;
-    nb.roadmapDoneAsking = true;
-    let j;
-    try{
-      const r = await postJSON("/api/roadmap", {project: nb.memProj, action: "finished"});
-      j = await r.json();
-    }catch(e){ j = {error: String(e)}; }
-    if (seq !== nb.roadmapDoneSeq) return;
-    nb.roadmapDoneAsking = false;
-    nb.roadmapDone = j.finished || [];
-    drawFinished();
+  function loadFinished(){
+    return reading(`${nb.memProj}:finished`, async () => {
+      const seq = nb.roadmapDoneSeq = (nb.roadmapDoneSeq || 0) + 1;
+      nb.roadmapDoneAsking = true;
+      let j;
+      try{
+        j = await postJSON("/api/roadmap", {project: nb.memProj, action: "finished"});
+      }catch(e){ j = {error: String(e)}; }
+      if (seq !== nb.roadmapDoneSeq) return;
+      nb.roadmapDoneAsking = false;
+      nb.roadmapDone = j.finished || [];
+      drawFinished();
+    });
   }
   function drawFinished(){
     const host = $("roadmapDoneList");
@@ -1211,8 +1212,8 @@ function nbRoadmapView({$, nb}){
     if (!$("roadmapDoneSect").open){ host.innerHTML = ""; return; }
     const q = (nb.roadmapFind || "").trim().toLowerCase();
     const rows = nb.roadmapDone;
-    if (rows === null){ host.innerHTML = `${skel("rows")}`; return; }
-    if (!rows.length){ host.innerHTML = `<div class="empty">nothing finished yet</div>`; return; }
+    if (rows === null){ drawHTML(host, `${skel("rows")}`); return; }
+    if (!rows.length){ drawHTML(host, `<div class="empty">nothing finished yet</div>`); return; }
     const when = t => t ? fmtTime(t * 1000, {day: "2-digit", month: "short"}) : "";
     // Each the same fold as an open item (R254 step 2): its row, then its
     // details and its steps with when each was done, and Reopen where a
@@ -1222,11 +1223,11 @@ function nbRoadmapView({$, nb}){
     // 17 Oct): built whole and hidden, a long finished list was slow to draw.
     const vis = rows.filter(r => rmVer(r, nb.roadmapVer) && rmMatch(r, q));
     if (!vis.length && nb.roadmapVer){
-      host.innerHTML = `<div class="empty">nothing finished ${nb.roadmapVer === "none" ? "without a target" : `for ${esc(nb.roadmapVer)}`}</div>`;
+      drawHTML(host, `<div class="empty">nothing finished ${nb.roadmapVer === "none" ? "without a target" : `for ${esc(nb.roadmapVer)}`}</div>`);
       return;
     }
     const lim = pageLimit(host, "roadmapDone", vis.length);
-    host.innerHTML = vis.slice(0, lim).map(r => `<details class="grp done" data-done="${r.id}"${
+    drawHTML(host, vis.slice(0, lim).map(r => `<details class="grp done" data-done="${r.id}"${
         held.has(String(r.id)) ? " open" : ""}>
       <summary><div class="roadmap"><span class="n id">R${r.id}</span> <span class="body"><span class="txt">${esc(r.text || "")}</span>
         <span class="sub dim">done ${r.done_at ? esc(when(r.done_at)) : ""}${(() => { const v = shippedIn(r.done_at, nb.roadmapReleases);
@@ -1244,7 +1245,7 @@ function nbRoadmapView({$, nb}){
       <div class="actbar">${r.reopenable
         ? `<button type="button" data-reopen="${r.id}" title="put it back on the list as it was, for more work on the same goal">Reopen</button>`
         : `<span class="state">shipped in a release: more work on it is a new item</span>`}</div>
-    </details>`).join("");
+    </details>`).join(""));
     host.querySelectorAll("[data-reopen]").forEach(b => b.onclick = async () => {
       const j = await postRoadmap({action: "reopen", id: b.dataset.reopen});
       if (!j) return;

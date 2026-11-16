@@ -144,7 +144,7 @@ await section("the Library's toolchain cards, on the sandbox node", async () => 
 const card = (name, patch) => page.evaluate(([n, p]) => {
   const r = lib.rows.find(x => x.kind === 'toolchain' && x.name === n);
   const was = { ...r };
-  Object.assign(r, p); libRev++; drawPanes();
+  Object.assign(r, p); readMoved('library'); drawPanes();
   const c = document.querySelector(`.doc .librarytab .lcard[data-lrow="toolchain:${n}"]`);
   const st = c?.querySelector('.pcacts .state');
   const out = { state: st?.textContent.trim() || '', cls: st?.className || '', dots: !!st?.querySelector('.dots'),
@@ -152,7 +152,7 @@ const card = (name, patch) => page.evaluate(([n, p]) => {
                 acts: [...(c?.querySelectorAll('[data-libact]') || [])].map(b => b.textContent.trim()),
                 pills: [...(c?.querySelectorAll('.lcmeta .pill') || [])].map(x => x.textContent.trim()) };
   for (const k of Object.keys(p)) delete r[k];
-  Object.assign(r, was); libRev++; drawPanes();
+  Object.assign(r, was); readMoved('library'); drawPanes();
   return out;
 }, [name, patch]);
 await section("One word and an ellipsis for the whole of a job", async () => {
@@ -181,15 +181,15 @@ await section("One word and an ellipsis for the whole of a job", async () => {
   const dots = await page.evaluate(async () => {
     const r = lib.rows.find(x => x.kind === 'toolchain' && x.name === 'flutter');
     const was = { running: r.running, doing: r.doing };
-    Object.assign(r, { running: true, doing: 'install' }); libRev++; drawPanes();
+    Object.assign(r, { running: true, doing: 'install' }); readMoved('library'); drawPanes();
     const read = () => document.querySelector('.doc .librarytab .lcard[data-lrow="toolchain:flutter"] .dots')?.textContent ?? null;
     const first = read();
     // Until the page's timer has ticked them, ten seconds at most.
     let later = first;
     for (const end = Date.now() + 10000; (later = read()) === first && Date.now() < end;) await new Promise(res => setTimeout(res, 50));
-    libRev++; drawPanes();                      // a redraw, mid-animation
+    readMoved('library'); drawPanes();                      // a redraw, mid-animation
     const after = read();
-    Object.assign(r, was); libRev++; drawPanes();
+    Object.assign(r, was); readMoved('library'); drawPanes();
     return { first, later, after };
   });
   ok(dots.later !== null && dots.later !== dots.first && dots.after === dots.later,
@@ -200,10 +200,10 @@ await section("What a job said failed, under the card it failed on and no other"
   const bad = await page.evaluate(() => {
     const was = lib.job;
     lib.job = { ...(was || {}), running: false, errors: { flutter: 'could not download file · install failed (exit 1)' } };
-    libRev++; drawPanes();
+    readMoved('library'); drawPanes();
     const out = { text: document.querySelector('.doc .librarytab .lcard[data-lrow="toolchain:flutter"] .sub.bad')?.textContent || '',
                   n: document.querySelectorAll('.doc .librarytab .lcard .sub.bad').length };
-    lib.job = was; libRev++; drawPanes();
+    lib.job = was; readMoved('library'); drawPanes();
     return out;
   });
   ok(/could not download file/.test(bad.text) && bad.n === 1,
@@ -216,7 +216,7 @@ await section("One operation at a time", async () => {
   const g = await page.evaluate(() => {
     const was = lib.job;
     lib.job = { ...(was || {}), running: true, action: 'install', current: 'swift' };
-    libRev++; drawPanes();
+    readMoved('library'); drawPanes();
     const all = sel => [...document.querySelectorAll(sel)];
     const installs = all('.doc .librarytab [data-libact="install"][data-libkind="toolchain"]');
     const out = {
@@ -224,7 +224,7 @@ await section("One operation at a time", async () => {
       abort: all('.doc .librarytab [data-libabort]').length === 1 && !document.querySelector('.doc .librarytab [data-libabort]').disabled,
       install: installs.length > 0 && installs.every(b => !b.disabled),
     };
-    lib.job = was; libRev++; drawPanes();
+    lib.job = was; readMoved('library'); drawPanes();
     return out;
   });
   ok(g.check && g.abort && g.install,
@@ -235,11 +235,11 @@ await section("One operation at a time", async () => {
   const c = await page.evaluate(() => {
     const was = lib.job;
     lib.job = { ...(was || {}), running: true, action: 'check' };
-    libRev++; drawPanes();
+    readMoved('library'); drawPanes();
     const b = document.querySelector('.doc .librarytab [data-libcheck]');
     const out = { t: b?.textContent || '', dots: !!b?.querySelector('.dots'),
                   head: document.querySelector('.doc .librarytab .pghead')?.textContent || '' };
-    lib.job = was; libRev++; drawPanes();
+    lib.job = was; readMoved('library'); drawPanes();
     return out;
   });
   ok(/^Checking for updates/.test(c.t) && c.dots && !/Checking/.test(c.head),
@@ -250,11 +250,11 @@ await section("One operation at a time", async () => {
   const when = await page.evaluate(() => {
     const was = lib.store;
     const read = () => /Versions checked/.test(document.querySelector('.doc .librarytab .pghead')?.textContent || '');
-    lib.store = { ...(was || {}), checked: 0 }; libRev++; drawPanes();
+    lib.store = { ...(was || {}), checked: 0 }; readMoved('library'); drawPanes();
     const none = read();
-    lib.store = { ...(was || {}), checked: Math.floor(Date.now() / 1000) - 3600 }; libRev++; drawPanes();
+    lib.store = { ...(was || {}), checked: Math.floor(Date.now() / 1000) - 3600 }; readMoved('library'); drawPanes();
     const some = read();
-    lib.store = was; libRev++; drawPanes();
+    lib.store = was; readMoved('library'); drawPanes();
     return { none, some };
   });
   ok(!when.none && when.some, 'the head says when versions were last checked, and nothing while they never were');
@@ -263,10 +263,10 @@ await section("One operation at a time", async () => {
 await section("A retired node's directory on the store is offered with Remove", async () => {
   const seen = await page.evaluate(() => {
     const was = lib.cleanable;
-    lib.cleanable = [{ dir: 'n_0ldd0ne1', what: "gone's, a node since retired" }]; libRev++; drawPanes();
+    lib.cleanable = [{ dir: 'n_0ldd0ne1', what: "gone's, a node since retired" }]; readMoved('library'); drawPanes();
     const out = { head: (document.querySelector('.doc .librarytab .pghead')?.textContent || '').replace(/\s+/g, ' '),
                   rm: !!document.querySelector('.pane [data-libclean].danger') };
-    lib.cleanable = was; libRev++; drawPanes();
+    lib.cleanable = was; readMoved('library'); drawPanes();
     return out;
   });
   ok(/Remove takes\W*n_0ldd0ne1 \(gone's, a node since retired\)/.test(seen.head) && seen.rm,

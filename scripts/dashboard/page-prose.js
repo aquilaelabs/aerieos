@@ -1,11 +1,11 @@
 // One line of prose, in a box that can show all of it: a
 // textarea.proseline wraps and grows to its content, and Enter never
-// inserts a newline in it. The observer that wires one as it appears runs
-// at load, in index.html.
+// inserts a newline in it. The draw that writes one wires it (drawn,
+// page-paint.js).
 //
 // One classic script beside index.html (docs/design-language.md, Files):
-// pure declarations, nothing runs at load. What runs at load stays in
-// index.html under the section's header.
+// pure declarations, nothing runs at load. What runs at load is
+// page-boot.js's, under the section's header.
 
 "use strict";
 

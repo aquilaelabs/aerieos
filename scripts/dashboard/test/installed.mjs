@@ -96,7 +96,7 @@ await section("a pack that brings a coding agent sits with the agents", async ()
     const row = { kind: 'pack', group: 'agent', tier: 'vetted', name: 'kite', label: 'Kite', about: 'A coding agent from a pack.', installed: true,
                   version: '1.0', pack: { url: 'https://example.test/kite', commit: 'a'.repeat(40), tier: 'vetted' } };
     inst.rows.push(row);
-    instRev++; drawPanes();
+    readMoved('installed'); drawPanes();
     const at = sel => !!document.querySelector(`.doc.on .installedtab details.sect[data-sect="${sel}"] .irow[data-irow="pack:kite"]`);
     const signin = THING_SECTS.pack.find(s => s[0] === 'signin')[2];
     const out = { agents: at('installed:agent'), packs: at('installed:pack'),
@@ -121,7 +121,7 @@ await section("a pack that brings a coding agent sits with the agents", async ()
     // Edit is for a pack a person added themselves, here as on the Library.
     out.edit = { catalog: /data-instact="edit"/.test(instActs(row, { install: true })), own: /data-instact="edit"/.test(instActs({ ...row, tier: 'sideloaded' }, { install: true })),
                  remove: /data-instact="remove"/.test(instActs(row, { install: true })) };
-    inst.rows.pop(); agentsAdopt([]); instRev++; drawPanes();
+    inst.rows.pop(); agentsAdopt([]); readMoved('installed'); drawPanes();
     return out;
   });
   ok(!got.edit.catalog && got.edit.own && got.edit.remove,

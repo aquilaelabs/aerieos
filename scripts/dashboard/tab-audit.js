@@ -11,31 +11,30 @@
 
 let auditData = null;            // {rows, total, people, machines}, or null before the first read
 let auditErr = "";
-let auditRev = 0;
 let auditPerson = "", auditMachine = "";
 
 function openAuditTab(){
   openTab({kind: "audit", arg: "__audit", label: "Audit"});
 }
 
-async function loadAudit({older = false} = {}){
-  const q = new URLSearchParams();
-  if (auditPerson) q.set("person", auditPerson);
-  if (auditMachine) q.set("machine", auditMachine);
-  const have = older ? (auditData?.rows || []) : [];
-  if (older && have.length) q.set("before", String(have[have.length - 1].at));
-  try{
-    const j = await (await fetch("/api/audit?" + q.toString())).json();
-    if (j.error){ auditErr = j.error; }
-    else{
-      auditErr = "";
-      // Older rows join under the ones on screen, which never move
-      // (long-lists); a fresh read replaces them.
-      auditData = {...j, rows: older ? [...have, ...j.rows] : j.rows};
-    }
-  }catch(e){ auditErr = "audit: " + failWords(e); }
-  auditRev++;
-  if (tabs.some(t => t.kind === "audit")) drawPanes();
+function loadAudit({older = false} = {}){
+  return reading("audit", async () => {
+    const q = new URLSearchParams();
+    if (auditPerson) q.set("person", auditPerson);
+    if (auditMachine) q.set("machine", auditMachine);
+    const have = older ? (auditData?.rows || []) : [];
+    if (older && have.length) q.set("before", String(have[have.length - 1].at));
+    try{
+      const j = await getJSON("/api/audit?" + q.toString());
+      if (j.error){ auditErr = j.error; }
+      else{
+        auditErr = "";
+        // Older rows join under the ones on screen, which never move
+        // (long-lists); a fresh read replaces them.
+        auditData = {...j, rows: older ? [...have, ...j.rows] : j.rows};
+      }
+    }catch(e){ auditErr = "audit: " + failWords(e); }
+  });
 }
 
 const AUDIT_COLS = [{label: "When", w: "7rem"}, {label: "Who", w: "minmax(0,.7fr)"}, {label: "Did"}, {label: "On"}];
@@ -59,9 +58,9 @@ function renderAuditInto(i){
   // where on a bar of their own they stood alone on a line.
   d.setBar("");
   if (data === null){
-    d.list.innerHTML = auditErr ? `<div class="field"><div class="notice bad">${esc(auditErr)}</div></div>`
+    drawHTML(d.list, auditErr ? `<div class="field"><div class="notice bad">${esc(auditErr)}</div></div>`
       : skTpl(pageHead({facts: [["Recorded", GHOST], ["Shown", GHOST]]})
-        + docSection("audit", "trail", "What was done", "", skRows(6)));
+        + docSection("audit", "trail", "What was done", "", skRows(6))));
     if (!auditErr) loadAudit();
     return;
   }

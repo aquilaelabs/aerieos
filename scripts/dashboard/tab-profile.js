@@ -13,7 +13,7 @@
 
 "use strict";
 
-let profile = null, profileRev = 0;
+let profile = null;
 // Typed and not yet saved, kept across the poll's redraws: a field that
 // emptied itself mid-sentence would be unusable (docs/design-language.md,
 // Settings; nothing takes effect until Save).
@@ -32,15 +32,12 @@ function openProfileTab(){
   openTab({kind: "profile", arg: "__profile", label: "Profile"});
 }
 
-async function loadProfile(){
-  try{
-    const r = await bootFetch("/api/profile");
-    const j = await r.json();
-    if (j.error){ notify(j.error, true); return; }
+function loadProfile(){
+  return reading("profile", async () => {
+    const j = await getJSON("/api/profile");
+    if (j.error){ notify("profile: " + j.error, true); return; }
     profile = j;
-  }catch(e){ notify("profile: " + failWords(e), true); return; }
-  profileRev++;
-  if (tabs.some(t => t.kind === "profile")) drawPanes();
+  });
 }
 
 // Key, label, what the ? beside it says, input type. The label sits above
@@ -107,11 +104,11 @@ function renderProfileInto(i){
     // Every section the page always has, so none arrives after (the
     // operator, 7 Nov: settings popping in on a page that never changes);
     // Your shares, a machine install's alone, comes with its answer.
-    d.list.innerHTML = skTpl(skSplit([["Who you are", PROFILE_SAYS.you], ["What you may do", PROFILE_SAYS.may],
+    drawHTML(d.list, skTpl(skSplit([["Who you are", PROFILE_SAYS.you], ["What you may do", PROFILE_SAYS.may],
       ["Password", PROFILE_SAYS.password], ["Two-factor sign-in", PROFILE_SAYS.twofactor], ["Your key store", PROFILE_SAYS.mykey],
       ["Uses of your tokens", PROFILE_SAYS.uses], ["Your terminal", PROFILE_SAYS.terminal],
       ["Where the bell reaches you", PROFILE_SAYS.reach], ["Signed in as you", PROFILE_SAYS.devices]], "Who you are", PROFILE_FIELDS.map(([, label]) => fld(label)).join(""),
-      pageHead({title: GHOST, facts: [["Roles", GHOST], ["Owner of", GHOST]]})));
+      pageHead({title: GHOST, facts: [["Roles", GHOST], ["Owner of", GHOST]]}))));
     return;
   }
   const p = {...(profile.profile || {}), account: profile.name}, g = profile.git || {};
@@ -232,7 +229,7 @@ function wireShares(root){
   const post = async (btn, password, word) => {
     busy(btn, word);
     try{
-      const j = await (await postJSON("/api/profile", {action: "smb-password", password})).json();
+      const j = await postJSON("/api/profile", {action: "smb-password", password});
       if (j.error){ notify(j.error, true); return; }
       notify(password ? "your separate share password is set: the machine takes it up within a minute" : "cleared: sign in again and your shares follow your password");
       await loadProfile();
@@ -298,14 +295,14 @@ function termLookPicked(root){
 function wireTerminalLook(root){
   const save = async term => {
     try{
-      const j = await (await postJSON("/api/users", {action: "prefs", prefs: {term}})).json();
+      const j = await postJSON("/api/users", {action: "prefs", prefs: {term}});
       if (j.error) return notify(j.error, true);
     }catch(e){ return notify("could not reach the controller: " + failWords(e), true); }
     refresh();
   };
   const preview = () => {
     const t = termLookPicked(root), box = root.querySelector("#pfTermPreview");
-    if (box) box.innerHTML = termPreview(termPalette(t.scheme, t.colors[t.scheme]), t);
+    if (box) drawHTML(box, termPreview(termPalette(t.scheme, t.colors[t.scheme]), t));
   };
   root.querySelectorAll("[data-pfterm]").forEach(el => el.onchange = () => { preview(); save(termLookPicked(root)); });
   // A swatch redraws the preview as it is dragged and saves when it is let go.
@@ -331,10 +328,12 @@ let pfReach = null;              // {dest, kinds, channels, mail}, or null befor
 let pfReachAsked = false;
 let pfReachForm = null;          // {kind, id?} while the form is open
 
-async function loadReach(){
+function loadReach(){
   pfReachAsked = true;
-  pfReach = await pfTf({action: "reach-list"});
-  profileRev++; drawPanes();
+  return reading("profile.reach", async () => {
+    pfReach = await pfTf({action: "reach-list"});
+    readMoved("profile");
+  });
 }
 
 
@@ -384,10 +383,10 @@ function profileReachForm(f, ch, kinds){
 }
 
 function wireReach(root){
-  root.querySelectorAll("[data-reachadd]").forEach(b => b.onclick = () => { pfReachForm = {kind: b.dataset.reachadd}; profileRev++; drawPanes(); });
+  root.querySelectorAll("[data-reachadd]").forEach(b => b.onclick = () => { pfReachForm = {kind: b.dataset.reachadd}; readMoved("profile"); drawPanes(); });
   root.querySelectorAll("[data-reachedit]").forEach(b => b.onclick = () => {
     const d = (pfReach?.dest || []).find(x => x.id === b.dataset.reachedit);
-    if (d){ pfReachForm = {kind: d.kind, id: d.id}; profileRev++; drawPanes(); }
+    if (d){ pfReachForm = {kind: d.kind, id: d.id}; readMoved("profile"); drawPanes(); }
   });
   // The switch: off keeps its settings, so a kind is turned on again as it was.
   root.querySelectorAll("[data-reachon]").forEach(i => i.onchange = async () => {
@@ -395,7 +394,7 @@ function wireReach(root){
     if (r.error) notify(r.error, true);
     loadReach();
   });
-  root.querySelectorAll("[data-reachcancel]").forEach(b => b.onclick = () => { pfReachForm = null; profileRev++; drawPanes(); });
+  root.querySelectorAll("[data-reachcancel]").forEach(b => b.onclick = () => { pfReachForm = null; readMoved("profile"); drawPanes(); });
   root.querySelectorAll("[data-reachsave]").forEach(b => b.onclick = async () => {
     const form = root.querySelector("[data-reachform]");
     const fields = {};
@@ -430,7 +429,7 @@ function wireDeviceOut(root){
     if (!await askYes(r?.mine ? "Sign out this browser?" : `Sign out ${r ? r.agent : "that browser"}? Its next request finds it signed out.`)) return;
     busy(b, "Signing out");
     try{
-      const j = await (await postJSON("/api/profile", {action: "signin-out", id: b.dataset.pfsignout})).json();
+      const j = await postJSON("/api/profile", {action: "signin-out", id: b.dataset.pfsignout});
       if (j.error) notify(j.error, true);
       else if (j.this){ location.href = "/login"; return; }
     }catch(e){ notify("could not reach the controller: " + failWords(e), true); }
@@ -442,8 +441,8 @@ function wireDeviceOut(root){
     if (!await askYes(`Disconnect ${d ? d.name : "this device"}${of ? ` of ${of}` : ""}? It stops syncing at once and signs in again to come back.`)) return;
     busy(b, "Disconnecting");
     try{
-      const j = await (await postJSON(of ? "/api/users" : "/api/profile",
-        of ? {action: "device-signout", name: of, device: b.dataset.pfdevout} : {action: "device-signout", device: b.dataset.pfdevout})).json();
+      const j = await postJSON(of ? "/api/users" : "/api/profile",
+        of ? {action: "device-signout", name: of, device: b.dataset.pfdevout} : {action: "device-signout", device: b.dataset.pfdevout});
       if (j.error) notify(j.error, true);
     }catch(e){ notify("could not reach the controller: " + failWords(e), true); }
     await (of ? loadUsers() : loadProfile());
@@ -456,23 +455,23 @@ async function openConversation(project, id){
   const m = $("cvModal"), body = $("cvBody");
   $("cvTitle").textContent = `Conversation on ${projLabel(project)}`;
   $("cvNote").textContent = "";
-  body.innerHTML = skel("lines", 8, "reading…");
+  drawHTML(body, skel("lines", 8, "reading…"));
   m.hidden = false;
   $("cvClose").onclick = () => { m.hidden = true; };
   const tz = userTZ() || Intl.DateTimeFormat().resolvedOptions().timeZone || "";
   let j;
   try{
-    j = await (await fetch(`/api/transcript?project=${encodeURIComponent(project)}&id=${encodeURIComponent(id)}&as=turns&tz=${encodeURIComponent(tz)}`)).json();
+    j = await getJSON(`/api/transcript?project=${encodeURIComponent(project)}&id=${encodeURIComponent(id)}&as=turns&tz=${encodeURIComponent(tz)}`);
   }catch(e){ j = {error: "could not reach the controller: " + e}; }
-  if (j.error){ body.innerHTML = `<div class="notice bad">${esc(j.error)}</div>`; return; }
+  if (j.error){ drawHTML(body, `<div class="notice bad">${esc(j.error)}</div>`); return; }
   // The agent the conversation is with (R95): Claude, or the one it names.
   const WHO = {you: "You", claude: j.agent_name || "Claude", system: "System"};
-  body.innerHTML = (j.turns || []).map(t => `<div class="cvturn ${esc(t.who)}">
+  drawHTML(body, (j.turns || []).map(t => `<div class="cvturn ${esc(t.who)}">
       <div class="cvwho">${esc(WHO[t.who] || t.who)}${t.at ? ` · ${esc(t.at)}` : ""}</div>
       ${t.text ? `<div class="cvtext">${esc(t.text)}</div>` : ""}
       ${(t.tools || []).map(c => `<details class="cvtool${c.error ? " err" : ""}"><summary>${esc(c.call.split("\n")[0])}</summary>
         <pre>${esc(c.result || "(nothing)")}${c.cut ? "\n[cut here: the download has the rest]" : ""}</pre></details>`).join("")}
-    </div>`).join("") || `<div class="empty">Nothing said in it yet.</div>`;
+    </div>`).join("") || `<div class="empty">Nothing said in it yet.</div>`);
   $("cvNote").textContent = j.partial ? "The newest part of a long conversation: the download has all of it." : "";
   body.scrollTop = body.scrollHeight;
 }
@@ -509,10 +508,7 @@ function wireProfile(root){
     }
     busy(save, "Saving");
     try{
-      const r = await fetch("/api/profile", {method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({action: "save", profile: body, account})});
-      const j = await r.json();
+      const j = await postJSON("/api/profile", {action: "save", profile: body, account});
       if (j.error) return notify(j.error, true);
       for (const k of Object.keys(profileDraft)) delete profileDraft[k];
       notify(j.name !== profile?.name
@@ -546,10 +542,7 @@ function wireProfile(root){
     if (!cur || a.length < 8 || a !== b2) return pwReady();
     busy(pw, "Changing");
     try{
-      const r = await fetch("/api/profile", {method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({action: "password", current: cur, password: a})});
-      const j = await r.json();
+      const j = await postJSON("/api/profile", {action: "password", current: cur, password: a});
       if (j.error){ sayAt(/current/.test(j.error) ? "pfCur" : "pfNew", j.error); return; }
       notify("password changed: sign in again where you are asked to");
       ["pfCur", "pfNew", "pfNew2"].forEach(id => { const el = fld(id); if (el) el.value = ""; });
@@ -595,9 +588,8 @@ function profileTwoFactor(tf, required){
 const pfU8 = s => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4)), c => c.charCodeAt(0));
 const pfB64 = a => btoa(String.fromCharCode(...new Uint8Array(a))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
-async function pfTf(body){
-  const r = await fetch("/api/profile", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
-  return r.json().catch(() => ({error: "HTTP " + r.status}));
+function pfTf(body){
+  return postJSON("/api/profile", body);
 }
 
 // A fresh second factor for a change that wants one: a passkey where the
@@ -618,12 +610,12 @@ async function pfFresh(){
 }
 
 function wireTwoFactor(root){
-  const redraw = async () => { await loadProfile(); profileRev++; drawPanes(); };
+  const redraw = async () => { await loadProfile(); readMoved("profile"); drawPanes(); };
   root.querySelectorAll("[data-tf]").forEach(b => b.onclick = async () => {
     const what = b.dataset.tf;
-    if (what === "totp-add"){ pfTotp = await pfTf({action: "2fa-totp-begin"}); profileRev++; drawPanes(); return; }
-    if (what === "totp-cancel"){ pfTotp = null; profileRev++; drawPanes(); return; }
-    if (what === "codes-done"){ pfCodes = null; profileRev++; drawPanes(); return; }
+    if (what === "totp-add"){ pfTotp = await pfTf({action: "2fa-totp-begin"}); readMoved("profile"); drawPanes(); return; }
+    if (what === "totp-cancel"){ pfTotp = null; readMoved("profile"); drawPanes(); return; }
+    if (what === "codes-done"){ pfCodes = null; readMoved("profile"); drawPanes(); return; }
     if (what === "totp-confirm"){
       const r = await pfTf({action: "2fa-totp-confirm", code: root.querySelector("#pfTfCode")?.value || ""});
       if (r.error){ const s = root.querySelector("#pfTfSaid"); if (s){ s.textContent = r.error; s.classList.add("bad"); } return; }

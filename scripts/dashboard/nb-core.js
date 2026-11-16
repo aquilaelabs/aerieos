@@ -5,8 +5,8 @@
 // save.
 //
 // One classic script beside index.html (docs/design-language.md, Files):
-// pure declarations, nothing runs at load. What runs at load stays in
-// index.html under the section's header.
+// pure declarations, nothing runs at load. What runs at load is
+// page-boot.js's, under the section's header.
 
 "use strict";
 
@@ -66,6 +66,7 @@ function makeNotebook(project){
   // id alone is therefore keyed on BOTH of them, which is what paginate was.
   root.dataset.project = project;
   document.getElementById("nbPark").appendChild(root);
+  drawn(root);
   const $ = id => root.querySelector('[id="' + CSS.escape(id) + '"]');
   // The notebook's state, one object rather than sixty closure variables,
   // so a view can live in its own file and reach it by name (R60).
@@ -197,7 +198,7 @@ function makeNotebook(project){
     const gen = ++nb.memGen;
     $("memTitle").textContent = "Notebook: " + projLabel(name);
     nb.memN = null; briefingHead();
-    $("memDrift").innerHTML = $("memList").innerHTML = $("memAdd").innerHTML = "";
+    drawHTML($("memDrift"), $("memList").innerHTML = $("memAdd").innerHTML = "");
     nb.roadmapSel = null;                 // the send box lives on the row, and the
     nb.roadmapOrdering = false;           // rows are about to be replaced wholesale
     nb.roadmapPending = []; nb.roadmapWas = null;
@@ -217,7 +218,7 @@ function makeNotebook(project){
     cancelSend();
     $("roadmapText").value = "";
     $("roadmapForm").hidden = true; $("roadmapAddBar").hidden = true; $("roadmapShow").setAttribute("aria-expanded", "false");
-    $("roadmapList").innerHTML = `${skel("rows")}`;
+    drawHTML($("roadmapList"), `${skel("rows")}`);
     // Opening it is a re-read: both halves come off disk again, and the card
     // gets the same treatment so the number on the row you just pressed is not
     // the one from the last poll.
@@ -275,7 +276,7 @@ function makeNotebook(project){
     if (bc) bc.onclick = async () => {
       busy(bc, "Closing");
       try{
-        const j = await (await postJSON("/api/roadmap", {project, action: "batch-close"})).json();
+        const j = await postJSON("/api/roadmap", {project, action: "batch-close"});
         if (j.error) notify(j.error, true);
       }catch(e){ notify("could not reach the server: " + failWords(e), true); }
       await refresh();
@@ -422,14 +423,11 @@ function makeNotebook(project){
     // there is no one there to say anything to.
     if (state && !(state.projects || []).some(p => p.name === nb.memProj)) return;
     try{
-      const r = await fetch("/api/presence", {method: "POST",
-        headers: {"Content-Type": "application/json"},
-        // A leave sent as the page goes away (pagehide) has to outlive the
-        // page: keepalive is what lets it arrive after the page has gone.
-        keepalive: !!keepalive,
-        body: JSON.stringify({project: nb.memProj, client: nbClient,
-                              where: nb.nbWhere, ...(leave ? {leave: 1} : {})})});
-      const j = await r.json();
+      // A leave sent as the page goes away (pagehide) has to outlive the
+      // page: keepalive is what lets it arrive after the page has gone.
+      const j = await postJSON("/api/presence", {project: nb.memProj, client: nbClient,
+                                                 where: nb.nbWhere, ...(leave ? {leave: 1} : {})},
+                               {keepalive: !!keepalive});
       if (leave || !j.ok) return;
       nb.nbRead = j.read || 0;
       drawHere();
@@ -818,47 +816,51 @@ function makeNotebook(project){
   // ---- the handle the rest of the page holds ------------------------------
   // This project's VMs as the VMs page draws them, scoped to it (R96): the
   // page's own rows and their presses, the project's card alone.
-  async function loadNbVms(){
-    try{
-      vmsData = await (await fetch("/api/vms")).json();
-    }catch(e){ viewGlance($("nvHint"), [], esc("VMs: " + e), "", "bad"); return; }
-    const rows = (vmsData.vms || []).filter(v => v.project === project);
-    const up = rows.filter(v => v.state === "running").length;
-    // The glance (R109): what runs of how many, as the VMs page counts,
-    // and on the row with VMs page and New VM what a session here may do
-    // about VMs, so those two are never on a line of their own (the sweep,
-    // 7 Nov, on a phone).
-    const dial = (state?.projects || []).find(x => x.name === project)?.prefs?.makevms || "deny";
-    viewGlance($("nvHint"), rows.length ? [{label: "running", value: up, sub: `of ${rows.length} VM${rows.length === 1 ? "" : "s"}`}] : [],
-               dial === "auto" ? "a session here makes VMs on its own" : dial === "ask" ? "a session here asks before it makes a VM"
-                 : "a session here may not make VMs");
-    const may = (vmsData.can || {})[project] === "write";
-    const nb = $("nvNew");
-    nb.hidden = !may;
-    nb.disabled = !(vmsData.hosts || []).length;
-    nb.onclick = () => openNewVm(project);
-    $("nvOpen").onclick = () => openVmsTab();
-    // What the view is for, as its empty state (R119 step 4).
-    $("nvList").innerHTML = rows.length ? vmGroupsHtml(rows)
-      : `<div class="field"><div class="hint nbempty">${!(vmsData.hosts || []).length
-          ? `No node has VM host yet: a node's Features section on the ${pageLink("nodes", "Nodes page")} installs it.`
-          : dial === "deny" ? "A session here may not make VMs (Make VMs is deny in this space's settings); a person makes one with New VM."
-          : "A session makes one with aerie vm new NAME --os debian, or a person with New VM."}</div></div>`;
-    wireVms($("nvList"));
+  function loadNbVms(){
+    return reading(`${project}:vms`, async () => {
+      try{
+        vmsData = await getJSON("/api/vms");
+      }catch(e){ viewGlance($("nvHint"), [], esc("VMs: " + e), "", "bad"); return; }
+      const rows = (vmsData.vms || []).filter(v => v.project === project);
+      const up = rows.filter(v => v.state === "running").length;
+      // The glance (R109): what runs of how many, as the VMs page counts,
+      // and on the row with VMs page and New VM what a session here may do
+      // about VMs, so those two are never on a line of their own (the sweep,
+      // 7 Nov, on a phone).
+      const dial = (state?.projects || []).find(x => x.name === project)?.prefs?.makevms || "deny";
+      viewGlance($("nvHint"), rows.length ? [{label: "running", value: up, sub: `of ${rows.length} VM${rows.length === 1 ? "" : "s"}`}] : [],
+                 dial === "auto" ? "a session here makes VMs on its own" : dial === "ask" ? "a session here asks before it makes a VM"
+                   : "a session here may not make VMs");
+      const may = (vmsData.can || {})[project] === "write";
+      const nb = $("nvNew");
+      nb.hidden = !may;
+      nb.disabled = !(vmsData.hosts || []).length;
+      nb.onclick = () => openNewVm(project);
+      $("nvOpen").onclick = () => openVmsTab();
+      // What the view is for, as its empty state (R119 step 4).
+      drawHTML($("nvList"), rows.length ? vmGroupsHtml(rows)
+        : `<div class="field"><div class="hint nbempty">${!(vmsData.hosts || []).length
+            ? `No node has VM host yet: a node's Features section on the ${pageLink("nodes", "Nodes page")} installs it.`
+            : dial === "deny" ? "A session here may not make VMs (Make VMs is deny in this space's settings); a person makes one with New VM."
+            : "A session makes one with aerie vm new NAME --os debian, or a person with New VM."}</div></div>`);
+      wireVms($("nvList"));
+    });
   }
 
   // This project's containers as the Containers page draws them, scoped to
   // it (the operator, 19 Oct): its tiles, when the images were checked, and
   // its card in the page's cards or list, whichever this browser keeps.
   let dkGot = null;
-  async function loadNbDocker(){
-    const p = (state?.projects || []).find(x => x.name === project);
-    const node = p?.prefs?.node || dockerNode || "";
-    try{
-      dkGot = await (await fetch("/api/docker" + (node ? "?node=" + encodeURIComponent(node) : ""))).json();
-    }catch(e){ viewGlance($("dkHint"), [], esc("docker: " + e), "", "bad"); return; }
-    dockerSeen[dkGot.node || node || ""] = dkGot;
-    drawNbDocker();
+  function loadNbDocker(){
+    return reading(`${project}:docker`, async () => {
+      const p = (state?.projects || []).find(x => x.name === project);
+      const node = p?.prefs?.node || dockerNode || "";
+      try{
+        dkGot = await getJSON("/api/docker" + (node ? "?node=" + encodeURIComponent(node) : ""));
+      }catch(e){ viewGlance($("dkHint"), [], esc("docker: " + e), "", "bad"); return; }
+      dockerSeen[dkGot.node || node || ""] = dkGot;
+      drawNbDocker();
+    });
   }
   function drawNbDocker(){
     const got = dkGot, node = got.node || "";
@@ -1242,7 +1244,7 @@ async function reposAlso(el, project, kind){
   const rows = [];
   for (const m of r.members.filter(m => m !== project)){
     try{
-      const j = await (await fetch(`/api/${kind}?project=${encodeURIComponent(m)}`)).json();
+      const j = await getJSON(`/api/${kind}?project=${encodeURIComponent(m)}`);
       const list = kind === "bugs" ? (j.bugs || []).filter(b => b.status === "open") : (j.items || []);
       for (const x of list) rows.push({m, id: x.id, text: x.title || x.text || ""});
     }catch(e){ /* that repository's list answers on its own page */ }

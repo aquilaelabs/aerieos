@@ -21,7 +21,6 @@ let ndHistory = {};              // the own machine's reporting per node: {span,
 let nodesStale = false;
 // The pages that draw the list: a node picker each, or the rows themselves.
 const NODE_READERS = ["nodes", "toolchains", "agents", "library", "entry", "installed", "thing", "emulator", "docker", "projects", "settings", "debug"];
-let nodesRev = 0;                // bumped when it changes, so panes repaint
 let nodesErr = "";
 let nodesAgent = null;           // the agent this controller ships: {digest, version}
 let nodesMove = null;            // after a move landed here (R175): {arrived, not_here: [{id, name, line}]}
@@ -49,92 +48,34 @@ function openNodesTab(nid, what){
     if (what && what !== "agent") sectOpen["nodes:" + what] = true;
     nodesReveal = what === "agent" ? '[data-nd="update-agent"], .ndagent'
                 : what ? `[data-sect="nodes:${what}"]` : null;
-    nodesRev++;
+    readMoved("nodes");
   }
   openTab({kind: "nodes", arg: "__nodes", label: "Nodes"});
   loadNodes();
   if (nid) drawPanes();
 }
 
-// Each read numbered, so an answer asked for before a later one (a poll's,
-// in flight when a save asked again) cannot land after it and stay drawn
-// until the nodes next move (B849), as page-toolchains.js's tcLoadSeq does.
-// A caller awaiting one that was overtaken waits for the newest instead, so
-// what it reads after is the list.
-let nodesLoadSeq = 0, nodesLoading = null;
+// One read at a time (reading), so an answer asked for before a later one (a
+// poll's, in flight when a save asked again) cannot land after it and stay
+// drawn until the nodes next move (B849). A caller awaiting a read that is
+// out waits for the newest, so what it reads after is the list.
 function loadNodes(){
-  const seq = ++nodesLoadSeq;
-  return (nodesLoading = loadNodesOnce(seq));
-}
-async function loadNodesOnce(seq){
-  try{
-    const j = await (await bootFetch("/api/v1/nodes")).json();
-    if (seq !== nodesLoadSeq) return nodesLoading;
+  return reading("nodes", async () => {
+    const j = await getJSON("/api/v1/nodes");
     nodesErr = j.error || "";
-    nodesList = j.nodes || [];
-    nodesAgent = j.agent || null;
-    nodesMove = j.move || null;
-    nodesDefault = j.default || "";
-    nodesSystems = Array.isArray(j.systems) ? j.systems : [];
-  }catch(e){
-    if (seq !== nodesLoadSeq) return nodesLoading;
-    nodesErr = String(e);
-    nodesList = nodesList || [];
-  }
-  nodesStale = false;
-  nodesRev++;
-  // Any page that draws the list is drawn again with it: the Toolchains
-  // bar's picker appears when the first node enrolls, as it did when the
-  // strip held the Nodes tab.
-  if (NODE_READERS.some(shown)) drawPanes();
-}
-
-// A button that starts something goes dead the moment it is pressed.
-//
-// Every action here awaits a round trip: the POST, then loadNodes(), then
-// the repaint, and for that second or two the control looked exactly as it
-// did before the click. So there was no way to tell a press that had landed
-// from one that had missed, and a second press queued a second job or
-// collected a "one at a time" refusal for its trouble.
-//
-// Only the gap: the repaint that follows draws the real state (n.applying,
-// the runner's census, a queued job) and replaces this element entirely, so
-// the restore below fires only when nothing repainted: an error, or an
-// action that changes no state. Put the await askYes() BEFORE the call, so
-// canceling leaves the button alive.
-// ...and one still going after a moment wears a spinner (the operator, 8
-// Nov: a press that took a while looked like one that had missed): not while
-// a question the press asked waits for its answer, and not where busy() has
-// put its own word on the button.
-const PRESS_SHOW_MS = 200;
-async function pressing(btn, fn){
-  if (!btn || btn.disabled) return undefined;
-  btn.disabled = true;
-  const t = setInterval(() => {
-    if (!btn.isConnected || btn.getAttribute("aria-busy") === "true") return;
-    if (document.querySelector(".modal.askdlg:not([hidden])")) return;
-    // Only where a ring has room (pressRing, page-motion.js).
-    if (btn.classList.contains("working") || btn.__noRing) return;
-    if (!pressRing(btn)){ btn.__noRing = true; return; }
-    btn.setAttribute("aria-busy", "true");
-  }, PRESS_SHOW_MS);
-  try{
-    return await fn();
-  }finally{
-    clearInterval(t);
-    delete btn.__noRing;
-    if (btn.classList.contains("working")){ btn.classList.remove("working"); btn.removeAttribute("aria-busy"); }
-    // Given back as its markup has it now: a surface the page patches
-    // (R244) keeps the button the press began on, which a redraw during the
-    // press may have drawn disabled, or made another button in its place.
-    pressBack(btn);
-  }
+    if (!j.error){
+      nodesList = j.nodes || [];
+      nodesAgent = j.agent || null;
+      nodesMove = j.move || null;
+      nodesDefault = j.default || "";
+      nodesSystems = Array.isArray(j.systems) ? j.systems : [];
+    } else nodesList = nodesList || [];
+    nodesStale = false;
+  });
 }
 
 async function nodeAct(body){
-  const j = await (await fetch("/api/v1/nodes", {
-    method: "POST", headers: {"Content-Type": "application/json"},
-    body: JSON.stringify(body)})).json().catch(() => ({error: "no answer"}));
+  const j = await postJSON("/api/v1/nodes", body);
   if (j.error) notify(j.error, true);
   await loadNodes();
   return j;
@@ -564,7 +505,7 @@ function nodeUsbSection(n){
   if (!n.reported?.features?.vmhost?.installed || !hw) return "";
   const title = ndTitle("usb");
   // The VMs page's own read, and this page drawn again once it lands.
-  if (vmsData === null && !nodeUsbAsked){ nodeUsbAsked = true; loadVms().then(() => { nodesRev++; drawPanes(); }); }
+  if (vmsData === null && !nodeUsbAsked){ nodeUsbAsked = true; loadVms().then(() => { readMoved("nodes"); drawPanes(); }); }
   const vmsHere = (vmsData?.vms || []).filter(v => v.node === n.id && !["making", "removing", "failed", "missing"].includes(v.state));
   const admin = !!state?.can?.admin && nodeMay(n) === "write";
   const why = !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
@@ -658,11 +599,13 @@ function nodeReportSection(n){
   }
   return docSection("nodes", "report", ndTitle("report"), ND_SPANS.find(x => x[0] === h.span)?.[1] || "", body);
 }
-async function loadHistory(nid, span){
+function loadHistory(nid, span){
   ndHistory[nid] = {span, data: null};
-  try{ ndHistory[nid] = {span, data: await (await fetch(`/api/history?node=${encodeURIComponent(nid)}&span=${encodeURIComponent(span)}`)).json()}; }
-  catch(e){ ndHistory[nid] = {span, data: {error: "history: " + failWords(e)}}; }
-  nodesRev++; drawPanes();
+  return reading("nodes.history", async () => {
+    const data = await getJSON(`/api/history?node=${encodeURIComponent(nid)}&span=${encodeURIComponent(span)}`);
+    ndHistory[nid] = {span, data: data.error ? {error: "history: " + data.error} : data};
+    readMoved("nodes");
+  });
 }
 function wireReportSection(root, n){
   const sect = root.querySelector('details[data-sect="nodes:report"]');
@@ -706,7 +649,7 @@ function wireMachineSection(root, n){
     if (tz.value.trim() !== (r.timezone || "")) body.timezone = tz.value.trim();
     if (spin.value !== String(r.spindown ?? 0)) body.spindown = parseInt(spin.value, 10);
     busy(b, "Applying");
-    const j = await (await postJSON("/api/v1/nodes", body)).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/v1/nodes", body);
     notify(j.error || "set on the machine: its next check-in says the new name and zone", !!j.error);
     await refresh();
   });
@@ -721,7 +664,7 @@ function wireUsbSection(root, n){
     const [project, name] = (sect.querySelector(`[data-usbvm="${b.dataset.usbgive}"]`)?.value || "/").split("/");
     if (!u || !project) return;
     busy(b, "Giving");
-    const j = await (await postJSON("/api/vms", {action: "usb-give", project, name, usb: named(u)})).json();
+    const j = await postJSON("/api/vms", {action: "usb-give", project, name, usb: named(u)});
     if (j.error) notify(j.error, true);
     else notify(`giving ${u.name || "the device"} to ${project}/${name}; the row says once the node reports back`);
     setTimeout(loadVms, 4000);
@@ -731,7 +674,7 @@ function wireUsbSection(root, n){
     const [project, name] = (b.dataset.vm || "/").split("/");
     if (!u || !project) return;
     busy(b, "Taking");
-    const j = await (await postJSON("/api/vms", {action: "usb-take", project, name, usb: named(u)})).json();
+    const j = await postJSON("/api/vms", {action: "usb-take", project, name, usb: named(u)});
     if (j.error) notify(j.error, true);
     else notify(`${u.name || "the device"} is the host's again once the node reports back`);
     setTimeout(loadVms, 4000);
@@ -944,7 +887,7 @@ function openUnenroll(n){
   const clean = !!(n.live && n.reported?.sandbox);
   const host = !!n.config?.host_only;
   document.getElementById("ndTitle").textContent = `Un-enroll ${n.name}?`;
-  body.innerHTML = clean ? `<div class="field">
+  drawHTML(body, clean ? `<div class="field">
       <div class="hint">Are you sure? AerieOS is uninstalled from ${esc(n.name)}, then the node is removed here. Its job account is <code>${esc(n.config?.user || "bb")}</code>.</div>
       ${unenrollWhat(false)}
       <label class="ndcap"><input type="checkbox" id="ndUnStores"> Also delete the stores on its disk: the toolchains, the caches, the artifacts, dev instance data, and the synced space copies</label>
@@ -955,7 +898,7 @@ function openUnenroll(n){
   : `<div class="field">
       <div class="hint bad">Are you sure? The machine cannot be cleaned from here: ${n.live ? "it was not provisioned by AerieOS" : "its agent is not dialing in"}. The node is removed here and its tokens revoked; AerieOS's pieces stay on the machine until <code>sudo bb-sandbox uninstall</code> is run there.</div>
     </div>
-    ${dlgFoot(`<button type="button" id="ndUnCancel">Cancel</button>`, `<button type="button" class="danger" id="ndUnGo">Remove it here</button>`)}`;
+    ${dlgFoot(`<button type="button" id="ndUnCancel">Cancel</button>`, `<button type="button" class="danger" id="ndUnGo">Remove it here</button>`)}`);
   modal.hidden = false;
   const shut = () => { modal.hidden = true; };
   body.querySelector("#ndUnCancel").onclick = shut;
@@ -1436,8 +1379,7 @@ async function ndStoreAsk(n, c){
   const probe = [...new Set([...roles.map(r => norm(d.stores[r])), ...roles.map(now).filter(Boolean), ...mounts])];
   let j;
   try{
-    j = await (await fetch("/api/v1/nodes", {method: "POST", headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({action: "path-state", id: n.id, paths: probe})})).json();
+    j = await postJSON("/api/v1/nodes", {action: "path-state", id: n.id, paths: probe});
   }catch(e){ j = {error: String(e)}; }
   if (j.error){ notify(`could not see what is at those paths on ${n.name}: ${j.error}`, true); return false; }
   const at = p => j.paths?.[p] || {};
@@ -2089,17 +2031,17 @@ function renderNodesInto(i){
     // node usually has under their own titles, and the jump bar sectJump
     // puts over them, as the page does.
     d.setBar(ndBar(null));
-    d.list.innerHTML = skTpl(`<div class="row stack2 ndrow"><div class="grow">
+    drawHTML(d.list, skTpl(`<div class="row stack2 ndrow"><div class="grow">
         <div class="name">${skv(7)}</div>${ndFacts(null)}
         <div class="actbar ndagent"><span class="lead dim"></span>${ndAgentButtons(true)}</div></div>
       <div class="ndsections">${ND_SECTS.filter(([k]) => !["gpu", "usb", "machine", "power", "report"].includes(k)).map(([k, t], j) =>
-        docSection("nodes", k, t, "", skRows(j ? 1 : 3))).join("")}</div></div>`);
+        docSection("nodes", k, t, "", skRows(j ? 1 : 3))).join("")}</div></div>`));
     sectJump(d.list.closest(".doctab") || d.el);
     loadNodes();
     return;
   }
   if (nodesErr){
-    d.list.innerHTML = `<div class="hint bad">${esc(nodesErr)}</div>`;
+    drawHTML(d.list, `<div class="hint bad">${esc(nodesErr)}</div>`);
     return;
   }
   // One node at a time, picked at the top. Every node's whole configuration
@@ -2204,7 +2146,7 @@ function renderRunnerInto(i){
     // page's own; the node and its runners are on their way.
     // In the node's panel, as it lands: its rows are bands there, not a card.
     d.setBar("");
-    d.list.innerHTML = skTpl(`<div class="ndrow runnerpanel"><div class="ndruns"><div class="field ndrunhead"><b>Runners</b><span class="sp"></span><span class="actbar ndrunadd"><button type="button" class="primary" disabled>Add runner</button></span></div>${skRows(1)}</div></div>`);
+    drawHTML(d.list, skTpl(`<div class="ndrow runnerpanel"><div class="ndruns"><div class="field ndrunhead"><b>Runners</b><span class="sp"></span><span class="actbar ndrunadd"><button type="button" class="primary" disabled>Add runner</button></span></div>${skRows(1)}</div></div>`));
     return;
   }
   const ns = (nodesList || []).filter(n => n.kind === "agent" && n.state !== "retired");
@@ -2221,7 +2163,7 @@ function renderRunnerInto(i){
         (state?.node_runners || []).length > 1 ? runnerRows() : "", runnerAddBtn(n, nodeDraft(n)))}</div></div>`
     : noNodeYet("a runner is added to a node"));
   const show = d.list.querySelector("[data-nrunnershow]");
-  if (show) show.onclick = () => { nodeDraft(n).addRunner = true; nodesRev++; drawPanes(); };
+  if (show) show.onclick = () => { nodeDraft(n).addRunner = true; readMoved("nodes"); drawPanes(); };
   if (n) wireNodeConf(d.list.querySelector(".ndrow"), n.id);
   d.list.querySelectorAll(".ndrunro button").forEach(b => { b.disabled = true; });
   // CI runners switched off on this install (R81): every control here dead,
@@ -2229,8 +2171,9 @@ function renderRunnerInto(i){
   if (featureOff("runner")){
     d.list.querySelectorAll("button, input, select").forEach(b => { b.disabled = true; });
     d.list.insertAdjacentHTML("afterbegin", `<div class="field">${deadWhy(featureOff("runner"))}</div>`);
+    drawn(d.list.firstElementChild);
   }
-  d.list.querySelectorAll("[data-runnode]").forEach(r => r.onclick = () => { runnerNode = r.dataset.runnode; nodesRev++; drawPanes(); });
+  d.list.querySelectorAll("[data-runnode]").forEach(r => r.onclick = () => { runnerNode = r.dataset.runnode; readMoved("nodes"); drawPanes(); });
 }
 
 // Add runner, the page's main action, on the head's action row; while the
@@ -2296,7 +2239,7 @@ function ndDialogs(){
     const dev = !!state?.settings?.settings?.offer_unvetted?.value;
     document.getElementById("ndTitle").textContent = again ? `Enroll ${again.name} again` : "Enroll a node";
     boxWidth(false);
-    body.innerHTML = `<div class="field">
+    drawHTML(body, `<div class="field">
         <div class="prefrow ctlrow">
           <div class="setrow col ctlrow">${lbl("ndEnName", "Name")}
             <input id="ndEnName" maxlength="60" autocomplete="off" placeholder="buildbox"></div>
@@ -2357,7 +2300,7 @@ function ndDialogs(){
         ? "A new script for this node: run it again on the same machine, as root, to set it up afresh or change what it reaches the controller through. It carries no secret (the node keeps its WireGuard config and its door's); a secret pasted here replaces the node's. It refuses to run on another machine, and so does the controller."
         : "The script carries a token good once, for a day, and runs as root on a Linux machine."}</div></div>
       ${dlgFoot(`<button type="button" id="ndEnCancel">Cancel</button>`,
-        `<button type="button" id="ndEnTok">Just a token</button><button type="button" class="primary" id="ndEnGo">Make the script</button>`)}`;
+        `<button type="button" id="ndEnTok">Just a token</button><button type="button" class="primary" id="ndEnGo">Make the script</button>`)}`);
     const $b = sel => body.querySelector(sel);
     if (again){
       const c = again.config || {};
@@ -2379,7 +2322,7 @@ function ndDialogs(){
     const sysWhy = () => {
       const s = nodesSystems.find(x => x.id === $b("#ndEnSystem")?.value);
       const dev = s && !s.vetted;
-      $b("#ndEnSysWhy").innerHTML = dev ? `${devMark().trim()} ${esc(s.why || "not walked on a real machine yet: it may need a hand")}` : "";
+      drawHTML($b("#ndEnSysWhy"), dev ? `${devMark().trim()} ${esc(s.why || "not walked on a real machine yet: it may need a hand")}` : "");
       $b("#ndEnSysWhy").hidden = !dev;
     };
     if ($b("#ndEnSystem")){ $b("#ndEnSystem").addEventListener("change", sysWhy); sysWhy(); }
@@ -2467,7 +2410,7 @@ function ndDialogs(){
         wg_conf: reach.value === "wireguard" ? conf : ""});
       if (r.error){ mintForm(kept, again); return; }
       mintScript(r);
-      nodesRev++; drawPanes();              // the pending row joins the picker
+      readMoved("nodes"); drawPanes();              // the pending row joins the picker
     });
     const tok = $b("#ndEnTok");
     tok.onclick = () => pressing(tok, async () => {
@@ -2480,7 +2423,7 @@ function ndDialogs(){
       // address the browser knows the controller by. A proxy in front is the
       // operator's to substitute.
       mintToken({name: a.name || "node", token: r.token, url: location.origin, user: a.user});
-      nodesRev++; drawPanes();
+      readMoved("nodes"); drawPanes();
     });
     $b("#ndEnName").onkeydown = e => {
       if (e.key === "Enter"){ e.preventDefault(); go.click(); }
@@ -2492,7 +2435,7 @@ function ndDialogs(){
     document.getElementById("ndTitle").textContent = `${r.filename}: run it on the machine`;
     boxWidth(true);
     const url = URL.createObjectURL(new Blob([r.script], {type: "text/x-shellscript"}));
-    body.innerHTML = `<div class="field ndtoken">
+    drawHTML(body, `<div class="field ndtoken">
         <div class="hint">Copy it to the machine and run it once, as root; the row goes live when it is done${
           helpIcon(`It ${r.reach === "wireguard" ? `brings the tunnel up as ${r.tunnel_addr}, checks the controller answers through it, `
             : r.reach === "public" ? "checks the controller answers at its hostname, " : ""}provisions the machine and enrolls it.`)}</div>
@@ -2504,7 +2447,7 @@ function ndDialogs(){
         <label class="lbl">${r.reach === "public" ? "At home, on the tunnel" : "On your router"}</label>
         <pre class="ndcmd" id="ndHome">${esc(r.home)}</pre>
       </div>` : ""}
-      ${dlgFoot(`<button type="button" id="ndTokDone">Done</button>`, `<button type="button" class="primary" id="ndScriptGet">Download ${esc(r.filename)}</button>`)}`;
+      ${dlgFoot(`<button type="button" id="ndTokDone">Done</button>`, `<button type="button" class="primary" id="ndScriptGet">Download ${esc(r.filename)}</button>`)}`);
     const save = () => Object.assign(document.createElement("a"), {href: url, download: r.filename}).click();
     body.querySelector("#ndScriptGet").onclick = save;
     save();
@@ -2513,7 +2456,7 @@ function ndDialogs(){
   const mintToken = (m) => {
     document.getElementById("ndTitle").textContent = `${m.name}: enroll it with one of these`;
     boxWidth(true);
-    body.innerHTML = `<div class="field ndtoken">
+    drawHTML(body, `<div class="field ndtoken">
         <div class="hint">Shown once. On a fresh Linux machine, as root:</div>
         <pre class="ndcmd">curl -fsSL -H 'Authorization: Bearer ${esc(m.token)}' '${esc(m.url)}/api/v1/agent/download?what=provisioner' -o provision-linux.sh
 sudo bash provision-linux.sh --controller ${esc(m.url)} --token ${esc(m.token)}${
@@ -2529,7 +2472,7 @@ aerieos-agent enroll --controller ${esc(m.url)} --token ${esc(m.token)}${
           m.user && m.user !== "bb" ? ` --user ${esc(m.user)}` : ""}</pre>
       </div>
       <div class="foot"><span class="sp"></span>
-        <button type="button" id="ndTokDone">Done</button></div>`;
+        <button type="button" id="ndTokDone">Done</button></div>`);
     body.querySelector("#ndTokDone").onclick = shut;
   };
   // ---- a machine to enroll, before there is one -------------------------
@@ -2561,7 +2504,7 @@ aerieos-agent enroll --controller ${esc(m.url)} --token ${esc(m.token)}${
                               mac_prefix: "52:54:00", artifact: "domain XML"}];
     const kind = kinds.find(k => k.id === vmDraft.hv) || kinds[0];
     const takes = k => (kind.wants || []).includes(k);
-    body.innerHTML = `<div class="field vmform">
+    drawHTML(body, `<div class="field vmform">
         <div class="hint">Pick where it runs; the machine is written the same everywhere.</div>
         <div class="setrow col ctlrow">${lbl("vm_hv", "Runs on")}
           <select id="vm_hv" data-vk="hv">${kinds.map(k =>
@@ -2594,7 +2537,7 @@ aerieos-agent enroll --controller ${esc(m.url)} --token ${esc(m.token)}${
       </div>` : ""}
       ${dlgFoot(`<button type="button" id="vmCancel">${made ? "Done" : "Cancel"}</button>`,
         `<button type="button" class="primary" id="vmGo">${made ? "Generate another" : "Generate"}</button>`,
-        made ? `<button type="button" id="vmCopy">Copy</button>` : "")}`;
+        made ? `<button type="button" id="vmCopy">Copy</button>` : "")}`);
     body.querySelectorAll("[data-vk]").forEach(el => {
       el.oninput = () => { vmDraft[el.dataset.vk] = el.value; };
     });
@@ -2802,7 +2745,7 @@ function wireNodesTab(root){
         const r = await nodeAct({action: "enroll", script: true, node: id, as_row: true, controller: location.origin});
         if (r.error) return;
         modal.hidden = false; mintScript(r);
-        nodesRev++; drawPanes();
+        readMoved("nodes"); drawPanes();
         return;
       }
       if (act === "door" && b.dataset.on === "0"){
@@ -2838,7 +2781,7 @@ function wireNodesTab(root){
         // person reads why on the toast and presses again (B862). A good one
         // keeps it busy until the agent's hello brings the new digest.
         else if (j.ok) notifyJob(j.job, `agent update on ${(nodesList || []).find(n => n.id === id)?.name || "the node"}`,
-          r => { if (r.state !== "succeeded"){ delete nodesUpdating[id]; nodesRev++; drawPanes(); } });
+          r => { if (r.state !== "succeeded"){ delete nodesUpdating[id]; readMoved("nodes"); drawPanes(); } });
         else delete nodesUpdating[id];
         return;
       }
@@ -2856,7 +2799,7 @@ function wireNodesTab(root){
       if (act === "sess-revert"){
         const c = nodesConf[id];
         if (c && c.draft) for (const k of ["rootAsks", "portsLocal", "turnsText", "workersText"]) c.draft[k] = undefined;
-        nodesRev++; drawPanes();
+        readMoved("nodes"); drawPanes();
         return;
       }
       if (act === "sess-save"){
@@ -3038,7 +2981,7 @@ function wireNodeConf(row, id){
       touch();
       // Only the two that change what else is enabled repaint now; a
       // keystroke in a path field does not need the whole tab redrawn.
-      if (k === "net:mode" || k === "type"){ nodesRev++; drawPanes(); }
+      if (k === "net:mode" || k === "type"){ readMoved("nodes"); drawPanes(); }
       else {
         // Both editors carry a Save and the status line: one record, two
         // sections, so every copy moves.
@@ -3056,7 +2999,7 @@ function wireNodeConf(row, id){
   const add = fold.querySelector("[data-madd]");
   if (add) add.onclick = () => {
     c.draft.mounts.push({type: "nfs", source: "", path: "", ro: false});
-    touch(); nodesRev++; drawPanes();
+    touch(); readMoved("nodes"); drawPanes();
     // ...and the new mount's first field takes the keyboard, the press's
     // button being kept by the patch rather than thrown away.
     const i = c.draft.mounts.length - 1;
@@ -3065,7 +3008,7 @@ function wireNodeConf(row, id){
   fold.querySelectorAll("[data-mrm]").forEach(b => b.onclick = () => {
     const i = Number(b.closest(".ndmount").dataset.i);
     c.draft.mounts.splice(i, 1);
-    touch(); nodesRev++; drawPanes();
+    touch(); readMoved("nodes"); drawPanes();
   });
   fold.querySelectorAll("[data-nrunner]").forEach(b => b.onclick = async () => {
     const n = nodesList.find(x => x.id === id);
@@ -3079,9 +3022,9 @@ function wireNodeConf(row, id){
       return nodeAct({action: "runner", id, slot, want, ...(c.addRunner && typed.length ? {labels: typed} : {})}); });
   });
   const showBtn = fold.querySelector("[data-nrunnershow]");
-  if (showBtn) showBtn.onclick = () => { c.addRunner = true; nodesRev++; drawPanes(); };
+  if (showBtn) showBtn.onclick = () => { c.addRunner = true; readMoved("nodes"); drawPanes(); };
   const cancelBtn = fold.querySelector("[data-nrunnercancel]");
-  if (cancelBtn) cancelBtn.onclick = () => { c.addRunner = false; c.draft.runner = undefined; nodesRev++; drawPanes(); };
+  if (cancelBtn) cancelBtn.onclick = () => { c.addRunner = false; c.draft.runner = undefined; readMoved("nodes"); drawPanes(); };
   const addBtn = fold.querySelector("[data-nrunneradd]");
   if (addBtn) addBtn.onclick = () => pressing(addBtn, async () => {
     busy(addBtn, "Adding");
@@ -3091,17 +3034,17 @@ function wireNodeConf(row, id){
     // The token leaves the page the moment it is handed over, either way;
     // the form rolls up once the runner is on the list.
     if (c.draft.runner) c.draft.runner.token = "";
-    if (!r.error){ c.addRunner = false; c.draft.runner = undefined; nodesRev++; drawPanes(); }
+    if (!r.error){ c.addRunner = false; c.draft.runner = undefined; readMoved("nodes"); drawPanes(); }
   });
   fold.querySelectorAll("[data-nrunnerforget]").forEach(b => b.onclick = async () => {
     const slot = b.dataset.slot;
     if (!await askYes(`Forget the token for ${slot}?\n\nA runner already registered keeps running; installing or removing one later needs a token again.`)) return;
     pressing(b, async () => { busy(b, "Forgetting");
       const r = await nodeAct({action: "runner-forget", id, slot});
-      if (!r.error){ nodesRev++; drawPanes(); } });
+      if (!r.error){ readMoved("nodes"); drawPanes(); } });
   });
   fold.querySelectorAll("[data-nrevert]").forEach(b => b.onclick = () => {
-    c.draft = null; c.dirty = false; nodesRev++; drawPanes();
+    c.draft = null; c.dirty = false; readMoved("nodes"); drawPanes();
   });
   fold.querySelectorAll("[data-nsave]").forEach(save => { save.onclick = () => pressing(save, async () => {
     const was = save.textContent;
@@ -3109,7 +3052,7 @@ function wireNodeConf(row, id){
     if (!await ndStoreAsk(nodesList.find(x => x.id === id), c)){ unbusy(save, was); return; }
     busy(save, "Saving");
     const r = await nodeAct({action: "config", id, config: c.draft});
-    if (!r.error){ c.dirty = false; c.draft = null; nodesRev++; drawPanes(); }
+    if (!r.error){ c.dirty = false; c.draft = null; readMoved("nodes"); drawPanes(); }
   }); });
   fold.querySelectorAll("[data-napply]").forEach(b => b.onclick = async () => {
     const what = b.dataset.napply;

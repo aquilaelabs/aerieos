@@ -1532,7 +1532,7 @@ await section("The fence inside the one page", async () => {
   await page.evaluate(() => {
     window.__realFxRender = TABKINDS.findings.render;
     TABKINDS.findings.render = () => { throw new Error('boom (deliberate)'); };
-    fxRev++; drawPanes();
+    readMoved('findings'); drawPanes();
   });
   await page.waitForFunction(() => /renderer failed/.test(
     document.querySelector('.doc.on')?.textContent || ''), null, { timeout: 8000 });
@@ -1556,7 +1556,7 @@ await section("The fence inside the one page", async () => {
   await page.evaluate(() => {
     TABKINDS.findings.render = window.__realFxRender;
     delete window.__realFxRender;
-    fxRev++; drawPanes();
+    readMoved('findings'); drawPanes();
   });
   // Not waited for: the Docker tab is in front now, so the Analysis tab does
   // not draw until the loop below brings it, and a wait for its rows sat out
@@ -2308,7 +2308,7 @@ await section("a quiet page is quiet, and a tab opens once", async () => {
   await page.evaluate(() => { for (const t of [...tabs]) if (t.kind !== 'term') dropTab(t.id); });
   // With every page put away the page lands on Home, the landing page, whose
   // one read on open is an open's and not a poll: counted from after it.
-  await page.waitForFunction(() => tabOf(panes[0])?.kind !== 'home' || (homeData !== null && !homeFetching), null, { timeout: 20000 });
+  await page.waitForFunction(() => tabOf(panes[0])?.kind !== 'home' || (homeData !== null && !readBusy('home')), null, { timeout: 20000 });
   // Which revisions moved over a window, read off the page's own tokens: a
   // re-read a moved token asked for is the page doing its job, not noise
   // (B757: an earlier kind's job finishing inside the window re-read Home,
@@ -2349,7 +2349,7 @@ await section("a quiet page is quiet, and a tab opens once", async () => {
   await quiet.evaluate(() => railGo('home'));
   // Left alone, and Home's own reads in by then, before the count starts.
   await quietFor(5000);
-  await quiet.waitForFunction(() => tabOf(panes[0])?.kind !== 'home' || (homeData !== null && !homeFetching),
+  await quiet.waitForFunction(() => tabOf(panes[0])?.kind !== 'home' || (homeData !== null && !readBusy('home')),
                               null, { timeout: 20000 }).catch(() => {});
   await quiet.evaluate(() => { window.__f = {}; const f = window.fetch;
     window.fetch = (...a) => { const u = String(a[0]).split('?')[0]; window.__f[u] = (window.__f[u] || 0) + 1; return f(...a); }; });

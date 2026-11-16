@@ -12,12 +12,11 @@ const browser = await launch();
 const page = await newPage(browser);
 await page.goto(BASE);
 await page.waitForFunction(() => typeof state !== 'undefined' && state && state.repos);
-const keys = body => page.evaluate(async b => (await (await postJSON('/api/keys', b)).json()), body);
+const keys = body => page.evaluate(async b => (await postJSON('/api/keys', b)), body);
 
 // A token of the person's, given to alpha (the fixture's project).
 const given = await page.evaluate(async () => {
-  const r = await postJSON('/api/rename', { name: 'alpha', token: 'ghp_suiteTokenValue0123' });
-  return r.json();
+  return postJSON('/api/rename', { name: 'alpha', token: 'ghp_suiteTokenValue0123' });
 }).catch(() => ({}));
 let mine = await keys({ action: 'mine' });
 // With no install key nothing can be sealed into a person's store: the token
@@ -90,13 +89,13 @@ if (prfOk){
     const got = await page.evaluate(async () => {
       const s = await keyStoreSecret('', 'passkey');
       if (!s) return { error: 'no secret' };
-      return (await (await postJSON('/api/keys', { action: 'own-key', ...s, keep: [] })).json());
+      return (await postJSON('/api/keys', { action: 'own-key', ...s, keep: [] }));
     });
     ok(got.ok === true, `the passkey holds the key: the store moved under its PRF secret (${got.error || 'ok'})`);
     await keys({ action: 'lock' });
     const again = await page.evaluate(async () => {
       const s = await keyStoreSecret('', 'passkey');
-      return s ? (await (await postJSON('/api/keys', { action: 'unlock', ...s })).json()) : { error: 'no secret' };
+      return s ? (await postJSON('/api/keys', { action: 'unlock', ...s })) : { error: 'no secret' };
     });
     ok(again.ok === true, `...and unlocks it again (${again.error || 'ok'})`);
     ok((await keys({ action: 'own-back' })).ok === true, 'given back under the install key');

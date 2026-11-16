@@ -18,7 +18,7 @@
 
 "use strict";
 
-let lib = null, libNode = "", libRev = 0, libSeq = 0, libLanded = 0, libFollow = null;
+let lib = null, libNode = "", libFollow = null;
 let libQ = "", libKind = "", libTier = "";
 // Whether the source chips drew the last time the page did: a library whose
 // cards all come from one source draws none, and its waiting template then
@@ -64,7 +64,7 @@ function openLibraryOn(id, agent = ""){
   try{ localStorage.setItem("bb.libnode", id); }catch(e){ /* private */ }
   const was = location.hash;
   openLibrary();
-  libRev++;
+  readMoved("library");
   const to = routeOf(tabOf(panes[0]));
   if (to && to !== was) shellPush(to);
   loadLibrary();
@@ -85,63 +85,40 @@ function libPick(){
   return live.find(n => n.id === want) || null;
 }
 
-// A read for a node already on its way is shared by the calls that come in
-// while it has only just set out: a rail press, the tab's open and the
-// revisions poll each asked at once, and the page waited on three reads
-// where one would do. A call later than that reads again, so nothing it
-// was asked about is missed.
-let libFlight = null;
-async function loadLibrary(){
-  if (libFlight && libFlight.node === libNode && Date.now() - libFlight.at < 500) return libFlight.p;
-  const flight = {node: libNode, at: Date.now(), p: null};
-  libFlight = flight;
-  flight.p = loadLibraryNow().finally(() => { if (libFlight === flight) libFlight = null; });
-  return flight.p;
-}
-
-async function loadLibraryNow(){
-  const asked = ++libSeq;
-  if (nodesList === null || nodesStale) await loadNodes();
-  if (asked !== libSeq) return;
-  if (!libPick()){
-    lib = {nonode: true};
-    libRev++; drawPanes();
-    return;
-  }
-  // A reply is kept when it is still about the node on show and nothing
-  // asked after it has landed first (B154: dropping every overtaken reply
-  // was a livelock on a loaded box).
-  const node = libNode;
-  const keep = () => libNode === node && asked > libLanded;
-  try{
-    const r = await fetch("/api/library?node=" + encodeURIComponent(node));
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    const got = await r.json();
-    if (!keep()) return;
+// One read at a time (reading), an ask about the same node within half a
+// second of a read's start sharing it: the page's open, its node's census
+// and the revisions poll each asked at once, and the page waited on three
+// reads where one would do. A call later than that reads again, so nothing
+// it was asked about is missed.
+function loadLibrary(){
+  return reading("library", async () => {
+    if (nodesList === null || nodesStale) await loadNodes();
+    if (!libPick()){ lib = {nonode: true}; return; }
+    // A reply is kept while it is still about the node on show.
+    const node = libNode;
+    const got = await getJSON("/api/library?node=" + encodeURIComponent(node));
+    if (libNode !== node) return;
     lib = got;
-  }catch(e){ if (!keep()) return; lib = {error: failWords(e)}; }
-  libLanded = asked;
-  if (libWantAgent && !lib.error){
-    const r = (lib.rows || []).find(x => x.kind === "agent" && x.agent === libWantAgent);
-    libWantAgent = "";
-    // The agent's own entry page (R183), once the card is drawn.
-    if (r) setTimeout(() => openEntry(libNode, `agent:${r.name}`));
-  }
-  // The lines the Toolchains and Agents pages draw read their own page's
-  // state: the node's sandbox flag (Install them now on a system line) and
-  // this person's plugins and MCP servers there (an agent's Yours).
-  if (!lib.error){
-    tcSandboxNow = !!lib.sandbox; agYours = lib.yours || {plugins: [], mcp: {}};
-    // ...and tcAct refuses a second job by the Toolchains page's record of
-    // the one running, which this read keeps current for it.
-    if (toolchains && !toolchains.nonode && !toolchains.error) toolchains.job = lib.job; else toolchains = {name: lib.name, job: lib.job, items: []};
-  }
-  // One follow-up while a job writes a row, not a poll: the toolchains
-  // revision moves when the job ends, and the row's "installing" until then.
-  clearTimeout(libFollow); libFollow = null;
-  if ((lib.rows || []).some(r => r.running || r.queued)) libFollow = setTimeout(loadLibrary, 3000);
-  libRev++;
-  drawPanes();
+    if (libWantAgent && !lib.error){
+      const r = (lib.rows || []).find(x => x.kind === "agent" && x.agent === libWantAgent);
+      libWantAgent = "";
+      // The agent's own entry page (R183), once the card is drawn.
+      if (r) setTimeout(() => openEntry(libNode, `agent:${r.name}`));
+    }
+    // The lines the Toolchains and Agents pages draw read their own page's
+    // state: the node's sandbox flag (Install them now on a system line) and
+    // this person's plugins and MCP servers there (an agent's Yours).
+    if (!lib.error){
+      tcSandboxNow = !!lib.sandbox; agYours = lib.yours || {plugins: [], mcp: {}};
+      // ...and tcAct refuses a second job by the Toolchains page's record of
+      // the one running, which this read keeps current for it.
+      if (toolchains && !toolchains.nonode && !toolchains.error) toolchains.job = lib.job; else toolchains = {name: lib.name, job: lib.job, items: []};
+    }
+    // One follow-up while a job writes a row, not a poll: the toolchains
+    // revision moves when the job ends, and the row's "installing" until then.
+    clearTimeout(libFollow); libFollow = null;
+    if ((lib.rows || []).some(r => r.running || r.queued)) libFollow = setTimeout(loadLibrary, 3000);
+  }, {join: 500, about: libNode});
 }
 
 // What the search box matches: the name, what it is, its kind and its tier.
@@ -356,12 +333,12 @@ const LIB_ICONS = {
 async function libLook(key){
   const r = (lib?.rows || []).find(x => `${x.kind}:${x.name}` === key);
   if (!r || libSeen[key] === "looking") return;
-  libSeen[key] = "looking"; libRev++; drawPanes();
+  libSeen[key] = "looking"; readMoved("library"); drawPanes();
   const body = r.catalog ? {action: "preview", url: r.catalog.url, commit: r.catalog.commit, sha256: r.catalog.sha256, path: r.catalog.path || ""}
     : {action: "preview", url: r.pack.url, commit: r.pack.commit, path: r.pack.path || ""};
-  const j = await (await postJSON("/api/toolpacks", body)).json().catch(() => ({error: "no answer"}));
+  const j = await postJSON("/api/toolpacks", body);
   libSeen[key] = j;
-  libRev++; drawPanes();
+  readMoved("library"); drawPanes();
 }
 
 // The driver's version on its card (R102, the operator 6 Oct: the branch
@@ -453,15 +430,15 @@ function renderLibraryInto(i){
   if (lib === null){
     d.setBar("");
     const skcard = () => `<div class="lcard skcard"><div class="lchead"><span class="lcicon"></span><div class="lctitle">${skv(7, "name")}${skv(4)}</div></div>${skRows(1)}</div>`;
-    d.list.innerHTML = skTpl(pageHead({facts: [["Installed", GHOST], ["Store", GHOST]]})
+    drawHTML(d.list, skTpl(pageHead({facts: [["Installed", GHOST], ["Store", GHOST]]})
       + `<div class="field lfilter libfilter"><div class="libsearchrow"><input type="search" disabled placeholder="search by name or what it does"><span class="actbar"><button type="button" disabled>${barSaid("Check for updates", "Check")}</button><button type="button" class="primary" disabled>${barSaid("Add your own", "Add")}</button></span></div><div class="chips">${skel("chips", 5)}</div>${libHadTiers ? `<div class="chips">${skel("chips", 3)}</div>` : ""}</div>`
-      + `<div class="field libgroups">${LIB_KINDS.map(([k, title]) => `<div class="libgroup"><h3 class="libgname">${esc(title)}</h3><div class="lgrid">${skcard()}${skcard()}${skcard()}</div></div>`).join("")}</div>`);
-    if (!libSeq) loadLibrary();
+      + `<div class="field libgroups">${LIB_KINDS.map(([k, title]) => `<div class="libgroup"><h3 class="libgname">${esc(title)}</h3><div class="lgrid">${skcard()}${skcard()}${skcard()}</div></div>`).join("")}</div>`));
+    if (!readRev("library") && !readBusy("library")) loadLibrary();
     return;
   }
   if (lib.nonode){
     d.setBar("");
-    d.list.innerHTML = noNodeYet("toolchains and coding agents install on a node", "libnone");
+    drawHTML(d.list, noNodeYet("toolchains and coding agents install on a node", "libnone"));
     return;
   }
   const may = lib.may || {};
@@ -553,12 +530,12 @@ function wireLibrary(root){
   if (typeof wireSignin === "function") wireSignin(root);
   const q = root.querySelector("#libFind");
   if (q){
-    onTyping(q, () => { libQ = q.value; libRev++; drawPanes(); });
+    onTyping(q, () => { libQ = q.value; readMoved("library"); drawPanes(); });
   }
   // A chip rearranges the shelf (R192): the cards that stay slide to their
   // places, the ones it leaves out fade away, the ones it brings fade up.
   const shelf = () => document.querySelector(".pane .doc.on .librarytab");
-  const move = set => chipMove(shelf, ".lcard, .libgname", () => { set(); libRev++; drawPanes(); });
+  const move = set => chipMove(shelf, ".lcard, .libgname", () => { set(); readMoved("library"); drawPanes(); });
   root.querySelectorAll("[data-libkind]").forEach(b => b.onclick = () => move(() => { libKind = b.dataset.libkind; }));
   root.querySelectorAll("[data-libtier]").forEach(b => b.onclick = () => move(() => { libTier = b.dataset.libtier; }));
   root.querySelectorAll("[data-libmore]").forEach(b => b.onclick = () => openEntry(libNode, b.dataset.libmore));
@@ -576,7 +553,7 @@ function wireLibrary(root){
     const dirs = (lib?.cleanable || []).map(c => c.dir);
     if (!dirs.length || !await askYes(`Take ${dirs.join(", ")} off the store?\n\nNo node runs from ${dirs.length === 1 ? "it" : "them"}; what is in ${dirs.length === 1 ? "it" : "them"} is gone for good.`, {verb: "Remove", danger: true})) return;
     busy(cl, "Removing");
-    const j = await (await postJSON("/api/toolchains", {action: "clean", node: libNode, names: dirs})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/toolchains", {action: "clean", node: libNode, names: dirs});
     if (j.error) notify(j.error, true);
     loadLibrary();
   };
@@ -606,7 +583,7 @@ async function libAct(b, act, kind, name){
     // runs Docker.
     if (r.catalog){
       busy(b, "Taking");
-      const j = await (await postJSON("/api/nasapps", {action: "add-catalog", app: name})).json().catch(() => ({error: "no answer"}));
+      const j = await postJSON("/api/nasapps", {action: "add-catalog", app: name});
       if (j.error){ notify(j.error, true); await loadLibrary(); return; }
       if (typeof cApps !== "undefined") cApps = null;
       await loadLibrary();
@@ -616,7 +593,7 @@ async function libAct(b, act, kind, name){
   }
   if (kind === "service"){
     busy(b, "Deploying");
-    const j = await (await postJSON("/api/library", {action: "install", node: libNode, pack: r.name})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/library", {action: "install", node: libNode, pack: r.name});
     if (j.error) notify(j.error, true);
     else if (j.job) notify(`deploying ${r.label}: its row on the Containers page has the build`);
     await loadLibrary();
@@ -625,7 +602,7 @@ async function libAct(b, act, kind, name){
   if (kind === "agent"){
     if (r.installed && !await askYes(`Update ${r.label} on ${where}? Its sessions there end first; they start again from the space rows.`)) return;
     busy(b, "Asking");
-    const j = await (await postJSON("/api/agents", {action: act, node: libNode, agent: r.agent || ""})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/agents", {action: act, node: libNode, agent: r.agent || ""});
     if (j.error) notify(j.error, true);
     await loadLibrary();
     return;

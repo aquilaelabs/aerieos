@@ -42,33 +42,34 @@ function nbTestsView({$, nb, project}){
     const session = sessionOf(t.arg);
     let said = "";
     try{
-      const j = await (await postJSON("/api/send", {session, macro: "tests-log", wait: 48})).json();
+      const j = await postJSON("/api/send", {session, macro: "tests-log", wait: 48});
       said = j.error || "";
     }catch(e){ said = "could not send: " + failWords(e); }
     if (said) notify(said, true);
     unbusy(btn, "Open the run's output");
   }
 
-  async function loadTests(again = false){
-    try{
-      const r = await fetch("/api/tests?project=" + encodeURIComponent(project));
-      const j = await r.json();
-      nb.tests = j.error ? {tests: [], suites: [], error: j.error} : j;
-    }catch(e){ nb.tests = {tests: [], suites: [], error: String(e)}; }
-    // The revision the ANSWER carried, never the page's token as of now: a
-    // write landing between the read and this line moved the token, and
-    // recording that marked the write as seen, so the row it made never
-    // showed (B201). The same rule the roadmap and memory halves keep.
-    // An answer that failed carries none, and the token stands in so the
-    // watch keeps asking rather than waiting on a number that never comes.
-    nb.testsRev = nb.tests.rev ?? revs[`tests:${project}`] ?? nb.testsRev;
-    drawTests();
-    // Already behind: a write landed while this answer was on its way, and
-    // the poll fired for it BEFORE this landed, so it will not fire again.
-    // Read once more now rather than wait for the next write. Once: an
-    // answer and a token that disagree for good must not become a loop.
-    if (!again && nb.tests.rev !== undefined && revs[`tests:${project}`] !== undefined
-        && revs[`tests:${project}`] !== nb.tests.rev) return loadTests(true);
+  function loadTests(again = false){
+    return reading(`${project}:tests`, async () => {
+      try{
+        const j = await getJSON("/api/tests?project=" + encodeURIComponent(project));
+        nb.tests = j.error ? {tests: [], suites: [], error: j.error} : j;
+      }catch(e){ nb.tests = {tests: [], suites: [], error: String(e)}; }
+      // The revision the ANSWER carried, never the page's token as of now: a
+      // write landing between the read and this line moved the token, and
+      // recording that marked the write as seen, so the row it made never
+      // showed (B201). The same rule the roadmap and memory halves keep.
+      // An answer that failed carries none, and the token stands in so the
+      // watch keeps asking rather than waiting on a number that never comes.
+      nb.testsRev = nb.tests.rev ?? revs[`tests:${project}`] ?? nb.testsRev;
+      drawTests();
+      // Already behind: a write landed while this answer was on its way, and
+      // the poll fired for it BEFORE this landed, so it will not fire again.
+      // Read once more now rather than wait for the next write. Once: an
+      // answer and a token that disagree for good must not become a loop.
+      if (!again && nb.tests.rev !== undefined && revs[`tests:${project}`] !== undefined
+          && revs[`tests:${project}`] !== nb.tests.rev) loadTests(true); return;
+    });
   }
 
   // Wrapped so the poll can tell this panel's own write from somebody
@@ -81,8 +82,7 @@ function nbTestsView({$, nb, project}){
       return null;
     }
     try{
-      const r = await postJSON("/api/tests", {project, ...body});
-      const j = await r.json();
+      const j = await postJSON("/api/tests", {project, ...body});
       if (j.error){ notify(j.error, true); return null; }
       nb.tests = j;
       // This panel's own write moved nothing the poll watches: describing a
@@ -150,7 +150,7 @@ function nbTestsView({$, nb, project}){
       // What the view is for, as its empty state, in one sentence as every
       // view's is (the a-notebook/views rule): a command box the page's
       // width read as a field to type in.
-      $("tstStats").innerHTML = `<div class="field"><div class="hint nbempty">Each test run a session records with <code>aerie tests run</code>, once there is one: what passed and failed, the tests that went flaky, and the ones with nothing saying what they protect.</div></div>`;
+      drawHTML($("tstStats"), `<div class="field"><div class="hint nbempty">Each test run a session records with <code>aerie tests run</code>, once there is one: what passed and failed, the tests that went flaky, and the ones with nothing saying what they protect.</div></div>`);
       $("tstList").innerHTML = ""; $("tstBar").hidden = true;
       $("tstFolds").innerHTML = "";
       return;
@@ -280,7 +280,7 @@ function nbTestsView({$, nb, project}){
       // Read first, the way a bug report is: the two sentences under their
       // labels and an Edit. The fields come only when Edit is pressed.
       if (ro || (!draft && !tstEditing.has(t.key))){
-        body.innerHTML = `${sub}
+        drawHTML(body, `${sub}
           ${t.protects || t.notes ? `
             <div class="bfield"><label>What it protects</label><div class="bval${t.protects ? "" : " dim"}">${
               esc(t.protects) || "not written yet"}</div></div>
@@ -289,13 +289,13 @@ function nbTestsView({$, nb, project}){
           : `<div class="bfield"><div class="bval dim">Not described yet: what breaks if this goes red, and what it exercises.</div></div>`}
           ${t.accepted ? `<div class="bfield"><label>The wait is the work</label><div class="bval">${esc(t.accepted)}</div></div>` : ""}
           ${ro ? "" : `<div class="actbar"><span class="sp"></span>
-            <button type="button" class="tstEdit">Edit</button></div>`}`;
+            <button type="button" class="tstEdit">Edit</button></div>`}`);
         if (!ro) body.querySelector(".tstEdit").onclick = () => {
           tstEditing.add(t.key); body.dataset.done = ""; fill(box);
         };
         return;
       }
-      body.innerHTML = `${sub}
+      drawHTML(body, `${sub}
         <label>What it protects</label>
         <textarea class="tstP" spellcheck="false"
           placeholder="the behavior that breaks if this goes red">${
@@ -313,7 +313,7 @@ function nbTestsView({$, nb, project}){
         <div class="actbar"><span class="sp"></span>
           <button type="button" class="stop tstCancel"
             title="discard what was typed">Cancel</button>
-          <button type="button" class="primary tstSave">Save</button></div>`;
+          <button type="button" class="primary tstSave">Save</button></div>`);
       const acc = body.querySelector(".tstAccept");
       if (acc) acc.onchange = () => { body.querySelector(".tstWhy").hidden = !acc.checked; };
       body.querySelector(".tstCancel").onclick = () => {

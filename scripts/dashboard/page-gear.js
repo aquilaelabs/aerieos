@@ -53,9 +53,7 @@ function applyMode(id, {save = true} = {}){
   if (!save) return;
   try{ localStorage.setItem("bb.mode", use); localStorage.setItem("bb.mode.who", state?.me || ""); }catch(e){ /* private mode */ }
   modeSaved = use;
-  fetch("/api/users", { method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "prefs", prefs: { mode: use } }) })
+  postJSON("/api/users", { action: "prefs", prefs: { mode: use } })
     .catch(() => {});
   markUiMenu();
 }
@@ -129,9 +127,7 @@ function applyTheme(id){
   // this account: it adopts the scheme after first paint instead of never.
   // Fire and forget: a failed save is a scheme that did not follow you, not
   // something to interrupt the person picking colors about.
-  fetch("/api/users", { method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "prefs", prefs: { theme: use } }) })
+  postJSON("/api/users", { action: "prefs", prefs: { theme: use } })
     .catch(() => {});
   markUiMenu();
 }
@@ -187,7 +183,7 @@ function drawUiMenu(){
   if (!el || el.hidden) return;
   const cur = currentTheme();
   const mode = currentMode();
-  el.innerHTML = `<div class="popbar"><b>Preferences</b></div>
+  drawHTML(el, `<div class="popbar"><b>Preferences</b></div>
     <h4>Appearance</h4><div class="popbody">
     <div class="pseg modeseg" role="group" aria-label="dark or light">${MODES.map(([id, label]) => `
       <button type="button" data-mode="${id}" class="${id === mode ? "on" : ""}"
@@ -213,7 +209,7 @@ function drawUiMenu(){
       <button type="button" id="uiProfile">Profile</button>
       <button type="button" id="uiReport" class="narrowonly" aria-label="report a bug" title="report a bug in AerieOS: it goes to the diagnostics">${$("bReport")?.querySelector("svg")?.outerHTML || "Report a bug"}</button>
       <button type="button" id="uiOut" class="narrowonly" aria-label="sign out" title="sign out: back to the login page">${$("bOut")?.querySelector("svg")?.outerHTML || "Sign out"}</button>
-    </div></div>`;
+    </div></div>`);
   el.querySelectorAll(".sw").forEach(b =>
     b.onclick = () => applyTheme(b.dataset.theme));
   el.querySelectorAll("[data-mode]").forEach(b =>
@@ -307,8 +303,7 @@ function wireLogSection(el){
     const btn = el.querySelector("#logApply");
     busy(btn, "Applying");
     try{
-      const r = await postJSON("/api/logs", {action: "days", days});
-      const j = await r.json();
+      const j = await postJSON("/api/logs", {action: "days", days});
       if (j.error) return notify(j.error, true);
       if (typeof settingsDraft === "object") delete settingsDraft.logDays;
       notify(j.removed
@@ -326,8 +321,7 @@ function wireLogSection(el){
     if (!await askYes("Delete every kept log except this session's?\n\n"
                  + "This session keeps writing to its own.")) return;
     try{
-      const r = await postJSON("/api/logs", {action: "clear"});
-      const j = await r.json();
+      const j = await postJSON("/api/logs", {action: "clear"});
       notify(j.error || `${j.removed} file${j.removed === 1 ? "" : "s"} removed`, !!j.error);
       refresh(); drawUiMenu();
     }catch(e){ notify("logs: " + failWords(e), true); }

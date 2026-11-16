@@ -78,7 +78,7 @@ function wireDebug(el){
   if (devSave) devSave.onclick = async () => {
     busy(devSave, "Saving");
     try{
-      const j = await (await postJSON("/api/settings", {set: {offer_unvetted: debugDev}})).json();
+      const j = await postJSON("/api/settings", {set: {offer_unvetted: debugDev}});
       if (j.error){ notify(j.error, true); unbusy(devSave, "Save"); return; }
       debugDev = null;
       notify("saved");
@@ -94,7 +94,7 @@ function wireDebug(el){
       const c = projectList().find(x => x.key === key);
       if (!c?.first) continue;
       try{
-        const j = await (await postJSON("/api/prefs", {project: c.first.name, diag: g.diag, log_from: g.log_from})).json();
+        const j = await postJSON("/api/prefs", {project: c.first.name, diag: g.diag, log_from: g.log_from});
         if (j.error){ notify(`${c.name}: ${j.error}`, true); unbusy(save, "Save"); return; }
       }catch(e){ notify(`${c.name}: ${failWords(e)}`, true); unbusy(save, "Save"); return; }
       delete debugGrants[key];

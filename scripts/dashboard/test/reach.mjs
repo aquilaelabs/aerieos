@@ -59,9 +59,9 @@ await page.waitForFunction(() => /sent/.test(document.querySelector('details[dat
 ok(true, 'the row says it was sent');
 
 // The secret address is kept sealed and listed on the Keys page by name only.
-const kept = await page.evaluate(async () => (await (await postJSON('/api/keys', { action: 'status' })).json()).kept || []);
+const kept = await page.evaluate(async () => (await postJSON('/api/keys', { action: 'status' })).kept || []);
 const mine = kept.find(k => k.kind === 'reach');
-const sealing = !!(await page.evaluate(async () => (await (await postJSON('/api/keys', { action: 'status' })).json()).sealing));
+const sealing = !!(await page.evaluate(async () => (await postJSON('/api/keys', { action: 'status' })).sealing));
 ok(!!mine && /the harness/.test(mine.name) && (mine.sealed === true || !sealing),
    `the Keys page lists the destination's address${sealing ? ' as sealed' : ' (no install key here, so nothing is sealed)'} (${mine ? mine.name : 'none'})`);
 

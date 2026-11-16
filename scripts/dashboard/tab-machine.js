@@ -57,18 +57,18 @@ function renderMachineInto(i){
   if (!d) return;
   d.setBar("");
   if (!state?.bare_metal){
-    d.list.innerHTML = `<div class="empty">This controller is a bare-metal install's page: the release it runs on its own computer and that computer's updates. This AerieOS runs in a container, which has no machine of its own here; its nodes are on the Nodes page.</div>`;
+    drawHTML(d.list, `<div class="empty">This controller is a bare-metal install's page: the release it runs on its own computer and that computer's updates. This AerieOS runs in a container, which has no machine of its own here; its nodes are on the Nodes page.</div>`);
     return;
   }
   if (nodesList === null){
-    d.list.innerHTML = skTpl(pageHead({title: GHOST, facts: [["System", GHOST], ["Release", GHOST], ["Up", GHOST]]})
-      + docSection("nodes", "updates", "Updates", "", skRows(2)));
+    drawHTML(d.list, skTpl(pageHead({title: GHOST, facts: [["System", GHOST], ["Release", GHOST], ["Up", GHOST]]})
+      + docSection("nodes", "updates", "Updates", "", skRows(2))));
     loadNodes();
     return;
   }
   const n = ownMachine();
   if (!n){
-    d.list.innerHTML = `<div class="empty">This install's own machine is not enrolled as a node yet: the setup page shows it being set up, and the installer's --install does it (install-controller.sh --no-node leaves it out, and then there is nothing here).</div>`;
+    drawHTML(d.list, `<div class="empty">This install's own machine is not enrolled as a node yet: the setup page shows it being set up, and the installer's --install does it (install-controller.sh --no-node leaves it out, and then there is nothing here).</div>`);
     return;
   }
   patch(d.list, machineHead(n)
@@ -100,9 +100,9 @@ function wireHoldNext(root){
   root.querySelectorAll("[data-holdnextbox]").forEach(c => c.onchange = async () => {
     const on = c.checked;
     c.disabled = true;
-    const j = await (await postJSON("/api/v1/nodes", {action: "hold-next", on})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/v1/nodes", {action: "hold-next", on});
     notify(j.error || (on ? "the next start is held: nothing runs after the restart until Start is pressed on This controller" : "the next start runs as usual"), !!j.error);
-    nodesRev++;
+    readMoved("nodes");
     await refresh();
   });
 }
@@ -131,7 +131,7 @@ function wireOlderVersions(root){
         : `Remove ${version} from this machine?\n\nIt goes from the boot menu and its files are deleted. A release can be installed again by updating to it.`,
         {title: verb === "next" ? "Boot it next?" : "Remove it?", verb: verb === "next" ? "Boot it next" : "Remove", danger: verb !== "next"})) return;
     busy(b, verb === "next" ? "Setting" : "Removing");
-    const j = await (await postJSON("/api/v1/nodes", {action: "os-kept", id: ownMachine()?.id || "", verb, version})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/v1/nodes", {action: "os-kept", id: ownMachine()?.id || "", verb, version});
     notify(j.error || (verb === "next" ? `${version} boots next, once: restart from Advanced` : `removing ${version}`), !!j.error);
     await loadNodes();
   }));
@@ -231,7 +231,7 @@ function wireStick(root){
         : `Take ${path} as the spaces folder?\n\nThe controller restarts and works in it from then on, every boot. Its files are handed to AerieOS's own account, so git and the controller can write them, and the folder is closed to other accounts: the system that had it can no longer read it until it is given back. Who had it is kept in the folder, in ${path}/.aerieos-give-back.sh: Let it go runs that, and so can root on that system. Their owner changes, nothing in them does, and a share of this folder stops serving other people.`,
         {title: release ? "Let it go?" : "Use this folder?", verb: release ? "Let it go" : "Use it"})) return;
     busy(pb, release ? "Letting go" : "Taking it");
-    const j = await (await postJSON("/api/v1/nodes", {action: "projects-folder", id: ownMachine()?.id || "", path, release})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/v1/nodes", {action: "projects-folder", id: ownMachine()?.id || "", path, release});
     notify(j.error || "taking the folder: the job says which spaces it found, and the controller restarts on it", !!j.error);
     await loadNodes();
   }));
@@ -246,7 +246,7 @@ function wireStick(root){
     if (!await askYes(`${aside ? `${path} holds another AerieOS install's folder. It is renamed to ${path}/aerieos-system.old (or .old-2 and on) and nothing in it is read, taken or deleted: delete it yourself once nothing in it is wanted.\n\n` : ""}Put docker, the VMs, the toolchains, the spaces and the secrets on ${path}?\n\nDocker and the VMs stop while what the stick holds of theirs is moved there, and start again on the pool. From then on they write there, the install key and the secrets live there, and the stick keeps the configuration alone.`,
         {title: aside ? "Set it aside and use this pool?" : "Use this pool?", verb: aside ? "Set aside and move" : "Move"})) return;
     busy(b, "Moving");
-    const j = await (await postJSON("/api/v1/nodes", {action: "system-pool", id: ownMachine()?.id || "", path, aside})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/v1/nodes", {action: "system-pool", id: ownMachine()?.id || "", path, aside});
     notify(j.error || "moving to the pool: the Nodes page says when it is done", !!j.error);
     await loadNodes();
   });
@@ -279,7 +279,7 @@ function wireMachineConsole(root){
     if (clear && !await askYes("Take the console password away?\n\nNobody can log in at the screen as admin until one is set again; the boot menu's Rescue entry still opens a root shell there.",
         {title: "Take it away?", verb: "Take it away", danger: true})) return;
     busy(b, clear ? "Taking it away" : "Setting");
-    const j = await (await postJSON("/api/v1/nodes", {action: "console", id: n?.id || "", ...(clear ? {clear: true} : {password: pw})})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/v1/nodes", {action: "console", id: n?.id || "", ...(clear ? {clear: true} : {password: pw})});
     notify(j.error || (clear ? "taking the console password away" : "setting it: log in at the screen as admin"), !!j.error);
     await loadNodes();
   }));
@@ -469,11 +469,13 @@ function adoptAppsPointer(n){
     `<div class="field"><div class="actbar"><span class="grow sub">Read what the old system ran, download its containers' compose files and define its VMs, on this machine's Containers page.</span>
       <button type="button" data-oldapps>Containers page</button></div></div>`);
 }
-async function loadAdoptPlan(){
-  const j = await (await postJSON("/api/v1/nodes", {action: "adopt-apps", op: "plan", id: ownMachine()?.id || ""})).json().catch(() => ({error: "no answer"}));
-  adoptPlan = j.apps || [];
-  adoptNets = j.networks || {};
-  nodesRev++; drawPanes();
+function loadAdoptPlan(){
+  return reading("adoptplan", async () => {
+    const j = await postJSON("/api/v1/nodes", {action: "adopt-apps", op: "plan", id: ownMachine()?.id || ""});
+    adoptPlan = j.apps || [];
+    adoptNets = j.networks || {};
+    readMoved("nodes");
+  });
 }
 
 // The zip of their compose files, saved where the browser saves: fetched
@@ -498,14 +500,14 @@ function wireAdoptApps(root){
   const n = ownMachine();
   root.querySelectorAll("[data-adpick]").forEach(c => c.onchange = () => {
     if (c.checked) adoptSkip.delete(c.dataset.adpick); else adoptSkip.add(c.dataset.adpick);
-    nodesRev++; drawPanes();
+    readMoved("nodes"); drawPanes();
   });
   root.querySelectorAll("[data-adoptapp]").forEach(b => b.onclick = () => pressing(b, async () => {
     const act = b.dataset.adoptapp, from = oldAppsFrom(n) || {};
     if (act === "zip") return downloadOldCompose(b);
     if (act === "read"){
       busy(b, "Reading");
-      const j = await (await postJSON("/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: "read-apps", docker: from.docker, vms: from.vms})).json().catch(() => ({error: "no answer"}));
+      const j = await postJSON("/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: "read-apps", docker: from.docker, vms: from.vms});
       notify(j.error || "reading: the containers and VMs it ran are listed here when it is done", !!j.error);
     } else if (act === "define"){
       const other = new Set((n.reported?.vms_other || []).map(v => v.name));
@@ -513,21 +515,21 @@ function wireAdoptApps(root){
       if (!await askYes(`Define ${names.length} VM${names.length === 1 ? "" : "s"} in this machine's libvirt?\n\n${names.join(", ")}\n\nEach keeps its disks where they are; its network bridge becomes the LAN through this machine's interface, and those that started with the machine there do here.`,
           {title: "Define the VMs?", verb: "Define"})) return;
       busy(b, "Defining");
-      const j = await (await postJSON("/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: "define-vms", names})).json().catch(() => ({error: "no answer"}));
+      const j = await postJSON("/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: "define-vms", names});
       notify(j.error || "defining: its job says each VM's changes", !!j.error);
     }
     await loadNodes();
   }));
   root.querySelectorAll("[data-adoptnet]").forEach(b => b.onclick = () => pressing(b, async () => {
     busy(b, "Making");
-    const j = await (await postJSON("/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: "docker-network", name: b.dataset.adoptnet, subnet: b.dataset.subnet, gateway: b.dataset.gateway})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: "docker-network", name: b.dataset.adoptnet, subnet: b.dataset.subnet, gateway: b.dataset.gateway});
     notify(j.error || `making the ${b.dataset.adoptnet} network`, !!j.error);
     await loadNodes();
   }));
   root.querySelectorAll("[data-adoptvmauto]").forEach(c => c.onchange = async () => {
     const name = c.dataset.adoptvmauto, on = c.checked;
     c.disabled = true;
-    const j = await (await postJSON("/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: "vm", name, op: on ? "autostart-on" : "autostart-off"})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: "vm", name, op: on ? "autostart-on" : "autostart-off"});
     notify(j.error || `${name}: ${on ? "starts" : "does not start"} with the machine`, !!j.error);
     if (j.error) c.checked = !on;
     c.disabled = false;
@@ -535,7 +537,7 @@ function wireAdoptApps(root){
   });
   root.querySelectorAll("[data-adoptvm]").forEach(b => b.onclick = () => pressing(b, async () => {
     busy(b, "Asking");
-    const j = await (await postJSON("/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: "vm", name: b.dataset.vmname, op: b.dataset.adoptvm})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: "vm", name: b.dataset.vmname, op: b.dataset.adoptvm});
     notify(j.error || `${b.dataset.vmname}: ${b.dataset.adoptvm.replace("-", " ")}`, !!j.error);
     await loadNodes();
   }));
@@ -610,11 +612,11 @@ function wireAdopt(root){
     }
     busy(b, dry ? "Checking" : "Taking over");
     const moves = adoptMovesNow();
-    const j = await (await postJSON("/api/v1/nodes", {action: "storage-array", id: n.id, array: "takeover", dry, confirm, ...(moves.length ? {moves} : {})})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/v1/nodes", {action: "storage-array", id: n.id, array: "takeover", dry, confirm, ...(moves.length ? {moves} : {})});
     // The mover's schedule, as picked, once the takeover is on its way.
     let sched = "";
     if (!j.error && !dry && moves.some(m => m.from) && adoptMoverCron){
-      const k = await (await postJSON("/api/schedules", {action: "save", name: "Array mover", cron: adoptMoverCron, node: n.id, on: true, system: {apply: "storage-array", config: {array: "mover"}}})).json().catch(() => ({error: "no answer"}));
+      const k = await postJSON("/api/schedules", {action: "save", name: "Array mover", cron: adoptMoverCron, node: n.id, on: true, system: {apply: "storage-array", config: {array: "mover"}}});
       sched = k.error ? `; the mover's schedule was not made (${k.error}): make it on the Storage page` : `; the mover runs ${String(k.schedule?.words || "on its schedule").toLowerCase()}`;
     }
     notify(j.error || (dry ? "checking the takeover: its job says each step, changing nothing" : `taking the array over: the first sync builds the parity, its progress on the Storage page${sched}`), !!j.error || /not made/.test(sched));
@@ -627,7 +629,7 @@ function wireAdopt(root){
     const rows = names.map(name => ({name, path: `/mnt/user/${name}`,
       smb: {on: true, guest: true, ro: false, tm: false, users: [], readers: []}, nfs: {on: false, ro: false, clients: []}}));
     busy(b, "Serving");
-    const j = await (await postJSON("/api/v1/nodes", {action: "storage-share", id: n.id, share: "set-many", shares: rows})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/v1/nodes", {action: "storage-share", id: n.id, share: "set-many", shares: rows});
     notify(j.error || `serving ${rows.length - (j.skipped || []).length} folder${rows.length === 1 ? "" : "s"}${(j.skipped || []).length ? `; not ${j.skipped.map(x => `${x.name} (${x.why})`).join(", ")}` : ""}`, !!j.error);
     await loadNodes();
   }));
@@ -635,7 +637,7 @@ function wireAdopt(root){
     const n = ownMachine(), rows = state?.firstboot?.shares?.rows || [];
     if (!n || !rows.length) return;
     busy(b, "Serving");
-    const j = await (await postJSON("/api/v1/nodes", {action: "storage-share", id: n.id, share: "set-many", shares: rows})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/v1/nodes", {action: "storage-share", id: n.id, share: "set-many", shares: rows});
     notify(j.error || `serving ${rows.length - (j.skipped || []).length} shares${(j.skipped || []).length ? `; not ${j.skipped.map(x => `${x.name} (${x.why})`).join(", ")}` : ""}`, !!j.error);
     await loadNodes();
   }));
@@ -649,7 +651,7 @@ function wireAdopt(root){
         {title: "Writable?", verb: "Adopt writable"})) return;
     busy(b, act === "dry" ? "Checking" : act === "adopt" ? "Adopting" : "Releasing");
     const want = act === "release" ? undefined : {...(state?.firstboot?.adopt?.want || {}), writable: adoptWritable};
-    const j = await (await postJSON("/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: act, ...(want ? {want} : {})})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: act, ...(want ? {want} : {})});
     notify(j.error || (act === "dry" ? "checking: its job says each mount, on the node's Jobs" : act === "adopt" ? "adopting: the Nodes page shows each mount as it lands" : "releasing"), !!j.error);
     await loadNodes();
   }));
@@ -659,11 +661,11 @@ function wireHeld(root){
   root.querySelectorAll("[data-heldstart]").forEach(b => b.onclick = () => pressing(b, async () => {
     busy(b, "Starting");
     const check = !!root.querySelector("#heldVerify")?.checked;
-    const j = await (await postJSON("/api/v1/nodes", {action: "start-held"})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/v1/nodes", {action: "start-held"});
     let v = null;
     if (!j.error && check){
       const n = ownMachine();
-      v = await (await postJSON("/api/v1/nodes", {action: "storage-array", id: n?.id, array: "verify", correct: false})).json().catch(() => ({error: "no answer"}));
+      v = await postJSON("/api/v1/nodes", {action: "storage-array", id: n?.id, array: "verify", correct: false});
     }
     notify(j.error || `started: sessions run again${v ? v.error ? `; the parity check did not start: ${v.error}` : "; the parity check runs now, its result on the bell" : ""}`, !!(j.error || v?.error));
     await refresh();

@@ -17,34 +17,23 @@
 "use strict";
 
 let noticesData = null;          // the account's notices, or null before the first read
-let noticesRev = 0;
 let noticesErr = "";
 let noticesChip = "";            // the chip in force: "", a kind, or "bad" for failures
-let noticesFetching = false;
 
 function openNotices(){
   openTab({kind: "notices", arg: "__notices", label: "Notifications"});
 }
 
-async function loadNotices(){
-  if (noticesFetching) return;
-  noticesFetching = true;
-  try{
-    const j = await (await fetch("/api/notices")).json();
-    noticesErr = j.error || "";
-    noticesData = j.notices || [];
-  }catch(e){
-    noticesErr = "could not read the notices: " + e;
-    noticesData = noticesData || [];
-  }finally{
-    noticesFetching = false;
-  }
-  noticesRev++;
-  drawPanes();
+function loadNotices(){
+  return reading("notices", async () => {
+    const j = await getJSON("/api/notices");
+    noticesErr = j.error ? "could not read the notices: " + j.error : "";
+    noticesData = j.notices || noticesData || [];
+  });
 }
 
 async function noticesAct(body){
-  const j = await (await postJSON("/api/notices", body)).json().catch(() => ({error: "no answer"}));
+  const j = await postJSON("/api/notices", body);
   if (j.error) notify(j.error, true);
   await loadNotices();
 }
@@ -99,8 +88,8 @@ function renderNoticesInto(i){
     // Its template (R218 step 16): the History section and its name are the
     // page's own; what was kept is on its way.
     d.setBar(`<span class="dim">${skv(4)}</span>`);
-    d.list.innerHTML = skTpl(docSection("notices", "history", "History", "", skRows(5)));
-    if (!noticesFetching) loadNotices();
+    drawHTML(d.list, skTpl(docSection("notices", "history", "History", "", skRows(5))));
+    if (!readBusy("notices")) loadNotices();
     return;
   }
   const all = noticesData, rows = noticesShown(), waiting = noticesWaitingRows();
@@ -143,14 +132,14 @@ function wireNotices(root){
     noticesAct({action: "clear", kind});
   };
   root.querySelectorAll("[data-ntchip]").forEach(b => b.onclick = () =>
-    chipMove(() => document.querySelector(".pane .doc.on"), ".ntrow", () => { noticesChip = b.dataset.ntchip; noticesRev++; drawPanes(); }));
+    chipMove(() => document.querySelector(".pane .doc.on"), ".ntrow", () => { noticesChip = b.dataset.ntchip; readMoved("notices"); drawPanes(); }));
   root.querySelectorAll("[data-ntdel]").forEach(b => b.onclick = () => noticesAct({action: "delete", id: b.dataset.ntdel}));
   root.querySelectorAll("[data-ntjob]").forEach(b => b.onclick = () => openJob(b.dataset.ntjob));
   root.querySelectorAll("[data-ntallow]").forEach(b => b.onclick = () => askAnswer(Number(b.dataset.ntallow), true, !!b.dataset.session));
   root.querySelectorAll("[data-ntdeny]").forEach(b => b.onclick = () => askAnswer(Number(b.dataset.ntdeny), false));
   root.querySelectorAll("[data-ntinvite]").forEach(b => b.onclick = async () => {
     const yes = b.dataset.yes === "1";
-    const j = await (await postJSON("/api/members", {action: yes ? "accept" : "decline", id: Number(b.dataset.ntinvite)})).json().catch(() => ({}));
+    const j = await postJSON("/api/members", {action: yes ? "accept" : "decline", id: Number(b.dataset.ntinvite)});
     notify(j.error || (yes ? `you are on ${projLabel(j.project)} now` : `declined ${projLabel(j.project)}`), !!j.error, {kind: "ask"});
     refresh();
   });

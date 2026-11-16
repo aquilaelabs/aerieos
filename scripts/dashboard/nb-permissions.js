@@ -74,7 +74,7 @@ function nbPermsView({$, nb, project, root}){
     if (pa) pa.onclick = async () => {
       busy(pa, "Applying");
       try{
-        const j = await (await postJSON("/api/prefs", {project, gitpol: {...pol, ...draft}})).json();
+        const j = await postJSON("/api/prefs", {project, gitpol: {...pol, ...draft}});
         if (j.error) return notify(j.error, true);
         draft = {};
         notify("saved");
@@ -89,15 +89,16 @@ function nbPermsView({$, nb, project, root}){
   // staged until Apply as Pushing is. The token sets what is possible; a
   // Deny here takes an ability away whatever the token allows.
   let host = null, hostDraft = {}, hostFor = "";
-  async function loadHost(measure){
-    try{
-      const r = measure ? await postJSON("/api/forge-access", {project, action: "measure"})
-                        : await fetch("/api/forge-access?project=" + encodeURIComponent(project));
-      const j = await r.json();
-      if (j.error) throw new Error(j.error);
-      host = j; hostFor = project;
-    }catch(e){ host = {error: failWords(e)}; hostFor = project; }
-    drawHost();
+  function loadHost(measure){
+    return reading(`${project}:host`, async () => {
+      try{
+        const j = measure ? await postJSON("/api/forge-access", {project, action: "measure"})
+                          : await getJSON("/api/forge-access?project=" + encodeURIComponent(project));
+        if (j.error) throw new Error(j.error);
+        host = j; hostFor = project;
+      }catch(e){ host = {error: failWords(e)}; hostFor = project; }
+      drawHost();
+    });
   }
   function drawHost(){
     const el = view()?.querySelector(".permhost");
@@ -143,7 +144,7 @@ function nbPermsView({$, nb, project, root}){
     if (ab) ab.onclick = async () => {
       busy(ab, "Applying");
       try{
-        const j = await (await postJSON("/api/prefs", {project, forgepol: {...hostDraft}})).json();
+        const j = await postJSON("/api/prefs", {project, forgepol: {...hostDraft}});
         if (j.error) return notify(j.error, true);
         hostDraft = {};
         notify("saved");

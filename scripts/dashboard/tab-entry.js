@@ -19,7 +19,7 @@ function openEntry(node, key){
   const to = `#/build/library/${encodeURIComponent(libNode || "")}/${encodeURIComponent(entryKey)}`;
   shellCame(was, to);
   openTab({kind: "entry", arg: "__entry", label: "Library"});
-  libRev++;
+  readMoved("library");
   if (to !== was) shellPush(to, was);
   // Read afresh, as opening the Library is: a press is somebody asking now.
   loadLibrary();
@@ -38,8 +38,8 @@ function renderEntryInto(i){
   // layout after a reload that did not land on its address): the Library.
   if (!entryKey){ d.list.innerHTML = ""; setTimeout(() => { if (!entryKey) openLibrary(); }, 0); return; }
   if (lib === null){
-    d.list.innerHTML = skTpl(pageHead({title: GHOST, facts: [["Node", GHOST]]}) + docSection("entry", "about", "What it is", "", skRows(3)));
-    if (!libSeq) loadLibrary();
+    drawHTML(d.list, skTpl(pageHead({title: GHOST, facts: [["Node", GHOST]]}) + docSection("entry", "about", "What it is", "", skRows(3))));
+    if (!readRev("library") && !readBusy("library")) loadLibrary();
     return;
   }
   const r = entryRow();

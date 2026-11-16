@@ -9,14 +9,14 @@
 import { launch, newPage, ok, done, ready, sleep, URL } from './lib.mjs';
 
 const PAGES = [
-  ['home', '#/home', 'homeData = null; homeFetching = true; renderHomeInto(0)'],
+  ['home', '#/home', 'homeData = null; renderHomeInto(0)'],
   ['jobs', '#/jobs', 'jobsList = null; renderJobsInto(0)'],
   ['schedules', '#/jobs/schedules', 'schedData = null; renderSchedulesInto(0)'],
   ['nodes', '#/machines/nodes', 'nodesList = null; renderNodesInto(0)'],
   ['storage', '#/machines/storage', 'storageList = null; renderStorageInto(0)'],
   // Installed (R172): its sections are the kinds with anything there, which
   // the fixture's node has one or two of; the template draws the four.
-  ['installed', '#/machines/installed', 'inst = null; instSeq = 1; renderInstalledInto(0)', ['title:Coding agents', 'title:Toolchains', 'title:Tool packs', 'title:Services']],
+  ['installed', '#/machines/installed', 'inst = null; renderInstalledInto(0)', ['title:Coding agents', 'title:Toolchains', 'title:Tool packs', 'title:Services']],
   // Deploy is an undeployed node's alone, which is not known while it waits.
   // ...and its four sections are a deployed node's: the fixture's is not, so
   // the page draws one line and Deploy where the template, waiting for the
@@ -29,7 +29,7 @@ const PAGES = [
   // The Library (R170): its five sections are always drawn, so the template
   // is the page. Its address is where #/build/toolchains and #/build/apps
   // land now, so those pages are not measured by address.
-  ['library', '#/build/library', 'lib = null; libSeq = 1; renderLibraryInto(0)'],
+  ['library', '#/build/library', 'lib = null; renderLibraryInto(0)'],
   // The fixture's node never reported its images (known false), so the page
   // lands with no tiles; a node that has carries them, as the template does.
   ['emulator', '#/build/emulator', 'emu = null; renderEmulatorInto(0)', ['tiles']],
@@ -38,7 +38,7 @@ const PAGES = [
   ['users', '#/people/users', 'usersList = null; renderUsersInto(0)'],
   ['roles', '#/people/roles', 'rolesData = null; renderRolesInto(0)'],
   ['profile', '#/settings', 'profile = null; renderProfileInto(0)'],
-  ['notices', '#/notifications', 'noticesData = null; noticesFetching = true; renderNoticesInto(0)'],
+  ['notices', '#/notifications', 'noticesData = null; renderNoticesInto(0)'],
   // Landed means the daemon answered: one that did not (a slow one, under
   // load) leaves the page honestly drawing its rows grayed with no tiles,
   // which is another page than the one its template stands in for.

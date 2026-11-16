@@ -14,7 +14,6 @@
 
 let jobsList = null;             // last answer, or null before the first
 let jobsNodes = {};              // id -> name, from the same answer
-let jobsRev = 0;                 // bumped when it changes, so panes repaint
 let jobsErr = "";
 // The chip in force: "" for every job, else a state group's key (JOB_GROUPS).
 // A view, never a setting: kept for the page's life, nothing saved; Home's
@@ -40,34 +39,32 @@ function openJob(id){
   loadJobs();
 }
 
-async function loadJobs(){
-  try{
-    const j = await (await bootFetch("/api/v1/jobs?n=100")).json();
-    jobsErr = j.error || "";
-    jobsList = j.jobs || [];
-    jobsNodes = j.nodes || {};
-    // An unfolded log follows its job: refetched with the list, so a running
-    // job's tail moves on the same revision that moves its row.
-    await Promise.all([...jobsOpen].map(async id => {
-      const r = await (await fetch(`/api/v1/jobs?id=${encodeURIComponent(id)}`)).json();
-      // A job answers with its own fields, `error` among them for one that
-      // failed; a refused request has no id. Reading a failed job's error
-      // as the request's kept its log out, so every failed job read "(this
-      // job wrote nothing)" (B658, the operator, 11 Oct).
-      if (r.id) jobsLogs[id] = r.log || "";
-    }));
-  }catch(e){
-    jobsErr = String(e);
-    jobsList = jobsList || [];
-  }
-  jobsRev++;
-  if (tabs.some(t => t.kind === "jobs")) drawPanes();
+function loadJobs(){
+  return reading("jobs", async () => {
+    try{
+      const j = await getJSON("/api/v1/jobs?n=100");
+      jobsErr = j.error || "";
+      jobsList = j.jobs || [];
+      jobsNodes = j.nodes || {};
+      // An unfolded log follows its job: refetched with the list, so a running
+      // job's tail moves on the same revision that moves its row.
+      await Promise.all([...jobsOpen].map(async id => {
+        const r = await getJSON(`/api/v1/jobs?id=${encodeURIComponent(id)}`);
+        // A job answers with its own fields, `error` among them for one that
+        // failed; a refused request has no id. Reading a failed job's error
+        // as the request's kept its log out, so every failed job read "(this
+        // job wrote nothing)" (B658, the operator, 11 Oct).
+        if (r.id) jobsLogs[id] = r.log || "";
+      }));
+    }catch(e){
+      jobsErr = String(e);
+      jobsList = jobsList || [];
+    }
+  });
 }
 
 async function jobAct(body){
-  const j = await (await fetch("/api/v1/jobs", {
-    method: "POST", headers: {"Content-Type": "application/json"},
-    body: JSON.stringify(body)})).json().catch(() => ({error: "no answer"}));
+  const j = await postJSON("/api/v1/jobs", body);
   if (j.error) notify(j.error, true);
   await loadJobs();
   return j;
@@ -250,13 +247,13 @@ function renderJobsInto(i){
     // Its template (R218 step 16): the bar's filter and the table's head are
     // the page's own; the count and the rows are on their way.
     d.setBar("");
-    d.list.innerHTML = skTpl(jobsSection(skTable(JOB_COLS, 6, "jbtbl"), ""));
+    drawHTML(d.list, skTpl(jobsSection(skTable(JOB_COLS, 6, "jbtbl"), "")));
     wireJobsTab(d.el);
     loadJobs();
     return;
   }
   if (jobsErr){
-    d.list.innerHTML = `<div class="hint bad">${esc(jobsErr)}</div>`;
+    drawHTML(d.list, `<div class="hint bad">${esc(jobsErr)}</div>`);
     return;
   }
   // Its count is its tiles' (the operator, 25 Oct: no loose words at a
@@ -335,7 +332,7 @@ function renderJobsInto(i){
 function wireJobsTab(root){
   root.querySelectorAll("[data-jbshow]").forEach(b => b.onclick = () => chipMove(
     () => document.querySelector(".pane .doc.on .jobstab") || root, ".jbrow",
-    () => { jobsShowSet(b.dataset.jbshow); jobsRev++; drawPanes(); shellSync(); }));
+    () => { jobsShowSet(b.dataset.jbshow); readMoved("jobs"); drawPanes(); shellSync(); }));
   // Every tail sits at its own bottom after a draw: the end is where the
   // reason is, the same rule the manager's compose log keeps.
   root.querySelectorAll('.jblog[data-tail="1"]').forEach(t => { t.scrollTop = t.scrollHeight; });

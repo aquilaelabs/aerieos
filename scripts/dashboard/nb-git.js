@@ -53,7 +53,7 @@ function nbGitView({$, nb, project}){
     gitAsking.add(ask);
     let html, ok = false;
     try{
-      const j = await (await fetch(url)).json();
+      const j = await getJSON(url);
       html = j.error ? `<div class="hint bad">${esc(j.error)}</div>` : render(j);
       ok = !j.error;
     }catch(e){ html = `<div class="hint bad">${esc(String(e))}</div>`; }
@@ -61,7 +61,7 @@ function nbGitView({$, nb, project}){
     if (ok) gitKept[kind][id] = {key, html};
     const at = `.gfile[data-path="${CSS.escape(id)}"]`;
     const now = $("gitBody")?.querySelector(at);
-    for (const fold of new Set([d, now])) if (fold?.dataset.key === key) fold.querySelector(sel).innerHTML = html;
+    for (const fold of new Set([d, now])) if (fold?.dataset.key === key) drawHTML(fold.querySelector(sel), html);
   }
   // The commit a click picked, until its detail has drawn and been scrolled
   // to: the detail sits under the whole history, so a long one leaves the
@@ -85,8 +85,7 @@ function nbGitView({$, nb, project}){
     if (to === null || (!to && !args?.confirmed && !await sendSure(project, what))) return;
     if (btn) busy(btn, "Sending");
     try{
-      const r = await postJSON("/api/git", {project, action: "ask", kind, args: args || {}, session: to});
-      const j = await r.json();
+      const j = await postJSON("/api/git", {project, action: "ask", kind, args: args || {}, session: to});
       if (j.error) return notify(j.error, true);
       if (!j.sent) notify("Not sent: the session is busy. Press Enter in its tab when it is free.", true);
       openSentTo(project, j.session);
@@ -104,77 +103,78 @@ function nbGitView({$, nb, project}){
     const owner = git?.owner || "", notMine = !!owner && owner !== state?.me;
     return {owner, notMine, barred: notMine && !state?.admin};
   };
-  async function loadGit(){
-    const hint = $("gitHint"), body = $("gitBody");
-    try{
-      const r = await fetch("/api/git?project=" + encodeURIComponent(project) + "&what=all");
-      git = await r.json();
-    }catch(e){ viewGlance(hint, [], esc("git: " + e), "", "bad"); return; }
-    if (git.error){
-      const none = git.error === "not a git repository";
-      viewGlance(hint, [], none ? "no repository yet" : esc("git: " + git.error), "", none ? "" : "bad");
-      // The way on, where the dead end was: Init makes the repository here
-      // (a project adopted from a directory, or unpacked from an archive
-      // without one), and a session then commits and pushes as anywhere.
-      body.innerHTML = none ? `<div class="field actbar">
-          <span class="state">Init makes one, on main, with nothing committed; a session can then version, build and push.</span>
-          <button type="button" data-gitinit="1">Init repository</button></div>` : "";
-      const b = body.querySelector("[data-gitinit]");
-      if (b) b.onclick = () => gitAct("init", {}, b, "Making");
-      return;
-    }
-    const st = git.status || {}, files = st.files || [], commits = git.commits || [];
-    const local = (git.branches || []).filter(b => !b.remote);
-    const tree = treeOf();
-    // The glance (R109): what is not committed, the branches, and what is to
-    // push and to pull against the upstream, as tiles. A branch with no
-    // commit is not listed by git, so "0 branches" sat beside "on master"
-    // (B456): the honest word, on the line under them, is that nothing is
-    // committed yet. The branch is the picker's to say (R269 step 3); the
-    // words name one only when there is none to pick.
-    const host = git.host?.name || "the remote";
-    // Whose token a press would use (R159): yours, somebody else's who is
-    // signed in, or nobody's, which is what a push would wait on.
-    const tk = git.token || {};
-    const tokenSaid = !git.remote || !git.push ? ""
-      : tk.mine && tk.live ? "pushes and pulls use your token"
-      : tk.why ? tk.why
-      : tk.name ? `pushes and pulls use ${esc(tk.name)}'s token; yours is given in the space's settings` : "";
-    const said = [tree.notMine ? `${tree.owner}'s working tree` : "", st.branch ? "" : "on no branch",
-      commits.length ? "" : "no commits yet", tokenSaid,
-      // Without push rights and without an upstream there is nothing to pull
-      // either, and the line says so rather than offering Pull (B294).
-      !git.remote ? "" : !git.push
-        ? (st.upstream ? "no push rights: fetch and pull only; rights are granted in the clone dialog"
-                       : "no push rights and no upstream: fetch only; rights are granted in the clone dialog")
-        : st.upstream ? (st.ahead && st.behind
-          ? `pull first: ${host} has ${st.behind} commit${st.behind === 1 ? "" : "s"} this branch does not, and this branch has ${st.ahead} to push (${st.upstream})`
-          : st.ahead || st.behind ? `${host}, ${st.upstream}` : `in step with ${host}, ${st.upstream}`)
-        : "no upstream yet: Push sets one"].filter(Boolean).map(esc).join(" · ");
-    gitGlance = [[
-      {label: files.length === 1 ? "change" : "changes", value: files.length, sub: "not committed"},
-      {label: local.length === 1 ? "branch" : "branches", value: local.length, omit: !commits.length},
-      {label: "to push", value: st.ahead || 0, omit: !st.upstream},
-      {label: "to pull", value: st.behind || 0, omit: !st.upstream, tone: st.ahead && st.behind ? "warn" : ""}], said, "",
-      // In gold when it says what stops a press: no push rights, or both ways to go.
-      git.remote && (!git.push || (st.upstream && st.ahead && st.behind)) ? "warn" : ""];
-    viewGlance(hint, ...gitGlance);
-    const net = $("gitNet");
-    if (net){
-      const locked = !!(state?.projects || []).find(p => p.name === project)?.locked_me;
-      net.hidden = locked || !git.remote;
-      // A role that only reads the project is shown none of them (the
-      // operator, 21 Oct: what a role does not give is not drawn).
-      const ro = !!projWriteWhy(project);
-      net.querySelector('[data-gitact="fetch"]').hidden = ro;
-      net.querySelector('[data-gitact="push"]').hidden = ro;
-      net.querySelector('[data-gitact="push"]').disabled = !git.push;
-      const pull = net.querySelector('[data-gitact="pull"]');
-      pull.disabled = !st.upstream;
-      pull.title = st.upstream ? "fast-forward this branch to its upstream" : "this branch has no upstream to pull from";
-      net.querySelector('[data-gitact="pull"]').hidden = tree.barred || ro;
-    }
-    drawGit();
+  function loadGit(){
+    return reading(`${project}:git`, async () => {
+      const hint = $("gitHint"), body = $("gitBody");
+      try{
+        git = await getJSON("/api/git?project=" + encodeURIComponent(project) + "&what=all");
+      }catch(e){ viewGlance(hint, [], esc("git: " + e), "", "bad"); return; }
+      if (git.error){
+        const none = git.error === "not a git repository";
+        viewGlance(hint, [], none ? "no repository yet" : esc("git: " + git.error), "", none ? "" : "bad");
+        // The way on, where the dead end was: Init makes the repository here
+        // (a project adopted from a directory, or unpacked from an archive
+        // without one), and a session then commits and pushes as anywhere.
+        drawHTML(body, none ? `<div class="field actbar">
+            <span class="state">Init makes one, on main, with nothing committed; a session can then version, build and push.</span>
+            <button type="button" data-gitinit="1">Init repository</button></div>` : "");
+        const b = body.querySelector("[data-gitinit]");
+        if (b) b.onclick = () => gitAct("init", {}, b, "Making");
+        return;
+      }
+      const st = git.status || {}, files = st.files || [], commits = git.commits || [];
+      const local = (git.branches || []).filter(b => !b.remote);
+      const tree = treeOf();
+      // The glance (R109): what is not committed, the branches, and what is to
+      // push and to pull against the upstream, as tiles. A branch with no
+      // commit is not listed by git, so "0 branches" sat beside "on master"
+      // (B456): the honest word, on the line under them, is that nothing is
+      // committed yet. The branch is the picker's to say (R269 step 3); the
+      // words name one only when there is none to pick.
+      const host = git.host?.name || "the remote";
+      // Whose token a press would use (R159): yours, somebody else's who is
+      // signed in, or nobody's, which is what a push would wait on.
+      const tk = git.token || {};
+      const tokenSaid = !git.remote || !git.push ? ""
+        : tk.mine && tk.live ? "pushes and pulls use your token"
+        : tk.why ? tk.why
+        : tk.name ? `pushes and pulls use ${esc(tk.name)}'s token; yours is given in the space's settings` : "";
+      const said = [tree.notMine ? `${tree.owner}'s working tree` : "", st.branch ? "" : "on no branch",
+        commits.length ? "" : "no commits yet", tokenSaid,
+        // Without push rights and without an upstream there is nothing to pull
+        // either, and the line says so rather than offering Pull (B294).
+        !git.remote ? "" : !git.push
+          ? (st.upstream ? "no push rights: fetch and pull only; rights are granted in the clone dialog"
+                         : "no push rights and no upstream: fetch only; rights are granted in the clone dialog")
+          : st.upstream ? (st.ahead && st.behind
+            ? `pull first: ${host} has ${st.behind} commit${st.behind === 1 ? "" : "s"} this branch does not, and this branch has ${st.ahead} to push (${st.upstream})`
+            : st.ahead || st.behind ? `${host}, ${st.upstream}` : `in step with ${host}, ${st.upstream}`)
+          : "no upstream yet: Push sets one"].filter(Boolean).map(esc).join(" · ");
+      gitGlance = [[
+        {label: files.length === 1 ? "change" : "changes", value: files.length, sub: "not committed"},
+        {label: local.length === 1 ? "branch" : "branches", value: local.length, omit: !commits.length},
+        {label: "to push", value: st.ahead || 0, omit: !st.upstream},
+        {label: "to pull", value: st.behind || 0, omit: !st.upstream, tone: st.ahead && st.behind ? "warn" : ""}], said, "",
+        // In gold when it says what stops a press: no push rights, or both ways to go.
+        git.remote && (!git.push || (st.upstream && st.ahead && st.behind)) ? "warn" : ""];
+      viewGlance(hint, ...gitGlance);
+      const net = $("gitNet");
+      if (net){
+        const locked = !!(state?.projects || []).find(p => p.name === project)?.locked_me;
+        net.hidden = locked || !git.remote;
+        // A role that only reads the project is shown none of them (the
+        // operator, 21 Oct: what a role does not give is not drawn).
+        const ro = !!projWriteWhy(project);
+        net.querySelector('[data-gitact="fetch"]').hidden = ro;
+        net.querySelector('[data-gitact="push"]').hidden = ro;
+        net.querySelector('[data-gitact="push"]').disabled = !git.push;
+        const pull = net.querySelector('[data-gitact="pull"]');
+        pull.disabled = !st.upstream;
+        setTitle(pull, st.upstream ? "fast-forward this branch to its upstream" : "this branch has no upstream to pull from");
+        net.querySelector('[data-gitact="pull"]').hidden = tree.barred || ro;
+      }
+      drawGit();
+    });
   }
 
   // One action on the repository: a fixed command on the controller with
@@ -183,8 +183,7 @@ function nbGitView({$, nb, project}){
   async function gitAct(action, args, btn, verb){
     if (btn) busy(btn, verb || "Working");
     try{
-      const r = await postJSON("/api/git", {project, action, args: args || {}});
-      const j = await r.json();
+      const j = await postJSON("/api/git", {project, action, args: args || {}});
       if (j.error){
         if (j.unmerged && await askYes(`${j.error}.\n\nDelete it anyway?`))
           return gitAct(action, {...args, force: true}, btn, verb);
@@ -454,7 +453,7 @@ function nbGitView({$, nb, project}){
     if (cl) cl.onclick = async () => {
       busy(cl, "Checking");
       try{
-        const j = await (await postJSON("/api/ci-watch", {project})).json();
+        const j = await postJSON("/api/ci-watch", {project});
         if (j.error) notify(j.error, true);
         else { git.ci = j; drawGit(); }
       }catch(e){ notify("could not reach the controller: " + failWords(e), true); }
@@ -557,7 +556,7 @@ function nbGitView({$, nb, project}){
       box.querySelectorAll("[data-gitpick]").forEach(b => { b.hidden = !!ql && !b.dataset.gitpick.toLowerCase().includes(ql); });
       const make = box.querySelector("[data-gitpicknew]"), have = local.some(b => b.name === q);
       make.hidden = !q || have;
-      make.innerHTML = q ? `Create branch <b>${esc(q)}</b> from <b>${esc(cur)}</b>` : "";
+      drawHTML(make, q ? `Create branch <b>${esc(q)}</b> from <b>${esc(cur)}</b>` : "");
     };
     sift();
     if (open) floatAt(menu, btn);
@@ -630,12 +629,14 @@ function nbGitView({$, nb, project}){
   }
   nb.gitPage = () => gitCmp;
   nb.gitAt = name => { if ((name || "") !== gitCmp){ gitCmp = name || ""; if (git) drawGit(); } };
-  async function loadCompare(name, key){
-    try{
-      const j = await (await fetch("/api/git?project=" + encodeURIComponent(project) + "&what=compare&branch=" + encodeURIComponent(name))).json();
-      gitCmpData = {name, key, j};
-    }catch(e){ gitCmpData = {name, key, j: {error: String(e)}}; }
-    if (gitCmp === name) drawCompare();
+  function loadCompare(name, key){
+    return reading(`${project}:compare`, async () => {
+      try{
+        const j = await getJSON("/api/git?project=" + encodeURIComponent(project) + "&what=compare&branch=" + encodeURIComponent(name));
+        gitCmpData = {name, key, j};
+      }catch(e){ gitCmpData = {name, key, j: {error: String(e)}}; }
+      if (gitCmp === name) drawCompare();
+    });
   }
   function drawCompare(){
     const box = $("gitCmp");
@@ -650,18 +651,18 @@ function nbGitView({$, nb, project}){
     viewGlance($("gitHint"), [], `<a href="${esc(routeOf({kind: "notebook", arg: project}).replace(/\/compare\/.*$/, ""))}" data-gitcmpback>Branches</a> › ${esc(name)} into ${esc(main)}`);
     const back = "";
     if (!b){
-      box.innerHTML = back + `<div class="field"><div class="empty">no branch called ${esc(name)} here now</div></div>`;
+      drawHTML(box, back + `<div class="field"><div class="empty">no branch called ${esc(name)} here now</div></div>`);
             return;
     }
     if (gitCmpData?.name !== name || gitCmpData.key !== key){
-      if (!gitCmpData || gitCmpData.name !== name) box.innerHTML = back + docSection("git", "cmp-commits", "Commits", "", skRows(3))
-        + docSection("git", "cmp-files", "Files changed", "", skRows(3));
+      if (!gitCmpData || gitCmpData.name !== name) drawHTML(box, back + docSection("git", "cmp-commits", "Commits", "", skRows(3))
+        + docSection("git", "cmp-files", "Files changed", "", skRows(3)));
             loadCompare(name, key);
       return;
     }
     const j = gitCmpData.j;
     if (j.error){
-      box.innerHTML = back + `<div class="field"><div class="hint bad">${esc(j.error)}</div></div>`;
+      drawHTML(box, back + `<div class="field"><div class="hint bad">${esc(j.error)}</div></div>`);
             return;
     }
     const s_ = n => n === 1 ? "" : "s";
@@ -699,57 +700,58 @@ function nbGitView({$, nb, project}){
         wireBranchActs(box);
   }
 
-  async function loadGitCommit(sha){
-    let box = $("gitDetail");
-    if (!box) return;
-    box.hidden = false;
-    // Read again in place when it is this commit's already (a poll, a draw
-    // of the view): its ask pulldown and a branch's name being typed under
-    // it stay (R244). Another commit starts from the waiting shape.
-    if (box.dataset.sha !== sha || !box.querySelector(".gcommit")){ box.innerHTML = `${skel("lines", 6)}`; box.dataset.sha = sha; }
-    try{
-      const r = await fetch("/api/git?project=" + encodeURIComponent(project) + "&what=show&sha=" + encodeURIComponent(sha));
-      const c = await r.json();
-      if (sha !== gitPick) return;               // moved on meanwhile
-      // The box on the page NOW: a redraw while the answer was on its way
-      // (a commit landing, the poll) replaced it, and writing into the one
-      // resolved above put the detail into a detached element (B256).
-      box = $("gitDetail");
+  function loadGitCommit(sha){
+    return reading(`${project}:commit`, async () => {
+      let box = $("gitDetail");
       if (!box) return;
       box.hidden = false;
-      if (c.error){ box.innerHTML = `<div class="hint bad">${esc(c.error)}</div>`; return; }
-      const when = c.when ? fmtTime(c.when * 1000) : "";
-      box.dataset.sha = sha;
-      patch(box, `<div class="gcommit">
-        <div class="name"><code>${esc(c.short)}</code> ${esc(c.message.split("\n")[0])}</div>
-        <div class="sub">${esc(c.author)} &lt;${esc(c.email)}&gt; · ${esc(when)}${
-          c.parents.length > 1 ? " · merge" : ""}${c.refs.length ? " · " + c.refs.map(esc).join(", ") : ""}</div>
-        ${c.message.includes("\n") ? `<pre class="gmsg">${esc(c.message.split("\n").slice(1).join("\n").trim())}</pre>` : ""}
-        <div class="sub">${c.files.length} file${c.files.length === 1 ? "" : "s"}: ${c.files.map(f =>
-          `<code>${esc(f.path)}</code>${f.added != null ? ` <span class="gadd">+${f.added}</span> <span class="gdel">−${f.removed}</span>` : ""}`).join(", ")}</div>
-        ${shut() ? "" : `<div class="actbar">
-          ${treeOf().barred ? "" : `<span class="state">revert makes a new commit undoing this one; a branch starts from it</span>`}
-          <select data-gitaskkind aria-label="what to ask"><option value="review">review</option>
-            <option value="explain">explain</option><option value="revert">revert</option></select>
-          <button type="button" data-gitaskcommit="${esc(c.sha)}"
-            title="hand this commit to the space's session with the ask picked">Send to ${esc(sendAgent(project).name)}</button>
-          ${treeOf().barred ? "" : `<button type="button" data-gitbranchat="${esc(c.sha)}" title="a new branch starting at this commit">Branch here</button>
-          <button type="button" data-gitrevert="${esc(c.sha)}" title="a new commit that undoes this one; nothing is rewritten">Revert</button>`}
-        </div>`}
-        ${renderDiff(c.diff)}
-      </div>`);
-      revealCommit(box, sha);
-      box.querySelectorAll("[data-gitrevert]").forEach(b => b.onclick = async () => {
-        if (await askYes(`Revert ${c.short}: ${c.message.split("\n")[0]}?\n\nA new commit undoes it; the history keeps both.`))
-          gitAct("revert", {sha: b.dataset.gitrevert}, gitBusy(b), "Reverting");
-      });
-      box.querySelectorAll("[data-gitaskcommit]").forEach(b => b.onclick = () =>
-        gitAsk(box.querySelector("[data-gitaskkind]")?.value || "review", {sha: b.dataset.gitaskcommit}, gitBusy(b)));
-      box.querySelectorAll("[data-gitbranchat]").forEach(b => b.onclick = async () => {
-        const name = await askInline(b.closest(".actbar") || b, {label: `A branch starting at ${c.short}: its name`, ok: "Make the branch"});
-        if (name) gitAct("branch", {name, at: b.dataset.gitbranchat, switch: true}, gitBusy(b), "Creating");
-      });
-    }catch(e){ box.innerHTML = `<div class="hint bad">${esc(String(e))}</div>`; revealCommit(box, sha); }
+      // Read again in place when it is this commit's already (a poll, a draw
+      // of the view): its ask pulldown and a branch's name being typed under
+      // it stay (R244). Another commit starts from the waiting shape.
+      if (box.dataset.sha !== sha || !box.querySelector(".gcommit")){ drawHTML(box, `${skel("lines", 6)}`); box.dataset.sha = sha; }
+      try{
+        const c = await getJSON("/api/git?project=" + encodeURIComponent(project) + "&what=show&sha=" + encodeURIComponent(sha));
+        if (sha !== gitPick) return;               // moved on meanwhile
+        // The box on the page NOW: a redraw while the answer was on its way
+        // (a commit landing, the poll) replaced it, and writing into the one
+        // resolved above put the detail into a detached element (B256).
+        box = $("gitDetail");
+        if (!box) return;
+        box.hidden = false;
+        if (c.error){ drawHTML(box, `<div class="hint bad">${esc(c.error)}</div>`); return; }
+        const when = c.when ? fmtTime(c.when * 1000) : "";
+        box.dataset.sha = sha;
+        patch(box, `<div class="gcommit">
+          <div class="name"><code>${esc(c.short)}</code> ${esc(c.message.split("\n")[0])}</div>
+          <div class="sub">${esc(c.author)} &lt;${esc(c.email)}&gt; · ${esc(when)}${
+            c.parents.length > 1 ? " · merge" : ""}${c.refs.length ? " · " + c.refs.map(esc).join(", ") : ""}</div>
+          ${c.message.includes("\n") ? `<pre class="gmsg">${esc(c.message.split("\n").slice(1).join("\n").trim())}</pre>` : ""}
+          <div class="sub">${c.files.length} file${c.files.length === 1 ? "" : "s"}: ${c.files.map(f =>
+            `<code>${esc(f.path)}</code>${f.added != null ? ` <span class="gadd">+${f.added}</span> <span class="gdel">−${f.removed}</span>` : ""}`).join(", ")}</div>
+          ${shut() ? "" : `<div class="actbar">
+            ${treeOf().barred ? "" : `<span class="state">revert makes a new commit undoing this one; a branch starts from it</span>`}
+            <select data-gitaskkind aria-label="what to ask"><option value="review">review</option>
+              <option value="explain">explain</option><option value="revert">revert</option></select>
+            <button type="button" data-gitaskcommit="${esc(c.sha)}"
+              title="hand this commit to the space's session with the ask picked">Send to ${esc(sendAgent(project).name)}</button>
+            ${treeOf().barred ? "" : `<button type="button" data-gitbranchat="${esc(c.sha)}" title="a new branch starting at this commit">Branch here</button>
+            <button type="button" data-gitrevert="${esc(c.sha)}" title="a new commit that undoes this one; nothing is rewritten">Revert</button>`}
+          </div>`}
+          ${renderDiff(c.diff)}
+        </div>`);
+        revealCommit(box, sha);
+        box.querySelectorAll("[data-gitrevert]").forEach(b => b.onclick = async () => {
+          if (await askYes(`Revert ${c.short}: ${c.message.split("\n")[0]}?\n\nA new commit undoes it; the history keeps both.`))
+            gitAct("revert", {sha: b.dataset.gitrevert}, gitBusy(b), "Reverting");
+        });
+        box.querySelectorAll("[data-gitaskcommit]").forEach(b => b.onclick = () =>
+          gitAsk(box.querySelector("[data-gitaskkind]")?.value || "review", {sha: b.dataset.gitaskcommit}, gitBusy(b)));
+        box.querySelectorAll("[data-gitbranchat]").forEach(b => b.onclick = async () => {
+          const name = await askInline(b.closest(".actbar") || b, {label: `A branch starting at ${c.short}: its name`, ok: "Make the branch"});
+          if (name) gitAct("branch", {name, at: b.dataset.gitbranchat, switch: true}, gitBusy(b), "Creating");
+        });
+      }catch(e){ drawHTML(box, `<div class="hint bad">${esc(String(e))}</div>`); revealCommit(box, sha); }
+    });
   }
 
   // Down to the picked commit's detail, once, when a click picked it.

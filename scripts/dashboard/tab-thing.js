@@ -23,7 +23,7 @@ function openThing(node, key, at = ""){
   const to = `#/machines/installed/${encodeURIComponent(instNode || "")}/${encodeURIComponent(thingKey)}`;
   shellCame(was, to);
   openTab({kind: "thing", arg: "__thing", label: "Installed"});
-  instRev++;
+  readMoved("installed");
   if (to !== was) shellPush(to, was);
   // Read afresh, as opening Installed is: a press is somebody asking now.
   loadInstalled();
@@ -80,8 +80,8 @@ function renderThingInto(i){
   // name: it is the Installed page then, where the row is.
   if (!thingKey){ d.list.innerHTML = ""; setTimeout(() => { if (!thingKey) openInstalledTab(); }, 0); return; }
   if (inst === null){
-    d.list.innerHTML = skTpl(pageHead({title: GHOST, facts: [["Installed", GHOST]]}) + docSection("thing", "about", "What it is", "", skRows(3)));
-    if (!instSeq) loadInstalled();
+    drawHTML(d.list, skTpl(pageHead({title: GHOST, facts: [["Installed", GHOST]]}) + docSection("thing", "about", "What it is", "", skRows(3))));
+    if (!readRev("installed") && !readBusy("installed")) loadInstalled();
     return;
   }
   const r = thingRow();

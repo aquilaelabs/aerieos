@@ -5,8 +5,8 @@
 // how a time or a size is written.
 //
 // One classic script beside index.html (docs/design-language.md, Files):
-// pure declarations, nothing runs at load. What runs at load stays in
-// index.html under the section's header.
+// pure declarations, nothing runs at load. What runs at load is
+// page-boot.js's, under the section's header.
 
 "use strict";
 
@@ -56,12 +56,43 @@ const $ = id => document.getElementById(id);
 const saidOf = el => el ? (el.getAttribute("aria-description") || el.getAttribute("aria-label") || el.getAttribute("title") || "") : "";
 const helpIcon = t => t ? `<span class="help" data-help="${esc(t)}" aria-label="${esc(t)}" role="button" aria-expanded="false" tabindex="0">?</span>` : "";
 const lbl = (id, text, help) => `<label class="lbl"${id ? ` for="${esc(id)}"` : ""}>${esc(text)}${helpIcon(help)}</label>`;
-// One POST for everything the page sends: JSON in, the Response back, so
-// the caller reads r.ok and r.json() as it always did. Written once here
-// after forty-eight copies of the same three headers (R60).
-function postJSON(path, body){
-  return fetch(path, {method: "POST", headers: {"Content-Type": "application/json"},
-                      body: JSON.stringify(body)});
+// One POST for everything the page sends: JSON in, the answer's JSON back.
+// A request that never landed (a restart, the network) answers
+// {error: "the controller did not answer"}, and one the controller refused
+// without saying why answers its status in words, so a caller's
+// `if (j.error)` says either, and nothing is thrown for a press to drop
+// unheard. One that never landed says so in `unreached` as well, for a
+// read whose failure is the poll's to say. A press's request asks for its
+// button's ring (pressTie). With {blob: true} the answer is a file:
+// {blob, name} where it landed.
+function postJSON(path, body, opts = {}){
+  return pressTie(answerOf(fetch(path, {method: "POST", headers: {"Content-Type": "application/json"},
+                                        body: JSON.stringify(body), ...(opts.keepalive ? {keepalive: true} : {})}), opts));
+}
+// ...a file's bytes as the body, for an upload the server spools (an archive,
+// an ISO), answered the same way...
+function postFile(path, file, type = ""){
+  return pressTie(answerOf(fetch(path, {method: "POST", body: file,
+                                        ...(type ? {headers: {"Content-Type": type}} : {})}), {}));
+}
+// ...and the same for a read: a GET's JSON, or {error} in words, taken from
+// the head's early read of it where there is one (bootFetch).
+function getJSON(path, opts = {}){
+  return pressTie(answerOf(opts.signal ? fetch(path, {signal: opts.signal}) : bootFetch(path), opts));
+}
+async function answerOf(req, opts){
+  let r;
+  try{ r = await req; }catch(e){ return {error: failWords(e), unreached: unreached(e)}; }
+  const said = `the controller answered ${r.status}${r.statusText ? " " + r.statusText : ""}`;
+  if (opts.blob && r.ok){
+    const name = (r.headers.get("Content-Disposition") || "").match(/filename="([^"]+)"/)?.[1] || "";
+    try{ return {blob: await r.blob(), name}; }catch(e){ return {error: failWords(e)}; }
+  }
+  let j;
+  try{ const t = await r.text(); j = t ? JSON.parse(t) : {}; }
+  catch(e){ return {error: r.ok ? `${said}, in words the page could not read` : said}; }
+  if (!r.ok && j && typeof j === "object" && !Array.isArray(j) && !j.error) j.error = said;
+  return j;
 }
 
 const esc = s => String(s ?? "").replace(/[&<>"']/g,
@@ -260,8 +291,8 @@ const humanBytes = n =>
 // its own attribute, as 1Password and LastPass honor theirs, so every field
 // that is not a password or a sign-in carries all three. A password field,
 // and one whose autocomplete names an account or a password, is left as it
-// is: those are where a manager belongs. Wired in index.html on every
-// element that appears, the way proselines are; idempotent.
+// is: those are where a manager belongs. Applied by the draw that writes a
+// field (drawn, page-paint.js), as proselines are; idempotent.
 const MANAGER_FIELDS = new Set(["username", "current-password", "new-password", "one-time-code", "email"]);
 function quietFields(root){
   const all = root.matches?.("input, textarea") ? [root] : [];

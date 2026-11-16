@@ -178,7 +178,7 @@ async function setupGenerateConsole(b){
   const was = b.textContent;
   busy(b, "Generating");
   const password = consoleLogin();
-  const j = await (await postJSON("/api/v1/nodes", {action: "console", id: n?.id || "", password})).json().catch(() => ({error: "no answer"}));
+  const j = await postJSON("/api/v1/nodes", {action: "console", id: n?.id || "", password});
   if (j.error){ notify(j.error, true); unbusy(b, was); return; }
   await ask({title: "Console login", text: "At this machine's screen or a KVM, log in as admin with this password; sudo gives root. It takes a few seconds to reach the machine.\n\nIt is shown this once and never kept here, so note it now.",
              choices: [{label: "Done", value: true}], cancel: null, field: {value: password, label: "Password"}});
@@ -188,7 +188,7 @@ async function setupShutDown(b){
   const n = ownMachine();
   if (!await askYes(`Shut ${n?.name || "this machine"} down?\n\nIt stays off until somebody switches it on. Setup picks up where it was when it starts again.`, {title: "Shut down?", verb: "Shut down", danger: true})) return;
   busy(b, "Shutting down");
-  const j = await (await postJSON("/api/v1/nodes", {action: "poweroff", id: n?.id || ""})).json().catch(() => ({error: "no answer"}));
+  const j = await postJSON("/api/v1/nodes", {action: "poweroff", id: n?.id || ""});
   if (j.error){ notify(j.error, true); unbusy(b, "Shut down"); return; }
   notify("shutting down");
   await loadNodes();
@@ -215,17 +215,15 @@ function wireSetup(el, s){
   if (name && email){ name.oninput = ready; email.oninput = ready; }
   if (git) git.onclick = async () => {
     busy(git, "Saving");
-    const j = await (await postJSON("/api/profile", {action: "save", profile: {full_name: name.value.trim(), email: email.value.trim()}}))
-      .json().catch(() => ({error: "no answer from the dashboard"}));
+    const j = await postJSON("/api/profile", {action: "save", profile: {full_name: name.value.trim(), email: email.value.trim()}});
     if (j.error){ unbusy(git, "Save"); return notify(j.error, true); }
     refresh();
   };
   const cl = el.querySelector("[data-setclaude]");
   if (cl) cl.onclick = async () => {
     busy(cl, "Starting");
-    const r = await postJSON("/api/agents", {action: "install", agent: "claude", node: s.node.id});
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok){ unbusy(cl, "Install"); return notify(j.error || `could not start (HTTP ${r.status})`, true); }
+    const j = await postJSON("/api/agents", {action: "install", agent: "claude", node: s.node.id});
+    if (j.error){ unbusy(cl, "Install"); return notify(j.error, true); }
     notifyJob(j.job, `installing Claude Code on ${s.node.name}`);
     // It turns to done when the node's census reports the version.
     busy(cl, "Installing");
@@ -241,7 +239,7 @@ async function setupFinish(){
   busy(btn, "Finishing");
   let j;
   try{
-    j = await (await postJSON("/api/settings", {set: {setup_done: true}})).json();
+    j = await postJSON("/api/settings", {set: {setup_done: true}});
   }catch{ j = {error: "no answer from the dashboard"}; }
   if (j.error){
     unbusy(btn, "Finish");
@@ -319,7 +317,7 @@ function setupPlaceAuto(s){
   const arr = n.reported?.array?.mount, mount = (pools.find(p => p.name === "fast") || pools[0])?.mount || (arr && !(stick.others || []).includes(arr) ? arr : "");
   if (!mount || setupPlaceTried === mount) return;
   setupPlaceTried = mount;
-  postJSON("/api/v1/nodes", {action: "system-pool", id: n.id, path: mount}).then(r => r.json()).catch(() => ({error: "no answer"}))
+  postJSON("/api/v1/nodes", {action: "system-pool", id: n.id, path: mount})
     .then(j => { if (j.error) notify(j.error, true); loadNodes().then(() => drawSetup()); });
 }
 // One machine's system jobs run one at a time, a second queued behind the
@@ -328,10 +326,10 @@ function setupPlaceAuto(s){
 async function setupInTurn(calls, btn, word){
   for (const [i, c] of calls.entries()){
     if (calls.length > 1) busy(btn, `${word} ${i + 1} of ${calls.length}`);
-    const j = await (await postJSON("/api/v1/nodes", c)).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/v1/nodes", c);
     if (j.error) return j.error;
     for (let tries = 0; j.job && tries < 900; tries++){
-      const d = await (await fetch(`/api/v1/jobs?id=${encodeURIComponent(j.job)}`)).json().catch(() => ({}));
+      const d = await getJSON(`/api/v1/jobs?id=${encodeURIComponent(j.job)}`);
       if (d.state === "failed" || d.state === "canceled") return `${d.error || "that job failed"}: its log is on the Jobs page, after Finish`;
       if (!d.state || d.state === "succeeded") break;
       await new Promise(r => setTimeout(r, 2000));
@@ -368,10 +366,12 @@ function setupWalkPick(to){
   if (to === "move") setupLandLoad();
   setupSig = ""; drawSetup();
 }
-async function setupLandLoad(){
-  try{ setupLand = (await (await fetch("/api/move")).json()).land || null; }
-  catch(e){ /* the step says it is waiting */ }
-  drawSetup();
+function setupLandLoad(){
+  return reading("setup.land", async () => {
+    try{ setupLand = (await getJSON("/api/move")).land || null; }
+    catch(e){ /* the step says it is waiting */ }
+    drawSetup();
+  });
 }
 // What the walk's steps show, for the page's own redraw test: a poll that moved
 // none of it leaves what was typed alone.
@@ -538,13 +538,15 @@ function setupDiskPlan(disks, {lose = 1, layout = ""} = {}){
 // fail, an Advanced layout, the disks holding something a person said to
 // use, and the storage read it draws from (the own machine's row).
 const setupDisks = {lose: 1, layout: "", use: new Set(), adv: false, own: null, at: 0, made: false};
-async function setupDisksLoad(){
-  setupDisks.at = Date.now();
-  try{
-    const j = await (await fetch("/api/storage")).json();
-    setupDisks.own = (j.nodes || []).find(n => n.own) || null;
-  }catch(e){ /* the card says it is waiting */ }
-  drawSetup();
+function setupDisksLoad(){
+  return reading("setup.disks", async () => {
+    setupDisks.at = Date.now();
+    try{
+      const j = await getJSON("/api/storage");
+      setupDisks.own = (j.nodes || []).find(n => n.own) || null;
+    }catch(e){ /* the card says it is waiting */ }
+    drawSetup();
+  });
 }
 // Done once the machine holds a pool or an array, whoever made it.
 const setupDisksDone = n => !!(n && ((n.pools || []).length || (n.array?.data || []).length || n.array?.mount));
@@ -722,9 +724,9 @@ function setupInOrder(el, s){
   // nothing but its time (the progress rule).
   const since = job.started ? Math.max(0, Math.floor(Date.now() / 1000 - job.started)) : 0;
   const took = since >= 3600 ? `${Math.floor(since / 3600)} h ${Math.floor(since % 3600 / 60)} min` : since >= 60 ? `${Math.floor(since / 60)} min` : since ? `${since} s` : "";
-  band.innerHTML = `<div class="notice">${esc(n?.name || "This machine")} is ${esc(words)}<span class="dots"></span>${
+  drawHTML(band, `<div class="notice">${esc(n?.name || "This machine")} is ${esc(words)}<span class="dots"></span>${
       job.step || took ? ` <span class="dim">${[job.step && esc(job.step), took && `${esc(took)} so far`].filter(Boolean).join(", ")}</span>` : ""
-    } One job runs on a machine at a time: the steps go on when it ends, by themselves.</div>`;
+    } One job runs on a machine at a time: the steps go on when it ends, by themselves.</div>`);
   if (head) head.after(band); else el.prepend(band);
   if (!tcDotsTimer) tcDotsTimer = setInterval(tcTickDots, 400);
 }

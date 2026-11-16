@@ -5,8 +5,7 @@
 
 "use strict";
 
-let fxRev = 0;                  // bumped when the filters change, so the pane
-let fxProject = "";             // repaints without waiting for a poll
+let fxProject = "";
 const fxState = {level: "", find: ""};
 
 // The narrowing itself, shared with every notebook's Analysis view: the same
@@ -100,25 +99,15 @@ const levelClass = l => l === "error" ? "bad" : l === "warning" ? "warn"
 // survive, but their scroll position does not).
 let findingsMtime = null;
 
-async function loadFindings(force){
-  if (findings && !force) return;
-  findingsMtime = state?.reports_mtime ?? null;
-  findings = {loading: true};
-  try{
-    const r = await fetch("/api/findings");
-    findings = await r.json();
-  }catch(e){ findings = {error: String(e)}; }
-  // The Analysis tab repaints if one is open: it draws "loading…" while the
-  // fetch is in flight, and a fetch that completes without saying so leaves
-  // that word on the pane until some unrelated revision moves. Only then:
-  // notebooks call this too, and an unconditional drawPanes() from THEIR
-  // fetches landed mid pane-swap in flows that had nothing to do with
-  // findings, which is how the Resume test started failing on a tab this
-  // never touches.
-  if (tabs.some(t => t.kind === "findings")){
-    fxRev++;
-    drawPanes();
-  }
+// The Analysis tab draws "loading…" while the read is out, and its landing
+// moves the tab's live key, so the word goes when the answer comes.
+function loadFindings(force){
+  if (findings && !force) return Promise.resolve();
+  return reading("findings", async () => {
+    findingsMtime = state?.reports_mtime ?? null;
+    findings = {loading: true};
+    findings = await getJSON("/api/findings");
+  });
 }
 
 // Every project section starts collapsed: the summary line of pills is the
@@ -196,8 +185,8 @@ function renderFindingsInto(i){
   const off = findingsOff();
   if (off){
     d.setBar("");
-    d.list.innerHTML = `<div class="empty">${esc(off)}. The Scanners page under Containers deploys AerieOS's
-      scanners to each node, and <a href="#/help/scanners">The scanners</a> says how.</div>`;
+    drawHTML(d.list, `<div class="empty">${esc(off)}. The Scanners page under Containers deploys AerieOS's
+      scanners to each node, and <a href="#/help/scanners">The scanners</a> says how.</div>`);
     return;
   }
   if (!findings){
@@ -211,18 +200,18 @@ function renderFindingsInto(i){
     // where they will, their boxes shimmering; the findings are on their way.
     d.setBar(fxBarHtml([], fxState, `<select aria-label="space" disabled><option>all spaces</option></select>`, true));
     // As it lands across projects: a project's name over its card.
-    d.list.innerHTML = skTpl(`<div class="fxproj"><span class="name">${skv(8)}</span></div>${skRows(6)}`);
+    drawHTML(d.list, skTpl(`<div class="fxproj"><span class="name">${skv(8)}</span></div>${skRows(6)}`));
     return;
   }
   if (findings.error){
-    d.list.innerHTML = `<div class="hint bad">${esc(findings.error)}</div>`;
+    drawHTML(d.list, `<div class="hint bad">${esc(findings.error)}</div>`);
     return;
   }
   if (findings.available === false){
     // How to set the scanners up, one press away in Help (docs/scanners.md).
-    d.list.innerHTML = `<div class="empty">no scanner reports yet: the Scanners page under Containers
+    drawHTML(d.list, `<div class="empty">no scanner reports yet: the Scanners page under Containers
       deploys AerieOS's scanners to each node and runs them on a schedule, and what they send up lands here.
-      <a href="#/help/scanners">The scanners</a> says how.</div>`;
+      <a href="#/help/scanners">The scanners</a> says how.</div>`);
     return;
   }
   const rows = fxRows();
@@ -266,7 +255,7 @@ function renderFindingsInto(i){
         : ""}` : "";
   const ages = reportAges();
   d.setFoot([aside, ages].filter(Boolean).join("<br>"));
-  const redraw = () => { fxRev++; drawPanes(); };
+  const redraw = () => { readMoved("findings"); drawPanes(); };
   $("fxProject").onchange = e => { fxProject = e.target.value; redraw(); };
   fxWireBar(d.el, fxState, redraw);
 }

@@ -1059,8 +1059,8 @@ ok(!execFileSync('git', ['-C', A, 'status', '--porcelain'], { env }).toString().
 // beside every other dial (R223); that view writes it with the same call.
 ok(await page.$eval(`${NB} #verBox .verpol`, e => /Agent access/.test(e.textContent) && !!e.querySelector('[data-verpolgo]')),
    'the Version section says the agent\'s access and offers Change on Permissions');
-const polSet = await page.evaluate(async () => (await postJSON('/api/version', {project: 'alpha', action: 'policy', policy: 'minor'})).status);
-ok(polSet === 200, `the policy is written as the Permissions view writes it (${polSet})`);
+const polSet = await page.evaluate(async () => (await postJSON('/api/version', {project: 'alpha', action: 'policy', policy: 'minor'})).error || 'written');
+ok(polSet === 'written', `the policy is written as the Permissions view writes it (${polSet})`);
 await page.waitForFunction(async () => {
   const r = await fetch('/api/version?project=alpha');
   return (await r.json()).policy === 'minor';

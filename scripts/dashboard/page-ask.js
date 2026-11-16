@@ -44,14 +44,14 @@ function ask({title = "", text = "", choices = [{label: "Yes", value: true}], ca
     // The primary first and anything destructive last: a question whose
     // answer destroys something puts Cancel before it.
     const verbs = choices.map(btn).join("");
-    m.innerHTML = `<div class="box">
+    drawHTML(m, `<div class="box">
       <h3 id="${id}T">${esc(head)}</h3>
       ${paras.map(p => `<div class="field"><p class="asksaid">${esc(p).replace(/\n/g, "<br>")}</p></div>`).join("")}
       ${field ? `<div class="field">${field.label ? `<label for="${id}F">${esc(field.label)}</label>` : ""}
         <input id="${id}F" data-afield value="${esc(field.value || "")}" spellcheck="false" autocomplete="off"
           aria-label="${esc(field.label || head)}"></div>` : ""}
       <div class="foot"><span class="sp"></span>${danger ? cancelBtn + verbs : verbs + cancelBtn}</div>
-    </div>`;
+    </div>`);
     document.body.appendChild(m);
     armModal(m);
     let over = false;

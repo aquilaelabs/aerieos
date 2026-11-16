@@ -4,8 +4,8 @@
 // turn. Unlinking and deleting a project start here too.
 //
 // One classic script beside index.html (docs/design-language.md, Files):
-// pure declarations, nothing runs at load. What runs at load stays in
-// index.html under the section's header.
+// pure declarations, nothing runs at load. What runs at load is
+// page-boot.js's, under the section's header.
 
 "use strict";
 
@@ -254,11 +254,11 @@ function rnFillNode(){
     const row = (state?.projects || []).find(p => p.name === rnFor);
     const gone = row?.node_removed && rnPrefWas.node && !pick.some(n => n.id === rnPrefWas.node)
       ? `<option value="${esc(rnPrefWas.node)}" class="removed" selected>${esc(row.node_name || rnPrefWas.node)} (removed)</option>` : "";
-    sel.innerHTML = `<option value="">none: no builds, tests or sessions until one is picked</option>`
+    drawHTML(sel, `<option value="">none: no builds, tests or sessions until one is picked</option>`
       + gone
       + pick.map(n => `<option value="${esc(n.id)}"${n.id === rnPrefWas.node ? " selected" : ""}>${
           esc(n.name)} (${n.config?.own ? "this machine, " : ""}${esc(n.kind)}, ${esc(n.state)}${n.live === false ? ", quiet" : ""}${
-          tools(n).length ? " · " + esc(tools(n).slice(0, 4).join(", ")) : ""})</option>`).join("");
+          tools(n).length ? " · " + esc(tools(n).slice(0, 4).join(", ")) : ""})</option>`).join(""));
     sel.value = gone ? rnPrefWas.node : pick.some(n => n.id === rnPrefWas.node) ? rnPrefWas.node : "";
     // The closed picker is italic while the removed node is the one shown.
     sel.classList.toggle("removed", !!gone && sel.value === rnPrefWas.node);
@@ -314,13 +314,13 @@ function rnDrawReach(focus){
   // Nodes Write, as the server asks (R255 step 3), not the administrator
   // role: a role of anybody's may give it.
   const ns = rnReachNodes(), ro = state?.areas ? state.areas.nodes !== "write" : !state?.admin;
-  box.innerHTML = rnReachDraft.map((e, i) => `<div class="rnreach" data-i="${i}">
+  drawHTML(box, rnReachDraft.map((e, i) => `<div class="rnreach" data-i="${i}">
       <input data-reach value="${esc(e.addr)}" autocomplete="off" spellcheck="false" placeholder="192.168.1.20 or 192.168.1.20:8080"
         aria-label="an address a session here may reach"${ro ? " disabled" : ""}>
       ${ns.length > 1 ? `<span class="rnreachnodes">${ns.map(n => `<label class="ndcap"><input type="checkbox" data-reachnode value="${esc(n.id)}"${
         !e.nodes.length || e.nodes.includes(n.id) ? " checked" : ""}${ro ? " disabled" : ""}> ${esc(n.name)}</label>`).join("")}</span>` : ""}
       ${ro ? "" : rmIcon("data-reachrm", "remove this address", {title: "remove this address"})}
-    </div>`).join("");
+    </div>`).join(""));
   // Empty is no box at all, so the field keeps its rhythm under the label.
   box.hidden = !rnReachDraft.length;
   $("rnReachAdd").hidden = ro;
@@ -367,10 +367,10 @@ function rnFillNodesMore(){
   // so Save does not drop it without anybody seeing.
   const gone = rnPrefWas.hosts.split(",").filter(id => id && !others.some(n => n.id === id) && id !== primary);
   box.hidden = hint.hidden = label.hidden = rnMode === "git" || !(others.length || gone.length);
-  box.innerHTML = others.map(n => lrow(n.id, n.config?.host_only ? `${n.name} (Hosting only)` : n.name,
+  drawHTML(box, others.map(n => lrow(n.id, n.config?.host_only ? `${n.name} (Hosting only)` : n.name,
                                        `${n.config?.host_only ? "containers" : n.kind}, ${n.state}${n.live === false ? ", quiet" : ""}`,
                                        first ? was.has(n.id) : checked.has(n.id))).join("")
-    + gone.map(id => lrow(id, `${id} (Hosting only)`, "not a hosting node now", first ? true : checked.has(id))).join("");
+    + gone.map(id => lrow(id, `${id} (Hosting only)`, "not a hosting node now", first ? true : checked.has(id))).join(""));
   // Read-only without the `node` grant, like the primary above (R137 step 4).
   if (state?.can?.node === false) box.querySelectorAll("input").forEach(i => { i.disabled = true; });
   // Drawn from what is saved until a draw has had nodes to draw: one made
@@ -390,17 +390,19 @@ function rnFillNodesMore(){
 // lists them, and every tool pack: a row each, ticked when its sessions may
 // use it. Fetched when the settings open; null until it has arrived.
 let rnToolsList = null;
-async function rnLoadTools(p){
-  rnToolsList = null;
-  // Not on the repository's own door (rnMode "git"), like Reads beside it.
-  $("rnToolsField").hidden = rnMode === "git";
-  if (rnMode === "git") return;
-  $("rnTools").innerHTML = `<div class="hint">reading the toolchains on its node…</div>`;
-  const node = p?.prefs?.node || "";
-  const j = await (await fetch("/api/toolchains" + (node ? `?node=${encodeURIComponent(node)}` : ""))).json().catch(() => ({}));
-  if (p?.name && p.name !== rnFor) return;          // another project's settings opened meanwhile
-  rnToolsList = (j.items || []).filter(i => i.installed || i.pack);
-  rnFillTools();
+function rnLoadTools(p){
+  return reading("rn.tools", async () => {
+    rnToolsList = null;
+    // Not on the repository's own door (rnMode "git"), like Reads beside it.
+    $("rnToolsField").hidden = rnMode === "git";
+    if (rnMode === "git") return;
+    drawHTML($("rnTools"), `<div class="hint">reading the toolchains on its node…</div>`);
+    const node = p?.prefs?.node || "";
+    const j = await getJSON("/api/toolchains" + (node ? `?node=${encodeURIComponent(node)}` : ""));
+    if (p?.name && p.name !== rnFor) return;          // another project's settings opened meanwhile
+    rnToolsList = (j.items || []).filter(i => i.installed || i.pack);
+    rnFillTools();
+  });
 }
 function rnFillTools(){
   const box = $("rnTools");
@@ -409,10 +411,10 @@ function rnFillTools(){
   const shipped = rnToolsList.filter(i => !i.pack).sort((a, b) => a.label.localeCompare(b.label));
   const packs = rnToolsList.filter(i => i.pack).sort((a, b) => a.label.localeCompare(b.label));
   const row = (i, attr, ticked, sub) => lrow(i.name, i.label, sub, ticked).replace("<input ", `<input ${attr} `);
-  box.innerHTML = shipped.map(i => row(i, "data-shipped", !off.has(i.name), i.version || "installed"))
+  drawHTML(box, shipped.map(i => row(i, "data-shipped", !off.has(i.name), i.version || "installed"))
     .concat(packs.map(i => row(i, "data-pack", on.has(i.name),
       `tool pack, added by ${i.pack.by || "an administrator"}${i.installed ? "" : "; not installed on its node yet"}`))).join("")
-    || `<div class="hint">nothing is installed on its node yet</div>`;
+    || `<div class="hint">nothing is installed on its node yet</div>`);
   box.querySelectorAll("input").forEach(i => i.onchange = () => rnBars());
   rnSpaceRelock();
 }
@@ -434,18 +436,18 @@ function rnFillAgents(off = rnPrefWas.agents_off, dflt = rnPrefWas.agent_default
   const box = $("rnAgents");
   if (!box) return;
   const was = new Set(String(off || "").split(",").filter(Boolean));
-  box.innerHTML = agentsLive().filter(a => a.id !== "claude")
-    .map(a => lrow(a.id, a.name, a.product, !was.has(a.id))).join("");
+  drawHTML(box, agentsLive().filter(a => a.id !== "claude")
+    .map(a => lrow(a.id, a.name, a.product, !was.has(a.id))).join(""));
   // Which guards hold for which agent (R95 step 6), said rather than implied.
   const g = $("rnAgentGuards");
-  if (g) g.innerHTML = agentsLive().map(a => `<div><b>${esc(a.name)}</b>: ${esc(AGENT_GUARDS[a.id] || "")}</div>`).join("");
+  if (g) drawHTML(g, agentsLive().map(a => `<div><b>${esc(a.name)}</b>: ${esc(AGENT_GUARDS[a.id] || "")}</div>`).join(""));
   // The one Start opens (R95 step 4): an agent left ticked, Claude first.
   const sel = $("rnAgentDefault");
   const offer = () => {
     const off2 = new Set([...box.querySelectorAll("input:not(:checked)")].map(i => i.value));
     const cur = sel.value || dflt || "claude";
-    sel.innerHTML = agentsLive().filter(a => !off2.has(a.id))
-      .map(a => `<option value="${esc(a.id)}"${a.id === cur ? " selected" : ""}>${esc(a.name)}</option>`).join("");
+    drawHTML(sel, agentsLive().filter(a => !off2.has(a.id))
+      .map(a => `<option value="${esc(a.id)}"${a.id === cur ? " selected" : ""}>${esc(a.name)}</option>`).join(""));
     if (!sel.value) sel.value = "claude";
   };
   if (sel){ sel.value = ""; offer(); box.querySelectorAll("input").forEach(i => i.addEventListener("change", offer)); }
@@ -464,9 +466,9 @@ function rnFillReads(){
   const own = reposOf(rnFor);
   const others = projectList().filter(c => c.key !== own).sort((a, b) => a.name.localeCompare(b.name));
   wrap.hidden = rnMode === "git" || !others.length;
-  box.innerHTML = others.map(c => lrow(c.key, c.name,
+  drawHTML(box, others.map(c => lrow(c.key, c.name,
     c.rows.length === 1 && c.rows[0].branch ? `git: ${c.rows[0].branch}` : c.rows.length ? `${c.rows.length} repositories` : "no repository yet",
-    was.has(c.key))).join("");
+    was.has(c.key))).join(""));
   // AerieOS's owner's alone (the operator, 6 Oct): shown to everybody,
   // changed by the owner, and why not said on the row (not a tooltip).
   const mine = state?.can?.reads !== false;
@@ -509,8 +511,8 @@ function rnFillTestNode(p){
   const named = id => names.get(id) || (nodesList || []).find(n => n.id === id)?.name || id;
   // A repository may set its own apart from its space's, as a dial (R223).
   const inh = rnDialMode(p) === "inherit", sv = p?.prefs?.project_dials?.test_node || "";
-  sel.innerHTML = (inh ? `<option value="inherit">as the space (${esc(sv ? named(sv) : "the session's own node")})</option>` : "")
-    + `<option value="">the session's own node</option>` + ids.map(id => `<option value="${esc(id)}">${esc(named(id))}</option>`).join("");
+  drawHTML(sel, (inh ? `<option value="inherit">as the space (${esc(sv ? named(sv) : "the session's own node")})</option>` : "")
+    + `<option value="">the session's own node</option>` + ids.map(id => `<option value="${esc(id)}">${esc(named(id))}</option>`).join(""));
   sel.dataset.proj = `${rnMode}:${p?.name || ""}`;
   const saved = inh ? rnDialVal(p, "test_node", "") : (p?.prefs?.test_node || "");
   sel.value = picked !== null && (picked === "" || picked === "inherit" || ids.includes(picked)) && picked !== saved ? picked
@@ -529,7 +531,7 @@ function rnFillTests(canDev){
   const opts = [...nodes.map(([v, t]) => [`node|${v}`, on(t)]),
                 ...(canDev ? [...nodes.map(([v, t]) => [`up|${v}`, `in its dev instance when it is up, else ${on(t)}`]),
                               ["only|", "only in its dev instance"]] : [])];
-  sel.innerHTML = optionList(opts);
+  drawHTML(sel, optionList(opts));
   const want = `${dev.value || "node"}|${dev.value === "only" ? "" : node.value}`;
   sel.value = opts.some(([v]) => v === want) ? want : opts[0]?.[0] || "";
   sel.onchange = () => {
@@ -575,7 +577,7 @@ function rnFillPrefsRest(p){
     // Built again when its words change: "as the project (deny)" names
     // the project's value, which another project's door may differ on.
     if (el.dataset.built !== sig){
-      el.innerHTML = optionList(choices);
+      drawHTML(el, optionList(choices));
       el.dataset.built = sig;
     }
     el.value = value;
@@ -661,9 +663,8 @@ async function unlinkProject(name){
                       unbusy($("rnUnlink"), `Unlink from ${p?.forge_name || "its remote"}`); };
   busy($("rnUnlink"), "Unlinking");
   try{
-    const r = await postJSON("/api/unlink", {name});
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || j.error) return stop(j.error || `unlink failed (HTTP ${r.status})`);
+    const j = await postJSON("/api/unlink", {name});
+    if (j.error) return stop(j.error);
     closeRename();
     notify(`${projLabel(name)} is unlinked: ${(j.removed || []).join(", ")}`
            + (j.others?.length ? `. Its other remotes are untouched: ${j.others.join(", ")}` : ""));
@@ -921,7 +922,7 @@ function rnFillHostsOwn(p){
   if (f.hidden) return;
   const off = new Set(String(rnPrefWas.hosts_off || "").split(",").filter(Boolean));
   const named = id => (nodesList || []).find(n => n.id === id)?.name || id;
-  box.innerHTML = all.map(id => lrow(id, named(id), "hosting only", !off.has(id))).join("");
+  drawHTML(box, all.map(id => lrow(id, named(id), "hosting only", !off.has(id))).join(""));
 }
 // The space's parts locked again: People and Toolchains draw themselves once
 // their lists arrive, after the dialog has opened.
@@ -944,8 +945,8 @@ function rnSpaceMarks(name, door){
   const band = () => {
     const d = document.createElement("div");
     d.className = "field rnspaceband";
-    d.innerHTML = `<div class="actbar"><span class="state">The space's, for every repository in ${esc(projectName(name))}: changed in its settings.</span>
-      <span class="sp"></span><button type="button" data-rnspacego>Open the space's settings</button></div>`;
+    drawHTML(d, `<div class="actbar"><span class="state">The space's, for every repository in ${esc(projectName(name))}: changed in its settings.</span>
+      <span class="sp"></span><button type="button" data-rnspacego>Open the space's settings</button></div>`);
     d.querySelector("[data-rnspacego]").onclick = () => renameProject(name, "project");
     return d;
   };
@@ -993,7 +994,6 @@ function rnLoadPeople(name, keep = false){
   }
   if (rnMode === "git") return;
   postJSON("/api/members", {action: "view", project: name})
-    .then(r => r.json())
     .then(j => { if (rnFor !== name || j.error) return;
                  if (keep && Object.keys(rnPeopleDraft).length) return;
                  rnPeople = j; rnDrawPeople(); })
@@ -1009,7 +1009,7 @@ function rnDrawPeople(){
   const invitable = v.accounts.filter(n => !v.members.includes(n) && !v.invites.some(i => i.name === n));
   $("rnPeopleField").hidden = false;
   setHidden($("rnPeopleField").closest("details"), false);
-  $("rnPeople").innerHTML = `
+  drawHTML($("rnPeople"), `
     <div class="setrow ctlrow">${v.may_manage
       ? `<label class="ndcap" for="rnOwner">Space owner</label>
          <select id="rnOwner">${optionList(v.accounts, owner)}</select>`
@@ -1029,7 +1029,7 @@ function rnDrawPeople(){
       <select id="rnInviteWho" aria-label="account to invite">${invitable.map(n => `<option>${esc(n)}</option>`).join("")}</select>
       <select id="rnInviteRole" aria-label="the role they are invited as">${v.roles.map(n => `<option>${esc(n)}</option>`).join("")}</select>
       <button type="button" id="rnInviteGo">Invite</button></div>`
-      : `<div class="sub warn">no role on this space to invite anybody with: add one on the ${pageLink("roles", "Roles page")}</div>` : ""}`;
+      : `<div class="sub warn">no role on this space to invite anybody with: add one on the ${pageLink("roles", "Roles page")}</div>` : ""}`);
   const o = $("rnOwner");
   if (o) o.onchange = () => { d.owner = o.value; rnDrawPeople(); };
   // What each person holds (R152): a name opens their roles, which a
@@ -1041,7 +1041,7 @@ function rnDrawPeople(){
   const io = $("rnInviteOnly");
   if (io && v.may_manage) io.onchange = () => { d.invite_only = io.checked; rnDrawPeople(); };
   const act = async body => {
-    const j = await (await postJSON("/api/members", body)).json();
+    const j = await postJSON("/api/members", body);
     if (j.error) return notify(j.error, true);
     rnPeople = j; rnDrawPeople();
   };
@@ -1061,8 +1061,8 @@ async function rnSavePeople(name){
   const owner = d.owner && d.owner !== v.owner ? d.owner : "";
   const only = d.invite_only !== undefined && d.invite_only !== v.invite_only ? d.invite_only : undefined;
   if (!owner && only === undefined) return "";
-  const j = await (await postJSON("/api/members", {action: "set", project: name, owner,
-                                                   ...(only !== undefined ? {invite_only: only} : {})})).json();
+  const j = await postJSON("/api/members", {action: "set", project: name, owner,
+                                                   ...(only !== undefined ? {invite_only: only} : {})});
   if (j.offered) notify(`${projLabel(name)}: offered to ${j.offered}, who becomes its owner on accepting from their bell`);
   return j.error || "";
 }
@@ -1081,7 +1081,6 @@ function rnLoadFtp(name){
   $("rnFtpField").hidden = true;
   if (rnMode === "git") return;
   postJSON("/api/project-ftp", {project: name})
-    .then(r => r.json())
     .then(j => { if (rnFor !== name || j.error) return; rnFtp = j; rnDrawFtp(); })
     .catch(() => {});
 }
@@ -1099,15 +1098,15 @@ function rnDrawFtp(){
   // Switched off on this install (R81): the sentence, and nothing to set.
   if (featureOff("ftp")){
     $("rnFtpField").hidden = false;
-    box.innerHTML = deadWhy(featureOff("ftp"));
+    drawHTML(box, deadWhy(featureOff("ftp")));
     return;
   }
   if (!v.may_set){
     $("rnFtpField").hidden = !v.on && !v.editor;
-    box.innerHTML = `${v.on ? `<div>Served over FTPS${where ? `, at ${esc(where)}` : ""}.</div>` : ""}
+    drawHTML(box, `${v.on ? `<div>Served over FTPS${where ? `, at ${esc(where)}` : ""}.</div>` : ""}
       ${v.editor ? `<div>Open from your own machine: AerieOS for VS Code and the Windows companion.</div>` : ""}
       <div class="hint">Sign in with your AerieOS name and password, if you were given access.
-        Who may is set by AerieOS's owner, or a role that grants ftp.</div>`;
+        Who may is set by AerieOS's owner, or a role that grants ftp.</div>`);
     return;
   }
   $("rnFtpField").hidden = false;
@@ -1119,7 +1118,7 @@ function rnDrawFtp(){
         your AerieOS name and password. The certificate is the node's own, so the client asks to trust it once.</div>`
     : st.why ? `<div class="hint bad">Not running: ${esc(st.why)}</div>`
     : `<div class="hint">Starting on its node.</div>`;
-  box.innerHTML = `
+  drawHTML(box, `
     <label class="ndcap"><input type="checkbox" id="rnFtpOn"${on ? " checked" : ""}> Serve this space's files over FTPS</label>
     <label class="ndcap"><input type="checkbox" id="rnFtpEditor"${editor ? " checked" : ""}> Open them from people's own machines: AerieOS for VS Code and the Windows companion</label>
     ${editor ? `<div class="hint">Through this controller, as each person's own account: everyone on the space gets what their roles' File access gives, and a choice on the list below narrows it.</div>` : ""}
@@ -1136,7 +1135,7 @@ function rnDrawFtp(){
       const a = d.access?.[p.uid] ?? p.access;
       return `<div class="rnftprow"><span class="grow">${esc(p.name)}</span>
         <select data-ftpuid="${esc(p.uid)}" aria-label="${esc(p.name)}'s file access">${optionList(RN_FTP_ACCESS, a)}</select></div>`;
-    }).join("")}</div>`;
+    }).join("")}</div>`);
   $("rnFtpOn").onchange = e => { d.on = e.target.checked; rnDrawFtp(); };
   $("rnFtpEditor").onchange = e => { d.editor = e.target.checked; rnDrawFtp(); };
   const fo = $("rnFtpFor");
@@ -1166,7 +1165,7 @@ function rnFtpChange(){
 }
 
 async function rnSaveFtp(name, change){
-  const j = await (await postJSON("/api/project-ftp", {action: "set", project: name, ...change})).json();
+  const j = await postJSON("/api/project-ftp", {action: "set", project: name, ...change});
   return j.error || "";
 }
 
@@ -1178,7 +1177,7 @@ const rnSettingsWhy = name => (state?.projects || []).find(p => p.name === name)
 // server's own words naming the area and level that would open it (R255
 // step 4), not hidden as if there were nothing there.
 function rnWhyOff(field, body, why){
-  body.innerHTML = `<div class="sub bad">${esc(why)}</div>`;
+  drawHTML(body, `<div class="sub bad">${esc(why)}</div>`);
   field.hidden = false;
 }
 
@@ -1196,14 +1195,12 @@ function rnLoadSnapshots(name, keep = false){
   // Not asked for where the row already says it would be refused (B89), and
   // not drawn: what a role does not give is not shown (the operator, 21 Oct).
   if (rnSettingsWhy(name)) return;
-  fetch("/api/snapshots?project=" + encodeURIComponent(name))
-    .then(r => r.json())
-    .then(j => {
-      if (rnFor !== name) return;
-      if (j.error){ rnWhyOff($("rnSnapField"), $("rnSnapRows"), j.error); return; }
-      rnSnap = j; rnDrawSnapshots();
-    })
-    .catch(() => {});
+  return reading("rn.snapshots", async () => {
+    const j = await getJSON("/api/snapshots?project=" + encodeURIComponent(name));
+    if (rnFor !== name) return;
+    if (j.error){ rnWhyOff($("rnSnapField"), $("rnSnapRows"), j.error); return; }
+    rnSnap = j; rnDrawSnapshots();
+  });
 }
 
 function rnDrawSnapshots(){
@@ -1212,7 +1209,7 @@ function rnDrawSnapshots(){
   $("rnSnapField").hidden = false;
   const days = rnSnap.days || [];
   const when = d => d.at ? new Date(d.at * 1000).toLocaleString([], {dateStyle: "medium", timeStyle: "short"}) : d.day;
-  $("rnSnapRows").innerHTML = (days.length ? days.map(d => `<div class="rnsnap actbar" data-day="${esc(d.day)}">
+  drawHTML($("rnSnapRows"), (days.length ? days.map(d => `<div class="rnsnap actbar" data-day="${esc(d.day)}">
       <span class="grow">${esc(when(d))}${d.pinned ? ` <span class="pill note" title="kept whatever the days kept say">pinned</span>` : ""}${d.why ? ` <span class="dim">(${esc(d.why.replace(/-/g, " "))})</span>` : ""}
         <span class="dim">· ${d.files} files · ${esc(humanBytes(d.bytes))}</span></span>
       <input type="text" data-snapfile placeholder="a file, from the tree's top" spellcheck="false" autocomplete="off"
@@ -1222,7 +1219,7 @@ function rnDrawSnapshots(){
       <button type="button" data-snappin="${d.pinned ? "unpin" : "pin"}" title="${d.pinned ? "let it go with the rest when it is older than the days kept" : "keep this day whatever the days kept say"}">${d.pinned ? "Unpin" : "Pin"}</button>
     </div>`).join("")
     : `<div class="dim">none yet: the first is taken within half an hour of the setting being above 0</div>`)
-    + `<div class="actbar"><button type="button" data-snaptake>Take one now</button></div>`;
+    + `<div class="actbar"><button type="button" data-snaptake>Take one now</button></div>`);
   const pinned = days.filter(d => d.pinned).length;
   $("rnSnapHint").textContent = (rnSnap.keep
     ? `One a day, kept ${rnSnap.keep} day${rnSnap.keep === 1 ? "" : "s"}. A restore snapshots the tree first, so it can be undone from the line it leaves.`
@@ -1232,8 +1229,7 @@ function rnDrawSnapshots(){
   const act = async (b, body, ask) => {
     if (ask && !await askYes(ask)) return;
     await pressing(b, async () => {
-      const r = await postJSON("/api/snapshots", {project: name, ...body});
-      const j = await r.json();
+      const j = await postJSON("/api/snapshots", {project: name, ...body});
       if (j.error) return notify(j.error, true);
       notify(body.action === "take" ? `snapshot taken: ${j.files} files`
         : body.action === "pin" ? `${j.day} pinned: kept until unpinned`
@@ -1282,10 +1278,7 @@ function rnLoadAuth(name){
   $("rnTestField").hidden = true;
   $("rnTestOut").hidden = true;
   if (rnMode !== "git") return;
-  fetch("/api/project-auth", {method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({name})})
-    .then(r => r.json())
+  postJSON("/api/project-auth", {name})
     .then(j => {
       if (rnFor !== name || j.error) return;   // closed, or reopened elsewhere
       rnAuthOpts = j;
@@ -1329,12 +1322,12 @@ function rnDrawStore(name){
   const rows = mine.filter(f => !(me && me.id === f.id)).map(f => `<div class="setrow ctlrow"><span class="grow">Your ${
     esc(f.host)} token${f.login ? `, as ${esc(f.login)}` : ""}</span>
     <button type="button" data-rnstore="${esc(f.id)}">${me ? "Use this one instead" : "Give it to this space"}</button></div>`).join("");
-  box.innerHTML = said + who + rows;
+  drawHTML(box, said + who + rows);
   box.hidden = !(said || who || rows);
   box.querySelectorAll("[data-rnstore]").forEach(b => b.onclick = async () => {
     busy(b, "Linking");
     try{
-      const j = await (await postJSON("/api/rename", {name, link_account: b.dataset.rnstore})).json();
+      const j = await postJSON("/api/rename", {name, link_account: b.dataset.rnstore});
       if (j.error) notify(j.error, true);
       else notify(`${projLabel(name)} uses your token for your pushes and pulls`);
     }catch(e){ notify("link: " + failWords(e), true); }
@@ -1343,7 +1336,7 @@ function rnDrawStore(name){
   box.querySelectorAll("[data-rnunlink]").forEach(b => b.onclick = async () => {
     busy(b, "Taking back");
     try{
-      const j = await (await postJSON("/api/rename", {name, unlink_mine: true})).json();
+      const j = await postJSON("/api/rename", {name, unlink_mine: true});
       if (j.error) notify(j.error, true);
       else notify(`your token is no longer given to ${projLabel(name)}`);
     }catch(e){ notify("take back: " + failWords(e), true); }
@@ -1362,10 +1355,10 @@ function rnDrawKey(){
   $("rnKeyPasteBtn").hidden = !!k;
   $("rnKeyPasteBtn").textContent = pasting ? "Keep it" : "Paste a key";
   $("rnKeyCopy").hidden = $("rnKeyForget").hidden = !k;
-  $("rnKeyHint").innerHTML = k
+  drawHTML($("rnKeyHint"), k
     ? `Add this on the host as a deploy key with write access${k.page ? `: <a href="${esc(k.page)}" target="_blank" rel="noopener">its deploy keys page</a>` : ""}, then pick Deploy key below and Save.`
     : pasting ? "Paste the whole private key, without a passphrase. It is kept where sessions can push with it and never read it."
-    : "None made here. Make one, or paste one you have.";
+    : "None made here. Make one, or paste one you have.");
 }
 
 async function rnKeyAct(action){
@@ -1373,8 +1366,8 @@ async function rnKeyAct(action){
   busy($(btn), action === "key-forget" ? "Forgetting" : action === "key-make" ? "Making" : "Keeping");
   let j;
   try{
-    j = await (await postJSON("/api/project-auth", {name, action,
-      key: action === "key-store" ? $("rnKeyPaste").value : ""})).json();
+    j = await postJSON("/api/project-auth", {name, action,
+      key: action === "key-store" ? $("rnKeyPaste").value : ""});
   }catch{ j = {error: "no answer from the dashboard"}; }
   $(btn).disabled = false;
   $(btn).removeAttribute("aria-busy");
@@ -1468,8 +1461,8 @@ async function rnTestAuth(){
   out.hidden = true;
   let j;
   try{
-    j = await (await postJSON("/api/project-auth", {name, action: "test",
-      token: $("rnToken").disabled ? "" : $("rnToken").value.trim()})).json();
+    j = await postJSON("/api/project-auth", {name, action: "test",
+      token: $("rnToken").disabled ? "" : $("rnToken").value.trim()});
   }catch{ j = {error: "no answer from the dashboard"}; }
   btn.disabled = false;
   btn.removeAttribute("aria-busy");
@@ -1479,10 +1472,10 @@ async function rnTestAuth(){
   const good = !j.error && !missing.length;
   out.classList.toggle("bad", !good);
   out.classList.toggle("ok", good && j.push !== null);
-  out.innerHTML = j.error ? esc(j.error)
+  drawHTML(out, j.error ? esc(j.error)
     : missing.length
       ? `With ${esc(j.using)} it is missing:<ul>${missing.map(m => `<li>${esc(m)}</li>`).join("")}</ul>`
-      : `With ${esc(j.using)} it can read${j.push ? " and push" : ""}.`;
+      : `With ${esc(j.using)} it can read${j.push ? " and push" : ""}.`);
   if (!j.error && (j.notes || []).length)
     out.innerHTML += `<div class="sub">${j.notes.map(esc).join(" ")}</div>`;
   out.hidden = false;
@@ -1827,8 +1820,7 @@ async function rnSubmit(sect, end = false){
       // space's would have cut the space's own (R223).
       const only = new Set(mine.filter(k => !(rnSpaceOn && RN_GROUP.has(k))));
       const pick = o => Object.fromEntries(Object.entries(o).filter(([k]) => only.has(k)));
-      const r = await fetch("/api/prefs", {method: "POST", headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({project: name, restart: restartNow,
+      const j = await postJSON("/api/prefs", {project: name, restart: restartNow,
                               // The project's own door writes the project's defaults (R208 step 6);
                               // a notebook writes this repository's overrides.
                               scope: rnMode === "project" ? "project" : "repository",
@@ -1841,8 +1833,7 @@ async function rnSubmit(sect, end = false){
                               outputs: v.outputs.split(",").map(x => x.trim()).filter(Boolean),
                               ...(v.capture_days !== "" ? {capture_days: +v.capture_days} : {}),
                               ...(v.snapshot_days !== "" ? {snapshot_days: +v.snapshot_days} : {}),
-                              ...(v.dev_keep !== "" ? {dev_keep: +v.dev_keep} : {})})})});
-      const j = await r.json();
+                              ...(v.dev_keep !== "" ? {dev_keep: +v.dev_keep} : {})})});
       if (j.error) return stop(j.error);
       // Said out loud when the session was left on what it started with,
       // and why, and when it was ended.
@@ -1863,7 +1854,7 @@ async function rnSubmit(sect, end = false){
     // Move the version is version.py's policy: written where the Artifacts
     // tab writes it, so the two never disagree.
     if (sect === "claude" && enc.version !== rnPrefWas.version){
-      const j = await (await postJSON("/api/version", {project: name, action: "policy", policy: enc.version})).json();
+      const j = await postJSON("/api/version", {project: name, action: "policy", policy: enc.version});
       if (j.error) return stop(j.error);
     }
     const ftpChange = sect === "files" ? rnFtpChange() : null;
@@ -1873,8 +1864,7 @@ async function rnSubmit(sect, end = false){
       rnLoadFtp(name);
     }
     if (needRename){
-      const r = await postJSON("/api/rename", {name, to, token, auth, clear_token, address});
-      const j = await r.json();
+      const j = await postJSON("/api/rename", {name, to, token, auth, clear_token, address});
       if (j.error) return stop(j.error);
       notify(renaming ? `${j.from || projLabel(name)} is now ${j.label || to}`
         : address ? `${projLabel(name)}: ${(j.moved || []).find(m => /points at/.test(m)) || "saved"}`
@@ -1907,7 +1897,7 @@ async function rnSubmit(sect, end = false){
 async function deleteProject(name){
   // What keeps running with no project while it is in the trash (the
   // operator, 26 Oct), said before it is asked.
-  const own = await postJSON("/api/repos", {action: "owned", name}).then(r => r.json()).catch(() => ({}));
+  const own = await postJSON("/api/repos", {action: "owned", name});
   const left = [own.containers?.length ? `Its container${own.containers.length === 1 ? "" : "s"} ${own.containers.join(", ")} keep${own.containers.length === 1 ? "s" : ""} running, given to no space until it is put back.` : "",
                 own.vms?.length ? `Its VM${own.vms.length === 1 ? "" : "s"} ${own.vms.join(", ")} keep${own.vms.length === 1 ? "s" : ""} running under No space, an administrator's to act on.` : ""].filter(Boolean).join(" ");
   if (!await askYes(`Delete ${projLabel(name)}?\n\n`
@@ -1916,8 +1906,7 @@ async function deleteProject(name){
       + `and Put back in the trash returns all of it.${left ? "\n\n" + left : ""}\n\n`
       + `Close its terminals first.`)) return;
   try{
-    const r = await postJSON("/api/trash", {name});
-    const j = await r.json();
+    const j = await postJSON("/api/trash", {name});
     if (j.error){ notify(j.error, true); return; }
     // The path is named back because it may not be the one the dialog said:
     // a second delete of the same name is numbered rather than overwriting the

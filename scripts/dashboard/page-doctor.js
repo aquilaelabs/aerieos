@@ -50,7 +50,7 @@ function drawDoctor(){
 }
 
 // Open or shut the panel, with the bell's manners: anything else closes it,
-// Escape closes it (wired in index.html).
+// Escape closes it (wired by page-boot.js).
 function toggleDoctor(open){
   docShown = open === undefined ? !docShown : open;
   $("bDocDot").setAttribute("aria-expanded", String(docShown));

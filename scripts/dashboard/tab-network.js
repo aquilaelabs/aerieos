@@ -62,11 +62,11 @@ function renderNetworkInto(i){
   if (!d) return;
   d.setBar("");
   if (!state?.settings){
-    d.list.innerHTML = `<div class="row stack2"><div class="grow"><div class="sub">the settings arrive with the first poll…</div></div></div>`;
+    drawHTML(d.list, `<div class="row stack2"><div class="grow"><div class="sub">the settings arrive with the first poll…</div></div></div>`);
     delete d.el.dataset.netstamp;
     return;
   }
-  // The nodes move with every check-in (nodesRev), and a draw of the whole
+  // The nodes move with every check-in (the nodes' revision), and a draw of the whole
   // page on each would replace a secret being typed (a secret is never
   // drafted) and an Apply under the pointer: when only the nodes moved, the
   // head's count and the dial section are written again in place and the
@@ -78,7 +78,7 @@ function renderNetworkInto(i){
     // a .pghead of its own, and painting it into the old one nested a
     // second box in the first (seen at a desk, 29 Oct).
     const head = d.list.querySelector(":scope > .pghead"), was = head?.dataset.drawn, now = networkReach();
-    if (head && was !== now){ head.outerHTML = now; d.list.querySelector(":scope > .pghead")?.setAttribute("data-drawn", now); }
+    if (head && was !== now){ head.outerHTML = now; drawn(d.list.querySelector(":scope > .pghead"))?.setAttribute("data-drawn", now); }
     patch(dial.querySelector(":scope > .body"), networkDial(), true);
     const st = dial.querySelector(":scope > summary .sst"), says = networkDialStatus();
     if (st) st.textContent = says;
@@ -99,7 +99,7 @@ function renderNetworkInto(i){
   d.el.querySelectorAll("[data-srevert]").forEach(b => b.onclick = () => {
     const sec = b.closest("details.sect");
     sec?.querySelectorAll("input, select").forEach(i => { if (i.id) delete settingsDraft[i.id]; });
-    settingsRev++;
+    readMoved("settings");
     drawPanes();
   });
   wireSettingsSections(d.el);

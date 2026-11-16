@@ -13,29 +13,28 @@
 
 let schedData = null;            // the last answer, or null before the first
 let schedErr = "";
-let schedRev = 0;
 let schedDraft = {};             // what the open dialog holds
 
 function openSchedulesTab(){
   openTab({kind: "schedules", arg: "__schedules", label: "Schedules"});
 }
 
-async function loadSchedules(){
-  try{
-    const j = await (await bootFetch("/api/schedules")).json();
-    schedErr = j.error || "";
-    schedData = j.error ? {schedules: [], nodes: [], may: false} : j;
-  }catch(e){
-    schedErr = failWords(e);
-    schedData = schedData || {schedules: [], nodes: [], may: false};
-  }
-  schedRev++;
-  if (tabs.some(t => t.kind === "schedules")) drawPanes();
+function loadSchedules(){
+  return reading("schedules", async () => {
+    try{
+      const j = await getJSON("/api/schedules");
+      schedErr = j.error || "";
+      schedData = j.error ? {schedules: [], nodes: [], may: false} : j;
+    }catch(e){
+      schedErr = failWords(e);
+      schedData = schedData || {schedules: [], nodes: [], may: false};
+    }
+  });
 }
 
 async function postSchedule(body){
   try{
-    const j = await (await postJSON("/api/schedules", body)).json();
+    const j = await postJSON("/api/schedules", body);
     if (j.error) notify(j.error, true);
     return j;
   }catch(e){
@@ -144,11 +143,11 @@ function openSchedForm(s){
   // account: the note under Runs on says so.
   const at = (schedData.nodes || []).find(n => n.id === s?.node);
   if (s?.as === "root" && at && !at.sandbox) schedDraft.as = "job";
-  m.innerHTML = `<div class="box"><h3 id="schT">${s ? esc(s.name || "Schedule") : "New schedule"}</h3>
+  drawHTML(m, `<div class="box"><h3 id="schT">${s ? esc(s.name || "Schedule") : "New schedule"}</h3>
     ${schedForm(s)}
     ${dlgFoot(`<button type="button" data-schedcancel>Cancel</button>`,
               `<button type="button" class="primary" data-schedsave="${esc(s?.id || "")}">${s ? "Save" : "Add"}</button>`,
-              `<span class="state" id="schSay"></span>`)}</div>`;
+              `<span class="state" id="schSay"></span>`)}</div>`);
   wireSchedForm(m, s);
   m.hidden = false;
   m.onclick = e => { if (e.target === m) closeSchedForm(); };
@@ -175,7 +174,7 @@ function wireSchedForm(m, s){
       // Off a sandbox, the jobs account: root is not this node's to give.
       if (!n?.sandbox && (schedDraft.as ?? s?.as) === "root") schedDraft.as = "job";
       if (!row) return;             // a system schedule has no Runs as
-      row.innerHTML = schedAs(s);
+      drawHTML(row, schedAs(s));
       const as = row.querySelector("[data-schedf]");
       if (as) wireField(as);
     }
@@ -208,15 +207,15 @@ function renderSchedulesInto(i){
   if (!d) return;
   if (schedData === null){
     d.setBar("");
-    d.list.innerHTML = skTpl(pageHead({facts: [["Schedules", GHOST], ["Turned on", GHOST], ["Next run", GHOST]],
+    drawHTML(d.list, skTpl(pageHead({facts: [["Schedules", GHOST], ["Turned on", GHOST], ["Next run", GHOST]],
                                        actions: `<button type="button" class="primary" disabled>New schedule</button>`})
-      + docSection("schedules", "list", "Schedules", "", skRows(2)));
+      + docSection("schedules", "list", "Schedules", "", skRows(2))));
     loadSchedules();
     return;
   }
   if (schedErr){
     d.setBar("");
-    d.list.innerHTML = `<div class="field"><div class="notice bad">${esc(schedErr)}</div></div>`;
+    drawHTML(d.list, `<div class="field"><div class="notice bad">${esc(schedErr)}</div></div>`);
     return;
   }
   const rows = schedData.schedules || [], may = !!schedData.may;

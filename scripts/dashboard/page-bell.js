@@ -3,8 +3,8 @@
 // held change).
 //
 // One classic script beside index.html (docs/design-language.md, Files):
-// pure declarations, nothing runs at load. What runs at load stays in
-// index.html under the section's header.
+// pure declarations, nothing runs at load. What runs at load is
+// page-boot.js's, under the section's header.
 
 "use strict";
 
@@ -39,6 +39,21 @@ let toastHeld = false;
 // rather than as a JavaScript error; anything else as it came (B301).
 const unreached = e => e instanceof TypeError && /fetch|network|load failed/i.test(e.message || "");
 const failWords = e => unreached(e) ? "the controller did not answer" : String(e?.message || e);
+// What nothing caught is said rather than lost (R9 step 1): a promise a
+// press or a draw dropped with its failure in it, as a toast in words, once
+// a minute for the same words so a loop that keeps failing is one line. A
+// read the page itself called off (AbortError) is no failure.
+const unheardSaid = new Map();
+function sayUnheard(e){
+  const why = e?.reason;
+  if (why?.name === "AbortError") return;
+  const words = failWords(why ?? "something failed with nothing said");
+  const now = Date.now();
+  if (now - (unheardSaid.get(words) || 0) < 60000) return;
+  unheardSaid.set(words, now);
+  toastAdd(words, "bad");
+  logNote(words, true);
+}
 
 // `opts.kind` is what the record files it under ("said", the default, or
 // "ask" or "job"); `opts.job` names the job it is about.
@@ -54,8 +69,8 @@ function toastAdd(text, lv){
   if (!stack) return null;
   const el = document.createElement("div");
   el.className = "tst " + lv;
-  el.innerHTML = `<span class="tic">${TOAST_ICONS[lv] || TOAST_ICONS.info}</span><span class="tmsg"></span>
-    <button type="button" class="ic tx" aria-label="dismiss">×</button>`;
+  drawHTML(el, `<span class="tic">${TOAST_ICONS[lv] || TOAST_ICONS.info}</span><span class="tmsg"></span>
+    <button type="button" class="ic tx" aria-label="dismiss">×</button>`);
   el.querySelector(".tmsg").textContent = text;
   el.querySelector(".tx").onclick = () => toastGone(el);
   stack.append(el);
@@ -112,7 +127,7 @@ function notifyJob(id, label, onEnd){
 async function jobToastsCheck(){
   for (const [id, t] of [...jobToasts]){
     let j;
-    try{ j = await (await fetch(`/api/v1/jobs?id=${encodeURIComponent(id)}`)).json(); }catch(e){ continue; }
+    try{ j = await getJSON(`/api/v1/jobs?id=${encodeURIComponent(id)}`); }catch(e){ continue; }
     // A job carries an error field of its own (a failed one's reason), so
     // the read is good when it names the job.
     if (!j || j.id !== id){ jobToasts.delete(id); continue; }
@@ -126,7 +141,7 @@ async function jobToastsCheck(){
     const lv = j.state === "failed" ? "bad" : j.state === "canceled" ? "warn" : "info";
     if (t.el?.isConnected){
       t.el.className = "tst " + lv;
-      t.el.querySelector(".tic").innerHTML = TOAST_ICONS[lv];
+      drawHTML(t.el.querySelector(".tic"), TOAST_ICONS[lv]);
       t.el.left = lv === "info" ? 4000 : 7000;
       toastTick(t.el);
     }
@@ -559,11 +574,11 @@ function askActs(a, {deny, allow, session = "data-session"}){
 // the account's record (kind "ask"): which ask, and what was said to it.
 function askAnswer(id, allow, session = false){
   const a = (ph?.asks || []).find(x => x.id === id);
-  if (allow){ phBusy = "running it"; phRev++; drawPanes(); }
+  if (allow){ phBusy = "running it"; readMoved("phone"); drawPanes(); }
   phFetch(allow ? {action: "allow", id, session} : {action: "deny", id});
   if (a){
     const plain = document.createElement("i");
-    plain.innerHTML = askTag(a).replace(/: needs your answer$/, "");
+    drawHTML(plain, askTag(a).replace(/: needs your answer$/, ""));
     keepNotice({text: `${allow ? (session ? "Approved for the session" : "Approved") : "Denied"}: ${plain.textContent}${
       (a.cmd || []).length ? ` (${a.cmd.join(" ")})` : ""}`, level: allow ? "info" : "warn", kind: "ask"});
   }
@@ -714,12 +729,12 @@ function drawBell(){
   // ...headed as the doctor's and the gear's are (the operator, 22 Oct),
   // See all at the head's right where the eye starts.
   const head = `<div class="popbar"><b>Notifications</b><button type="button" id="bellAll">See all</button></div>`;
-  panel.innerHTML = head + (answer.length + needs.length + said.length
+  drawHTML(panel, head + (answer.length + needs.length + said.length
     ? group("Waiting on you", answer) + group("Needs attention", needs)
       + group("Recent", said.slice(0, 5), `<button type="button" id="bellClear">Clear</button>`, said.length)
     // Before the first status read nothing is known yet, which is not
     // nothing to report.
-    : !state ? `<div class="bempty">${skRows(2)}</div>` : `<div class="bempty">nothing to report</div>`) + putAway;
+    : !state ? `<div class="bempty">${skRows(2)}</div>` : `<div class="bempty">nothing to report</div>`) + putAway);
   // Any press in the drawer closes it, after the press's own handler has
   // run (the operator, 7 Oct): Approve, Deny, an invitation's answer, Clear,
   // a link to where a row is about. One listener on the drawer, so a row
@@ -746,8 +761,8 @@ function drawBell(){
   panel.querySelectorAll("[data-binvite]").forEach(a => a.onclick = async e => {
     e.preventDefault();
     const yes = a.dataset.yes === "1";
-    const j = await (await postJSON("/api/members", {action: yes ? "accept" : "decline",
-                                                     id: Number(a.dataset.binvite)})).json().catch(() => ({}));
+    const j = await postJSON("/api/members", {action: yes ? "accept" : "decline",
+                                                     id: Number(a.dataset.binvite)});
     notify(j.error || (yes ? (j.owner ? `you own ${projLabel(j.project)} now` : `you are on ${projLabel(j.project)} now`)
                            : `declined ${projLabel(j.project)}`), !!j.error);
     refresh();
@@ -807,8 +822,7 @@ function wireNeeds(root, after = () => {}){
   // every browser it opens; a newer version notes again.
   root.querySelectorAll("[data-bdismiss]").forEach(a => a.onclick = async e => {
     e.preventDefault();
-    const j = await (await postJSON("/api/bell", {action: "dismiss", keys: a.dataset.bdismiss.split(" ")}))
-      .json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/bell", {action: "dismiss", keys: a.dataset.bdismiss.split(" ")});
     if (j.error) notify(j.error, true);
     refresh();
   });
@@ -819,15 +833,14 @@ function wireNeeds(root, after = () => {}){
     e.preventDefault();
     if (a.getAttribute("aria-busy") === "true") return;
     a.setAttribute("aria-busy", "true");
-    const j = await (await postJSON("/api/bell", {action: "resume", node: a.dataset.bheld, session: a.dataset.session}))
-      .json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/bell", {action: "resume", node: a.dataset.bheld, session: a.dataset.session});
     a.removeAttribute("aria-busy");
     notify(j.error || (j.sent ? `told ${a.dataset.claude} to pick up where it stopped`
                                 : `the line is in ${a.dataset.claude}'s input, not sent: it was busy (a turn or its check running) or a question was on its screen; Enter in it sends it`), !!j.error);
     refresh();
   });
   root.querySelectorAll("#bellRestore, [data-brestore]").forEach(restore => restore.onclick = async () => {
-    const j = await (await postJSON("/api/bell", {action: "restore"})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/bell", {action: "restore"});
     if (j.error) notify(j.error, true);
     refresh();
   });
@@ -907,7 +920,7 @@ function wireNeeds(root, after = () => {}){
   // ...and a release's Update (R90 step 5): the own node's job, said once queued.
   root.querySelectorAll("[data-brelease]").forEach(a => a.onclick = async e => {
     e.preventDefault();
-    const j = await (await postJSON("/api/v1/nodes", {action: "controller-update", id: a.dataset.brelease})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/v1/nodes", {action: "controller-update", id: a.dataset.brelease});
     notify(j.error || "updating: the installer runs on this machine's node, and the page comes back on the new release", !!j.error);
     after();
   });

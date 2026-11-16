@@ -8,7 +8,6 @@
 
 let vmsData = null;             // the last /api/vms answer, null before the first
 let vmsErr = "";
-let vmsRev = 0;
 let vmsSearch = "";
 let vmsNode = "";               // the node picked in the bar, "" for every one
 let vmsChip = "";               // the project chip pressed, "" for All (a view, never saved)
@@ -26,18 +25,19 @@ function openVmsTab(){
   openTab({kind: "vms", arg: "__vms", label: "VMs"});
 }
 
-async function loadVms(){
-  try{
-    const j = await (await bootFetch("/api/vms")).json();
-    vmsErr = j.error || "";
-    vmsData = j;
-  }catch(e){
-    vmsErr = String(e);
-    vmsData = vmsData || {vms: [], images: [], hosts: [], can: {}};
-  }
-  vmsRev++;
-  vmReapConsoles();
-  if (tabs.some(t => t.kind === "vms")) drawPanes();
+function loadVms(){
+  return reading("vms", async () => {
+    try{
+      const j = await getJSON("/api/vms");
+      vmsErr = j.error || "";
+      vmsData = j;
+    }catch(e){
+      vmsErr = String(e);
+      vmsData = vmsData || {vms: [], images: [], hosts: [], can: {}};
+    }
+    vmReapConsoles();
+    if (tabs.some(t => t.kind === "vms")) drawPanes();
+  });
 }
 // A console tab is the account's and outlives the page, so one whose VM was
 // removed while no page watched it stayed in the dock onto nothing (B172):
@@ -173,7 +173,7 @@ async function vmCloneAsk(nodeId, from){
   const a = await ask({title: `Clone ${from} into a space?`, text: `Each of its disks is copied into the node's VM folder, the original untouched and still defined, so you can try the copy before removing it. The copy keeps its vCPUs, memory, firmware, MAC address and passthrough: run one of the two at a time.\n\nThe copy's name, then the space it goes to.`,
                        choices, field: {value: from.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 31) || "vm", label: "Name"}});
   if (!a) return;
-  const j = await (await postJSON("/api/vms", {action: "clone", project: a.value, node: nodeId, from, name: String(a.text || "").trim()})).json().catch(() => ({error: "no answer"}));
+  const j = await postJSON("/api/vms", {action: "clone", project: a.value, node: nodeId, from, name: String(a.text || "").trim()});
   notify(j.error || `cloning ${from}: its disks are copied on the node, then it is on the VMs page under ${a.value === "machine" ? "This machine's own" : projLabel(a.value)}`, !!j.error);
   if (!j.error && typeof loadVms === "function") loadVms();
 }
@@ -234,9 +234,9 @@ function renderVmsInto(i){
   if (!el) return;
   el.classList.add("flush");
   if (!vmsData){
-    el.innerHTML = `<div class="doctab vmtab">${skTpl(`${vmBar(true)}${statTiles([{label: "running", value: GHOST, sub: GHOST},
+    drawHTML(el, `<div class="doctab vmtab">${skTpl(`${vmBar(true)}${statTiles([{label: "running", value: GHOST, sub: GHOST},
         {label: "spaces", value: GHOST}, {label: "snapshots", value: GHOST}])}
-      <section class="dmcard"><div class="field dmgroup"><b>${skv(8)}</b></div>${skRows(2)}</section>`)}</div>`;
+      <section class="dmcard"><div class="field dmgroup"><b>${skv(8)}</b></div>${skRows(2)}</section>`)}</div>`);
     loadVms();
     return;
   }
@@ -307,14 +307,14 @@ function wireVms(el){
         if (!vmsData?.take?.[v.project])
           return notify(`${andList(held)} ${held.length > 1 ? "have" : "has"} ${v.name}'s Console open: it is one person's at a time. Its Screen can be shared, or ask them.`, true);
         if (!await askYes(`Take ${v.name}'s Console from ${andList(held)}?\n\nA console is one person's at a time: theirs ends, and they are told you took it. Its Screen can be shared instead.`)) return;
-        const j = await (await postJSON("/api/vms", {action: "console-take", project: v.project, name: v.name})).json();
+        const j = await postJSON("/api/vms", {action: "console-take", project: v.project, name: v.name});
         if (j.error) return notify(j.error, true);
       }
       openTab({kind: "term", arg: `vm:${v.project}:${v.name}`, label: `console ${v.name}`});
     });
     row.querySelectorAll("[data-vmhw]").forEach(b => b.onclick = () => openVmHardware(v));
     row.querySelectorAll("[data-vmauto]").forEach(c => c.onchange = () => pressing(c, async () => {
-      const j = await (await postJSON("/api/vms", {action: "autostart", project: v.project, name: v.name, on: c.checked})).json();
+      const j = await postJSON("/api/vms", {action: "autostart", project: v.project, name: v.name, on: c.checked});
       if (j.error){ notify(j.error, true); c.checked = !c.checked; }
       else notify(`${v.name} ${c.checked ? "starts" : "no longer starts"} with its host`);
     }));
@@ -356,7 +356,7 @@ function wireVms(el){
       if (b.dataset.force) body.force = true;
       busy(b, {start: "Starting", stop: "Stopping", restart: "Restarting", remove: "Removing", snapshot: "Saving",
                revert: "Reverting", "snapshot-rm": "Deleting", eject: "Ejecting", "disk-grow": "Growing", "disk-add": "Adding"}[action] || "Working");
-      const j = await (await postJSON("/api/vms", body)).json();
+      const j = await postJSON("/api/vms", body);
       if (!j.error && action === "stop" && !body.force) vmStopAsked[`${v.project}/${v.name}`] = Date.now();
       if (j.error) notify(j.error, true);
       else notify(`${v.name}: ${action === "snapshot-rm" ? "snapshot delete" : action} queued`);
@@ -388,7 +388,7 @@ function openNewVm(forProject = ""){
       <optgroup label="Installers on this node">${optionList(isos.map(i => ["iso:" + i.name, `${i.name} (${i.mb} MB)`]))}
         <option value="iso-add">Add an ISO…</option></optgroup>`;
   };
-  m.innerHTML = `<div class="box"><h3>New VM</h3>
+  drawHTML(m, `<div class="box"><h3>New VM</h3>
     <div class="prefrow ctlrow">
       <div class="setrow col ctlrow">${lbl("vmName", "Name")}<input id="vmName" maxlength="31" autocomplete="off" spellcheck="false" placeholder="db"></div>
       <div class="setrow col ctlrow">${lbl("vmProject", "Belongs to", "a space, whose sessions reach it; or this machine's own, an administrator's alone")}<select id="vmProject">${optionList(projects.map(p => [p, vmOwner(p)]), forProject)}</select></div>
@@ -436,7 +436,7 @@ function openNewVm(forProject = ""){
       <div id="vmHwBox"></div>
     </details>
     <div class="field" id="vmWhyF" hidden><div class="hint bad" id="vmWhy"></div></div>
-    ${dlgFoot(`<button type="button" id="vmCancel">Cancel</button>`, `<button type="button" id="vmGo" class="primary">Make it</button>`)}</div>`;
+    ${dlgFoot(`<button type="button" id="vmCancel">Cancel</button>`, `<button type="button" id="vmGo" class="primary">Make it</button>`)}</div>`);
   m.hidden = false;
   const $m = s => m.querySelector(s);
   // More opens as every fold here does, slid rather than snapped.
@@ -455,18 +455,18 @@ function openNewVm(forProject = ""){
   const hwBox = () => {
     const nid = $m("#vmNode").value;
     document.getElementById("vmhwmodal")?.replaceChildren();   // one set of the fields' ids on the page
-    $m("#vmHwBox").innerHTML = vmHwFields((vmsData?.hosts || []).find(h => h.id === nid), {}, !!state?.can?.admin);
+    drawHTML($m("#vmHwBox"), vmHwFields((vmsData?.hosts || []).find(h => h.id === nid), {}, !!state?.can?.admin));
     vmHwWire($m("#vmHwBox"), nid, $m("#vmProject").value);
   };
   hwBox();
-  $m("#vmNode").onchange = () => { $m("#vmOs").innerHTML = fromOptions($m("#vmNode").value); from(); hwBox(); };
+  $m("#vmNode").onchange = () => { drawHTML($m("#vmOs"), fromOptions($m("#vmNode").value)); from(); hwBox(); };
   $m("#vmOs").onchange = from;
   $m("#vmCancel").onclick = () => { m.hidden = true; };
   $m("#vmAgent").onchange = () => { $m("#vmAgentHint").hidden = !$m("#vmAgent").checked; };
   $m("#vmIsoGo").onclick = () => pressing($m("#vmIsoGo"), async () => {
     busy($m("#vmIsoGo"), "Asking");
-    const j = await (await postJSON("/api/vms", {action: "iso-add", project: $m("#vmProject").value, node: $m("#vmNode").value,
-      url: $m("#vmIsoUrl").value.trim(), sha256: $m("#vmIsoSum").value.trim()})).json();
+    const j = await postJSON("/api/vms", {action: "iso-add", project: $m("#vmProject").value, node: $m("#vmNode").value,
+      url: $m("#vmIsoUrl").value.trim(), sha256: $m("#vmIsoSum").value.trim()});
     $m("#vmIsoGo").disabled = false; $m("#vmIsoGo").textContent = "Fetch it onto the node";
     if (j.error) return say(j.error);
     say("");
@@ -478,10 +478,7 @@ function openNewVm(forProject = ""){
     if (!f) return;
     busy($m("#vmIsoUp"), "Uploading");
     const q = new URLSearchParams({project: $m("#vmProject").value, node: $m("#vmNode").value, name: f.name});
-    let j;
-    try{ j = await (await fetch("/api/vms-iso-upload?" + q, {method: "POST", body: f,
-                                 headers: {"Content-Type": "application/octet-stream"}})).json(); }
-    catch(e){ j = {error: String(e)}; }
+    const j = await postFile("/api/vms-iso-upload?" + q, f, "application/octet-stream");
     $m("#vmIsoUp").disabled = false; $m("#vmIsoUp").textContent = "Upload it to the node";
     if (j.error) return say(j.error);
     say("");
@@ -491,14 +488,14 @@ function openNewVm(forProject = ""){
     busy($m("#vmGo"), "Making");
     const v = $m("#vmOs").value, iso = v.startsWith("iso:") ? v.slice(4) : "";
     const disks = $m("#vmDisks").value.split(",").map(x => x.trim()).filter(Boolean).map(Number);
-    const j = await (await postJSON("/api/vms", {action: "new", project: $m("#vmProject").value,
+    const j = await postJSON("/api/vms", {action: "new", project: $m("#vmProject").value,
       name: $m("#vmName").value.trim(), node: $m("#vmNode").value,
       ...(iso ? {iso, boot: $m("#vmFw").value} : {os: v, keys: $m("#vmKey").value.split("\n").map(s => s.trim()).filter(Boolean),
                                                   node_agent: $m("#vmAgent").checked}),
       vcpus: +$m("#vmCpu").value, mem_mb: Math.round(+$m("#vmMem").value * 1024), disk_gb: +$m("#vmDisk").value,
       ...(disks.length ? {disks} : {}), ...($m("#vmMac").value.trim() ? {mac: $m("#vmMac").value.trim()} : {}),
       ...($m("#vmPw").value ? {console_password: $m("#vmPw").value} : {}),
-      hw: vmHwRead($m("#vmHwBox")), autostart: $m("#vmAuto").checked})).json();
+      hw: vmHwRead($m("#vmHwBox")), autostart: $m("#vmAuto").checked});
     if (j.error){ say(j.error); $m("#vmGo").disabled = false; $m("#vmGo").textContent = "Make it"; return; }
     m.hidden = true;
     notify(iso ? `${j.key}: starting from ${iso} on ${j.node}; open its Screen to install`
@@ -616,7 +613,7 @@ function vmHwWire(root, nodeId, project){
   if (mb) mb.onclick = e => { e.preventDefault(); root.querySelector("#vmHwMac").value = vmNewMac(); };
   root.querySelectorAll("[data-vbios]").forEach(b => b.onclick = e => { e.preventDefault(); pressing(b, async () => {
     busy(b, "Asking");
-    const j = await (await postJSON("/api/vms", {action: "vbios", project, node: nodeId, addr: b.dataset.vbios})).json();
+    const j = await postJSON("/api/vms", {action: "vbios", project, node: nodeId, addr: b.dataset.vbios});
     b.disabled = false; b.textContent = "Dump vBIOS";
     notify(j.error || `reading ${b.dataset.vbios}'s vBIOS on the node; the job says how it went`, !!j.error);
   }); });
@@ -631,7 +628,7 @@ function vmHwWire(root, nodeId, project){
       const bytes = new Uint8Array(await f.arrayBuffer());
       let bin = "";
       for (let i = 0; i < bytes.length; i += 32768) bin += String.fromCharCode(...bytes.subarray(i, i + 32768));
-      const j = await (await postJSON("/api/vms", {action: "vbios", project, node: nodeId, addr: b.dataset.vbiosgive, rom: btoa(bin)})).json();
+      const j = await postJSON("/api/vms", {action: "vbios", project, node: nodeId, addr: b.dataset.vbiosgive, rom: btoa(bin)});
       notify(j.error || `${f.name}: kept on the node for ${b.dataset.vbiosgive}`, !!j.error);
     });
     pick.click();
@@ -648,16 +645,16 @@ function openVmHardware(v){
   }
   const host = (vmsData?.hosts || []).find(h => h.id === v.node);
   document.getElementById("vmHwBox")?.replaceChildren();   // New VM's, so the fields' ids are this dialog's alone
-  m.innerHTML = `<div class="box"><h3>${esc(v.name)}'s hardware</h3>
+  drawHTML(m, `<div class="box"><h3>${esc(v.name)}'s hardware</h3>
     ${vmHwFields(host, v.hw || {}, !!state?.can?.admin)}
     <div class="field" id="vmHwWhyF" hidden><div class="hint bad" id="vmHwWhy"></div></div>
-    ${dlgFoot(`<button type="button" id="vmHwCancel">Cancel</button>`, `<button type="button" id="vmHwGo" class="primary">Save</button>`)}</div>`;
+    ${dlgFoot(`<button type="button" id="vmHwCancel">Cancel</button>`, `<button type="button" id="vmHwGo" class="primary">Save</button>`)}</div>`);
   m.hidden = false;
   vmHwWire(m, v.node, v.project);
   m.querySelector("#vmHwCancel").onclick = () => { m.hidden = true; };
   m.querySelector("#vmHwGo").onclick = () => pressing(m.querySelector("#vmHwGo"), async () => {
     busy(m.querySelector("#vmHwGo"), "Saving");
-    const j = await (await postJSON("/api/vms", {action: "hardware", project: v.project, name: v.name, hw: vmHwRead(m)})).json();
+    const j = await postJSON("/api/vms", {action: "hardware", project: v.project, name: v.name, hw: vmHwRead(m)});
     if (j.error){ m.querySelector("#vmHwWhy").textContent = j.error; m.querySelector("#vmHwWhyF").hidden = false;
                   m.querySelector("#vmHwGo").disabled = false; m.querySelector("#vmHwGo").textContent = "Save"; return; }
     m.hidden = true;

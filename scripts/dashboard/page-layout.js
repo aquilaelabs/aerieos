@@ -5,8 +5,8 @@
 // 5 Oct); and render(), the one draw of the page every change ends in.
 //
 // One classic script beside index.html (docs/design-language.md, Files):
-// pure declarations, nothing runs at load. What runs at load stays in
-// index.html under the section's header.
+// pure declarations, nothing runs at load. What runs at load is
+// page-boot.js's, under the section's header.
 
 "use strict";
 
@@ -89,9 +89,7 @@ async function pushLayout(){
   const body = lastSaved;
   let ok = false;
   try{
-    const r = await fetch("/api/layout", {method:"POST",
-      headers:{"Content-Type":"application/json"}, body});
-    const j = await r.json();
+    const j = await postJSON("/api/layout", JSON.parse(body));
     if (typeof j.rev === "number"){ myRev = j.rev; ok = true; }
   }catch(e){ /* below */ }
   pushing = false;

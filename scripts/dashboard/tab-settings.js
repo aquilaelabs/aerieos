@@ -16,24 +16,21 @@
 // What the controller offers and holds of its companions (apps.view), for
 // the Apps section here and the Library's Companions cards (the Apps page's
 // read until R170).
-let devApps = null, devAppsRev = 0;
-async function loadApps(){
+let devApps = null;
+function loadApps(){
   // Switched off on this install (R81): the route refuses, so it is not asked.
-  if (featureOff("apps")){ devAppsRev++; return; }
-  try{
-    const r = await bootFetch("/api/apps");
-    const j = await r.json();
+  if (featureOff("apps")){ readMoved("apps"); return Promise.resolve(); }
+  return reading("apps", async () => {
+    const j = await getJSON("/api/apps");
+    // ...and one that could not be read leaves the section saying so.
     if (!j.error) devApps = j;
-  }catch(e){ /* the section says it could not read them */ }
-  devAppsRev++;
-  if (tabs.some(t => t.kind === "settings")) drawPanes();
+  });
 }
 
 // Revert on a section puts its fields back to what is saved: the draft for
 // them dropped and the tab repainted, which the live key has to notice.
-let settingsRev = 0;
 function settingsLive(){
-  return JSON.stringify([state?.settings?.settings, state?.settings?.tunnel, state?.idle, state?.logs, state?.paths, settingsRev, devAppsRev, state?.checks]);
+  return JSON.stringify([state?.settings?.settings, state?.settings?.tunnel, state?.idle, state?.logs, state?.paths, readRev("settings"), readRev("apps"), state?.checks]);
 }
 
 // Typed and not yet applied, by control id, across the tab's redraws: one
@@ -127,8 +124,8 @@ function renderSettingsInto(i){
     const titles = [["logs", "Logs"], ["reports", "AerieOS bug reports"], ["idle", "Idle sessions"], ["paths", "Storage on this controller"],
       ...SETTING_GROUPS.filter(g => !g.debug && !g.bare && !NETWORK_GROUPS.includes(g.key)).map(g => [g.key, g.title]),
       ["copies", "Backup copies"], ["move", "Move this controller"], ["reset", "Reset AerieOS"]];
-    d.list.innerHTML = `${head}<div class="sectjump" data-sects></div>
-      ${titles.map(([k, t]) => sect(k, t, "", `<div class="field loading">${skRows(2)}</div>`)).join("")}`;
+    drawHTML(d.list, `${head}<div class="sectjump" data-sects></div>
+      ${titles.map(([k, t]) => sect(k, t, "", `<div class="field loading">${skRows(2)}</div>`)).join("")}`);
     sectJump(d.list.querySelector("[data-sects]"));
     return;
   }
@@ -165,7 +162,7 @@ function renderSettingsInto(i){
   d.el.querySelectorAll("[data-srevert]").forEach(b => b.onclick = () => {
     const sec = b.closest("details.sect");
     sec?.querySelectorAll("input, select").forEach(i => { if (i.id) delete settingsDraft[i.id]; });
-    settingsRev++;
+    readMoved("settings");
     drawPanes();
     fieldsBack(sec);
     if (sec?.isConnected) settingsWake(d.el);
@@ -182,7 +179,7 @@ function renderSettingsInto(i){
   if (ac) ac.onclick = async () => {
     busy(ac, "Looking");
     try{
-      const j = await (await postJSON("/api/apps", {action: "check"})).json();
+      const j = await postJSON("/api/apps", {action: "check"});
       if (j.error) notify(j.error, true);
     }catch(e){ notify("could not reach the controller: " + failWords(e), true); }
     // The look runs in the background; read again once it has had a moment.
@@ -212,14 +209,13 @@ function withRevert(html, key){
 // Whoever reads Controller settings reads them; only a session reading them
 // is debug's. Read when the page draws it and after a delete, not on the poll.
 let reportsList = null;
-async function loadReports(){
-  try{
-    const j = await (await postJSON("/api/reports", {action: "list"})).json();
+function loadReports(){
+  return reading("settings.reports", async () => {
+    const j = await postJSON("/api/reports", {action: "list"});
     if (j.error) return;
     reportsList = j.reports || [];
-  }catch{ return; }
-  settingsRev++;
-  drawPanes();
+    readMoved("settings");
+  });
 }
 const reportsCount = () => reportsList === null ? null : reportsList.length;
 // A bare-metal install's updates (R90 step 5): the release running, the
@@ -273,11 +269,13 @@ function updatesSection(){
 // Back up now writes a copy to every folder where they go; the list is what
 // is there, newest first, each under the state downloadable (sealed).
 let backupData = null, backupAsked = false;
-async function loadBackup(){
+function loadBackup(){
   backupAsked = true;
-  try{ backupData = await (await fetch("/api/backup")).json(); }
-  catch(e){ backupData = {error: "backup: " + failWords(e)}; }
-  settingsRev++; drawPanes();
+  return reading("settings.backup", async () => {
+    backupData = await getJSON("/api/backup");
+    if (backupData.error) backupData = {error: "backup: " + backupData.error};
+    readMoved("settings");
+  });
 }
 function backupSection(){
   if (backupData === null){ if (!backupAsked) loadBackup(); return `<div class="field">${skRows(2)}</div>`; }
@@ -301,13 +299,13 @@ function wireBackup(root){
   root.querySelectorAll("[data-backupalsosave]").forEach(b => b.onclick = () => pressing(b, async () => {
     const ids = [...root.querySelectorAll("[data-backupalso]:checked")].map(x => x.dataset.backupalso);
     busy(b, "Saving");
-    const j = await (await postJSON("/api/settings", {set: {backup_also: ids.join(" ")}})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/settings", {set: {backup_also: ids.join(" ")}});
     notify(j.error || (ids.length ? `the next copy also goes to ${ids.length} disk${ids.length === 1 ? "" : "s"} or share${ids.length === 1 ? "" : "s"} off this machine` : "copies stay on this machine's pools"), !!j.error);
     await loadBackup();
   }));
   root.querySelectorAll("[data-backupnow]").forEach(b => b.onclick = () => pressing(b, async () => {
     busy(b, "Writing");
-    const j = await (await postJSON("/api/backup", {action: "now"})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/backup", {action: "now"});
     notify(j.error || `written: ${j.name} to ${(j.where || []).length} place${(j.where || []).length === 1 ? "" : "s"}`, !!j.error);
     await loadBackup();
   }));
@@ -321,19 +319,21 @@ function wireBackup(root){
 // it went, and the controller marks itself so when the new one tells it or
 // answers its asking. The moved band is page-shell.js's (drawMovedBand).
 let moveData = null, moveAsked = false, moveToken = null;
-async function loadMove(){
+function loadMove(){
   moveAsked = true;
-  const was = JSON.stringify(moveData);
-  try{ moveData = await (await fetch("/api/move?pieces=1")).json(); }
-  catch(e){ moveData = {error: "move: " + failWords(e)}; }
-  // Drawn once it has landed, as the backup copies are (B645: the section
-  // stayed its two shimmer rows after a reload, and Forget it drew nothing).
-  if (JSON.stringify(moveData) !== was){ settingsRev++; if (tabs.some(t => t.kind === "settings")) drawPanes(); }
-  // ...and read again every poll while a move is armed (B646): how many
-  // nodes have heard it, the last packing and the ask's answer move on
-  // their own, while the page is open and only then.
-  clearTimeout(moveTimer); moveTimer = null;
-  if (moveData?.prepared && tabs.some(t => t.kind === "settings")) moveTimer = setTimeout(loadMove, 15000);
+  return reading("settings.move", async () => {
+    const was = JSON.stringify(moveData);
+    moveData = await getJSON("/api/move?pieces=1");
+    if (moveData.error) moveData = {error: "move: " + moveData.error};
+    // Drawn once it has landed, as the backup copies are (B645: the section
+    // stayed its two shimmer rows after a reload, and Forget it drew nothing).
+    if (JSON.stringify(moveData) !== was) readMoved("settings");
+    // ...and read again every poll while a move is armed (B646): how many
+    // nodes have heard it, the last packing and the ask's answer move on
+    // their own, while the page is open and only then.
+    clearTimeout(moveTimer); moveTimer = null;
+    if (moveData?.prepared && tabs.some(t => t.kind === "settings")) moveTimer = setTimeout(loadMove, 15000);
+  });
 }
 let moveTimer = null;
 function moveStatus(){
@@ -434,12 +434,12 @@ function wireMove(root){
     const box = b.closest("[data-movelandbox]"), prog = document.createElement("div");
     prog.className = "field landprog";
     if (box) box.append(prog);
-    const draw = (sent, total) => { prog.innerHTML = `<div class="sub">Sending the bundle: ${moveSize(sent)} of ${moveSize(total)}</div>${pctBar(total ? sent / total * 100 : 0, "bundle sent")}`; };
+    const draw = (sent, total) => { drawHTML(prog, `<div class="sub">Sending the bundle: ${moveSize(sent)} of ${moveSize(total)}</div>${pctBar(total ? sent / total * 100 : 0, "bundle sent")}`); };
     const j = await new Promise(resolve => {
       const x = new XMLHttpRequest();
       x.open("POST", "/api/move-land");
       if (file) x.upload.onprogress = e => { if (e.lengthComputable) draw(e.loaded, e.total); };
-      x.upload.onload = () => { prog.innerHTML = `<div class="sub">Sent. Landing it: unpacking, then the swap<span class="dots"></span></div>`; busy(b, "Landing"); };
+      x.upload.onload = () => { drawHTML(prog, `<div class="sub">Sent. Landing it: unpacking, then the swap<span class="dots"></span></div>`); busy(b, "Landing"); };
       x.onload = () => { let r = {}; try{ r = JSON.parse(x.responseText); }catch(e){ r = {error: x.status === 200 ? "no answer" : `HTTP ${x.status}`}; } resolve(r); };
       x.onerror = () => resolve({error: "the landing stopped: the connection dropped"});
       x.send(fd);
@@ -454,7 +454,7 @@ function wireMove(root){
     busy(b, "Preparing");
     const on = k => !!root.querySelector(`[data-movepiece="${k}"]`)?.checked;
     const stores = [...root.querySelectorAll('[data-movepiece^="store:"]')].filter(x => x.checked).map(x => x.dataset.movepiece.slice(6));
-    const j = await (await postJSON("/api/move", {action: "prepare", to: $("moveTo")?.value || "", repos: on("repos"), carry_key: on("install_key"), stores})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/move", {action: "prepare", to: $("moveTo")?.value || "", repos: on("repos"), carry_key: on("install_key"), stores});
     if (j.error){ notify(j.error, true); unbusy(b, "Prepare to move"); return; }
     if ((j.said || []).length) notify(j.said.join(". "), true);
     moveToken = j.token;
@@ -466,7 +466,7 @@ function wireMove(root){
     const on = k => !!root.querySelector(`[data-movepiece="${k}"]`)?.checked;
     const stores = [...root.querySelectorAll('[data-movepiece^="store:"]')].filter(x => x.checked).map(x => x.dataset.movepiece.slice(6));
     busy(b, "Packing");
-    const j = await (await postJSON("/api/move", {action: "backup", repos: on("repos"), carry_key: on("install_key"), stores})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/move", {action: "backup", repos: on("repos"), carry_key: on("install_key"), stores});
     unbusy(b, "Download a backup");
     if (j.error){ notify(j.error, true); return; }
     const typed = await askText(`The backup's token, shown once and never kept here:\n\n${j.token}\n\nRecord it: the backup opens only under it, on a new controller's first setup, and whoever holds the file and the token holds this controller's data${on("install_key") ? " and its install key" : ""}. Nothing is armed, so no node hears of it. It is the controller and what was ticked, not the files on your pools: the Storage page's snapshots and Backups keep those.\n\nType the token's last four characters to download the file.`,
@@ -483,7 +483,7 @@ function wireMove(root){
   // failure came back as a page of JSON).
   root.querySelectorAll("[data-movebundle]").forEach(b => b.onclick = () => pressing(b, async () => {
     busy(b, "Packing");
-    const j = await (await postJSON("/api/move", {action: "pack"})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/move", {action: "pack"});
     unbusy(b, "Download the bundle");
     if (j.error){ notify(j.error, true); return; }
     const a = document.createElement("a");
@@ -493,14 +493,14 @@ function wireMove(root){
   }));
   root.querySelectorAll("[data-moveforget]").forEach(b => b.onclick = () => pressing(b, async () => {
     if (!await askYes("Forget this move?\n\nThe key is gone from here, so no node will follow a controller restored from its bundle, and the nodes hear of it no more. A bundle already downloaded still opens under its token, as a backup does.", {title: "Forget the move?", verb: "Forget it", danger: true})) return;
-    const j = await (await postJSON("/api/move", {action: "forget"})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/move", {action: "forget"});
     if (j.error) notify(j.error, true);
     moveToken = null;
     await loadMove();
   }));
   root.querySelectorAll("[data-moveask]").forEach(b => b.onclick = () => pressing(b, async () => {
     busy(b, "Asking");
-    const j = await (await postJSON("/api/move", {action: "ask"})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/move", {action: "ask"});
     if (j.error) notify(j.error, true);
     else notify(j.moved ? "it landed: this controller is marked moved" : `not landed there yet${j.asked_error ? `: ${j.asked_error}` : ""}`);
     await loadMove();
@@ -508,7 +508,7 @@ function wireMove(root){
   }));
   root.querySelectorAll("[data-movedone]").forEach(b => b.onclick = () => pressing(b, async () => {
     if (!await askYes("Mark this controller as moved?\n\nFrom now on it is read-only and tells its nodes where it went; press this once the new home is up and answering, or let it learn so by itself.", {title: "Moved?", verb: "Mark as moved", danger: true})) return;
-    const j = await (await postJSON("/api/move", {action: "moved"})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/move", {action: "moved"});
     if (j.error) notify(j.error, true);
     await loadMove();
     await refresh();
@@ -518,7 +518,7 @@ function wireMove(root){
 function wireUpdates(root){
   // The channel's pick (R179): saved, then the newest asked for again.
   root.querySelectorAll("[data-relchannel]").forEach(s => s.onchange = async () => {
-    const j = await (await postJSON("/api/settings", {set: {release_channel: s.value}})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/settings", {set: {release_channel: s.value}});
     if (j.error){ notify(j.error, true); return; }
     await postJSON("/api/v1/nodes", {action: "release-check"}).catch(() => {});
     await refresh();
@@ -527,18 +527,18 @@ function wireUpdates(root){
     const reboot = !!$("hostReboot")?.checked;
     if (!await askYes(`Update the system's own packages?\n\napt brings every package to its newest with the configuration files kept as they are${reboot ? ", and the machine restarts after if the update asks for it" : "; a restart, if one is needed, is yours to press after"}. The log is on the Jobs page.`, {title: "Apply updates?", verb: "Update"})) return;
     busy(b, "Updating");
-    const j = await (await postJSON("/api/v1/nodes", {action: "host-update", id: b.dataset.hostupdate, reboot})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/v1/nodes", {action: "host-update", id: b.dataset.hostupdate, reboot});
     notify(j.error || "updating: the job runs on this machine; its log is on the Jobs page", !!j.error);
   }));
   root.querySelectorAll("[data-hostreboot]").forEach(b => b.onclick = () => pressing(b, async () => {
     if (!await askYes("Restart this machine now? Every session and container on it stops until it is back.", {title: "Restart?", verb: "Restart", danger: true})) return;
     busy(b, "Restarting");
-    const j = await (await postJSON("/api/v1/nodes", {action: "reboot", id: b.dataset.hostreboot})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/v1/nodes", {action: "reboot", id: b.dataset.hostreboot});
     notify(j.error || "restarting: the page comes back when the machine does", !!j.error);
   }));
   root.querySelectorAll("[data-relcheck]").forEach(b => b.onclick = () => pressing(b, async () => {
     busy(b, "Checking");
-    const j = await (await postJSON("/api/v1/nodes", {action: "release-check"})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/v1/nodes", {action: "release-check"});
     if (j.error) notify(j.error, true);
     await refresh();
   }));
@@ -547,14 +547,14 @@ function wireUpdates(root){
     if (!from){ notify("name the folder on this machine that holds the release's ISO with its .sha256 and .attestation.jsonl", true); return; }
     if (!await askYes(`Write the ISO in ${from} into the other slot?\n\nThe ISO is checked against the sha256 beside it; the slot not in use takes it and boots next; nothing running changes until you restart.`, {title: "Update from a folder?", verb: "Write the slot"})) return;
     busy(b, "Updating");
-    const j = await (await postJSON("/api/v1/nodes", {action: "os-update", id: b.dataset.osfrom, from})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/v1/nodes", {action: "os-update", id: b.dataset.osfrom, from});
     notify(j.error || "updating: the job writes the other slot; restart from the Nodes page when it is done", !!j.error);
   }));
   root.querySelectorAll("[data-relpick]").forEach(b => b.onclick = () => pressing(b, async () => {
     const tag = $("relPick")?.value;
     if (!tag || !await askYes(`Install ${tag} on this machine?\n\nIt is fetched and checked as any update is. An older build may refuse this machine's state, and a dev build may not come up.`, {title: "Install this version?", verb: "Install"})) return;
     busy(b, "Installing");
-    const j = await (await postJSON("/api/v1/nodes", {action: b.dataset.os ? "os-update" : "controller-update", id: b.dataset.relpick, release: tag})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/v1/nodes", {action: b.dataset.os ? "os-update" : "controller-update", id: b.dataset.relpick, release: tag});
     notify(j.error || j.said || `installing ${tag}: its job is on the Jobs page`, !!j.error);
     unbusy(b, "Install this version");
   }));
@@ -562,13 +562,13 @@ function wireUpdates(root){
     if (b.dataset.os){
       if (!await askYes(`Update this machine to AerieOS ${state?.release?.newer}?\n\nThe release's image is fetched and checked (sha256, build attestation), written into the slot not in use and named for the next boot; nothing running changes until you restart from the Nodes page, and the slot running now stays to fall back to.`, {title: "Update the image?", verb: "Write the slot"})) return;
       busy(b, "Updating");
-      const j = await (await postJSON("/api/v1/nodes", {action: "os-update", id: b.dataset.relupdate, release: "v" + state.release.newer})).json().catch(() => ({error: "no answer"}));
+      const j = await postJSON("/api/v1/nodes", {action: "os-update", id: b.dataset.relupdate, release: "v" + state.release.newer});
       notify(j.error || j.said || "updating: the job writes the other slot; restart from the Nodes page when it is done", !!j.error);
       return;
     }
     if (!await askYes(`Update this install to ${state?.release?.newer}?\n\nThe installer runs on this machine's node: the bundle is fetched and checked, the state copied aside, the service switched to the new release and started. The page comes back on it; if it does not answer, the install goes back by itself.`)) return;
     busy(b, "Updating");
-    const j = await (await postJSON("/api/v1/nodes", {action: "controller-update", id: b.dataset.relupdate})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/v1/nodes", {action: "controller-update", id: b.dataset.relupdate});
     notify(j.error || "updating: the job runs on this machine's node; the page comes back on the new release", !!j.error);
   }));
 }
@@ -593,7 +593,7 @@ async function deleteReport(btn){
   const id = Number(btn.dataset.repdel);
   busy(btn, "");
   try{
-    const j = await (await postJSON("/api/reports", {action: "delete", id})).json();
+    const j = await postJSON("/api/reports", {action: "delete", id});
     if (j.error){ notify(j.error, true); unbusy(btn, ""); return; }
     notify(`report #${id} deleted`);
   }catch{ notify("could not delete the report", true); unbusy(btn, ""); return; }
@@ -609,7 +609,7 @@ async function clearReports(btn){
   if (!await askYes(`Delete all ${n} report${s} about AerieOS?`)) return;
   busy(btn, "Clearing");
   try{
-    const j = await (await postJSON("/api/reports", {action: "clear"})).json();
+    const j = await postJSON("/api/reports", {action: "clear"});
     if (j.error) notify(j.error, true);
     else notify(`cleared ${j.cleared} report${j.cleared === 1 ? "" : "s"}`);
   }catch{ notify("could not clear the reports", true); }
@@ -825,7 +825,7 @@ function checksStatus(){
 function wireChecks(root){
   root.querySelectorAll("[data-checknow]").forEach(b => b.onclick = () => pressing(b, async () => {
     busy(b, "Checking");
-    const j = await (await postJSON("/api/checks", {kind: b.dataset.checknow})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/checks", {kind: b.dataset.checknow});
     notify(j.error || "checking: the answer is here in a moment", !!j.error);
     setTimeout(() => refresh(), 4000);
   }));
@@ -857,23 +857,22 @@ function wireCatalogMirror(root){
     if (!f) return;
     const b = root.querySelector("[data-mirrorimport]");
     if (b) busy(b, "Importing");
-    const u = await fetch("/api/upload-archive?name=" + encodeURIComponent(f.name), {method: "POST", body: f});
-    const uj = await u.json().catch(() => ({}));
-    const j = !u.ok || uj.error ? {error: uj.error || `the upload failed (HTTP ${u.status})`}
-      : await (await postJSON("/api/catalog-mirror", {action: "import", archive: uj.id})).json().catch(() => ({error: "no answer"}));
+    const uj = await postFile("/api/upload-archive?name=" + encodeURIComponent(f.name), f);
+    const j = uj.error ? {error: `the upload failed: ${uj.error}`}
+      : await postJSON("/api/catalog-mirror", {action: "import", archive: uj.id});
     notify(j.error || `the mirror is imported: ${j.packs} entries, made ${j.generated}`, !!j.error);
     if (state && !j.error) state.catalog_mirror = j.mirror;
-    settingsRev++; drawPanes(); refresh();
+    readMoved("settings"); drawPanes(); refresh();
   };
   const fg = root.querySelector("[data-mirrorforget]");
   if (fg) fg.onclick = async e => {
     const b = e.currentTarget;
     if (!await askYes("Forget the catalog's mirror? The Library reads the catalog's address alone again; packs kept from the mirror stay.")) return;
     busy(b, "Forgetting");
-    const j = await (await postJSON("/api/catalog-mirror", {action: "forget"})).json().catch(() => ({error: "no answer"}));
+    const j = await postJSON("/api/catalog-mirror", {action: "forget"});
     notify(j.error || "the mirror is forgotten", !!j.error);
     if (state && !j.error) state.catalog_mirror = null;
-    settingsRev++; drawPanes();
+    readMoved("settings"); drawPanes();
   };
 }
 
@@ -955,7 +954,7 @@ async function askReset(){
   try { await loadNodes(); } catch {}
   const list = (nodesList || []).filter(n => n.kind === "agent" && n.state !== "retired");
   const shut = () => { modal.hidden = true; body.innerHTML = ""; };
-  body.innerHTML = `<div class="field">
+  drawHTML(body, `<div class="field">
       <div class="hint bad">Accounts, nodes, space settings, tokens, the notebook, memories and logs move into a dated
         directory under the controller's config. Space files stay. The next page is the setup page.</div>
     </div>
@@ -976,7 +975,7 @@ async function askReset(){
     </div>
     <div class="foot"><span class="sp"></span>
       <button type="button" id="resetKeep">Keep it</button>
-      <button type="button" class="danger" id="resetGo" disabled>Reset</button></div>`;
+      <button type="button" class="danger" id="resetGo" disabled>Reset</button></div>`);
   modal.hidden = false;
   const word = $("resetWord"), go = $("resetGo"), why = $("resetWhy");
   word.oninput = () => { go.disabled = word.value.trim() !== "reset"; };
@@ -986,8 +985,8 @@ async function askReset(){
     why.hidden = true;
     let j;
     try{
-      j = await (await postJSON("/api/reset", {confirm: word.value.trim(), unenroll: ids,
-        stores: !!$("resetStores")?.checked})).json();
+      j = await postJSON("/api/reset", {confirm: word.value.trim(), unenroll: ids,
+        stores: !!$("resetStores")?.checked});
     }catch(e){ j = {error: "no answer from the dashboard: " + e}; }
     if (j.error){ unbusy(go, "Reset"); why.textContent = j.error; why.hidden = false; return; }
     if (j.unenrolling) return resetFollow(body, ids, send);
@@ -1001,7 +1000,7 @@ async function askReset(){
 // stops it; then Reset anyway, which leaves the rest enrolled.
 function resetFollow(body, ids, send){
   const draw = j => {
-    body.innerHTML = `<div class="field">
+    drawHTML(body, `<div class="field">
         <div class="hint">Un-enrolling, then the reset. A machine reports its uninstall when it is done; this can take a few minutes.</div>
         ${(j.nodes || []).map(x => `<div class="ndcap">${esc(x.name)}: ${
           x.error ? `<span class="bad">${esc(x.error)}</span>` : x.done ? "done" : x.how === "uninstall" ? "uninstalling…" : "removing…"}</div>`).join("")}
@@ -1009,12 +1008,12 @@ function resetFollow(body, ids, send){
       </div>
       <div class="foot"><span class="sp"></span>${j.error ? `
         <button type="button" id="resetShut">Close</button>
-        <button type="button" class="danger" id="resetAnyway">Reset anyway</button>` : ""}</div>`;
+        <button type="button" class="danger" id="resetAnyway">Reset anyway</button>` : ""}</div>`);
     if (j.error){
       $("resetShut").onclick = () => { $("resetmodal").hidden = true; body.innerHTML = ""; };
       $("resetAnyway").onclick = async () => {
         let r;
-        try{ r = await (await postJSON("/api/reset", {confirm: "reset"})).json(); }
+        try{ r = await postJSON("/api/reset", {confirm: "reset"}); }
         catch(e){ r = {error: "no answer from the dashboard: " + e}; }
         if (r.error){ $("resetWhy").textContent = r.error; $("resetWhy").hidden = false; return; }
         resetGone(body, r.moved_to);
@@ -1023,7 +1022,7 @@ function resetFollow(body, ids, send){
   };
   const tick = async () => {
     let j;
-    try{ j = await (await fetch("/api/reset")).json(); }
+    try{ j = await getJSON("/api/reset"); }
     catch{ return resetGone(body, ""); }       // the controller is starting over
     draw(j);
     if (j.moved_to) return resetGone(body, j.moved_to);
@@ -1033,8 +1032,8 @@ function resetFollow(body, ids, send){
 }
 
 function resetGone(body, moved){
-  body.innerHTML = `<div class="field"><div class="hint">Reset: the dashboard is starting over${
-    moved ? `; the old state is in ${esc(moved)}` : ""}. The setup page follows.</div></div>`;
+  drawHTML(body, `<div class="field"><div class="hint">Reset: the dashboard is starting over${
+    moved ? `; the old state is in ${esc(moved)}` : ""}. The setup page follows.</div></div>`);
   setTimeout(() => { location.href = "/login"; }, 2500);
 }
 
@@ -1120,7 +1119,7 @@ function wireSettingsSections(el){
   el.querySelectorAll("[data-tlsissue]").forEach(b => b.onclick = async () => {
     busy(b, "Asking");
     try{
-      const j = await (await postJSON("/api/tls", {action: "issue"})).json();
+      const j = await postJSON("/api/tls", {action: "issue"});
       if (j.error) notify(j.error, true);
       else notify("asking Let's Encrypt: the Connection section says how it goes");
     }catch(e){ notify("could not ask: " + failWords(e), true); }
@@ -1139,14 +1138,13 @@ function wireSettingsSections(el){
       box.querySelectorAll("[data-clear]:checked").forEach(i => { set[i.dataset.clear] = ""; });
       busy(btn, "Applying");
       try{
-        const post = extra => fetch("/api/settings", {method: "POST",
-          headers: {"Content-Type": "application/json"}, body: JSON.stringify({set, ...extra})});
-        let j = await (await post({})).json();
+        const post = extra => postJSON("/api/settings", {set, ...extra});
+        let j = await post({});
         // Maintenance mode asks first, with every other account's sessions
         // and what each is doing, since turning it on ends them.
         if (j.confirm === "maintenance"){
           if (!await maintAsk(j.sessions || [])) return;
-          j = await (await post({confirmed: true})).json();
+          j = await post({confirmed: true});
         }
         if (j.error) return notify(j.error, true);
         box.querySelectorAll("[data-set]").forEach(i => { delete settingsDraft[i.id]; });
@@ -1200,10 +1198,7 @@ function wireIdleSection(el){
     const btn = el.querySelector("#idleApply");
     if (btn) busy(btn, "Applying");
     try{
-      const r = await fetch("/api/idle", {method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({minutes})});
-      const j = await r.json();
+      const j = await postJSON("/api/idle", {minutes});
       if (j.error) return notify(j.error, true);
       delete settingsDraft.idleMin;
       notify(j.minutes ? `every agent's session ends after ${j.minutes} idle minute(s), here and on every node`
@@ -1265,9 +1260,7 @@ function wirePathsSection(el){
     busy(btn, "Applying");
     try{
       for (const i of changed){
-        const r = await fetch("/api/paths", {method: "POST", headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({name: i.dataset.path, path: i.value.trim()})});
-        const j = await r.json();
+        const j = await postJSON("/api/paths", {name: i.dataset.path, path: i.value.trim()});
         if (j.error) return notify(`${i.dataset.path}: ${j.error}`, true);
         delete settingsDraft[i.id];
         notify(j.moving ? `${i.dataset.path}: moving what is there; it switches once it has arrived`

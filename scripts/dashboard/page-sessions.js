@@ -2,8 +2,8 @@
 // the tab each is in, and ending one.
 //
 // One classic script beside index.html (docs/design-language.md, Files):
-// pure declarations, nothing runs at load. What runs at load stays in
-// index.html under the section's header.
+// pure declarations, nothing runs at load. What runs at load is
+// page-boot.js's, under the section's header.
 
 "use strict";
 
@@ -142,8 +142,7 @@ async function killSession(name, node = ""){
 // End a session, no questions asked. killSession is this with the dialog in
 // front of it.
 async function endSession(name, node = "", wait = false){
-  const r = await postJSON("/api/session", {action:"kill", session:name, node, ...(wait ? {wait: true} : {})});
-  return r.json();
+  return postJSON("/api/session", {action:"kill", session:name, node, ...(wait ? {wait: true} : {})});
 }
 
 // ---- who has a session on a project ----
@@ -169,23 +168,25 @@ const othersOn = p => withMe(p).filter(n => n !== state?.me);
 // `live` moves: a session starting, ending or turning to work shows within
 // a few seconds, where the status poll runs git for every project and
 // stays at fifteen (the operator, 25 Sep).
-async function liveRefresh(){
-  let j;
-  try{ j = await (await fetch("/api/live")).json(); }catch(e){ return; }
-  if (!state || !j || j.error) return;
-  // Your own sessions starting or ending are what the cards' Manage agent,
-  // a project's header and its settings read off the status read's session
-  // list, which this light read does not carry and keeps putting off: so a
-  // change in yours reads it at once (the operator, 17 Oct: Start agent
-  // stayed until a reload).
-  const yours = w => Object.entries(w || {}).filter(([, ns]) => (ns || []).includes(state.me)).map(([k]) => k).sort().join(",");
-  const moved = yours(j.claude_with) !== yours(state.claude_with);
-  state.claude_with = j.claude_with || {};
-  state.claude_busy = j.claude_busy || {};
-  state.claude_asking = j.claude_asking || {};
-  state.claude_where = j.claude_where || {};
-  drawProjects(state.projects);
-  if (moved) refresh();
+function liveRefresh(){
+  return reading("live", async () => {
+    let j;
+    try{ j = await getJSON("/api/live"); }catch(e){ return; }
+    if (!state || !j || j.error) return;
+    // Your own sessions starting or ending are what the cards' Manage agent,
+    // a project's header and its settings read off the status read's session
+    // list, which this light read does not carry and keeps putting off: so a
+    // change in yours reads it at once (the operator, 17 Oct: Start agent
+    // stayed until a reload).
+    const yours = w => Object.entries(w || {}).filter(([, ns]) => (ns || []).includes(state.me)).map(([k]) => k).sort().join(",");
+    const moved = yours(j.claude_with) !== yours(state.claude_with);
+    state.claude_with = j.claude_with || {};
+    state.claude_busy = j.claude_busy || {};
+    state.claude_asking = j.claude_asking || {};
+    state.claude_where = j.claude_where || {};
+    drawProjects(state.projects);
+    if (moved) refresh();
+  });
 }
 function sessionRows(proj){
   const all = withMe(proj);

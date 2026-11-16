@@ -3,8 +3,8 @@
 // draws, and the busy state a button wears while its request runs.
 //
 // One classic script beside index.html (docs/design-language.md, Files):
-// pure declarations, nothing runs at load. What runs at load stays in
-// index.html under the section's header.
+// pure declarations, nothing runs at load. What runs at load is
+// page-boot.js's, under the section's header.
 
 "use strict";
 
@@ -91,11 +91,11 @@ function skv(em = 5, cls = ""){ return `<i class="skv${cls ? " " + esc(cls) : ""
 function dropBox(at, {q, sub = "", placeholder = "", max = 1000, verb, tone = "primary", place = "append", go, cancel}){
   const box = document.createElement("div");
   box.className = "dropbox ctlown";
-  box.innerHTML = `<div class="q">${esc(q)}${sub ? `<span>${esc(sub)}</span>` : ""}</div>
+  drawHTML(box, `<div class="q">${esc(q)}${sub ? `<span>${esc(sub)}</span>` : ""}</div>
     <textarea class="proseline" rows="1" maxlength="${Number(max) || 1000}" placeholder="${esc(placeholder)}"></textarea>
     <div class="actbar">
       <button type="button" class="stop">Cancel</button>
-      <button type="button" class="${esc(tone)}" data-dropgo>${esc(verb)}</button></div>`;
+      <button type="button" class="${esc(tone)}" data-dropgo>${esc(verb)}</button></div>`);
   if (place === "after") at.after(box); else at.appendChild(box);
   arriveBox(box);
   const ta = box.querySelector("textarea");
@@ -246,8 +246,8 @@ function bootOwn(root, tool){
   const was = doc.innerHTML;
   doc.id = "docboot";
   doc.innerHTML = "";
-  try{ spec.render("boot"); }catch(e){ doc.innerHTML = was; }
-  if (!doc.querySelector(".doclist > *")) doc.innerHTML = was;
+  try{ spec.render("boot"); }catch(e){ drawHTML(doc, was); }
+  if (!doc.querySelector(".doclist > *")) drawHTML(doc, was);
   doc.removeAttribute("id");
 }
 
@@ -334,11 +334,11 @@ function askInline(after, {label, value = "", ok = "OK", options = [], allowEmpt
     const list = options.length ? `askopts${++seq}` : "";
     const field = `<input type="text" autocomplete="off" spellcheck="false" aria-label="${esc(label)}"${
         list ? ` role="combobox" aria-expanded="false" aria-controls="${list}" aria-autocomplete="list"` : ""}>`;
-    box.innerHTML = `<label class="lbl">${esc(label)}</label><div class="askrow actbar ctlrow">${list
+    drawHTML(box, `<label class="lbl">${esc(label)}</label><div class="askrow actbar ctlrow">${list
         ? `<span class="combo">${field}<button type="button" class="combobtn" tabindex="-1" aria-label="every ${esc(label.toLowerCase())}">${CHEVRON_DOWN}</button>
             <span class="combolist" id="${list}" role="listbox" hidden></span></span>` : field}
       <button type="button" data-askno>Cancel</button><button type="button" class="primary" data-askok>${esc(ok)}</button>${
-        also ? `<button type="button" class="danger" data-askalso>${esc(also.label)}</button>` : ""}</div>`;
+        also ? `<button type="button" class="danger" data-askalso>${esc(also.label)}</button>` : ""}</div>`);
     // On a card's back the box takes the repositories' place, and the back
     // keeps its height while it is open: the card never changes size.
     const back = after.closest(".pcback");
@@ -376,9 +376,9 @@ function comboWire(box, inp, options){
     const q = inp.value.trim().toLowerCase();
     shown = all || !q ? options.slice() : options.filter(o => o.toLowerCase().includes(q));
     at = Math.min(at, shown.length - 1);
-    ul.innerHTML = shown.length ? shown.map((o, i) => `<button type="button" role="option" data-combo="${i}" aria-selected="${i === at}"${
+    drawHTML(ul, shown.length ? shown.map((o, i) => `<button type="button" role="option" data-combo="${i}" aria-selected="${i === at}"${
         i === at ? ' class="on"' : ""} tabindex="-1">${esc(o)}</button>`).join("")
-      : `<span class="combonone">none yet: what is typed is a new one</span>`;
+      : `<span class="combonone">none yet: what is typed is a new one</span>`);
     // Taken on the click, a press and its release on the one option, so a
     // press that holds to scroll the list takes nothing (B404); the press
     // itself only keeps the field's focus, whose blur would shut the list.
@@ -443,11 +443,11 @@ function docSurface(i, kind){
   let box = el.firstElementChild;
   if (!box || el.children.length !== 1 || !box.classList.contains("doctab") || !box.classList.contains(`${kind}tab`)
       || !box.querySelector(":scope > .doclist")){
-    el.innerHTML = `<div class="doctab ${esc(kind)}tab">
+    drawHTML(el, `<div class="doctab ${esc(kind)}tab">
       <div class="field docbarrow" hidden></div>
       <div class="doclist"></div>
       <div class="fnote" hidden></div>
-    </div>`;
+    </div>`);
     box = el.firstElementChild;
   }
   const bar = box.querySelector(":scope > .docbarrow");
@@ -629,7 +629,7 @@ function splitDraw(root){
       <span class="name">${esc(d.querySelector(":scope > summary .t")?.textContent || k)}</span>
       <span class="rtags">${say ? `<span class="dim">${esc(say)}</span>` : ""}<span class="sunsaved" hidden>unsaved</span></span></button>`; }).join("");
   if (nav.dataset.drawn !== html){
-    nav.innerHTML = html; nav.dataset.drawn = html;
+    drawHTML(nav, html); nav.dataset.drawn = html;
     nav.querySelectorAll("[data-spick]").forEach(b => b.onclick = () => {
       // The section on show pressed again at a desk is no change: nothing
       // drawn again, no fade (B317). On a phone the list stands in its place,
@@ -751,7 +751,7 @@ function sectJump(g){
   if (bar.className !== cls) bar.className = cls;
   if (bar.getAttribute("aria-label") !== "sections") bar.setAttribute("aria-label", "sections");
   const html = mine.map((o, i) => `<a href="#" data-jump="${i}">${esc(titleOf(o))}</a>`).join("");
-  if (bar.innerHTML !== html) bar.innerHTML = html;
+  if (bar.innerHTML !== html) drawHTML(bar, html);
   // At the top, before the surface's first section of any kind (the
   // operator, 25 Oct: pills at the top of a page and nowhere else); before
   // its first jump target it stood mid-page under the sections its chips
@@ -877,7 +877,7 @@ function oneOpen(g){
 // skipped, a single leftover is drawn inline (a menu of one is a detour),
 // and two or more make the menu; `always` makes the menu of one too, for a
 // table's buttons column, whose width is the ⋯'s whatever the row offers.
-// wireMore() wires the button; the page's one click listener (index.html)
+// wireMore() wires the button; the page's one click listener (page-boot.js)
 // shuts every open menu.
 function actMore(items, always = false){
   const have = items.filter(Boolean);
@@ -1009,16 +1009,6 @@ function closeMore(){
   });
 }
 
-function busy(btn, word){
-  if (!btn) return;
-  btn.disabled = true;
-  btn.setAttribute("aria-busy", "true");
-  btn.innerHTML = `${esc(word)}<span class="dots"></span>`;
-  // The one ticker every .dots on the page shares; it stops itself when
-  // the last one is repainted away.
-  if (!tcDotsTimer) tcDotsTimer = setInterval(tcTickDots, 400);
-}
-
 // A bar where the thing running reports an honest measure of its own (the
 // operator, 8 Nov: SnapRAID's percentage, an upload's bytes sent), under the
 // word that says what runs; "" for anything that reports none, since a bar
@@ -1028,27 +1018,6 @@ function pctBar(said, label = "progress"){
   const m = typeof said === "number" ? said : parseInt(String(said || "").match(/(\d{1,3})%/)?.[1] ?? "", 10);
   if (!Number.isFinite(m)) return "";
   return `<progress class="pbar" max="100" value="${Math.max(0, Math.min(100, m))}" aria-label="${esc(label)}"></progress>`;
-}
-
-// ...and the other half, for a press that can fail without a repaint behind
-// it. Most busy() calls need none: the round trip redraws the surface and
-// the button with it, but the notebook's Send and Save both stay on screen
-// when the server says no, and a button left wearing "Sending…" over a
-// refusal is the worst of both.
-function unbusy(btn, word){
-  if (!btn) return;
-  btn.removeAttribute("aria-busy");
-  // A button a patched surface drew (R244) is given back as its markup has
-  // it now: the redraw the press brought may have drawn it with another
-  // label (a branch switched to) or disabled, and the word kept from before
-  // the press would undo that.
-  if (btn.__markupHtml !== undefined){
-    if (btn.innerHTML !== btn.__markupHtml){ btn.innerHTML = btn.__markupHtml; for (const c of btn.children) patchRecord(c); }
-    pressBack(btn);
-    return;
-  }
-  btn.disabled = false;
-  btn.textContent = word;
 }
 
 // ---- tiles, facts, tables, charts and chips (R216, R218, the 2.0 language)
@@ -1469,19 +1438,16 @@ function chipsUp(){
 function chipsClickGuard(e){
   if (chipDragged && e.target?.closest?.(".chips, .hscroll")){ e.stopPropagation(); e.preventDefault(); }
 }
-function chipsRestore(muts){
-  for (const m of muts) for (const n of m.addedNodes){
-    if (n.nodeType !== 1) continue;
-    // Its ends, once it is laid out.
-    if (n.matches(".chips, .hscroll") || n.querySelector(".chips, .hscroll")) requestAnimationFrame(() => chipsEdges(n.parentNode || document));
-    for (const c of n.matches(".chips[data-chips]") ? [n] : n.querySelectorAll(".chips[data-chips]")){
-      const x = chipScroll[c.dataset.chips];
-      if (x && c.scrollLeft !== x){
-        c.scrollLeft = x;
-        // ...and once more after layout, for a row not laid out yet when
-        // it was added (inside a view fading in).
-        requestAnimationFrame(() => { if (c.isConnected && c.scrollLeft !== x) c.scrollLeft = x; });
-      }
+function chipsBack(root){
+  // Its ends, once it is laid out.
+  if (root.matches(".chips, .hscroll") || root.querySelector(".chips, .hscroll")) requestAnimationFrame(() => chipsEdges(root.parentNode || document));
+  for (const c of root.matches(".chips[data-chips]") ? [root] : root.querySelectorAll(".chips[data-chips]")){
+    const x = chipScroll[c.dataset.chips];
+    if (x && c.scrollLeft !== x){
+      c.scrollLeft = x;
+      // ...and once more after layout, for a row not laid out yet when
+      // it was added (inside a view fading in).
+      requestAnimationFrame(() => { if (c.isConnected && c.scrollLeft !== x) c.scrollLeft = x; });
     }
   }
 }
