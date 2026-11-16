@@ -280,7 +280,7 @@ def render_fstab(p):
         # behind the old parity's back (the proof of 1 Nov caught an XFS
         # image changed by a plain ro mount). These write nothing; a disk
         # whose journal needs replaying then refuses to mount and says so.
-        opts = (f"ro,{NO_REPLAY.get(m['fs'], '')}," if m.get("ro") else "") + "defaults,nofail,noatime"
+        opts = (f"ro,{NO_REPLAY.get(m['fs'], '')}," if m.get("ro") else "") + "defaults,nofail,noatime,nosuid,nodev"
         opts = opts.replace(",,", ",")
         lines.append(f"{m['what']} {m['where']} {m['fs']} {opts} 0 0 {MARK}\n")
     for where, branches in (p.get("merged") or {}).items():
@@ -288,7 +288,7 @@ def render_fstab(p):
         # over and each share lands where its folder is (array.py _landing).
         create = (p.get("user_create") if p.get("user_create") in ("ff", "epff") else "ff") if where.endswith("/user") else "mfs"
         req = ",".join(f"x-systemd.requires-mounts-for={b.split('=')[0]}" for b in branches)
-        lines.append(f"{':'.join(branches)} {where} fuse.mergerfs defaults,nofail,allow_other,use_ino,cache.files=off,"
+        lines.append(f"{':'.join(branches)} {where} fuse.mergerfs defaults,nofail,nosuid,nodev,allow_other,use_ino,cache.files=off,"
                      f"dropcacheonclose=true,category.create={create},moveonenospc=true,minfreespace=10G,fsname=adopted-{os.path.basename(where)},{req} 0 0 {MARK}\n")
     return "".join(lines)
 
@@ -880,7 +880,7 @@ class AdoptMixin:
             job.say(f"{img} holds {fs or 'nothing blkid knows'}, not the btrfs, XFS or ext4 an image file is\n")
             return ""
         d = tempfile.mkdtemp(prefix="bb-adopt-")
-        opts = "loop,ro," + {"xfs": "norecovery", "btrfs": "rescue=nologreplay", "ext4": "noload"}[fs]
+        opts = "loop,ro,nosuid,nodev,noexec," + {"xfs": "norecovery", "btrfs": "rescue=nologreplay", "ext4": "noload"}[fs]
         if self._sh(job, ["mount", "-o", opts, img, d], timeout=60) != 0:
             os.rmdir(d)
             return ""

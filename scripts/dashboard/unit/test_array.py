@@ -77,8 +77,8 @@ class TheAgent(unittest.TestCase):
         two = self.am.render_snapraid({**REC, "parity": REC["parity"] + [{"slot": 2, "id": "x", "uuid": "4", "fs": "xfs"}]})
         self.assertIn("2-parity /mnt/parity/p2/snapraid.2-parity\n", two)
         fstab = self.am.render_fstab(REC)
-        self.assertIn("UUID=1111 /mnt/disks/d1 xfs defaults,nofail,noatime 0 0 # builderbot-array\n", fstab)
-        self.assertIn("UUID=3333 /mnt/parity/p1 xfs defaults,nofail,noatime 0 0 # builderbot-array\n", fstab)
+        self.assertIn("UUID=1111 /mnt/disks/d1 xfs defaults,nofail,noatime,nosuid,nodev 0 0 # builderbot-array\n", fstab)
+        self.assertIn("UUID=3333 /mnt/parity/p1 xfs defaults,nofail,noatime,nosuid,nodev 0 0 # builderbot-array\n", fstab)
         merged = [ln for ln in fstab.splitlines() if "fuse.mergerfs" in ln][0]
         self.assertTrue(merged.startswith("/mnt/disks/d* /mnt/array fuse.mergerfs "))
         self.assertIn("category.create=epmfs", merged)

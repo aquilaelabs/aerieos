@@ -243,13 +243,13 @@ def render_fstab(rec):
     # An array taken over keeps its data disks and its merged tree on the
     # adoption's own lines (adopt.render_fstab): only its parity is ours.
     for d in [] if rec.get("adopted") else rec.get("data") or []:
-        lines.append(f"UUID={d['uuid']} {mount_of('d', int(d['slot']))} {d.get('fs', 'xfs')} defaults,nofail,noatime 0 0 {MARK}\n")
+        lines.append(f"UUID={d['uuid']} {mount_of('d', int(d['slot']))} {d.get('fs', 'xfs')} defaults,nofail,noatime,nosuid,nodev 0 0 {MARK}\n")
     for p in rec.get("parity") or []:
-        lines.append(f"UUID={p['uuid']} {slot_mount('p', p)} {p.get('fs', 'xfs')} defaults,nofail,noatime 0 0 {MARK}\n")
+        lines.append(f"UUID={p['uuid']} {slot_mount('p', p)} {p.get('fs', 'xfs')} defaults,nofail,noatime,nosuid,nodev 0 0 {MARK}\n")
     if rec.get("data") and not rec.get("adopted"):
         policy = rec.get("policy") if rec.get("policy") in POLICIES else "mfs"
         req = ",".join(f"x-systemd.requires-mounts-for={mount_of('d', int(d['slot']))}" for d in rec["data"])
-        lines.append(f"{DISKS}/d* {MOUNT} fuse.mergerfs defaults,nofail,allow_other,use_ino,cache.files=off,dropcacheonclose=true,"
+        lines.append(f"{DISKS}/d* {MOUNT} fuse.mergerfs defaults,nofail,nosuid,nodev,allow_other,use_ino,cache.files=off,dropcacheonclose=true,"
                      f"category.create={policy},moveonenospc=true,minfreespace=20G,fsname=bbarray,{req} 0 0 {MARK}\n")
     return "".join(lines)
 

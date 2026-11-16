@@ -177,10 +177,10 @@ class ExtMountsMixin:
             return [shutil.which("mount") or "mount", "-o", "nosuid,nodev" + (",ro" if m.get("ro") else ""), dev, path] if dev else None
         if kind == "smb":
             creds = os.path.join(_env("BB_CREDS", CREDS), m["name"])
-            opts = f"credentials={creds},uid=0,gid=0,file_mode=0664,dir_mode=0775,vers=3.0,soft" + (",ro" if m.get("ro") else "")
+            opts = f"credentials={creds},uid=0,gid=0,file_mode=0664,dir_mode=0775,vers=3.0,soft,nosuid,nodev" + (",ro" if m.get("ro") else "")
             return [shutil.which("mount") or "mount", "-t", "cifs", f"//{m.get('host')}/{m.get('path')}", path, "-o", opts]
         if kind == "nfs":
-            opts = "nfsvers=4,soft,timeo=100" + (",ro" if m.get("ro") else "")
+            opts = "nfsvers=4,soft,timeo=100,nosuid,nodev" + (",ro" if m.get("ro") else "")
             return [shutil.which("mount") or "mount", "-t", "nfs", f"{m.get('host')}:{m.get('path')}", path, "-o", opts]
         return None
 
