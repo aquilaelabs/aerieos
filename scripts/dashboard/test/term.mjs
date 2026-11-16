@@ -352,4 +352,45 @@ await section("A terminal closed while a frame of its own is still pending", asy
      `a terminal closed with a frame of its own still pending throws nothing${thrown.length ? ': ' + thrown.join(' | ').slice(0, 200) : ''}`);
 });
 
+// A terminal not on show writes nothing until it is shown (R228 step 14),
+// but answers a question as it comes: tmux asks who the terminal is as it
+// attaches, and an answer held until the tab was shown reached it after it
+// had stopped waiting and was typed into the shell as "1;2c0;276;0c".
+await section("A terminal not on show holds its output and answers its questions at once", async () => {
+  const got = await page.evaluate(async () => {
+    await xtermReady();
+    const el = document.createElement('div');
+    el.style.cssText = 'position:fixed;left:0;top:0;width:600px;height:300px';
+    document.body.append(el);
+    const term = new window.Terminal({ scrollback: 100 });
+    term.open(el);
+    const answered = [];
+    term.onData(d => answered.push(d));
+    const rec = { term, el };
+    const enc = s => new TextEncoder().encode(s);
+    const text = () => { const b = term.buffer.active; const out = [];
+      for (let i = 0; i < b.length; i++) out.push(b.getLine(i)?.translateToString(true) || ''); return out.join('|'); };
+    const settle = () => new Promise(r => term.write('', r));
+    termShow(rec, false);
+    termOut(rec, enc('held line\r\n'));
+    await settle();
+    const whileAway = text();
+    termOut(rec, enc('\x1b[c\x1b[>c'));
+    await settle();
+    const asked = answered.join('');
+    termOut(rec, enc('after it\r\n'));
+    await settle();
+    const afterAsk = text();
+    termShow(rec, true);
+    await settle();
+    const shown = text();
+    term.dispose(); el.remove();
+    return { whileAway, asked: JSON.stringify(asked), afterAsk, shown };
+  });
+  ok(!/held line/.test(got.whileAway), `not on show, what it is sent is not drawn (${got.whileAway.replace(/\|+$/, '') || 'nothing'})`);
+  ok(/\\u001b\[\?/.test(got.asked) && /held line/.test(got.afterAsk) && !/after it/.test(got.afterAsk),
+     `...a question in it is answered as it comes, with what came before it drawn (${got.asked}; ${got.afterAsk.replace(/\|+$/, '')})`);
+  ok(/held line/.test(got.shown) && /after it/.test(got.shown), `...and shown, the rest is drawn (${got.shown.replace(/\|+$/, '')})`);
+});
+
 await done(browser);

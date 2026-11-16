@@ -649,9 +649,21 @@ function termSweep(){
 // Past TERM_HOLD_MAX it keeps nothing more and opens again when shown,
 // which has tmux draw its screen whole.
 const TERM_HOLD_MAX = 4 << 20;
+// ...but a question the terminal answers (who it is, where its cursor is,
+// its colors), which tmux asks as it attaches, is answered as it comes, with
+// what came before it: held until shown, the answer reached tmux after it
+// had stopped waiting and was typed into the shell as "1;2c0;276;0c".
+const TERM_ASKS = /\x1b\[[>=?]?\d*c|\x1b\[[56]n|\x1b\][0-9]+;\?/;
+const termLatin = new TextDecoder("latin1");
 function termOut(rec, bytes){
   if (!rec.away){ rec.term.write(bytes); return; }
   if (!rec.held) return;
+  if (bytes.includes(27) && TERM_ASKS.test(termLatin.decode(bytes))){
+    rec.held.forEach(b => rec.term.write(b));
+    rec.term.write(bytes);
+    rec.held = []; rec.heldN = 0;
+    return;
+  }
   rec.held.push(bytes);
   rec.heldN += bytes.length;
   if (rec.heldN > TERM_HOLD_MAX) rec.held = null;
