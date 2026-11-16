@@ -38,6 +38,7 @@
 - Home, Chat, the Sessions page, the Doctor, Notices and Help keep what you are doing when they update, and a choice you made in a pulldown stays made when its list changes under it. After saving a key on a Library entry's Configure form, the field empties to type a replacement into. (9a94691)
 - A commit message being typed in a space's Git view, a name being typed on a space's card, a commit's details with the ask picked under it, and the rail, the dock and a space's header keep what you are doing when the page updates (a1204ba)
 - A pick in a space's Design view keeps the pulldown it was made in focused and a field's caret where it was, and a theme's Fill from preset goes back to its first line once it has filled the colors (1782e35)
+- What you type, pick or open stays put when a page or a space's view updates under you, on every page now: Settings, Profile, Users, Roles, Jobs, Schedules, Storage, Network and the rest, and a space's Artifacts, Signing, Memory, Tests, Permissions, Analysis and Wiki views; a search box waits for the word an input method is composing before it narrows the list (21fd9f6)
 
 ### Fixed
 
