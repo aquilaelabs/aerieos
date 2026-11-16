@@ -5257,7 +5257,8 @@ if not NODES_OK:
 # Every account's sessions on a project, for its settings dialog, and an
 # administrator ending one (projsessions.py): the rows the Sessions card is
 # made from, and its kill.
-projsessions.configure(sessions=lambda: tmux_sessions(kept=True) + node_tmux_sessions(),
+projsessions.configure(sessions=lambda: tmux_sessions() + node_tmux_sessions(),
+                       live_sessions=lambda: tmux_sessions(kept=True) + node_tmux_sessions(),
                        base=tmux_base, owner=tmux_owner, accounts=account_names,
                        owner_name=users.owner_name, end=end_session)
 projsessions.BEHIND = session_behind
