@@ -40,6 +40,7 @@
 - A pick in a space's Design view keeps the pulldown it was made in focused and a field's caret where it was, and a theme's Fill from preset goes back to its first line once it has filled the colors (1782e35)
 - What you type, pick or open stays put when a page or a space's view updates under you, on every page now: Settings, Profile, Users, Roles, Jobs, Schedules, Storage, Network and the rest, and a space's Artifacts, Signing, Memory, Tests, Permissions, Analysis and Wiki views; a search box waits for the word an input method is composing before it narrows the list (21fd9f6)
 - The dashboard answers faster and holds less up: its status read costs about a quarter of what it did, the check every open page makes every second and a half a tenth, a browser keeps one connection between requests, job lists and a node's last job read from indexes, and a connection that sends nothing no longer holds every other request for five seconds. A notebook left open no longer fills the audit with its presence, and a node's numbers and its census no longer write over each other (c32326f)
+- aerie's commands start sooner and aerie status answers in about half the time, aerie map find answers in a third of the time with a quarter of the memory, a coding agent other than Claude waits less on AerieOS's checks before each tool it runs, and a node's agent hands out jobs without waiting on its container statistics and starts fewer processes while it waits (44323cb)
 
 ### Fixed
 
@@ -62,6 +63,7 @@
 - A button's spinning ring follows its own press: it no longer spins on for a page's refresh that happened to start just after it on a slow link, and a press that asks a question and then sends wears it while it sends (2df776a)
 - A page whose data moves quickly (the Jobs page while a job writes its log, Storage, VMs, Users, Schedules, Scanners) reads it one read at a time, never drawing an older answer over a newer one, and while a job runs it reads once more rather than once for every line of its log (2df776a)
 - Less motion, the device's or the one in your Preferences, now also stills a dialog's box as it opens and the page a press leaves, which still moved (7f0448c)
+- A section opened while it was still sliding shut stays open; it shut again a moment later, and the page kept it shut (7d1e7e7)
 
 ### Security
 
