@@ -223,7 +223,7 @@ await section("Coverage (R76 steps 2 to 4)", async () => {
     execFileSync('cp', [`${REPO}/scripts/dashboard/${f}`, `${dir}/${f}`]);
   const said = execFileSync('python3', [`${REPO}/scripts/lib/codemap.py`, 'instrument', dir], { encoding: 'utf8' });
   const inst = readFileSync(`${dir}/tab-docker.js`, 'utf8');
-  ok(/instrumented \d+ functions in 3 files/.test(said) && /async function loadDocker\(\)\{__bbcov\("scripts\/dashboard\/tab-docker\.js:loadDocker#1"\);/.test(inst),
+  ok(/instrumented \d+ functions in 3 files/.test(said) && /function loadDocker\(\)\{__bbcov\("scripts\/dashboard\/tab-docker\.js:loadDocker#1"\);/.test(inst),
      `the instrumenter counts a function body at its opening brace, keyed by name and ordinal so a line shift keeps the count (${said.trim()})`);
   ok(/<script>var __bbcovc/.test(readFileSync(`${dir}/index.html`, 'utf8')), '...and defines the counter at the head of the page');
   execFileSync('node', ['--check', `${dir}/tab-docker.js`]); execFileSync('node', ['--check', `${dir}/nb-roadmap.js`]);
@@ -237,7 +237,7 @@ await section("Coverage (R76 steps 2 to 4)", async () => {
      'covered NAME names the suite that ran it and how often');
   // ...and a change measured by it (the operator, 29 Sep): the lines a
   // change touched, the function they fall in, the suites that reached it.
-  const ldLine = readFileSync(`${REPO}/scripts/dashboard/tab-docker.js`, 'utf8').split('\n').findIndex(l => /^async function loadDocker\(/.test(l)) + 2;
+  const ldLine = readFileSync(`${REPO}/scripts/dashboard/tab-docker.js`, 'utf8').split('\n').findIndex(l => /^function loadDocker\(/.test(l)) + 2;
   const aff = map('affected', '--ranges', `scripts/dashboard/tab-docker.js:${ldLine}-${ldLine}`);
   ok(/^by coverage \(last covered run .*\): \d+ suites?/.test(aff) && /  probe-suite  \(loadDocker\(\)\)/.test(aff),
      `affected names the suite the covered run says reached the changed function (${aff.split('\n').slice(0, 2).join(' | ').slice(0, 120)})`);
@@ -253,10 +253,11 @@ await section("Coverage (R76 steps 2 to 4)", async () => {
 
 // A file by its sections: the unit a cleanup moves, with what reaches in
 // from outside and what runs at load, which is what decides whether a
-// section can leave the page whole.
-const sec = map('sections', 'scripts/dashboard/index.html');
-ok(/^scripts\/dashboard\/index\.html: \d+ sections, \d+ top-level definitions$/m.test(sec)
-   && /^\s+\d+  the welcome panel: the guide, and the changelog: \d+ functions, \d+ callers? from outside/m.test(sec)
+// section can leave the page whole. What runs at load is page-boot.js's,
+// a section a part (R9 step 5).
+const sec = map('sections', 'scripts/dashboard/page-boot.js');
+ok(/^scripts\/dashboard\/page-boot\.js: \d+ sections, \d+ top-level definitions$/m.test(sec)
+   && /^\s+\d+  the welcome panel: the guide, and the changelog: \d+ functions?, \d+ callers? from outside/m.test(sec)
    && /^\s+\d+  tabs: \d+ functions?, \d+ callers? from outside/m.test(sec),
    'sections lists a file by its headers with each section\'s functions and outside callers');
 

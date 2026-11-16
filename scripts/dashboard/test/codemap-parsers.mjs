@@ -149,8 +149,11 @@ if (!babel) {
   }
   const tp = truth(only.join(''), 'page.js');
   const bp = tp ? compare(idx.files[page], tp) : [{ babel: 'could not parse' }];
-  ok(bp.length === 0 && tp.defs.length > 0,
-     `...and on index.html's inline scripts (${tp ? tp.defs.length : 0} definitions)${bp.length ? ': ' + show(bp) : ''}`);
+  // They define nothing of their own since then (a whole run's copy adds
+  // the coverage counter to the first), so what holds the check to them is
+  // their calls: the head's reads and boot().
+  ok(bp.length === 0 && tp.calls.length > 0,
+     `...and on index.html's inline scripts (${tp ? tp.defs.length : 0} definitions, ${tp ? tp.calls.length : 0} calls)${bp.length ? ': ' + show(bp) : ''}`);
 }
 
 // ---- 2. this tree's python against its own ast ----------------------------------
