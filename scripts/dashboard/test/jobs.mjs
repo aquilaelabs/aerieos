@@ -235,17 +235,22 @@ await section("The tab at a glance", async () => {
   ok(true, '#/jobs/failed opens the page narrowed to the failed jobs');
   // B113: Home's "N failed today" opens on what it counted, not on every
   // failure: a failure from yesterday is under Failed and not here.
-  await page.evaluate(() => {
+  await page.evaluate(() => { location.hash = '#/jobs/failed-today'; });
+  await page.waitForFunction(() => document.querySelector('.jobstab [data-jbshow="failed-today"].on'), null, { timeout: 10000 });
+  // Put in once a read of the list already out has landed, then drawn and
+  // read in the same task: a read landing after it took it out again, and
+  // Failed counted one fewer (B739).
+  const today = await page.evaluate(async () => {
+    await readingOf('jobs').busy;
     const y = { id: 'j_yesterday', type: 'exec', state: 'failed', queued: jobsToday() - 7200, ended: jobsToday() - 3600, spec: {} };
     if (!jobsList.some(j => j.id === y.id)) jobsList.push(y);
     readMoved('jobs');
-    location.hash = '#/jobs/failed-today';
+    drawPanes();
+    return {
+      rows: [...document.querySelectorAll('.jobstab .jbrow:not(.fghost)')].map(r => [r.dataset.job, r.dataset.state]),
+      chip: document.querySelector('.jobstab [data-jbshow="failed-today"] .pill')?.textContent,
+      failed: document.querySelector('.jobstab [data-jbshow="failed"] .pill')?.textContent };
   });
-  await page.waitForFunction(() => document.querySelector('.jobstab [data-jbshow="failed-today"].on'), null, { timeout: 10000 });
-  const today = await page.evaluate(() => ({
-    rows: [...document.querySelectorAll('.jobstab .jbrow:not(.fghost)')].map(r => [r.dataset.job, r.dataset.state]),
-    chip: document.querySelector('.jobstab [data-jbshow="failed-today"] .pill')?.textContent,
-    failed: document.querySelector('.jobstab [data-jbshow="failed"] .pill')?.textContent }));
   ok(today.rows.length && today.rows.every(([id, s]) => s === 'failed' && id !== 'j_yesterday')
      && Number(today.chip) === today.rows.length && Number(today.failed) === today.rows.length + 1,
      `#/jobs/failed-today lists today's failures alone, under a chip whose count is the rows shown (${JSON.stringify(today)})`);
