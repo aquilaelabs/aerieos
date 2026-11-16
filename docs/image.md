@@ -416,10 +416,11 @@ A VM runs the USB edition as a machine does: the stick's image
 least one more virtual disk for a pool, since the stick keeps the
 configuration and the containers' data goes on a pool. The build also
 converts the raw disk, never laid out again, into
-`aerieos-os-VERSION.qcow2` and `aerieos-os-VERSION.ova` (a
-stream-optimized VMDK with its OVF descriptor, `image/ovf.xml`, and a
-manifest), which the boot test runs and the CI run keeps as its artifact;
-a release does not carry them. Give the VM two processors and 4 GB at least, and
+`aerieos-os-VERSION.qcow2`, which the boot test runs and the CI run keeps
+as its artifact; `image/build.sh --all-disks` makes
+`aerieos-os-VERSION.ova` (a stream-optimized VMDK with its OVF descriptor,
+`image/ovf.xml`, and a manifest) and the raw disk as `.raw.xz` as well. A
+release carries none of them. Give the VM two processors and 4 GB at least, and
 turn nested virtualization on for it where VMs are to run inside it (the
 Features row says when `/dev/kvm` is missing); the data partition is grown
 to the disk the hypervisor gives it at boot, so a disk made bigger later is

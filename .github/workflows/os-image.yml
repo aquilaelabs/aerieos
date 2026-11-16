@@ -26,6 +26,13 @@ on:
 permissions:
   contents: read
 
+# A branch push the next one supersedes is ended (R228 step 21): the image
+# it was building is the one the next push builds again. Never a tag's, a
+# dispatch's or the weekly rebuild's, which each stand alone.
+concurrency:
+  group: os-image-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') }}
+
 jobs:
   # The appliance image (R160 step 1): AerieOS, built by image/build.sh
   # on a hosted runner, since mkosi installs packages and the disk is laid
@@ -87,6 +94,14 @@ jobs:
           # tree is unchanged (a release moves it by a commit).
           date -u -d 'yesterday 00:00' +%Y%m%dT%H%M%SZ > image/SNAPSHOT
           echo "snapshot: $(cat image/SNAPSHOT)"
+      # mkosi's package cache, kept between runs (R228 step 21): the image is
+      # pinned to a snapshot, so a run on the same snapshot and package set
+      # fetches the same packages again. The weekly rebuild's new snapshot,
+      # set above, is a new key.
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830   # v4.3.0, pinned by commit (R206)
+        with:
+          path: .mkosi-packages
+          key: mkosi-packages-${{ hashFiles('image/SNAPSHOT', 'image/mkosi.conf', 'config/controller-packages.tsv') }}
       - name: Sign the agent with the release key
         # A node that pinned AerieOS's release key takes an agent update only
         # with this signature (scripts/agent/aerieos_agent/release.py). The
@@ -109,6 +124,7 @@ jobs:
           # do not outlast. Another try picks up from the packages already in
           # mkosi's package cache, which --force keeps, so it costs only what
           # is still missing.
+          export MKOSI_PACKAGE_CACHE="$PWD/.mkosi-packages"
           for try in 1 2 3; do
             sudo -E image/build.sh --out out 2>&1 | tee build.log && exit 0
             [ "$try" -lt 3 ] || break
@@ -121,6 +137,11 @@ jobs:
           # shows without signing in, where the log itself needs a token.
           tail -n 40 build.log | tail -c 3500 | python3 -c 'import sys; t = sys.stdin.read(); print("::error title=Build the image::" + t.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A"))'
           exit 1
+      - name: The package cache, the runner's to keep
+        if: always()
+        shell: bash
+        # Written as root by the build; the cache is saved as the runner.
+        run: sudo chown -R "$(id -u):$(id -g)" .mkosi-packages 2>/dev/null || true
       - name: What moved since the last release
         if: github.event_name == 'schedule'
         shell: bash
@@ -261,11 +282,14 @@ jobs:
               case "$code" in
                 200|302|303)
                   # The machine has to become its own node too, which takes a
-                  # little longer than the dashboard: a failure is said on the serial line.
+                  # little longer than the dashboard: said on the serial line
+                  # either way, and the wait ends on whichever comes (R228
+                  # step 21: two minutes were waited out on every boot).
                   for _ in $(seq 1 24); do
                     if grep -aq "did not become its controller's node" "$2"; then
                       tail -c 3000 "$2"; echo "$3: the machine did not become its own node"; exit 1
                     fi
+                    grep -aq "first boot: this machine is its controller's node" "$2" && break
                     sleep 5
                   done
                   kill "$(cat qemu.pid)" || true; sleep 2

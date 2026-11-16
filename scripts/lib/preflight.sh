@@ -29,7 +29,14 @@ cmd_tests_preflight() {
         git rev-parse --git-dir >/dev/null 2>&1 || die "not in a git tree: aerie tests preflight --files F... names the files instead"
         local defaulted=""
         if [ -z "$base" ]; then
-            base="$(git rev-parse --verify -q origin/main >/dev/null 2>&1 && echo origin/main || echo main)"
+            # What the branch has pushed (R228 step 20): a push adds what is
+            # past it, and measured from origin/main a long branch was every
+            # file it ever touched and every suite on every gate. A branch
+            # never pushed is measured from main. A whole gate still comes
+            # before a release (CI runs every suite on its tag) and whenever
+            # the harness changes.
+            base="$(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null)" || base=""
+            [ -n "$base" ] || base="$(git rev-parse --verify -q origin/main >/dev/null 2>&1 && echo origin/main || echo main)"
             defaulted=1
         fi
         local mb; mb="$(git merge-base "$base" HEAD 2>/dev/null || echo "$base")"

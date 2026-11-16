@@ -1030,8 +1030,13 @@ def _section_commit(project, comp, title, env=None, keep=None):
     if staged:
         return (f"{', '.join(staged[:4])} {'is' if len(staged) == 1 else 'are'} staged for another commit, and the "
                 f"changelog's commit for {title} would carry {'it' if len(staged) == 1 else 'them'}: commit or unstage first")
+    hist = []
+
     def cite(text, have=()):
-        return _cite(project, rel, text, have)
+        # The history read once for every entry the section dates.
+        if not hist:
+            hist.append(_changelog_added(project, rel) or [])
+        return _cite(project, rel, text, have, hist[0])
 
     if not changelog.roll(where, title, time.strftime("%Y-%m-%d"), resolve=cite, keep=keep):
         return ""
@@ -1598,21 +1603,39 @@ def _stamp(project, value, part, env=None):
     return sorted(touched() - before), ""
 
 
-def _cite(project, rel, text, have=()):
+def _changelog_added(project, rel):
+    """Each commit that changed the changelog, oldest first, with the lines
+    it added: one walk of its history for every entry a cut dates (R228 step
+    22), where each entry was a `git log -S` of its own, 0.65 s apiece, and
+    one that ran past its 30 s kept its old stamp without a word. None when
+    git cannot say."""
+    out = _git(project, "log", "--reverse", "-p", "-U0", "--format=%x00%h", "--", rel, timeout=120)
+    if out is None:
+        return None
+    hist = []
+    for chunk in out.split("\0")[1:]:
+        sha, _, diff = chunk.partition("\n")
+        hist.append((sha.strip(), [ln[1:] for ln in diff.split("\n")
+                                   if ln.startswith("+") and not ln.startswith("+++")]))
+    return hist
+
+
+def _cite(project, rel, text, have=(), hist=None):
     """The commits an entry names once it is dated (B284): the commit that
     introduced its line where its stamp is the one aerie changelog add put on
     it, HEAD of the moment, the commit before; a stamp the line was given by
     hand, naming the change it is about, is kept (B702: a cut named the
-    changelog's commits in place of the changes)."""
-    out = _git(project, "log", "--format=%h", "-S", f"- {text}", "--", rel, timeout=30)
-    shas = [ln.strip() for ln in (out or "").splitlines() if ln.strip()]
-    if not shas:
+    changelog's commits in place of the changes). `hist` is the changelog's
+    history as _changelog_added reads it, read here when not given."""
+    hist = _changelog_added(project, rel) if hist is None else hist
+    needle = f"- {text}"
+    intro = next((sha for sha, added in hist or () if any(needle in ln for ln in added)), "")
+    if not intro:
         return list(have)
-    intro = shas[-1]
-    before = _git(project, "rev-parse", "--short=7", f"{intro}^") or ""
     have = [h for h in have if h]
     if not have:
         return [intro]
+    before = _git(project, "rev-parse", "--short=7", f"{intro}^") or ""
     if before and all(before.startswith(h) or h.startswith(before) for h in have):
         # The stamp is the commit before the line's. That is add's HEAD of
         # the moment when the line landed with its change; when the line's
@@ -1640,9 +1663,13 @@ def _seal(project, where, ver_rel, value, msg, env=None, extra=(), comp=""):
     cl_rel = None
     note = ""
 
+    hist = []
+
     def cite(text, have=()):
         rel = str((where / changelog.FILE).relative_to(root(project).resolve()))
-        return _cite(project, rel, text, have)
+        if not hist:
+            hist.append(_changelog_added(project, rel) or [])
+        return _cite(project, rel, text, have, hist[0])
 
     # A stable version gathers the pre-releases since the last stable one,
     # leaving out the fixes to what only they had (R217).

@@ -2872,6 +2872,12 @@ def coverage_ingest(root, idx, files, strip=""):
     "counts": {"abs/path:firstline:name": n}}, matched to the map's own
     definitions by file and name, nearest line."""
     cov = coverage_load(root) or {"format": COVERAGE_FORMAT, "suites": {}}
+    # A suite this run counted is what this run saw of it, the counts of its
+    # runs before put away (R228 step 20): added to for good, what a suite
+    # stopped reaching, a function renamed and a folder moved (the agent's,
+    # 495 keys under its old name) stayed on it and planned it. Its files in
+    # one run (the page's, the server's, a rerun's) still add up.
+    fresh = set()
     py_by = {}
     for d in idx["defs"]:
         if idx["files"][d["file"]]["lang"] == "py" and d["kind"] == "def":
@@ -2882,7 +2888,10 @@ def coverage_ingest(root, idx, files, strip=""):
         except (OSError, ValueError):
             continue
         suite = got.get("suite") or Path(f).stem
-        counts = cov["suites"].setdefault(suite, {})
+        if suite not in fresh:
+            fresh.add(suite)
+            cov["suites"][suite] = {}
+        counts = cov["suites"][suite]
         for key, n in (got.get("counts") or {}).items():
             if "#" in key:
                 # the page's own key: file:name#k, from the instrumenter
@@ -2966,11 +2975,31 @@ def changed_ranges(root, base, files):
     return out
 
 
+# A function nearly every suite reaches (the status read, the page's draw)
+# is passed through by each on its way to what it tests, and a change to one
+# planned all of them: one that 70 of 85 suites reach was a whole gate (R228
+# step 20). Past MOST_SHARE of the covered suites, the MOST_TAKE that run it
+# most often stand for them. A whole gate still runs before a release, on
+# its tag, and when the harness changes.
+MOST_SHARE = 0.75
+MOST_TAKE = 12
+
+
+def most_reached(by, total):
+    """The suites to plan for a function `by` ({suite: count}) says reach
+    it: all of them, or past MOST_SHARE of `total` the MOST_TAKE that run it
+    most, the order of their names settling a tie."""
+    if total and len(by) > MOST_TAKE and len(by) >= MOST_SHARE * total:
+        return dict(sorted(by.items(), key=lambda kv: (-kv[1], kv[0]))[:MOST_TAKE])
+    return by
+
+
 def affected(idx, cov, ranges, root=None):
     """{suite stem: set of reasons}, plus the account: for each changed file,
     the functions and the drawn things its changed lines fall in, the suites
     coverage or the map say reach them, and what fell back to the file."""
     hit = covered_ids(cov) if cov else {}
+    total = len((cov or {}).get("suites", {}))
     suites, notes, unknown = {}, [], []
     every = False
     # How each changed function was placed, for preflight to say: measured
@@ -3024,7 +3053,7 @@ def affected(idx, cov, ranges, root=None):
                     if cd.get("end", cd["line"]) - cd["line"] >= 0.5 * max(
                             (x.get("end", x["line"]) for x in entry["defs"]), default=1):
                         continue
-                    got.update(hit.get(fid(cd)) or {})
+                    got.update(most_reached(hit.get(fid(cd)) or {}, total))
                 if not got:
                     got = through_callers(cn, hops - 1, seen, f, by_name, entry)
                 for s_ in got:
@@ -3033,7 +3062,11 @@ def affected(idx, cov, ranges, root=None):
         for d in fns:
             by = hit.get(fid(d))
             if by:
-                for s_ in by:
+                most = most_reached(by, total)
+                if len(most) < len(by):
+                    notes.append(f"{f}:{d['line']} {d['name']}: reached by {len(by)} of {total} suites, "
+                                 f"planned by the {len(most)} that run it most")
+                for s_ in most:
                     suites.setdefault(s_, set()).add(f"{d['name']}()")
                 found.add(d["name"])
                 LAST_ACCOUNT["measured"] += 1

@@ -4517,14 +4517,21 @@ cmd_lint() {
         fi
     }
 
+    # Each tracked file's first line, read once and in one process for the
+    # two lists below that go by shebang (R228 step 22): read for each, three
+    # processes a read, it was about 14 s of a lint.
+    local -A bang=()
+    local bk
+    while IFS= read -r -d '' bk && IFS= read -r -d '' f; do bang["$f"]+="$bk"; done \
+        < <(files '*' | python3 "${BB_LIB_DIR:-$BB_SCRIPTS/lib}/embedded.py" shebangs 2>/dev/null)
+
     # Shell scripts, by shebang: the same selection CI's lint workflow makes,
     # so passing here means passing there.
     section "shell scripts (shellcheck)"
     if need shellcheck; then
         local -a shells=()
         while IFS= read -r -d '' f; do
-            head -c 64 "$f" 2>/dev/null | head -1 | grep -qE '^#!.*\b(ba)?sh\b' \
-                && shells+=("$f")
+            case "${bang["$f"]:-}" in *sh*) shells+=("$f") ;; esac
         done < <(files '*')
         # A script embedded in a QUOTED heredoc is a string to the shell and a
         # string to shellcheck, so it was never checked at all, and one of
@@ -4583,11 +4590,7 @@ cmd_lint() {
         local -a pys=() others=() embedded=()
         while IFS= read -r -d '' f; do
             case "$f" in *.py) pys+=("$f"); continue ;; esac
-            if head -c 64 "$f" 2>/dev/null | head -1 | grep -qE '^#!.*\bpython3?\b'; then
-                pys+=("$f")
-            else
-                others+=("$f")
-            fi
+            case "${bang["$f"]:-}" in *py*) pys+=("$f") ;; *) others+=("$f") ;; esac
         done < <(files '*')
         local pyd=""
         if [ "${#others[@]}" -gt 0 ]; then
@@ -4621,9 +4624,12 @@ cmd_lint() {
         while IFS= read -r -d '' f; do
             case "$f" in *.js|*.mjs) jss+=("$f") ;; esac
         done < <(files '*.js' '*.mjs')
-        for f in "${jss[@]}"; do
-            node --check "$f" >/dev/null 2>&1 || jsbad+=("$f")
-        done
+        # As many at once as the machine has cores (R228 step 22): one after
+        # another they were about 9 s of a lint.
+        while IFS= read -r f; do [ -n "$f" ] && jsbad+=("$f"); done < <(
+            [ "${#jss[@]}" -eq 0 ] || printf '%s\0' "${jss[@]}" \
+                | xargs -0 -r -P "$(nproc 2>/dev/null || echo 4)" -n 1 \
+                    sh -c 'node --check "$1" >/dev/null 2>&1 || printf "%s\n" "$1"' _)
         while IFS= read -r -d '' f; do
             node -e '
 const fs = require("fs"); const s = fs.readFileSync(process.argv[1], "utf8");

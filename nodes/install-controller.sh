@@ -717,6 +717,9 @@ cmd_firstboot() {
         [ "${#OS_FEATURES[@]}" -eq 0 ] || printf '   features asked for at install: %s\n' "$(tr '\n' ' ' < "$OS_FEATURES_FILE")"
     fi
     own_node || die "this machine did not become its controller's node (above): the unit runs again at the next boot"
+    # Said on the console as the failure is, so whatever watches a first
+    # boot (the image's boot test) stops on it rather than waiting it out.
+    say "first boot: this machine is its controller's node"
 }
 
 # ---- updates: the release fetched and put in place as an image pull is -----
