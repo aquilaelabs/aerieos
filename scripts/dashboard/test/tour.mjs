@@ -84,7 +84,10 @@ ok(/Every space you work on/.test(await page.$eval('#tourCard .toursay', e => e.
    'the first visit to another page opens that page\'s tour');
 await page.check('#tourAll');
 await page.click('#tourSkip');
-const off = await (await fetch(base + '/api/status', { headers: H })).json();
+// The press saves without waiting on it: read until the save has landed,
+// where one read at once could be answered before it.
+let off = {};
+await until(async () => { off = await (await fetch(base + '/api/status', { headers: H })).json(); return off.tour?.off === true; });
 ok(off.tour?.off === true && off.tour.seen.includes('projects'), `Skip tour with its box ticked skips every page's (${JSON.stringify(off.tour)})`);
 await page.evaluate(() => openNodesTab());
 // The page drawn first, which a tour waits for, then the time one would
