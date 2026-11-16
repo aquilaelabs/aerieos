@@ -92,6 +92,7 @@
 - A share can no longer be named global, homes or printers, which reopened Samba's own settings for every share after it, and FTP never runs as root. (1013735)
 - A coding session can no longer reach another account's sign-in through links in its own cache folder, nor the host's per-user runtime folder. (9c8f0c4)
 - Adopting an old system's VMs defines each only with what it needs to run: extra QEMU settings, dnsmasq options, shared folders and ISOs outside the adopted disks are left out and listed, and a VM whose disk or firmware is outside the adopted disks or this machine's own folders is not defined, with the reason. (afd45dd)
+- A coding session's changes to the shared Flutter install stay in that session, so one session can no longer change what Flutter runs for other spaces and CI jobs. (5601c65)
 
 ## 0.9.0-dev.5341: 2026-11-12
 
