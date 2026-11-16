@@ -195,7 +195,7 @@ const DM_SLOW_MS = 600;
 const DM_PARTS = ".pane .doc.on .dmtab .dmcard, .pane .doc.on .dmtab > .tbl";
 let dmSlowTimer = null, dmSlow = false;
 function loadDocker(){
-  return reading("docker", async () => {
+  return reading("docker", async overtaken => {
     const asked = dockerNode;
     clearTimeout(dmSlowTimer);
     dmSlowTimer = setTimeout(() => {
@@ -206,6 +206,10 @@ function loadDocker(){
     // Every answer is that node's in the cache, the page falling back to it
     // while it has no list; reading() lands them in the order asked, so an
     // older one cannot write over a newer one (B853).
+    // ...unless a newer ask has overtaken it: one revision's reload under
+    // another's, about an earlier moment, and a daemon that came back
+    // between the two would be painted as gone again (B69).
+    if (overtaken()) return false;
     dockerSeen[got.node || asked || ""] = got;
     dmSlow = false; clearTimeout(dmSlowTimer);
     // An answer for a node the person has already picked away from must not

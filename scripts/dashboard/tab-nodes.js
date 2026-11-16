@@ -57,11 +57,16 @@ function openNodesTab(nid, what){
 
 // One read at a time (reading), so an answer asked for before a later one (a
 // poll's, in flight when a save asked again) cannot land after it and stay
-// drawn until the nodes next move (B849). A caller awaiting a read that is
-// out waits for the newest, so what it reads after is the list.
+// drawn until the nodes next move (B849), and one a newer ask has overtaken
+// is left unlanded. A caller awaiting a read that is out waits for the
+// newest, so what it reads after is the list.
 function loadNodes(){
-  return reading("nodes", async () => {
+  return reading("nodes", async overtaken => {
     const j = await getJSON("/api/v1/nodes");
+    // An answer a newer ask has overtaken is not drawn: a node's draft is
+    // made from what is drawn, and one made from the moment before a save
+    // stayed (B849).
+    if (overtaken()) return false;
     nodesErr = j.error || "";
     if (!j.error){
       nodesList = j.nodes || [];

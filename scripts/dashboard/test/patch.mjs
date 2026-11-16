@@ -449,6 +449,30 @@ await section("a kind of read is one at a time: the last asked is made once more
      `two asks while a read is out make one more read, the newest, after it lands; a failure still lets it be made, and is raised at the end (${JSON.stringify(r)})`);
 });
 
+await section("an answer a newer ask has overtaken may be left unlanded, never two in a row", async () => {
+  const r = await page.evaluate(async () => {
+    const landed = [], gates = [];
+    const step = name => async overtaken => {
+      await new Promise(res => gates.push(res));
+      if (overtaken()) return false;
+      landed.push(name);
+    };
+    const rev0 = readRev('r9.skip');
+    const p = reading('r9.skip', step('a'));
+    reading('r9.skip', step('b'));                          // overtakes a
+    gates.shift()();                                        // a lands: skipped
+    await new Promise(res => setTimeout(res, 20));
+    reading('r9.skip', step('c'));                          // overtakes b
+    gates.shift()();                                        // b lands: landed anyway, a was skipped
+    await new Promise(res => setTimeout(res, 20));
+    gates.shift()();                                        // c lands
+    await p;
+    return { landed, revs: readRev('r9.skip') - rev0 };
+  });
+  ok(JSON.stringify(r.landed) === JSON.stringify(['b', 'c']) && r.revs === 2,
+     `an overtaken answer is skipped, the one after it lands though it is overtaken too, and only landings move the revision (${JSON.stringify(r)})`);
+});
+
 await section("a press's ring is its own work, and a read the page makes after it holds no button", async () => {
   await page.route('**/api/r9-slow', async r => { await new Promise(res => setTimeout(res, 900)); await r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }); });
   const r = await page.evaluate(async () => {

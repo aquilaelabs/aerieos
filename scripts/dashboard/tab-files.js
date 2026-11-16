@@ -40,11 +40,13 @@ function flQuery(extra = {}){
 }
 
 function loadFiles(){
-  return reading("files", async () => {
+  return reading("files", async overtaken => {
     if (nodesList === null || nodesStale) await loadNodes();
     if (!flPick()){ fl = {nonode: true}; return; }
     const node = flNode, root = flRoot, path = flPath;
     const got = await getJSON("/api/node-files?" + flQuery());
+    // A folder asked for since (a click deeper) is what is drawn next.
+    if (overtaken()) return false;
     if (got.error){ fl = {error: got.error}; return; }
     // A root no longer there (a pool exported) gives way to the first one,
     // read next (reading() makes the read this one asks for once it lands).

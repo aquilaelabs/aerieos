@@ -64,15 +64,25 @@ function reading(key, fn, {join = 0, about = ""} = {}){
   r.at = Date.now(); r.about = about;
   // A read that throws still lets the one asked meanwhile be made; the
   // first failure is raised at the end, where the page says it (sayUnheard).
+  // A read may leave its answer unlanded when a newer ask is already
+  // waiting (overtaken(): its answer is about an earlier moment, and a page
+  // that builds a draft from what it reads would build it from that), but
+  // never two in a row, so a page asked faster than it answers still lands
+  // one answer in two (B154). It says so by returning false.
   r.busy = (async () => {
     let failed = null;
     try{
       for (let f = fn; f; f = r.again){
         if (f !== fn){ r.at = Date.now(); r.about = r.againAbout; }
         r.again = null;
-        try{ await f(); }
+        const overtaken = () => !!r.again && !r.skipped;
+        let landed = true;
+        try{ landed = (await f(overtaken)) !== false; }
         catch(e){ failed = failed || e; }
-        finally{ r.rev++; drawPanes(); }
+        finally{
+          r.skipped = !landed;
+          if (landed){ r.rev++; drawPanes(); }
+        }
       }
     }finally{ r.busy = null; }
     if (failed) throw failed;
