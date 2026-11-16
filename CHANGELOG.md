@@ -66,10 +66,21 @@
 - A page whose data moves quickly (the Jobs page while a job writes its log, Storage, VMs, Users, Schedules, Scanners) reads it one read at a time, never drawing an older answer over a newer one, and while a job runs it reads once more rather than once for every line of its log (2df776a)
 - Less motion, the device's or the one in your Preferences, now also stills a dialog's box as it opens and the page a press leaves, which still moved (7f0448c)
 - A section opened while it was still sliding shut stays open; it shut again a moment later, and the page kept it shut (7d1e7e7)
+- A page a press opens (nginx, Scanners, a Library entry, an Installed item) opens from a space's page again, and its Back names the space; a reload on a space's page no longer shows Home's outline while it loads. (56e74af)
+- A managed container's Edit dialog opened while the Containers page reloads stays read-only. (8afcb16)
+- New container from the Library suggests a data folder named for the app picked, not Jellyfin's for every app. (b1b7816)
+- A section pressed again while it slides shut opens again. (488e06f)
+- A pack installed on a node from an earlier manifest says so on its Installed row and Library card, with Install again to take what the kept manifest installs. (4214389)
+- aerie devapp rebuild no longer says an instance is up when its container stops right after starting; it says so and fails. (4d77c2c)
+- One file a node cannot sync no longer holds back every change after it without a word: it is said as the space's sync error and counted as waiting, and the rest go up. (501a681)
+- aerie git push on a node says when a commit made there had not reached the controller yet, and fails, where it pushed the older tree and said nothing. (5d08d15)
+- The changelog editor shows what Save kept. (6cab345)
 
 ### Security
 
 - A coding agent's session reaches only what its own verbs use. Its token is refused on every other route of the controller, with the verb that is a session's way to the same thing where there is one; it could read the list of accounts, its person's chat and tab layout, and the controller's settings in the page's own status read, and could type into or end its person's other sessions. A session's token also opens none of the dashboard: `aerie capture shot` and `reel` of the controller's own address say so, and photograph a dev instance, any other page, the emulator or a display as before. Upgrading: nothing to do; a session that photographed the controller's own dashboard photographs a dev instance of it instead (`aerie devapp`). (2241625)
+- A node's recorded address is where its calls come from: an X-Forwarded-For header the node sends itself no longer sets it, nor where a sign-in came from, unless a proxy this install trusts (its own tunnel, one named in Settings) passed it on. (f578e79)
+- An OS update takes only an image whose build attestation names AerieOS's release workflow run on a version tag, where any workflow of the repository passed. (14a575e)
 
 ## 0.9.0-dev.5341: 2026-11-12
 
