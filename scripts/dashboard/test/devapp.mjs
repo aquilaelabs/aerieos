@@ -2310,7 +2310,10 @@ await section("a shell inside a container, in the dock", async () => {
     const extra = `${DIR}/sandboxdata/census-extra.json`;
     writeFileSync(extra, JSON.stringify({ session: { ctr: false } }));
     let old = null;
-    await until(async () => (old = await term(`ctr:ep.silon:main:${offered[0].ctr}`)).status === 403, 20000, 500);
+    // Until a census both lists the container running and says no terminal:
+    // under a whole run's load a census came between with the container not
+    // listed, and twenty seconds ran out on that answer (B829).
+    await until(async () => (old = await term(`ctr:ep.silon:main:${offered[0].ctr}`)).status === 403, 60000, 500);
     rmSync(extra, { force: true });
     ok(old?.status === 403 && /has not set up its container terminal yet/.test(old.error),
        `a node whose agent runs no container terminal yet says so (${(old?.error || '').slice(0, 80)})`);
@@ -4151,6 +4154,9 @@ await section("who may rebuild it", async () => {
     const gone = await asSession({ project: 'ep.silon', action: 'remove', instance: 'fresh' });
     await idle();
     const insts = () => Object.keys(JSON.parse(readFileSync(`${DIR}/state/devapps.json`, 'utf8'))['ep.silon'] || {});
+    // The record goes when the remove's job has run, which under a whole
+    // run's load is past idle()'s twenty seconds (B832): waited for itself.
+    await until(() => !insts().includes('fresh'), 90000, 250);
     ok(gone.status === 200 && !insts().includes('fresh'),
        `...and removes its own container on auto (${gone.error || gone.job || 'removed'}; left: ${insts().join(', ')})`);
     await dial('ask');
