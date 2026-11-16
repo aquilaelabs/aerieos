@@ -250,6 +250,8 @@ if (await page.$('.doc .librarytab [data-libkind="app"][data-libact="install"]')
   await page.waitForFunction(id => document.getElementById('cApp').value === id && !document.getElementById('cAppFields').hidden, id, { timeout: 10000 });
   ok(await page.$eval('.doc .librarytab [data-libkind="app"][data-libact="install"]', b => b.textContent.trim() === 'New container'),
      `an app's press reads New container, and opens that dialog with ${id} picked and its blanks shown`);
+  const eg = await page.$eval('#cAppData', e => e.placeholder);
+  ok(eg === `/mnt/tank/apps/${id}`, `...its data folder's example names that app, not one app for every one (${eg})`);
   await page.evaluate(() => { $('cmodal').hidden = true; });
 }
 

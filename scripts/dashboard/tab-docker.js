@@ -1503,6 +1503,8 @@ async function cAppPicked(){
   $("cAppWhat").textContent = a ? a.what : "";
   if (!a) return;
   $("cAppMediaField").hidden = !a.media;
+  // The example names the app picked, not one app for all of them (B803).
+  $("cAppData").placeholder = "/mnt/tank/apps/" + id;
   $("cAppPort").value = a.port;
   if (!$("cAppTz").value) $("cAppTz").value = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
   if (!$("cName").value) $("cName").value = id;
