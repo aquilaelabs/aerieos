@@ -73,6 +73,7 @@
 - A space is one of your favorites rather than pinned: a star by its name marks it, your favorites are on Home under Favorites, and the Spaces page lists every space by name with a Favorites chip that narrows it to yours; favorites are each person's own, and the spaces you had pinned are your favorites (63adcc9)
 - Archiving a space is your own, as favorites are: anybody signed in archives a space for themselves and nobody else's page changes, and an archived space works as any other, its card kept with its star, group and controls in the Archived section at the foot of the Spaces page; a space archived before this update stays archived for every account that had it (2883407)
 - The Doctor's panel is compact: each problem a line saying what is wrong and how many other checks pass, with Controller settings at its foot opening the full verdict, every check with what it said and its fix (a2bcdf0)
+- Every dialog's buttons are in one order: the main one first, the way out after it, and anything that cannot be undone last; the buttons stay at the foot of a dialog that scrolls (a6403f5)
 
 ### Fixed
 
