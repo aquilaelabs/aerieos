@@ -2657,6 +2657,14 @@ const DIALOGS = {
   move: () => { moveConfirm({ label: 'beta', from: 'gamma', to: 'alpha', node_why: '', busy: [], things: [], lose: [],
                               nodes: [{ id: 'n_x', name: 'ubu', have: false, as: 'works', instances: [] }] }); },
   roleaccess: () => rolesAccessOpen('test'),
+  // The Library's Add your own, a pack's dialog with nothing picked yet.
+  addown: () => new Promise(r => libWithToolchains(() => { tpOpen(''); r(); })),
+  // A notebook's sheet: alpha's Roadmap history, pressed as a person does.
+  sheet: async () => { openNotebook('alpha', 'roadmap');
+    let b = null;
+    for (let i = 0; i < 40 && !(b = [...document.querySelectorAll('.nb [id="roadmapLog"]')].find(x => x.checkVisibility())); i++)
+      await new Promise(r => setTimeout(r, 250));
+    b?.click(); },
   // A schedule's form reads the Schedules page's nodes: opened from there.
   schedule: async () => { railGo('jobs', 'schedules');
     for (let i = 0; i < 40 && !schedData; i++) await new Promise(r => setTimeout(r, 250));
@@ -2671,7 +2679,7 @@ const DIALOGS = {
 const opened = new Set();
 async function dialogShape(pg = page){
   return pg.evaluate(() => {
-    const m = [...document.querySelectorAll('.modal')].find(x => !x.hidden);
+    const m = [...document.querySelectorAll('.modal:not(.inline)')].find(x => !x.hidden);
     if (!m) return { err: 'no dialog opened' };
     const box = m.querySelector('.box');
     const loose = [...box.querySelectorAll('*')].filter(e => {
@@ -2716,13 +2724,13 @@ async function dialogShape(pg = page){
 }
 for (const [name, open] of Object.entries(DIALOGS)) {
   await page.evaluate(open);
-  const seen = await page.waitForFunction(() => [...document.querySelectorAll('.modal')].some(m => !m.hidden),
+  const seen = await page.waitForFunction(() => [...document.querySelectorAll('.modal:not(.inline)')].some(m => !m.hidden),
     null, { timeout: 10000 }).then(() => true).catch(() => false);
   // Its entrance over, and what it reads in and drawn.
   await motionOver();
   await settled(page, { quiet: 250 });
   const d = seen ? await dialogShape() : { err: 'nothing opened' };
-  const id = await page.evaluate(() => [...document.querySelectorAll('.modal')].find(m => !m.hidden)?.id || '');
+  const id = await page.evaluate(() => [...document.querySelectorAll('.modal:not(.inline)')].find(m => !m.hidden)?.id || '');
   if (id) opened.add(id);
   // One shape for every dialog (R50 step 81): its title the box's first
   // line, its foot the box's own, centered over the page, its foot in the
@@ -2742,7 +2750,7 @@ for (const [name, open] of Object.entries(DIALOGS)) {
   // The jump bar's chips sit in a row (the operator, 11 Oct): the dialog's
   // field rule stacks a band's children, and the bar is a band.
   const jump = await page.evaluate(() => {
-    const bar = [...document.querySelectorAll('.modal')].find(x => !x.hidden)?.querySelector('.sectjump');
+    const bar = [...document.querySelectorAll('.modal:not(.inline)')].find(x => !x.hidden)?.querySelector('.sectjump');
     if (!bar || !bar.offsetHeight) return null;
     const a = [...bar.querySelectorAll('a')].slice(0, 2).map(e => Math.round(e.getBoundingClientRect().top));
     return { dir: getComputedStyle(bar).flexDirection, stacked: a.length === 2 && a[0] !== a[1] };
@@ -2753,7 +2761,7 @@ for (const [name, open] of Object.entries(DIALOGS)) {
   // stacked children carried none, so one form read as three depending on
   // which container a field landed in. The token is --field-gap.
   const rhythm = await page.evaluate(() => {
-    const m = [...document.querySelectorAll('.modal')].find(x => !x.hidden);
+    const m = [...document.querySelectorAll('.modal:not(.inline)')].find(x => !x.hidden);
     const box = m?.querySelector('.box');
     if (!box) return { err: 'no dialog' };
     const css = getComputedStyle(document.documentElement);
@@ -2783,7 +2791,7 @@ for (const [name, open] of Object.entries(DIALOGS)) {
   // the end of a dialog carries on into the page behind it, which is what
   // the operator saw on a phone: the whole page moving under the box.
   const still = await page.evaluate(() => {
-    const m = [...document.querySelectorAll('.modal')].find(x => !x.hidden);
+    const m = [...document.querySelectorAll('.modal:not(.inline)')].find(x => !x.hidden);
     if (!m) return { err: 'no dialog' };
     return { chain: getComputedStyle(m).overscrollBehaviorY,
              locked: getComputedStyle(document.documentElement).overflow };
