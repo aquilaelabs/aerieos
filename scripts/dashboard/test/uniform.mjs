@@ -1494,6 +1494,37 @@ await section("the notebook's head row", async () => {
      `...and under it the glance: tiles in the tiles' shape, then a status line, then one band of chips, and no loose Save row (R109)${
        glance.length ? `; not: ${glance.join('; ')}` : ''}`);
 });
+
+// Every row of a notebook's lists opens the room a .row does (--row-y)
+// above its first line: a bug, a memory, a rule, a roadmap item, a test, a
+// commit, a file and a conversation alike, so the lists read at one pace
+// from view to view.
+await section("the notebook's lists keep one rhythm", async () => {
+  await bring('notebook');
+  const views = await page.$$eval('.nb .nbview', vs => vs.map(v => v.dataset.view));
+  const off = [], seen = new Set();
+  for (const v of views){
+    await page.evaluate(w => getNotebook('alpha').view(w), v);
+    await page.waitForFunction(w => document.querySelector(`.nb .nbview[data-view="${w}"]`)?.checkVisibility(), v, { timeout: 20000 });
+    await sleep(300);
+    const got = await page.evaluate(w => {
+      const view = document.querySelector(`.nb .nbview[data-view="${w}"]`);
+      const want = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--row-y'));
+      const pad = e => parseFloat(getComputedStyle(e).paddingTop) || 0;
+      return [...view.querySelectorAll('.row,details.bug,details.mem,details.tst,details.grp,.artrow,.grow[data-sha]')]
+        .filter(r => r.checkVisibility()).map(r => {
+          // A row that opens has its line in its summary; a roadmap item's
+          // line sits in the summary's own line.
+          const line = r.matches('details') ? r.querySelector(':scope > summary') : r;
+          const inner = r.matches('details.grp') ? r.querySelector(':scope > summary > .roadmap') : null;
+          return { kind: r.className.split(/\s+/)[0], top: pad(line) + (line !== r ? pad(r) : 0) + (inner ? pad(inner) : 0), want };
+        });
+    }, v);
+    for (const g of got){ seen.add(g.kind); if (Math.abs(g.top - g.want) > 0.5) off.push(`${v} ${g.kind} ${g.top}px`); }
+  }
+  ok(!off.length && seen.size >= 4, `every row of a notebook's lists opens --row-y above its first line (${[...seen].join(', ')}${
+     off.length ? '; off: ' + [...new Set(off)].join(', ') : ''})`);
+});
 ok(seenSects.size <= 1,
    `a section heading wears one skin everywhere (${JSON.stringify([...seenSects])})`);
 await section("B495: a password manager offers itself only where a password or an", async () => {

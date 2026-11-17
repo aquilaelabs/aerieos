@@ -803,7 +803,7 @@ button.danger[disabled]{background:color-mix(in srgb, var(--bad) 8%, var(--groun
 /* A roadmap group's summary is its item row, which fills the line, and its
    caret is the row's own first control, in the place the send arrow had,
    level with the first line of the words (the operator, 29 Sep). */
-details.grp>summary>.roadmap{flex:1 1 auto;min-width:0}
+details.grp>summary>.roadmap{flex:1 1 auto;min-width:0;padding-block:0}
 .roadmap .fold{flex:0 0 auto;align-self:flex-start;display:inline-flex;align-items:center;justify-content:center;
   color:var(--dim);font-size:11px;cursor:pointer}
 .roadmap .fold::before{content:"\25B8"}
@@ -1319,9 +1319,12 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
 /* A memory is a fold like a bug report and a rule: a line divider, no box.
    The rounded, sunk card it used to be was the one row shape in the notebook
    that did not match the others. */
-.mem{border-top:var(--hair) solid var(--line);padding:2px 0}
+.mem{border-top:var(--hair) solid var(--line)}
 .mem:first-child{border-top:0}
-.mem>summary{padding:8px 2px;min-height:var(--tap);box-sizing:border-box}
+/* Each row of a notebook's list opens a row's room (--row-y) above its
+   first line, the room a .row has: a memory, a bug, a rule, a roadmap
+   item, a test, a file or a conversation alike. */
+.mem>summary{padding:var(--row-y) 2px;min-height:var(--tap);box-sizing:border-box}
 /* Wrapped, unlike the command editor's textarea: those are shell lines where a
    wrap would lie about what runs, these are prose with an 80-column habit and
    a description line that is nobody's idea of scrollable. */
@@ -1337,9 +1340,9 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
 .memadd .actbar{margin-top:10px}
 /* Bugs: one <details> per report, severity leading the line the way type
    leads a memory's. */
-.bug{border-top:var(--hair) solid var(--line);padding:2px 0}
+.bug{border-top:var(--hair) solid var(--line)}
 .bug:first-child{border-top:0}
-.bug>summary{padding:8px 2px}
+.bug>summary{padding:var(--row-y) 2px}
 .bug .btitle{flex:1;min-width:0;font:var(--f-row);
   overflow-wrap:anywhere}
 .bug .btitle.done{color:var(--dim);text-decoration:line-through}
