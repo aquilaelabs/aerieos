@@ -14,7 +14,7 @@ html[data-mode="light"][data-theme="nostromo"] button:not(.link){
 /* The install's banner (R88): a band of the page's column under the header,
    so the content below is shorter by it and nothing pinned to the page sits
    over it. One line at a desk, wrapping on a phone. */
-.banner{flex:0 0 auto;padding:6px 12px;font-size:13px;line-height:1.4;color:var(--ink);
+.banner{flex:0 0 auto;padding:6px 12px;font:var(--f-ui);color:var(--ink);
   background:var(--panel);border-bottom:var(--hair) solid var(--line);overflow-wrap:anywhere}
 .banner a{color:var(--note);margin-left:6px}
 .banner.held{color:var(--ground-ink);background:color-mix(in srgb, var(--bad) 16%, var(--ground))}
@@ -173,7 +173,7 @@ html:not([data-theme]) .logo.away,.logo.away{color:var(--dim)}
 .help.on{color:var(--ink);border-color:var(--ink)}
 .helppop{position:fixed;z-index:400;max-width:min(320px, calc(100vw - 16px));padding:8px 10px;background:var(--panel);
   border:var(--hair) solid var(--line);border-radius:var(--r-surface);box-shadow:0 10px 28px rgba(0,0,0,.38);
-  color:var(--ink);font:var(--f-hint, 12px/1.45 system-ui,sans-serif);white-space:normal;overflow-wrap:anywhere;
+  color:var(--ink);font:var(--f-ui);white-space:normal;overflow-wrap:anywhere;
   pointer-events:none;animation:menuIn .16s cubic-bezier(.33,1,.68,1)}
 .helppop[hidden]{display:none}
 .setrow input:not([type=checkbox]):not([type=number]){flex:1 1 12em;min-width:0;width:auto}
@@ -206,7 +206,7 @@ html:not([data-theme]) .logo.away,.logo.away{color:var(--dim)}
   border-color:var(--warn);font-weight:600}
 .bnote .bdetail summary{font:var(--f-note);color:var(--dim);cursor:pointer;margin-top:4px}
 .bnote .bdetail pre{font:var(--f-data);white-space:pre-wrap;overflow-wrap:anywhere;max-height:40vh;overflow:auto;margin:6px 0 0;padding:8px;background:var(--sunk);border-radius:var(--r-control)}
-.bnote .bcmd{font:11px/1.5 var(--mono);color:var(--dim);overflow-wrap:anywhere;
+.bnote .bcmd{font:var(--f-code);color:var(--dim);overflow-wrap:anywhere;
   margin-top:3px}
 /* Its actions beside what it says while they fit, and on a line of their
    own under it when they do not, each button's words kept whole (B332). */
@@ -263,7 +263,7 @@ html:not([data-theme]) .logo.away,.logo.away{color:var(--dim)}
 /* A question's title is the question, a sentence in its own case at reading
    size: a dialog's label title is small capitals, and a question in it read
    as shouting (the operator, 23 Oct). */
-.modal.askdlg h3{font:600 15px/1.35 system-ui,sans-serif;letter-spacing:0;text-transform:none}
+.modal.askdlg h3{font:var(--f-sect);letter-spacing:0;text-transform:none}
 .modal .box.prose{display:flex;flex-direction:column}
 .modal .box.prose>*{flex:none}
 .modal .box.prose>.about{flex:0 1 auto;min-height:0;display:flex;flex-direction:column}
@@ -424,7 +424,7 @@ button.on{background:var(--accent-deep);border-color:var(--accent-mid);color:var
   border-bottom:var(--hair) solid var(--line);cursor:pointer;color:var(--ink)}
 .tc:last-child{border-bottom:0}
 .tc input{margin:3px 0 0;width:16px;height:16px;flex:0 0 auto}
-.tc .nm{font:600 13px/1.35 system-ui,sans-serif}
+.tc .nm{font:var(--f-row);font-weight:600}
 .tc .sub{display:block;color:var(--dim);font:var(--f-note)}
 .tc .where{font-family:var(--mono);overflow-wrap:anywhere}
 /* An image nothing is built on: said, but quietly. It is the answer to "can
@@ -695,7 +695,7 @@ button.danger[disabled]{background:color-mix(in srgb, var(--bad) 8%, var(--groun
    project row is: both are a line of text you can press, and reading as one
    is what tells you that. Dim and undecorated it read as a caption. */
 .modal .link{background:none;--sheen:none;border:0;color:var(--warn);padding:2px 0;
-  font:12px/1.4 system-ui,sans-serif;min-height:var(--tap);text-align:left;
+  font:var(--f-ui);min-height:var(--tap);text-align:left;
   text-decoration:underline;cursor:pointer}
 .modal .link[hidden]{display:none}
 /* The project settings' sections: folds, as a tab's sections are, one
@@ -799,7 +799,7 @@ details.grp[open]>summary .roadmap .fold::before{content:"\25BE"}
    it is a fact about the list plus the controls that turn its page, not a
    section of its own. */
 .pagemore{display:flex;gap:8px;align-items:center;flex-wrap:wrap;
-  padding:10px 0 2px;border-top:1px dashed var(--btn);margin-top:6px}
+  padding:10px 0 2px;border-top:var(--hair) dashed var(--btn);margin-top:6px}
 .pagemore span{color:var(--dim);font:var(--f-note)}
 .pagemore button{margin-left:auto}
 .pagemore button+button{margin-left:0}
@@ -924,7 +924,7 @@ a.btn svg{width:12px;height:12px;flex:0 0 auto}
    has a border where a line of text has a descender, so it needs the air a
    text line gets for free. */
 .row .name .pill{display:inline-block;margin-bottom:5px}
-.phcmd{font:11px/1.4 var(--mono);color:var(--dim);overflow-wrap:anywhere}
+.phcmd{font:var(--f-code);color:var(--dim);overflow-wrap:anywhere}
 /* The one warning on this card that is about what the operator is doing right
    now rather than about the machine's state. */
 .row .sub b.warn{color:var(--warn)}
@@ -956,7 +956,7 @@ a.btn svg{width:12px;height:12px;flex:0 0 auto}
 .roadmap{display:flex;gap:9px;align-items:flex-start;padding:9px 0}
 /* A group's steps sit under its title, indented and hairlined, so the shape
    of "these go in this order" is visible without reading them. */
-.roadmap.step{padding:5px 0 5px 26px;border-top:1px dashed var(--btn)}
+.roadmap.step{padding:5px 0 5px 26px;border-top:var(--hair) dashed var(--btn)}
 /* A step's send button lines up under its item's, which sits in the
    summary's inset, rather than on the card's edge. */
 .fx details.grp .roadmap.step{padding-right:var(--row-x)}
@@ -973,7 +973,7 @@ a.btn svg{width:12px;height:12px;flex:0 0 auto}
   font:var(--f-tag);text-transform:uppercase;letter-spacing:.4px;
   padding:3px 5px;border-radius:var(--r-small);border:var(--hair) solid var(--line);
   color:var(--dim);white-space:nowrap}
-.roadmap .n{flex:0 0 auto;color:var(--dim);font:600 11px/1.5 var(--mono);
+.roadmap .n{flex:0 0 auto;color:var(--dim);font:var(--f-data);font-weight:600;
   min-width:1.2em;text-align:right}
 /* An item's own number, in the column its steps number themselves in. It is
    the id, not the position; it does not change when the list is rearranged,
@@ -982,7 +982,7 @@ a.btn svg{width:12px;height:12px;flex:0 0 auto}
 /* An item the server has never heard of has no number to show. It gets one
    from Save, which is also the moment it becomes something a session can be
    told about. */
-.roadmap .n.id.new{font:600 10px/1.5 system-ui,sans-serif;color:var(--accent);
+.roadmap .n.id.new{font:var(--f-tag);color:var(--accent);
   opacity:.9}
 /* The words and their labels are one column, so a pill sits above the line
    instead of eating a third of it, on a phone that difference is the whole
@@ -1274,7 +1274,7 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
    browser dialog: it has to hold a field, and a phone's confirm() cannot. */
 .dropbox{border:var(--hair) solid var(--red2-edge);border-radius:var(--r-surface);padding:9px 10px;
   margin:0 0 9px 26px;background:color-mix(in srgb, var(--bad) 8%, var(--ground))}
-.dropbox .q{font:12px/1.5 system-ui,sans-serif;color:var(--ink);margin-bottom:7px}
+.dropbox .q{font:var(--f-ui);color:var(--ink);margin-bottom:7px}
 .dropbox .q span{color:var(--dim)}
 .dropbox input{width:100%;box-sizing:border-box;padding:6px 8px;
   font:var(--f-row);min-height:var(--tap)}
@@ -1314,7 +1314,7 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
 .mem textarea{white-space:pre-wrap;min-height:190px}
 .mem .body{padding:0 10px 10px}
 .macts{margin-top:8px}
-.memadd{border:1px dashed var(--line);border-radius:var(--r-surface);padding:10px}
+.memadd{border:var(--hair) dashed var(--line);border-radius:var(--r-surface);padding:10px}
 .memadd label{margin-top:8px}
 .memadd>label:first-child{margin-top:0}
 /* Wrapped, unlike the command editor's: this one is prose, and `.modal
@@ -2422,7 +2422,7 @@ button[aria-busy="true"]{opacity:.75}
    screen; it is a window on what is happening, not a log file. */
 .dmlog{margin:6px 0 0;padding:7px 9px;max-height:150px;overflow:auto;
   background:var(--sunk);border:var(--hair) solid var(--line);border-radius:var(--r-control);
-  color:var(--dim);font:11px/1.5 var(--mono);white-space:pre-wrap;
+  color:var(--dim);font:var(--f-code);white-space:pre-wrap;
   overflow-wrap:anywhere}
 /* Its colors sit under the look a disabled button keeps when pointed at (a
    press leaves its button disabled while it works), which outranks them. */
@@ -2717,7 +2717,7 @@ body.booting .pane>.skel{margin:0;width:100%;align-self:stretch}
 }
 
 /* Findings view ------------------------------------------------------ */
-.fx h3{margin:0 0 8px;font-size:15px}
+.fx h3{margin:0 0 8px;font:var(--f-sect)}
 /* Not in the notebook. A pane's document carries `fx` whatever it holds, so
    the findings card (bordered, rounded, floating on its own background)
    landed on every row of the to-do list and made it read as a wall of
