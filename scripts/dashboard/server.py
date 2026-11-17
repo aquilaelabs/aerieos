@@ -55,9 +55,9 @@ SCREEN_PORT = 7684
 # One sign-in on a real login page covers the page and its terminals, which
 # are websockets on this origin (/termws), so no second port is published.
 #
-# The cookie is a signed expiry, not a server-side session: the secret lives
-# on the /config volume, so a container update does not log every phone out,
-# and there is no session table to grow, lock, or clean. Basic auth still
+# The cookie is a signed expiry and the sign-in row it names (logins.py), so
+# a browser can be signed out from anywhere: the secret lives on the /config
+# volume, so a container update does not log every phone out. Basic auth still
 # works on every request (curl, aerie capture shot and the tests send it preemptively),
 # but no response carries a WWW-Authenticate challenge any more, because the
 # challenge is precisely what made browsers pop their own dialog.

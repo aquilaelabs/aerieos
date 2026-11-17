@@ -42,8 +42,8 @@ is the question a session otherwise spends thirty greps on, and it says so
 in its output where it is guessing (an anonymous callback is attributed to
 the nearest named function around it).
 
-The index lives at .bb-map/map3.json under the tree, the number being its
-format. Building it keeps .bb-map/ out of git through the repository's own
+The index lives at .bb-map/map5.json under the tree, the number being its
+format, with the calls a few questions need in map5-calls.json beside it. Building it keeps .bb-map/ out of git through the repository's own
 exclude file, never the project's .gitignore, which is the project's to write.
 """
 import ast

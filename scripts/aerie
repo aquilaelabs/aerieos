@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 #
-# `aerie`: small convenience CLI inside the container.
+# `aerie`: AerieOS's command line. The operator runs it on the controller, and
+# a session runs it on its node, where each verb either answers there or is
+# relayed to the controller with the session's token.
 #
 set -euo pipefail
 

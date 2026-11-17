@@ -69,10 +69,10 @@ class ConfigPlaneMixin:
     # -- the configuration plane (docs/nodes.md §12, phase 5) -----------------
     def system(self, job, spec):
         """Apply the desired storage or network config the controller holds
-        for this node: the one root-privileged thing the agent does. Not
-        dropped to the enrolled account, because mounts and addresses are
-        root's; offered by the controller only to nodes that enrolled as a
-        sandbox, and refused here without bb-sandbox, which is the stamp."""
+        for this node. Not dropped to the enrolled account, because mounts
+        and addresses are root's; offered by the controller only to nodes
+        that enrolled as a sandbox, and refused here without bb-sandbox,
+        which is the stamp."""
         what = spec.get("apply")
         self.refresh_sandbox_tool(job)
         # Per verb, not one stamp for all of them (roadmap #23): storage and

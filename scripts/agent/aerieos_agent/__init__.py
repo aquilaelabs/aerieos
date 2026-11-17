@@ -1,4 +1,5 @@
-"""AerieOS's node agent: one file, standard library only, dialing OUT.
+"""AerieOS's node agent: a package of the standard library alone, shipped
+as one zip, dialing OUT.
 
 A node runs this under systemd. It enrolls once with a token the operator
 minted on the Nodes page, then loops for the life of the machine: say hello,
@@ -7,8 +8,9 @@ never connects to a node (a node needs no open port, no inbound rule and no
 key the controller could lose), and the credential it holds opens nothing
 but its own row (docs/nodes.md §4, §8).
 
-The protocol is six verbs over plain HTTP, and this file speaks four of them
-plus the download that fetches itself:
+The protocol is verbs over plain HTTP. These carry every job; the
+features add their own beside them (sync, runner-token, signing, scans and
+the rest, channel.py on the controller says what each means):
 
     POST /api/v1/agent/enroll     once: the enroll token in, the node token out
     POST /api/v1/agent/hello      on connect and every ten minutes: the census,
@@ -23,7 +25,7 @@ plus the download that fetches itself:
                                   canceled), exit code and a one-line error
     GET  /api/v1/agent/download   the agent the controller ships, for self-update
 
-Three rules this file keeps that are worth knowing before changing it:
+Three rules the agent keeps that are worth knowing before changing it:
 
   * The agent is the DURABLE side of a job (door 5). A controller restart
     must never kill running work: log chunks that could not be posted are
@@ -75,4 +77,4 @@ Runs anywhere Python 3.8+ is, with nothing installed:
 # that "which of these two is newer" always has an answer. A reset would put
 # the same number on two different agents, and a number that cannot say which
 # is newer is the reason the flat protocol number this replaced was useless.
-AGENT_VERSION = "0.9.454"
+AGENT_VERSION = "0.9.455"
