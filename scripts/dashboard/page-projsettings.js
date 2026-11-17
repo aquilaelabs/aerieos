@@ -161,6 +161,7 @@ function rnFillPrefs(p){
   // the last project's dialog left in it (the merged list, 13 Oct).
   const nm = $("rnNodesMore");
   if (nm) delete nm.dataset.drawn;
+  rnMore = null;
   rnPrefWas = rnPrefsOf(p);
   // A select with no value of its own reads as its first option, and the
   // form collects every field whichever section is saved: set here, with the
@@ -179,6 +180,7 @@ function rnFillPrefs(p){
   // first draw would read them back into it.
   $("rnReachRows").innerHTML = "";
   rnReachDraft = JSON.parse(rnPrefWas.reaches || "[]");
+  rnReachEdit = null;
   rnFillNode();
   rnFillPrefsRest(p);
   rnFillReads();
@@ -278,67 +280,103 @@ function rnHostIds(){
 }
 
 // Also reaches (the operator, 7 Oct): addresses a session here may still
-// reach where its node filters, each on the project's nodes ticked beside
-// it, every one when the project is on one node. A draft until Save; all
-// ticked is stored as none named, which also covers a node added later.
+// reach where its node filters, each on the project's nodes ticked in its
+// form, every one when the project is on one node. All ticked is stored as
+// none named, which also covers a node added later.
 let rnReachDraft = [];
 
 function rnReachNodes(){
   const primary = $("rnNode").value;
   // The nodes a session may run on: a hosting-only row holds no session.
   const hosts = rnHostIds();
-  const more = [...$("rnNodesMore").querySelectorAll("input:checked")].map(i => i.value).filter(id => !hosts.has(id));
+  const more = rnMoreIds().filter(id => !hosts.has(id));
   const ids = primary ? [primary, ...more.filter(x => x !== primary)] : [];
   return ids.map(id => (nodesList || []).find(n => n.id === id) || {id, name: id});
 }
 
-// What is typed and ticked, back into the draft before a redraw or a save.
-function rnReachSync(){
-  const ns = rnReachNodes();
-  $("rnReachRows").querySelectorAll(".rnreach").forEach(row => {
-    const e = rnReachDraft[+row.dataset.i];
-    if (!e) return;
-    e.addr = row.querySelector("[data-reach]").value.trim();
-    const ticks = [...row.querySelectorAll("[data-reachnode]")];
-    if (ticks.length){
-      const on = ticks.filter(t => t.checked).map(t => t.value);
-      e.nodes = on.length === ns.length ? [] : on;
-    }
-  });
-}
-
+// Also reaches as records (the record-lists rule; the operator, 17 Nov: a
+// record's Save writes it at once): an address a row with the nodes it is
+// on, read-only with Edit at its right, Edit opening it in place (its
+// address, its nodes where the space works on several, Delete, Cancel and
+// Save), Add an address over the table. A Save writes the space's list with
+// that one changed; the section's own Save is for its other fields.
+const REACH_COLS = [{label: "Address"}, {label: "On", w: "minmax(0,1fr)"}, {act: true, w: "5rem"}];
+let rnReachEdit = null;           // {i, form: {addr, nodes}}: the row open, i -1 for a new one
 function rnDrawReach(focus){
   if (rnMode === "git") return;
   const box = $("rnReachRows");
-  if (box.childElementCount) rnReachSync();
   // Nodes Write, as the server asks (R255 step 3), not the administrator
-  // role: a role of anybody's may give it.
+  // role: a role of anybody's may give it. A repository's view draws the
+  // space's dead (rnSpaceRelock, after each draw).
   const ns = rnReachNodes(), ro = state?.areas ? state.areas.nodes !== "write" : !state?.admin;
-  drawHTML(box, rnReachDraft.map((e, i) => `<div class="rnreach" data-i="${i}">
-      <input data-reach value="${esc(e.addr)}" autocomplete="off" spellcheck="false" placeholder="192.168.1.20 or 192.168.1.20:8080"
-        aria-label="an address a session here may reach"${ro ? " disabled" : ""}>
-      ${ns.length > 1 ? `<span class="rnreachnodes">${ns.map(n => `<label class="ndcap"><input type="checkbox" data-reachnode value="${esc(n.id)}"${
-        !e.nodes.length || e.nodes.includes(n.id) ? " checked" : ""}${ro ? " disabled" : ""}> ${esc(n.name)}</label>`).join("")}</span>` : ""}
-      ${ro ? "" : rmIcon("data-reachrm", "remove this address", {title: "remove this address"})}
-    </div>`).join(""));
+  const named = id => ns.find(n => n.id === id)?.name || (nodesList || []).find(n => n.id === id)?.name || id;
+  const ed = rnReachEdit;
+  const form = (f, i) => `<div class="ngform rnreachform" data-i="${i}">
+      <label class="setrow col ctlrow"><span class="lbl">Address</span><input data-reachf="addr" value="${esc(f.addr || "")}" autocomplete="off" spellcheck="false"
+        placeholder="192.168.1.20 or 192.168.1.20:8080" aria-label="an address a session here may reach"></label>
+      ${ns.length > 1 ? `<div class="rnreachnodes">${ns.map(n => `<label class="ndcap"><input type="checkbox" data-reachfnode value="${esc(n.id)}"${
+        !f.nodes.length || f.nodes.includes(n.id) ? " checked" : ""}> ${esc(n.name)}</label>`).join("")}</div>` : ""}
+      <div class="actbar ngformbar">${i >= 0 ? `<button type="button" class="danger lead" data-reachdel>Delete</button>` : ""}
+        <button type="button" data-reachcancel>Cancel</button>
+        <button type="button" class="primary" data-reachsave>Save</button></div>
+    </div>`;
+  const rows = rnReachDraft.map((e, i) => `<div class="row rnreach${ed?.i === i ? " open" : ""}" data-i="${i}">${tblLine(REACH_COLS, [
+      `<code>${esc(e.addr)}</code>`, esc(e.nodes.length ? e.nodes.map(named).join(", ") : "every node it works on"),
+      ed?.i === i || ro ? "" : `<button type="button" data-reachedit="${i}">Edit</button>`])}${ed?.i === i ? form(ed.form, i) : ""}</div>`).join("");
+  const fresh = ed?.i === -1 ? `<div class="row rnreach open" data-i="-1">${form(ed.form, -1)}</div>` : "";
+  drawHTML(box, rows || fresh ? tblWrap(REACH_COLS, fresh + rows, "rnreaches") : "");
   // Empty is no box at all, so the field keeps its rhythm under the label.
-  box.hidden = !rnReachDraft.length;
+  box.hidden = !rows && !fresh;
   $("rnReachAdd").hidden = ro;
-  box.querySelectorAll("[data-reachrm]").forEach(b => b.onclick = () => {
-    rnReachSync();
-    rnReachDraft.splice(+b.closest(".rnreach").dataset.i, 1);
-    // Read already: the rows on screen no longer line up with the draft.
-    $("rnReachRows").innerHTML = "";
-    rnDrawReach();
+  $("rnReachAdd").disabled = ed?.i === -1;
+  const keep = () => {
+    if (!rnReachEdit) return;
+    const o = box.querySelector(".rnreach.open");
+    rnReachEdit.form.addr = o?.querySelector("[data-reachf]")?.value.trim() ?? rnReachEdit.form.addr;
+    const ticks = [...(o?.querySelectorAll("[data-reachfnode]") || [])];
+    if (ticks.length){
+      const on = ticks.filter(t => t.checked).map(t => t.value);
+      rnReachEdit.form.nodes = on.length === ns.length ? [] : on;
+    }
+  };
+  box.querySelectorAll("[data-reachf], [data-reachfnode]").forEach(el => { el.oninput = keep; el.onchange = keep; });
+  box.querySelectorAll("[data-reachedit]").forEach(b => b.onclick = () => {
+    const e = rnReachDraft[+b.dataset.reachedit];
+    rnReachEdit = {i: +b.dataset.reachedit, form: {addr: e.addr, nodes: [...e.nodes]}};
+    rnDrawReach(true);
   });
-  if (focus) box.querySelector(".rnreach:last-child [data-reach]")?.focus();
+  box.querySelectorAll("[data-reachcancel]").forEach(b => b.onclick = () => { rnReachEdit = null; rnDrawReach(); });
+  box.querySelectorAll("[data-reachsave]").forEach(b => b.onclick = () => {
+    keep();
+    const {i, form} = rnReachEdit;
+    const list = rnReachDraft.map(e => ({addr: e.addr, nodes: [...e.nodes]}));
+    const e = {addr: form.addr, nodes: [...form.nodes].sort()};
+    if (i < 0) list.push(e); else list[i] = e;
+    rnReachSave(list.filter(x => x.addr), b);
+  });
+  box.querySelectorAll("[data-reachdel]").forEach(b => b.onclick = () =>
+    rnReachSave(rnReachDraft.filter((_, j) => j !== rnReachEdit.i).map(e => ({addr: e.addr, nodes: [...e.nodes]})), b));
+  if (focus) box.querySelector(".rnreach.open [data-reachf]")?.focus();
+  rnSpaceRelock();
   // Every node keeps each session to its own project's network (R146).
   $("rnReachHint").textContent = !ns.length ? "" : "An address for the whole machine, or address:port for one service.";
 }
+// A record's Save: the space's list with that one changed, written now;
+// running sessions take it at once.
+async function rnReachSave(list, btn){
+  const word = btn.textContent;
+  busy(btn, "Saving");
+  const j = await postJSON("/api/prefs", {project: rnFor, scope: rnMode === "project" ? "project" : "repository", reaches: list});
+  if (j.error){ unbusy(btn, word); notify(j.error, true); return; }
+  rnReachDraft = list;
+  rnPrefWas.reaches = JSON.stringify(rnReachNow());
+  rnReachEdit = null;
+  rnDrawReach();
+  rnBars();
+}
 
-// What Save sends: the rows with an address, in the stored shape.
+// What the section's Save sends: the saved rows, in the stored shape.
 function rnReachNow(){
-  rnReachSync();
   return rnReachDraft.filter(e => e.addr).map(e => ({addr: e.addr, nodes: [...e.nodes].sort()}));
 }
 
@@ -347,39 +385,80 @@ const lrow = (value, name, sub, on) => `<label class="lrow"><input type="checkbo
     on ? " checked" : ""}><span>${esc(name)}</span>${sub ? `<span class="lsub">${esc(sub)}</span>` : ""}</label>`;
 
 // The rest of the set (R82) and the hosting-only nodes (prefs.hosts) in one
-// list (the operator, 13 Oct): every node but the primary, a listbox row
-// each, a hosting-only one marked so in its name, ticked for the ones the
-// project also works on or hosts containers on. Redrawn when the primary
-// changes, since the primary is never offered twice.
+// list (the operator, 13 Oct), as records (the record-lists rule; the
+// operator, 17 Nov: a record's Save writes it at once): a node a row with
+// what it takes (sessions and containers, or containers alone for one marked
+// Hosting only) and its bin, nothing on it to edit, as Hostnames' rows; Add
+// a node over the table, a pick of the ones not on it. Each written at once,
+// with the primary as it is saved; the primary is never listed twice.
+const MORE_COLS = [{label: "Node"}, {label: "Takes", w: "minmax(0,1fr)"}, {act: true, w: "3rem"}];
+let rnMore = null;                // the saved set: node ids, the primary's set and the hosting ones
+function rnMoreIds(){
+  const primary = $("rnNode").value;
+  return [...(rnMore || [])].filter(id => id && id !== primary);
+}
 function rnFillNodesMore(){
   const box = $("rnNodesMore"), hint = $("rnNodesMoreHint"), label = $("rnNodesLabel");
   if (!box) return;
   const primary = $("rnNode").value;
-  const was = new Set([...rnPrefWas.nodes.split(","), ...rnPrefWas.hosts.split(",")].filter(Boolean));
-  const checked = new Set([...box.querySelectorAll("input:checked")].map(i => i.value));
-  const first = !box.dataset.drawn;
+  // Read from what is saved on a fresh open, whether or not the node list
+  // has arrived (B796: a draw before it marked a saved second node gone).
+  if (!box.dataset.drawn || rnMore === null)
+    rnMore = new Set([...rnPrefWas.nodes.split(","), ...rnPrefWas.hosts.split(",")].filter(Boolean).filter(id => id !== rnPrefWas.node));
   // Without a primary there is nothing for a session to also work on, but
-  // a hosting-only node still takes the project's containers, so those
-  // rows stay on offer.
+  // a hosting-only node still takes the project's containers.
   const others = (nodesList || []).filter(n => n.kind !== "local" && n.state !== "retired" && n.state !== "disabled" && n.id !== primary
                                             && (primary || n.config?.host_only));
-  // A hosting node named but gone, or no longer hosting-only, stays ticked
-  // so Save does not drop it without anybody seeing.
-  const gone = rnPrefWas.hosts.split(",").filter(id => id && !others.some(n => n.id === id) && id !== primary);
-  box.hidden = hint.hidden = label.hidden = rnMode === "git" || !(others.length || gone.length);
-  drawHTML(box, others.map(n => lrow(n.id, n.config?.host_only ? `${n.name} (Hosting only)` : n.name,
-                                       `${n.config?.host_only ? "containers" : n.kind}, ${n.state}${n.live === false ? ", quiet" : ""}`,
-                                       first ? was.has(n.id) : checked.has(n.id))).join("")
-    + gone.map(id => lrow(id, `${id} (Hosting only)`, "not a hosting node now", first ? true : checked.has(id))).join(""));
-  // Read-only without the `node` grant, like the primary above (R137 step 4).
-  if (state?.can?.node === false) box.querySelectorAll("input").forEach(i => { i.disabled = true; });
-  // Drawn from what is saved until a draw has had nodes to draw: one made
-  // before the node list arrived listed nothing, and marking it drawn made
-  // the real one read its own empty boxes, so a saved second node came up
-  // unticked and read as one to drop (B796, seen on dev, 16 Oct).
+  const ids = rnMoreIds();
+  box.hidden = hint.hidden = label.hidden = rnMode === "git" || !(others.length || ids.length);
+  // Without the `node` grant the list is read alone (R137 step 4); a
+  // repository's view draws it dead (rnSpaceRelock, at the end).
+  const ro = state?.can?.node === false;
+  const node = id => (nodesList || []).find(n => n.id === id);
+  const rows = ids.map(id => {
+    const n = node(id), host = n ? !!n.config?.host_only : rnPrefWas.hosts.split(",").includes(id);
+    return `<div class="row rnmore" data-id="${esc(id)}">${tblLine(MORE_COLS, [
+      `${esc(n?.name || id)}${host ? ` <span class="pill">Hosting only</span>` : ""}`,
+      esc(!n && host ? "not a hosting node now" : `${host ? "its containers" : "its sessions and containers"}${n ? `, ${n.state}${n.live === false ? ", quiet" : ""}` : ""}`),
+      ro ? "" : rmIcon(`data-morerm="${esc(id)}"`, `take ${n?.name || id} off`)])}</div>`;
+  }).join("");
+  const offer = others.filter(n => !ids.includes(n.id));
+  drawHTML(box, `${ro || !offer.length ? "" : `<div class="addbar ctlrow rnmoreadd">
+      <select data-moreadd aria-label="a node to add">${optionList(offer.map(n => [n.id, n.config?.host_only ? `${n.name} (Hosting only)` : n.name]), "")}</select>
+      <button type="button" data-moreaddgo>Add a node</button></div>`}
+    ${rows ? tblWrap(MORE_COLS, rows, "rnmores") : `<div class="hint">none: its sessions and containers are on its node alone</div>`}`);
+  box.querySelector("[data-moreaddgo]")?.addEventListener("click", e => {
+    const id = box.querySelector("[data-moreadd]")?.value;
+    if (id) rnMoreSave(new Set([...(rnMore || []), id]), e.currentTarget);
+  });
+  box.querySelectorAll("[data-morerm]").forEach(b => b.onclick = () => {
+    const keep = new Set(rnMore || []); keep.delete(b.dataset.morerm);
+    rnMoreSave(keep, b);
+  });
+  // Drawn from what is saved until a draw has had nodes to draw (B796).
   if (nodesList !== null) box.dataset.drawn = "1";
+  rnSpaceRelock();
   // Also reaches ticks among these, so it is drawn after them.
   rnDrawReach();
+}
+// A record's Save: the set written now, with the primary as it is saved; a
+// session running keeps what it started with until it starts again.
+async function rnMoreSave(set, btn){
+  const word = btn.textContent;
+  busy(btn, "Saving");
+  const primary = rnPrefWas.node;
+  const hosting = id => !!(nodesList || []).find(n => n.id === id)?.config?.host_only
+    || (!(nodesList || []).some(n => n.id === id) && rnPrefWas.hosts.split(",").includes(id));
+  const more = [...set].filter(id => id && id !== primary);
+  const nodes = primary ? [primary, ...more.filter(id => !hosting(id))] : [];
+  const hosts = more.filter(hosting);
+  const j = await postJSON("/api/prefs", {project: rnFor, scope: rnMode === "project" ? "project" : "repository", nodes, hosts});
+  if (j.error){ unbusy(btn, word); notify(j.error, true); return; }
+  rnMore = new Set(more);
+  rnPrefWas.nodes = nodes.join(","); rnPrefWas.hosts = hosts.join(",");
+  if (myLiveSession(rnFor)) notify(`${projLabel(rnFor)}: saved. Its running session keeps the nodes it started with until it starts again.`);
+  rnFillNodesMore();
+  rnBars();
 }
 
 // The projects a session here may read: every other project this account
@@ -1592,10 +1671,10 @@ function rnEnc(){
   const node = drawn ? $("rnNode").value : rnPrefWas.node;
   return {git_name: $("rnGitName").value.trim(), git_email: $("rnGitEmail").value.trim(),
           node, nodes: !drawn ? rnPrefWas.nodes
-            : (node ? [node, ...[...$("rnNodesMore").querySelectorAll("input:checked")].map(i => i.value).filter(id => !rnHostIds().has(id))] : []).join(","),
+            : (node ? [node, ...rnMoreIds().filter(id => !rnHostIds().has(id))] : []).join(","),
           // The ticked rows marked Hosting only are prefs.hosts, the rest
           // prefs.nodes: one list on screen, two settings underneath.
-          hosts: !drawn ? rnPrefWas.hosts : [...$("rnNodesMore").querySelectorAll("input:checked")].map(i => i.value).filter(id => rnHostIds().has(id)).join(","),
+          hosts: !drawn ? rnPrefWas.hosts : rnMoreIds().filter(id => rnHostIds().has(id)).join(","),
           // The space's hosting nodes this repository keeps its containers
           // off (R223): the rows unticked.
           hosts_off: $("rnHostsOwn")?.hidden !== false ? rnPrefWas.hosts_off
@@ -1726,6 +1805,7 @@ function rnRevertSect(sect){
     $("rnSees").value = w.sees;
     $("rnReachRows").innerHTML = "";
     rnReachDraft = JSON.parse(w.reaches || "[]");
+    rnReachEdit = null;
     rnDrawReach();
   } else if (sect === "build"){
     $("rnBuildCmd").value = w.build; $("rnTestCmd").value = w.test; $("rnOutputs").value = w.outputs;

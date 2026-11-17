@@ -11131,7 +11131,7 @@ class Handler(BaseHTTPRequestHandler):
             # is a person's.
             if session and (name != sess or str(req.get("node") or "") not in (prefs.get(sess).get("hosts") or [])):
                 return self._json({"error": "sending a space's container to a node it is not on is a "
-                                            "person's, unless the node is ticked under Also works on in the "
+                                            "person's, unless the node is listed under Also works on in the "
                                             "space's settings (a hosting-only node takes containers alone): "
                                             "it puts the space's image on another machine"}, 403)
             if not session and self._refused("node", name):

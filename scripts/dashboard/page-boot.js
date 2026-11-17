@@ -444,12 +444,9 @@ function bootContainerDialogs(){
     rnFillNodesMore();
   };
   // Each Also reaches row ticks among the nodes picked above, so it follows them.
-  $("rnNodesMore").addEventListener("change", rnDrawReach);
-  $("rnReachAdd").onclick = () => {
-    rnReachSync(); rnReachDraft.push({addr: "", nodes: []});
-    $("rnReachRows").innerHTML = "";
-    rnDrawReach(true);
-  };
+  // ...and so do its records, which redraw them when they move.
+  // Add an address opens its form at the table's top.
+  $("rnReachAdd").onclick = () => { rnReachEdit = {i: -1, form: {addr: "", nodes: []}}; rnDrawReach(true); };
   $("cGo").onclick = cSubmit;
   // The controller restarted under unsaved work: the band's one press (page-poll.js).
   $("newBuildGo").onclick = () => location.reload();

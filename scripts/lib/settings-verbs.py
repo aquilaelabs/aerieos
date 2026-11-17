@@ -184,7 +184,7 @@ def show():
         nodes = dash.load("nodes", here)
         nodes.db.open_readonly(state)
         named = {n["id"]: n["name"] for n in nodes.node_list(all=True)}
-    # Hosting-only nodes ticked under Also works on (prefs' hosts), named
+    # Hosting-only nodes listed under Also works on (prefs' hosts), named
     # as the dialog shows them, so a session reads it has them (B712).
     for k in ("node", "nodes", "hosts", "reads", "sees", "model", "effort", "build", "test", "outputs", "policy", "locked",
               "toolchains_off"):

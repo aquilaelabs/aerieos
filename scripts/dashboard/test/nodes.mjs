@@ -1537,10 +1537,12 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     await page.evaluate(async () => { nodesList = null; await loadNodes(); });
     await page.evaluate(n => renameProject(n, 'project'), 'gamma');   // Also works on is the space's (R223)
     await page.waitForSelector('#rnmodal:not([hidden])', { timeout: 10000 });
-    await page.waitForFunction(id => [...document.querySelectorAll('#rnNodesMore input')].some(i => i.value === id), minted.id, { timeout: 10000 });
+    await page.waitForFunction(id => [...document.querySelectorAll('#rnNodesMore [data-moreadd] option')].some(o => o.value === id), minted.id, { timeout: 10000 })
+      .catch(async e => { console.log('[diag] Also works on: ' + JSON.stringify(await page.evaluate(() => ({ space: rnSpaceOn, node: state?.can?.node, mode: rnMode,
+        html: $('rnNodesMore')?.outerHTML.slice(0, 600), primary: $('rnNode')?.value })))); throw e; });
     ok(!(await page.$$eval('#rnNode option', (os, id) => os.some(o => o.value === id), minted.id))
-       && /Hosting only/.test(await page.$eval('#rnNodesMore', b => b.textContent)),
-       'a hosting-only node is not offered as a space\'s primary, only under Also works on, marked Hosting only');
+       && await page.$eval(`#rnNodesMore [data-moreadd] option[value="${minted.id}"]`, o => /\(Hosting only\)$/.test(o.textContent)),
+       'a hosting-only node is not offered as a space\'s primary, only under Also works on\'s Add a node, marked Hosting only');
     await page.click('#rnCancel');
     // Nothing on it runs Claude Code (the operator, 11 Oct): no section on
     // its row, and no Claude Code among its coding agents (the Library's
@@ -1707,14 +1709,14 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     ok(!hosted.error && hostsNow.join() === minted.id,
        `...but a space may name it under Hosts its containers on (${hosted.error || hostsNow.join()})`);
     await page.evaluate(n => renameProject(n, 'project'), 'gamma');   // Also works on is the space's (R223)
-    await page.waitForSelector(`#rnNodesMore:not([hidden]) input[value="${minted.id}"]:checked`, { timeout: 10000 });
-    ok(/\(Hosting only\)$/.test(await page.$eval(`#rnNodesMore input[value="${minted.id}"]`, i => i.parentElement.querySelector('span').textContent))
+    await page.waitForSelector(`#rnNodesMore:not([hidden]) .rnmore[data-id="${minted.id}"]`, { timeout: 10000 });
+    ok(/Hosting only/.test(await page.$eval(`#rnNodesMore .rnmore[data-id="${minted.id}"]`, r => r.textContent))
        && await page.$eval('.rnbar[data-rnbar="runs"] [data-rnsave]', b => b.disabled),
-       '...shown ticked under Also works on, marked Hosting only, nothing unsaved');
-    await page.click(`#rnNodesMore input[value="${minted.id}"]`);
-    const unErr = await sectSave(page, 'runs');
-    const left = (await gammaHosts('')).length;
-    ok(!unErr && left === 0, `...and unticked there and saved, it is taken off (${unErr || left})`);
+       '...listed under Also works on, marked Hosting only, nothing unsaved');
+    // A record (the operator, 17 Nov): its bin takes it off at once.
+    await page.click(`#rnNodesMore .rnmore[data-id="${minted.id}"] [data-morerm]`);
+    const left = await until(async () => (await gammaHosts('')).length === 0 || null, 15000, 300);
+    ok(left === true, `...and its bin there takes it off at once (${left})`);
     await page.click('#rnCancel');
     await napi('/api/prefs', { project: 'gamma', hosts: [] });
     await page.click(`${ROW} [data-nd="host-off"]`);
@@ -1916,11 +1918,11 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
   // scrolls sideways and no text control is smaller than the field type
   // (--f-field). Measured with the page on show: on a phone it once sat in a
   // hidden view, every control measured nothing, and this passed vacuously.
-  const skin = await page.evaluate(sel => {
-    const ref = document.getElementById('pName');
   // A mount's form open among them, its fields being the fold's too.
   await page.evaluate(sel => document.querySelector(sel + ' [data-madd]')?.click(), ROW);
   await page.waitForSelector(`${ROW} .ndmount.open [data-mf="source"]`, { timeout: 5000 }).catch(() => {});
+  const skin = await page.evaluate(sel => {
+    const ref = document.getElementById('pName');
     const key = el => { const c = getComputedStyle(el);
       return [c.backgroundColor, c.borderTopLeftRadius, c.borderTopColor, c.fontFamily].join('|'); };
     return [...document.querySelectorAll(sel + ' .ndconf input:not([type=checkbox]), ' + sel + ' .ndconf select')]
@@ -1939,9 +1941,9 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
   }, ROW);
   ok(phone.over <= 0 && phone.seen >= 8 && phone.small === 0,
      `...and at phone width it does not scroll sideways (${phone.over}px) and its ${phone.seen} controls are the field type, ${phone.field}px (${phone.small} smaller)`);
+  await page.evaluate(sel => document.querySelector(sel + ' .ndmount.open [data-mcancel]')?.click(), ROW);
   // A guest node's one line where Storage and Network would be (B157): inset
   // from the screen's edges and clear of the next section's head, in the
-  await page.evaluate(sel => document.querySelector(sel + ' .ndmount.open [data-mcancel]')?.click(), ROW);
   // note voice, at phone width as at a desk.
   const guest = await page.evaluate(sel => {
     const body = document.querySelector(sel + ' .ndconfbody');
@@ -2631,9 +2633,9 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
     const drawn = async q => { for (let i = 0; i < 100 && !document.querySelector(q); i++) await new Promise(r => setTimeout(r, 100));
       return document.querySelector(q); };
     openRunnerTab(id);
+    (await drawn(`.runnertab .ndrow[data-node="${id}"] [data-nredit]`))?.click();
     const b = await drawn(`.runnertab .ndrow[data-node="${id}"] [data-nrunner="install"]`);
     const was = b?.disabled; openNodesTab(); await drawn(`.nodestab .ndrow[data-node="${id}"] [data-napply="storage"]`); return was; }, minted.id);
-    (await drawn(`.runnertab .ndrow[data-node="${id}"] [data-nredit]`))?.click();
   const off = await page.evaluate(sel => ({
     storage: document.querySelector(sel + ' [data-napply="storage"]')?.disabled,
     network: document.querySelector(sel + ' [data-napply="network"]')?.disabled,

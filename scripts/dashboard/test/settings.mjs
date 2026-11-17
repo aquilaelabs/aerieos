@@ -639,13 +639,13 @@ await section("a project's settings live in its notebook", async () => {
     await page.evaluate(() => { getNotebook('alpha')?.view('roadmap'); nodesList = null; openProjectSettings('alpha'); });
     await page.waitForFunction(() => nodesList !== null, null, { timeout: 15000 });
     // The second draw, the one that had nodes to draw, and what it asked for answered.
-    await page.waitForFunction(id => $('rnNodesMore').dataset.drawn && document.querySelector(`#rnNodesMore input[value="${id}"]`),
+    await page.waitForFunction(id => $('rnNodesMore').dataset.drawn && document.querySelector(`#rnNodesMore .rnmore[data-id="${id}"]`),
       other.id, { timeout: 15000 }).catch(() => {});
     await settled(page);
-    const also = await page.evaluate(id => ({ ticked: !!document.querySelector(`#rnNodesMore input[value="${id}"]`)?.checked,
+    const also = await page.evaluate(id => ({ listed: !!document.querySelector(`#rnNodesMore .rnmore[data-id="${id}"]`),
       unsaved: !document.querySelector('.snav [data-spick="runs"] .sunsaved')?.hidden }), other.id);
-    ok(also.ticked && !also.unsaved,
-       `a space's second node is ticked under Also works on when its settings open before the node list is read, and Nodes holds nothing unsaved (${JSON.stringify(also)})`);
+    ok(also.listed && !also.unsaved,
+       `a space's second node is listed under Also works on when its settings open before the node list is read, and Nodes holds nothing unsaved (${JSON.stringify(also)})`);
     await post('/api/prefs', { project: 'alpha', node: first.id, nodes: [first.id] });
     await post('/api/v1/nodes', { action: 'retire', id: other.id });
   }

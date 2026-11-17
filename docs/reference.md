@@ -411,7 +411,7 @@ aerie devapp new [NAME] [--branch REF] [--compose FILE] [--override FILE] [--nod
                    files (site/compose.yml), the root's own by default; --override
                    lays another compose file from the tree over it, for this one
                    container (its own ports, env or an extra service). --node
-                   puts it on a hosting node ticked under the space's Also
+                   puts it on a hosting node listed under the space's Also
                    works on (marked Hosting only): built on the space's own
                    node and shipped there. On ask, one request carries all of it and
                    Approve makes and builds it

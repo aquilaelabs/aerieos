@@ -267,16 +267,26 @@ await section("what its sessions may still reach where the node filters", async 
   // What sessions reach is the space's (R223): its own dialog, the card's door.
   await page.evaluate(() => renameProject('alpha', 'project'));
   await page.waitForSelector('#rnmodal:not([hidden])', { timeout: 10000 });
-  const rows = await page.$$eval('#rnReachRows .rnreach [data-reach]', es => es.map(e => e.value));
-  ok(rows.join() === '192.168.1.50,192.168.1.60:8123', `the dialog draws a row per address (${rows.join(', ')})`);
+  // As records (the record-lists rule): an address a read-only row with
+  // Edit, Add an address over them, and a record's Save or Delete written at
+  // once (the operator, 17 Nov).
+  const rows = await page.$$eval('#rnReachRows .rnreach .tline .td.lead', es => es.map(e => e.textContent.trim()));
+  ok(rows.join() === '192.168.1.50,192.168.1.60:8123' && !(await page.$('#rnReachRows input')),
+     `the dialog draws a read-only row per address (${rows.join(', ')})`);
   await page.evaluate(() => document.querySelector('details[data-sect="rn:runs"]').open = true);
   await page.click('#rnReachAdd');
-  await page.fill('#rnReachRows .rnreach:last-child [data-reach]', '192.168.1.70');
-  await page.click('#rnReachRows .rnreach:first-child [data-reachrm]');
-  await saveDialog(page);
+  await page.fill('#rnReachRows .rnreach.open [data-reachf]', '192.168.1.70');
+  await page.click('#rnReachRows .rnreach.open [data-reachsave]');
+  await refreshUntil(page, () => (state?.projects || []).find(p => p.name === 'alpha')?.prefs?.reaches?.length === 3, { timeout: 20000 });
+  const at = await page.$$eval('#rnReachRows .rnreach', rs => rs.find(r => /192\.168\.1\.50$/.test(r.querySelector('.td.lead')?.textContent.trim() || ''))?.dataset.i);
+  await page.click(`#rnReachRows .rnreach[data-i="${at}"] [data-reachedit]`);
+  await page.click('#rnReachRows .rnreach.open [data-reachdel]');
   await refreshUntil(page, () => (state?.projects || []).find(p => p.name === 'alpha')?.prefs?.reaches?.length === 2, { timeout: 20000 });
   const after = (prefsOf('alpha').reaches || []).map(e => e.addr);
-  ok(after.join() === '192.168.1.60:8123,192.168.1.70', `...and Save keeps what the rows say, one removed and one added (${after.join(', ')})`);
+  const still = await page.evaluate(() => !document.querySelector('.rnbar[data-rnbar="sees"] [data-rnsave]:not([disabled])'));
+  ok(after.join() === '192.168.1.60:8123,192.168.1.70' && still,
+     `...a record's Save adds one and its Delete takes one away, each at once, with nothing left for the section's Save (${after.join(', ')})`);
+  await page.evaluate(() => closeRename());
   await api('/api/prefs', { project: 'alpha', reaches: [] });
 });
 
