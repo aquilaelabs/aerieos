@@ -181,7 +181,10 @@ class Wired(unittest.TestCase):
         # A session's verbs go to the controller unless they are named as
         # this machine's own; the record is beside the tree the harness ran
         # from, and the controller answered "unknown: aerie tests flakes".
-        self.assertIn('|"tests flakes"|"tests root"|', self.read("scripts", "aerie"))
+        # ...and aerie tests bisect, which runs the harness here at each commit.
+        line = next(x for x in self.read("scripts", "aerie").splitlines() if '"tests run"|' in x and '"tests flakes"' in x)
+        for verb in ("tests flakes", "tests bisect", "tests root"):
+            self.assertIn(f'"{verb}"', line, f"aerie {verb} runs here")
 
 
 if __name__ == "__main__":
