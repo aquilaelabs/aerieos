@@ -475,6 +475,9 @@ button.sw.on,button.sw.on:hover{background:var(--bg);border-color:var(--line);co
    the build lines are the changelog's (what is running is what changed),
    so they are not under the guide halving it (B110). */
 #aboutModal .box.prose,#cvModal .box.prose{height:90vh}
+/* ...but a conversation with nothing said in it is one line, in a box its
+   own size rather than a screen of nothing over a Close. */
+#cvModal .box.prose:has(#cvBody > .empty:only-child){height:auto}
 /* A conversation's turns (R83): who and when over the words, and Claude's
    commands folded under its turn, each opening onto what it answered. */
 .cvturn{margin:0 0 14px}
@@ -731,7 +734,8 @@ body.firstrun #panes{display:none}
 :is(.lbox,#roadmapList,#memList,#pendList,.dllog,.dmlog,.chatlog,.abpage,.dsboardwrap).scrollup{box-shadow:inset 0 1px 0 var(--line)}
 :is(.lbox,#roadmapList,#memList,#pendList,.dllog,.dmlog,.chatlog,.abpage,.dsboardwrap).scrollup.scrolldown{box-shadow:inset 0 1px 0 var(--line),inset 0 -1px 0 var(--line)}
 /* ...but a History's bar is a row in its sheet as on the page: the search and
-   its window side by side, wrapped only on a phone (B776). */
+   its window side by side, the window going under the search only where the
+   search would be narrower than a few words. */
 .box.sheet .sheetslot>.histbar{display:flex}
 @media(max-width:900px){
   .nbsheet{padding:0}
@@ -1397,7 +1401,7 @@ body.firstrun #panes{display:none}
 .histbar[hidden]{display:none}
 .histbar input{flex:1;min-width:0}
 .histbar select{flex:0 0 auto;width:auto}
-@media(max-width:600px){ .histbar{flex-wrap:wrap} .histbar input{flex:1 1 100%}
+@media(max-width:600px){ .histbar{flex-wrap:wrap} .histbar input{flex:1 1 180px}
 }
 /* The reason a line went, under the line it went with: indented, because it
    is a note about the event above it and not an event of its own. */

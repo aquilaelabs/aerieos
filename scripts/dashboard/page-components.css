@@ -1389,6 +1389,9 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
 .nb > *{max-width:var(--doc-w);margin-inline:auto}
 .nb > .nbtabs{max-width:none}
 .nb h3{display:none}
+/* ...but a dialog's title is its first line wherever the dialog sits, the
+   notebook's sheet (a log's history) among them, which had lost it. */
+.nb .modal:not(.inline) .box>h3{display:block}
 /* ...except a wiki article's: a page's ## is an h3 there, and this rule hid
    every one of them, so the sections were missing and the contents box
    linked to headings that were not drawn (the operator, 4 Oct). */

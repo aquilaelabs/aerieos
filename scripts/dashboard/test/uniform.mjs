@@ -2727,7 +2727,9 @@ async function dialogShape(pg = page){
       e.classList.contains('sp') ? 'sp' : e.classList.contains('state') ? 'state' : e.tagName === 'BUTTON'
         ? (e.classList.contains('primary') ? 'P' : e.classList.contains('danger') || e.dataset.danger ? 'D' : 'b') : e.tagName.toLowerCase()).join(' ') : '';
     const census = { id: m.id || m.className, cls: [...box.classList].filter(c => c !== 'box').join('.') || '-', w: Math.round(r.width),
-      title: box.firstElementChild?.tagName === 'H3', ownFoot: !!box.querySelector(':scope > .foot, :scope > .dlgbody > .foot'),
+      // Its title the first line, and one that shows: a notebook's rule hid
+      // the sheet's while the element stood first (the dialog walk, 17 Nov).
+      title: box.firstElementChild?.tagName === 'H3' && box.firstElementChild.offsetHeight > 0, ownFoot: !!box.querySelector(':scope > .foot, :scope > .dlgbody > .foot'),
       mid: r.height < innerHeight - 40 ? Math.round(r.top + r.height / 2 - innerHeight / 2) : 'tall', order };
     return { nested, loose: loose.slice(0, 3), h4: box.classList.contains('prose') ? 0 : box.querySelectorAll('h4').length,
              foot: !!fb && fb.offsetHeight > 0, gap, census };

@@ -100,6 +100,14 @@ ok(toolsAll.some(c => c.call === '$ aerie roadmap show R4' && /R4  The thing to 
    && toolsAll.some(c => /^Read: \/workspace\/alpha\/README\.md/.test(c.call) && c.err),
    `...Claude's commands folded under its turn, each with what it answered, a failed one marked (${toolsAll.map(c => c.call).join(' | ').slice(0, 120)})`);
 ok(!read.turns.some(t => /SECRET REASONING|SIDECHAIN WORDS/.test(t.text)), "...and neither Claude's reasoning nor a side chain is in it");
+const tall = await page.$eval('#cvModal .box', b => Math.round(b.getBoundingClientRect().height));
+// ...and one with nothing said in it is a box its own size, not a screen
+// of nothing over a Close (the dialog pass's walk, 17 Nov).
+const empty = await page.evaluate(() => { const was = $('cvBody').innerHTML;
+  $('cvBody').innerHTML = '<div class="empty">Nothing said in it yet.</div>';
+  const h = Math.round(document.querySelector('#cvModal .box').getBoundingClientRect().height);
+  $('cvBody').innerHTML = was; return h; });
+ok(empty < 260 && tall > empty * 2, `...and a conversation with nothing said in it is a dialog its own size (${empty}px, a read one ${tall}px)`);
 await page.click('#cvClose');
 // Any one of them resumed (the operator, 22 Oct: the Claude button resumes
 // only the last): Resume opens the chooser on that conversation, at the
