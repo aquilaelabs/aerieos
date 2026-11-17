@@ -67,6 +67,7 @@
 - The notebook's lists (bugs, memories, rules, roadmap items, files and conversations) give every row the same room above its first line, and a node's Set here switches sit as close as the rest of its Sessions section (1912504)
 - A node says its state in one pill: online, not answering when it is set to take work and its agent has gone quiet, or draining and disabled as set, where it showed online beside live or quiet (391cf7c)
 - A fold that shows more of a row (a bell row's details, a long ask, a push's full text, a tool call, a VM's More, how each agent is guarded) opens by the page's own chevron, and Findings' search keeps a search's width beside its pulldowns (1b82535)
+- The header over Machines, Build and Containers is one row: the machine's picker and its state pill beside it, which opens that machine's page from any of their pages; when it was seen, where it dials in from and its agent's version are on that page, no longer a line under the picker, and the page under the header no longer says the state again (e9b80fb)
 
 ### Fixed
 
