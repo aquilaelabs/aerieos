@@ -254,6 +254,7 @@ async function refresh(){
     setHidden($("devtag"), !state.settings?.settings?.offer_unvetted?.value);
     drawSetup();
     setText($("uptime"), "up " + shortUptime(state.uptime));
+    settingsPaintFacts();
     drawBuild(state.image);
     adoptLayout(state.layout);
     // Every part draws on its own from here (bug #44). They used to run as

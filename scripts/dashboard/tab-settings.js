@@ -31,16 +31,18 @@ function loadApps(){
 // them dropped and the tab repainted, which the live key has to notice.
 function settingsLive(){
   return JSON.stringify([state?.settings?.settings, state?.settings?.tunnel, state?.idle, state?.logs, state?.paths, readRev("settings"), readRev("apps"), state?.checks,
-    state?.doctor?.when, state?.doctor?.running, settingsFacts().map(f => f[1])]);
+    state?.doctor?.when, state?.doctor?.running]);
 }
 
 // The controller at a glance, the page's first section (Perch): what would
 // stop it if it ran out, as facts, a space running low in the warning's
 // color; and the doctor's checks, problems first with their whole
 // explanation and the way to fix each, the passing ones as chips, with Run
-// again. No hardware graphs: those are a node's. The facts as they read,
-// which is also what the page's live key compares: a byte more or less of
-// free space is not a redraw.
+// again. No hardware graphs: those are a node's. The facts are measures
+// that move on their own between reads (free space, the database's size,
+// the nodes and sessions counted), so they are not in the page's live key:
+// settingsPaintFacts writes them in place on every status read, marked
+// .meas, and the page is not drawn again for them.
 function settingsFacts(){
   const c = state?.controller || {};
   const low = r => r && r.total && r.free / r.total < 0.1;
@@ -65,10 +67,16 @@ function settingsCard(){
   const d = state?.doctor;
   const when = d?.running ? "running…" : d?.when ? `the doctor ran ${ago(d.when)}` : "";
   const checks = d?.when ? doctorChecks(d).html : `<div class="empty">${d?.running ? "running…" : "first run pending…"}</div>`;
-  return `<div class="field ctlcard">${factGrid(settingsFacts(), "ctlfacts")}
+  return `<div class="field ctlcard"><div class="ctlfactbox" data-own>${factGrid(settingsFacts(), "ctlfacts meas")}</div>
     <div class="ctlchecks doctor">${checks}</div>
     <div class="actbar sectbar"><span class="state">${esc(when)}</span><span class="sp"></span>
       <button type="button" id="setDocRun"${d?.running ? " disabled" : ""}>Run again</button></div></div>`;
+}
+
+// ...painted in place after each status read, while the page is drawn.
+function settingsPaintFacts(){
+  const box = document.querySelector(".settingstab .ctlfactbox");
+  if (box) patch(box, factGrid(settingsFacts(), "ctlfacts meas"));
 }
 
 // Typed and not yet applied, by control id, across the tab's redraws: one
