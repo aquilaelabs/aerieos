@@ -54,6 +54,7 @@
 - nginx's certificates are a table of domain, names covered, end date and routes, with Add a certificate and Let's Encrypt over it, and a hostname is added over its table (d3d5c70)
 - A node's mounts, path mapping and CI runners are tables you edit a row at a time: Edit opens one in place and its Save writes it at once; a mount still reaches the node with Apply storage, and a runner's Edit holds its new token, its labels, Reinstall, Forget token and Remove (f2e1cc1)
 - A space's Also reaches and Also works on are tables written a row at a time: an address is edited, added or deleted in place, and a node is added from a pick or taken off with its bin, each saved at once (dfa2dcb)
+- Text that kept a phone's size at a desk (a dialog's links, logs, a commit's name, code in a row, the banner, the line under the header when the controller is away) now grows a pixel at a desk like the rest, and every thin line is the same hairline (6710524)
 
 ### Fixed
 
