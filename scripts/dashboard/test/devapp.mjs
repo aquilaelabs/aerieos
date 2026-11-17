@@ -417,6 +417,10 @@ await section("A redraw must not take an open menu with it", async () => {
       if (!j || typeof j !== 'object') return r.fulfill({ response: real });
       await r.fulfill({ response: real, json: { ...j, images_at: planted } });
     });
+    // ...and no read of the list still out from before the route (B816): one
+    // asked before it landed after the plant with the list as it was, and
+    // the owed redraw then drew nothing new.
+    await page.waitForFunction(() => !readBusy('docker'), null, { timeout: patience(10000) }).catch(() => {});
     await page.evaluate(p => { if (dockerList) dockerList.images_at = p; readMoved('docker'); drawPanes(); }, planted);
     const kept = await page.evaluate(() => ({
       same: window.__heldSel.isConnected && document.querySelector('.dmtab') === window.__heldTab,
