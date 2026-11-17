@@ -606,6 +606,9 @@ await section("a session writes one", async () => {
   let nope = '';
   try { bb('edit', 'listz', '--text', txt); } catch (e) { nope = String(e.stderr); }
   ok(/no rule or page called listz; the nearest: lists/.test(nope), `...and a name it does not have is refused with the nearest (${nope.trim().slice(0, 90)})`);
+  // The rule as the rest of this file reads it.
+  writeFileSync(txt, 'Every list pages at fifty.');
+  bb('edit', 'lists', '--text', txt);
 
   await openSect('pages');   // one section open at a time (the operator, 5 Oct)
   await pickPage('p2');
