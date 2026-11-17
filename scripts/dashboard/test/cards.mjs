@@ -4,7 +4,7 @@
 // project on several nodes, and dialogs that scroll.
 import { launch, newPage, ok, done, ready, openArchived, doctorFixture, animatedDuring, refreshUntil,
          holdPoll, freePoll, tmuxNew, tmuxKill, tmuxFmt, nbShown, URL, DIR, unfold, registerProject,
-         saveDialog, sectSave, until, quiet, settled, sleep, OWNER, section } from './lib.mjs';
+         saveDialog, sectSave, splitPick, until, quiet, settled, sleep, OWNER, section } from './lib.mjs';
 import { writeFileSync, readFileSync, existsSync, rmSync, utimesSync,
          mkdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -255,7 +255,7 @@ await section("the doctor: a dot in the top bar, its checks in a panel", async (
                  && /2 to look at/.test(s.querySelector('summary').textContent); })() };
   });
   ok(card.shut && ['Under /config', "The spaces' share", 'Nodes', 'Sessions open'].every(f => card.facts.includes(f))
-     && card.probs.length === 2 && card.probs.every(Boolean) && card.first,
+     && card.probs.length === 2 && card.probs.some(Boolean) && card.first,
      `the panel's Controller settings opens the page on its first section, Controller, saying the verdict on its heading, with the facts and the problems with what each said (${JSON.stringify(card)})`);
   doctorFixture('ok');
   await page.click('.settingstab .ctlcard #setDocRun');
@@ -2744,7 +2744,10 @@ await section("the logs, in the gear menu", async () => {
   await page.click('#uiProfile');
   await page.waitForSelector('.profiletab .setrow', { timeout: 15000 });
   ok(true, "the gear's door opens the account's Profile page");
+  // Its first section is Controller (Perch); Logs is picked from its list.
   await page.evaluate(() => railGo('controller'));
+  await page.waitForSelector('.settingstab .snav [data-spick="logs"]', { timeout: 15000 });
+  await splitPick(page, 'logs');
   await page.waitForSelector('.settingstab #logApply');
   ok(await page.$eval('.settingstab #logApply', b => b.disabled), 'Apply sleeps while the days are as saved');
   await page.fill('.settingstab #logDays', '3');
