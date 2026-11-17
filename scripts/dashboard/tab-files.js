@@ -358,7 +358,7 @@ async function flPreview(name){
     : `<pre class="fxtext">${skRows(4)}</pre>`;
   drawHTML(m, `<div class="box"><h3>${esc(name)}</h3><div class="field"><div class="sub dim">${esc(flSize(e.size || 0))}, changed ${esc(fmtTime((e.mtime || 0) * 1000))}${e.owner ? `, owned by ${esc(e.owner)}` : ""}</div></div>
     <div class="field fxbody">${body}</div>
-    <div class="foot"><span class="sp"></span><a class="btn" href="${esc(src)}&dl=1" download="${esc(name)}">Download</a><button type="button" class="primary" data-fxclose>Close</button></div></div>`);
+    <div class="foot"><span class="sp"></span><a class="btn" href="${esc(src)}&dl=1" download="${esc(name)}">Download</a><button type="button" data-fxclose>Close</button></div></div>`);
   document.body.appendChild(m);
   armModal(m);
   const done = () => { m.hidden = true; setTimeout(() => m.remove(), 400); };

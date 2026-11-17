@@ -930,7 +930,7 @@ function dmSetGrid(cells, key, {cancel = false, bare = false} = {}){
 // A row's settings in a dialog (the operator, 17 Oct): a native dialog in
 // the page's top layer, drawn inside its row so the row's wiring reaches its
 // controls, shown by dmWireRows after each draw; its title, the settings
-// grid, and Cancel and the one filled Apply at its foot. Escape is Cancel.
+// grid, and the one filled Apply and Cancel at its foot. Escape is Cancel.
 function dmSetDialog(name, key, cells){
   const grid = dmSetGrid(cells, key, {bare: true});
   if (!grid) return "";
@@ -938,9 +938,9 @@ function dmSetDialog(name, key, cells){
     <div class="box wide"><h3>Settings: ${esc(name)}</h3>
       <div class="field">${grid}</div>
       <div class="foot"><span class="sp"></span>
-        <button type="button" class="stop" data-dmcancel="${esc(key)}">Cancel</button>
         <button type="button" class="primary" data-dmapply="${esc(key)}"${dmRowDirty(key) ? "" : " disabled"}
-          title="save what was changed">Apply</button></div>
+          title="save what was changed">Apply</button>
+        <button type="button" class="stop" data-dmcancel="${esc(key)}">Cancel</button></div>
     </div></dialog>`;
 }
 
