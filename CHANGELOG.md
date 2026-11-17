@@ -43,6 +43,12 @@
 - aerie's commands start sooner and aerie status answers in about half the time, aerie map find answers in a third of the time with a quarter of the memory, a coding agent other than Claude waits less on AerieOS's checks before each tool it runs, and a node's agent hands out jobs without waiting on its container statistics and starts fewer processes while it waits (44323cb)
 - The dashboard is a third smaller to download, and does less while you are not looking: a page you have left, a space's notebook not on show and a terminal not in front no longer redraw or read again in the background, and a long list builds only the rows it shows (7e05263)
 - Cutting a release or moving the version dates the changelog's entries in about a second, where each entry took half a second and one that ran past thirty seconds kept the commit it was first stamped with; aerie lint takes about a third less time (218ba7c)
+- The warning color is a true yellow that stands out, and green, yellow and red are one fixed set in every theme and beside every space's color; the restart band and the other warning bands are yellow with dark words (fc16521)
+- A page's row of tabs is one height on every page, with a button in it or not, under a group's header or standing alone (1c5977a)
+- A repository's Snapshots section is a table of the days kept, each with when it was taken, its files, its size and whether it is pinned; Restore on a row opens it to put back one file or all of them, and Take one now sits above the list (1d4f588)
+- A node's Sessions section lists what keeps its sessions apart as four lines, each with its state as a pill and its reason only where it is not in force, and puts the settings in a group of their own above Save (e4c521c)
+- Setting up a space's file access over FTP needs File access Write on that space, so a role that gives it may, as the space's owner and an administrator could; each person on its list still reaches no more than their own roles give (0efa969)
+- While the controller restarts, the page stays as it was and says AerieOS is restarting and for how long, its buttons resting until it is back, where it turned red and went blank; after an update it says Updated to the version in one line with What changed, where the changelog opened over the page by itself (72394e2)
 
 ### Fixed
 
