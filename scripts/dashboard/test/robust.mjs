@@ -181,8 +181,11 @@ await page.route('**/api/status*', r => r.abort());
 // the checks above just made it slow), and while it is, refresh() only queues
 // and returns at once, so forty asks spent themselves in milliseconds and the
 // late poll then landed and cleared the light (B176, 19 Sep).
+// A page that had been reading treats reads that stop landing as a restart
+// for the time one takes (home.mjs holds that calm state); this is past it,
+// where the red line with its reason is said.
 for (const until = Date.now() + 20000; Date.now() < until
-     && await page.evaluate(async () => { await refresh(); return pollFails; }) < 2;) await sleep(100);     // the loop's own period
+     && await page.evaluate(async () => { await refresh(); if (awaySince) awaySince = Date.now() - 91000; return pollFails; }) < 2;) await sleep(100);     // the loop's own period
 const dead = await page.evaluate(() => ({
   red: !!document.getElementById('dot')?.classList.contains('off'),
   title: document.getElementById('dot')?.getAttribute('aria-label') || '',
