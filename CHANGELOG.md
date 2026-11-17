@@ -61,6 +61,7 @@
 - The Git view's history lists the commits by day, with the branch lanes under a Graph switch, and goes past a hundred commits as you scroll to its foot, its head saying how many there are; Changes says each file's lines added and removed and opens the diffs by themselves only when three files or fewer have changed (a549e40)
 - An Artifacts file row is one line, its name with its size and age, Download and the one press it is most often for (Install, Push or View), the rest behind its ⋯; a press on the line opens it to where it sits and what built and signed it, with the fingerprint to copy. Why Install and Push cannot go is said once over the files, and a capture's Remove reads as destructive (484e390)
 - The Design view's pages are rows, each opening its page at an address of its own, so a link lands on that page and Back returns to the rows; the Overview's rules, the design's rules and the wiki's log show a page at a time, more arriving as you reach the foot (c85ba2e)
+- A line under a name reads the same on every page: a sentence in the small note voice, and a line of facts (ids, sizes, paths, versions, a node and an age) in the monospace data voice; inside a list's rows the two had been the other way round from the rest of the page (48073c8)
 
 ### Fixed
 
