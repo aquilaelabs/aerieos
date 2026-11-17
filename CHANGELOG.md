@@ -60,6 +60,7 @@
 - Nostromo dresses the rail, the search, the tiles, the cards' heads and the dock: steel, readouts with scanlines and a hazard stripe along the dock's edge in its dark half, wall panels and the door's red and white stripe in its light half; the header's pipes no longer run under the space's name and the search (586f9f7)
 - The Git view's history lists the commits by day, with the branch lanes under a Graph switch, and goes past a hundred commits as you scroll to its foot, its head saying how many there are; Changes says each file's lines added and removed and opens the diffs by themselves only when three files or fewer have changed (a549e40)
 - An Artifacts file row is one line, its name with its size and age, Download and the one press it is most often for (Install, Push or View), the rest behind its ⋯; a press on the line opens it to where it sits and what built and signed it, with the fingerprint to copy. Why Install and Push cannot go is said once over the files, and a capture's Remove reads as destructive (484e390)
+- The Design view's pages are rows, each opening its page at an address of its own, so a link lands on that page and Back returns to the rows; the Overview's rules, the design's rules and the wiki's log show a page at a time, more arriving as you reach the foot (c85ba2e)
 
 ### Fixed
 
