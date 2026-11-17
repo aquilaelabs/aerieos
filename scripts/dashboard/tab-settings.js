@@ -1042,7 +1042,7 @@ async function askReset(){
       <div class="hint bad" id="resetWhy" hidden></div>
     </div>
     <div class="foot"><span class="sp"></span>
-      <button type="button" id="resetKeep">Keep it</button>
+      <button type="button" id="resetKeep" data-way-out>Keep it</button>
       <button type="button" class="danger" id="resetGo" disabled>Reset</button></div>`);
   modal.hidden = false;
   const word = $("resetWord"), go = $("resetGo"), why = $("resetWhy");

@@ -84,6 +84,19 @@ function armModal(el){
         () => { if (this.classList.contains("leaving")){ this.classList.remove("leaving"); this.setAttribute("hidden", ""); } },
         () => {});                        // canceled: it was shown again, and stays
     }});
+  // A press on the dimmed page around it is its way out, as Escape is: its
+  // own backdrop handler where it has one, else its foot's Cancel or Close.
+  // One holding something shown once (data-keep-stray) keeps the press.
+  el.addEventListener("click", e => {
+    if (e.target !== el || el.dataset.keepStray !== undefined) return;
+    setTimeout(() => { if (!el.hidden) modalWayOut(el)?.click(); }, 0);
+  });
+}
+// A dialog's way out at its foot: the one marked data-way-out where its
+// words are its own (Keep it), else its Cancel or Close.
+function modalWayOut(m){
+  const bs = [...m.querySelectorAll(":scope > .box .foot button")].filter(b => !b.disabled);
+  return bs.find(b => b.dataset.wayOut !== undefined) || bs.find(b => /^(cancel|close)$/i.test(b.textContent.trim())) || null;
 }
 
 // ---- a dialog and the keyboard ------------------------------------------
@@ -156,13 +169,11 @@ function modalFocusables(m){
 
 // Escape closes the dialog the way it closes itself: its backdrop's "never
 // mind" where it has one (which may tidy up, as closeEditor and closeRename
-// do), else its foot's Cancel or Close, else simply hidden.
+// do), else its foot's way out (modalWayOut), else simply hidden.
 function dismissModal(m){
   m.dispatchEvent(new MouseEvent("click", {bubbles: true}));
   if (m.hidden) return;
-  const c = [...m.querySelectorAll(":scope > .box .foot button")]
-    .find(b => !b.disabled && /^(cancel|close)$/i.test(b.textContent.trim()));
-  if (c) c.click();
+  modalWayOut(m)?.click();
   if (!m.hidden) m.hidden = true;
 }
 

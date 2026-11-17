@@ -2676,6 +2676,10 @@ const DIALOGS = {
     for (let i = 0; i < 40 && !document.querySelector('.nodestab button'); i++) await new Promise(r => setTimeout(r, 250));
     [...document.querySelectorAll('.nodestab button')].find(b => /enroll/i.test(b.textContent))?.click(); },
 };
+// A dialog that keeps a press on the page around it, and why.
+const KEEPS_A_STRAY_PRESS = {
+  enroll: "it shows an enrollment's one-time token, which a stray press must not take away",
+};
 const opened = new Set();
 async function dialogShape(pg = page){
   return pg.evaluate(() => {
@@ -2801,7 +2805,19 @@ for (const [name, open] of Object.entries(DIALOGS)) {
   ok(!rhythm.err && rhythm.odd.length === 0,
      `[dialog ${name}] one rhythm down the band (${rhythm.want}px, ${rhythm.tight}px under a label)${
        rhythm.err ? ` (${rhythm.err})` : rhythm.odd.length ? `: ${rhythm.odd.join('; ')}` : ''}`);
-  // ...and Escape puts it away, as a person shuts it (R50 step 81).
+  // ...a press on the dimmed page around it puts it away (R50 step 81),
+  // and so does Escape, each as a person shuts it: opened again for the
+  // second. A dialog holding something said once keeps a stray press.
+  const shut = () => page.waitForFunction(() => ![...document.querySelectorAll('.modal:not(.inline)')].some(m => !m.hidden),
+    null, { timeout: 3000 }).then(() => true).catch(() => false);
+  if (!KEEPS_A_STRAY_PRESS[name]){
+    await page.mouse.click(3, Math.round((await page.evaluate(() => innerHeight)) - 3));
+    ok(await shut(), `[dialog ${name}] a press on the page around it puts it away`);
+    await page.evaluate(() => { document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }); resumeFor = null; resumePick = null; });
+    await page.evaluate(open);
+    await page.waitForFunction(() => [...document.querySelectorAll('.modal:not(.inline)')].some(m => !m.hidden), null, { timeout: 10000 }).catch(() => {});
+    await motionOver();
+  }
   await page.keyboard.press('Escape');
   const escaped = await page.waitForFunction(() => ![...document.querySelectorAll('.modal')].some(m => !m.hidden && !m.classList.contains('inline')),
     null, { timeout: 3000 }).then(() => true).catch(() => false);
