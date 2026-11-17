@@ -1614,6 +1614,11 @@ await section("the CI watch", async () => {
 // whole. The commits are made with plumbing on top of HEAD, so the index
 // and the tree's changes are left as they are, and HEAD goes back after.
 await section("The history pages past a hundred commits", async () => {
+  // From its first page, and by the press alone: the pages a view of beta
+  // has shown are forgotten, and the foot's own loading as it comes into
+  // view (paginate's, held by paging.mjs) is left out of this part.
+  await page.evaluate(() => { for (const k of Object.keys(pageState)) if (/gitlog$/.test(k)) delete pageState[k];
+    window.IntersectionObserver = undefined; });
   const was = git('rev-parse', 'HEAD'), tree = git('rev-parse', 'HEAD^{tree}');
   let top = was;
   for (let i = 0; i < 110; i++) top = git('commit-tree', tree, '-p', top, '-m', `Paging ${i}`);
