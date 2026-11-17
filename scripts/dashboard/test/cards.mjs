@@ -209,7 +209,7 @@ await section("the doctor: a dot in the top bar, its checks in a panel", async (
   // (B742): no tooltip says the rest.
   const long = await page.evaluate(() => {
     const keep = state.doctor.checks;
-    state.doctor.checks = [...keep, { level: 'warn', text: '2 nodes can run a session (bb-dev-sandbox, bb-dev-sandbox-rh, a third node with a long name)' }];
+    state.doctor.checks = [...keep, { level: 'warn', text: 'a node cannot run a session: bb-dev-sandbox, bb-dev-sandbox-rh, a third node with a long name and a fourth whose name is longer still' }];
     drawDoctor();
     const lines = [...document.querySelectorAll('#doctor .probs .sub')];
     const panel = document.getElementById('docPanel').getBoundingClientRect();
@@ -2404,22 +2404,32 @@ await section("One card on its back at a time", async () => {
   await turned(A);
 });
 // A card that moves slides there, the rest closing up, and the page follows
-// the one pressed on (the operator, 26 Oct): the last card pinned moves up
-// among the pinned, slid there and in sight.
+// the one pressed on (the operator, 26 Oct). A star moves nothing, the page
+// being by name; a space whose name comes to sort first (a rename's answer)
+// moves up, slid there and in sight.
 await section("A card that moves slides there, the rest closing up, and the page follows", async () => {
   await page.setViewportSize({ width: 1280, height: 600 });
   const last = await page.evaluate(() => { const g = document.querySelector('.doc .projtab #pjGrid > .pgrid');
     const cs = [...g.querySelectorAll('.pcard[data-pkey]')].filter(c => c.querySelector('.pcfront [data-pmark]:not(.on)'));
     const c = cs[cs.length - 1]; c.scrollIntoView({ block: 'end' }); return c.dataset.pkey; });
   const sel = `.doc .projtab .pcard[data-pkey="${last}"]`;
-  // The page at this height and the card's pin on the screen.
+  const place = () => page.evaluate(s => [...document.querySelectorAll('.doc .projtab #pjGrid > .pgrid .pcard[data-pkey]')].indexOf(document.querySelector(s)), sel);
+  const sliding = () => page.evaluate(() => [...document.querySelectorAll('.doc .projtab .pcard')]
+    .some(x => x.getAnimations().some(a => /translate/.test(JSON.stringify(a.effect?.getKeyframes?.() || [])))));
   await page.waitForFunction(s => { const r = document.querySelector(s)?.querySelector('.pcfront [data-pmark]')?.getBoundingClientRect();
     return innerHeight === 600 && !!r && r.top >= 0 && r.bottom <= innerHeight; }, sel, { timeout: 10000 }).catch(() => {});
+  const at0 = await place();
   await page.click(`${sel} .pcfront [data-pmark]`);
+  await page.waitForFunction(s => !!document.querySelector(s)?.querySelector('.pcfront [data-pmark].on'), sel, { timeout: 10000 }).catch(() => {});
+  const starred = { at: await place(), slid: await sliding() };
+  ok(starred.at === at0 && !starred.slid, `a star leaves its card where its name puts it, nothing sliding (${JSON.stringify({ at0, ...starred })})`);
+  await page.click(`${sel} .pcfront [data-pmark]`);
+  await page.waitForFunction(s => !document.querySelector(s)?.querySelector('.pcfront [data-pmark].on'), sel, { timeout: 10000 }).catch(() => {});
+  // Its name made to sort first, as the answer to a rename pressed on it.
+  await page.evaluate(k => { pjFollow = { key: k, until: Date.now() + 8000 }; const r = state.repos[k]; r.__was = r.name; r.name = '0 first'; drawProjects(state.projects); }, last);
   const r = await page.waitForFunction(s => {
     const c = document.querySelector(s); if (!c) return null;
-    const cs = [...document.querySelectorAll('.doc .projtab #pjGrid > .pgrid .pcard[data-pkey]')], at = cs.indexOf(c);
-    const first = at >= 0 && c.querySelector('[data-pmark].on') && cs.slice(0, at).every(x => x.querySelector('[data-pmark].on'));
+    const first = [...document.querySelectorAll('.doc .projtab #pjGrid > .pgrid .pcard[data-pkey]')].indexOf(c) === 0;
     const slid = [...document.querySelectorAll('.doc .projtab .pcard')].some(x => x.getAnimations().some(a => /translate/.test(JSON.stringify(a.effect?.getKeyframes?.() || []))));
     return first ? { first, slid } : null;
   }, sel, { timeout: 10000 }).then(h => h.jsonValue()).catch(() => null);
@@ -2429,12 +2439,11 @@ await section("A card that moves slides there, the rest closing up, and the page
     if (!c || c.getAnimations().length) return false;
     const r = c.getBoundingClientRect(), d = c.closest('.doc').getBoundingClientRect(); return r.top >= d.top - 2 && r.bottom <= d.bottom + 2; }, sel, { timeout: 10000 }).catch(() => {});
   const seen = await page.$eval(sel, c => { const r = c.getBoundingClientRect(), d = c.closest('.doc').getBoundingClientRect(); return r.top >= d.top - 2 && r.bottom <= d.bottom + 2; });
-  ok(r?.first && r?.slid && seen, `a card pinned from the foot slides up among the pinned, the others with it, and the page follows it there (${JSON.stringify({ ...r, seen })})`);
-  await page.click(`${sel} .pcfront [data-pmark]`);
-  // Unpinned again, and no card still sliding back.
-  await page.waitForFunction(s => { const c = document.querySelector(s);
-    return !!c && !c.querySelector('.pcfront [data-pmark].on') && ![...document.querySelectorAll('.doc .projtab .pcard')]
-      .some(x => x.getAnimations().some(a => /translate/.test(JSON.stringify(a.effect?.getKeyframes?.() || [])))); }, sel, { timeout: 10000 }).catch(() => {});
+  ok(r?.first && r?.slid && seen, `a card whose name comes to sort first slides up, the others with it, and the page follows it there (${JSON.stringify({ ...r, seen })})`);
+  await page.evaluate(k => { const x = state.repos[k]; x.name = x.__was; delete x.__was; drawProjects(state.projects); }, last);
+  // Back in its place, and no card still sliding back.
+  await page.waitForFunction(() => ![...document.querySelectorAll('.doc .projtab .pcard')]
+      .some(x => x.getAnimations().some(a => /translate/.test(JSON.stringify(a.effect?.getKeyframes?.() || [])))), null, { timeout: 10000 }).catch(() => {});
   await page.setViewportSize({ width: 1280, height: 800 });
 });
 // Leaving the page turns a card back: Projects comes back on the fronts.

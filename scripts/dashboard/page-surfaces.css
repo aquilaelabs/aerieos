@@ -2014,8 +2014,8 @@ body.firstrun #panes{display:none}
 :is(.dmtab,.dkview,.vmtab) details.dmline > .dmbody{padding:0 var(--row-x) var(--row-y);border-top:var(--hair) solid var(--line)}
 /* One control high, its edge drawn inside it as an outline rather than
    around it, so the switch is the height of every control beside it. */
-:is(.dmtab,.dkview,.vmtab) .dmviewseg{border:0;outline:var(--hair) solid var(--line);outline-offset:calc(-1 * var(--hair))}
-:is(.dmtab,.dkview,.vmtab) .dmviewseg button{min-height:var(--ctl)}
+:is(.dmtab,.dkview,.vmtab,.projtab) .dmviewseg{border:0;outline:var(--hair) solid var(--line);outline-offset:calc(-1 * var(--hair))}
+:is(.dmtab,.dkview,.vmtab,.projtab) .dmviewseg button{min-height:var(--ctl)}
 .pghead:has(> .actbar > :is(button, a.btn):only-child) > .actbar{grid-column:2;grid-row:1;margin:0;align-self:start}
 /* Every value of a grid's column starts at one line, whatever its label's
    length (B76: on a phone each value began where its own label ended, two

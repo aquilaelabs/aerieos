@@ -842,10 +842,10 @@ mkdir -p "$S/ws/toolstore" && : > "$S/ws/toolstore/.bbignore"
 # container about it. It is not a project because the Projects card did not
 # accept it, which is the only test that matters now.
 mkdir -p "$S/ws/vendored-junk/deep" && echo x > "$S/ws/vendored-junk/deep/thing.py"
-# delta is archived and locked by an administrator (R119): out of sight, and
-# held against everybody, its owner included.
+# delta is locked by an administrator (R119): held against everybody, its
+# owner included. It is archived for the test owner too, once that account
+# is made below: an archive is each person's own.
 echo '{"delta": {"by": "u_0000aaaa", "admin": true}}' > "$S/state/locked-projects.json"
-echo '["delta"]' > "$S/state/archived-projects.json"
 # alpha may push, on the deploy key its remote uses. Stated here rather than
 # left to a migration: the one-off that used to grant this on first boot went
 # at 0.5.0, and a fixture that leans on a migration is a fixture that breaks
@@ -1457,7 +1457,8 @@ fresh() {
     # Tests view has rows, and testreg.mjs counts what it ingests.
     rm -f "$S/state/tests.json"
     echo '{"delta": {"by": "u_0000aaaa", "admin": true}}' > "$S/state/locked-projects.json"  # a test that locks must not hand that on
-    echo '["delta"]' > "$S/state/archived-projects.json"   # ...nor one that archives
+    python3 -c 'import json, sys; u = json.load(open(sys.argv[1]))["users"]["test"]["uid"]; open(sys.argv[2], "w").write(json.dumps({u: ["delta"]}))' \
+      "$S/state/users.json" "$S/state/archived-projects.json"   # ...nor one that archives
     rm -f "$S/state/pinned-projects.json"                  # ...nor one that unpins
     # ...nor one that binds a project to a node. nodes.mjs saves alpha's node
     # from the settings dialog; agent.mjs then asserts that a project with no
@@ -1624,6 +1625,8 @@ d["users"]["test"] = {"uid": u.mint_uid(), "role": "owner", "projects": fixtures
                       "password": u.hash_password("test"), "created": 0,
                       "seen": 0}
 u._save(d)
+# delta archived for this account (an archive is each person's own).
+open(os.path.join(sys.argv[2], "archived-projects.json"), "w").write(json.dumps({d["users"]["test"]["uid"]: ["delta"]}))
 PY
 
 # ---- the docker-host node --------------------------------------------------
