@@ -92,7 +92,7 @@ function renderSessionsInto(i){
       s.node ? esc(s.node) : `<span class="dim">this controller</span>`,
       // A clock: it moves with time, not with news (uniform's quiet read).
       s.created ? `<span class="ago">${esc(ago(s.created))}</span>` : "",
-      `<div class="actbar">${t ? (claude ? "" : `<button type="button" data-min="${esc(t.id)}"
+      `<div class="actbar">${t ? (claude ? "" : `<button type="button" data-min="${esc(s.name)}"
           title="take its tab off the strip; it keeps running">Minimize</button>`)
         : `<button type="button" data-a="${esc(s.name)}" title="reopen its tab">Open</button>`}
         <button type="button" class="danger" data-k="${esc(s.name)}" data-kn="${esc(s.node_id || "")}"
@@ -107,7 +107,13 @@ function renderSessionsInto(i){
   const goTo = (e, name) => { e.stopPropagation(); openTab({kind: "term", arg: argForSession(name), label: name}); };
   d.list.querySelectorAll("[data-a]").forEach(b => b.onclick = e => goTo(e, b.dataset.a));
   d.list.querySelectorAll("[data-go]").forEach(n => n.onclick = e => goTo(e, n.dataset.go));
-  d.list.querySelectorAll("[data-min]").forEach(b => b.onclick = () => hideTab(b.dataset.min));
+  // The session's tab as it is at the press: one drawn into the row before
+  // the tab was made again named an id nothing held, and the press did
+  // nothing (B825).
+  d.list.querySelectorAll("[data-min]").forEach(b => b.onclick = () => {
+    const t = tabs.find(x => sessionOf(x.arg) === b.dataset.min);
+    if (t) hideTab(t.id);
+  });
   d.list.querySelectorAll("[data-k]").forEach(b => b.onclick = () => killSession(b.dataset.k, b.dataset.kn));
 }
 

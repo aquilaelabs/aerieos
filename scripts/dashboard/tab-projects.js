@@ -649,11 +649,18 @@ function renderProjectsInto(i){
   // The card pressed on, moved, is followed on screen to where it lands:
   // measured once its slide is over, since while it slides it is drawn at
   // the place it left and a scroll then went nowhere.
+  // A redraw during the slide (the poll's) starts a slide of its own and
+  // cancels this one, whose end then came while the card was still drawn
+  // where it left: each slide is waited out in turn, a few at most.
   if (drawn && moved && pjFollow && Date.now() < pjFollow.until && was.indexOf(pjFollow.key) !== now.indexOf(pjFollow.key)){
     const card = grid.querySelector(`.pcard[data-pkey="${CSS.escape(pjFollow.key)}"]`);
-    const go = () => card?.isConnected && card.scrollIntoView({block: "nearest", behavior: noMotion() ? "auto" : "smooth"});
-    const slide = card?.getAnimations().find(a => /translate/.test(JSON.stringify(a.effect?.getKeyframes?.() || [])));
-    if (slide) slide.finished.then(go, go); else go();
+    const go = (left = 4) => {
+      if (!card?.isConnected) return;
+      const slide = card.getAnimations().find(a => /translate/.test(JSON.stringify(a.effect?.getKeyframes?.() || [])));
+      if (slide && left > 0) slide.finished.then(() => go(left - 1), () => go(left - 1));
+      else card.scrollIntoView({block: "nearest", behavior: noMotion() ? "auto" : "smooth"});
+    };
+    go();
     pjFollow = null;
   }
   if (drawn){
