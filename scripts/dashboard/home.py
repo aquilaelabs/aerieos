@@ -47,6 +47,12 @@ def _machines():
     return [n for n in nodes.node_list() if n.get("kind") == "agent" and n.get("state") != "retired"]
 
 
+def node_counts(ns=None):
+    """The enrolled nodes and how many of them are online."""
+    ns = _machines() if ns is None else ns
+    return {"enrolled": len(ns), "online": sum(1 for n in ns if n.get("state") == "online" and n.get("live") is not False)}
+
+
 def _containers(ns):
     """Running and all containers across the docker nodes, and whether any
     count came from a kept answer (the node's own, or Home's last listing of
@@ -120,8 +126,7 @@ def read(jobs_rows, job_names, machines, light=False):
     out = {"jobs": _jobs(jobs_rows or [], job_names or {}), "nodes": None, "containers": None}
     if machines:
         ns = _machines()
-        out["nodes"] = {"enrolled": len(ns),
-                        "online": sum(1 for n in ns if n.get("state") == "online" and n.get("live") is not False)}
+        out["nodes"] = node_counts(ns)
         if not light:
             out["containers"] = _containers(ns)
         # The own machine's backups (R162 step 5): the tile says the last

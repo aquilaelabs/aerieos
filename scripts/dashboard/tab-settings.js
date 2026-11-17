@@ -30,7 +30,45 @@ function loadApps(){
 // Revert on a section puts its fields back to what is saved: the draft for
 // them dropped and the tab repainted, which the live key has to notice.
 function settingsLive(){
-  return JSON.stringify([state?.settings?.settings, state?.settings?.tunnel, state?.idle, state?.logs, state?.paths, readRev("settings"), readRev("apps"), state?.checks]);
+  return JSON.stringify([state?.settings?.settings, state?.settings?.tunnel, state?.idle, state?.logs, state?.paths, readRev("settings"), readRev("apps"), state?.checks,
+    state?.doctor?.when, state?.doctor?.running, settingsFacts().map(f => f[1])]);
+}
+
+// The controller at a glance, the page's first section (Perch): what would
+// stop it if it ran out, as facts, a space running low in the warning's
+// color; and the doctor's checks, problems first with their whole
+// explanation and the way to fix each, the passing ones as chips, with Run
+// again. No hardware graphs: those are a node's. The facts as they read,
+// which is also what the page's live key compares: a byte more or less of
+// free space is not a redraw.
+function settingsFacts(){
+  const c = state?.controller || {};
+  const low = r => r && r.total && r.free / r.total < 0.1;
+  const room = r => r && r.total ? `${humanBytes(r.free)} free of ${humanBytes(r.total)}` : "";
+  const n = c.nodes;
+  return [
+    ["Under /config", room(c.config), low(c.config) ? {cls: "warn"} : null],
+    ["The spaces' share", room(c.spaces), low(c.spaces) ? {cls: "warn"} : null],
+    ["Database", c.db ? humanBytes(c.db) : ""],
+    ["Nodes", n ? `${n.online} online of ${n.enrolled} enrolled` : "", n && n.online < n.enrolled ? {cls: "warn"} : null],
+    ["Sessions open", state ? String((state.sessions || []).length) : ""],
+  ];
+}
+// The section's status: the doctor's verdict, and its level for the heading.
+function settingsCardSaid(){
+  const d = state?.doctor;
+  if (!d?.when) return {said: d?.running ? "running" : "", cls: ""};
+  const {level, probs, fine} = doctorChecks(d);
+  return {said: probs.length ? `${probs.length} to look at` : `all ${fine.length} ok`, cls: level === "ok" ? "" : level};
+}
+function settingsCard(){
+  const d = state?.doctor;
+  const when = d?.running ? "running…" : d?.when ? `the doctor ran ${ago(d.when)}` : "";
+  const checks = d?.when ? doctorChecks(d).html : `<div class="empty">${d?.running ? "running…" : "first run pending…"}</div>`;
+  return `<div class="field ctlcard">${factGrid(settingsFacts(), "ctlfacts")}
+    <div class="ctlchecks doctor">${checks}</div>
+    <div class="actbar sectbar"><span class="state">${esc(when)}</span><span class="sp"></span>
+      <button type="button" id="setDocRun"${d?.running ? " disabled" : ""}>Run again</button></div></div>`;
 }
 
 // Typed and not yet applied, by control id, across the tab's redraws: one
@@ -80,6 +118,7 @@ function openSettingsTab(){
 
 // Each section's line on the list beside it: what is in it.
 const SETTINGS_SAYS = {
+  controller: "the doctor's checks, the space left, the nodes",
   logs: "days kept, following, downloads", reports: "what was reported about AerieOS, and the diagnostics",
   idle: "when an idle session is ended", paths: "the shares and disks this controller uses",
   tunnel: "a hostname that reaches it from outside",
@@ -121,7 +160,7 @@ function renderSettingsInto(i){
   // section it will have, shimmering, rather than the few that need no
   // state and then the rest. Drawn whole again when the settings arrive.
   if (!state?.settings){
-    const titles = [["logs", "Logs"], ["reports", "AerieOS bug reports"], ["idle", "Idle sessions"], ["paths", "Storage on this controller"],
+    const titles = [["controller", "Controller"], ["logs", "Logs"], ["reports", "AerieOS bug reports"], ["idle", "Idle sessions"], ["paths", "Storage on this controller"],
       ...SETTING_GROUPS.filter(g => !g.debug && !g.bare && !NETWORK_GROUPS.includes(g.key)).map(g => [g.key, g.title]),
       ["copies", "Backup copies"], ["move", "Move this controller"], ["reset", "Reset AerieOS"]];
     drawHTML(d.list, `${head}<div class="sectjump" data-sects></div>
@@ -135,7 +174,9 @@ function renderSettingsInto(i){
   // The logs are an administrator's: a poll that has landed without them
   // means this account has no Logs section, not one still on its way (B38).
   const logs = logSection();
+  const card = settingsCardSaid();
   patch(d.list, `${head}<div class="sectjump" data-sects></div>
+    ${sect("controller", "Controller", card.said, settingsCard(), {cls: card.cls})}
     ${logs || !state ? sect("logs", "Logs", "", `<div class="row stack2" data-group="Logs"><div class="grow">${withRevert(logs, "logs")
         || `<div class="sub">log settings arrive with the first poll…</div>`}</div></div>`) : ""}
     ${sect("reports", "AerieOS bug reports", reportsCount() === null ? "" : reportsCount() ? `${reportsCount()} report${reportsCount() === 1 ? "" : "s"}` : "none", reportsSection())}
@@ -156,6 +197,8 @@ function renderSettingsInto(i){
     </div>`)}`);
   sectJump(d.list.querySelector("[data-sects]"));
   wireSections(d.el);
+  const run = d.el.querySelector("#setDocRun");
+  if (run) run.onclick = () => runDoctor();
   // A page of settings (page-docs.js splitSects): the sections a list beside
   // the one picked, as a project's Settings are.
   splitSects(d.list, "settings", {says: SETTINGS_SAYS, back: "Controller settings"});

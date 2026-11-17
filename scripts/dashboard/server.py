@@ -6214,6 +6214,11 @@ def _snapshot(who):
         "off": featuresoff.sentences(),
         # ...and where the controller keeps what grows, an administrator's.
         "paths": _timed("status:paths", lambda: {} if users.may(who, "admin") else paths.view()),
+        # ...and what would stop it if it ran out, for Controller settings'
+        # card: the free space under /config and the spaces, the database's
+        # size, and the nodes online of enrolled.
+        "controller": _timed("status:controller", lambda: {} if users.may(who, "controller-read")
+                             else paths.room() | {"nodes": home.node_counts()}),
         # The command list is built from the table above rather than spelled out
         # again in the page, so a command added here appears as a button and one
         # removed cannot leave a button that posts a name the server rejects.

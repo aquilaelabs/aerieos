@@ -238,7 +238,30 @@ await section("the doctor: a dot in the top bar, its checks in a panel", async (
   ok(await page.$eval('#docPanel', p => !p.hidden), '...with the panel still open after ↻ redrew it');
   await page.keyboard.press('Escape');
   ok(await page.$eval('#docPanel', p => p.hidden), 'Escape shuts the panel');
+  // Controller settings from the panel, as the gear has Profile, on its
+  // first section, Controller (Perch), where the same checks are, with the
+  // facts that would stop the controller if they ran out.
+  await page.click('#bDocDot');
+  await page.waitForSelector('#docPanel:not([hidden]) #docSettings:not([hidden])', { timeout: 5000 });
+  await page.click('#docSettings');
+  await page.waitForSelector('.settingstab .ctlcard .ctlchecks .probs .sub', { timeout: 15000 });
+  const card = await page.evaluate(() => {
+    const c = document.querySelector('.settingstab .ctlcard');
+    return { shut: document.getElementById('docPanel').hidden,
+             facts: [...c.querySelectorAll('dl.facts dt')].map(t => t.textContent),
+             probs: [...c.querySelectorAll('.ctlchecks .probs .sub')].map(s => !!s.querySelector('.why')),
+             first: (() => { const s = c.closest('details.sect');
+               return s?.dataset.sect === 'settings:controller' && s.classList.contains('scur') && s === document.querySelector('.settingstab details.sect')
+                 && /2 to look at/.test(s.querySelector('summary').textContent); })() };
+  });
+  ok(card.shut && ['Under /config', "The spaces' share", 'Nodes', 'Sessions open'].every(f => card.facts.includes(f))
+     && card.probs.length === 2 && card.probs.every(Boolean) && card.first,
+     `the panel's Controller settings opens the page on its first section, Controller, saying the verdict on its heading, with the facts and the problems with what each said (${JSON.stringify(card)})`);
   doctorFixture('ok');
+  await page.click('.settingstab .ctlcard #setDocRun');
+  const again = await page.waitForFunction(() => !document.querySelector('.settingstab .ctlcard .ctlchecks .probs .sub')
+    && document.querySelector('.settingstab .ctlcard .ctlchecks .chips .pill'), null, { timeout: 15000 }).then(() => true, () => false);
+  ok(again, '...and its Run again runs the doctor, the card drawing what it found');
   await page.evaluate(() => document.getElementById('bDoctor').click());
   await page.waitForFunction(() => document.getElementById('docDot').className.includes('ok'), null, { timeout: 15000 });
 });

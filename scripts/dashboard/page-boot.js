@@ -354,18 +354,12 @@ function bootDoctor(){
   document.addEventListener("keydown", e => {
     if (e.key === "Escape" && docShown) toggleDoctor(false);
   });
-  $("bDoctor").onclick = async () => {
-    const b = $("bDoctor");
-    if (b.disabled) return;
-    b.disabled = true;
-    $("docWhen").textContent = "running…";
-    try{
-      const j = await postJSON("/api/doctor", {});
-      if (j.error) notify("doctor: " + j.error, true);
-      else { if (state) state.doctor = j; drawDoctor(); }
-    }catch(e){ notify("doctor: " + failWords(e), true); }
-    b.disabled = false;
-    drawDoctor();
+  $("bDoctor").onclick = () => runDoctor();
+  // Controller settings on its Controller section, where the checks are.
+  $("docSettings").onclick = () => {
+    toggleDoctor(false);
+    Object.assign(SPLIT.settings || (SPLIT.settings = {}), {pick: "controller", open: true});
+    openSettingsTab();
   };
 }
 

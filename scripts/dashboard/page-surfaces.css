@@ -2430,6 +2430,15 @@ body.firstrun #panes{display:none}
 #docDot.ok{background:var(--pass)}
 /* The doctor's panel under its dot in the top bar (R218 step 3). */
 .doctor .probs{padding:8px 12px;display:flex;flex-direction:column;gap:4px}
+/* Controller settings from the doctor's panel, as the gear has Profile: one
+   press across its foot. */
+.doctor .docfoot{padding:8px 12px 10px;border-top:var(--hair) solid var(--line)}
+.doctor .docfoot:has(>[hidden]){display:none}
+.doctor .docfoot>button{width:100%;min-height:var(--tap)}
+/* Controller settings' first section: the facts, then the checks at the
+   section's own edges, then when the doctor ran and Run again. */
+.ctlcard .ctlchecks .probs,.ctlcard .ctlchecks .chips{padding-left:0;padding-right:0}
+.ctlcard .ctlchecks .probs:not(:empty)+.chips{border-top:0}
 .doctor .probs:empty{display:none}
 .doctor .probs:not(:empty)+.chips{border-top:var(--hair) solid var(--line)}
 .doctor .probs .sub.bad{color:var(--bad)}

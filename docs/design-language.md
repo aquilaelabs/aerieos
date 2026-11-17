@@ -1582,6 +1582,16 @@ Layout of Controller settings on a desktop frame (12 columns by 8 rows), from th
 Notes:
   A document tab: the bar band, the list of bands, a quiet footer (docSurface). Nothing here takes effect on the change: each section is a draft until its Apply. The color scheme is not here; it is in the gear, since a theme is looked at and not decided.
   Sections like every other tab's (the operator, 11 Oct): a fold per group (Logs, Claude sessions, Storage on this controller, Reach from outside, Debugging, Reset, Nodes), its status on the heading (the idle minutes, the number of paths, connected or off, on or off), a jump bar of chips over them, and each with its own Apply and Revert on its action bar; Revert puts that section's fields back to what is saved. The Reach from outside section carries its own setup steps as a numbered list, the controller's port in them.
+This page's own rules:
+  controller-settings/controller-card: scripts/dashboard/tab-settings.js, scripts/dashboard/page-doctor.js; controller card, doctor, run again (`aerie design show controller-settings/controller-card` reads it)
+
+#### Rules of Controller settings's own
+
+##### controller-settings/controller-card
+
+Applies to: scripts/dashboard/tab-settings.js, scripts/dashboard/page-doctor.js; controller card, doctor, run again
+
+The page's first section is Controller (Perch, the operator 18 Oct: a Controller card at the top), picked first in the list, its heading's status the doctor's verdict (all N ok, or N to look at in its level's color): the facts that would stop a controller if they ran out (the free space under /config and on the spaces' share, a disk under a tenth free in the warning's color, the database with its log, the nodes online of enrolled in the warning's color when any is not, the sessions open), with no hardware graphs, those being a node's; then the doctor's checks as its panel draws them (doctorChecks): the problems first, each in its level's color with what the check said under it and the way to fix it, the passing ones as chips; then when the doctor ran and Run again in the section's bar. The page redraws on the facts as they read, never on a byte of free space. The doctor's panel has Controller settings across its foot, as the gear has Profile, for an account that may open it, and it opens the page on this section.
 
 ### the Users tab (Web app)
 

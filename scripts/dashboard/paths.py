@@ -90,6 +90,28 @@ def view():
                       for k in KINDS]}
 
 
+def room():
+    """For Controller settings' card: the free and whole space on the disks
+    under /config and the spaces share, and the database's size with its
+    log, each left out when it cannot be read."""
+    out = {}
+    for key, where in (("config", STATE), ("spaces", WORKSPACE)):
+        try:
+            u = shutil.disk_usage(str(where))
+            out[key] = {"free": u.free, "total": u.total}
+        except OSError:
+            pass
+    size = 0
+    for name in ("builderbot.db", "builderbot.db-wal"):
+        try:
+            size += (STATE / name).stat().st_size
+        except OSError:
+            pass
+    if size:
+        out["db"] = size
+    return out
+
+
 def problem(name, path):
     """Why `path` cannot hold `name`, or ""."""
     if name not in KINDS:

@@ -20,6 +20,22 @@ function drawDoctor(){
     patch(el, `<div class="empty">${d?.running ? "running…" : "first run pending…"}</div>`);
     return;
   }
+  const {level, probs, fine, html} = doctorChecks(d);
+  setClass(dot, "st " + level);
+  setAttr($("bDocDot"), "aria-label", level === "ok" ? `aerie doctor: all ${fine.length} ok`
+    : `aerie doctor: ${probs.length} to look at`);
+  patch(el, html);
+  // Controller settings from here, for an account that may open it, as the
+  // gear has Profile.
+  const go = $("docSettings");
+  if (go) go.hidden = !railAllows("settings");
+}
+
+// The doctor's checks as the panel and Controller settings' card draw them:
+// the problems first, each its line in its level's color with what the
+// check said under it and the way to fix it where the server knows one, then
+// the passing checks as chips. {level, probs, fine, html}.
+function doctorChecks(d){
   const tip = c => c.text + (c.detail ? "\n\n" + c.detail : "");
   // A plain user sees the lines that are theirs to act on: whether a node
   // can run their session. Runner tokens, ssh keys and the docker daemon
@@ -29,13 +45,9 @@ function drawDoctor(){
   const probs = checks.filter(c => c.level === "FAIL" || c.level === "warn");
   const fine = checks.filter(c => c.level === "ok");
   const skip = checks.filter(c => c.level === "skip");
-
   const level = probs.some(c => c.level === "FAIL") ? "bad"
               : probs.length ? "warn" : "ok";
-  setClass(dot, "st " + level);
-  setAttr($("bDocDot"), "aria-label", level === "ok" ? `aerie doctor: all ${fine.length} ok`
-    : `aerie doctor: ${probs.length} to look at`);
-  patch(el,
+  const html =
     `<div class="probs">${probs.map(c =>
        `<div class="sub ${c.level === "FAIL" ? "bad" : "warn"}" title="${esc(tip(c))}">${esc(c.text)}${
           c.detail ? `<span class="why">${esc(c.detail)}</span>` : ""}${
@@ -46,7 +58,25 @@ function drawDoctor(){
     `<div class="chips">${
        fine.map(c => `<span class="pill ok" title="${esc(tip(c))}">${esc(c.text)}</span>`).join("") +
        skip.map(c => `<span class="pill" title="${esc(tip(c))}">${esc(c.text)}</span>`).join("")
-     }</div>`);
+     }</div>`;
+  return {level, probs, fine, html};
+}
+
+// Run the doctor now, from the panel's ↻ or the card's Run again: both
+// presses rest while it runs, and both places draw what it found.
+async function runDoctor(){
+  const bs = [$("bDoctor"), $("setDocRun")].filter(Boolean);
+  if (bs.some(b => b.disabled)) return;
+  bs.forEach(b => { b.disabled = true; });
+  setText($("docWhen"), "running…");
+  try{
+    const j = await postJSON("/api/doctor", {});
+    if (j.error) notify("doctor: " + j.error, true);
+    else if (state) state.doctor = j;
+  }catch(e){ notify("doctor: " + failWords(e), true); }
+  [$("bDoctor"), $("setDocRun")].filter(Boolean).forEach(b => { b.disabled = false; });
+  drawDoctor();
+  if (shown("settings")) drawPanes();
 }
 
 // Open or shut the panel, with the bell's manners: anything else closes it,
