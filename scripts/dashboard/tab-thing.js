@@ -42,7 +42,7 @@ const THING_SECTS = {
     ["about", "What it is", r => instAboutLines(r)],
     ["signin", "Your sign-in", r => {
       const n = (nodesList || []).find(x => x.id === instNode), a = agentById(r.agent);
-      return n && (r.installed || r.agent === "claude") && typeof signinBlock === "function" && a?.provider ? signinBlock(n, r.agent) : "";
+      return n && (r.installed || r.agent === "claude") && a?.provider ? signinBlock(n, r.agent) : "";
     }],
     ["yours", "Yours", r => { const a = agentById(r.agent); return r.installed && a ? agExtras(a) : ""; }],
   ],
@@ -59,7 +59,7 @@ const THING_SECTS = {
     ["signin", "Your sign-in", r => {
       const a = r.group === "agent" ? agentById(r.name) : null;
       const n = (nodesList || []).find(x => x.id === instNode);
-      if (a && r.installed && a.signin && n && typeof signinBlock === "function") return signinBlock(n, a.id);
+      if (a && r.installed && a.signin && n) return signinBlock(n, a.id);
       return a && r.installed ? `<span class="sub">${esc(a.name)} signs in${a.provider ? ` with ${/^(?:[AEIOU]|x(?=[A-Z]))/.test(a.provider) ? "an" : "a"} ${esc(a.provider)} account` : ""} in its own terminal: start a ${esc(a.name)} session on a space on ${esc(inst?.name || "this node")} (Start agent on the space's card), open the link it shows, and paste the code it gives back into that terminal.</span>
         <span class="sub">A sign-in is this node's alone: each node you work on is signed in from a session there.</span>` : "";
     }],

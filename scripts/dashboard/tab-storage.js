@@ -195,7 +195,7 @@ function storageMachineDisks(n){
 // in front of the data disks (the adopted ones, in their order) or the
 // array. A select's value for the mover is "FROM>TO", or "" for off.
 function movePools(){
-  const own = typeof ownMachine === "function" ? ownMachine() : null;
+  const own = ownMachine();
   return ((own?.reported?.adopted || {}).mounts || []).map(m => String(m.where || "")).filter(w => w && !/^\/mnt\/disk\d+$/.test(w)).map(w => w.split("/").pop());
 }
 const movePlace = p => p === "array" ? "the array" : p;
@@ -948,7 +948,7 @@ function storageBody(n, where){
 // on the Storage page of the machine they are in (the controller's own),
 // with the same Check, Adopt, Release and shares, folded as Storage's are.
 function storageAdopt(n){
-  const own = typeof ownMachine === "function" ? ownMachine() : null;
+  const own = ownMachine();
   if (!own || own.id !== n.node) return "";
   const p = adoptParts(own);
   return p ? docSection("storage", p.id, p.title, p.status, p.body, p.opts) : "";

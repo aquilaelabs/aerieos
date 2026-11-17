@@ -173,7 +173,7 @@ function instAboutLines(r){
   }
   if (r.about) lines.push(`<span class="sub">${esc(r.about)}</span>`);
   // Who it is by, as its Library card's Details say (makerLine).
-  if (typeof makerLine === "function" && makerLine(r)) lines.push(makerLine(r));
+  if (makerLine(r)) lines.push(makerLine(r));
   if (r.kind === "toolchain" || r.kind === "pack"){
     if (r.tool) lines.push(`<span class="sub">Adds <code>aerie tool ${esc(r.tool)}</code> to a session.</span>`);
     if (r.needs?.length) lines.push(`<span class="sub">Needs ${esc(r.needs.join(", "))}, installed with it.${r.needed_by?.length ? ` Needed by ${esc(r.needed_by.join(", "))}.` : ""}</span>`);
@@ -347,7 +347,7 @@ function renderInstalledInto(i){
 
 function wireInstalled(root){
   wireSections(root);
-  if (typeof wireSignin === "function") wireSignin(root);
+  wireSignin(root);
   root.querySelectorAll("[data-instopen]").forEach(b => b.onclick = () => openThing(instNode, b.dataset.instopen, b.dataset.instat || ""));
   root.querySelectorAll("[data-tcsys]").forEach(b => b.onclick = async () => { await tcAct("sysdeps", [b.dataset.tcsys]); loadInstalled(); });
   root.querySelectorAll("[data-tcneed]").forEach(b => b.onclick = async () => { await tcAct("install", [b.dataset.tcneed]); loadInstalled(); });

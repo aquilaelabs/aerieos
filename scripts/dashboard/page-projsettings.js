@@ -706,7 +706,7 @@ function settingsInto(name, host){
     // days kept, who is on it, the sessions running.
     rnLoadSnapshots(name, true);
     rnLoadPeople(name, true);
-    if (typeof rnSessionsLoad === "function") rnSessionsLoad(name);
+    rnSessionsLoad(name);
     return;
   }
   // Lent to another view still: taken back first, so the form is the
@@ -1766,7 +1766,7 @@ async function rnSubmit(sect, end = false){
   // so their change is not written over unseen (the operator, 17 Oct); a
   // second press writes this one's over it. Read against the project as it
   // is now, the poll asked first.
-  if (typeof refresh === "function") await refresh().catch(() => {});
+  await refresh().catch(() => {});
   const now = rnPrefsOf((state?.projects || []).find(x => x.name === name));
   const theirs = mine.filter(k => k !== "version" && String(now[k] ?? "") !== String(rnPrefWas[k] ?? "")
                                && String(now[k] ?? "") !== String(enc[k] ?? ""));

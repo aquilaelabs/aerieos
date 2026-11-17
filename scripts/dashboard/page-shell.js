@@ -147,8 +147,8 @@ const OPENERS = {
   scanners: () => openScannersTab(), audit: () => openAuditTab(), machine: () => openMachineTab(), network: () => openNetworkTab(),
 };
 function railWarm(key){
-  if (key === "containers" && typeof dockerWarm === "function") dockerWarm();
-  else if (key === "build" && typeof loadLibrary === "function" && !lib) loadLibrary();
+  if (key === "containers") dockerWarm();
+  else if (key === "build" && !lib) loadLibrary();
 }
 
 function railGo(key, tool){
@@ -423,7 +423,7 @@ function shellCame(from, to){
   const was = shellFrom?.hash;
   shellFrom = from ? {kind: k, hash: from, label: routeLabel(from)} : null;
   // A header drawn before this was known names it on the next draw.
-  if ((shellFrom?.hash || null) !== (was || null) && typeof drawPanes === "function") setTimeout(drawPanes);
+  if ((shellFrom?.hash || null) !== (was || null)) setTimeout(drawPanes);
 }
 // The page kind an address names, or "".
 function kindOfRoute(hash){
@@ -545,7 +545,7 @@ function groupPick(g, nid){
     if (NODE_SET[k]) NODE_SET[k](nid);
     PAGE_SEEN[k] = nid;
     if (GROUP_KEEP[k]){ try{ localStorage.setItem(GROUP_KEEP[k], nid); }catch(e){ /* private */ } }
-    if (k === "docker" && typeof dockerNodeKeep === "function") dockerNodeKeep();
+    if (k === "docker") dockerNodeKeep();
   });
   if (g.key === "machines"){ readMoved("nodes"); readMoved("storage"); readMoved("installed"); }
   if (g.key === "build"){ readMoved("library"); readMoved("emulator"); readMoved("nodes"); }
@@ -759,4 +759,311 @@ function wireJump(){
     else if (e.key === "Escape"){ inp.value = ""; list.hidden = true; inp.blur(); }
   };
   document.addEventListener("click", e => { if (!e.target.closest(".jump")) list.hidden = true; });
+}
+
+// ---- the project page's header (R218 step 3) -----------------------------
+
+// A project is a page: its pane's bar is the header the design names (the
+// a-notebook/project-page rule): the name large, the branch and the node in
+// the data face, the session's state as the dot and a word, and at the
+// right its actions: Start agent, or Open
+// Claude in green while yours runs (the chooser under it), Shell, and the rest behind one menu (link, phone, report,
+// lock, pin, settings). Drawn by paintBar on every pass like every bar; the
+// chooser sits on the pane, not in the bar, so a repaint leaves it up.
+// The session's state as the dot and a word: this account's session
+// first, then whose else is here, then none. The dot is the one every
+// session surface wears.
+function projectState(p){
+  const name = p.name, sess = myLiveSession(name), mine = !!sess;
+  // One entry per person per agent per slot (B344: a person's Claude and
+  // Codex folded into one, one session's state masking the other's; R143:
+  // and two of one agent's), from where each session is: its account, its
+  // agent, its slot and its state, a session on two nodes once.
+  const rows = (state?.claude_where || {})[tmuxName(name)] || (state?.claude_where || {})[name] || [];
+  const seen = new Map();
+  for (const r of rows){
+    const k = `${r.who}|${r.agent}|${r.slot || 1}`, was = seen.get(k);
+    seen.set(k, {who: r.who, agent: r.agent, slot: r.slot || 1, working: !!(r.working || was?.working), asking: !!(r.asking || was?.asking)});
+  }
+  const one = (st, word, cls, agent, slot = 1) => `<span class="pstate${cls}">${st ? `<span class="st ${st}"></span>` : ""}${esc(word)}${
+    agent ? `<span class="pagent"> · ${esc(agentSlotName(agentById(agent) || {name: agent}, slot))}</span>` : ""}</span>`;
+  // Yours first, then everybody else's, each with its own dot (the
+  // operator, 16 Oct). On its permission prompt it is asking, in amber, as
+  // the dock and Sessions say it (B98); another account's reads asking too
+  // (B104), not "asking you": only that person's terminal answers it.
+  const all = [...seen.values()];
+  const me = all.filter(e => e.who === state?.me).map(e => e.asking ? one("asking", "asking you", "", e.agent, e.slot)
+    : e.working ? one("working", "working", "", e.agent, e.slot) : one("waiting", "waiting for you", "", e.agent, e.slot)).join("")
+    // A session of yours the poll has not placed on a node yet.
+    || (mine ? (claudeOf(sess)?.state === "asking" ? one("asking", "asking you", "", agentOfSession(tmuxBase(sess))?.agent.id)
+        : one("waiting", "waiting for you", "", agentOfSession(tmuxBase(sess))?.agent.id)) : "");
+  const them = all.filter(e => e.who !== state?.me).map(e => e.asking ? one("asking", `${e.who} asking`, " other", e.agent, e.slot)
+    : one(e.working ? "working" : "waiting", `${e.who}${e.working ? " working" : "'s session"}`, " other", e.agent, e.slot)).join("");
+  return me || them ? `<span class="pstates">${me}${them}</span>` : one("", "no session", "", "");
+}
+// The one notice a project carries (why nobody can start here, the agent
+// out of window), in the notice voice, or nothing.
+function projectNote(p, band = false){
+  const here = withMe(p.name).length > 0;
+  // What holds it back is said ahead of a wait that would end by itself
+  // (B826: a copy going up was said and the missing Claude Code that really
+  // held it never was).
+  const held = p.held && !state?.mapping?.[p.name]?.running ? p.held : "";
+  // Not this account's to change: nothing is said and Start agent is not
+  // drawn (the operator, 21 Oct: a role somebody lacks is not advertised to
+  // them, and a reason a button is off is not an error, so no line is red).
+  if (!p.locked_me && writeWhy(p)) return "";
+  // Your session running here and behind what changed since it started (a
+  // toolchain on its node, AerieOS updated, a repository added): said
+  // ahead of the rest, which are about starting one.
+  const behind = !here ? [] : [...new Set(((state?.claude_where || {})[tmuxName(p.name)] || (state?.claude_where || {})[p.name] || [])
+    .filter(r => r.who === state?.me).flatMap(r => r.behind || []))];
+  // A band between the header and the view strip, put away with its x for
+  // as long as it says the same (the operator, 28 Oct); what changed next
+  // brings it back, and so does leaving the notebook and coming back to it
+  // (the operator, 29 Oct). Every note the header carries is one (pnoteBand).
+  if (behind.length){
+    const text = `Restart your session to use what changed: ${behind.join("; ")}.`;
+    return band ? pnoteBand(p, text) : `<div class="pnote warn">${esc(text)}</div>`;
+  }
+  // The project's agent missing on its node, for an account that may install
+  // it: the button says it (Install Claude, Install ChatGPT), so no line does.
+  if (agentInstall(p, projectAgent(p))) return "";
+  const said = held || p.session_why;
+  // An error where no session can run there and nothing passes by itself
+  // (a node removed, disabled, off or hosting only); a warning where it is a
+  // wait or a hold (the operator, 29 Oct: warnings yellow, errors red).
+  const tone = held || p.session_waiting ? "warn" : "bad";
+  if (said && !p.locked_me && !here) return band ? pnoteBand(p, said, tone) : `<div class="pnote dim">${esc(said)}</div>`;
+  // ...and otherwise why Start agent is dead, whatever made it so (B88):
+  // a Profile with no commit author, somebody else's node. A locked one
+  // says so by its mark, and is left out.
+  const dead = p.locked_me ? "" : claudeDeadWhy(p);
+  return !dead ? "" : band ? pnoteBand(p, dead) : `<div class="pnote dim">${esc(dead)}</div>`;
+}
+// A note in the project's header as a band with its x (the operator, 28 and
+// 29 Oct: every one, the way the restart band is), or "" while it is put away.
+function pnoteBand(p, text, tone = "warn"){
+  if (pnotePutAway(p.name) === text) return "";
+  return `<div class="pnote ${tone === "bad" ? "bad" : "warn"} pband" data-pnote="${esc(p.name)}"><span class="grow">${esc(text)}</span><button type="button" class="ic" data-pnote-x aria-label="put this away">×</button></div>`;
+}
+// The node to install Claude Code on in place of starting a session, or "":
+// the project's node has none and this account may install toolchains there
+// (the operator, 21 Oct: the button opens that node's Toolchains).
+const claudeInstall = p => !p.locked_me && !myLiveSession(p.name) && p.claude_missing
+  && mayToolchains(p.claude_missing) ? p.claude_missing : "";
+// ...and the same for any agent (R95 step 18): another agent is missing where
+// the project's node does not list it among the agents installed there, the
+// list Start's chooser offers from.
+function agentInstall(p, ag){
+  if (ag.id === "claude") return claudeInstall(p);
+  const n = (p.session_nodes || []).find(x => x.id === p.session_node);
+  return !p.locked_me && !myLiveSession(p.name) && n && n.where === "node"
+    && !(n.agents || []).includes(ag.id) && mayToolchains(n.id) ? n.id : "";
+}
+// The agent a project's Start agent opens first: this account's pick for it,
+// else Claude.
+const projectAgent = p => agentById(p.prefs?.agent_default) || AGENTS[0];
+// Why Start agent is dead on this project, or "" when it is live: the one
+// answer the button, its description and the line under it all read.
+function claudeDeadWhy(p){
+  const mine = !!myLiveSession(p.name);
+  if (p.locked_me) return lockedWhy(p);
+  if (notMine(p)) return NOT_MINE_WHY;
+  // A Claude session is work on the project (B86): Projects Write.
+  if (p.write_why) return p.write_why;
+  if (heldWhy(p)) return heldWhy(p);
+  if (!p.session_at && p.session_why && !mine) return p.session_why;
+  if (p.node_removed && !mine) return p.session_why || "its node was removed: pick another in its settings";
+  return "";
+}
+// Why a lock holds this account out, as the server says it (R119).
+const lockedWhy = p => p.locked_admin
+  ? "locked by an administrator: nobody starts a session or changes it until one unlocks it"
+  : `locked by ${p.owner_name || "its owner"}, its owner: only they work in it until they unlock it`;
+// The lock's press in a menu: an administrator's says it is one (the
+// operator, 23 Oct), since it holds the project's owner out too.
+const lockLabel = p => {
+  const asAdmin = p.locked ? p.locked_admin : !p.owner_mine;
+  return (asAdmin ? "Admin: " : "") + (p.locked ? "Unlock" : "Lock");
+};
+// The agent's button, on a project's card and a repository's header: Start
+// agent, Manage agent while this account's session runs, or Install where
+// the project's agent is missing on its node. A project's one session runs
+// on its first repository (R136), so every repository's opens that.
+function agentButton(p){
+  // The agent the project's Start opens (R95 step 4): Claude's unless its
+  // settings name another. Its own session running here makes it Open.
+  const ag = projectAgent(p);
+  const rk = state?.repos?.[p.project];
+  const name = p.name, at = rk?.members?.[0] || name, sess = myLiveSession(at), mine = !!sess;
+  const dead = claudeDeadWhy(p);
+  // What this account's roles do not give is left out, not drawn dead.
+  if (isBroken(p) || (!p.locked_me && !!writeWhy(p))) return "";
+  // What a press does, or why it is dead, in the button's own words: a
+  // screen reader hears it, and a press on a dead one is told.
+  const live = liveSessions();
+  // Named for the agent it opens, whatever it says: the button's own word is
+  // Start agent for every one of them.
+  const said = dead ? dead
+    : p.session_why ? p.session_why
+    : othersOn(name).length ? `${othersOn(name).join(", ")} also working here, in a checkout of their own: start yours`
+    : p.session_node && !agentOn(ag.id, p.session_node) && !live.has(myAgentSession(ag.id, name))
+      ? `${ag.name}: you are not signed in on ${p.session_at}, this space's node. Press for its sign-in`
+    : p.session_at ? `${ag.name}: a session on ${p.session_at}, this space's node`
+    : mine ? `${agentOfSession(tmuxBase(sess))?.agent.name || ag.name}: your session is running; open its tab, restart or end it`
+    : p.last_claude ? `${ag.name}: no session running; resume or start one`
+    : `${ag.name}: start a session here`;
+  const say = said.startsWith(`${ag.name}:`) ? said : `${ag.name}: ${said}`;
+  // Green only while your session runs, and then Manage agent, since the
+  // press opens the chooser with the session's Open, Restart and End;
+  // otherwise a plain Start agent, the chooser under it picking which (the
+  // operator, 16 Oct: green on every card read as running everywhere; 22
+  // Oct: one word for every agent; 23 Oct: Manage agent, not Open Claude).
+  const inst = agentInstall(p, ag);
+  return inst ? `<button type="button" data-tcinst="${esc(inst)}" data-agent="${esc(ag.id)}" title="${
+        esc(`${ag.product} is not installed on ${p.node_name || "its node"}: the Library installs it there`)}">Install ${esc(ag.name)}</button>`
+    : `<button type="button"${mine ? ' class="primary"' : ""} data-c="${esc(at)}"${dead ? " disabled" : ""} title="${esc(say)}">${
+        mine ? "Manage agent" : "Start agent"}</button>`;
+}
+// A repository's header: the agent, a shell, and the rest behind one menu
+// (R238: nine look-alike icons on a row were one too many). Its data-*
+// names are wireProjectRows', which serves them; the marks act on its
+// project.
+function projectActions(p){
+  const name = p.name, key = p.project || name, c = state?.repos?.[key] || p;
+  const menu = [
+    p.git_ok && !isBroken(p) && state?.can?.["git-auth"] !== false
+      ? `<button type="button" data-l="${esc(name)}">${
+          p.linked ? `${esc(p.forge_name || "Remote")} settings` : "Link to a git host"}</button>` : "",
+    p.phone?.mine ? `<button type="button" data-ph="${esc(name)}"${phoneWhy(p) ? " disabled" : ""}>${
+        p.phone?.lease?.project === name ? "Take your phone back" : "Lend your phone"}</button>` : "",
+    p.mine === false ? "" : `<button type="button" data-bug="${esc(name)}">Report an AerieOS bug</button>`,
+    // Archive is out of sight only (R119, the operator, 23 Oct): its card
+    // folds away at the foot of the Projects page and leaves Home, and the
+    // project works on. Its owner's or an administrator's.
+    c.may_archive ? `<button type="button" data-k="${esc(key)}" data-on="${c.archived ? "0" : "1"}">${c.archived ? "Unarchive" : "Archive"}</button>` : "",
+    // ...and Lock, which is: its owner's holds everybody else out, an
+    // administrator's its owner too, and says so on the press.
+    c.may_lock ? `<button type="button" data-lock="${esc(key)}" data-on="${c.locked ? "0" : "1"}">${lockLabel(c)}</button>` : "",
+    c.archived ? "" : `<button type="button" data-p="${esc(key)}" data-on="${c.pinned ? "0" : "1"}">${c.pinned ? "Unpin" : "Pin"}</button>`,
+    `<button type="button" data-rn="${esc(name)}">Settings</button>`,
+  ].filter(Boolean).join("");
+  return `${agentButton(p)}
+    ${mayShell() && !notMine(p) ? `<button type="button" data-s="${esc(name)}"${!gitReadyFor(p) ? " disabled" : ""}>Shell</button>` : ""}
+    <span class="more"><button type="button" data-pmore aria-label="more" aria-expanded="false">${DOTS}</button><div class="actmenu" hidden>${menu}</div></span>`;
+}
+function projectHeader(t){
+  const name = t.arg, p = (state?.projects || []).find(x => x.name === name);
+  if (!p) return `<div class="phead"><span class="pname">${esc(projLabel(name))}</span></div>`;
+  // A repository of a project of several (R136): the project's name, and
+  // its repositories as a pulldown, this one picked, each opening its own
+  // notebook (the operator, 27 Oct: a switch of buttons is no way to hold a
+  // list that may be long), in the project's color as its buttons are.
+  const rk = state?.repos?.[p.project];
+  const repoSwitch = rk?.members.length > 1 ? `<select class="prepos" data-reposw aria-label="${esc(rk.name)}'s repositories: the one this notebook is">${
+    optionList(rk.members.map(m => [m, projLabel(m)]), name)}</select>` : "";
+  return `<div class="phead">
+    <span class="pname">${esc(rk ? rk.name : p.label || name)}${lockMark(p)}</span>${repoSwitch}
+    <span class="pfacts">${projFacts(p)}</span>
+    ${projectState(p)}
+    <span class="sp"></span>
+    ${projectActions(p)}
+  </div>${projectNote(p, true)}${p.testing ? `<div class="pnote dim ptesting">tests running, started ${esc(ago(p.testing.since))}</div>` : ""}`;
+}
+// The row's handlers serve the header too (the same data-* names); the
+// menu's own button is the one thing the row did differently.
+// The header's band put away, by project: the text it had, for this visit
+// to the notebook alone (the operator, 29 Oct: it comes back once you fully
+// leave the notebook and return). A view of the same notebook is the same
+// visit; another page, another project or a reload is not.
+const pnoteAway = {};
+let pnoteHere = "";
+function pnotePutAway(name, text){
+  if (text !== undefined) pnoteAway[name] = text;
+  return pnoteAway[name] || "";
+}
+// The project the front pane is on, told on every draw of its bar: leaving
+// one forgets what was put away there.
+function pnoteOnShow(name){
+  if (name === pnoteHere) return;
+  if (pnoteHere) delete pnoteAway[pnoteHere];
+  pnoteHere = name;
+}
+function wireProjectHeader(bar){
+  wireProjectRows(bar);
+  bar.querySelectorAll("[data-pnote-x]").forEach(b => b.onclick = () => {
+    const band = b.closest("[data-pnote]");
+    pnotePutAway(band.dataset.pnote, band.querySelector(".grow")?.textContent || "");
+    band.remove();
+  });
+  bar.querySelectorAll("select[data-reposw]").forEach(s => s.onchange = () => openNotebook(s.value));
+  // On the project's own page its menu's Settings is the notebook's Settings
+  // view (R259: the view strip carries no tab for it), not the dialog. Only
+  // there: a card on the Projects page keeps wireProjectRows' Settings, which
+  // goes to the page (B82: this one turned the notebook in the background).
+  bar.querySelectorAll("[data-rn]").forEach(b => b.onclick = () => {
+    const n = getNotebook(b.dataset.rn);
+    if (n) n.view("settings"); else openProjectSettings(b.dataset.rn);
+  });
+  wireProjectMenu(bar);
+}
+// The other repositories of a project of several (R136), under one
+// repository's own list: their open roadmap items or open bugs, merged,
+// each row naming its repository and opening its view there. Read-only
+// here, as each repository's list is its own to change.
+async function reposAlso(el, project, kind){
+  if (!el) return;
+  const r = state?.repos?.[(state?.projects || []).find(p => p.name === project)?.project];
+  if (!r || r.members.length < 2){ el.hidden = true; el.innerHTML = ""; return; }
+  const rows = [];
+  for (const m of r.members.filter(m => m !== project)){
+    try{
+      const j = await getJSON(`/api/${kind}?project=${encodeURIComponent(m)}`);
+      const list = kind === "bugs" ? (j.bugs || []).filter(b => b.status === "open") : (j.items || []);
+      for (const x of list) rows.push({m, id: x.id, text: x.title || x.text || ""});
+    }catch(e){ /* that repository's list answers on its own page */ }
+  }
+  const tag = kind === "bugs" ? "B" : "R", noun = kind === "bugs" ? "open bug" : "open item";
+  const body = rows.length ? rows.map(x => `<div class="alsorow">
+      <button type="button" class="namelink" data-also="${esc(x.m)}">${esc(projLabel(x.m))}</button>
+      <span class="pid">${tag}${x.id}</span><span class="alsotext">${esc(x.text)}</span></div>`).join("")
+    : `<div class="empty">nothing open in its other repositories</div>`;
+  const html = docSection(kind, "also", `Also in ${r.name}`, `${rows.length} ${noun}${rows.length === 1 ? "" : "s"}`, body, {open: true});
+  if (patch(el, html)){
+    wireSections(el);
+    el.querySelectorAll("[data-also]").forEach(b => b.onclick = () => openNotebook(b.dataset.also, kind === "bugs" ? "bugs" : "roadmap"));
+  }
+  el.hidden = false;
+}
+
+// A project's ⋯, on its header and on its card alike.
+function wireProjectMenu(bar){
+  bar.querySelectorAll("[data-pmore]").forEach(b => b.onclick = e => {
+    e.stopPropagation();
+    const m = b.nextElementSibling, open = m.hidden;
+    closeMore();
+    m.hidden = !open;
+    b.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) floatAt(m, b);
+  });
+}
+
+// A project's lock, said one way on its card, its page's header and Home
+// (consistency batch J: the header said locked where the card said
+// archived): locked when its owner or an administrator locked it (R119),
+// whomever it holds out, read-only when it is not this account's to change
+// (not taken on, or a role that reads it alone). Archived is said by where
+// the card sits, not by a mark.
+function lockMark(p){
+  const said = p.locked ? (p.locked_admin ? "locked by an administrator" : "locked") : writeWhy(p) ? "read-only" : "";
+  return said ? ` <span class="lockmark" title="${esc(p.locked ? lockedWhy(p) : said)}">${LOCK}${said}</span>` : "";
+}
+// A project's facts line, the same parts wherever it is drawn: its id, its
+// branch, that it may push, and the node it runs on.
+function projFacts(p){
+  const node = p.node_name || p.session_at || "";
+  return [p.pid ? `<span class="pid" title="this space's id, which never changes: aerie -p ${projId(p)} names it">${projId(p)}</span>` : "",
+          p.git ? `git: <span class="pbr">${esc(p.git)}</span>${p.push ? ` · <span class="ok">push</span>` : ""}` : "",
+          esc(node)].filter(Boolean).join(" · ");
 }

@@ -419,7 +419,7 @@ const PAGE_AT = {nodes: "#/machines/nodes", installed: "#/machines/installed", s
 // A page this account may not open is its words and no link (B114): the
 // address of one a grant forbids landed on the group's first page instead.
 function pageLink(page, words, hash = PAGE_AT[page]){
-  if (typeof railAllows === "function" && !railAllows(page)) return esc(words);
+  if (!railAllows(page)) return esc(words);
   return `<a href="${esc(hash || "#")}" class="pagelink">${esc(words)}</a>`;
 }
 // A table on its way: its real head over rows whose cells shimmer, each as

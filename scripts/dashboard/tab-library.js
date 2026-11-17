@@ -530,7 +530,7 @@ function wireLibrary(root){
     if (i.complete && !i.naturalWidth) broke(); else i.onerror = broke;
   });
   wireSections(root);
-  if (typeof wireSignin === "function") wireSignin(root);
+  wireSignin(root);
   const q = root.querySelector("#libFind");
   if (q){
     onTyping(q, () => { libQ = q.value; readMoved("library"); drawPanes(); });

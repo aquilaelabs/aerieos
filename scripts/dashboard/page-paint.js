@@ -396,3 +396,14 @@ function newShell(proj){
   if (here) notify(`${projLabel(proj)}'s node cannot take a session now; this shell is on the controller`);
   openTab({kind:"term", arg, label: `sh: ${proj ? projLabel(proj) : "workspace"}${here ? " (here)" : ""}`, here});
 }
+
+// A meter: a label, a bar filled to pct (warn from 80, bad from 92) and the
+// value at its right, as the Nodes and Storage pages draw a resource.
+function meter(label, pct, right, title){
+  const p = Math.max(0, Math.min(100, Math.round(pct)));
+  const cls = p >= 92 ? "bad" : p >= 80 ? "warn" : "";
+  return `<div class="ndmeter${cls ? " " + cls : ""}"${title ? ` title="${esc(title)}"` : ""}>
+    <span class="lbl">${esc(label)}</span>
+    <span class="track"><span class="fill" data-style="width:${p}%"></span></span>
+    <span class="val">${esc(right)}</span></div>`;
+}

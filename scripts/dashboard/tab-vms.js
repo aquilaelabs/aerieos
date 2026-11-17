@@ -178,7 +178,7 @@ async function vmCloneAsk(nodeId, from){
   if (!a) return;
   const j = await postJSON("/api/vms", {action: "clone", project: a.value, node: nodeId, from, name: String(a.text || "").trim()});
   notify(j.error || `cloning ${from}: its disks are copied on the node, then it is on the VMs page under ${a.value === "machine" ? "This machine's own" : projLabel(a.value)}`, !!j.error);
-  if (!j.error && typeof loadVms === "function") loadVms();
+  if (!j.error) loadVms();
 }
 
 // A VM whose repository is gone is in no project (the operator, 26 Oct),

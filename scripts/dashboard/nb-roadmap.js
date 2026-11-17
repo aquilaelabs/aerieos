@@ -284,7 +284,7 @@ function nbRoadmapView({$, nb}){
     // the row say running while every arrow here said no session (B214):
     // an answer drawn before the list caught up stood until something else
     // redrew, and nothing said which of the two to believe.
-    const sess = j.session || (typeof liveSessions === "function" && nb.memProj
+    const sess = j.session || (nb.memProj
                                ? myLiveSession(nb.memProj) : null);
     j = Object.assign({}, j, {session: sess});
     const rows = j.items || [], live = !!sess;

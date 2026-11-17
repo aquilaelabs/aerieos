@@ -1302,7 +1302,7 @@ function nodeAdvancedSection(n, stale, inflight){
         !n.live ? `<span class="bad">They need the agent dialing in, and it is away: power the machine from its console or its hypervisor.</span>`
         : installing ? `<span class="warn">${esc(installing[0].toUpperCase() + installing.slice(1))} is running here: one pressed now waits for it to end.</span>`
         : "Reboot ends every session there and the machine comes back on its own; Shut down does not come back until somebody switches it on.",
-        (n.id === state?.own_node && typeof holdNextBox === "function" ? holdNextBox() : "") + ["reboot", "poweroff"].map(w =>
+        (n.id === state?.own_node ? holdNextBox() : "") + ["reboot", "poweroff"].map(w =>
           `<button type="button" class="danger" data-nd="${w}" ${!n.live || inflight(w) ? "disabled" : ""}>${
             inflight(w) ? (w === "reboot" ? "Rebooting…" : "Shutting down…")
                         : (w === "reboot" ? "Reboot" : "Shut down")}</button>`).join(""))}
@@ -1734,14 +1734,6 @@ function nodeConfSections(n){
         + docSection("nodes", "network", ndTitle("network"), netStatus, network, {cls: netCls})
       : `<div class="hint ndguest">Storage and network are managed on the machine itself, not here.</div>`}
   </div></div>`;
-}
-function meter(label, pct, right, title){
-  const p = Math.max(0, Math.min(100, Math.round(pct)));
-  const cls = p >= 92 ? "bad" : p >= 80 ? "warn" : "";
-  return `<div class="ndmeter${cls ? " " + cls : ""}"${title ? ` title="${esc(title)}"` : ""}>
-    <span class="lbl">${esc(label)}</span>
-    <span class="track"><span class="fill" data-style="width:${p}%"></span></span>
-    <span class="val">${esc(right)}</span></div>`;
 }
 
 // Storage's reading of a size (sgb): TB past ten of them (B834: 11425GB).
@@ -2628,7 +2620,7 @@ function wireNodesTab(root){
     if (j?.error) notify(j.error, true); else notify(`its versions are checked ${s.value === "off" ? "only when asked" : s.value}`);
   });
   // The own machine's hold-next checkbox beside Reboot (R161 step 11).
-  if (typeof wireHoldNext === "function") wireHoldNext(root);
+  wireHoldNext(root);
   wireSignin(root);
   wireCharts(root);
   root.querySelectorAll("[data-ndopen]").forEach(b => b.onclick = () => openNotebook(b.dataset.ndopen));

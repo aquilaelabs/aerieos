@@ -115,28 +115,6 @@ function projectMatches(p, q){
   return q.toLowerCase().split(/\s+/).filter(Boolean).every(w => hay.includes(w));
 }
 
-// One project's card on the grid (R218 step 3): its color down the left
-// edge, the name (a press opens its page), the branch and the node, the
-// session's dot and word, the one notice, and the two actions with the
-// rest behind the menu, the same parts the project page's header draws.
-// A project's lock, said one way on its card, its page's header and Home
-// (consistency batch J: the header said locked where the card said
-// archived): locked when its owner or an administrator locked it (R119),
-// whomever it holds out, read-only when it is not this account's to change
-// (not taken on, or a role that reads it alone). Archived is said by where
-// the card sits, not by a mark.
-function lockMark(p){
-  const said = p.locked ? (p.locked_admin ? "locked by an administrator" : "locked") : writeWhy(p) ? "read-only" : "";
-  return said ? ` <span class="lockmark" title="${esc(p.locked ? lockedWhy(p) : said)}">${LOCK}${said}</span>` : "";
-}
-// A project's facts line, the same parts wherever it is drawn: its id, its
-// branch, that it may push, and the node it runs on.
-function projFacts(p){
-  const node = p.node_name || p.session_at || "";
-  return [p.pid ? `<span class="pid" title="this space's id, which never changes: aerie -p ${projId(p)} names it">${projId(p)}</span>` : "",
-          p.git ? `git: <span class="pbr">${esc(p.git)}</span>${p.push ? ` · <span class="ok">push</span>` : ""}` : "",
-          esc(node)].filter(Boolean).join(" · ");
-}
 // A project's id as it is written (P3), as a roadmap item is R12 and a bug
 // B7: the registry's number, never reused, so it names one project for good.
 const projId = p => p?.pid ? `P${p.pid}` : "";

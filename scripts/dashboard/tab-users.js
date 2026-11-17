@@ -88,7 +88,7 @@ function usersDirty(){
   if (!u) return false;
   // A role changed with no field typed is unsaved too: its Save wakes for it.
   const was = usersEdit ? usersEditFrom(u) : null;
-  return (!!usersEdit && USER_KEYS.some(k => was[k] !== usersEdit[k])) || (typeof rolesPeopleDirty === "function" && rolesPeopleDirty());
+  return (!!usersEdit && USER_KEYS.some(k => was[k] !== usersEdit[k])) || rolesPeopleDirty();
 }
 function usersRedraw(){ readMoved("users"); drawPanes(); }
 // Accounts and roles Read without its Write: the page is there to read, its

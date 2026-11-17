@@ -499,7 +499,7 @@ function tpDraw(first){
     const j = await postJSON("/api/nasapps", {action: "remove", app: id});
     if (j.error){ tpForm.error = j.error; tpDraw(); return; }
     notify(`${tpForm.app.name || id} removed from the catalog`);
-    tpClose(); if (typeof loadLibrary === "function") loadLibrary();
+    tpClose(); loadLibrary();
   };
   m.querySelectorAll("[data-tpfrom]").forEach(b => b.onclick = () => {
     if (tpForm.from === b.dataset.tpfrom) return;
@@ -529,7 +529,7 @@ function tpDraw(first){
       const j = await postJSON("/api/nasapps", {action: "add", app: a.id, name: a.name, what: a.what, port: a.port, compose: a.compose, replace: !!a.editing});
       if (j.error){ tpForm.busy = ""; tpForm.error = j.error; tpDraw(); return; }
       notify(a.editing ? `${a.name} saved` : `${a.name} added: Install on its card opens New container with it picked`);
-      tpClose(); if (typeof loadLibrary === "function") loadLibrary();
+      tpClose(); loadLibrary();
       return;
     }
     const j = await post(tpForm.seen?.staged ? {action: "add", staged: tpForm.seen.staged}
@@ -539,7 +539,7 @@ function tpDraw(first){
     notify(j.unchanged ? `${j.pack.name}: nothing changed, so it is kept as it was`
          : j.replaced ? `${j.pack.name} updated: where it is installed, uninstall it and install it again to take the new version`
          : `${j.pack.name} added: install it below like any toolchain`);
-    tpClose(); loadToolchains(); if (typeof loadLibrary === "function" && shown("library")) loadLibrary();
+    tpClose(); loadToolchains(); if (shown("library")) loadLibrary();
   };
   const rm = m.querySelector("[data-tprm]");
   if (rm) rm.onclick = async () => {

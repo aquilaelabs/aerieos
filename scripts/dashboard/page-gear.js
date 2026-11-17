@@ -262,7 +262,7 @@ function logSection(){
       <div class="logdays setrow col ctlrow">
         ${lbl("logDays", "Days of logs kept", "older files are deleted when this is applied")}
         <input id="logDays" type="number" min="1" max="3650" step="1"
-               value="${typeof sdVal === "function" ? sdVal("logDays", L.days) : L.days}" inputmode="numeric">
+               value="${sdVal("logDays", L.days)}" inputmode="numeric">
       </div>
       <div class="actbar">
         <span class="state">applies at once, and anything already past it is cropped</span>

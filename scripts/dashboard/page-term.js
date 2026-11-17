@@ -543,7 +543,7 @@ function termConnect(rec){
   // there, which a store under a key of their own gives only while it is
   // unlocked (R157 step 2): asked for first, once, and the terminal then
   // opens with it; declined, it opens as a terminal with no sign-in.
-  if (state?.store?.own && state.store.locked && !rec.unlockAsked && typeof keyStoreUnlock === "function"){
+  if (state?.store?.own && state.store.locked && !rec.unlockAsked){
     rec.unlockAsked = true;
     keyStoreUnlock("Unlock your key store so this terminal opens your sign-ins?").then(() => termConnect(rec));
     return;
