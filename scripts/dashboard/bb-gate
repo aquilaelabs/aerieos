@@ -339,11 +339,21 @@ def own_notes():
         return True
     if tool not in NOTE_TOOLS:
         return False
-    path = os.path.realpath(str((call.get("tool_input") or {}).get("file_path")
-                                or (call.get("tool_input") or {}).get("notebook_path") or ""))
-    home = os.path.realpath(os.environ.get("HOME", "/nonexistent"))
-    return bool(path) and (any(path.startswith(os.path.join(home, d) + os.sep) for d in NOTE_DIRS)
-                           or path.startswith("/tmp/claude-"))
+    given = str((call.get("tool_input") or {}).get("file_path")
+                or (call.get("tool_input") or {}).get("notebook_path") or "")
+    if not given:
+        return False
+    # The path as written with its `..` taken out, and the path its links
+    # lead to: a session's own folder holds links of AerieOS's making
+    # (~/.claude/projects leads to the store's copy of every account's
+    # projects), so a memory there resolves outside the home, and either
+    # one inside a folder of notes is a note.
+    said = os.path.normpath(os.path.join(os.getcwd(), given))
+    real = os.path.realpath(given)
+    home = os.environ.get("HOME", "/nonexistent")
+    roots = {os.path.join(h, d) for h in (home, os.path.realpath(home)) for d in NOTE_DIRS}
+    return any(p.startswith(r + os.sep) for p in (said, real) for r in roots) \
+        or any(p.startswith("/tmp/claude-") for p in (said, real))
 
 
 if __name__ == "__main__":

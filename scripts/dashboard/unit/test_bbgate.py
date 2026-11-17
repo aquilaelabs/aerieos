@@ -152,6 +152,28 @@ class HeldNotes(unittest.TestCase):
         code, _ = self.run_gate(lambda home: {"tool_name": "update_plan", "tool_input": {}})
         self.assertEqual(code, 0, "Codex's plan")
 
+    def test_a_memory_through_the_projects_link_is_a_note(self):
+        # B925: ~/.claude/projects is a link to the store's copy, so the
+        # memory's resolved path is outside the home; it is still a note.
+        import tempfile
+        store = tempfile.mkdtemp()
+        self.addCleanup(__import__("shutil").rmtree, store, ignore_errors=True)
+
+        def call(home):
+            os.makedirs(home + "/.claude", exist_ok=True)
+            if not os.path.lexists(home + "/.claude/projects"):
+                os.symlink(store, home + "/.claude/projects")
+            return {"tool_name": "Read", "tool_input": {"file_path": home + "/.claude/projects/x/memory/where.md"}}
+        code, _ = self.run_gate(call)
+        self.assertEqual(code, 0, "read through the link")
+
+        def write(home):
+            c = call(home)
+            c["tool_name"] = "Write"
+            return c
+        code, _ = self.run_gate(write)
+        self.assertEqual(code, 0, "written through the link")
+
     def test_a_hold_is_marked_and_cleared(self):
         # R251: the mark its node's agent reports, for the bell's Resume.
         import json
