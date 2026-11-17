@@ -63,6 +63,8 @@
 - The Design view's pages are rows, each opening its page at an address of its own, so a link lands on that page and Back returns to the rows; the Overview's rules, the design's rules and the wiki's log show a page at a time, more arriving as you reach the foot (c85ba2e)
 - A line under a name reads the same on every page: a sentence in the small note voice, and a line of facts (ids, sizes, paths, versions, a node and an age) in the monospace data voice; inside a list's rows the two had been the other way round from the rest of the page (48073c8)
 - A row's name is the same size and weight on every page, a row asking you something (the bell's asks, a phone to pair, a node's root command, a container to make) carries one mark at its left edge in the ask's tone, and a row picked to show its detail (a commit, a file, a node's runner) is lit the one way a list beside its detail lights its pick (bea7ad0, 698ed89)
+- A space's card, its notebook's header and Home's glance say its id, its branch and its notes the same way; the header now also says when a phone is lent to the space or its code is being mapped (042caa2)
+- The notebook's lists (bugs, memories, rules, roadmap items, files and conversations) give every row the same room above its first line, and a node's Set here switches sit as close as the rest of its Sessions section (1912504)
 
 ### Fixed
 
@@ -98,6 +100,7 @@
 - A node holding a space as a synced copy catches up in moments after git packs its objects, where its sync sent thousands of removals one at a time and every aerie verb on it waited and was refused for many minutes. (5412515)
 - New container, New space and four other dialogs keep their buttons at the right of the dialog's foot like every other, where a notice in the corner could lie over Create and Cancel. (4dd850e)
 - A VM keeps its console password through a hardware change, a start and a move to the LAN bridge. (3df960a)
+- A space's settings listed each other space of one repository as "1 repositories" under What sessions reach; it names the branch, or says the repository has no git (b5a5d69)
 
 ### Security
 
