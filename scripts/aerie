@@ -6533,8 +6533,9 @@ if on_node && [ -z "${BB_RELAYED:-}" ]; then
         # `flakes` reads the record the harness keeps beside the tree it ran
         # from, and `root` runs the root tier of the tree here (in a
         # container where docker answers): neither is the controller's.
+        # `bisect` runs the harness here at each commit, as `run` does.
         # `rules -h` is help, the bb beside it answers (B411).
-        "tests run"|"tests last"|"tests log"|"tests lab"|"tests probe"|"tests keep"|"tests preflight"|"tests unit"|"tests coverage"|"tests flakes"|"tests root"|"rules check"|"rules audit"|"rules -h"|"rules --help"|"findings sample") : ;;
+        "tests run"|"tests last"|"tests log"|"tests lab"|"tests probe"|"tests keep"|"tests preflight"|"tests unit"|"tests coverage"|"tests flakes"|"tests bisect"|"tests root"|"rules check"|"rules audit"|"rules -h"|"rules --help"|"findings sample") : ;;
         *)  # ...and that is the whole run: without the exit the dispatch
             # below ran the verb a second time HERE, against files the bundle
             # does not carry: `aerie bug` printed the controller's answer and
