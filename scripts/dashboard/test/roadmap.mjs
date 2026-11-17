@@ -360,13 +360,20 @@ await section("A group is a fold now", async () => {
     shown: [...d.querySelectorAll('.roadmap[data-step]:not([data-step="-1"])')].some(r => r.checkVisibility()) }));
   ok(!first.open && !first.shown, `a group starts folded, its steps out of sight (${JSON.stringify(first)})`);
   // A step's send lines up under its item's, off the card's edge (B51).
+  // Measured once the rows carry a send: one is drawn once the status read
+  // has said this account writes the space (projWriteWhy), which under a
+  // whole run's load came after the list (B834); when none comes, why.
+  const sends = await page.waitForSelector('#roadmapList details.grp:has(.roadmap[data-step="1"]) .roadmap .go',
+    { state: 'attached', timeout: 20000 }).then(() => '', () => page.evaluate(() =>
+      ` none drawn: read-only ${JSON.stringify(projWriteWhy('alpha') || '')}, ${
+        document.querySelectorAll('#roadmapList details.grp:has(.roadmap[data-step="1"]) .roadmap').length} rows`));
   const goes = await page.$eval('#roadmapList details.grp:has(.roadmap[data-step="1"])', d => {
     d.open = true;
     const r = [...d.querySelectorAll('.roadmap')].map(x => x.querySelector('.go')?.getBoundingClientRect().right).filter(Boolean);
     d.open = false;
     return r.map(Math.round);
   });
-  ok(goes.length > 1 && goes.every(x => Math.abs(x - goes[0]) <= 1), `a step's send is under its item's (${goes.join(', ')})`);
+  ok(goes.length > 1 && goes.every(x => Math.abs(x - goes[0]) <= 1), `a step's send is under its item's (${goes.join(', ')}${sends})`);
   // The send is the Claude mark among the row's own buttons on the right,
   // the caret is where the arrow was, and the words open the fold (the
   // pencil rewords a group).

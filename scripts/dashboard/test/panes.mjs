@@ -269,14 +269,20 @@ await section("The dock's line with more tabs than fit has an arrow at the end w
     await page.waitForFunction(() => !document.querySelector('.dockline').classList.contains('chl'), null, { timeout: 3000 }).catch(() => {});
     was = await page.$eval('.dockline', l => ({ chr: l.classList.contains('chr'), left: l.scrollLeft }));
   }
-  const r = await page.$eval('.dockline', l => { const b = l.getBoundingClientRect(); return { x: b.right - 10, y: b.top + b.height / 2 }; });
   // Pressed again when the line did not move: with fourteen terminals just
   // opened the bar is still being drawn anew, and a press whose down and up
   // fell either side of one of those draws is no press at all (the gate of
-  // 15 Nov: the line stayed at its start with its arrow still there).
+  // 15 Nov: the line stayed at its start with its arrow still there). Each
+  // press is aimed at the arrow's middle as the line is then, since a point
+  // measured once went stale as the line was drawn anew (a later gate of 15
+  // Nov: three presses, no move); what was under it is said if none moves it.
+  let hit = '';
   for (let i = 0; i < 3; i++){
+    const r = await page.$eval('.dockline', l => { const b = l.getBoundingClientRect(); return { x: b.right - 14, y: b.top + b.height / 2 }; });
+    hit = await page.evaluate(p => { const e = document.elementFromPoint(p.x, p.y);
+      return e?.matches('.dockline') ? '' : (e ? e.tagName.toLowerCase() + '.' + String(e.className).split(' ')[0] : 'nothing'); }, r);
     await page.mouse.click(r.x, r.y);
-    if (await page.waitForFunction(() => document.querySelector('.dockline').scrollLeft > 60, null, { timeout: 5000 }).then(() => true, () => false)) break;
+    if (await page.waitForFunction(() => document.querySelector('.dockline').scrollLeft > 60, null, { timeout: 5000 }).then(() => true, () => false)) { hit = ''; break; }
   }
   // Its smooth scroll come to rest, read twice the same a frame apart,
   // rather than a fixed pause a loaded gate outran (B420).
@@ -287,7 +293,7 @@ await section("The dock's line with more tabs than fit has an arrow at the end w
   await still();
   const now = await page.$eval('.dockline', l => ({ left: l.scrollLeft, chl: l.classList.contains('chl') }));
   ok(was.chr && was.left === 0 && now.left > 0 && now.chl,
-     `the dock's line has an arrow at the end with more tabs past it, and a press on it moves the line along (${JSON.stringify({ was, now })})`);
+     `the dock's line has an arrow at the end with more tabs past it, and a press on it moves the line along (${JSON.stringify({ was, now })}${hit ? '; under the press: ' + hit : ''})`);
   // Drawn again (something on the line moved, as a session's dot does), the
   // line stays where the press put it rather than going back to the tab in
   // front (B322). Chat's unread count, since a terminal's label is its

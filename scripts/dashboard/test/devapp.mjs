@@ -2688,11 +2688,15 @@ ok(dead.pills.length > 0 && dead.pills.every(t => /state unknown/.test(t)),
 // the queue says has ended is said on its row at once, not when the whole
 // listing has been read again (it kept "stopping..." and Abort for seconds).
 await section("except on a row whose own job is running, which knows what it is doing", async () => {
-  // The list in hand first: read while a re-read had it put away, this
-  // threw on a list that was not there (the gate of 14 Nov, under load).
-  await page.waitForFunction(() => !!dockerList?.instances?.length, null, { timeout: 15000 }).catch(() => {});
+  // The list in hand first, and no read of it out: read while a re-read had
+  // it put away, this threw on a list that was not there (the gates of 14
+  // and 17 Nov, under load, B913). Said as a failure, never thrown, when it
+  // does not come.
+  await page.waitForFunction(() => !readBusy('docker') && !!dockerList?.instances?.length, null,
+    { timeout: patience(30000) }).catch(() => {});
   const got = await page.evaluate(async () => {
-    const d = (dockerList?.instances || [])[0], was = dockerList.job, realFetch = window.fetch;
+    if (!dockerList?.instances?.length) return { pill: '', after: { list: dockerList ? 'no instances' : 'not read' } };
+    const d = dockerList.instances[0], was = dockerList.job, realFetch = window.fetch;
     const job = { id: 'j_settle', running: true, project: d.project, instance: d.instance, action: 'rebuild', step: 'stopping' };
     dockerList.job = job;
     const pill = (dmRowsHtml([d], dockerJob(), true).match(/class="pill stat dmpill[^"]*">([^<]*)/) || [])[1];

@@ -57,7 +57,10 @@ ok(await page.$eval('#veiltest iframe',
      f => getComputedStyle(f.contentDocument.documentElement).backgroundColor
           === 'rgb(43, 43, 43)'),
    'unveil gives it the pane color, so there is no white left to paint');
-ok(took < 120, `...and the cover comes off at once (${took}ms, not the old 350ms floor)`);
+// Timed from here, the page's round trips in it: under a whole run's load
+// that alone was 133 ms, so the bound is the old floor's side of the line
+// with room, not the machine's speed.
+ok(took < 250, `...and the cover comes off at once (${took}ms, not the old 350ms floor)`);
 await page.waitForFunction(() => !document.querySelector('#veiltest .veil'), { timeout: 3000 });
 ok(await veilState() === 'removed', '...then takes itself out of the pane');
 

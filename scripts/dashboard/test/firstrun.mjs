@@ -8,7 +8,7 @@
 // as making the owner does, and Finish puts it right again.
 import { URL, launch, newPage, ok, done, DIR, until, holdPoll, freePoll, api, section } from './lib.mjs';
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdirSync, rmSync, openSync } from 'node:fs';
+import { mkdirSync, rmSync, openSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
 
@@ -144,6 +144,11 @@ await section("a bare-metal install's first run", async () => {
   const OWNER = { username: 'firstowner', password: 'longenough1' };
   const H = { Authorization: 'Basic ' + Buffer.from(`${OWNER.username}:${OWNER.password}`).toString('base64'),
               'Content-Type': 'application/json' };
+  // Every controller started here ends with the suite, whatever stopped the
+  // section it was for: one a failed check left running outlived the run
+  // under the first process (B928).
+  const ctrls = [];
+  process.on('exit', () => ctrls.forEach(p => { try { p.kill('SIGKILL'); } catch (e) { /* gone */ } }));
   const controller = async (kind, { noOwner = false } = {}) => {
     const w = `${DIR}/firstrun-${kind}`;
     rmSync(w, { recursive: true, force: true });
@@ -161,8 +166,15 @@ await section("a bare-metal install's first run", async () => {
       BB_NGINX_CHECK_DELAY: '3600', BB_APPS_RELEASES_URL: 'file:///nonexistent', BB_APPS_BOOT_DELAY: '3600',
       BB_IMAGE_CHECK_DELAY: '3600', BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', BB_COVERAGE_OUT: '',
       ...(kind === 'bare' ? { BB_INSTALL: 'bare-metal' } : {}) } });
+    ctrls.push(proc);
     const base = `http://127.0.0.1:${port}`;
-    await until(async () => (await fetch(`${base}/login`)).status === 200, 30000, 250);
+    // Its own server, which under a whole run's load took more than 30 s to
+    // answer; when it never does, its log says why, not "fetch failed".
+    if (!await until(async () => (await fetch(`${base}/login`)).status === 200, 90000, 250)) {
+      let said = '';
+      try { said = readFileSync(`${w}/server.log`, 'utf8').trim().split('\n').slice(-6).join(' | '); } catch (e) { said = String(e); }
+      throw new Error(`the ${kind} controller did not answer in 90 s: ${said || 'its log is empty'}`);
+    }
     const post = async (path, body, h = H) => (await fetch(base + path, { method: 'POST', headers: h, body: JSON.stringify(body) })).json();
     await post('/api/settings', { set: { setup_done: false } });
     // A node of it, minted from a shell as the installer mints its own, and

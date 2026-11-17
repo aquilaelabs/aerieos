@@ -186,6 +186,14 @@ ok(await page.$eval(`${NB} #gitDetail`, e => !!e.querySelector('pre.diff .d-add'
 // The detail sits under the whole history, so on a short window a click has
 // to take the page down to it rather than leave the change below the fold.
 await page.setViewportSize({ width: 1280, height: 360 });
+// The view laid out again at that height and its reads in before the pick:
+// under a whole run's load what sat above the detail changed after the
+// page had gone down to it, leaving it 151 px past the pane's top (B833).
+await until(async () => {
+  const a = await page.$eval(`${NB} .nbview[data-view="git"]`, e => Math.round(e.scrollHeight));
+  await new Promise(r => setTimeout(r, 250));
+  return a === await page.$eval(`${NB} .nbview[data-view="git"]`, e => Math.round(e.scrollHeight));
+}, 10000, 50);
 await page.click(`${NB} .grow[data-sha="${merge.sha}"]`);
 const landed = await page.waitForFunction(sel => {
   const d = document.querySelector(sel);
@@ -195,7 +203,7 @@ const landed = await page.waitForFunction(sel => {
   // At the top of the pane that scrolls, or as far down as the pane goes.
   return !!p && (Math.abs(d.getBoundingClientRect().top - p.getBoundingClientRect().top) < 24
                  || p.scrollTop >= p.scrollHeight - p.clientHeight - 2);
-}, `${NB} #gitDetail`, { timeout: 5000 }).then(() => true, () => false);
+}, `${NB} #gitDetail`, { timeout: 15000 }).then(() => true, () => false);
 const at = await page.$eval(`${NB} #gitDetail`, e => {
   let p = e.parentElement;
   while (p && !(p.scrollHeight > p.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(p).overflowY))) p = p.parentElement;
@@ -1148,11 +1156,17 @@ await section("step 3: the policy, and Send to Claude", async () => {
     file: !!el.querySelector('[data-gitaskfile]'), commit: !!el.querySelector('#gitDetail [data-gitaskcommit]'),
     branch: el.querySelectorAll('[data-gitaskbranch]').length,
     pol: el.querySelectorAll('[data-gitpol]').length }));
-  await page.waitForFunction(() => {
+  const offered = () => page.waitForFunction(() => {
     const el = document.querySelector('.nb .nbview[data-view="git"]');
     return el && el.querySelector('[data-gitaskfile]') && el.querySelector('#gitDetail [data-gitaskcommit]')
       && el.querySelectorAll('[data-gitaskbranch]').length >= 1;
-  }, null, { timeout: 10000 }).catch(() => {});
+  }, null, { timeout: 30000 }).then(() => true, () => false);
+  // A commit's detail is read when its row is picked, slower than 10 s under
+  // a whole run's load (B923); a pick a repaint took is picked again.
+  if (!await offered() && !(await page.$('.nb .nbview[data-view="git"] .grow[data-sha].on'))) {
+    await page.click('.nb .nbview[data-view="git"] .grow[data-sha]:not(.on)');
+    await offered();
+  }
   const v = await look();
   ok(v.file && v.commit && v.branch >= 1 && v.pol === 0,
      `the view offers Send to Claude on a change, a commit and a branch, and no push policy, which is the Permissions view's (${JSON.stringify(v)})`);

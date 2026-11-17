@@ -1212,9 +1212,12 @@ for (const kind of kinds){
   // over a third status read, the first two letting the page's own fetches
   // land; the header's uptime and the doctor's "ran 2 min ago" are the
   // things that move with time (B814: it aged across a minute in the window).
+  // The first two reads and what they set off landed before the third is
+  // watched: two fixed pauses of 600 ms were not that under a whole run's
+  // load, and the Settings page's own read landed in the window (17 Nov).
+  await page.evaluate(async () => { await refresh(); await refresh(); });
+  await settled(page, { quiet: 600, cap: 20000 });
   const quietRead = await page.evaluate(async () => {
-    await refresh(); await new Promise(r => setTimeout(r, 600));
-    await refresh(); await new Promise(r => setTimeout(r, 600));
     const seen = [];
     const name = e => e ? (e.id ? '#' + e.id : e.tagName.toLowerCase() + (typeof e.className === 'string' && e.className ? '.' + e.className.trim().split(/\s+/)[0] : '')) : '?';
     const mo = new MutationObserver(ms => ms.forEach(m => {
@@ -1431,7 +1434,11 @@ await section("the notebook's head row", async () => {
   // three and this check went red for the suite rather than for the page
   // (B116). Two agreeing reads is the condition; the pause was never the
   // thing being tested.
-  const settled = async (w) => {
+  const still = async (w) => {
+    // The view's own reads landed first: a placeholder holds still for two
+    // reads 50 ms apart under a whole run's load, and Analysis was measured
+    // so, two pixels low (B927).
+    await settled(page, { quiet: 300, cap: 15000 });
     let last = null;
     for (let i = 0; i < 80; i++){
       // The head row and the view's first band (the glance, ordered over
@@ -1452,7 +1459,7 @@ await section("the notebook's head row", async () => {
     await page.evaluate(w => getNotebook('alpha').view(w), v);
     await page.waitForFunction(w => document.querySelector(`.nb .nbview[data-view="${w}"]`)?.checkVisibility(),
                                v, { timeout: 20000 });
-    await settled(v);
+    await still(v);
     heads[v] = await page.evaluate(w => {
       const view = document.querySelector(`.nb .nbview[data-view="${w}"]`);
       const shown = [...view.children].filter(e => e.offsetHeight > 0 || e.offsetWidth > 0);
@@ -2729,7 +2736,11 @@ async function dialogShape(pg = page){
 // A button on the page that a dialog is opened from, as a person's press
 // leaves the focus on what they pressed; and what the dialog on show took
 // for its opener, kept to be found again once it is put away.
-const focusProbe = () => {
+const focusProbe = async () => {
+  // Once a dialog put away has finished leaving: focus given to the page
+  // while one still left went nowhere under a whole run's load, and the next
+  // dialog opened with no opener (17 Nov, About).
+  for (let i = 0; i < 80 && document.querySelector('.modal.leaving'); i++) await new Promise(r => setTimeout(r, 25));
   let b = document.getElementById('dlgProbe');
   if (!b){
     b = document.createElement('button'); b.id = 'dlgProbe'; b.type = 'button'; b.textContent = 'probe';

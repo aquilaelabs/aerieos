@@ -363,6 +363,9 @@ await page.evaluate(() => dropTab(tabs.find(t => t.arg === 'sh:5:alpha').id));
 // A terminal in front again, for what follows.
 await page.evaluate(() => { const t = tabs.find(x => x.kind === 'term'); if (t) focusTab(t.id); });
 const nd2 = page.dialogs.length;
+// The dock's line is drawn a moment after the focus: waited for, not read
+// at once (B825's second sighting).
+await page.waitForSelector('#pane1 .dtab.on', { timeout: 10000 });
 const tb = await (await page.$('#pane1 .dtab.on')).boundingBox();
 await page.mouse.click(tb.x + 20, tb.y + 12, { button: 'middle' });
 await page.waitForFunction(() => !state.sessions.some(s => s.name === 'shell-9'), { timeout: 15000 });

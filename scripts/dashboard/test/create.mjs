@@ -655,8 +655,12 @@ await section("and a gate picked on the dialog is written with the project, the 
   // ...and the signing and reporting dials, when one differs from the
   // default a project gets anyway.
   const signed = await postJson({ name: 'Signed App', mode: 'init', sign: 'auto', keys: 'deny', release: 'auto', report: 'deny' });
-  await refreshUntil(page, () => state?.projects?.some(p => p.name === 'Signed-App' && p.prefs?.sign === 'auto'), { timeout: 15000 });
-  const sp = await page.evaluate(() => (state?.projects || []).find(p => p.name === 'Signed-App')?.prefs || {});
+  // Read where the create wrote them, as Run its container is above: the
+  // page's copy is a status poll away, and under a whole run's load the
+  // polls ran past a 15 s wait (B916).
+  const signedKey = Object.entries(JSON.parse(readFileSync(`${DIR}/state/project-repos.json`, 'utf8')).projects || {})
+    .find(([, r]) => (r.members || []).includes('Signed-App'))?.[0];
+  const sp = JSON.parse(readFileSync(`${DIR}/state/claude-prefs.json`, 'utf8')).projects?.[signedKey] || {};
   ok(signed.status === 200 && sp.sign === 'auto' && sp.keys === 'deny' && sp.release === 'auto' && sp.report === 'deny',
      `Sign a build, Manage signing keys, Tag and publish a release and Report AerieOS bugs from the dialog land on the new space (${sp.sign}/${sp.keys}/${sp.release}/${sp.report})`);
   const bad = await postJson({ name: 'Gated Bad', mode: 'init', gate: { roadmap: 'maybe' } });

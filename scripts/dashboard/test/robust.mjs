@@ -288,13 +288,17 @@ ok(await page.evaluate(() => !/not drawn/.test(document.getElementById('doctor')
    '...and the part recovers on the next poll that draws');
 // ...and when the page trips BEFORE the draws (on the payload, not on the
 // fetch), the light and the placeholders blame this page, not the network.
-// The status answer is held for half a second so the stub is in place
-// before the page's own first poll comes back: the placeholders have to be
-// on screen for the words on them to matter.
+// The status answer is held until the stub is in place, so the page's own
+// first poll comes back to it: the placeholders have to be on screen for the
+// words on them to matter. A fixed half second was shorter than the reload
+// under a whole run's load, and the poll drew the page first (B837).
+let stubIn;
+const stubbed = new Promise(r => { stubIn = r; });
 await page.route('**/api/status*', async r => {
-  await sleep(500); await r.continue(); });
+  await stubbed; await r.continue(); });
 await page.reload({ waitUntil: 'domcontentloaded' });
 await page.evaluate(() => { adoptLayout = () => { throw new Error('layout boom'); }; });
+stubIn();
 await page.evaluate(() => refresh());
 await page.evaluate(() => refresh());
 await page.waitForFunction(() => pollFails >= 2, null, { timeout: 5000 });

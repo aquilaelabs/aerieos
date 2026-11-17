@@ -2701,11 +2701,16 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
   // takes no new work meanwhile, and the line says so rather than "Updating"
   // for minutes. The listing is answered with one running job added, since a
   // node behind takes nothing but its update and so cannot be made busy here.
+  // A request still out when the route is taken away is handled by the
+  // default, and its fulfill then says so: passed over, where it ended the
+  // suite under a whole run's load (B924).
   const busyList = async route => {
-    const r = await route.fetch(); const j = await r.json();
-    for (const n of j.nodes || []) if (n.id === minted.id)
-      n.jobs = [...(n.jobs || []), { id: 'j_busy', type: 'exec', state: 'running' }];
-    await route.fulfill({ response: r, json: j });
+    try {
+      const r = await route.fetch(); const j = await r.json();
+      for (const n of j.nodes || []) if (n.id === minted.id)
+        n.jobs = [...(n.jobs || []), { id: 'j_busy', type: 'exec', state: 'running' }];
+      await route.fulfill({ response: r, json: j });
+    } catch (e) { if (!/already handled/.test(String(e))) throw e; }
   };
   await page.route('**/api/v1/nodes', busyList);
   await page.evaluate(async id => { await loadNodes(); delete nodesConf[id]; readMoved('nodes'); drawPanes(); }, minted.id);

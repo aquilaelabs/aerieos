@@ -286,6 +286,11 @@ class Signs(Base):
         self.assertFalse(releasesign.status("app")["looking"])
 
     def test_a_release_whose_apk_never_came_is_said(self):
+        # The look expect() starts on a thread of its own is the test's here,
+        # as OneRun's are: run beside the test it saved the file over the
+        # backdated expectation, and nothing was due (B921).
+        self.addCleanup(setattr, releasesign, "check_soon", releasesign.check_soon)
+        releasesign.check_soon = lambda *a, **k: False
         releasesign.expect("app", "v0.9.0")
         d = json.loads((self.tmp / "release-signing.json").read_text())
         d["app"]["expect"]["v0.9.0"] = int(time.time()) - releasesign.EXPECT_S - 5

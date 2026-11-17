@@ -3158,10 +3158,16 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
     // Live is the agent's held poll being open, which it is again a moment
     // after the job's result is posted: read at once under a whole run's
     // load, the node was between the two (seen 15 Nov, twice).
-    const still = await until(async () => { const n = await nodeById(minted.id); return n.live ? n : null; }, 20000) || await nodeById(minted.id);
-    ok(still.live && still.agent.digest === good && !existsSync(`${AGENT_RUN}.new`) && !existsSync(`${AGENT_RUN}.trial`)
-       && broken && broken.digest !== good,
-       `...and the node runs on as it was, live, with nothing left beside its file (live ${still.live}, on ${String(still.agent?.digest).slice(0, 19)})`);
+    // ...and the trial's files gone, which the agent clears as it goes on:
+    // the third sighting read the node live and failed on what the line did
+    // not say (B824), so each is waited for and said.
+    const left = () => [`${AGENT_RUN}.new`, `${AGENT_RUN}.trial`].filter(f => existsSync(f)).map(f => f.split('.').pop());
+    const still = await until(async () => { const n = await nodeById(minted.id); return n.live && !left().length ? n : null; }, 20000)
+      || await nodeById(minted.id);
+    ok(still.live && still.agent.digest === good && !left().length && broken && broken.digest !== good,
+       `...and the node runs on as it was, live, with nothing left beside its file (live ${still.live}, on ${
+         String(still.agent?.digest).slice(0, 19)}${still.agent?.digest === good ? ', the good one' : `, not ${String(good).slice(0, 19)}`}${
+         left().length ? '; left: ' + left().join(', ') : ''}${broken ? '' : '; the broken build never shipped'})`);
     writeFileSync(GPU, gpuWas);
     // Two: a build that loads and then dies as it starts. It is installed,
     // on trial; the service starts it again and again; the fourth start

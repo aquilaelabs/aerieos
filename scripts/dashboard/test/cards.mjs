@@ -261,9 +261,13 @@ await section("the doctor: a dot in the top bar, its checks in a panel", async (
      && card.probs.length === 2 && card.probs.some(Boolean) && card.first,
      `the panel's Controller settings opens the page on its first section, Controller, saying the verdict on its heading, with the facts and the problems with what each said (${JSON.stringify(card)})`);
   doctorFixture('ok');
+  // Pressed once no run is out: the press rests while one runs (runDoctor),
+  // and a slow one under a whole run's load took the press with it.
+  await page.waitForFunction(() => { const b = document.querySelector('.settingstab .ctlcard #setDocRun');
+    return b && !b.disabled && !document.getElementById('bDoctor')?.disabled; }, null, { timeout: 30000 }).catch(() => {});
   await page.click('.settingstab .ctlcard #setDocRun');
   const again = await page.waitForFunction(() => !document.querySelector('.settingstab .ctlcard .ctlchecks .probs .sub')
-    && document.querySelector('.settingstab .ctlcard .ctlchecks .chips .pill'), null, { timeout: 15000 }).then(() => true, () => false);
+    && document.querySelector('.settingstab .ctlcard .ctlchecks .chips .pill'), null, { timeout: 30000 }).then(() => true, () => false);
   ok(again, '...and its Run again runs the doctor, the card drawing what it found');
   await page.evaluate(() => document.getElementById('bDoctor').click());
   await page.waitForFunction(() => document.getElementById('docDot').className.includes('ok'), null, { timeout: 15000 });
