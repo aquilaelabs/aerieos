@@ -65,6 +65,8 @@
 - A row's name is the same size and weight on every page, a row asking you something (the bell's asks, a phone to pair, a node's root command, a container to make) carries one mark at its left edge in the ask's tone, and a row picked to show its detail (a commit, a file, a node's runner) is lit the one way a list beside its detail lights its pick (bea7ad0, 698ed89)
 - A space's card, its notebook's header and Home's glance say its id, its branch and its notes the same way; the header now also says when a phone is lent to the space or its code is being mapped (042caa2)
 - The notebook's lists (bugs, memories, rules, roadmap items, files and conversations) give every row the same room above its first line, and a node's Set here switches sit as close as the rest of its Sessions section (1912504)
+- A node says its state in one pill: online, not answering when it is set to take work and its agent has gone quiet, or draining and disabled as set, where it showed online beside live or quiet (391cf7c)
+- A fold that shows more of a row (a bell row's details, a long ask, a push's full text, a tool call, a VM's More, how each agent is guarded) opens by the page's own chevron, and Findings' search keeps a search's width beside its pulldowns (1b82535)
 
 ### Fixed
 
