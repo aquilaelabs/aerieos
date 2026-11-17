@@ -69,6 +69,7 @@
 - A fold that shows more of a row (a bell row's details, a long ask, a push's full text, a tool call, a VM's More, how each agent is guarded) opens by the page's own chevron, and Findings' search keeps a search's width beside its pulldowns (1b82535)
 - The header over Machines, Build and Containers is one row: the machine's picker and its state pill beside it, which opens that machine's page from any of their pages; when it was seen, where it dials in from and its agent's version are on that page, no longer a line under the picker, and the page under the header no longer says the state again (e9b80fb)
 - Start agent and Manage agent open their choices in a dialog over the dimmed page, like every other dialog, rather than a menu beside the button that was hard to see on a phone and moved when New or Restart changed its height; its Close, its backdrop and Escape each put it away (89c7709)
+- A space is one of your favorites rather than pinned: a star by its name marks it, your favorites are on Home under Favorites, and the Spaces page lists every space by name with a Favorites chip that narrows it to yours; favorites are each person's own, and the spaces you had pinned are your favorites (63adcc9)
 
 ### Fixed
 
