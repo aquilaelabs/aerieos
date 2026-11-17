@@ -625,7 +625,6 @@ body.firstrun #panes{display:none}
 .jbrow > .jbopen:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 /* The Notifications page (R218 step 6): an ask's long part whole in a box
    that scrolls inside itself; a kept notice wears its kind's icon. */
-.ntask.bad{box-shadow:inset 3px 0 var(--bad)}
 .ntask .bcmd{font:var(--f-data);color:var(--dim);overflow-wrap:anywhere;margin-top:4px}
 .ntlong summary{font:var(--f-note);color:var(--dim);cursor:pointer;margin-top:6px}
 .ntbox{font:var(--f-code);white-space:pre-wrap;overflow-wrap:anywhere;max-height:50vh;overflow:auto;
@@ -936,7 +935,7 @@ body.firstrun #panes{display:none}
 .fxtbl .fxname{display:flex;align-items:center;gap:8px;min-width:0}
 .fxtbl .fxname .namelink{display:inline-flex;align-items:center;gap:8px;min-width:0;text-align:left}
 .fxtbl .fxname .fxn{overflow-wrap:anywhere}
-.fxtbl .tline.on{background:color-mix(in srgb, var(--accent) 10%, transparent)}
+
 /* A listing's names are read down a long column: the plain weight, a folder's a little heavier. */
 .tbl.fxtbl .td.lead{font-weight:400}
 .tbl.fxtbl .td.lead [data-fxdir="1"]{font-weight:600}
@@ -1358,7 +1357,6 @@ body.firstrun #panes{display:none}
 .artrow.job .grow{font:var(--f-ui);color:var(--dim)}
 /* A question somebody is blocked on. Bordered rather than merely spaced,
    because a question on a dashboard is easy to scroll past. */
-.row.phask{border-left:2px solid var(--accent)}
 /* The code base's language bar: one strip, a segment per language, and a
    legend that wraps. Widths are percentages of the code, so the strip is
    always full when there is any code at all. */
@@ -1368,13 +1366,9 @@ body.firstrun #panes{display:none}
 .cblegend .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle}
 .cblegend .n{color:var(--dim);font:var(--f-note);margin-left:4px}
 .cbfoot{margin-top:8px}
-.row.ndask{border-left:2px solid var(--bad)}
-.row.ndask .name{color:var(--bad)}
 /* A rebuild waiting on an answer. The same row as a root ask, in the accent
    rather than in red: it is somebody waiting on you, not root on a shared
    machine. */
-.row.dmask{border-left:2px solid var(--accent)}
-.row.dmask .name{color:var(--accent)}
 /* A button that adds beside the words saying what it adds, never on a line of
    its own under them; under them only where the row is too narrow for both. */
 .addline{display:flex;flex-wrap:wrap;gap:var(--field-gap);align-items:center;justify-content:space-between}

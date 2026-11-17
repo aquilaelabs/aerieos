@@ -100,6 +100,16 @@ html:not([data-theme]) .logo.away,.logo.away{color:var(--dim)}
    control does. */
 :is(.rolestab,.userstab) .rrow.on,:is(.rolestab,.userstab) .rrow.on:hover,.snav .rrow.on,.snav .rrow.on:hover{
   background:color-mix(in srgb,var(--lit) 14%,transparent);border-bottom-color:var(--line)}
+/* ...and every row picked to show what is beside or under it is lit the
+   same way: a commit picked in the history, a file in Files, a node's
+   runner on the CI runner page. */
+.grow[data-sha].on,.grow[data-sha].on:hover,.fxtbl .tline.on,.fxtbl .tline.on:hover,.runnersall .row.on,.runnersall .row.on:hover{background:color-mix(in srgb,var(--lit) 14%,transparent)}
+/* A row that asks a person something (the bell's asks, a phone to pair, a
+   node's root command, a container to make): one mark, an edge of the
+   ask's tone inside its left side so nothing moves, a root command or an
+   ask that removes something in --bad and the rest in the accent. */
+:is(.ntask,.phask,.ndask,.dmask){box-shadow:inset 3px 0 var(--accent)}
+:is(.ntask.bad,.ndask){box-shadow:inset 3px 0 var(--bad)}
 /* A page of settings (page-docs.js splitSects, the operator, 16 Oct): its
    sections a list beside the one picked, the Roles page's shape, the picked
    section's heading a heading rather than a fold (a project's Settings,
@@ -328,7 +338,7 @@ body.firstrun .rail, body.firstrun .railbar, body.firstrun .railmore{display:non
 /* Its colors sit under the look a disabled button keeps when pointed at (a
    press leaves its button disabled while it works), which outranks them. */
 .runnersall .row{background:none;border:0;border-bottom:var(--hair) solid var(--line)}
-.runnersall .row.on{box-shadow:inset 3px 0 var(--accent)}
+
 /* A row nothing here can act on: a container this dashboard did not start, or
    any instance while the daemon is not answering. Dimmed rather than dropped;
    it is still the answer to "what is on record", and a row you cannot act on
@@ -882,7 +892,7 @@ details.grp[open]>summary .roadmap .fold::before{content:"\25BE"}
 .grow[data-sha]:last-child{border-bottom:0}
 @media(hover:hover){ .grow[data-sha]:hover{background:var(--btn)}
 }
-.grow[data-sha].on{background:var(--btn-hi)}
+
 /* A lane's color: nb-git.js builds the name as gl${lane % 5}, so no file
    holds .gl0 whole (R60 took these for dead, B79). */
 .gl0{stroke:var(--accent)} .gl1{stroke:var(--note)} .gl2{stroke:var(--warn)}
