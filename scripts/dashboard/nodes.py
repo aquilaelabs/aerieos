@@ -1554,25 +1554,30 @@ def _vm_hw(hw):
 VM_ISO_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,100}\.iso")
 
 
-def _census(c):
-    """What a node says about itself, kept to the fields the row shows.
-    Whitelisted rather than stored whole: a census is a JSON blob from a
-    machine that could be lying, and the row is rendered from it."""
-    c = c if isinstance(c, dict) else {}
-    out = {}
-    for k in ("cpu", "mem_mb"):
-        with contextlib.suppress(TypeError, ValueError):
-            out[k] = int(c.get(k) or 0)
-    for k in ("os", "docker", "docker_id", "gpu", "hostname", "git"):
-        if c.get(k):
-            out[k] = str(c[k])[:120]
+# The plain fields of a census: whole numbers, 0 for none and left out
+# where int() refuses; and strings cut at 120, left out where the agent
+# said nothing. Written first, before the table's rows.
+CENSUS_INTS = ("cpu", "mem_mb")
+CENSUS_STRINGS = ("os", "docker", "docker_id", "gpu", "hostname", "git")
+
+
+def _c_machine(c, out):
     # The machine's fingerprint (R177): what a re-enrollment is held to.
     if re.fullmatch(r"[0-9a-f]{32}", str(c.get("machine") or "")):
         out["machine"] = str(c["machine"])
+
+
+def _c_placement(c, out):
     # The two placement dimensions (door 9), as fields the agent reports.
     out["system"] = re.sub(r"[^a-z0-9]", "", str(c.get("system") or "").lower())[:20]
     out["arch"] = re.sub(r"[^a-zA-Z0-9_]", "", str(c.get("arch") or ""))[:20]
+
+
+def _c_sshd(c, out):
     out["sshd"] = bool(c.get("sshd"))
+
+
+def _c_stores(c, out):
     stores = c.get("stores") if isinstance(c.get("stores"), dict) else {}
     out["stores"] = {}
     for role, s in list(stores.items())[:8]:
@@ -1593,21 +1598,27 @@ def _census(c):
                 # The node's own directory in the store: linux-x86_64,
                 # darwin-arm64 (roadmap R19).
                 "scope": re.sub(r"[^A-Za-z0-9_-]", "", str(s.get("scope") or ""))[:40]}
-    # {name: version} from `aerie toolchains versions` on the node: the controller's
-    # own generator, run there. Whitelisted like store_dirs, and for the same
-    # reason: a value the agent reports and this drops is a value that does
-    # not exist.
+
+
+def _c_tunnel(c, out):
     # The tunnel the node reaches the controller through (R161): its kind,
     # its address there, and whether the interface is up.
     t = c.get("tunnel") if isinstance(c.get("tunnel"), dict) else {}
     if t.get("addr") and re.fullmatch(r"[0-9.]{7,15}", str(t["addr"])):
         out["tunnel"] = {"kind": re.sub(r"[^a-z]", "", str(t.get("kind") or ""))[:20],
                          "addr": str(t["addr"]), "up": bool(t.get("up"))}
+
+
+def _c_toolchain_versions(c, out):
+    # {name: version} from `aerie toolchains versions` on the node: the controller's
+    # own generator, run there. Whitelisted like store_dirs, and for the same
+    # reason: a value the agent reports and this drops is a value that does
+    # not exist.
     pv = c.get("toolchain_versions") if isinstance(c.get("toolchain_versions"), dict) else {}
     out["toolchain_versions"] = {str(k)[:40]: str(v)[:40] for k, v in list(pv.items())[:40]}
-    # How each was checked when it was installed (R137): the algorithm, or
-    # none, and where the publisher said it.
-    tv = c.get("toolchain_verified") if isinstance(c.get("toolchain_verified"), dict) else {}
+
+
+def _c_tokseal(c, out):
     # The coding agents' sign-ins sealed there (R126): the agent's public
     # half for this boot and each seal's R with what its login said of
     # itself, all public. Hex held to the group's width.
@@ -1623,9 +1634,18 @@ def _census(c):
                                                        "email": str(v.get("email") or "")[:120],
                                                        "plan": str(v.get("plan") or "")[:40]}
         out["tokseal"] = {"E": tk["E"], "sealed": sealed}
+
+
+def _c_toolchain_verified(c, out):
+    # How each was checked when it was installed (R137): the algorithm, or
+    # none, and where the publisher said it.
+    tv = c.get("toolchain_verified") if isinstance(c.get("toolchain_verified"), dict) else {}
     out["toolchain_verified"] = {str(k)[:40]: {"algo": str(v.get("algo") or "")[:8], "where": str(v.get("where") or "")[:200]}
                                  for k, v in list(tv.items())[:80] if isinstance(v, dict)
                                  and str(v.get("algo") or "") in ("sha1", "sha256", "sha512", "gpg", "none")}
+
+
+def _c_toolchain_receipts(c, out):
     # What each pinned install left behind (R234): the commit it came from,
     # one sha256 over every file that landed, how many and how big, when,
     # and the tree the same commit made there before where it was another.
@@ -1640,6 +1660,9 @@ def _census(c):
                 "files": max(0, int(v.get("files") or 0)), "bytes": max(0, int(v.get("bytes") or 0)), "at": max(0, int(v.get("at") or 0)),
                 "before": v["before"] if re.fullmatch(r"[0-9a-f]{64}", str(v.get("before") or "")) else "",
                 "net": v.get("net") if v.get("net") in ("cut", "open") else ""}
+
+
+def _c_store_dirs(c, out):
     # Kept only when the agent sent one: a listing that is there and empty
     # is a store with nothing in it (B671), a key that is absent is a node
     # that has not said, and the Installed page reads the two apart.
@@ -1655,6 +1678,9 @@ def _census(c):
             out["store_dirs"]["versions"] = {
                 str(k)[:20]: [str(x)[:60] for x in (v or [])[:64]]
                 for k, v in list(sd["versions"].items())[:8] if isinstance(v, list)}
+
+
+def _c_images(c, out):
     # The android system images in the toolchain store, and the AVDs built on
     # each (roadmap #20). Whitelisted like store_dirs and toolchain_versions,
     # and for the same reason: a field the agent reports and this drops is a
@@ -1672,21 +1698,42 @@ def _census(c):
                 "api": str(im.get("api") or "")[:20], "kind": str(im.get("kind") or "")[:40],
                 "abi": str(im.get("abi") or "")[:20],
                 "avds": [str(a)[:60] for a in (im.get("avds") or [])[:16]]})
+
+
+def _c_toolchains(c, out):
     tc = c.get("toolchains") if isinstance(c.get("toolchains"), dict) else {}
     out["toolchains"] = {str(k)[:30]: (str(v)[:40] if v else None)
                          for k, v in list(tc.items())[:16]}
+
+
+def _c_docker_ip(c, out):
     # The address docker binds published ports to by default (R190).
     out["docker_ip"] = str(c.get("docker_ip") or "")[:40]
+
+
+def _c_docker_gid(c, out):
     # ...and its docker group's id (R86), passed to a compose as BB_DOCKER_GID.
     g = c.get("docker_gid")
     out["docker_gid"] = g if isinstance(g, int) and not isinstance(g, bool) and 0 <= g < 2**31 else None
+
+
+def _c_internet(c, out):
     # ...and whether it reaches the internet (R82); None where the report's
     # answer is not one.
     out["internet"] = c.get("internet") if isinstance(c.get("internet"), bool) else None
+
+
+def _c_store_ro(c, out):
     # ...and whether its toolchain store is read-only to it (R85).
     out["store_ro"] = c.get("store_ro") is True
+
+
+def _c_store_noexec(c, out):
     # ...and whether it is mounted noexec, which stops every terminal there.
     out["store_noexec"] = c.get("store_noexec") is True
+
+
+def _c_features(c, out):
     # The features bb-sandbox installs and removes (R91), each not installed
     # where the report says nothing usable of it.
     fe = c.get("features") if isinstance(c.get("features"), dict) else {}
@@ -1715,6 +1762,9 @@ def _census(c):
                        "gpuvm": {"installed": (fe.get("gpuvm") or {}).get("installed") is True, "bound": (fe.get("gpuvm") or {}).get("bound") is True,
                                  "cards": int((fe.get("gpuvm") or {}).get("cards") or 0) if str((fe.get("gpuvm") or {}).get("cards") or 0).isdigit() else 0,
                                  "ids": re.sub(r"[^0-9a-f:,]", "", str((fe.get("gpuvm") or {}).get("ids") or ""))[:200]} if isinstance(fe.get("gpuvm"), dict) else {}}
+
+
+def _c_disks(c, out):
     # The machine's disks (R162 step 1), each to its shape: a name, a model,
     # a serial, a size, what each partition holds, SMART's three facts.
     if isinstance(c.get("disks"), list):
@@ -1736,6 +1786,9 @@ def _census(c):
                                                              ("temp_c", int(sm["temp_c"]) if isinstance(sm.get("temp_c"), int) else None),
                                                              ("hours", int(sm["hours"]) if isinstance(sm.get("hours"), int) else None))
                                            if v is not None}})
+
+
+def _c_shares(c, out):
     # ...and its shares (R162 step 1): a name, a path, SMB's and NFS's halves.
     if isinstance(c.get("shares"), list):
         sw = lambda v, n: re.sub(r"[^\w .,:/()*@+-]", "", str(v or ""))[:n]  # noqa: E731
@@ -1752,6 +1805,9 @@ def _census(c):
                                           "readers": [sw(u, 32) for u in (smb.get("readers") or [])[:64] if isinstance(u, str)]},
                                   "nfs": {"on": nfs.get("on") is True, "ro": nfs.get("ro") is True,
                                           "clients": [sw(c, 80) for c in (nfs.get("clients") or [])[:64] if isinstance(c, str)]}})
+
+
+def _c_pools(c, out):
     # ...and its ZFS pools (R162 step 1): name, sizes, health, the members
     # by layout, the last scrub and the errors line, each to its shape.
     if isinstance(c.get("pools"), list):
@@ -1769,6 +1825,9 @@ def _census(c):
                                             "disks": [{"id": pw(d.get("id"), 120), "state": pw(d.get("state"), 12)}
                                                       for d in (v.get("disks") or [])[:64] if isinstance(d, dict)]}
                                            for v in (pl.get("vdevs") or [])[:32] if isinstance(v, dict)]})
+
+
+def _c_pools_importable(c, out):
     # ...and the pools on its disks another machine made (R163 step 1).
     if isinstance(c.get("pools_importable"), list):
         out["pools_importable"] = [{"name": str(x["name"]), "id": str(x.get("id") or "")[:24] if str(x.get("id") or "").isdigit() else "",
@@ -1776,6 +1835,9 @@ def _census(c):
                                     "said": re.sub(r"[^\w .,:;/()'@+-]", "", str(x.get("said") or ""))[:200]}
                                    for x in c["pools_importable"][:16]
                                    if isinstance(x, dict) and re.fullmatch(r"[a-z][a-z0-9_-]{0,30}", str(x.get("name") or ""))]
+
+
+def _c_snapshots(c, out):
     # ...and its snapshots per pool (R162 step 5): counts by kind, the newest.
     if isinstance(c.get("snapshots"), dict):
         out["snapshots"] = {}
@@ -1789,6 +1851,9 @@ def _census(c):
                                       "newest": [{"name": str(x["name"]), "at": int(x["at"]) if isinstance(x.get("at"), int) else 0}
                                                  for x in (v.get("newest") or [])[:10]
                                                  if isinstance(x, dict) and re.fullmatch(r"bb-(hourly|daily|weekly|manual)-\d{8}-\d{4}", str(x.get("name") or ""))]}
+
+
+def _c_array(c, out):
     # ...and its array (R162 step 2): the disks by slot with their room,
     # the merged tree, and SnapRAID's last sync, scrub and check.
     if isinstance(c.get("array"), dict):
@@ -1814,9 +1879,15 @@ def _census(c):
             v = ar["verify"]
             out["array"]["verify"] = {k: mb(v.get(k)) for k in ("at", "found", "fixed", "unfixed")} | {
                 "ok": v.get("ok") is True, "corrected": v.get("corrected") is True} if v else {}
+
+
+def _c_console(c, out):
     # ...and whether its console takes a password (R194, AerieOS).
     if isinstance(c.get("console"), dict) and c["console"]:
         out["console"] = {k: c["console"].get(k) is True for k in ("os", "set", "open")}
+
+
+def _c_adopted(c, out):
     # ...and what it adopted of another NAS (R163 step 8): each mount, its
     # filesystem, read-only or not and mounted now, the merged trees, and
     # the parity disk left alone.
@@ -1848,9 +1919,15 @@ def _census(c):
                 "said": [aw(x, 300) for x in (ap.get("said") or [])[:16]],
                 # ...and when it read them, so the page fetches the rows again.
                 "at": ap["at"] if isinstance(ap.get("at"), int) and not isinstance(ap.get("at"), bool) else 0}
+
+
+def _c_timezone(c, out):
     # The machine's time zone (R161 step 3), a name under zoneinfo.
     if isinstance(c.get("timezone"), str):
         out["timezone"] = re.sub(r"[^A-Za-z0-9_+./-]", "", c["timezone"])[:64]
+
+
+def _c_store_backups(c, out):
     # ...and its backups' last runs (R162 step 5), each to its shape.
     if isinstance(c.get("store_backups"), list):
         mb = lambda v: int(v) if isinstance(v, int) and not isinstance(v, bool) and v >= 0 else 0  # noqa: E731
@@ -1858,6 +1935,9 @@ def _census(c):
                                  "ok": b.get("ok") is True, "error": re.sub(r"[^\w .,:;/()'@%+-]", "", str(b.get("error") or ""))[:200],
                                  "size_mb": mb(b.get("size_mb")), "runs": mb(b.get("runs")), "took_s": mb(b.get("took_s"))}
                                 for b in c["store_backups"][:32] if isinstance(b, dict) and re.fullmatch(r"[a-z][a-z0-9-]{0,30}", str(b.get("name") or ""))]
+
+
+def _c_ext_mounts(c, out):
     # ...and its other disks and shares (R162 step 4), each to its shape.
     if isinstance(c.get("ext_mounts"), list):
         out["ext_mounts"] = [{"id": re.sub(r"[^a-z0-9_]", "", str(m.get("id") or ""))[:16], "name": str(m["name"]), "kind": str(m.get("kind") or "")[:4],
@@ -1865,6 +1945,9 @@ def _census(c):
                               "size_mb": int(m["size_mb"]) if isinstance(m.get("size_mb"), int) else 0, "used_mb": int(m["used_mb"]) if isinstance(m.get("used_mb"), int) else 0,
                               "error": re.sub(r"[^\w .,:;/()'@%+-]", "", str(m.get("error") or ""))[:200]}
                              for m in c["ext_mounts"][:32] if isinstance(m, dict) and re.fullmatch(r"[a-z][a-z0-9-]{0,30}", str(m.get("name") or ""))]
+
+
+def _c_ups(c, out):
     # ...and its UPS (R164 step 3) and its own packages' updates, each to its shape.
     if isinstance(c.get("ups"), dict) and c["ups"]:
         up = c["ups"]
@@ -1872,13 +1955,22 @@ def _census(c):
         out["ups"] = {"model": re.sub(r"[^\w .,()/+-]", "", str(up.get("model") or ""))[:64], "status": re.sub(r"[^A-Z ]", "", str(up.get("status") or ""))[:32],
                       "words": re.sub(r"[^a-z ,]", "", str(up.get("words") or ""))[:80], "answers": up.get("answers") is True,
                       "charge": num("charge"), "runtime_s": num("runtime_s"), "load": num("load")}
+
+
+def _c_host_updates(c, out):
     if isinstance(c.get("host_updates"), dict) and c["host_updates"]:
         hu = c["host_updates"]
         out["host_updates"] = {k: (int(hu[k]) if isinstance(hu.get(k), int) and not isinstance(hu.get(k), bool) and hu[k] >= 0 else 0)
                                for k in ("pending", "security", "checked")} | {"reboot": hu.get("reboot") is True}
+
+
+def _c_spindown(c, out):
     # ...and its disks' spin-down in minutes (R164 step 3), 0 for never.
     if isinstance(c.get("spindown"), int) and not isinstance(c.get("spindown"), bool) and c["spindown"] in SPINDOWN_MINUTES:
         out["spindown"] = c["spindown"]
+
+
+def _c_os_image(c, out):
     # AerieOS on the machine (R160 step 4): the image's version and
     # snapshot, the slot this boot came from and the one GRUB boots next.
     if isinstance(c.get("os_image"), dict) and c["os_image"].get("version"):
@@ -1891,6 +1983,9 @@ def _census(c):
                      # On trial, and a fallback said (R161 step 2).
                      "trial": o.get("trial") is True,
                      "fell_back": re.sub(r"[^\w .,:;()'-]", "", str(o.get("fell_back") or ""))[:200]}
+
+
+def _c_os_kept(c, out):
     # The older versions kept on its boot menu, and whether this boot is one (R201).
     if isinstance(c.get("os_kept"), dict) and (c["os_kept"].get("versions") or c["os_kept"].get("booted")):
         vs = c["os_kept"].get("versions")
@@ -1899,6 +1994,9 @@ def _census(c):
                           "versions": [{"version": re.sub(r"[^A-Za-z0-9.+-]", "", str(x.get("version") or ""))[:60], "mb": num(x.get("mb")),
                                         "at": num(x.get("at")), "state": x.get("state") is True}
                                        for x in (vs if isinstance(vs, list) else [])[:16] if isinstance(x, dict) and x.get("version")]}
+
+
+def _c_os_stick(c, out):
     # A stick boot (R161 step 10): its system pool, whether docker and the
     # VMs may run yet, what still lives on the stick, what it has written.
     if isinstance(c.get("os_stick"), dict) and c["os_stick"].get("stick") is True:
@@ -1916,6 +2014,9 @@ def _census(c):
                            "others": [str(x)[:200] for x in (s.get("others") or []) if isinstance(x, str) and x.startswith("/")][:16],
                            # The stick's own partition: its size and its room, from an agent that says them.
                            **{k: kb(s.get(k)) for k in ("var_total_mb", "var_free_mb") if kb(s.get(k)) is not None}}
+
+
+def _c_vms_other(c, out):
     # The domains its libvirt has that AerieOS did not make (R165 step 1):
     # a name, a state and a size, read-only on the VMs page.
     if isinstance(c.get("vms_other"), list):
@@ -1924,6 +2025,9 @@ def _census(c):
                              "mem_mb": int(v["mem_mb"]) if isinstance(v.get("mem_mb"), int) else 0, "autostart": v.get("autostart") is True}
                             for v in c["vms_other"][:64]
                             if isinstance(v, dict) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}", str(v.get("name") or ""))]
+
+
+def _c_vms(c, out):
     # ...and the VMs it runs (R91), each as libvirt says, with the room their
     # disks have: whitelisted field by field like the rest.
     if isinstance(c.get("vms"), list):
@@ -1952,9 +2056,15 @@ def _census(c):
                                # filesystem, whitelisted field by field.
                                **({"guest": _vm_guest(v["guest"])} if isinstance(v.get("guest"), dict) else {}),
                                "iso": str(v.get("iso") or "") if VM_ISO_RE.fullmatch(str(v.get("iso") or "")) else ""})
+
+
+def _c_vm_pool(c, out):
     vp = c.get("vm_pool") if isinstance(c.get("vm_pool"), dict) else None
     if vp:
         out["vm_pool"] = {k: int(vp[k]) for k in ("free_mb", "total_mb") if isinstance(vp.get(k), int)}
+
+
+def _c_vm_host(c, out):
     # ...and what a VM there could be given (R100).
     vh = c.get("vm_host") if isinstance(c.get("vm_host"), dict) else None
     if vh:
@@ -1990,29 +2100,47 @@ def _census(c):
                       if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,31}", str(x))],
             # Whether a VM can be given a TPM here (swtpm).
             "tpm": vh.get("tpm") is True}
+
+
+def _c_vm_isos(c, out):
     # ...and the installer ISOs fetched onto it (R99).
     if isinstance(c.get("vm_isos"), list):
         out["vm_isos"] = [{"name": str(i["name"]), "mb": int(i.get("mb") or 0) if isinstance(i.get("mb"), int) else 0}
                           for i in c["vm_isos"][:64]
                           if isinstance(i, dict) and VM_ISO_RE.fullmatch(str(i.get("name") or ""))]
+
+
+def _c_sandbox(c, out):
     # The configuration plane's reported half (docs/nodes.md §12): whether
     # the node was provisioned as a sandbox (bb-sandbox is there: the stamp
     # system jobs are gated on), what it mounts as bb-sandbox reads it, and
     # the address it is on. Facts about the machine, drawn against the
     # operator's desired config on the row; never treated as the config.
     out["sandbox"] = bool(c.get("sandbox"))
+
+
+def _c_release(c, out):
     # Whose agent updates it takes (the agent's release.py): the release key
     # it pinned, shortened, and whether its console allows unsigned builds.
     out["release_key"] = re.sub(r"[^0-9a-f]", "", str(c.get("release_key") or ""))[:16]
     out["release_spare"] = re.sub(r"[^0-9a-f]", "", str(c.get("release_spare") or ""))[:16]
     out["unsigned_ok"] = c.get("unsigned_ok") is True
+
+
+def _c_root_off(c, out):
     # Root commands switched off at its own console (R227 step 2).
     out["root_off"] = c.get("root_off") is True
+
+
+def _c_gpu(c, out):
     # The GPU (R20): the NVIDIA card by its PCI id, before any driver, and
     # what the display's unit last said; absent where there is no card.
     for k in ("gpu_card", "gpu_display", "gpu_amd"):
         if c.get(k):
             out[k] = str(c[k])[:200]
+
+
+def _c_gpu_driver(c, out):
     # Where the NVIDIA driver stands (R102): installed for this kernel,
     # loaded now, and which driver has the card, for the driver's
     # row in the Library and on the Installed page.
@@ -2031,6 +2159,9 @@ def _census(c):
             if isinstance(o, dict) and DRIVER_PKG.fullmatch(str(o.get("pkg") or ""))]
         if not c.get("gpu_card"):
             out["gpu_driver"]["nocard"] = True
+
+
+def _c_gpu_container(c, out):
     # ...and the container toolkit (R102): the version installed, what apt
     # would move it to, and whether Docker lists the nvidia runtime.
     gc = c.get("gpu_container")
@@ -2039,6 +2170,9 @@ def _census(c):
         out["gpu_container"] = {"installed": ver(gc.get("installed")), "candidate": ver(gc.get("candidate")),
                                 "runtime": bool(gc.get("runtime")),
                                 **({} if c.get("gpu_card") else {"nocard": True})}
+
+
+def _c_sound(c, out):
     # The sound it has (R107): ALSA's cards, real and virtual apart, and the
     # sound server installed.
     snd = c.get("sound")
@@ -2047,15 +2181,24 @@ def _census(c):
         out["sound"] = {"cards": [word(x) for x in (snd.get("cards") or [])[:8]],
                         "virtual": [word(x) for x in (snd.get("virtual") or [])[:8]],
                         "server": snd.get("server") if snd.get("server") in ("pipewire", "pulseaudio") else ""}
+
+
+def _c_administers(c, out):
     # Whether the agent may install system packages there: the stamp and
     # root.
     out["administers"] = bool(c.get("administers"))
+
+
+def _c_isolation(c, out):
     # Whether a session there sees only its own project (R35), in the
     # helper's own answer, and why not. Absent until the node has said,
     # which the row says as unknown rather than as a no.
     iso = c.get("isolation")
     if isinstance(iso, dict):
         out["isolation"] = {"sessions": bool(iso.get("sessions")), "why": str(iso.get("why") or "")[:200]}
+
+
+def _c_session_net(c, out):
     # ...and whether each session there reaches only its own project's
     # containers (R79): whether the node can, why not, whether it is in
     # force, how many sessions have a network of their own, and what went
@@ -2074,6 +2217,9 @@ def _census(c):
                                          "why": str(ct.get("why") or "")[:200], "active": bool(ct.get("active")),
                                          "error": str(ct.get("error") or "")[:300],
                                          "bridges": int(ct.get("bridges") or 0) if str(ct.get("bridges") or 0).isdigit() else 0}
+
+
+def _c_sysdeps(c, out):
     # Which held recipes need system packages the machine lacks (roadmap
     # R51): the family and, per recipe, the package names, both bounded.
     sd = c.get("sysdeps") if isinstance(c.get("sysdeps"), dict) else {}
@@ -2083,6 +2229,9 @@ def _census(c):
         "unmet": {re.sub(r"[^A-Za-z0-9:._-]", "", str(k))[:40]:
                   [re.sub(r"[^A-Za-z0-9:._+/-]", "", str(x))[:60] for x in v if str(x)][:64]
                   for k, v in list(unmet.items())[:32] if isinstance(v, list) and v}}
+
+
+def _c_storage(c, out):
     # What the disks hold (R169, the agent's storage.py): the last hourly
     # walk, bounded, for the Storage tab; the tab folds projects an account
     # may not see into one total (storage.py here).
@@ -2122,6 +2271,9 @@ def _census(c):
                         "name": str(p.get("name") or "")[:80], "mb": mb(p.get("mb")), "running": bool(p.get("running")),
                         "ran": mb(p.get("ran")) or 0, "snap_mb": mb(p.get("snap_mb")) or 0}
                        for p in (st.get("phones") or [])[:200] if isinstance(p, dict)]}
+
+
+def _c_mounts(c, out):
     out["mounts"] = []
     for m in (c.get("mounts") if isinstance(c.get("mounts"), list) else [])[:32]:
         if isinstance(m, dict) and str(m.get("path") or "").startswith("/"):
@@ -2132,12 +2284,18 @@ def _census(c):
                 "stale": bool(m.get("stale")),
                 # What mount said when it failed: the server's own reason.
                 "error": str(m.get("error") or "")[:200]})
+
+
+def _c_door(c, out):
     # The door in for SSH (R174), as the machine has it: its kind, its
     # name, whether the client is there and whether it is up.
     dr = c.get("door") if isinstance(c.get("door"), dict) else {}
     if dr.get("kind") in ("cloudflared", "tailscale"):
         out["door"] = {"kind": dr["kind"], "host": re.sub(r"[^a-z0-9.-]", "", str(dr.get("host") or "").lower())[:253],
                        "installed": bool(dr.get("installed")), "active": bool(dr.get("active"))}
+
+
+def _c_services(c, out):
     sv = c.get("services") if isinstance(c.get("services"), dict) else {}
 
     def one_runner(ar):
@@ -2166,15 +2324,15 @@ def _census(c):
         "dns": re.sub(r"[^A-Za-z0-9.-]", "", str(ts.get("dns") or ""))[:200],
         # https port -> the local port it forwards to, as the node reports it
         "funnel": {str(k)[:6]: _mb(v) for k, v in list(fun.items())[:8]}}
-    # The session half (roadmap #24): whether this node runs sessions, the
-    # port its terminals come in on, as which account, and whether /workspace, where its
-    # synced copy is, is there. Absent (not empty) until the node has
-    # said, so the row can tell "no sessions here" from "did not say"; the
-    # proxy relays a project's session to a node only on the
-    # strength of this.
+
+
+def _c_files(c, out):
     # The file explorer's port (R224): its presence says the agent serves it.
     if isinstance(c.get("files"), dict):
         out["files"] = {"port": _mb(c["files"].get("port")) or 0}
+
+
+def _c_relay(c, out):
     # How that port is spoken to (R243): the sha256 of the certificate the
     # node made for itself, which is the only one the controller then takes
     # there (relay_of), and whether it takes a signed request once. A report
@@ -2184,6 +2342,15 @@ def _census(c):
         tls = str(c["relay"].get("tls") or "")
         out["relay"] = {"tls": tls if re.fullmatch(r"sha256:[0-9a-f]{64}", tls) else "",
                         "once": c["relay"].get("once") is True}
+
+
+def _c_session(c, out):
+    # The session half (roadmap #24): whether this node runs sessions, the
+    # port its terminals come in on, as which account, and whether /workspace, where its
+    # synced copy is, is there. Absent (not empty) until the node has
+    # said, so the row can tell "no sessions here" from "did not say"; the
+    # proxy relays a project's session to a node only on the
+    # strength of this.
     se = c.get("session")
     if isinstance(se, dict):
         out["session"] = {
@@ -2230,6 +2397,9 @@ def _census(c):
             # raised, failing the node's whole hello (B180).
             "up_s": max(-1, int(se["up_s"])) if isinstance(se.get("up_s"), (int, float))
                     and math.isfinite(se["up_s"]) else None}
+
+
+def _c_network(c, out):
     net = c.get("network") if isinstance(c.get("network"), dict) else {}
     out["network"] = {
         "interface": str(net.get("interface") or "")[:32],
@@ -2239,6 +2409,9 @@ def _census(c):
         # Its static routes beside the default one.
         "routes": [{"to": str(r.get("to") or "")[:64], "via": str(r.get("via") or "")[:64]}
                    for r in (net.get("routes") or [])[:32] if isinstance(r, dict)]}
+
+
+def _c_distro(c, out):
     # The machine's own tools, as the agent detected them: its package
     # manager and the service that owns its network. A system job's spec is
     # the same for every node; this says what the agent there would turn it
@@ -2248,6 +2421,114 @@ def _census(c):
     if d is not None:
         out["distro"] = {k: re.sub(r"[^a-zA-Z0-9 ._()/-]", "", str(d.get(k) or ""))[:80]
                          for k in ("id", "family", "pretty", "pkg", "network")}
+
+
+# The census, field by field. Each row is the census keys a cleaner reads
+# and the cleaner, which writes what it keeps of them into the record,
+# each to its caps. In the order the record has always been written, which
+# is the order its keys are stored in; no cleaner reads what another wrote.
+# A key no row reads is dropped, and said once on stderr: a field the agent
+# reports and this drops is a field that does not exist, and a field
+# dropped without a word went unnoticed until a page read it as missing.
+CENSUS = (
+    (("machine",), _c_machine),
+    (("system", "arch"), _c_placement),
+    (("sshd",), _c_sshd),
+    (("stores",), _c_stores),
+    (("tunnel",), _c_tunnel),
+    (("toolchain_versions",), _c_toolchain_versions),
+    (("tokseal",), _c_tokseal),
+    (("toolchain_verified",), _c_toolchain_verified),
+    (("toolchain_receipts",), _c_toolchain_receipts),
+    (("store_dirs",), _c_store_dirs),
+    (("images",), _c_images),
+    (("toolchains",), _c_toolchains),
+    (("docker_ip",), _c_docker_ip),
+    (("docker_gid",), _c_docker_gid),
+    (("internet",), _c_internet),
+    (("store_ro",), _c_store_ro),
+    (("store_noexec",), _c_store_noexec),
+    (("features",), _c_features),
+    (("disks",), _c_disks),
+    (("shares",), _c_shares),
+    (("pools",), _c_pools),
+    (("pools_importable",), _c_pools_importable),
+    (("snapshots",), _c_snapshots),
+    (("array",), _c_array),
+    (("console",), _c_console),
+    (("adopted",), _c_adopted),
+    (("timezone",), _c_timezone),
+    (("store_backups",), _c_store_backups),
+    (("ext_mounts",), _c_ext_mounts),
+    (("ups",), _c_ups),
+    (("host_updates",), _c_host_updates),
+    (("spindown",), _c_spindown),
+    (("os_image",), _c_os_image),
+    (("os_kept",), _c_os_kept),
+    (("os_stick",), _c_os_stick),
+    (("vms_other",), _c_vms_other),
+    (("vms",), _c_vms),
+    (("vm_pool",), _c_vm_pool),
+    (("vm_host",), _c_vm_host),
+    (("vm_isos",), _c_vm_isos),
+    (("sandbox",), _c_sandbox),
+    (("release_key", "release_spare", "unsigned_ok"), _c_release),
+    (("root_off",), _c_root_off),
+    (("gpu_card", "gpu_display", "gpu_amd"), _c_gpu),
+    (("gpu_driver", "gpu_card"), _c_gpu_driver),
+    (("gpu_container", "gpu_card"), _c_gpu_container),
+    (("sound",), _c_sound),
+    (("administers",), _c_administers),
+    (("isolation",), _c_isolation),
+    (("session_net",), _c_session_net),
+    (("sysdeps",), _c_sysdeps),
+    (("storage",), _c_storage),
+    (("mounts",), _c_mounts),
+    (("door",), _c_door),
+    (("services",), _c_services),
+    (("files",), _c_files),
+    (("relay",), _c_relay),
+    (("session",), _c_session),
+    (("network",), _c_network),
+    (("distro",), _c_distro),
+)
+# Every census key a table reads; census_unknown is the rest.
+CENSUS_KEYS = frozenset(CENSUS_INTS + CENSUS_STRINGS + tuple(k for keys, _ in CENSUS for k in keys))
+# The unknown keys already said, so each is said once a process and not on
+# every hello; at most CENSUS_SAID_MOST of them, since the keys come from a
+# machine that could be lying, and one that sends fresh ones each time must
+# grow neither this nor the log without end.
+_census_said = set()
+CENSUS_SAID_MOST = 64
+
+
+def census_unknown(c):
+    """The keys of a census that no table here reads, in the census's
+    order: what the controller drops of what the node said."""
+    return [k for k in c if k not in CENSUS_KEYS] if isinstance(c, dict) else []
+
+
+def _census(c):
+    """What a node says about itself, kept to the fields the row shows.
+    Whitelisted rather than stored whole: a census is a JSON blob from a
+    machine that could be lying, and the row is rendered from it. The
+    plain fields come from CENSUS_INTS and CENSUS_STRINGS, the rest from
+    CENSUS's rows in turn, and a key none of them reads is said once."""
+    c = c if isinstance(c, dict) else {}
+    out = {}
+    for k in census_unknown(c):
+        if k not in _census_said and len(_census_said) < CENSUS_SAID_MOST:
+            _census_said.add(k)
+            print(f"[nodes] a node's census carries {json.dumps(str(k)[:80])}, which the controller "
+                  "does not keep: add it to nodes.CENSUS", file=sys.stderr, flush=True)
+    for k in CENSUS_INTS:
+        with contextlib.suppress(TypeError, ValueError):
+            out[k] = int(c.get(k) or 0)
+    for k in CENSUS_STRINGS:
+        if c.get(k):
+            out[k] = str(c[k])[:120]
+    for _, clean in CENSUS:
+        clean(c, out)
     return out
 
 
