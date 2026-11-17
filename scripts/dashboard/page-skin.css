@@ -135,6 +135,10 @@
      17 Oct: it reads better with that much room): its 32px controls and
      6px above and below them. */
   --pbar-h:45px;
+  /* The row a page's tabs sit in: one height on every page, a group's under
+     its header and a page standing alone (Home, Spaces), with an action in
+     it or not. The size a group's row has with a button in it. */
+  --tabrow-h:40px;
   /* The three corners on the page: a surface (card, panel, dialog), a
      control (tab, button, field) and a small thing (a pill's box, a bar's
      cap). Named so a scheme can square them all at once: nostromo does,

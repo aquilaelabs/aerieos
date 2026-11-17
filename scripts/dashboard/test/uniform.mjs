@@ -892,11 +892,24 @@ if (runs('a')) {
 // the button language, what spans, what lines up) are taken on ONE visit to
 // each kind. They were four walks over 26 kinds, each paying the bring and
 // the settle again (R211: 0.5 to 0.8 s a visit, four times over).
+// The row a page's tabs sit in, by page: one height on every page, under a
+// group's header or standing alone, with an action in it or not.
+// A page a press opens wears its Back header there instead of tabs, and is
+// not measured as a tab row.
+const tabRow = () => page.evaluate(() => {
+  const bar = document.querySelector('#pane0 .bar.page');
+  if (!bar || bar.querySelector('.backhead')) return null;
+  const row = bar.querySelector(':scope > .subrow') || bar;
+  return Math.round(row.getBoundingClientRect().height);
+});
+const tabRows = {};
 for (const kind of kinds){
   if (!DRIVERS[kind]) continue;
   await bring(kind);
   await page.waitForSelector(DRIVERS[kind].readyWhen, { timeout: 20000 });
   await arrived();   // the entrance animation settles, and the last band to arrive is part of the row
+  const row = await tabRow();
+  if (row !== null) tabRows[kind] = row;
   const m = await measure(kind);
   ok(!m.err, `[${kind}] a document box exists (${m.err || 'ok'})`);
   ok((m.ragged || []).length === 0,
@@ -1051,6 +1064,25 @@ for (const kind of kinds){
 }
 ok(seenBars.size <= 1,
    `an action bar lays out the same on every tab (${JSON.stringify([...seenBars])})`);
+ok(new Set(Object.values(tabRows)).size === 1,
+   `a page's tab row is one height on every page, with an action in it or not (${JSON.stringify(tabRows)})`);
+// ...and on a phone, the pages that differed: a group's with actions and
+// without, and the pages standing alone.
+{
+  await page.setViewportSize({ width: 393, height: 851 });
+  const phone = {};
+  for (const [g, t] of [['machines', 'nodes'], ['machines', 'storage'], ['containers', 'docker'], ['home'], ['projects'], ['jobs']]) {
+    await page.evaluate(([g, t]) => t ? railGo(g, t) : railGo(g), [g, t]);
+    await page.waitForSelector('#pane0 .bar.page', { timeout: 15000 }).catch(() => {});
+    await arrived();
+    const row = await tabRow();
+    if (row !== null) phone[t || g] = row;
+  }
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await arrived();
+  ok(new Set(Object.values(phone)).size === 1 && Object.values(phone).every(v => v === Object.values(tabRows)[0]),
+     `...and the same height on a phone (${JSON.stringify(phone)})`);
+}
 }
 
 if (runs('a')) {

@@ -1506,6 +1506,10 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
 /* A page's bar: the group's tools as a segment (the same .pseg the gear's
    Appearance uses), or the page's name, and no close. */
 .pane .bar.page{padding:6px calc(var(--row-x) + var(--doc-in));min-height:var(--pbar-h)}
+/* A page standing alone (Home, Spaces, Jobs): its bar is its tab row, the
+   height a group's row has under its header. */
+.pane .bar.page:not(.grouped){padding-top:0;padding-bottom:0;min-height:var(--tabrow-h)}
+.pane .bar.page:not(.grouped) .subnav.pseg{margin:0}
 .nbhead .nbsum{min-width:0;flex:1 1 auto}
 /* A project's page (R218 step 3): the bar is its header, one band: the name
    large, the branch and the node in the data face, the session's dot and
@@ -1530,7 +1534,7 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
 .pane .bar.page.grouped .pname{font-weight:600;font-size:1.15rem;line-height:1.3;color:var(--ink);overflow-wrap:anywhere;min-width:0}
 .pane .bar.page.grouped .pfacts{font:var(--f-data);color:var(--dim);overflow-wrap:anywhere;min-width:0;flex:0 1 auto}
 .pane .bar.page.grouped .phead>.sp{flex:1}
-.pane .bar.page.grouped>.subrow{display:flex;align-items:center;gap:10px;flex:1 1 100%;min-width:0;min-height:var(--tap);margin-top:6px;position:relative}
+.pane .bar.page.grouped>.subrow{display:flex;align-items:center;gap:10px;flex:1 1 100%;min-width:0;min-height:var(--tabrow-h);margin-top:6px;position:relative}
 /* ...its rule the pane's whole width, as the notebook's over its strip,
    though the header itself keeps the reading width. */
 .pane .bar.page.grouped>.subrow::before{content:"";position:absolute;top:0;left:-100vw;right:-100vw;border-top:var(--hair) solid var(--line);pointer-events:none}
