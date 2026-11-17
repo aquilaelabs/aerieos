@@ -1632,7 +1632,7 @@ await section("The page is by name, and Favorites narrows it", async () => {
   await page.click(`.doc .projtab [data-pjchip="${fav}"]`);
   const shown = () => page.evaluate(() => { const cs = [...document.querySelectorAll('.doc .projtab #pjGrid .pcard')];
     return { n: cs.length, favs: cs.every(c => !!state.repos[c.dataset.pkey]?.pinned),
-             want: projectList().filter(c => c.pinned && !c.archived).length }; });
+             want: projectList().filter(c => c.pinned).length }; });
   await page.waitForFunction(() => [...document.querySelectorAll('.doc .projtab #pjGrid .pcard')].every(c => !!state.repos[c.dataset.pkey]?.pinned),
     null, { timeout: 8000 }).catch(() => {});
   const narrowed = await shown();
