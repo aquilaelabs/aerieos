@@ -602,9 +602,9 @@ function groupHeader(t, g){
   const cur = groupNode(g, t.kind);
   const n = live.find(x => x.id === cur);
   // Beside the picker, the node's state as one pill and a press to its own
-  // page from any page of the group (the operator, 17 Nov: the facts line
-  // under the picker took a phone's second and third lines; when it was
-  // seen, where it dials in from and its agent are on that page).
+  // page from any page of the group. When it was seen, where it dials in
+  // from and its agent are on that page, not a line under the picker, which
+  // took a phone's second and third lines.
   const s = n ? nodeState(n) : null;
   const pill = !s ? "" : `<button type="button" class="pill stat ${s.cls} ndstate" data-ndgo="${esc(n.id)}"
       aria-label="${esc(n.name)} is ${esc(s.word)}: open its page" title="${esc(s.means ? `${s.means}: open its page` : "open its page")}">${esc(s.word)}</button>`;

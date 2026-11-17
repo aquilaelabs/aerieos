@@ -1545,8 +1545,8 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
    group's actions at its right (the operator, 28 Oct: on the tabs' line). */
 .pane .bar.page.grouped{flex-wrap:wrap;gap:0 10px;font:var(--f-ui);padding-top:0;padding-bottom:0}
 /* Its head is one row a little taller than the tab row under it, at a desk
-   and on a phone (the operator, 17 Nov): the node's picker and its state as
-   one pill beside it, the picker giving up width before the pill. */
+   and on a phone: the node's picker and its state as one pill beside it,
+   the picker giving up width before the pill. */
 .pane .bar.page.grouped .phead{display:flex;align-items:center;gap:10px;flex:1 1 100%;min-width:0;flex-wrap:nowrap;min-height:var(--ghead-h)}
 .pane .bar.page.grouped .phead>label.pick{display:inline-flex;align-items:center;gap:var(--field-gap);margin:0;min-width:0;flex:0 1 auto}
 /* The word stays for a reader of the page, as the select's label. */
