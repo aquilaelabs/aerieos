@@ -1453,6 +1453,10 @@ await section("the notebook's head row", async () => {
                  const g = view.querySelector(':scope > .nbglance');
                  if (w !== 'settings' && !g) bad.push('no glance');
                  if (g) for (const t of g.querySelectorAll('.tile')) if (!t.closest('.tiles') || !t.querySelector('.tv') || !t.querySelector('.tl')) bad.push('a tile out of shape');
+                 // Count-first: the row's first tile is how many of what
+                 // the view lists, a figure, before anything it says of them.
+                 const lead = g?.querySelector('.tiles .tile .tv')?.textContent.trim();
+                 if (lead !== undefined && !/^\d/.test(lead)) bad.push(`its first tile reads ${lead.slice(0, 20)}, not a count`);
                  // Every group of chips the view narrows by in one band.
                  const bands = [...view.querySelectorAll(':scope > .lfilter')].filter(b => b.checkVisibility());
                  if (bands.length > 1) bad.push(`${bands.length} chip bands`);
