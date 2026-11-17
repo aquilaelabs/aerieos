@@ -93,7 +93,10 @@ ok(await page.$$eval(`${NB} #dsBody > details.sect`, ds => ds.map(d => `${d.data
 const pagesList = async () => {
   await openSect('pages');
   const back = page.locator(`${NB} [data-dspageback] >> visible=true`);
-  if (await back.count()) await back.first().click();
+  // Pressed while it is there: a redraw from the poll (the record saved
+  // from a session) can take the page and its Back away between the count
+  // and the press, and the rows are then on show anyway.
+  if (await back.count()) await back.first().click({ timeout: 5000 }).catch(() => {});
   await page.waitForSelector(`${NB} .dspages .dspagerow`, { timeout: 10000 });
 };
 const pageRows = () => page.$$eval(`${NB} .dspages .dspagerow`, rs => rs.map(r => ({ key: r.dataset.dspagego, text: r.textContent.replace(/\s+/g, ' ').trim() })));
@@ -606,9 +609,11 @@ await section("a session writes one", async () => {
   let nope = '';
   try { bb('edit', 'listz', '--text', txt); } catch (e) { nope = String(e.stderr); }
   ok(/no rule or page called listz; the nearest: lists/.test(nope), `...and a name it does not have is refused with the nearest (${nope.trim().slice(0, 90)})`);
-  // The rule as the rest of this file reads it.
+  // The rule as the rest of this file reads it, and the view's own read of
+  // what these saves did landed before anything here is pressed again.
   writeFileSync(txt, 'Every list pages at fifty.');
   bb('edit', 'lists', '--text', txt);
+  await settled(page, { quiet: 800, cap: 15000 });
 
   await openSect('pages');   // one section open at a time (the operator, 5 Oct)
   await pickPage('p2');
