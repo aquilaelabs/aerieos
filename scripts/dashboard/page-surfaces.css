@@ -609,7 +609,7 @@ body.firstrun #panes{display:none}
   background:var(--btn);display:flex;flex-direction:column;gap:4px}
 .hproj.pc{box-shadow:inset 3px 0 var(--pc);background:color-mix(in srgb, var(--pc) 16%, var(--btn));
   border-color:color-mix(in srgb, var(--pc) 45%, var(--line))}
-.hproj .name{font:var(--f-row);font-weight:600}
+
 /* ...its name a link to the project, not a box (a project card's is a
    heading), and its facts in the project card's voices. */
 .hproj .name.namelink{align-self:flex-start}
@@ -1270,7 +1270,7 @@ body.firstrun #panes{display:none}
 .gdays .grow[data-sha]{padding:var(--row-y) var(--row-x)}
 .gfile>summary .gcount{font:var(--f-data);flex:0 0 auto}
 #gitDetail{border-top:var(--hair) solid var(--line);padding:var(--row-y) 0 0}
-.gcommit .name{font:var(--f-row);font-weight:600;overflow-wrap:anywhere}
+.gcommit .name{overflow-wrap:anywhere}
 .gmsg{font:var(--f-code);white-space:pre-wrap;overflow-wrap:anywhere;margin:6px 0;color:var(--dim)}
 .gadd{color:var(--accent)} .gdel{color:var(--bad)}
 .gbranches .td.lead code{font:inherit;background:none;--sheen:none;padding:0;color:inherit}
@@ -1291,7 +1291,7 @@ body.firstrun #panes{display:none}
 .gcmpfiles{display:flex;flex-direction:column;gap:2px;margin-bottom:var(--field-gap)}
 .gcmpfile{display:flex;gap:8px;align-items:baseline;font:var(--f-data);min-width:0}
 .gcmpfile code{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:auto}
-.gcmpcommit .name{font:var(--f-row);overflow-wrap:anywhere}
+.gcmpcommit .name{overflow-wrap:anywhere}
 /* ...and on a phone, where the cell wears its column's name, the counts
    sit on that line, the bars left to a desk. */
 @media(max-width:900px){
@@ -2405,7 +2405,7 @@ body.firstrun #panes{display:none}
 .ndact{display:flex;align-items:center;gap:8px 16px;padding:10px 0;border-bottom:var(--hair) solid var(--line)}
 .ndact:last-child{border-bottom:0}
 .ndact>.grow{min-width:0;flex:1 1 auto}
-.ndact .name{font:var(--f-ui);font-weight:600;color:var(--ink)}
+.ndact .name{color:var(--ink)}
 .ndact .sub{margin:2px 0 0}
 .ndact>.acts{flex:0 0 auto;display:flex;gap:8px}
 @media(max-width:600px){ .ndact{flex-wrap:wrap} .ndact>.acts{width:100%;justify-content:flex-end}

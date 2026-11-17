@@ -92,7 +92,7 @@ html:not([data-theme]) .logo.away,.logo.away{color:var(--dim)}
 .rrow{display:flex;flex-direction:column;align-items:flex-start;gap:4px;width:100%;text-align:left;white-space:normal;
   background:none;--sheen:none;border:0;border-bottom:var(--hair) solid var(--line);border-radius:0;padding:var(--row-y) var(--row-x);
   min-height:var(--tap);color:var(--ink)}
-.rrow .name{font-weight:600}
+.rrow .name{font:var(--f-row);font-weight:600}
 .rrow .rtags{display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center;font:var(--f-note)}
 @media(hover:hover){ :is(.rolestab,.userstab) .rrow:hover:not(.on),.snav .rrow:hover:not(.on){background:color-mix(in srgb,var(--ink) 6%,transparent)}
 }
@@ -341,7 +341,9 @@ body.firstrun .rail, body.firstrun .railbar, body.firstrun .railmore{display:non
 .row.off > :not(.actbar),.row.off > .actbar > :not(.more),.row.off > .actbar > .more > button{opacity:.62}
 /* A directory name can be one long unbroken token; it wraps rather than
    handing the whole page a sideways scroll. */
-.row .name{font-weight:600;overflow-wrap:anywhere}
+/* A row's name, one font everywhere (the consistency pass): the row's
+   voice, bold. A card's or a page head's title is the larger title. */
+:is(.row,.hproj,.gcommit) .name{font:var(--f-row);font-weight:600;overflow-wrap:anywhere}
 .row .name.go{cursor:pointer}
 /* A name that opens what it names (a repository, a project, a person) is
    linked text, as a session's name is on Sessions: the row's own ink, no box,
