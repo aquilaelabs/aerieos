@@ -1068,7 +1068,7 @@ ok(new Set(Object.values(tabRows)).size === 1,
    `a page's tab row is one height on every page, with an action in it or not (${JSON.stringify(tabRows)})`);
 // ...and on a phone, the pages that differed: a group's with actions and
 // without, and the pages standing alone.
-{
+await section("a page's tab row on a phone", async () => {
   await page.setViewportSize({ width: 393, height: 851 });
   const phone = {};
   for (const [g, t] of [['machines', 'nodes'], ['machines', 'storage'], ['containers', 'docker'], ['home'], ['projects'], ['jobs']]) {
@@ -1082,7 +1082,7 @@ ok(new Set(Object.values(tabRows)).size === 1,
   await arrived();
   ok(new Set(Object.values(phone)).size === 1 && Object.values(phone).every(v => v === Object.values(tabRows)[0]),
      `...and the same height on a phone (${JSON.stringify(phone)})`);
-}
+});
 }
 
 if (runs('a')) {
