@@ -63,14 +63,17 @@ function loadEmulator(){
   });
 }
 
-// Adding images is Toolchains' gesture (R121, the operator 4 Oct): tick
-// rows, press Install selected. Forty-odd images (every API level Google
+// An image is added by its row's own Install, which acts on the press
+// (Perch: actions act on the press, only settings stage); several at once
+// are a Select mode in the bar, where the rows take ticks and Install
+// selected adds the ticked set. Forty-odd images (every API level Google
 // still ships, times four flavors) would bury the few installed, so the
 // rows to add are one flavor's at a time, chosen above them, and the
 // installed ones stay in a list of their own. The sizes come from
 // sdkmanager's own index, the only place they exist before the download.
 // A tick survives a change of flavor, and the button counts them all.
 const emuTicked = new Set();
+let emuSelecting = false;         // the bar's Select mode, ticks on the rows
 
 function emuFlavorNow(d){
   const flavors = d.flavors || [];
@@ -100,27 +103,31 @@ function emuAddRows(d, why){
       ${about ? `<span class="sub imgabout">${esc(about)}</span>` : ""}</div>
     <div class="tcs emaddrows">${mine.map(r => {
       const now = writing.has(r.id);
-      return `<label class="tc emnew">
-        <input type="checkbox" value="${esc(r.id)}"${why || !mayToolchains(emuNode) ? " disabled" : ""}${
-          emuTicked.has(r.id) || now ? " checked" : ""}>
-        <span class="grow">
+      const dead = !!why || !mayToolchains(emuNode);
+      const body = `<span class="grow">
           <span class="nm">API ${esc(r.api)}</span>
           ${now ? `<span class="sub prog plain">${job.current === r.id ? "adding" : "waiting its turn"}<span class="dots"></span></span>`
                 : `<span class="sub where">${[r.size, r.id].filter(Boolean).map(esc).join(" · ")}</span>`}
-        </span></label>`;
+        </span>`;
+      // Selecting: the row is its tick's label. Otherwise its Install at
+      // its right, gone while the image is on its way.
+      return emuSelecting
+        ? `<label class="tc emnew" data-emuid="${esc(r.id)}">
+            <input type="checkbox" value="${esc(r.id)}"${dead || now ? " disabled" : ""}${emuTicked.has(r.id) || now ? " checked" : ""}>${body}</label>`
+        : `<div class="tc emnew" data-emuid="${esc(r.id)}">${body}${now ? "" : `<button type="button" data-emuadd="${esc(r.id)}"${
+            dead || job.running ? " disabled" : ""}${why ? ` title="${esc(why)}"` : ""}>Install</button>`}</div>`;
     }).join("") || `<div class="tchead">every ${esc(flavors.find(f => f.kind === chosen)?.label || "")} image is here already</div>`}</div>`;
 }
 
-// One installed image, drawn as an installed toolchain is: its tick set and
-// dead, its bin at the right. Which AVDs are built on it, because that is
+// One installed image: its name and kind, its size and id, and its bin at
+// the right. Which AVDs are built on it, because that is
 // the question anybody asking "can this go?" is really asking: an AVD names
 // one image exactly, and two flavors at one API level are not interchangeable.
 function emuRow(im, why){
   const avds = (im.avds || []).length
     ? `<span class="sub">${im.avds.length === 1 ? "AVD" : "AVDs"}: ${esc(im.avds.join(", "))}</span>`
     : `<span class="sub dim">no AVD uses it</span>`;
-  return `<label class="tc done emimg">
-    <input type="checkbox" checked disabled title="installed">
+  return `<div class="tc done emimg">
     <span class="grow">
       <span class="nm">${esc(im.api)} <span class="pill">${esc(im.kind)}</span></span>
       <span class="sub where on">${[im.size ? `<span${im.size_from ? ` title="${esc(im.size_from)}"` : ""}>${esc(im.size)}</span>` : "",
@@ -128,7 +135,7 @@ function emuRow(im, why){
       ${avds}
     </span>
     ${mayToolchains(emuNode) ? rmIcon(`data-rmimg="${esc(im.id)}"`, `remove ${im.id}`, {title: "remove this system image", why}) : ""}
-  </label>`;
+  </div>`;
 }
 
 // The page's two lists under their heads (the operator, 18 Oct: the
@@ -169,9 +176,13 @@ function emuAddBar(d, held, job){
       ${job.running ? `<span class="state tcworking">${job.action === "remove" ? "Removing" : "Adding"} ${
         esc(job.current || job.image || "")}<span class="dots"></span></span>` : ""}
       ${held && !job.running ? `<span class="state bad">${esc(held)}</span>` : ""}
-      <button class="primary" data-emu="install"${held || !emuTickedHere(d).length ? " disabled" : ""}>Install selected${
-        emuTickedHere(d).length > 1 ? ` (${emuTickedHere(d).length})` : ""}</button>
       ${job.running ? abortBtn('data-emu="abort"', job.aborting) : ""}
+      <span class="sp"></span>
+      ${!(d.addable || []).length ? ""
+        : emuSelecting ? `<button type="button" data-emu="unselect">Cancel</button>
+      <button class="primary" data-emu="install"${held || job.running || !emuTickedHere(d).length ? " disabled" : ""}>Install selected${
+        emuTickedHere(d).length > 1 ? ` (${emuTickedHere(d).length})` : ""}</button>`
+        : `<button type="button" data-emu="select"${held || job.running ? " disabled" : ""}>Select several</button>`}
     </div>`;
 }
 
@@ -264,6 +275,12 @@ function renderEmulatorInto(i){
   if (toTc) toTc.onclick = e => { e.preventDefault(); openLibraryOn(emuNode); };
   const fl = el.querySelector("#imgFlavor");
   if (fl) fl.onchange = () => { emuFlavor = fl.value; readMoved("emulator"); drawPanes(); };
+  const sel = el.querySelector('[data-emu="select"]');
+  if (sel) sel.onclick = () => { emuSelecting = true; readMoved("emulator"); drawPanes(); };
+  const unsel = el.querySelector('[data-emu="unselect"]');
+  if (unsel) unsel.onclick = () => { emuSelecting = false; emuTicked.clear(); readMoved("emulator"); drawPanes(); };
+  // A row's own Install: straight in, no confirmation, as Install selected.
+  el.querySelectorAll("[data-emuadd]").forEach(b => b.onclick = () => emuAct("add", [b.dataset.emuadd], b));
   el.querySelectorAll(".tc.emnew input").forEach(b => b.onchange = () => {
     b.checked ? emuTicked.add(b.value) : emuTicked.delete(b.value);
     readMoved("emulator"); drawPanes();          // the button counts them
@@ -326,6 +343,7 @@ async function emuAct(action, image, btn){
     if (j.error) notify(j.error, true);
     else {
       if (many) image.forEach(id => emuTicked.delete(id));
+      if (action === "add") emuSelecting = false;
       notify(`${action === "add" ? "adding" : "removing"} ${many && image.length > 1
         ? `${image.length} images` : (many ? image[0] : image)} on ${
         emu?.name || "the node"}; this can take minutes`);

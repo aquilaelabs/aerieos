@@ -448,6 +448,10 @@ button.on{background:var(--accent-deep);border-color:var(--accent-mid);color:var
    point; an empty dead box said only the second half. */
 .tc.done input{opacity:.5}
 .tc .rm{flex:0 0 auto;align-self:center;color:var(--dim)}
+/* A row that is not a tick's label is not pressed as one: its press is the
+   button at its right (an image's Install, its bin). */
+div.tc{cursor:default}
+.tc>button{flex:0 0 auto;align-self:center}
 @media(hover:hover){ .tc .rm:hover{color:var(--bad);border-color:var(--red2-edge)}
 }
 /* Sizing only: the font is the house control font from the .doctab group.

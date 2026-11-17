@@ -2266,7 +2266,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
     await page.evaluate(id => { emuNode = id; openEmulator(); }, minted.id);
     // The rows both wait on Google's index (the size is joined from it),
     // which is read off the request.
-    await page.waitForFunction(() => document.querySelector('.emutab .tc.emnew input')
+    await page.waitForFunction(() => document.querySelector('.emutab .tc.emnew [data-emuadd]')
       && /GB/.test(document.querySelector('.emutab .tc.emimg')?.textContent || ''),
       null, { timeout: 15000 });
     const imgs = await page.$$eval('.emutab .tc.emimg',
@@ -2277,22 +2277,27 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
     ok(!(await page.$$eval('.emutab .tc .pill', ps => ps.some(p => /\d\s*[GMK]B/.test(p.textContent))))
        && /1\.\d GB · system-images/.test(await page.$eval('.emutab .tc.emimg .where', e => e.textContent)),
        '...its size a fact on the facts line beside its id, not a pill that wraps at 344px (R218 step 21)');
-    const apis = await page.$$eval('.emutab .tc.emnew input', o => o.map(x => x.value));
+    const apis = await page.$$eval('.emutab .tc.emnew [data-emuadd]', o => o.map(x => x.dataset.emuadd));
     ok(apis.length === 1 && apis[0] === 'system-images;android-31;google_apis;x86_64',
-       `...and the rows to add are what the NODE does not have (${JSON.stringify(apis)})`);
-    // Toolchains' gesture (R121 step 5): tick, then Install selected, which
-    // sleeps until something is ticked (the operator, 18 Oct) and wakes on
-    // a tick.
-    ok(await page.$eval('.emutab .tc.emimg input', b => b.checked && b.disabled),
-       '...ticked like Toolchains: an installed image is a set, dead tick');
+       `...and the rows to add are what the NODE does not have, each with its own Install (${JSON.stringify(apis)})`);
+    // An action acts on the press (Perch): no tick on a row until the bar's
+    // Select several, where Install selected sleeps until something is
+    // ticked and wakes on a tick; Cancel leaves it.
+    ok(!(await page.$('.emutab .tc input')) && !(await page.$('.emutab [data-emu="install"]')),
+       '...with no tick on any row, nor Install selected, outside Select several');
+    await page.click('.emutab [data-emu="select"]');
+    await page.waitForSelector('.emutab .tc.emnew input', { timeout: 10000 });
     const asleep = await page.$eval('.emutab [data-emu="install"]', b => b.disabled);
     await page.click('.emutab .tc.emnew input');
     await page.waitForFunction(() => !document.querySelector('.emutab [data-emu="install"]')?.disabled, null, { timeout: 10000 }).catch(() => {});
     const awake = await page.$eval('.emutab [data-emu="install"]', b => !b.disabled);
     await page.click('.emutab .tc.emnew input');
     await page.waitForFunction(() => document.querySelector('.emutab [data-emu="install"]')?.disabled, null, { timeout: 10000 }).catch(() => {});
-    ok(asleep && awake && await page.$eval('.emutab [data-emu="install"]', b => b.disabled),
-       `...and Install selected sleeps until something is ticked, waking on a tick and sleeping on its untick (${JSON.stringify({ asleep, awake })})`);
+    const slept = await page.$eval('.emutab [data-emu="install"]', b => b.disabled);
+    await page.click('.emutab [data-emu="unselect"]');
+    await page.waitForSelector('.emutab .tc.emnew [data-emuadd]', { timeout: 10000 });
+    ok(asleep && awake && slept && !(await page.$('.emutab .tc input')),
+       `...Select several gives the rows ticks and Install selected, asleep until something is ticked, and Cancel takes them away (${JSON.stringify({ asleep, awake, slept })})`);
     ok(await page.evaluate(async id => !('images' in await (await fetch('/api/toolchains?node=' + id)).json()),
                            minted.id),
        'a node\'s toolchain read no longer carries images: they are the Emulator page\'s');
@@ -2326,6 +2331,17 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
       image: 'system-images;android-30;google_apis;x86_64' });
     ok(rm.job, 'one it did report can be');
     if (rm.job) await napi('/api/v1/jobs', { action: 'cancel', id: rm.job });
+    // A row's own Install adds that image on the press: one add for it.
+    await page.evaluate(() => loadEmulator());
+    await page.waitForSelector('.emutab .tc.emnew [data-emuadd]:not([disabled])', { timeout: 30000 }).catch(() => {});
+    const sent = page.waitForRequest(r => r.url().endsWith('/api/emulator') && r.method() === 'POST', { timeout: 10000 }).catch(() => null);
+    await page.click('.emutab .tc.emnew [data-emuadd]').catch(() => {});
+    const req = await sent;
+    const body = req ? JSON.parse(req.postData() || '{}') : {};
+    const got = req ? await (await req.response())?.json().catch(() => ({})) : {};
+    if (got?.job) await napi('/api/v1/jobs', { action: 'cancel', id: got.job });
+    ok(body.action === 'add' && JSON.stringify(body.images) === '["system-images;android-31;google_apis;x86_64"]',
+       `a row's own Install adds its image on the press (${JSON.stringify(body)} ${got?.job || got?.error || ''})`);
     // The same in a terminal: aerie toolchains says where images went.
     let said = '';
     try { execFileSync('bash', [`${REPO}/scripts/aerie`, 'toolchains', 'images'], { stdio: 'pipe' }); }
