@@ -105,6 +105,7 @@ to be missing, ask.
 
     aerie map who-calls NAME      every call of NAME, with the function it is made from
     aerie map find NAME           where NAME is defined; aerie map defs FILE lists a file
+    aerie map show NAME           the definition itself, whole (FILE:LINE: the one holding it)
     aerie map draws ID|.class     which functions draw an element, which suites name it
     aerie map suites FILE...      the suites that reach what a file defines or draws
 
@@ -333,7 +334,9 @@ Design view: `aerie design show NAME` for one page, theme or rule
 (`nostromo/hull` for a theme's or a page's own), and `aerie design file` prints
 the docs/design-language.md it writes; `aerie design file --from FILE` prints it
 from a record of your own (what `aerie design json` prints, edited), so a
-branch's file carries its design and not what another branch saved. `aerie transcripts` lists this account's
+branch's file carries its design and not what another branch saved; `aerie
+design edit NAME --text FILE` (or `--append`) changes one rule or one page's
+notes in place, and `--file` writes docs/design-language.md with it. `aerie transcripts` lists this account's
 own earlier conversations here, from every coding agent it uses (Claude,
 ChatGPT, Copilot, Grok), each marked with its agent and never another
 account's, and `aerie transcripts show ID` prints one whole, every command and

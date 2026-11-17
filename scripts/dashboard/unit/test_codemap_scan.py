@@ -36,6 +36,15 @@ class JavaScript(unittest.TestCase):
         self.assertIn(("when", 2, 2), defs(s))
         self.assertIn(("select", 1, "open"), calls(s))
 
+    def test_an_arrow_in_a_conditionals_else_branch_is_no_key(self):
+        # B922: `? null : e => {` is no key `null` holding an arrow; the
+        # arrow's calls are the enclosing function's.
+        s = scan("function wire(grid){\n  grid.forEach(c => c.onclick = !c.x ? null : e => {\n"
+                 "    openCard(e);\n  });\n}\nconst t = {\n  open: () => {\n    load();\n  },\n};\n")
+        self.assertNotIn("null", {d["name"] for d in s.defs})
+        self.assertIn(("openCard", 3, "wire"), calls(s))
+        self.assertIn(("load", 8, "open"), calls(s), "a key on its own line is still one")
+
     def test_a_property_called_interface_is_no_class(self):
         s = scan("function f(net, rn){\n  if (net.interface && rn.interface) g();\n"
                  "  const x = {interface: '', routes: []};\n}\n")

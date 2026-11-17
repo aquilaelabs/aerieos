@@ -11,6 +11,8 @@ and a line pass for shell. `aerie map languages` says which files are read.
 
     aerie map                       what is indexed, and the verbs
     aerie map find NAME             where NAME is defined
+    aerie map show NAME|FILE:LINE   the definition itself, whole: each one called NAME (--first for one),
+                                 or the one holding that line, headed by where it is and its comment
     aerie map who-calls NAME        every call of NAME, with the caller, and every place NAME is
                                  passed by name without a call (handed to a draw, assigned, listed)
     aerie map calls NAME            what NAME calls
@@ -1301,8 +1303,11 @@ class JSScanner:
         self._prop = bool(m) and m.start(1) > 0 and head[m.start(1) - 1] == "."
         if m and m.group(1) not in self.kw:
             return m.group(1)
-        # `name: (...) =>` in an object
-        m = re.search(r"([A-Za-z_$][\w$]*)\s*:\s*(?:async\s*)?" + self.params + r"\s*=>\s*$", head)
+        # `name: (...) =>` in an object: a key after the brace or a comma
+        # that opens its entry, as OBJ_KEY_ARROW reads one, and never the
+        # word before a conditional's colon (`x ? null : e => {`, B922).
+        m = re.search(r"(?:^|[{,])\s*([A-Za-z_$][\w$]*)\s*:\s*(?:async\s*)?" + self.params + r"\s*=>\s*$",
+                      head, re.M)
         if m:
             return m.group(1)
         return ""
@@ -2443,6 +2448,63 @@ def value_decls(idx, root, name, limit=20):
                             return out
         except OSError:
             continue
+    return out
+
+
+# A definition longer than this is printed to here, and the rest named.
+SHOW_LINES = 400
+
+
+def q_show(idx, name, root, first=False):
+    """`aerie map show`: each definition called NAME printed whole, or with
+    FILE:LINE the innermost definition holding that line; each headed by
+    where it is, what kind it is and its comment, then its lines numbered."""
+    m = re.match(r"^(.+):(\d+)$", name)
+    in_file = (lambda d, f: d["file"] == f or d["file"].endswith("/" + f))
+    if m and any(in_file(d, m.group(1)) for d in idx["defs"]):
+        f, ln = m.group(1), int(m.group(2))
+        held = [d for d in idx["defs"] if in_file(d, f) and d["line"] <= ln <= max(d["end"], d["line"])]
+        if not held:
+            return [f"nothing the map holds is around {name}: it is at its file's top level; "
+                    f"aerie map sections {f} reads the file by its parts"]
+        rows = [min(held, key=lambda d: max(d["end"], d["line"]) - d["line"])]
+    else:
+        rows = [d for d in idx["defs"] if d["name"] == name]
+    if not rows:
+        found = q_find(idx, name, root)
+        if found and not found[0].startswith("nothing "):
+            return found + ["(not a definition with a body: aerie map find says where it is declared)"]
+        import difflib
+        near = difflib.get_close_matches(name, sorted({d["name"] for d in idx["defs"]}), n=5, cutoff=0.75)
+        return [f"nothing defines {name}" + (f"; the nearest: {', '.join(near)}" if near else "")]
+    if first:
+        rows = rows[:1]
+    out = []
+    texts = {}
+    for d in rows:
+        end = max(d["end"], d["line"])
+        out.append(f"== {d['file']}:{d['line']}" + (f" to {end}" if end > d["line"] else "")
+                   + f"  {d['kind']}" + (f"  in {d['parent']}" if d["parent"] else ""))
+        # Its comment, where that sits above it; a python docstring is in
+        # the body printed below.
+        said = "" if d["file"].endswith(".py") else said_by(root, d)
+        if said:
+            out.append(f"   says: {said}")
+        if d["file"] not in texts:
+            try:
+                texts[d["file"]] = (Path(root) / d["file"]).read_text(encoding="utf-8", errors="replace").splitlines()
+            except OSError:
+                texts[d["file"]] = None
+        lines = texts[d["file"]]
+        if lines is None:
+            out.append("   (the file cannot be read)")
+            continue
+        body = lines[d["line"] - 1:end]
+        out += [f"{d['line'] + i:>6}  {t}" for i, t in enumerate(body[:SHOW_LINES])]
+        if len(body) > SHOW_LINES:
+            out.append(f"   ...and {len(body) - SHOW_LINES} more lines, to {end}")
+    if len(rows) > 1:
+        out.append(f"({len(rows)} definitions called {name}; --first prints the first alone)")
     return out
 
 
@@ -3627,7 +3689,7 @@ def q_sections(idx, path, cov=None):
 
 # Every verb a person asks, in one line: what bare `aerie map` ends with, and
 # what bb's own usage names (B546: the two had drifted apart).
-VERBS = ("aerie map find NAME | who-calls NAME | calls NAME | defs FILE | draws ID|.class | suites FILE... | "
+VERBS = ("aerie map find NAME | show NAME|FILE:LINE | who-calls NAME | calls NAME | defs FILE | draws ID|.class | suites FILE... | "
          "state [FILE] | sections FILE | unused [FILE] | addresses [FILE...] | coverage | covered NAME | "
          "uncovered [FILE] | affected --base REF FILES... | languages | build; aerie map help says what each does")
 LANG_WORDS = {"py": "python", "c": "C and C++", "js": "brace scanner (C-shaped languages)",
@@ -3770,6 +3832,16 @@ def main(argv):
         return 0
     if verb == "uncovered":
         print("\n".join(q_uncovered(idx, coverage_load(root), rest[0] if rest else None)))
+        return 0
+    if verb == "show":
+        names = [r for r in rest if r != "--first"]
+        if not names:
+            print("aerie map show NAME|FILE:LINE [--first]", file=sys.stderr)
+            return 2
+        out = []
+        for n in names:
+            out += ([f"$ aerie map show {n}"] if len(names) > 1 else []) + q_show(idx, n, root, "--first" in rest)
+        print("\n".join(out))
         return 0
     need = {"find": 1, "who-calls": 1, "calls": 1, "defs": 1, "draws": 1, "suites": 1}
     if verb not in need:

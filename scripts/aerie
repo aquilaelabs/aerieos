@@ -451,6 +451,9 @@ aerie devapp test [ARGS]  the space's test command inside its running dev instan
                    container that is already up
 aerie tests unit      the python unit tier (scripts/dashboard/unit): the modules' rules without a server
                    or a browser, in under a second; preflight runs it before any suite
+aerie tests bisect SUITE GOOD BAD [--check WORDS] [--times N]   the first commit between GOOD and
+                   BAD where SUITE fails (or prints a FAIL line holding WORDS), found by halving and
+                   running it --at each commit; a suite that has flaked runs three times a commit
 aerie tests flakes [DAYS]  the suites that failed in a whole run and passed when run again, counted over
                    the last 30 days (or DAYS), the most often first, each with the check that failed
                    last; the harness records one as it names it, and aerie tests preflight fails on one
@@ -510,8 +513,12 @@ aerie design file [--from FILE]   docs/design-language.md as the notebook writes
                    of the saved design, so a branch writes the file from its own
 aerie design json     the record: the language, the pages, and the presets by key
 aerie design schema   the record's shape with every limit, for a save that lands first time
-aerie design save FILE   write a record of that shape back, whole: how a session
-                   puts a design language it was given into the notebook
+aerie design save FILE [--file]   write a record of that shape back, whole: how a
+                   session puts a design language it was given into the notebook
+aerie design edit NAME --text FILE|--append FILE [--file]   one rule's text (as
+                   show names it: a-dialog/layout) or one page's notes, changed
+                   in place and saved, printing what changed; - reads stdin.
+                   --file, here and on save, writes docs/design-language.md
 aerie wiki            the space's wiki, from the notebook's Wiki view: its pages,
                    who changed each last, and where it is pushed
 aerie wiki show NAME [--rev]   one page's Markdown (--rev: the revision a save checks)
@@ -726,13 +733,18 @@ aerie pc [VERB] [--why "..."]
 aerie doctor          check everything that usually goes wrong
 
 # developing AerieOS itself, from inside it
-aerie dashboard test  browser-test the dashboard from this checkout, isolated
+aerie dashboard test [SUITE...] [--at REF] [--loaded]  browser-test the dashboard from
+                   this checkout, isolated; --at runs a commit as it was (git archive, not the
+                   working tree); --loaded runs one suite beside a whole run's load, the gate's
+                   workers taking the longest of the rest, so a suite that fails only in a gate
+                   fails on demand
 aerie dashboard dev   serve the live dashboard from ./scripts/dashboard (--off reverts)
 aerie dashboard status  which copy of the dashboard is serving
 aerie dashboard trace [SECONDS]  what the dashboard was asked over the last SECONDS, by endpoint and who asked, with how long each took
 aerie drift           what this checkout changed that the container is not serving
 aerie map VERB ...    the code map, which a session asks before grepping: find NAME,
-                   who-calls NAME, calls NAME, defs FILE, draws ID|.class,
+                   show NAME|FILE:LINE (the definition whole), who-calls NAME,
+                   calls NAME, defs FILE, draws ID|.class,
                    suites FILE..., state [FILE], sections FILE, unused [FILE],
                    addresses [FILE...], coverage, covered NAME, uncovered [FILE],
                    affected --base REF FILES..., languages (which files it
@@ -2558,9 +2570,9 @@ cmd_history() {
 # prints is what the tab shows.
 cmd_design() {
     local verb="${1:-list}" auth proj
-    case "$verb" in list|show|file|json|schema|save) ;; -h|--help)
-        echo "aerie design [list | show [ID|NAME] | file [--from FILE] | json | schema | save FILE]: what this space looks like, from the notebook's Design view; aerie design save -h prints the record's shape"; return 0 ;;
-        *) die "aerie design [list | show [ID|NAME] | file [--from FILE] | json | schema | save FILE]" ;; esac
+    case "$verb" in list|show|file|json|schema|save|edit) ;; -h|--help)
+        echo "aerie design [list | show [ID|NAME] | file [--from FILE] | json | schema | save FILE [--file] | edit NAME --text FILE|--append FILE [--file]]: what this space looks like, from the notebook's Design view; aerie design save -h prints the record's shape"; return 0 ;;
+        *) die "aerie design [list | show [ID|NAME] | file [--from FILE] | json | schema | save FILE [--file] | edit NAME --text FILE|--append FILE [--file]]" ;; esac
     proj="$(bb_project)" || die "not inside a space under ${WORKSPACE}; cd into one first"
     auth="$(bb_auth_or_die)"
     BB_DESIGN_AUTH="$auth" BB_DESIGN_PROJECT="$proj" python3 "$BB_LIB/design-verbs.py" "$@"
@@ -2893,13 +2905,27 @@ cmd_tests() {
         python3 -m unittest discover -s "$u" -t "$u" "$@"
         return
     fi
+    # Which commit broke a suite (R55): halving the commits between GOOD and
+    # BAD, the suite run --at each, until the first that fails is found.
+    if [ "${1:-}" = bisect ]; then
+        shift
+        [ $# -ge 3 ] || die "usage: aerie tests bisect SUITE GOOD BAD [--check WORDS] [--times N]"
+        local here="${BB_REPO:-$PWD}/scripts/dashboard/test/run.sh"
+        [ -x "$here" ] || die "no dashboard test harness at $here: run this from the AerieOS checkout"
+        python3 "$BB_LIB/bisect-suite.py" --harness "$here" --flakes "${BB_REPO:-$PWD}/.bb-map/flakes.tsv" "$@"
+        return
+    fi
     # The flakes on record (R7 step 3): each suite that failed in a whole
     # run and passed when run again, counted over the last thirty days (or
     # DAYS), with the first check that failed the last time.
     if [ "${1:-}" = flakes ]; then
         shift
         case "${1:-30}" in ''|*[!0-9]*) die "usage: aerie tests flakes [DAYS]" ;; esac
-        python3 "$BB_LIB/flakes.py" list --file "${BB_REPO:-$PWD}/.bb-map/flakes.tsv" --days "${1:-30}"
+        # ...each with the open bug that names it, when one does.
+        local bl; bl="$(mktemp)"
+        "$0" bug list > "$bl" 2>/dev/null || : > "$bl"
+        python3 "$BB_LIB/flakes.py" list --file "${BB_REPO:-$PWD}/.bb-map/flakes.tsv" --days "${1:-30}" --bugs "$bl"
+        rm -f "$bl"
         return
     fi
     # The root tier (R240 step 5): what the root agent and the root helpers

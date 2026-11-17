@@ -549,6 +549,9 @@ aerie devapp test [ARGS]  the space's test command inside its running dev instan
                    container that is already up
 aerie tests unit      the python unit tier (scripts/dashboard/unit): the modules' rules without a server
                    or a browser, in under a second; preflight runs it before any suite
+aerie tests bisect SUITE GOOD BAD [--check WORDS] [--times N]   the first commit between GOOD and
+                   BAD where SUITE fails (or prints a FAIL line holding WORDS), found by halving and
+                   running it --at each commit; a suite that has flaked runs three times a commit
 aerie tests flakes [DAYS]  the suites that failed in a whole run and passed when run again, counted over
                    the last 30 days (or DAYS), the most often first, each with the check that failed
                    last; the harness records one as it names it, and aerie tests preflight fails on one
@@ -608,8 +611,12 @@ aerie design file [--from FILE]   docs/design-language.md as the notebook writes
                    of the saved design, so a branch writes the file from its own
 aerie design json     the record: the language, the pages, and the presets by key
 aerie design schema   the record's shape with every limit, for a save that lands first time
-aerie design save FILE   write a record of that shape back, whole: how a session
-                   puts a design language it was given into the notebook
+aerie design save FILE [--file]   write a record of that shape back, whole: how a
+                   session puts a design language it was given into the notebook
+aerie design edit NAME --text FILE|--append FILE [--file]   one rule's text (as
+                   show names it: a-dialog/layout) or one page's notes, changed
+                   in place and saved, printing what changed; - reads stdin.
+                   --file, here and on save, writes docs/design-language.md
 aerie wiki            the space's wiki, from the notebook's Wiki view: its pages,
                    who changed each last, and where it is pushed
 aerie wiki show NAME [--rev]   one page's Markdown (--rev: the revision a save checks)
@@ -824,13 +831,18 @@ aerie pc [VERB] [--why "..."]
 aerie doctor          check everything that usually goes wrong
 
 # developing AerieOS itself, from inside it
-aerie dashboard test  browser-test the dashboard from this checkout, isolated
+aerie dashboard test [SUITE...] [--at REF] [--loaded]  browser-test the dashboard from
+                   this checkout, isolated; --at runs a commit as it was (git archive, not the
+                   working tree); --loaded runs one suite beside a whole run's load, the gate's
+                   workers taking the longest of the rest, so a suite that fails only in a gate
+                   fails on demand
 aerie dashboard dev   serve the live dashboard from ./scripts/dashboard (--off reverts)
 aerie dashboard status  which copy of the dashboard is serving
 aerie dashboard trace [SECONDS]  what the dashboard was asked over the last SECONDS, by endpoint and who asked, with how long each took
 aerie drift           what this checkout changed that the container is not serving
 aerie map VERB ...    the code map, which a session asks before grepping: find NAME,
-                   who-calls NAME, calls NAME, defs FILE, draws ID|.class,
+                   show NAME|FILE:LINE (the definition whole), who-calls NAME,
+                   calls NAME, defs FILE, draws ID|.class,
                    suites FILE..., state [FILE], sections FILE, unused [FILE],
                    addresses [FILE...], coverage, covered NAME, uncovered [FILE],
                    affected --base REF FILES..., languages (which files it

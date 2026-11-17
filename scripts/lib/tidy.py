@@ -174,7 +174,20 @@ def suite_running(tmp=None):
             with open(lock, encoding="utf-8") as f:
                 pid = int(f.read().strip() or 0)
             if pid and os.path.isdir(os.path.join(PROC, str(pid))):
-                return True
+                # ...unless what started it is gone (B926): a gate ended by
+                # its own pid left its harness running under nobody, holding
+                # the lock, and that is a run to end, not one to spare.
+                return ppid_of(pid, PROC) > 1 or held_on_purpose(pid)
+    return False
+
+
+def held_on_purpose(pid, root=None):
+    """Whether a run outlives its launcher on purpose: a kept fixture
+    (aerie tests keep starts it detached) or one started BB_TEST_DETACHED."""
+    with contextlib.suppress(OSError):
+        with open(os.path.join(root or PROC, str(pid), "environ"), "rb") as f:
+            env = f.read().split(b"\0")
+        return b"BB_TEST_HOLD=1" in env or b"BB_TEST_DETACHED=1" in env
     return False
 
 

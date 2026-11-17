@@ -69,6 +69,10 @@ ci-log` reads either.
   `.bb-map/coverage.json`; `aerie map covered NAME`, `aerie map uncovered [FILE]`
   and `aerie map unused` read it. A whole run refreshes it, and preflight picks
   suites by it (`aerie map affected`).
+- **Before and after:** `aerie dashboard test SUITE --at REF` (and `aerie tests
+  run --at REF`) runs it on a commit, copied with `git archive` rather than
+  from the working tree, so nothing is stashed; `aerie tests bisect SUITE GOOD
+  BAD` finds the first commit where it fails.
 - **Before a push:** `aerie tests preflight`; `--dry` prints the plan,
   `--files F...` names the files, `--base HEAD` measures the working tree. A
   suite that fails in its run and passes run again is flaky: recorded
@@ -79,7 +83,7 @@ ci-log` reads either.
 
 ## Finding your way
 
-`aerie map find NAME`, `aerie map who-calls NAME`, `aerie map draws ID` and `aerie map
+`aerie map find NAME`, `aerie map show NAME` (the definition whole), `aerie map who-calls NAME`, `aerie map draws ID` and `aerie map
 suites FILE` answer "where would I look" from `scripts/lib/codemap.py`'s
 index, with the function's own comment; `aerie map sections FILE` reads a file
 by its `// ---- name ----` headers, `aerie map state [FILE]` lists a page

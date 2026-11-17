@@ -65,6 +65,34 @@ class Record(unittest.TestCase):
         self.assertNotIn("different check", got[0][4])
         self.assertEqual(got[1][1:], ("devapp", "8", "14.6", "the instance comes up (state: starting)"))
 
+    def test_what_it_waited_for_is_kept_and_said_on_its_bug(self):
+        # R250 step 2: the [wait] line under the first FAIL, or the error a
+        # suite stopped on, kept with the line; the bug that names the suite
+        # found; and the note said from the last sighting.
+        p = os.path.join(self.d, "worker-2.log")
+        with open(p, "w") as f:
+            f.write("[dashboard-test] == uniform-b.mjs ==\nFAIL  every view's first band starts at one height\n"
+                    "[wait] timed out; the page at that moment: {\"tabs\":[]}\nPASS  next\n"
+                    "[dashboard-test] == nodes.mjs ==\nPASS  a node enrolls\nnode:internal/process/promises:324\n"
+                    "route.fulfill: Route is already handled!\n    at busyList (nodes.mjs:2708:17)\n")
+        flakes.record(self.file, ["uniform-b.mjs", "nodes.mjs"], 8, "9.1", [p], now=1794700000)
+        rows = flakes.read_causes(self.file)
+        self.assertEqual(rows[0][4:], ("every view's first band starts at one height",
+                                       '[wait] timed out; the page at that moment: {"tabs":[]}'))
+        self.assertEqual(rows[1][4:], ("", "route.fulfill: Route is already handled!"))
+        self.assertEqual(flakes.read(self.file)[1], (1794700000, "nodes", "8", "9.1", ""), "read keeps its five")
+        bugs = ["  [ ] B927  (low)  uniform-b's 'every view's first band starts at one height' finds ...",
+                "  [ ] B924  (low)  test/nodes.mjs stops in busyList with 'route.fulfill ...",
+                "  [ ] B930  (low)  uniform-bar.mjs is another suite",
+                "  [x] B931  (low)  test/nodes.mjs, a closed one"]
+        self.assertEqual(flakes.bug_for("uniform-b", bugs), "B927")
+        self.assertEqual(flakes.bug_for("nodes.mjs", bugs), "B924")
+        self.assertEqual(flakes.bug_for("uniform", bugs), "", "a name inside another suite's is not it")
+        said = flakes.said(rows, "nodes", "35117c1")
+        self.assertIn("flaked again in a gate at 35117c1 (8 workers, load 9.1), 1 sightings on record", said)
+        self.assertIn("failed 'before its first check', having waited: route.fulfill: Route is already handled!", said)
+        self.assertEqual(flakes.said(rows, "cards"), "")
+
     def test_one_with_no_log_to_read_is_still_recorded_and_a_name_that_is_not_one_is_not(self):
         flakes.record(self.file, ["sessions.mjs", "../../etc/passwd\tx"], 1, "0.4", [], now=1794700000)
         self.assertEqual(flakes.read(self.file), [(1794700000, "sessions", "1", "0.4", "")])

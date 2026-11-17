@@ -10,6 +10,30 @@
 # caught it. The files: the branch against its base, plus the working
 # tree; or --files given outright; --dry only prints the plan.
 
+# Each flake onto its bug as it happens (R250 step 2): the check it failed
+# and what it waited for, noted on the open bug whose title names the suite,
+# or filed when none does, so the next session finds the sighting where it
+# looks and not only in this gate's scroll.
+flakes_to_bugs() {
+    local ff="${BB_REPO:-$PWD}/.bb-map/flakes.tsv" bl s b said commit
+    bl="$(mktemp)"
+    bash "$0" bug list > "$bl" 2>/dev/null || { rm -f "$bl"; return 0; }
+    commit="$(git rev-parse --short HEAD 2>/dev/null || true)"
+    for s in "$@"; do
+        said="$(python3 "$BB_LIB/flakes.py" said --file "$ff" --commit "$commit" "$s" 2>/dev/null)" || continue
+        b="$(python3 "$BB_LIB/flakes.py" bug-for --bugs "$bl" "$s" 2>/dev/null || true)"
+        if [ -n "$b" ]; then
+            bash "$0" bug note "$b" "$said" > /dev/null 2>&1 && printf '  NOTE  %s flaked: noted on %s\n' "$s" "$b"
+        else
+            b="$(bash "$0" bug add "test/$s.mjs fails under a whole gate's load and passes alone: $said" --sev low \
+                    --area "test/$s.mjs" --repro "aerie tests preflight${commit:+ at $commit}; aerie dashboard test $s --loaded runs it under that load on demand" \
+                    --reproduces sometimes 2>/dev/null | sed -n 's/^filed \(B[0-9]*\):.*/\1/p')"
+            [ -z "$b" ] || printf '  NOTE  %s flaked: filed %s\n' "$s" "$b"
+        fi
+    done
+    rm -f "$bl"
+}
+
 cmd_tests_preflight() {
     local dry="" base="" files=() f suites=() checks=() all_dash="" own=() mapped=() named=""
     # harness: the suites' own library or runner changed, so every suite
@@ -276,8 +300,9 @@ cmd_tests_preflight() {
     # passed run again, and exits 0; a gate runs the suites the change
     # touches, so one of them flaking is the change's to settle before a
     # push, where a release's tag still counts it as passed.
-    local flk=""
+    local flk="" flk_all=""
     [ "$rl" = /dev/null ] || flk="$(python3 "$BB_LIB/flakes.py" of-log "$rl" 2>/dev/null || true)"
+    flk_all="$flk"
     if [ -n "$flk" ] && [ -n "$harness_only" ]; then
         local fk="" fo="" x
         for x in $flk; do
@@ -290,6 +315,8 @@ cmd_tests_preflight() {
         printf '  FAIL  flaky in this gate: %s. Each failed in the run and passed when run again, and a gate runs the suites the change touches: aerie dashboard test SUITE runs one by itself, aerie tests flakes says how often each has flaked\n' "$flk" | tee -a "$rl"
         rc=1
     fi
+    # shellcheck disable=SC2086  # suite names, no spaces of their own
+    [ -z "$flk_all" ] || flakes_to_bugs $flk_all 2>&1 | tee -a "$rl"
     local c
     for c in "${checks[@]}"; do
         # design is uniform.mjs, already in the run when it is listed

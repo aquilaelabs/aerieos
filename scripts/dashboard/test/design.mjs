@@ -587,6 +587,26 @@ await section("a session writes one", async () => {
   let refused = '';
   try { bb('save', '/nonexistent.json'); } catch (e) { refused = String(e.stderr); }
   ok(/could not read \/nonexistent.json/.test(refused), 'a file that is not there is refused by name');
+  // One rule or one page's notes changed in place (R252): the record read,
+  // that one text changed, saved whole, and what changed printed.
+  const txt = `${DIR}/design-edit.txt`;
+  writeFileSync(txt, 'Every list pages at a hundred.\n');
+  const edited = bb('edit', 'lists', '--text', txt);
+  writeFileSync(txt, 'A row opens where it is pressed.');
+  const appended = bb('edit', 'the-login-screen', '--append', txt);
+  const ed = await api(`/api/design?project=${P}`);
+  ok(/saved the rule lists in alpha's design:/.test(edited) && /^-Every list pages at fifty\.$/m.test(edited) && /^\+Every list pages at a hundred\.$/m.test(edited)
+     && ed.language.themes[0].rules.find(r => r.name === 'lists')?.text === 'Every list pages at a hundred.'
+     && ed.language.themes[0].rules.find(r => r.name === 'voice')?.text === 'One sentence that tells the person what to do.'
+     && /saved the page the-login-screen's notes/.test(appended) && ed.pages[1].notes === 'A row opens where it is pressed.'
+     && ed.pages.length === 2 && ed.language.themes.length === 2,
+     `aerie design edit changes one rule's text, or adds to one page's notes, and leaves the rest as it was (${edited.split('\n')[0]}; ${appended.split('\n')[0]})`);
+  writeFileSync(txt, 'Every list pages at a hundred.');
+  ok(/already reads so; nothing saved/.test(bb('edit', 'lists', '--text', txt)), '...and a text it already has saves nothing');
+  let nope = '';
+  try { bb('edit', 'listz', '--text', txt); } catch (e) { nope = String(e.stderr); }
+  ok(/no rule or page called listz; the nearest: lists/.test(nope), `...and a name it does not have is refused with the nearest (${nope.trim().slice(0, 90)})`);
+
   await openSect('pages');   // one section open at a time (the operator, 5 Oct)
   await pickPage('p2');
   await page.waitForSelector(`${NB} [data-dspage="p2"] .dsboard`, { timeout: 5000 });

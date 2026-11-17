@@ -14,10 +14,18 @@ record's shape with every limit (B342); `save FILE` (or `-`
 for stdin) writes a record of that shape back, whole, which is how a
 session asked to put a design language into the notebook does it. A page
 without an id is new; one with its id replaces that page; one left out is
-removed. BB_DESIGN_AUTH is the auth header and BB_DESIGN_PROJECT the project.
+removed. `edit NAME --text FILE` (or `--append FILE`, either `-` for stdin)
+changes one rule's text (a design rule by its name, a theme's or a page's
+as `aerie design show` names it, `a-dialog/layout`) or one page's notes,
+and saves the record whole as `save` does, printing what changed. `--file`
+on `edit` and `save` writes docs/design-language.md into the repository's
+tree from what was saved. BB_DESIGN_AUTH is the auth header and
+BB_DESIGN_PROJECT the project.
 """
+import difflib
 import json
 import os
+import subprocess
 import sys
 import urllib.parse
 
@@ -33,7 +41,11 @@ fmt, argv = dash.format_flag(sys.argv[1:])
 verb = argv[0] if argv else "list"
 auth = os.environ["BB_DESIGN_AUTH"]
 proj = os.environ["BB_DESIGN_PROJECT"]
-USAGE = "usage: aerie design [list | show [ID|NAME] | file [--from FILE] | json | schema | save FILE]"
+USAGE = ("usage: aerie design [list | show [ID|NAME] | file [--from FILE] | json | schema | save FILE [--file] | "
+         "edit NAME --text FILE|--append FILE [--file]]")
+# --file on save and edit: docs/design-language.md written into the tree.
+write_file = "--file" in argv
+argv = [a for a in argv if a != "--file"]
 
 
 def fail(msg):
@@ -75,8 +87,48 @@ if verb == "file" and len(argv) > 1:
     sys.stdout.write(text + ("" if text.endswith("\n") else "\n"))
     raise SystemExit(0)
 
-if verb == "save":
-    rec = read_record(argv[1])
+def tree_file():
+    """This repository's docs/design-language.md, None outside a repository."""
+    try:
+        top = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True,
+                             check=True).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return os.path.join(top, "docs", "design-language.md")
+
+
+def saved_file_text():
+    """docs/design-language.md as the saved design writes it."""
+    r = bbapi.call("/api/design?project=" + urllib.parse.quote(proj) + "&show=file", auth=auth)
+    if not isinstance(r, dict) or r.get("error"):
+        fail((r or {}).get("error") if isinstance(r, dict) else "the controller answered something that is not a design")
+    text = str(r.get("text") or "")
+    return text + ("" if text.endswith("\n") else "\n")
+
+
+def design_file():
+    """docs/design-language.md written into this repository's tree from the
+    saved design, as `aerie design file > docs/design-language.md` does; or,
+    without --file, a line when the tree's file is not what it writes."""
+    path = tree_file()
+    if not write_file:
+        if path and os.path.isfile(path):
+            with open(path, encoding="utf-8", errors="replace") as f:
+                if f.read() != saved_file_text():
+                    print(f"{os.path.relpath(path)} in this tree is not what the saved design writes: "
+                          "--file writes it (aerie design file prints it)")
+        return
+    if not path:
+        fail("--file writes into a repository's tree, and this is not inside one")
+    text = saved_file_text()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text)
+    print(f"wrote {os.path.relpath(path)} from the saved design")
+
+
+def save(rec, said):
+    """Save a whole record, saying `said` once it lands."""
     r = bbapi.call("/api/design", {"action": "save", "project": proj,
                                    "language": rec.get("language") or {},
                                    "pages": rec.get("pages") or []}, auth=auth)
@@ -88,10 +140,54 @@ if verb == "save":
         print(f"held for the operator's approval on {proj}'s notebook (Agents may: Add to the design is ask): "
               f"{r['held'].get('summary', '')}")
         raise SystemExit(0)
-    n = len(r.get("pages") or [])
-    print(f"saved {proj}'s design: {n} page{'' if n == 1 else 's'}; the notebook's Design view shows it, "
-          "and aerie design file prints docs/design-language.md from it")
+    print(said(r))
+    design_file()
     raise SystemExit(0)
+
+
+if verb == "save":
+    rec = read_record(argv[1])
+    save(rec, lambda r: (f"saved {proj}'s design: {len(r.get('pages') or [])} page"
+                         f"{'' if len(r.get('pages') or []) == 1 else 's'}; the notebook's Design view shows it"
+                         + ("" if write_file else ", and aerie design file prints docs/design-language.md from it")))
+
+if verb == "edit":
+    # One rule or one page's notes changed in place, the record saved whole.
+    if len(argv) != 4 or argv[2] not in ("--text", "--append"):
+        fail("usage: aerie design edit NAME --text FILE|--append FILE [--file] (FILE or - for stdin)")
+    name, how, src = argv[1], argv[2], argv[3]
+    try:
+        new = sys.stdin.read() if src == "-" else open(src, encoding="utf-8").read()
+    except OSError as e:
+        fail(f"could not read {src}: {e}")
+    new = new.strip("\n")
+    if not new.strip():
+        fail(f"{src} is empty; aerie design save writes a record with the rule left out")
+    r = bbapi.call("/api/design?project=" + urllib.parse.quote(proj) + "&show=json", auth=auth)
+    if not isinstance(r, dict) or r.get("error"):
+        fail((r or {}).get("error") if isinstance(r, dict) else "the controller answered something that is not a design")
+    rec = json.loads(str(r.get("text") or "{}"))
+    import design
+    rules = {n: rule for n, rule, _ in design.scoped_rules(rec)}
+    pages = {}
+    for p in rec.get("pages") or []:
+        pages.setdefault(design.page_key(p), p)
+        pages.setdefault(str(p.get("name") or ""), p)
+    if name in rules:
+        holder, key, what = rules[name], "text", f"the rule {name}"
+    elif name in pages:
+        holder, key, what = pages[name], "notes", f"the page {name}'s notes"
+    else:
+        near = difflib.get_close_matches(name, [*rules, *[k for k in pages if k]], n=5, cutoff=0.6)
+        fail(f"the design has no rule or page called {name}" + (f"; the nearest: {', '.join(near)}" if near else "")
+             + "; aerie design lists them")
+    was = str(holder.get(key) or "")
+    holder[key] = (was.rstrip("\n") + "\n\n" + new) if how == "--append" and was.strip() else new
+    if holder[key] == was:
+        print(f"{what} already reads so; nothing saved")
+        raise SystemExit(0)
+    diff = list(difflib.unified_diff(was.splitlines(), holder[key].splitlines(), "before", "after", lineterm="", n=1))
+    save(rec, lambda _r: "\n".join([f"saved {what} in {proj}'s design:", *diff[2:]]))
 
 if verb == "show":
     which = " ".join(argv[1:]).strip() or "language"
