@@ -739,7 +739,10 @@ await section("tool packs (R77)", async () => {
     const next = g('rev-parse', 'HEAD');
     pin(next);
     const REPIN = `.doc.on .librarytab .lcard[data-lrow="pack:hexkit"] [data-libact="repin"]`;
-    await page.evaluate(() => { loadToolchains(); loadLibrary(); });
+    // As a person meets it: the Library read, and the Toolchains page's own
+    // rows never, which the Library stands in for with the job alone. Taken
+    // for the rows, the dialog sent no address and its Add was refused.
+    await page.evaluate(() => { toolchains = null; loadLibrary(); });
     await page.waitForSelector(REPIN, { timeout: 20000 });
     const vcard = await page.evaluate(() => [...document.querySelectorAll('.doc .librarytab .lcard[data-lrow="pack:hexkit"] .lcmeta .pill')].map(p => p.textContent.trim()));
     ok(vcard.includes('vetted'), `the kept pack's card wears vetted (${vcard.join(', ')})`);
@@ -763,6 +766,12 @@ await section("tool packs (R77)", async () => {
     await page.waitForFunction(c => (toolchains?.items || []).find(i => i.name === 'hexkit')?.pack?.commit === c, next, { timeout: 20000 });
     const after = await page.evaluate(() => (toolchains.items || []).find(i => i.name === 'hexkit').pack.tier);
     ok(after === 'vetted', `...and Update keeps it at that pin, still vetted (${after})`);
+    // ...and the Updates chip counts one fewer, as the card leaves it.
+    await page.waitForFunction(() => !(lib?.rows || []).find(r => r.name === 'hexkit')?.repin, null, { timeout: 20000 }).catch(() => {});
+    const left = await page.evaluate(() => ({ counted: (lib?.rows || []).filter(LIB_STANDS.update).some(r => r.name === 'hexkit'),
+      state: document.querySelector('.doc.on .librarytab .lcard[data-lrow="pack:hexkit"] .state')?.textContent.trim() || '' }));
+    ok(!left.counted && !/manifest update available/.test(left.state),
+       `...and it is no longer counted under Updates (${JSON.stringify(left)})`);
     // Kept from the catalog, its card has no Edit, which is for what a
     // person added themselves: the source line of its Details page opens
     // the same dialog, with its Remove.

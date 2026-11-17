@@ -518,7 +518,8 @@ function tpDraw(first){
   if (file) file.onchange = () => { tpForm.file = file.files[0] || null; tpForm.seen = null; tpForm.error = ""; tpDraw(); };
   m.querySelector("[data-tpcancel]").onclick = tpClose;
   const post = body => postJSON("/api/toolpacks", body);
-  const packUrl = () => tpEdit ? (toolchains?.items || []).find(i => i.name === tpEdit)?.pack?.url || "" : tpForm.url.trim();
+  // The kept pack's address, or the catalog pin's the dialog was opened on.
+  const packUrl = () => tpEdit ? (toolchains?.items || []).find(i => i.name === tpEdit)?.pack?.url || tpForm.catalog?.url || "" : tpForm.url.trim();
   const look = m.querySelector("[data-tplook]");
   if (look) look.onclick = tpForm.what === "app" && !tpEdit ? tpAppLook : tpLook;
   const add = m.querySelector("[data-tpadd]");
@@ -533,7 +534,7 @@ function tpDraw(first){
       return;
     }
     const j = await post(tpForm.seen?.staged ? {action: "add", staged: tpForm.seen.staged}
-                                             : {action: "add", url: packUrl(), commit: tpForm.seen?.commit || "",
+                                             : {action: "add", url: packUrl(), commit: tpForm.seen?.commit || tpForm.catalog?.commit || "",
                                                 ...(tpForm.catalog ? {sha256: tpForm.catalog.sha256, path: tpForm.catalog.path || ""} : {})});
     if (j.error){ tpForm.busy = ""; tpForm.error = j.error; tpDraw(); return; }
     notify(j.unchanged ? `${j.pack.name}: nothing changed, so it is kept as it was`

@@ -111,8 +111,11 @@ function loadLibrary(){
     if (!lib.error){
       tcSandboxNow = !!lib.sandbox; agYours = lib.yours || {plugins: [], mcp: {}};
       // ...and tcAct refuses a second job by the Toolchains page's record of
-      // the one running, which this read keeps current for it.
-      if (toolchains && !toolchains.nonode && !toolchains.error) toolchains.job = lib.job; else toolchains = {name: lib.name, job: lib.job, items: []};
+      // the one running, which this read keeps current for it: where that
+      // page has not read its rows, a stand-in holding the job alone, marked
+      // so the pack dialogs read the rows they need (libWithToolchains).
+      if (toolchains && !toolchains.nonode && !toolchains.error) toolchains.job = lib.job;
+      else toolchains = {name: lib.name, job: lib.job, items: [], stub: true};
     }
     // One follow-up while a job writes a row, not a poll: the toolchains
     // revision moves when the job ends, and the row's "installing" until then.
@@ -570,8 +573,12 @@ function wireLibrary(root){
 
 // The pack dialogs read the Toolchains page's rows (tpOpen's Edit finds the
 // pack there), so they are read for this node first where they are not yet.
+// The stand-in loadLibrary keeps for the running job is no rows: taken for
+// them, a kept pack was not found, its Manifest update opened as a fresh
+// install and its Add sent no address, refused as a pin the catalog does
+// not make.
 async function libWithToolchains(f){
-  if (!toolchains || toolchains.nonode || toolchains.error || tcNode !== libNode) await loadToolchains();
+  if (!toolchains || toolchains.stub || toolchains.nonode || toolchains.error || tcNode !== libNode) await loadToolchains();
   f();
 }
 
