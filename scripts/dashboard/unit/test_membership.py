@@ -60,7 +60,7 @@ class Membership(unittest.TestCase):
         # ...and through the Users tab's own verb, an administrator adding
         # themselves is refused there.
         bob = self.me("bob")
-        r = users.verb("projects", {"name": "bob", "projects": ["app"]}, lambda: {"app"},
+        r = users.verb("edit", {"name": "bob", "projects": ["app"]}, lambda: {"app"},
                        may_change=lambda p: membership.member_refusal(bob, p))
         self.assertIn("invite only", r.get("error", ""))
         self.assertNotIn("app", users.get("bob")["projects"])

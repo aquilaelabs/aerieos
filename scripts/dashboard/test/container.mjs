@@ -46,7 +46,7 @@ execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'add', 'visitor', '--rol
   { input: 'visitorpass1\nvisitorpass1\n', encoding: 'utf8',
     env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
 const other = asUser('visitor', 'visitorpass1');
-await api('/api/users', { action: 'projects', name: 'visitor', projects: ['alpha'] });
+await api('/api/users', { action: 'edit', name: 'visitor', projects: ['alpha'] });
 
 // ---- the ask, who sees it, and what they see --------------------------------
 const asked = await ask({});

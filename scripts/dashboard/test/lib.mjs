@@ -911,7 +911,7 @@ export async function takeOn(...names) {
   const have = me?.projects || [];
   const want = [...have, ...names.filter(n => !have.includes(n))];
   const r = await fetch(`${base}/api/users`, { method: 'POST', headers: h,
-    body: JSON.stringify({ action: 'projects', name: 'test', projects: want }) });
+    body: JSON.stringify({ action: 'edit', name: 'test', projects: want }) });
   return (await r.json()).projects || [];
 }
 
@@ -978,6 +978,6 @@ export async function member(...names) {
     await fetch(`${base}/api/roles`, { method: 'POST', headers: h,
       body: JSON.stringify({ action: 'assign', name, project_roles }) });
     await fetch(`${base}/api/users`, { method: 'POST', headers: h,
-      body: JSON.stringify({ action: 'projects', name, projects: was }) });
+      body: JSON.stringify({ action: 'edit', name, projects: was }) });
   }
 }

@@ -154,7 +154,7 @@ execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'add', 'visitor', '--rol
 const other = asUser('visitor', 'visitorpass1');
 // Given the project, so what is refused below is refused for ownership and
 // not for never having taken the project on.
-await api('/api/users', { action: 'projects', name: 'visitor', projects: ['alpha'] });
+await api('/api/users', { action: 'edit', name: 'visitor', projects: ['alpha'] });
 const theirs = (await api('/api/phone?node=' + sandbox.id, undefined, other)).body;
 const seen = theirs.nodes.find(n => n.id === sandbox.id);
 ok(seen.phone && !seen.phone.model && !seen.phone.serial && !seen.mine && !seen.may_drive && seen.owner?.name === 'test',
@@ -168,11 +168,11 @@ const plain = asUser('plainuser', 'plainpass1');
 // A user-role account (B490): no address either, and no remembered rows
 // but its own (an administrator keeps both: they may disconnect anyone's).
 // On the project, so the node is listed to them at all.
-await api('/api/users', { action: 'projects', name: 'plainuser', projects: ['alpha'] });
+await api('/api/users', { action: 'edit', name: 'plainuser', projects: ['alpha'] });
 const plainSeen = (await api('/api/phone?node=' + sandbox.id, undefined, plain)).body.nodes.find(n => n.id === sandbox.id);
 ok(plainSeen.phone && !plainSeen.phone.model && !plainSeen.ip && (plainSeen.known || []).length === 0 && plainSeen.owner?.name === 'test',
    `a user-role account is told the same, with no address and nobody else's remembered phones (${JSON.stringify([plainSeen.ip, plainSeen.known])})`);
-await api('/api/users', { action: 'projects', name: 'plainuser', projects: ['alpha'] });
+await api('/api/users', { action: 'edit', name: 'plainuser', projects: ['alpha'] });
 const theirDisc = await api('/api/phone', { action: 'disconnect', node: sandbox.id }, plain);
 ok(theirDisc.status === 400 && /connected by test/.test(theirDisc.body.error) && /or an administrator/.test(theirDisc.body.error),
    'only the account that connected a phone, or an administrator, can disconnect it, and the refusal names them');

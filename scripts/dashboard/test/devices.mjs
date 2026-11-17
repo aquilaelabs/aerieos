@@ -38,7 +38,7 @@ const signin = (username, password, name = 'TEST-PC') => dev('', 'signin', { use
 // ---- accounts, and what alpha's editor access gives each --------------------------
 const people = { 'dv.rw': 'dvrwpass1', 'dv.r': 'dvrpass12', 'dv.none': 'dvnonepass1' };
 for (const [n, pw] of Object.entries(people)) addUser(n, pw);
-for (const n of Object.keys(people)) await admin('/api/users', { action: 'projects', name: n, projects: ['alpha'] });
+for (const n of Object.keys(people)) await admin('/api/users', { action: 'edit', name: n, projects: ['alpha'] });
 await admin('/api/roles', { action: 'set', name: 'dv-files-w', scope: 'projects', perms: { projects: 'write', files: 'write' } });
 // dv.none is on alpha with a role that gives no File access: being on the
 // project lets a person's machine in only as far as their roles' File access

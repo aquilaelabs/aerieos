@@ -326,7 +326,7 @@ await section("a strip each", async () => {
   // which is correct, and would make everything below pass for the wrong
   // reason.
   await bare('/api/users', { method: 'POST', headers: owner,
-    body: JSON.stringify({ action: 'projects', name: 'sharer', projects: ['beta'] }) });
+    body: JSON.stringify({ action: 'edit', name: 'sharer', projects: ['beta'] }) });
   // ...and an author, or no Claude session starts for it (users.git_ready):
   // the checks below are about whose session it is, not about that.
   await bare('/api/users', { method: 'POST', headers: owner,
@@ -361,7 +361,7 @@ await section("a strip each", async () => {
         body: JSON.stringify({ action: 'prefs', prefs: { theme: '../../etc' } }) })).status === 400,
      'a scheme that is not one of the names is refused, not stored');
   ok((await bare('/api/users', { method: 'POST', headers: other,
-        body: JSON.stringify({ action: 'role', name: 'test', role: 'user' }) })).status === 403,
+        body: JSON.stringify({ action: 'edit', name: 'test', role: 'user' }) })).status === 403,
      '...and prefs being open to everyone did not open the rest of the tab');
 
   // ---- a Claude sign-in is one account's, on one node ----------------------
@@ -604,11 +604,11 @@ await section("a strip each", async () => {
       const ak = projectKey('alpha');
       ok(!list.includes('*') && list.includes(ak) && await mine() === true,
          `the owner's "*" became the spaces that exist, alpha's among them (${list.join(', ')})`);
-      await post(owner, '/api/users', { action: 'projects', name: 'test', projects: list.filter(p => p !== ak) });
+      await post(owner, '/api/users', { action: 'edit', name: 'test', projects: list.filter(p => p !== ak) });
       const off = await post(owner, '/api/roadmap', { project: 'alpha', action: 'add', text: 'x' });
       ok(await mine() === false && off.status === 403,
          `...and off their own list, alpha is read-only to the owner too (${off.status})`);
-      await post(owner, '/api/users', { action: 'projects', name: 'test', projects: list });
+      await post(owner, '/api/users', { action: 'edit', name: 'test', projects: list });
       ok(await mine() === true, '...until it is put back');
     }
     // The resume offer is the asking account's own (B489): a transcript the
@@ -676,12 +676,12 @@ await section("a strip each", async () => {
 
     // ...and the remedy is theirs to apply, which is the whole difference
     // between this and a user's list.
-    ok((await post(adm, '/api/users', { action: 'projects', name: 'second',
+    ok((await post(adm, '/api/users', { action: 'edit', name: 'second',
                                         projects: ['alpha'] })).status === 200,
        'an admin can add a space to its own list: a seatbelt, not a wall');
     ok((await post(adm, '/api/roadmap', { project: 'alpha', action: 'add', text: 'x' })).status === 200,
        '...and then it works on it');
-    ok((await post(other, '/api/users', { action: 'projects', name: 'sharer',
+    ok((await post(other, '/api/users', { action: 'edit', name: 'sharer',
                                           projects: ['alpha'] })).status === 403,
        'a user cannot grant itself anything, which is why theirs is a boundary');
     execFileSync('python3', ['-c', `
@@ -1411,7 +1411,7 @@ await section("the Profile tab", async () => {
     // the name. A plain account given alpha cannot lock it, move the shared
     // pins, read how its remote authenticates, or move its version; the
     // version panel is closed to a session's token outright.
-    await act(ownerAuth, '/api/users', { action: 'projects', name: 'plainone', projects: ['alpha'] });
+    await act(ownerAuth, '/api/users', { action: 'edit', name: 'plainone', projects: ['alpha'] });
     for (const [path, body, why] of [
         // Its owner's or an administrator's (R119), not a grant's.
         ['/api/lock', { name: 'alpha', locked: true }, /owner or an administrator/],
@@ -1653,14 +1653,14 @@ await section("the Profile tab", async () => {
       // owner's alone (the operator, 6 Oct): an administrator on the project
       // is refused a change and may still save the dialog around it.
       {
-        await post(ownerAuth, '/api/users', { action: 'projects', name: 'adminone', projects: ['alpha'] });
+        await post(ownerAuth, '/api/users', { action: 'edit', name: 'adminone', projects: ['alpha'] });
         const adminTry = await post(adminAuth, '/api/prefs', { project: 'alpha', reads: ['beta'] });
         const ownerTry = await post(ownerAuth, '/api/prefs', { project: 'alpha', reads: ['beta'] });
         const adminSame = await post(adminAuth, '/api/prefs', { project: 'alpha', reads: ['beta'] });
         const adminOff = await post(adminAuth, '/api/prefs', { project: 'alpha', reads: [] });
         const can = await bare('/api/status', { headers: adminAuth }).then(r => r.json()).then(j => j.can?.reads);
         await post(ownerAuth, '/api/prefs', { project: 'alpha', reads: [] });
-        await post(ownerAuth, '/api/users', { action: 'projects', name: 'adminone', projects: [] });
+        await post(ownerAuth, '/api/users', { action: 'edit', name: 'adminone', projects: [] });
         ok(adminTry.status === 403 && /AerieOS's owner alone/.test(adminTry.body.error || '') && ownerTry.status === 200
            && adminSame.status === 200 && adminOff.status === 403 && can === false,
            `only AerieOS's owner changes which spaces a space's sessions may read; an administrator is refused adding or taking one away, may save the rest, and the dialog is told (${adminTry.status}/${ownerTry.status}/${adminSame.status}/${adminOff.status}, can ${can})`);
@@ -1705,7 +1705,7 @@ await section("the Profile tab", async () => {
         ok(held.status === 429, `...and five wrong in a row hold the downloads, even for the right one (${held.status})`);
         // Handing the project on leaves the password where it is (the
         // operator, 2 Oct): the new owner changes it only with it.
-        await post(ownerAuth, '/api/users', { action: 'projects', name: 'adminone', projects: ['alpha'] });
+        await post(ownerAuth, '/api/users', { action: 'edit', name: 'adminone', projects: ['alpha'] });
         await post(ownerAuth, '/api/members', { action: 'set', project: 'alpha', owner: 'adminone' });
         const blind = await post(adminAuth, '/api/signing', { action: 'backup-password', project: 'alpha', new: 'taken-over-pw' });
         const told = await post(adminAuth, '/api/signing', { action: 'backup-password', project: 'alpha',
@@ -1718,7 +1718,7 @@ await section("the Profile tab", async () => {
       }
       const view = await post(ownerAuth, '/api/members', { action: 'view', project: 'gamma' });
       const set = await post(ownerAuth, '/api/members', { action: 'set', project: 'gamma', invite_only: true });
-      const self = await post(adminAuth, '/api/users', { action: 'projects', name: 'adminone', projects: ['gamma'] });
+      const self = await post(adminAuth, '/api/users', { action: 'edit', name: 'adminone', projects: ['gamma'] });
       const notOwner = await post(adminAuth, '/api/members', { action: 'set', project: 'gamma', invite_only: false });
       ok(view.status === 200 && view.body.owner === 'test' && set.body.invite_only === true
          && /invite only/.test(self.body.error || '') && notOwner.status === 403,
@@ -1730,8 +1730,8 @@ await section("the Profile tab", async () => {
         // By project (R138): the list names gamma's project by its key.
         const GK = projectKey('gamma');
         const without = list.filter(p => p !== GK);
-        await post(ownerAuth, '/api/users', { action: 'projects', name: 'test', projects: without });
-        const back = await post(ownerAuth, '/api/users', { action: 'projects', name: 'test', projects: [...without, 'gamma'] });
+        await post(ownerAuth, '/api/users', { action: 'edit', name: 'test', projects: without });
+        const back = await post(ownerAuth, '/api/users', { action: 'edit', name: 'test', projects: [...without, 'gamma'] });
         ok(back.status === 200 && (back.body.projects || []).includes(GK),
            `...while the owner adds themselves to it without an invitation (${back.status})`);
       }

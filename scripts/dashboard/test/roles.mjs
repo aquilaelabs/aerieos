@@ -162,7 +162,7 @@ for (const who of CAST) {
 // one set for everybody, and each person's own are theirs alone.
 await section("meeting each other", async () => {
   const [owner, admin1, , user1, user2, user3] = CAST;
-  const g = await api(admin1.page, '/api/users', { action: 'projects', name: 'w.user3', projects: ['alpha'] });
+  const g = await api(admin1.page, '/api/users', { action: 'edit', name: 'w.user3', projects: ['alpha'] });
   ok(g.status === 200 && !g.error, `an administrator grants w.user3 alpha (${g.status}${g.error ? ': ' + g.error : ''})`);
   await user3.page.reload(); await ready(user3.page);
   ok(await user3.page.evaluate(() => (state.projects || []).some(p => p.name === 'alpha')),

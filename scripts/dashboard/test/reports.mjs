@@ -291,7 +291,7 @@ await section("and only from a project the person works on", async () => {
   const send = async p => { const r = await fetch(URL.replace(/\/$/, '') + '/api/reports', { method: 'POST', headers: as,
     body: JSON.stringify({ action: 'add', project: p, text: 'seen from outside', area: 'Something else' }) }); return { status: r.status, body: await r.json() }; };
   await page.evaluate(() => fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'projects', name: 'repadmin', projects: ['beta'] }) }));
+    body: JSON.stringify({ action: 'edit', name: 'repadmin', projects: ['beta'] }) }));
   const refused = await send('alpha');
   ok(refused.status === 403 && /not on alpha/.test(refused.body.error || ''),
      `an administrator not on a space is refused a report from it (${refused.status} ${refused.body.error})`);

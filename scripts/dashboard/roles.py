@@ -26,43 +26,6 @@ import statefile
 
 NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9 ._-]{0,39}$")
 
-# Every capability the gate asks about, with its group and the sentence the
-# tab shows beside it. `work` is everything a person does on a project that
-# is not listed on its own below: the notebook, a Claude session, settings,
-# builds and tests, the phone it is lent.
-CAPS = {
-    "read": ("projects", "read a space: its notebook, code and state"),
-    "work": ("projects", "work on a space: the notebook, an agent's session, its settings, builds and tests"),
-    "version": ("projects", "move a space's version and release it"),
-    "lock": ("projects", "nothing any more: a space's owner or an administrator locks it (deprecated, goes in 0.8.0)"),
-    "rename": ("projects", "rename a space"),
-    "trash": ("projects", "delete a space"),
-    "git-auth": ("projects", "change how a space authenticates to its remote"),
-    "docker-write": ("projects", "start, stop and rebuild containers"),
-    "command-pin": ("projects", "move the pinned commands, one set for everybody"),
-    "ftp": ("projects", "turn on a space's file access over FTP, its port, and who may sign in to it"),
-    "node": ("nodes", "set which node a space builds on"),
-    "toolchains-write": ("nodes", "install and remove toolchains on a node"),
-    "jobs": ("nodes", "run a command on a node as a job"),
-    "terminal": ("nodes", "a shell on a node"),
-    "create": ("controller", "make a space"),
-    "runner": ("controller", "the CI runner page and its settings"),
-    "admin": ("controller", "everything else an administrator does: nodes, toolchains, settings, accounts"),
-    "debug": ("controller", "debug mode, the controller's diagnostics and nodes' logs, and granting them to a space's sessions"),
-}
-# Granted by name only (the operator, 6 Oct): `*` does not reach these, so
-# the built-in admin and a role that grants everything leave them out, and
-# only the owner has them until a role names them. ftp too (R151): who may
-# reach a project's files from outside AerieOS is the owner's to hand on.
-NAMED_ONLY = frozenset({"debug", "ftp"})
-# The capabilities whose scope is over NODES (step 3): every node, the
-# nodes of the account's projects, or named ones.
-NODE_CAPS = frozenset(c for c, (g, _) in CAPS.items() if g == "nodes")
-GROUPS = (("projects", "On a space"), ("nodes", "On a node"), ("controller", "The controller"))
-# What `work` does not cover: each needs a grant of its own.
-OWN_CAPS = frozenset(c for c in CAPS if c not in ("read", "work"))
-SCOPES = ("mine", "all")           # or a list of project names
-
 # ---- R152: areas, each Read and Write -------------------------------------
 # The operator, 7 Oct: a role is a scope and, per area, Read or Write;
 # Write needs Read, and an area without Read is not seen. Project areas hold
@@ -135,7 +98,11 @@ CAP_AREA = {
     "runner": ("runner", "write"),
     "command-pin": ("controller", "write"), "create": ("newprojects", "write"),
     "admin": ("accounts", "write"), "debug": ("controller", "write"),
-    "ftp": ("settings", "write"),
+    # A space's file access over FTP, its port and who of its people may
+    # sign in to it: File access, the area whose files it hands out. A
+    # person on its list reaches no more than their own roles' File access
+    # gives (ftp.access_for).
+    "ftp": ("files", "write"),
     # Each its own area (R255 step 3, the operator, 16 Oct): what these
     # gated was behind accounts write whatever it was, so a role's areas
     # did not say what it could do.

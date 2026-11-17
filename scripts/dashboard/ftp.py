@@ -10,8 +10,9 @@ password checked as the dashboard's sign-in checks them, then the access
 this project's settings give that account. Nothing is cached on the node,
 so taking an access away holds from the next login.
 
-Who may change any of it is the `ftp` grant, named only (roles.NAMED_ONLY),
-so the owner has it and nobody else until a role names it.
+Who may change any of it is File access Write on the space (the `ftp`
+action, roles.CAP_AREA): its owner and an administrator, and a role that
+gives it. Nobody on the list reaches more than their own roles give.
 """
 import socket
 import threading

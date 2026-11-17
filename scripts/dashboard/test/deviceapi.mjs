@@ -34,7 +34,7 @@ const rowsSeen = (body, reads) => Object.keys(reads || {}).filter(k => k.include
 
 // ---- accounts: a person with read and write on alpha through the editor's door ---------
 addUser('pin.rw', 'pinrwpass1');
-await admin('/api/users', { action: 'projects', name: 'pin.rw', projects: ['alpha'] });
+await admin('/api/users', { action: 'edit', name: 'pin.rw', projects: ['alpha'] });
 await admin('/api/roles', { action: 'set', name: 'pin-files-w', scope: 'projects', perms: { projects: 'write', files: 'write' } });
 await admin('/api/roles', { action: 'assign', name: 'pin.rw', project_roles: { alpha: ['pin-files-w'] } });
 const set = await admin('/api/project-ftp', { action: 'set', project: 'alpha', editor: true, access: { [uidOf('pin.rw')]: 'rw' } });

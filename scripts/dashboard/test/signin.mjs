@@ -283,7 +283,7 @@ await section("the agent a project's Start opens", async () => {
 // It is shown the nodes its own projects work on, no install or update, and
 // its own sign-in live: the one thing on the page that is its to change.
 await call('/api/users', { action: 'add', name: 's.user', password: 's.user-pass-1', role: 'user' });
-await call('/api/users', { action: 'projects', name: 's.user', projects: ['beta'] });
+await call('/api/users', { action: 'edit', name: 's.user', projects: ['beta'] });
 // A Claude session is work on the project, so it holds Projects Write there,
 // and a terminal to watch it in (B86: Start Claude is dead without them).
 await call('/api/roles', { action: 'set', name: 'si-worker', scope: 'projects', perms: { projects: 'write', terminal: 'write' } });

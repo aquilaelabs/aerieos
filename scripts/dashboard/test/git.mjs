@@ -1107,7 +1107,7 @@ await section("step 3: the policy, and Send to Claude", async () => {
   {
     const hh = OWNER;
     for (const body of [{ action: 'add', name: 'w.asker', password: 'w.asker-pass-1', role: 'user' },
-                        { action: 'projects', name: 'w.asker', projects: ['beta'] }])
+                        { action: 'edit', name: 'w.asker', projects: ['beta'] }])
       await fetch(URL.replace(/\/$/, '') + '/api/users', { method: 'POST', headers: hh, body: JSON.stringify(body) });
     await member('w.asker');
     const auid = JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users['w.asker'].uid;
@@ -1304,7 +1304,7 @@ await section("a branch is its session's", async () => {
     { method: 'POST', headers: H2, body: JSON.stringify(body) });
   for (const n of ['w.dev', 'w.peer']) {
     await users({ action: 'add', name: n, password: `${n}-pass-1`, role: 'user' });
-    await users({ action: 'projects', name: n, projects: ['beta'] });
+    await users({ action: 'edit', name: n, projects: ['beta'] });
     await member(n);
   }
   const uid = JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users['w.dev'].uid;
@@ -1393,7 +1393,7 @@ await section("a branch is its session's", async () => {
      `a plain account cannot commit, discard, switch, pull, revert or branch-and-switch in the owner's tree (${
        peerTree.map(r => r.status).join(',')}: ${peerTree[0].error})`);
   for (const body of [{ action: 'add', name: 'w.boss', password: 'w.boss-pass-1', role: 'admin' },
-                      { action: 'projects', name: 'w.boss', projects: ['beta'] }]) await users(body);
+                      { action: 'edit', name: 'w.boss', projects: ['beta'] }]) await users(body);
   const BOSS = asUser('w.boss', 'w.boss-pass-1');
   const bossAsked = await post({ project: 'beta', action: 'revert', args: { sha: 'zzzz' } }, BOSS);
   const bossSure = await post({ project: 'beta', action: 'revert', args: { sha: 'zzzz', confirmed: true } }, BOSS);

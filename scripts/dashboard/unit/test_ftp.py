@@ -215,10 +215,17 @@ class Ftp(unittest.TestCase):
         ftp.report("n1", [{"project": "alpha", "up": True, "port": free, "addr": "127.0.0.1"}])
         self.assertEqual(ftp.save("alpha", {"on": True, "port": free, "access": {"u_3": "r"}}, "boss")[1], 200)
 
-    def test_setting_it_up_is_the_project_owners_or_an_admins_and_never_a_sessions(self):
+    def test_setting_it_up_is_file_access_write_and_never_a_sessions(self):
         self.assertEqual(users.may(users.get("boss"), "ftp", "alpha"), "", "the space's owner")
-        self.assertEqual(users.may(users.get("adm"), "ftp", "alpha"), "", "an administrator (R152)")
-        self.assertIn("space's owner or an administrator", users.may(users.get("ann"), "ftp", "alpha"))
+        self.assertEqual(users.may(users.get("adm"), "ftp", "alpha"), "", "an administrator")
+        self.assertEqual(users.may(users.get("ann"), "ftp", "alpha"), "", "a role giving File access Write")
+        roles.set_role("reader", "projects", {"projects": "write", "files": "read"})
+        with users._lock:
+            d = users.load()
+            d["users"]["ann"]["project_roles"] = {"alpha": ["reader"]}
+            users._save(d)
+        self.assertIn("File access", users.may(users.get("ann"), "ftp", "alpha"),
+                      "File access Read alone does not set it up, and the refusal names the area")
         sess = {"name": "session:alpha", "role": "owner", "projects": ["alpha"], "session": "alpha", "seat": "u_1"}
         self.assertIn("session", users.may(sess, "ftp", "alpha"))
 

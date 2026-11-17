@@ -779,8 +779,8 @@ aerie logs --node NAME [--agent|--runner|--nginx|--system|--kernel|--crash] [N]
                    mode** is on in Controller settings, the session's space
                    has been granted that node's logs under **Debug** in its
                    settings, its own node included, and the session's account
-                   has the **debug** grant, which is the owner's unless a role
-                   names it. The space is the session's own, proved by its
+                   has **Controller** Write on its roles (the owner's and an
+                   administrator's, and a role's that gives it). The space is the session's own, proved by its
                    token. What can be read is a table of three streams;
                    anything else is refused, not run
 aerie diag [--json] [SECTION...]
@@ -792,10 +792,11 @@ aerie diag [--json] [SECTION...]
                    account installed on each node, the last day's jobs and the
                    failures, error lines from its own logs and the audit
                    trail, with anything shaped like a credential redacted. The
-                   **debug** grant's: the owner's, or a role's that names it.
+                   **Controller** Write's: the owner's, an administrator's, or
+                   a role's that gives it.
                    A session reads it only while **debug mode** is on, its
                    space is granted **the controller's diagnostics** on
-                   the Debug page, and its account has the grant.
+                   the Debug page, and its account has Controller Write.
                    Its `reports` section is what sessions on any space
                    reported about AerieOS, kept until a person clears them
 aerie report "..." [--area A] [--repro "..." --reproduces always|sometimes|once|untried]

@@ -3905,7 +3905,7 @@ def _diag_watch(project, uid):
         return None
 
 
-# The Debug page's switches, the debug grant's (roles.NAMED_ONLY).
+# The Debug page's switches, the debug action's (Controller Write).
 DEBUG_SETTINGS = ("debug_mode", "offer_unvetted")
 
 
@@ -13809,8 +13809,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def _project_ftp(self, req):
         """A project's file access over FTP (ftp.py, R151): what it is, for
-        whoever sees the project, and a change, for an account with the ftp
-        grant (named only: the owner, until a role names it)."""
+        whoever sees the project, and a change, for an account with File
+        access Write on it (users.may's ftp)."""
         name = field(req, "project")
         if self._not_project(name):
             return None

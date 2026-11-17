@@ -801,14 +801,6 @@ def may(u, action, project=None):
     # carries its account's uid, and is still a session.
     if action in PERSON_ONLY and (u or {}).get("session"):
         return f"{PERSON_ONLY[action]} is a person's, not a session's"
-    # Setting up a project's file access over FTP (R152 (f)): an
-    # administrator's, or the project's own owner's; who may then sign in is
-    # File access on their roles, which ftp.login reads.
-    if action == "ftp" and project is not None:
-        import membership
-        if is_admin(u) or uid_of(u) == membership.owner_of(project):
-            return ""
-        return "file access over FTP is set up by the space's owner or an administrator"
     # The grants (R137): what the account's roles allow, on this project
     # where one is named. The built-in roles reproduce the answers from
     # before roles existed; a role of your own says exactly what it grants.
@@ -848,10 +840,8 @@ def may(u, action, project=None):
                          "changing the method or clearing it reaches everybody who works on it"),
             "docker-write": ("starting and stopping containers", "you can see what is running and open it"),
             "toolchains-write": ("installing on a node", "these are gigabytes on shared disk"),
-            # Named only (roles.NAMED_ONLY): an administrator too is
-            # refused until a role grants it by name (the operator, 6 Oct).
-            "debug": ("the debug options", "AerieOS's owner's, or a role's that grants debug by name"),
-            "ftp": ("file access over FTP", "AerieOS's owner's, or a role's that grants ftp by name"),
+            "debug": ("the debug options", ""),
+            "ftp": ("setting up file access over FTP", "it hands the space's files to a server on the network"),
         }[action]
         return f"{what} {_needs(action, project)}" + (f" ({why})" if why else "")
     if action == "admin":
@@ -1643,10 +1633,9 @@ def _members_refused(name, want, may_change):
 
 def verb(act, req, seen, may_change=None):
     """One of the Users page's verbs on an account, an administrator's (the
-    server holds that gate): add, a password, a role, the projects, a
-    rename, the modal's one Save, remove. The store's own functions above
-    hold the owner's protections. `seen()` is the projects this
-    administrator sees. {ok} or {error}."""
+    server holds that gate): add, the account dialog's one Save (edit), and
+    remove. The store's own functions above hold the owner's protections.
+    `seen()` is the projects this administrator sees. {ok} or {error}."""
     name = field(req, "name")
     pw = req.get("password") or ""
     if act == "add":
@@ -1664,26 +1653,14 @@ def verb(act, req, seen, may_change=None):
             r2 = profile_set(name, pr)
             if r2.get("error"):
                 r = r2
-    elif act == "passwd":
-        r = set_password(name, pw)
-    elif act == "role":
-        r = set_role(name, field(req, "role"))
-    elif act == "projects":
-        # Only projects this admin can see; otherwise the tab becomes a
-        # way to learn what exists by handing it out.
-        # By project (R138): a project's key, or a repository's name, that
-        # stands for one this admin sees.
-        mine = {key_of(p) for p in seen()}
-        want = [p for p in (req.get("projects") or []) if key_of(str(p)) in mine]
-        why = _members_refused(name, want, may_change)
-        r = {"error": why} if why else set_projects(name, want)
-    elif act == "rename":
-        r = rename(name, field(req, "to"))
     elif act == "edit":
-        # The Users tab's modal: everything about one account in one
-        # Save. Each part is the same store function the single verbs
-        # use, so the owner protections hold here too; the rename goes
-        # last so every other part lands under the name it was asked for.
+        # The Users page's dialog: everything about one account in one
+        # Save. Each part is the store's own function, so the owner
+        # protections hold here too; the rename goes last so every other
+        # part lands under the name it was asked for. The projects are only
+        # ones this administrator sees, by key or a repository's name that
+        # stands for one, or the page becomes a way to learn what exists by
+        # handing it out.
         r = {"ok": True, "name": name}
         if isinstance(req.get("profile"), dict) and req["profile"]:
             r = profile_set(name, req["profile"])

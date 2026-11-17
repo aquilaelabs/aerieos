@@ -1496,7 +1496,7 @@ await section("an administrator's new project is theirs to work on", async () =>
   const call = async (path, body, h) => { const r = await fetch(URL.replace(/\/$/, '') + path,
     { method: 'POST', headers: h, body: JSON.stringify(body) }); return { status: r.status, ...(await r.json().catch(() => ({}))) }; };
   await call('/api/users', { action: 'add', name: 'w.maker', password: 'w.maker-pass-1', role: 'admin' }, H);
-  await call('/api/users', { action: 'projects', name: 'w.maker', projects: [] }, H);
+  await call('/api/users', { action: 'edit', name: 'w.maker', projects: [] }, H);
   const madeBy = await call('/api/create', { name: 'maker-made', mode: 'init' }, MAKER);
   const listed = JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users['w.maker'].projects || [];
   const worked = await call('/api/prefs', { project: 'maker-made', color: 'teal' }, MAKER);

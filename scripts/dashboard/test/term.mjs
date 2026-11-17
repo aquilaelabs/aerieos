@@ -270,7 +270,7 @@ await section("A grant taken away ends the terminal it opened", async () => {
   await fetch(`${base}/api/users`, { method: 'POST', headers: h,
     body: JSON.stringify({ action: 'edit', name: 'w.term', profile: { full_name: 'W Term', email: 'w.term@example.invalid' } }) });
   await fetch(`${base}/api/users`, { method: 'POST', headers: h,
-    body: JSON.stringify({ action: 'projects', name: 'w.term', projects: [projectKey('alpha')] }) });
+    body: JSON.stringify({ action: 'edit', name: 'w.term', projects: [projectKey('alpha')] }) });
   // The header sent up front, as lib's pages send theirs: a websocket's
   // handshake carries no credentials the browser was only asked for.
   const ctx = await browser.newContext({ extraHTTPHeaders: { Authorization: 'Basic ' + Buffer.from('w.term:w.term-pass-1').toString('base64') } });
@@ -307,7 +307,7 @@ await section("A grant taken away ends the terminal it opened", async () => {
   await fetch(`${base}/api/roles`, { method: 'POST', headers: h,
     body: JSON.stringify({ action: 'assign', name: 'w.term', project_roles: { [projectKey('alpha')]: [] } }) });
   await fetch(`${base}/api/users`, { method: 'POST', headers: h,
-    body: JSON.stringify({ action: 'projects', name: 'w.term', projects: [] }) });
+    body: JSON.stringify({ action: 'edit', name: 'w.term', projects: [] }) });
   const closed = await other.waitForFunction(() => window.bbClosed, null, { timeout: 20000 })
     .then(x => x.jsonValue(), () => null);
   await ctx.close();

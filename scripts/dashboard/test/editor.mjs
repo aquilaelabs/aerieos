@@ -38,7 +38,7 @@ const people = { 'ed.rw': 'edrwpass1', 'ed.r': 'edrpass12', 'ed.none': 'ednonepa
                  'ed.mem': 'edmempass1' };
 for (const [n, pw] of Object.entries(people)) addUser(n, pw);
 for (const n of ['ed.rw', 'ed.r', 'ed.none', 'ed.cap', 'ed.mem'])
-  await admin('/api/users', { action: 'projects', name: n, projects: ['alpha'] });
+  await admin('/api/users', { action: 'edit', name: n, projects: ['alpha'] });
 // Each holds a role on alpha that gives the files area write, but ed.cap's
 // gives read: its rw in the settings is capped at r by the role (R152 (f)).
 await admin('/api/roles', { action: 'set', name: 'ed-files-w', scope: 'projects',
@@ -169,7 +169,7 @@ await section("a save over a newer file, search, and changes as they happen", as
 await section("access taken away, partway", async () => {
   await admin('/api/roles', { action: 'assign', name: 'ed.r', project_roles: { alpha: ['ed-nofiles'] } });
   const gone = await as(c['ed.r'], 'alpha', 'read', { path: 'editor-probe.txt' });
-  await admin('/api/users', { action: 'projects', name: 'ed.cap', projects: [] });
+  await admin('/api/users', { action: 'edit', name: 'ed.cap', projects: [] });
   const off = await as(c['ed.cap'], 'alpha', 'list', { path: '' });
   await admin('/api/project-ftp', { action: 'set', project: 'alpha', editor: false });
   const shut = await as(c['ed.rw'], 'alpha', 'list', { path: '' });

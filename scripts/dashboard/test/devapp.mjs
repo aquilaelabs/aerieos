@@ -4990,7 +4990,7 @@ await section("the project a container belongs to", async () => {
   {
     const mine = await page.evaluate(async () => (await (await fetch('/api/users')).json()).users.find(u => u.name === 'test').projects);
     // By project (R138): the list names ep.silon's project by its key.
-    await api('/api/users', { action: 'projects', name: 'test', projects: mine.filter(p => p !== projectKey('ep.silon')) });
+    await api('/api/users', { action: 'edit', name: 'test', projects: mine.filter(p => p !== projectKey('ep.silon')) });
     const refused = await api('/api/dockerctl', { action: 'restart', container: 'someone-elses' });
     const read = await api('/api/devapp', { project: 'ep.silon', instance: 'loose', action: 'state' });
     await page.evaluate(async () => { await refresh(); location.hash = '#/containers'; dockerList = null; readMoved('docker'); loadDocker(); });
@@ -5002,7 +5002,7 @@ await section("the project a container belongs to", async () => {
                      live: [...off.querySelectorAll('button')].filter(b => !b.disabled).length,
                      after: cards.slice(cards.indexOf(off)).every(c => c.classList.contains('notmine') || !c.querySelector('.dmgroup:not(.none)')) } : null;
     });
-    await api('/api/users', { action: 'projects', name: 'test', projects: mine });
+    await api('/api/users', { action: 'edit', name: 'test', projects: mine });
     await page.evaluate(() => refresh());
     ok(refused.status === 403 && /not on your list of spaces/.test(refused.error || '') && read.status === 200,
        `an administrator not on a space may read its containers and not act on them (${refused.status}: ${refused.error}; read ${read.status})`);

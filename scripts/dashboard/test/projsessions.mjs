@@ -18,7 +18,7 @@ const call = async (path, body, h = H) => {
 // w.sess has sessions on alpha; w.watch is a plain account given alpha.
 await call('/api/users', { action: 'add', name: 'w.sess', password: 'w.sess-pass-1', role: 'user' });
 await call('/api/users', { action: 'add', name: 'w.watch', password: 'w.watch-pass-1', role: 'user' });
-await call('/api/users', { action: 'projects', name: 'w.watch', projects: ['alpha'] });
+await call('/api/users', { action: 'edit', name: 'w.watch', projects: ['alpha'] });
 const uid = JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users['w.sess'].uid;
 const PLAIN = asUser('w.watch', 'w.watch-pass-1');
 

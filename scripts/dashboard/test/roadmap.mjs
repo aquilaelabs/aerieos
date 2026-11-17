@@ -2209,7 +2209,7 @@ await section("a step's own release", async () => {
 await section("A project you may read and not change", async () => {
   const me = await page.evaluate(async () => (await (await fetch('/api/users')).json()).users.find(u => u.name === 'test')?.projects || []);
   const setMine = ps => page.evaluate(async ps => (await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'projects', name: 'test', projects: ps }) })).status, ps);
+    body: JSON.stringify({ action: 'edit', name: 'test', projects: ps }) })).status, ps);
   // By project (R138): the list names alpha's project by its key.
   await setMine(me.filter(n => n !== projectKey('alpha')));
   const fin = await post({ action: 'finished', project: 'alpha' });
