@@ -116,6 +116,7 @@
 - A space's settings listed each other space of one repository as "1 repositories" under What sessions reach; it names the branch, or says the repository has no git (b5a5d69)
 - A session held while AerieOS is down can read and keep its memory, as the hold's message says it may (59bcfa3)
 - aerie map no longer names an arrow function in a conditional's else branch after the word before the colon (1cf46c9)
+- A tool pack's Manifest update pressed on the Library keeps the catalog's newer pin, where its Add was refused as a pin the catalog does not make and the card stayed counted under Updates (c3da2f9)
 
 ### Security
 
