@@ -49,7 +49,7 @@ async function abLoadGuide(){
   el.querySelectorAll("a.wklink[data-page]").forEach(a => a.onclick = e => {
     e.preventDefault();
     closeAbout();
-    location.hash = "#/help/" + encodeURIComponent(a.dataset.page.replace(/\.md$/, ""));
+    hashGo("#/help/" + encodeURIComponent(a.dataset.page.replace(/\.md$/, "")));
   });
 }
 let abPage = "guide", abLogLoaded = false;

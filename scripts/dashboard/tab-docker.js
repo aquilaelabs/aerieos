@@ -1021,6 +1021,18 @@ function dmTestSaid(d){
 // as pills until Edit settings swaps the fields in; Apply and Cancel put them
 // away; a row with a setting staged stays open whatever this says.
 const dmEditing = new Set();
+// A container's settings hold Back as every dialog does (backHold): Back
+// puts them away as Cancel does.
+const dmBack = new Map();
+function dmBackHold(key){
+  if (dmBack.has(key)) return;
+  dmBack.set(key, backHold(() => { dmBack.delete(key); dmDropDrafts(key); dmEditing.delete(key); readMoved("docker"); drawPanes(); }));
+}
+function dmBackLet(key){
+  const t = dmBack.get(key);
+  dmBack.delete(key);
+  if (t) backRelease(t);
+}
 // Edit settings is the first thing behind the row's ⋯ (the operator, 17
 // Oct): the pills say every setting, so the press that changes them can
 // wait in the menu.
@@ -2186,7 +2198,7 @@ function dmSyncDialogs(el){
     }catch(e){ /* detached mid-draw */ }
     dlg.oncancel = e => {
       e.preventDefault();
-      dmDropDrafts(dlg.dataset.dmdlg); dmEditing.delete(dlg.dataset.dmdlg); readMoved("docker"); drawPanes();
+      dmBackLet(dlg.dataset.dmdlg); dmDropDrafts(dlg.dataset.dmdlg); dmEditing.delete(dlg.dataset.dmdlg); readMoved("docker"); drawPanes();
     };
   });
 }
@@ -2477,14 +2489,14 @@ function dmWireRows(el, list = dockerList){
   // into it going nowhere (B852).
   dmSyncDialogs(el);
   el.querySelectorAll("[data-dmedit]").forEach(b => b.onclick = () => {
-    closeMore(); dmEditing.add(b.dataset.dmedit); readMoved("docker"); drawPanes();
+    closeMore(); dmEditing.add(b.dataset.dmedit); dmBackHold(b.dataset.dmedit); readMoved("docker"); drawPanes();
   });
   el.querySelectorAll("[data-dmcancel]").forEach(b => b.onclick = () => {
-    dmDropDrafts(b.dataset.dmcancel); dmEditing.delete(b.dataset.dmcancel); readMoved("docker"); drawPanes();
+    dmBackLet(b.dataset.dmcancel); dmDropDrafts(b.dataset.dmcancel); dmEditing.delete(b.dataset.dmcancel); readMoved("docker"); drawPanes();
   });
   el.querySelectorAll("[data-dmapply]").forEach(btn => btn.onclick = async () => {
     const key = btn.dataset.dmapply, row = btn.closest(".row");
-    dmEditing.delete(key);
+    dmBackLet(key); dmEditing.delete(key);
     const inst = key.startsWith("inst:") ? key.slice(5) : "";
     const name = inst ? (list?.instances || []).find(x => `${x.project}|${x.instance}` === inst)?.name : key.slice(4);
     busy(btn, "Applying");

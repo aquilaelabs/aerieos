@@ -110,6 +110,14 @@ function bootShell(){
   // Its declarations are page-shell.js; what runs at load is this: the
   // address bar's back and forward open what they name, the search is wired,
   // and the phone's More sheet closes on a tap elsewhere.
+  addEventListener("popstate", backPressed);
+  // A link in a dialog goes the way hashGo does.
+  document.addEventListener("click", e => {
+    const a = e.target.closest?.('a[href^="#/"]');
+    if (!a || e.defaultPrevented || e.button || e.ctrlKey || e.metaKey || e.shiftKey || !a.closest(".modal") || !history.state?.dlg) return;
+    e.preventDefault();
+    hashGo(a.getAttribute("href"));
+  });
   addEventListener("hashchange", () => { sectNewVisit(); shellCame(shellSeen, location.hash); shellSeen = location.hash; if (!openRoute(location.hash)) shellSync(); });
   // The page the address names reads its own data now, on the read the head
   // began (preGets), so it is usually in hand when the first status read

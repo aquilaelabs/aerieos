@@ -695,6 +695,35 @@ await section("the route (phase 8)", async () => {
      'lan on a published port is a record with the URL that follows from the node');
 });
 
+// ---- a row's settings and Back --------------------------------------------
+// A container's settings is a native dialog in its row, and Back puts it
+// away as Cancel does, the page under it staying, as every dialog's does
+// (the operator, 17 Nov); put away by Cancel it gives its entry back.
+await section("Back puts a row's settings away and the Containers page stays", async () => {
+  await openManager();
+  const was = await page.evaluate(() => location.hash);
+  // The row draws Edit settings once what its settings read has come in.
+  const open = async () => {
+    await page.waitForSelector(`${DM} [data-dmedit]`, { state: 'attached', timeout: 20000 }).catch(() => {});
+    await page.evaluate(sel => { closeMore(); document.querySelector(sel + ' [data-dmedit]')?.click(); }, DM);
+    return page.waitForFunction(() => [...document.querySelectorAll('dialog.dmsetdlg')].some(d => d.open), null, { timeout: 10000 })
+      .then(() => true).catch(() => false);
+  };
+  const shut = () => page.waitForFunction(() => ![...document.querySelectorAll('dialog.dmsetdlg')].some(d => d.open), null, { timeout: 10000 })
+    .then(() => true).catch(() => false);
+  const first = await open();
+  ok(first && await page.evaluate(() => !!history.state?.dlg), `Edit settings opens the dialog and it holds an entry in the history${first ? '' : ': nothing opened'}`);
+  if (first) await page.evaluate(() => history.back());
+  const away = await shut();
+  ok(away && await page.evaluate(() => location.hash) === was,
+     `...and Back puts it away with the Containers page staying (${was}, then ${await page.evaluate(() => location.hash)})`);
+  ok(await open(), '...opened again');
+  await page.evaluate(() => [...document.querySelectorAll('dialog.dmsetdlg')].find(d => d.open)?.querySelector('[data-dmcancel]')?.click());
+  ok(await shut() && await page.waitForFunction(() => !history.state?.dlg, null, { timeout: 3000 }).then(() => true).catch(() => false),
+     '...and Cancel puts it away and gives its entry back');
+  await openManager();
+});
+
 // ---- a row is listed under the node its buttons act on --------------------
 // An instance with no node of its own belongs to its PROJECT's node, which
 // is what every action on the row resolves, and the LISTING resolved it one

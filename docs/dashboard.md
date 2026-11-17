@@ -82,6 +82,13 @@ its tiles first. A single action sits in its head's top-right corner or
 beside the words it belongs with, never on a line of its own; on a phone
 the search keeps its buttons on its line while they fit.
 
+A **dialog** is put away by its Cancel or Close, by Escape, by a press on
+the dimmed page around it, or by Back, which closes the dialog and leaves
+the page under it where it was; the focus goes back to what opened it. The
+one exception is the dialog that shows a node's one-time enrollment token:
+a stray press and Back pass it by, so the token is not lost before it is
+copied.
+
 **Help** is these docs, read in the wiki's reader: listed in the docs
 folder's README groups beside the one open (a picker above it on a phone), a
 long one opening on its contents, a link to another doc opening it in place

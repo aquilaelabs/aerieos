@@ -172,7 +172,9 @@ function railGo(key, tool){
 // there (B313).
 function shellPush(to, from = location.hash){
   shellCame(from, to);
-  history.pushState(null, "", to);
+  // From a dialog's entry the page takes it over (hashGo's way).
+  if (history.state?.dlg) history.replaceState(null, "", to);
+  else history.pushState(null, "", to);
   shellSeen = to;
 }
 
@@ -319,6 +321,8 @@ function shellSync(){
   const to = routeOf(tabOf(panes[0]));
   if (shellSeen !== null && location.hash && location.hash !== shellSeen && location.hash !== to) return;
   shellSeen = to || "";
+  // A page that moved under a dialog takes its entry over, so the dialog
+  // put away does not give back the page's address (backRelease).
   if (to && to !== location.hash) history.replaceState(null, "", to);
   // A document in front has no address: the page's goes, so a reload lands
   // on the document this browser had in front (R131), not on the last page.

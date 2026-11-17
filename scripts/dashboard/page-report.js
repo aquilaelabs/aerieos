@@ -44,7 +44,9 @@ function openReport(project, repos = []){
   m.onclick = e => { if (e.target === m) m.hidden = true; };
   $("reportCancel").onclick = () => { m.hidden = true; };
   $("reportSend").onclick = sendReport;
-  setTimeout(() => $("reportText").focus(), 50);
+  // Only while it is still open: put away inside the 50ms, the focus went
+  // into the closing box and not back to what opened it.
+  setTimeout(() => { if (!m.hidden) $("reportText").focus(); }, 50);
 }
 
 // The conversation a report could carry: this account's newest on the

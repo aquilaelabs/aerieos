@@ -124,6 +124,8 @@ function modalOpened(el){
   const i = openModals.indexOf(el);
   if (i >= 0) openModals.splice(i, 1);
   openModals.push(el);
+  if (el.dataset.keepStray === undefined && !el.__backTok)
+    el.__backTok = backHold(() => { el.__backTok = 0; dismissModal(el); });
   const a = document.activeElement;
   el.__opener = a && a !== document.body && !el.contains(a) ? a : null;
   // A dialog is named by its title for a screen reader, which the markup
@@ -148,6 +150,7 @@ function modalOpened(el){
 function modalClosed(el){
   const i = openModals.indexOf(el);
   if (i >= 0) openModals.splice(i, 1);
+  if (el.__backTok){ backRelease(el.__backTok); el.__backTok = 0; }
   const back = el.__opener, a = document.activeElement;
   el.__opener = null;
   // Only when the focus was still in the dialog: a Save that opened a tab
@@ -159,6 +162,61 @@ function modalClosed(el){
     a?.blur?.(); return;
   }
   back.focus({preventScroll: true});
+}
+
+// ---- a dialog and Back ----------------------------------------------------
+// Back puts the dialog on show away and leaves the page under it where it
+// was, as a phone's own apps do. A dialog opened holds an entry in the
+// history: the page's own address, its number in the entry's state. Back
+// leaving that entry puts away everything held after the entry it lands
+// on, each as Escape would. Put away any other way, a dialog gives its entry
+// back, unless the page has moved on from it. One holding something shown
+// once (data-keep-stray) holds none, and Back passes it by.
+let backHolds = [], backSeq = 0, backGiving = false;
+
+// Hold an entry for something Back puts away with `shut`; its number.
+function backHold(shut){
+  const tok = ++backSeq, cur = history.state?.dlg;
+  const st = {...(history.state || {}), dlg: tok};
+  // An entry a dialog just put away has not given back yet is this one's.
+  if (cur && !backHolds.some(h => h.tok === cur)) history.replaceState(st, "", location.href);
+  else history.pushState(st, "", location.href);
+  backHolds.push({tok, shut});
+  return tok;
+}
+
+// Let a hold go when what it held was put away some other way.
+function backRelease(tok){
+  const i = backHolds.findIndex(h => h.tok === tok);
+  if (i < 0) return;
+  backHolds.splice(i, 1);
+  setTimeout(() => {
+    if (history.state?.dlg !== tok) return;        // the page moved on, or another dialog took it
+    backGiving = true;
+    history.back();
+  }, 0);
+}
+
+// The page's popstate: Back (or Forward) moved between entries.
+function backPressed(){
+  const at = history.state?.dlg || 0;
+  if (backGiving){
+    backGiving = false;
+    // One opened while its entry was being given back holds one again.
+    const top = backHolds.at(-1);
+    if (top && at < top.tok) history.pushState({...(history.state || {}), dlg: top.tok}, "", location.href);
+    return;
+  }
+  const gone = backHolds.filter(h => h.tok > at);
+  backHolds = backHolds.filter(h => h.tok <= at);
+  gone.reverse().forEach(h => h.shut());
+}
+
+// Go to a page from a dialog: the dialog's entry becomes the page's, so
+// Back from there comes to the page the dialog was opened on.
+function hashGo(to){
+  if (history.state?.dlg) location.replace(to);
+  else location.hash = to;
 }
 
 function modalFocusables(m){

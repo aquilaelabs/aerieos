@@ -1454,6 +1454,19 @@ beside the thing it names, the way the Settings tab draws them
 hidden rather than disabled: a dialog with an empty list says so in one
 sentence and offers Close.
 
+A dialog is put away by its way out: Escape, a press on the dimmed page
+around it and Back each press it, as the person would. The way out is the
+foot's Cancel or Close, or the button marked `data-way-out` where its words
+are its own (Reset's Keep it), and it is never the primary: Apply then
+Cancel, Download then Close. Back puts the dialog away and leaves the page
+under it where it was (the operator, 17 Nov): each dialog opened holds an
+entry in the history (`backHold`), given back when it is put away some
+other way, and a link in it takes that entry over, so Back from where it
+led comes to the page it was opened on. On the way out the focus goes back
+to what opened it. A dialog holding something shown once (Enroll's
+one-time token) is marked `data-keep-stray`: a press around it and Back
+pass it by, and Escape or its own Done puts it away.
+
 ### signing in (Web app)
 
 Platform: a responsive web app: the layout holds at phone and desktop widths, and every tap target is at least 44px on a coarse pointer.

@@ -2726,7 +2726,21 @@ async function dialogShape(pg = page){
              foot: !!fb && fb.offsetHeight > 0, gap, census };
   });
 }
+// A button on the page that a dialog is opened from, as a person's press
+// leaves the focus on what they pressed; and what the dialog on show took
+// for its opener, kept to be found again once it is put away.
+const focusProbe = () => {
+  let b = document.getElementById('dlgProbe');
+  if (!b){
+    b = document.createElement('button'); b.id = 'dlgProbe'; b.type = 'button'; b.textContent = 'probe';
+    b.style.cssText = 'position:fixed;left:0;top:0;width:8px;height:8px;opacity:.01';
+    document.body.appendChild(b);
+  }
+  b.focus();
+};
+const keepOpener = () => { window.__dlgOpener = [...document.querySelectorAll('.modal:not(.inline)')].find(m => !m.hidden)?.__opener || null; };
 for (const [name, open] of Object.entries(DIALOGS)) {
+  await page.evaluate(focusProbe);
   await page.evaluate(open);
   const seen = await page.waitForFunction(() => [...document.querySelectorAll('.modal:not(.inline)')].some(m => !m.hidden),
     null, { timeout: 10000 }).then(() => true).catch(() => false);
@@ -2814,16 +2828,45 @@ for (const [name, open] of Object.entries(DIALOGS)) {
     await page.mouse.click(3, Math.round((await page.evaluate(() => innerHeight)) - 3));
     ok(await shut(), `[dialog ${name}] a press on the page around it puts it away`);
     await page.evaluate(() => { document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }); resumeFor = null; resumePick = null; });
+    await page.evaluate(focusProbe);
     await page.evaluate(open);
     await page.waitForFunction(() => [...document.querySelectorAll('.modal:not(.inline)')].some(m => !m.hidden), null, { timeout: 10000 }).catch(() => {});
     await motionOver();
   }
+  await page.evaluate(keepOpener);
+  const heldOpen = await page.evaluate(() => history.state?.dlg || 0);
   await page.keyboard.press('Escape');
   const escaped = await page.waitForFunction(() => ![...document.querySelectorAll('.modal')].some(m => !m.hidden && !m.classList.contains('inline')),
     null, { timeout: 3000 }).then(() => true).catch(() => false);
   ok(escaped, `[dialog ${name}] Escape puts it away`);
+  // ...and the focus goes back to what opened it, so a keyboard carries on
+  // from where the person was (R50 step 81).
+  const back = await page.evaluate(() => {
+    const o = window.__dlgOpener, a = document.activeElement;
+    const say = e => !e ? 'nothing' : e === document.body ? 'body' : e.id || e.dataset?.c || String(e.className || e.tagName.toLowerCase()).slice(0, 30);
+    return { opener: say(o), now: say(a), same: !!o && a === o };
+  });
+  ok(escaped && back.same, `[dialog ${name}] the focus goes back to what opened it (${back.opener}; now on ${back.now})`);
+  // ...and Back puts it away with the page under it staying where it was
+  // (the operator, 17 Nov). Put away by Escape it gave its entry in the
+  // history back, so Back is the dialog's alone; one that keeps a stray
+  // press holds none, and Back passes it by.
+  if (!KEEPS_A_STRAY_PRESS[name]){
+    const given = await page.waitForFunction(() => !history.state?.dlg, null, { timeout: 3000 }).then(() => true).catch(() => false);
+    ok(given, `[dialog ${name}] put away, it gives its entry in the history back`);
+    await page.evaluate(() => { document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }); resumeFor = null; resumePick = null; });
+    await page.evaluate(open);
+    await page.waitForFunction(() => [...document.querySelectorAll('.modal:not(.inline)')].some(m => !m.hidden), null, { timeout: 10000 }).catch(() => {});
+    await motionOver();
+    const was = await page.evaluate(() => ({ hash: location.hash, dlg: history.state?.dlg || 0 }));
+    await page.evaluate(() => history.back());
+    const away = await shut();
+    const now = await page.evaluate(() => location.hash);
+    ok(was.dlg && away && now === was.hash, `[dialog ${name}] Back puts it away and the page stays (${was.hash}${was.dlg ? '' : ', held no entry'}${away ? '' : ', still open'}; then ${now})`);
+  } else ok(!heldOpen, `[dialog ${name}] holds no entry in the history, so Back passes it by (${KEEPS_A_STRAY_PRESS[name]})`);
   await page.evaluate(() => { document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }); resumeFor = null; resumePick = null; });
 }
+await page.evaluate(() => document.getElementById('dlgProbe')?.remove());
 // ...and again on a small phone, where the room runs out first: every dialog
 // still scrolls in one place.
 await section("and again on a small phone, where the room runs out first", async () => {
