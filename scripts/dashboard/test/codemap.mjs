@@ -262,9 +262,9 @@ ok(/^scripts\/dashboard\/page-boot\.js: \d+ sections, \d+ top-level definitions$
    'sections lists a file by its headers with each section\'s functions and outside callers');
 
 // Nested definitions are shown under their parent.
-const defs = map('defs', 'scripts/dashboard/nb-roadmap.js');
-ok(/^\d+-\d+  function nbRoadmapView$/m.test(defs) && /^  \d+-\d+  function drawRoadmap  \(in nbRoadmapView\)$/m.test(defs)
-   && /^  \d+-\d+  arrow onclick  \(in drawRoadmap\)/m.test(defs),
+const defs = map('defs', 'scripts/dashboard/nb-bugs.js');
+ok(/^\d+-\d+  function nbBugsView$/m.test(defs) && /^  \d+-\d+  function drawBugs  \(in nbBugsView\)$/m.test(defs)
+   && /^  \d+-\d+  arrow onclick  \(in drawBugs\)/m.test(defs),
    'defs lists a file top down, a function under the closure it lives in and a callback under its function');
 
 // The index is two files (R228 step 16): what each file calls and passes by

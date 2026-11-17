@@ -64,6 +64,7 @@ const SURFACE = [ 'adoptLayout', 'adoptMode', 'adoptMotion', 'applyMotion', 'ado
   'openNewContainer', 'loadNasApps', 'cAppPicked', 'cAppFill', 'cImportPicked', 'cFormYaml', 'cFormWrote', 'openNewProject', 'openAddRepository', 'openNotebook', 'openPending', 'drawPendingModal', 'pendAct',
   'openProjectsTab', 'openSendToDocker', 'openTab', 'openTrash', 'pDraw',
   'nbAnalysisView', 'nbArtifactsView', 'nbBugsView', 'nbDesignView', 'nbGitView', 'nbHistoryView', 'nbMemoryView', 'nbPendingView', 'chipsScrolled', 'chipsEdge', 'chipsEdges', 'chipsArrow', 'chipsDown', 'chipsMove', 'chipsUp', 'chipsClickGuard', 'dmHostOnly', 'nbPermsView', 'nbSessionsView', 'convRows', 'convForm', 'resumeConversation', 'nbRoadmapView', 'nbRulesView', 'nbSigningView', 'nbTestsView', 'nbWikiView', 'wikiMarkdown', 'wikiSlug', 'wikiToc', 'wikiNav', 'wikiUntitled', 'wikiContents', 'wikiScroll', 'wikiArticle', 'pullScroller', 'pullRefresh', 'wirePull', 'openReport', 'reportConvFor', 'sendReport', 'pDrawForge', 'pUrlHost', 'postJSON', 'unlinkProject',
+  'nbRmLoad', 'nbRmCanSend', 'nbRmRowFacts', 'nbRmStepRow', 'nbRmBoxHolding', 'nbRmDraw', 'nbRmSendBoxEl', 'nbRmShutSendBoxes', 'nbRmDrawSendBox', 'nbRmPick', 'nbRmCancelSend', 'nbRmReallySend', 'nbRmPost', 'nbRmPostDo', 'nbRmShowClash', 'nbRmSettleClash', 'nbRmDrawClash', 'nbRmOpenDrop', 'nbRmPickItem', 'nbRmOpenSplit', 'nbRmOpenReword', 'nbRmOpenStepInput', 'nbRmCloseStepInput', 'nbRmAdd', 'nbRmForm', 'nbRmRevertPending', 'nbRmStage', 'nbRmStageAdd', 'nbRmStageAddStep', 'nbRmStageEdit', 'nbRmStageInfo', 'nbRmStageTarget', 'nbRmStageRemove', 'nbRmStageShelve', 'nbRmMoveLocally', 'nbRmFlushPending', 'nbRmLoadFinished', 'nbRmDrawFinished',
   'pFillGates', 'pFillNode', 'pDirOf', 'dmCalled', 'dmJobSettle', 'rnFillReads', 'rnLoadTools', 'rnFillTools', 'rnLockSettings', 'rnRowsList', 'rnHostIds', 'rnBars', 'rnWireBox', 'rnBarSay', 'rnRevertSect', 'rnSectChanges', 'rnEnc', 'rnDec', 'pJobAct', 'pJobPoll', 'pJobSeen', 'pJobWire', 'pNameShow', 'pOpen',
   // A terminal in its own window (R8).
   'popOut', 'reattachTab',
@@ -231,10 +232,15 @@ ok(twice.length === 0,
 // there, is a TypeError on some later click rather than a ReferenceError
 // anybody can see by name. Every nb.NAME read must be put on nb by an
 // assignment, by Object.assign's literal, or by the return of a view factory
-// that is assigned to it.
+// that is assigned to it. The state is the nb of makeNotebook, of a view, or
+// of a function a view is cut into: any function or const arrow named nb...
+// whose own nb it is, so a put or a read moved out of a view's closure still
+// counts.
 const isState = p => {
-  const fn = p.scope.getBinding('nb')?.scope.path.node;
-  return fn?.type === 'FunctionDeclaration' && /^(makeNotebook|nb\w+View)$/.test(fn.id?.name || '');
+  const fn = p.scope.getBinding('nb')?.scope.path;
+  const name = fn?.node.type === 'FunctionDeclaration' ? fn.node.id?.name
+    : fn?.parentPath?.isVariableDeclarator() ? fn.parent.id.name : '';
+  return /^(makeNotebook|nb\w+)$/.test(name || '');
 };
 const put = new Set(), reads = [], hands = {}, assignedFrom = [];
 for (const s of scripts)

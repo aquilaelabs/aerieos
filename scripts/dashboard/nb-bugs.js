@@ -374,7 +374,7 @@ function nbBugsView({$, nb, project}){
         const body = d.querySelector(".body");
         if (body.querySelector(".sendbox")) { nb.shutSendBoxes(); return; }
         nb.shutSendBoxes();
-        nb.sendNoteText = "";            // see nb.pickRoadmap: a note is not carried over
+        nb.sendNoteText = "";            // see nbRmPick: a note is not carried over
         nb.roadmapSel = null;               // and only one thing is armed at a time
         nb.drawSendBox(!!nb.roadmapSession);
         // Same session the roadmap sends into, and the same reason it has to

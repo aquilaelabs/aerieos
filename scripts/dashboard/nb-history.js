@@ -133,7 +133,7 @@ function nbHistoryView({$, nb, project}){
     return reading(`${project}:history`, async () => {
       nb.roadmapLog = null;
       nb.redrawRoadmap();
-      // quiet, because the answer is not a list payload and drawRoadmap must not be
+      // quiet, because the answer is not a list payload and nbRmDraw must not be
       // handed one that has no items in it.
       const j = await nb.postRoadmap(histQuery(), true);
       nb.roadmapLog = j?.history || [];
