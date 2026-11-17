@@ -73,8 +73,8 @@ header{display:flex;align-items:center;gap:10px;padding:8px 12px;
 header h1{font-size:15px;margin:0;font-weight:600}
 /* Maintenance mode's, for the owner while it is on: in the warning color,
    since everybody else is kept out until it is off. */
-.banner.maint{background:color-mix(in srgb, var(--warn) 18%, var(--panel))}
-.banner.maint a{margin-left:0}
+.banner.maint{color:var(--warn-wash-ink);background:var(--warn-wash)}
+.banner.maint a{margin-left:0;color:inherit;text-decoration:underline}
 /* Every header button one box, at every width: the bell carried the tap
    size on its own and the bug, gear and sign-out got it only on a narrow
    screen, so on a desk the bell stood taller and wider than its row (the
@@ -333,8 +333,8 @@ body:has(.modal:not([hidden])) :is(.tourcard,.tourring){display:none}
 /* The controller was updated under a page with unsaved work: a band under
    the header in the restart band's tint, its words at the left and Reload
    at the right. */
-.newbuild{display:flex;align-items:center;gap:8px;padding:6px 12px;color:var(--ink);font:var(--f-ui);
-  background:color-mix(in srgb, var(--warn) 14%, var(--panel));border-bottom:var(--hair) solid color-mix(in srgb, var(--warn) 40%, var(--line))}
+.newbuild{display:flex;align-items:center;gap:8px;padding:6px 12px;color:var(--warn-wash-ink);font:var(--f-ui);
+  background:var(--warn-wash);border-bottom:var(--hair) solid var(--warn-edge)}
 .newbuild[hidden]{display:none}
 .newbuild>.grow{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
 .uadd{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}
@@ -586,7 +586,7 @@ body.firstrun #panes{display:none}
    specificity and win only by coming later. */
 @media(hover:hover){
   .dockline .dtab .dx:hover{background:rgba(255,255,255,.09);color:var(--ink)}
-  .fx .cve:hover{background:color-mix(in srgb, var(--bad) 30%, var(--panel))}
+  .fx .cve:hover{background:color-mix(in srgb, var(--bad) 30%, var(--ground))}
 }
 /* The Linux and git cards show commands verbatim; mono keeps them readable
    as commands, and slightly smaller keeps the pipelines on one line. */
@@ -1730,11 +1730,11 @@ body.firstrun #panes{display:none}
 /* The restart note as a band between the header and the view strip (the
    operator, 28 Oct): tinted, its x at the right. */
 .pane .bar.proj .pnote.pband{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:var(--r-control);
-  background:color-mix(in srgb, var(--warn) 14%, var(--panel));border:var(--hair) solid color-mix(in srgb, var(--warn) 40%, var(--line))}
+  color:var(--warn-wash-ink);background:var(--warn-wash);border:var(--hair) solid var(--warn-edge)}
 /* An error's band (the operator, 29 Oct: warnings yellow, errors red): what
    will not pass by itself, in --bad, its words in --ink as the warning's are. */
-.pane .bar.proj .pnote.pband.bad{color:var(--ink);background:color-mix(in srgb, var(--bad) 14%, var(--panel));
-  border-color:color-mix(in srgb, var(--bad) 40%, var(--line))}
+.pane .bar.proj .pnote.pband.bad{color:var(--ground-ink);background:color-mix(in srgb, var(--bad) 14%, var(--ground));
+  border-color:color-mix(in srgb, var(--bad) 40%, var(--ground))}
 .pane .bar.proj .pnote.pband>.grow{flex:1 1 auto;min-width:0}
 .pane .bar.proj .pnote.pband>button.ic{flex:0 0 auto;min-width:28px;min-height:28px;padding:0 8px}
 .pane .bar.proj .pnote.bad{color:var(--bad)}

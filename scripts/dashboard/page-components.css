@@ -17,9 +17,9 @@ html[data-mode="light"][data-theme="nostromo"] button:not(.link){
 .banner{flex:0 0 auto;padding:6px 12px;font-size:13px;line-height:1.4;color:var(--ink);
   background:var(--panel);border-bottom:var(--hair) solid var(--line);overflow-wrap:anywhere}
 .banner a{color:var(--note);margin-left:6px}
-.banner.held{background:color-mix(in srgb, var(--bad) 16%, var(--panel))}
-.banner.moved{background:color-mix(in srgb, var(--warn) 18%, var(--panel))}
-.banner.moved a{margin-left:0}
+.banner.held{color:var(--ground-ink);background:color-mix(in srgb, var(--bad) 16%, var(--ground))}
+.banner.moved{color:var(--warn-wash-ink);background:var(--warn-wash)}
+.banner.moved a{margin-left:0;color:inherit;text-decoration:underline}
 .banner.held a{margin-left:0}
 .banner[hidden]{display:none}
 /* The mark in the scheme's second color (the operator, 16 Oct); red when
@@ -192,8 +192,7 @@ html:not([data-theme]) .logo.off{color:var(--bad)}
 /* Not a notification with a different border: a different thing. It is the
    only row here that is a question, it is pinned above every answer, and it
    is the one the Clear button cannot touch. */
-.bnote.ask{border-left:3px solid var(--warn);background:color-mix(in srgb, var(--warn) 12%, var(--panel));
-  background:color-mix(in srgb, var(--warn) 13%, var(--panel));
+.bnote.ask{border-left:3px solid var(--warn);background:var(--ground);
   border-bottom:var(--hair) solid var(--warn)}
 .bnote.ask .bwhy{color:var(--warn)}
 .bnote.ask .btag{display:inline-block;margin-bottom:5px;padding:1px 6px;
@@ -221,7 +220,7 @@ html:not([data-theme]) .logo.off{color:var(--bad)}
 /* Pinned like a question, red like a fault: an agent from another window
    is not waiting on an answer, it is stopping work until it is updated. */
 .bnote.ask.bad{border-left-color:var(--bad);border-bottom-color:var(--bad);
-  background:color-mix(in srgb, var(--bad) 13%, var(--panel))}
+  background:color-mix(in srgb, var(--bad) 13%, var(--ground))}
 .bnote.ask.bad .btag{background:var(--bad);color:var(--bg)}
 .bnote.ask.bad .bwhy{color:var(--bad)}
 /* The drawer in three groups, each headed by what it is and how many
@@ -398,8 +397,8 @@ button,a.btn,.dockline .dtab{background-image:var(--sheen) !important}
      hover leaking in here painted the active tab as a filled pill the moment
      the pointer crossed it. */
   .nbtabs button:hover,.nbtabs button.on:hover{background:none;--sheen:none}
-  .modal .danger:hover{background:color-mix(in srgb, var(--bad) 35%, var(--panel))}
-  .nb .caution:hover{background:color-mix(in srgb, var(--warn) 30%, var(--panel))}
+  .modal .danger:hover{background:color-mix(in srgb, var(--bad) 35%, var(--ground))}
+  .nb .caution:hover{background:color-mix(in srgb, var(--warn) 30%, var(--ground))}
   button:disabled:hover,button[aria-disabled="true"]:hover{background:var(--btn);border-color:var(--line)}
   button.eye:hover{color:var(--ink)}
   .pane .bar .x:hover{background:rgba(255,255,255,.1);color:var(--ink)}
@@ -675,11 +674,11 @@ textarea.proseline{resize:none;overflow:hidden;white-space:pre-wrap;
 /* A destructive button is filled, never an outline alone (the operator, 27
    Oct): a tint of the scheme's own red under its red words, a little more of
    it under the pointer, its edge the same red mixed down. */
-button.danger,a.btn.danger{background:color-mix(in srgb, var(--bad) 22%, var(--panel));
-  border-color:color-mix(in srgb, var(--bad) 50%, var(--panel))}
-@media(hover:hover){ button.danger:not([disabled]):hover,a.btn.danger:hover{background:color-mix(in srgb, var(--bad) 32%, var(--panel))}
+button.danger,a.btn.danger{background:color-mix(in srgb, var(--bad) 22%, var(--ground));
+  border-color:color-mix(in srgb, var(--bad) 50%, var(--ground))}
+@media(hover:hover){ button.danger:not([disabled]):hover,a.btn.danger:hover{background:color-mix(in srgb, var(--bad) 32%, var(--ground))}
 }
-button.danger[disabled]{background:color-mix(in srgb, var(--bad) 8%, var(--panel))}
+button.danger[disabled]{background:color-mix(in srgb, var(--bad) 8%, var(--ground))}
 /* Revert is amber rather than red. It throws away what has not been saved
    yet: a decision you might want back, and the color this page already uses
    for "wants a decision from you". Red is kept for the controls that destroy
@@ -1269,7 +1268,7 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
 /* Confirming a drop, with the reason it is going. Red-edged rather than a
    browser dialog: it has to hold a field, and a phone's confirm() cannot. */
 .dropbox{border:var(--hair) solid var(--red2-edge);border-radius:var(--r-surface);padding:9px 10px;
-  margin:0 0 9px 26px;background:color-mix(in srgb, var(--bad) 8%, var(--bg))}
+  margin:0 0 9px 26px;background:color-mix(in srgb, var(--bad) 8%, var(--ground))}
 .dropbox .q{font:12px/1.5 system-ui,sans-serif;color:var(--ink);margin-bottom:7px}
 .dropbox .q span{color:var(--dim)}
 .dropbox input{width:100%;box-sizing:border-box;padding:6px 8px;
@@ -2451,7 +2450,7 @@ button.eye svg,button.ic svg,#bTrashTab svg{width:16px;height:16px;display:block
   0 0 8px color-mix(in srgb, var(--accent) 50%, transparent)}
 .pill.live{box-shadow:0 0 0 1px color-mix(in srgb, var(--pass) 30%, transparent),
   0 0 10px color-mix(in srgb, var(--pass) 30%, transparent)}
-.doctor .chips .pill.ok{color:var(--pass);border-color:color-mix(in srgb, var(--pass) 35%, var(--panel))}
+.doctor .chips .pill.ok{color:var(--pass);border-color:color-mix(in srgb, var(--pass) 35%, var(--ground))}
 .st.ok{background:var(--pass)}
 .st.warn{background:var(--warn)}
 .st.bad{background:var(--bad)}

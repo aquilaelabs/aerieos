@@ -26,14 +26,21 @@
    `design` and measured by test/uniform.mjs. */
 :root,.sw[data-theme="default"]{
   --bg:#0b1322; --panel:#121c30; --line:#3e5378; --ink:#eaf1fc;
-  --dim:#a9b7ce; --accent:#2fc6ff; --warn:#f0a43c; --bad:#f2707a;
+  --dim:#a9b7ce; --accent:#2fc6ff; --warn:#facc15; --bad:#f2707a;
   --note:#8cc8ff;
-  /* Good, warning and error are one set in every scheme (the operator, 16
-     Oct and 7 Nov: they mean the same whatever the theme), a shade for the
-     dark half here and one for the light half below, never a scheme's own:
-     green, an orange-leaning amber (a yellow mixed into the panels read as
-     olive), and red. */
+  /* Good, warning and error are one set in every scheme: they mean the same
+     whatever the theme, a shade for the dark half here and one for the
+     light half below, never a scheme's own: green, a true yellow, and red.
+     A surface tinted with one of them is mixed over --ground, a neutral no
+     scheme and no space's color moves, its words in --ground-ink: mixed
+     over a space's panel, the warning's band read as a dirty olive. A
+     warning's own surface (a band, a banner) is --warn-wash with
+     --warn-wash-ink: in the dark half the yellow itself with dark words,
+     since any thin yellow over a dark ground reads olive; in the light half
+     a pale wash. */
   --pass:#3fb950;
+  --ground:#141922; --ground-ink:#eef1f6;
+  --warn-wash:#facc15; --warn-wash-ink:#1f1a00; --warn-edge:#facc15;
   /* Derived, not chosen. Buttons and the active/primary family were hardcoded
      hex: #232b34 eleven times, #1f6f36 and #2ea043 across every tab, pane and
      primary, which meant a scheme could repaint the page and leave every
@@ -302,6 +309,8 @@ html[data-theme="sepia"],.sw[data-theme="sepia"]{
 html[data-mode="light"]{
   color-scheme:light;
   --pass:#1a7f37;
+  --ground:#fbfbf8; --ground-ink:#1d2633;
+  --warn-wash:#fdf1bf; --warn-wash-ink:#1d2633; --warn-edge:#d8b62a;
   /* A lit control in the light half is a soft tint of the second color with
      its edge in the color itself and the ink on it (the operator, 16 Oct:
      the second color filled, darkened for white text, was too dark). The
@@ -321,7 +330,7 @@ html[data-mode="light"]{
 }
 html[data-mode="light"],html[data-mode="light"] .sw[data-theme="default"]{
   --bg:#eef3fb; --panel:#fbfdff; --line:#c4d2e6; --ink:#1d2633;
-  --dim:#566275; --accent:#0059c7; --warn:#9a5b00; --bad:#c62828; --note:#0a5fb0}
+  --dim:#566275; --accent:#0059c7; --warn:#7d6608; --bad:#c62828; --note:#0a5fb0}
 /* The default scheme alone fills what is pressed in its third hue, copper, so
    words and links stay blue and information never reads as a warning. */
 html:not([data-theme]),.sw[data-theme="default"]{--lit:#ff8f4a}
@@ -437,7 +446,7 @@ a{color:var(--note)}
 ::selection{background:var(--accent-deep);color:var(--on-fill)}
 @keyframes bellwait{
   0%,100%{background:var(--warn)}
-  50%{background:color-mix(in srgb, var(--warn) 22%, var(--panel))}
+  50%{background:color-mix(in srgb, var(--warn) 22%, var(--ground))}
 }
 @keyframes bellbad{
   0%,100%{background:transparent;--sheen:none}

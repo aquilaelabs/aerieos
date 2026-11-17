@@ -1699,6 +1699,48 @@ await section("what reads on a filled accent surface, on every scheme", async ()
      `the active tab's words read on its ground in all ${SCHEMES.length} schemes, dark and light${
        bad.length ? `; under ${AA}:1: ${bad.join(', ')}` : ''}`);
 });
+// Good, warning and error are one fixed trio (Perch, the warning a true
+// yellow): the same three colors on every scheme in each half, a warning's
+// band painted from its own wash whatever the scheme or a space's color
+// under it, and its words AA on that wash. Mixed over a space's panel, the
+// band read as a dirty olive.
+await section("good, warning and error are one trio on every scheme, and a warning's band reads", async () => {
+  const SCHEMES = await page.evaluate(() => THEMES.map(t => t[0]));
+  const bad = [], seen = { dark: new Set(), light: new Set() };
+  for (const [t, mode] of SCHEMES.flatMap(t => [[t, ''], [t, 'light']])) {
+    const r = await page.evaluate(([th, m]) => {
+      const root = document.documentElement;
+      root.dataset.theme = th;
+      if (m) root.dataset.mode = m; else delete root.dataset.mode;
+      const host = document.createElement('div');
+      host.className = 'pane'; host.style.cssText = 'position:absolute;left:-9999px;top:0;width:400px';
+      // A space's color under it: the band must not follow it.
+      host.innerHTML = '<div class="bar proj" style="--panel:#5b2a6e;--line:#8a4fa0"><div class="pnote warn pband"><span class="grow">Restart your session</span></div></div>';
+      document.body.appendChild(host);
+      const band = host.querySelector('.pband'), cs = getComputedStyle(band), rs = getComputedStyle(root);
+      const c = document.createElement('canvas'); c.width = c.height = 1;
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      const px = v => { ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 1, 1); ctx.fillStyle = v; ctx.fillRect(0, 0, 1, 1);
+                        const d = ctx.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2]]; };
+      const lin = x => { x /= 255; return x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); };
+      const lum = a => 0.2126 * lin(a[0]) + 0.7152 * lin(a[1]) + 0.0722 * lin(a[2]);
+      const R = (a, b) => { const x = lum(px(a)), y = lum(px(b)); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+      const out = { trio: ['--pass', '--warn', '--bad'].map(k => px(rs.getPropertyValue(k).trim()).join(',')).join(' '),
+                    wash: px(cs.backgroundColor).join(','), wantWash: px(rs.getPropertyValue('--warn-wash').trim()).join(','),
+                    words: +R(cs.color, cs.backgroundColor).toFixed(2) };
+      host.remove();
+      return out;
+    }, [t, mode]);
+    const half = mode ? 'light' : 'dark', name = mode ? `${t} (light)` : t;
+    seen[half].add(r.trio);
+    if (r.wash !== r.wantWash) bad.push(`${name}: the band is ${r.wash}, not the wash ${r.wantWash}`);
+    if (!(r.words >= 4.5)) bad.push(`${name}: the band's words ${r.words}:1`);
+  }
+  await page.evaluate(() => { delete document.documentElement.dataset.theme; delete document.documentElement.dataset.mode; });
+  if (seen.dark.size !== 1) bad.push(`the dark half's trio differs by scheme: ${[...seen.dark].join(' | ')}`);
+  if (seen.light.size !== 1) bad.push(`the light half's trio differs by scheme: ${[...seen.light].join(' | ')}`);
+  ok(bad.length === 0, `one trio on all ${SCHEMES.length} schemes in each half, and a warning's band its own wash with its words at AA${bad.length ? `: ${bad.join('; ')}` : ''}`);
+});
 }
 
 if (runs('b')) {
