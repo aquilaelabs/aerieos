@@ -331,7 +331,9 @@ function rolesRoleBody(){
     const exp = insts.length ? `<button type="button" class="rexp" data-rexp="${esc(key)}" aria-expanded="${open ? "true" : "false"}"
       aria-label="${esc(label)} on each ${what}">${rSome && !rAll ? `${lv.filter(Boolean).length} of ${insts.length} ${what}s` : `each ${what}`}</button>` : "";
     const head = tblLine(ROLE_AREA_COLS, [
-      `<span class="rareahead">${esc(label)}${exp}</span><div class="sub dim">Read: ${esc(rd)}. Write: ${esc(wr)}.</div>`,
+      // What Read and Write give behind the area's help mark (Perch: a
+      // sentence under every area made the table twice its height).
+      `<span class="rareahead">${esc(label)}${helpIcon(`Read: ${rd}. Write: ${wr}.`)}${exp}</span>`,
       box("data-rread", key, `Read ${label}`, rAll, rSome && !rAll, off),
       box("data-rwrite", key, `Write ${label}`, wAll, wSome && !wAll, off || !rSome)],
       "div", `rarea${off && !ro ? " off" : ""}`, `data-rarea="${esc(key)}"`);

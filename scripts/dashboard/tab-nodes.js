@@ -2007,7 +2007,8 @@ function ndRowHtml(n, lead = ""){
     const pendingBar = n.kind === "agent" && pending ? `
         <div class="sub ndpicks">Made with: ${picks(n.config || {})}.</div>
         <div class="actbar ndpending">
-          <span class="lead dim">Waiting for enroll-${esc(n.name)}-${esc(n.id)}.sh to run on the machine. Download it again makes a new one with a new token (the old script stops working); Discard takes the row off.</span>
+          <span class="lead dim">Waiting for enroll-${esc(n.name)}-${esc(n.id)}.sh to run on the machine${helpIcon(
+            "Download it again makes a new script with a new token, and the old one stops working; Discard takes the row off.")}</span>
           <button type="button" data-nd="reenroll" title="a new enroll script for this row, with a new token">Download it again</button>
           <button type="button" class="danger" data-nd="discard" title="take this waiting row off: nothing has enrolled with it">Discard</button>
         </div>` : "";
