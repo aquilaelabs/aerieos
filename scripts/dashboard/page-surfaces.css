@@ -2335,19 +2335,32 @@ body.firstrun #panes{display:none}
 @media(pointer:fine){ .ndsettings>.field>.ndcap>input[type=checkbox]{min-height:0;margin-block:0}
 }
 .ndactions{display:flex;flex-direction:column;gap:6px;margin-top:8px;border-top:var(--hair) solid var(--line);padding-top:6px}
-/* A mount is one line at a desk (the operator, 23 Oct: a row for read-only
-   and the × alone used a lot of room): its source and mountpoint, then its
-   kind, read-only, what the node says of it and its × together at the end. */
-.ndmount{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1.2fr) minmax(22em,1.4fr);gap:6px 10px;align-items:end}
-.ndmount .ndmline .ndcap{white-space:nowrap}
-/* Every mount in the same three columns, and the labels said once, over
-   the first: a Source and a Mountpoint over every row was most of its
-   height. The fields keep their own names for a screen reader. */
-.ndmount~.ndmount .setrow>.lbl{display:none}
-.ndmount .ndmline{display:flex;align-items:center;gap:6px 12px;min-height:var(--ctl);flex-wrap:nowrap;min-width:0}
-.ndmount .ndmline select{width:auto;flex:0 0 auto}
-.ndmount .ndmline .ndmstate{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ndmount .ndmline .eye{margin-left:auto}
+/* A node's mounts are records (the record-lists rule): a row read-only in
+   the table's columns, its open form in place on the sunk ground, the form's
+   fields across the row at a desk (source, mountpoint, kind, read-only) and
+   its bar under them, the nginx route form's shape. */
+.tbl.ndmounts>.row.ndmount{align-items:stretch}
+.ndmounts>.ndmount.open{background:var(--sunk);padding:var(--row-y) var(--row-x)}
+.ndmounts>.ndmount.open>.tline{display:none}
+.ndmfields{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1.2fr) minmax(0,.7fr) auto;column-gap:var(--row-x);row-gap:var(--field-gap);align-items:end;min-width:0}
+.ndmfields>.setrow.col{margin:0;min-width:0;max-width:none}
+.ndmfields>.ndmro{white-space:nowrap;min-height:var(--ctl);display:flex;align-items:center}
+.ndmounts .ndmstate{white-space:normal}
+/* A runner's record: its notes under its line, its open form the same shape. */
+.tbl.ndrunrecs>.row.ndrun{align-items:stretch}
+.ndrunrecs>.ndrun>.ndrunnote{padding:0 var(--row-x) var(--row-y)}
+.ndrunrecs>.ndrun.open{background:var(--sunk)}
+.ndrunform{padding:0 var(--row-x) var(--row-y)}
+.ndrunfields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:var(--row-x);row-gap:var(--field-gap);min-width:0}
+.ndrunfields>.setrow.col{margin:0;min-width:0;max-width:none}
+@media (max-width:600px){ .ndrunfields{grid-template-columns:minmax(0,1fr)} }
+/* The path mapping's records, the same shape: two fields across its form. */
+.tbl.ndpaths>.row.ndpath{align-items:stretch}
+.ndpaths>.ndpath.open{background:var(--sunk);padding:var(--row-y) var(--row-x)}
+.ndpaths>.ndpath.open>.tline{display:none}
+.ndpfields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);column-gap:var(--row-x);row-gap:var(--field-gap);min-width:0}
+.ndpfields>.setrow.col{margin:0;min-width:0;max-width:none}
+@media (max-width:600px){ .ndpfields{grid-template-columns:minmax(0,1fr)} }
 /* Static routes take the network's whole width, in either mode. */
 .ndnet .ndroutes{grid-column:1 / -1}
 .ndmstate.warn,.ndmwhy.warn{color:var(--warn)} .ndmstate.bad,.ndmwhy.bad{color:var(--bad)}
@@ -2386,11 +2399,10 @@ body.firstrun #panes{display:none}
 .row .jbouts code{font:var(--f-note);white-space:normal;overflow-wrap:anywhere}
 .jbouts a{overflow-wrap:anywhere}
 @media (max-width:600px){
-  /* A mount on a phone is two lines: its source and mountpoint side by
-     side, then its kind, read-only, its state and its × on one. */
-  .ndmount{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr)}
-  .ndmount .ndmline .ndmstate{white-space:normal}
-  .ndmount .ndmline{grid-column:1 / -1}
+  /* A mount's form on a phone: its source across, then its mountpoint and
+     kind side by side, then read-only. */
+  .ndmfields{grid-template-columns:minmax(0,1fr) 7em}
+  .ndmfields>:first-child,.ndmfields>.ndmro{grid-column:1 / -1}
 }
 /* The Jobs tab: it is narrowed by chips (B74); the reason a job ended
    badly is a warn line; the log is the manager's compose log, same box. */

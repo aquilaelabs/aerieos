@@ -302,6 +302,7 @@ function mountState(m, reported){
 // says is there, and the labels an install would register with: the node's
 // own name among them, which is the label a workflow's runs-on uses to land
 // here. Install and Remove are system jobs like the rest of the plane.
+const RUN_COLS = [{label: "Repository or organization"}, {label: "State", w: "9rem"}, {label: "Registered", w: "minmax(0,1fr)"}, {act: true, w: "5rem"}];
 function nodeRunnerSection(n, c, between = "", acts = ""){
   // One runner per git host on a node (R53): the record's asks and the
   // census's reports, joined by slot, each a row with its own state and
@@ -356,22 +357,36 @@ function nodeRunnerSection(n, c, between = "", acts = ""){
       exposedOf(n.id, slot) ? [exposedOf(n.id, slot), "warn"] : null,
     ].filter(Boolean);
     const ro = mayOn(slot) !== "write";
-    return `<div class="row stack2 ndrun${ro ? " ndrunro" : ""}" data-slot="${esc(slot)}"><div class="grow">
-        <div class="name"><code>${esc(rep.url || want.url || slot)}</code>${hostOf(want, rep) ? ` <span class="pill">${hostOf(want, rep)}</span>` : ""}
-          <span class="pill stat ndrunstate${pcls ? " " + pcls : ""}${rep.busy && !job ? " ndrunbusy" : ""}">${esc(word)}</span></div>
-        ${facts ? `<div class="sub ndrunfacts">${esc(facts)}</div>` : ""}
-        ${notes.map(([t, c]) => `<div class="sub ${c} ndrunnote">${esc(t)}</div>`).join("")}
-        <div class="actbar">
-          <span class="sp"></span>
-          <button type="button" data-nrunner="install" data-slot="${esc(slot)}" ${busyNow || !stored ? "disabled" : ""}
-            title="${why || (stored ? "install the runner here and register it with the stored token"
-                                    : "add a token first")}">${
-            rep.installed ? barSaid("Reinstall runner", "Reinstall") : barSaid("Install runner", "Install")}</button>
+    // A record (the record-lists rule; the operator, 17 Nov): its address,
+    // state and registration read-only in the table's columns, what is wrong
+    // under its line, and Edit opening it in place: a new token and its
+    // labels, Install or Reinstall, Forget token, and Remove at the left.
+    const open = c.runEdit?.slot === slot;
+    const f = open ? c.runEdit.form : {};
+    const form = !open ? "" : `<div class="ngform ndrunform">
+        <div class="ndrunfields">
+          <label class="setrow col ctlrow"><span class="lbl">Token</span><input data-rf="token" type="password" value="${esc(f.token || "")}" spellcheck="false" autocomplete="off"
+            placeholder="${stored ? "stored: paste one only to replace it" : "paste a token that may register runners there"}" aria-label="runner token"></label>
+          <label class="setrow col ctlrow"><span class="lbl">Extra labels</span><input data-rf="labels" value="${esc(f.labels || "")}" spellcheck="false" autocomplete="off"
+            placeholder="gpu, android" aria-label="extra labels, comma-separated"></label>
+        </div>
+        <div class="actbar ngformbar">
+          ${rep.installed || want.want ? `<button type="button" class="danger lead" data-nrunner="remove" data-slot="${esc(slot)}" ${busyNow || !stored ? "disabled" : ""}
+            title="${why || (stored ? "deregister it and remove it from this node" : "add a token first")}">${barSaid("Remove runner", "Remove")}</button>` : ""}
           ${stored ? `<button type="button" class="danger" data-nrunnerforget data-slot="${esc(slot)}" ${busyNow ? "disabled" : ""}
             title="drop the stored token and this row; a registered runner keeps running">${barSaid("Forget token", "Forget")}</button>` : ""}
-          ${rep.installed || want.want ? `<button type="button" class="danger" data-nrunner="remove" data-slot="${esc(slot)}" ${busyNow || !stored ? "disabled" : ""}
-            title="${why || (stored ? "deregister it and remove it from this node" : "add a token first")}">${barSaid("Remove runner", "Remove")}</button>` : ""}
-        </div></div></div>`;
+          <span class="sp"></span>
+          <button type="button" data-nruncancel>Cancel</button>
+          <button type="button" class="primary" data-nrunner="install" data-slot="${esc(slot)}" ${busyNow || (!stored && !f.token) ? "disabled" : ""}
+            title="${why || (stored || f.token ? "install the runner here and register it with the token" : "add a token first")}">${
+            rep.installed ? barSaid("Reinstall runner", "Reinstall") : barSaid("Install runner", "Install")}</button>
+        </div></div>`;
+    return `<div class="row ndrun${ro ? " ndrunro" : ""}${open ? " open" : ""}" data-slot="${esc(slot)}">${tblLine(RUN_COLS, [
+        `<code>${esc(rep.url || want.url || slot)}</code>${hostOf(want, rep) ? ` <span class="pill">${hostOf(want, rep)}</span>` : ""}`,
+        `<span class="pill stat ndrunstate${pcls ? " " + pcls : ""}${rep.busy && !job ? " ndrunbusy" : ""}">${esc(word)}</span>`,
+        facts ? `<span class="sub ndrunfacts">${esc(facts)}</span>` : `<span class="dim">not registered</span>`,
+        open ? "" : `<button type="button" data-nredit="${esc(slot)}">Edit</button>`])}${
+        notes.map(([t, cl]) => `<div class="sub ${cl} ndrunnote">${esc(t)}</div>`).join("")}${form}</div>`;
   }).join("");
   // Adding is a button that unrolls the form in its own band, the shape
   // every view adds with; the form is four fields that wrap to the width
@@ -405,7 +420,7 @@ function nodeRunnerSection(n, c, between = "", acts = ""){
   return `${between}
       ${addbar ? `<div class="field">${addbar}</div>` : ""}
       <div class="ndruns">${acts ? `<div class="field ndrunhead"><b>Runners</b><span class="dim">${slots.length}</span><span class="sp"></span><span class="actbar ndrunadd">${acts}</span></div>` : ""}${
-        rows || `<div class="empty ndrunnone">No runner on this node yet.</div>`}</div>
+        rows ? tblWrap(RUN_COLS, rows, "ndrunrecs") : `<div class="empty ndrunnone">No runner on this node yet.</div>`}</div>
       ${slots.length ? `<div class="field toolfoot ndrunpin"><div class="hint">This node's name pins a job here:
         <pre class="ndcmd">runs-on: [self-hosted, ${esc(n.name.replace(/[^A-Za-z0-9._-]/g, "-").slice(0, 40))}]</pre></div></div>` : ""}`;
 }
@@ -1229,12 +1244,7 @@ function nodeAdvancedSection(n, stale, inflight){
   // What keeps it from being disabled or un-enrolled (nodes.node_in_use):
   // the sessions and the containers running there, ended first.
   const inUse = ndInUse(n);
-  const paths = n.config?.paths || {};
-  const text = Object.entries(paths).map(([k, v]) => `${k}:${v}`).join(", ");
   const c = nodeDraft(n);
-  if (c.draft.pathsText === undefined || c.draft.pathsFrom !== text){
-    c.draft.pathsText = text; c.draft.pathsFrom = text;
-  }
   if (c.draft.nameText === undefined || c.draft.nameFrom !== n.name){
     c.draft.nameText = n.name; c.draft.nameFrom = n.name;
   }
@@ -1251,13 +1261,7 @@ function nodeAdvancedSection(n, stale, inflight){
       <button type="button" data-nd="rename"${!String(c.draft.nameText || "").trim() || String(c.draft.nameText).trim() === n.name ? " disabled" : ""}
         title="a runner already installed keeps its old label until reinstalled">Rename</button>
     </div>
-    <div class="ndpaths actbar ctlrow">
-      <div class="setrow col grow ctlrow">${lbl("", "Path mapping", "here:there pairs, comma-separated; only needed when a path a compose file names is somewhere else on the node")}
-      <input data-k="paths" value="${esc(c.draft.pathsText)}" spellcheck="false" autocomplete="off"
-        placeholder="/workspace:/workspace, /devdata:/mnt/user/appdata/bb-dev"
-        aria-label="path mapping"></div>
-      <button type="button" data-nd="paths" title="save the mapping onto the node's record">Save paths</button>
-    </div>
+    ${nodePathsTable(n, c)}
     <div class="ndacts">
     ${n.kind !== "agent" || !n.config?.host_only ? "" : act("Lock down",
         n.config?.lockdown ? "Locking down: it may take nothing but the job that stops its containers and shuts its door, and its credential is revoked when that ends, or within five minutes if it never answers."
@@ -1502,6 +1506,101 @@ function nodeDrift(n){
 }
 
 
+// A node's path mapping as records (the record-lists rule; the operator, 17
+// Nov: a record's Save writes it at once): a pair a row, what a path a
+// compose file names is called here and on the node, Edit opening that row
+// in place, Add a mapping over the table. Only needed where a path is
+// somewhere else on the node.
+const PATH_COLS = [{label: "Here"}, {label: "On the node"}, {act: true, w: "5rem"}];
+function nodePathsTable(n, c){
+  const pairs = Object.entries(n.config?.paths || {}), ed = c.pathEdit;
+  const form = (f, i) => `<div class="ngform ndpform" data-i="${i}">
+    <div class="ndpfields">
+      <label class="setrow col ctlrow"><span class="lbl">Here</span><input data-pf="here" value="${esc(f.here || "")}" spellcheck="false" autocomplete="off"
+        placeholder="/devdata" aria-label="the path as a compose file names it"></label>
+      <label class="setrow col ctlrow"><span class="lbl">On the node</span><input data-pf="there" value="${esc(f.there || "")}" spellcheck="false" autocomplete="off"
+        placeholder="/mnt/user/appdata/bb-dev" aria-label="where it is on the node"></label>
+    </div>
+    <div class="actbar ngformbar">${i >= 0 ? `<button type="button" class="danger lead" data-pdel>Delete</button>` : ""}
+      <button type="button" data-pcancel>Cancel</button>
+      <button type="button" class="primary" data-psave>Save</button></div>
+  </div>`;
+  const rows = pairs.map(([here, there], i) => `<div class="row ndpath${ed?.i === i ? " open" : ""}" data-i="${i}">${tblLine(PATH_COLS, [
+      `<code>${esc(here)}</code>`, `<code>${esc(there)}</code>`,
+      ed?.i === i ? "" : `<button type="button" data-pedit="${i}">Edit</button>`])}${ed?.i === i ? form(ed.form, i) : ""}</div>`).join("");
+  const fresh = ed?.i === -1 ? `<div class="row ndpath open" data-i="-1">${form(ed.form, -1)}</div>` : "";
+  return `<div class="ndpathmap"><div class="fsub">Path mapping${helpIcon("What a path a compose file names is called on this node, where it is somewhere else there. Nothing is needed where a path is the same on both.")}</div>
+    <div class="addbar ctlrow"><button type="button" data-padd${ed?.i === -1 ? " disabled" : ""}>Add a mapping</button></div>
+    ${rows || fresh ? tblWrap(PATH_COLS, fresh + rows, "ndpaths") : `<div class="hint">none: every path a compose file names is the same on this node</div>`}</div>`;
+}
+
+// A node's mounts as records (the record-lists rule; the operator, 17 Nov: a
+// record's Save writes it at once): a table of what is saved, each row
+// read-only with Edit at its right, Edit opening that row in place into its
+// form (Delete, Cancel, Save), Add a mount over the table opening the form
+// at its top. Apply still puts what is saved on the node. A node set up at
+// its own console lists what it reports until one is saved here.
+const MOUNT_COLS = [{label: "Source"}, {label: "Mountpoint"}, {label: "Kind", w: "minmax(0,.6fr)"},
+  {label: "State", w: "minmax(0,1fr)"}, {act: true, w: "5rem"}];
+function nodeMountsTable(n, c){
+  const d = c.draft, ed = c.mountEdit, rep = n.reported || {};
+  const locked = !!n.config?.lock;
+  const rec = (m, i) => {
+    const [st, cls] = mountState(m, rep.mounts);
+    // A reason with a fix in it (a stale handle, a mount that did not come
+    // up) is longer than its cell shows, and the section's state line names
+    // the last apply's failure instead of it once one has failed (B660): the
+    // cell keeps the state up to its first colon and the whole reason goes
+    // under the row, where it can wrap.
+    const cut = cls && st.length > 40 ? st.indexOf(": ") : -1;
+    const head = cut > 0 ? st.slice(0, cut) : st;
+    const open = ed?.i === i;
+    return `<div class="row ndmount${open ? " open" : ""}" data-i="${i}">${tblLine(MOUNT_COLS, [
+      `<code>${esc(m.source || "")}</code>`, `<code>${esc(m.path || "")}</code>`,
+      `${esc(m.type || "nfs")}${m.ro ? ", read-only" : ""}`,
+      `<span class="sub ndmstate ${cls}">${esc(head)}</span>`,
+      open ? "" : `<button type="button" data-medit="${i}"${locked ? ` disabled title="${esc(LOCKED_WHY)}"` : ""}>Edit</button>`])}${
+      cut > 0 ? `<div class="sub ndmwhy ${cls}">${esc(m.path || m.source || "this mount")}: ${esc(st)}</div>` : ""}${
+      open ? nodeMountForm(ed.form, i) : ""}</div>`;
+  };
+  const fresh = ed?.i === -1 ? `<div class="row ndmount open" data-i="-1">${nodeMountForm(ed.form, -1)}</div>` : "";
+  if (!d.mounts.length && !fresh) return `<div class="hint">none yet</div>`;
+  return tblWrap(MOUNT_COLS, fresh + d.mounts.map(rec).join(""), "ndmounts");
+}
+function nodeMountForm(f, i){
+  return `<div class="ngform ndmform" data-i="${i}">
+    <div class="ndmfields">
+      <label class="setrow col ctlrow"><span class="lbl">Source</span><input data-mf="source" value="${esc(f.source || "")}" spellcheck="false" autocomplete="off"
+        placeholder="${f.type === "virtiofs" ? "appdata" : "nas:/mnt/user/appdata"}" aria-label="${f.type === "virtiofs" ? "the share tag" : "host:/export"}"></label>
+      <label class="setrow col ctlrow"><span class="lbl">Mountpoint</span><input data-mf="path" value="${esc(f.path || "")}" spellcheck="false" autocomplete="off"
+        placeholder="/mnt/appdata" aria-label="mountpoint: blank means /mnt/ and the export's name"></label>
+      <label class="setrow col ctlrow"><span class="lbl">Kind</span><select data-mf="type" aria-label="kind">
+        <option value="nfs"${f.type !== "virtiofs" ? " selected" : ""}>nfs</option>
+        <option value="virtiofs"${f.type === "virtiofs" ? " selected" : ""}>virtiofs</option></select></label>
+      <label class="ndcap ndmro"><input type="checkbox" data-mf="ro"${f.ro ? " checked" : ""}> read-only</label>
+    </div>
+    <div class="actbar ngformbar">${i >= 0 ? `<button type="button" class="danger lead" data-mdel>Delete</button>` : ""}
+      <button type="button" data-mcancel>Cancel</button>
+      <button type="button" class="primary" data-msave>Save</button></div>
+  </div>`;
+}
+// Save the mounts as `mounts`, with the rest of the node's configuration as
+// it is saved (a store being typed stays a draft of its own); the draft's
+// mounts follow.
+async function nodeMountsSave(id, c, mounts, btn){
+  const n = nodesList.find(x => x.id === id);
+  const d = n?.config?.desired || {};
+  const config = {stores: {...(d.stores || {})}, keep: [...(d.keep || [])],
+    network: {mode: "dhcp", address: "", gateway: "", dns: [], interface: "", routes: [], ...(d.network || {})}, mounts};
+  busy(btn, "Saving");
+  const r = await nodeAct({action: "config", id, config});
+  if (r.error) return;
+  c.mountEdit = null;
+  c.draft.mounts = mounts.map(m => ({...m}));
+  c.draft.fromNode = false;
+  readMoved("nodes"); drawPanes();
+}
+
 // The configuration plane (docs/nodes.md §12) as three sections: the
 // runner, storage (mounts and stores), network. One record underneath:
 // Save keeps the whole draft, so the status line reads the same in both
@@ -1516,35 +1615,7 @@ function nodeConfSections(n){
   const rep = n.reported || {};
   const busyNow = n.applying;
   const locked = !!n.config?.lock;
-  const mounts = d.mounts.map((m, i) => {
-    const [st, cls] = mountState(m, rep.mounts);
-    // A reason with a fix in it (a stale handle, a mount that did not come
-    // up) is longer than the cell at the end of the line shows, and the
-    // section's state line names the last apply's failure instead of it
-    // once one has failed (B660): the cell keeps the state up to its first
-    // colon and the whole reason goes under the row, where it can wrap.
-    const cut = cls && st.length > 40 ? st.indexOf(": ") : -1;
-    const head = cut > 0 ? st.slice(0, cut) : st;
-    return `
-    <div class="ndmount ctlline" data-i="${i}">
-      <div class="setrow col ctlrow">${lbl("", "Source", m.type === "virtiofs" ? "the share tag" : "host:/export")}
-      <input data-k="source" value="${esc(m.source || "")}" spellcheck="false" autocomplete="off"
-        placeholder="${m.type === "virtiofs" ? "appdata" : "nas:/mnt/user/appdata"}" aria-label="source"></div>
-      <div class="setrow col ctlrow">${lbl("", "Mountpoint", "blank means /mnt/ and the export's name")}
-      <input data-k="path" value="${esc(m.path || "")}" spellcheck="false" autocomplete="off"
-        placeholder="/mnt/appdata" aria-label="mountpoint"></div>
-      <div class="ndmline">
-        <select data-k="type" aria-label="type">
-          <option value="nfs" ${m.type !== "virtiofs" ? "selected" : ""}>nfs</option>
-          <option value="virtiofs" ${m.type === "virtiofs" ? "selected" : ""}>virtiofs</option>
-        </select>
-        <label class="ndcap"><input type="checkbox" data-k="ro" ${m.ro ? "checked" : ""}> read-only</label>
-        <span class="sub ndmstate ${cls}">${esc(head)}</span>
-        <button type="button" class="eye" data-mrm title="take this mount out" aria-label="take this mount out">×</button>
-      </div>${cut > 0 ? `
-      <div class="sub ndmwhy ${cls}">${esc(m.path || m.source || "this mount")}: ${esc(st)}</div>` : ""}
-    </div>`;
-  }).join("");
+  const mounts = nodeMountsTable(n, c);
   const STORE_ABOUT = {
     data: "job workspaces and AVDs", toolchains: "toolchains installed here",
     cache: "build caches, per space", artifacts: "what spaces built, per space",
@@ -1628,9 +1699,9 @@ function nodeConfSections(n){
       title="put the fields back to what is saved">Revert</button>`;
   const storage = `
       <div class="sub">Shares mounted at boot.${
-        d.fromNode ? ` <span class="dim">As the node reports them; save to manage them from here.</span>` : ""}</div>
+        d.fromNode ? ` <span class="dim">As the node reports them: a Save on one manages them all from here.</span>` : ""}</div>
+      <div class="addbar ctlrow"><button type="button" data-madd${c.mountEdit?.i === -1 || locked ? " disabled" : ""}>Add a mount</button></div>
       ${mounts}
-      <div class="addbar ctlrow"><button type="button" data-madd>Add a mount</button></div>
       <div class="sub">Where job data, toolchains, caches and artifacts live.</div>
       <div class="fgrid ndstores">${stores}</div>${storePlaces}
       <div class="actbar">
@@ -2855,12 +2926,6 @@ function wireNodesTab(root){
         notify(said.length ? said.join("; ") : "nothing changed");
         return;
       }
-      if (act === "paths"){
-        const inp = box.querySelector('[data-k="paths"]');
-        await nodeAct({action: "paths", id, paths: inp ? inp.value : ""});
-        const c = nodesConf[id]; if (c && c.draft) c.draft.pathsText = undefined;
-        return;
-      }
       if (act === "test"){
         const out = root.querySelector(`.ndrow[data-node="${CSS.escape(id)}"] .ndtest`);
         if (out){ out.hidden = false; out.textContent = "asking…"; }
@@ -2889,10 +2954,7 @@ function wireNodesTab(root){
       if (j.error){ c.checked = !c.checked; notify(j.error, true); }
     });
     wireNodeConf(box, id);
-    const pi = box.querySelector('.ndpaths [data-k="paths"]');
-    if (pi){
-      pi.oninput = () => { const c = nodeDraft(nodesList.find(x => x.id === id)); c.draft.pathsText = pi.value; };
-    }
+    wireNodePaths(box, id);
     // ...and the name under Advanced: without it a heartbeat's repaint
     // between typing a new name and pressing Rename put the old one back,
     // and Rename said to type one (B176: nodes.mjs's rename wait timed out
@@ -2937,6 +2999,45 @@ function wireNodesTab(root){
     }
   });
 }
+// The path mapping's records: one open at a time, its form kept across a
+// repaint, its Save writing the whole mapping with that pair changed.
+function wireNodePaths(box, id){
+  const n = nodesList.find(x => x.id === id);
+  if (!n) return;
+  const c = nodeDraft(n);
+  const pairs = () => Object.entries(nodesList.find(x => x.id === id)?.config?.paths || {});
+  const open = (i, form) => {
+    c.pathEdit = {i, form};
+    readMoved("nodes"); drawPanes();
+    document.querySelector(`.ndrow[data-node="${CSS.escape(id)}"] .ndpath.open [data-pf="here"]`)?.focus();
+  };
+  const save = async (list, btn) => {
+    busy(btn, "Saving");
+    const r = await nodeAct({action: "paths", id, paths: list.map(([h, t]) => `${h}:${t}`).join(", ")});
+    if (!r.error){ c.pathEdit = null; readMoved("nodes"); drawPanes(); }
+  };
+  const add = box.querySelector("[data-padd]");
+  if (add) add.onclick = () => open(-1, {here: "", there: ""});
+  box.querySelectorAll("[data-pedit]").forEach(b => b.onclick = () => {
+    const [here, there] = pairs()[Number(b.dataset.pedit)] || ["", ""];
+    open(Number(b.dataset.pedit), {here, there});
+  });
+  box.querySelectorAll("[data-pf]").forEach(el => el.oninput = () => { if (c.pathEdit) c.pathEdit.form[el.dataset.pf] = el.value; });
+  box.querySelectorAll("[data-pcancel]").forEach(b => b.onclick = () => { c.pathEdit = null; readMoved("nodes"); drawPanes(); });
+  box.querySelectorAll("[data-psave]").forEach(b => b.onclick = () => pressing(b, () => {
+    const {i, form} = c.pathEdit || {};
+    if (i === undefined) return;
+    const list = pairs(), pair = [String(form.here || "").trim(), String(form.there || "").trim()];
+    if (i < 0) list.push(pair); else list[i] = pair;
+    return save(list, b);
+  }));
+  box.querySelectorAll("[data-pdel]").forEach(b => b.onclick = () => pressing(b, () => {
+    const i = c.pathEdit?.i;
+    if (!(i >= 0)) return;
+    return save(pairs().filter((_, j) => j !== i), b);
+  }));
+}
+
 function wireNodeConf(row, id){
   const fold = row.querySelector(".ndconf");
   if (!fold) return;
@@ -2947,14 +3048,8 @@ function wireNodeConf(row, id){
   fold.querySelectorAll("[data-k]").forEach(el => {
     const on = () => {
       const k = el.dataset.k;
-      const m = el.closest(".ndmount");
       const d = c.draft;
-      if (m){
-        const mt = d.mounts[Number(m.dataset.i)];
-        if (!mt) return;
-        if (k === "ro") mt.ro = el.checked;
-        else mt[k] = el.value;
-      } else if (k.startsWith("store:")){
+      if (k.startsWith("store:")){
         d.stores[k.slice(6)] = el.value;
       } else if (k.startsWith("net:")){
         const f = k.slice(4);
@@ -2975,7 +3070,7 @@ function wireNodeConf(row, id){
       touch();
       // Only the two that change what else is enabled repaint now; a
       // keystroke in a path field does not need the whole tab redrawn.
-      if (k === "net:mode" || k === "type"){ readMoved("nodes"); drawPanes(); }
+      if (k === "net:mode"){ readMoved("nodes"); drawPanes(); }
       else {
         // Both editors carry a Save and the status line: one record, two
         // sections, so every copy moves.
@@ -2990,30 +3085,78 @@ function wireNodeConf(row, id){
     el.oninput = on;
     el.onchange = on;
   });
-  const add = fold.querySelector("[data-madd]");
-  if (add) add.onclick = () => {
-    c.draft.mounts.push({type: "nfs", source: "", path: "", ro: false});
-    touch(); readMoved("nodes"); drawPanes();
-    // ...and the new mount's first field takes the keyboard, the press's
-    // button being kept by the patch rather than thrown away.
-    const i = c.draft.mounts.length - 1;
-    document.querySelector(`.ndrow[data-node="${CSS.escape(id)}"] .ndmount[data-i="${i}"] [data-k="source"]`)?.focus();
+  // The mounts' records: one open at a time, its form kept across the
+  // repaints a heartbeat brings, its Save writing that record at once.
+  const mountOpen = (i, form) => {
+    c.mountEdit = {i, form};
+    readMoved("nodes"); drawPanes();
+    // ...and its first field takes the keyboard.
+    document.querySelector(`.ndrow[data-node="${CSS.escape(id)}"] .ndmount.open [data-mf="source"]`)?.focus();
   };
-  fold.querySelectorAll("[data-mrm]").forEach(b => b.onclick = () => {
-    const i = Number(b.closest(".ndmount").dataset.i);
-    c.draft.mounts.splice(i, 1);
-    touch(); readMoved("nodes"); drawPanes();
+  const add = fold.querySelector("[data-madd]");
+  if (add) add.onclick = () => mountOpen(-1, {type: "nfs", source: "", path: "", ro: false});
+  fold.querySelectorAll("[data-medit]").forEach(b => b.onclick = () => mountOpen(Number(b.dataset.medit), {...c.draft.mounts[Number(b.dataset.medit)]}));
+  fold.querySelectorAll("[data-mf]").forEach(el => {
+    const on = () => {
+      if (!c.mountEdit) return;
+      c.mountEdit.form[el.dataset.mf] = el.type === "checkbox" ? el.checked : el.value;
+      // The kind changes what the source looks like.
+      if (el.dataset.mf === "type"){ readMoved("nodes"); drawPanes(); }
+    };
+    el.oninput = on; el.onchange = on;
   });
+  fold.querySelectorAll("[data-mcancel]").forEach(b => b.onclick = () => { c.mountEdit = null; readMoved("nodes"); drawPanes(); });
+  fold.querySelectorAll("[data-msave]").forEach(b => b.onclick = () => pressing(b, () => {
+    const {i, form} = c.mountEdit || {};
+    if (i === undefined) return;
+    const m = {type: form.type || "nfs", source: String(form.source || "").trim(), path: String(form.path || "").trim(), ro: !!form.ro};
+    const mounts = c.draft.mounts.map(x => ({...x}));
+    if (i < 0) mounts.push(m); else mounts[i] = m;
+    return nodeMountsSave(id, c, mounts, b);
+  }));
+  fold.querySelectorAll("[data-mdel]").forEach(b => b.onclick = () => pressing(b, () => {
+    const i = c.mountEdit?.i;
+    if (!(i >= 0)) return;
+    return nodeMountsSave(id, c, c.draft.mounts.filter((_, j) => j !== i).map(x => ({...x})), b);
+  }));
+  // A runner's record: Edit opens it in place, one at a time, what is typed
+  // in it kept across a repaint.
+  fold.querySelectorAll("[data-nredit]").forEach(b => b.onclick = () => {
+    const n = nodesList.find(x => x.id === id);
+    const want = n?.services?.runners?.[b.dataset.nredit] || {};
+    c.runEdit = {slot: b.dataset.nredit, form: {token: "", labels: (want.labels || []).join(", ")}};
+    readMoved("nodes"); drawPanes();
+  });
+  fold.querySelectorAll("[data-rf]").forEach(el => el.oninput = () => {
+    if (!c.runEdit) return;
+    c.runEdit.form[el.dataset.rf] = el.value;
+    // A token typed wakes Install where none was stored.
+    const inst = el.closest(".ndrunform")?.querySelector('[data-nrunner="install"]');
+    if (inst && el.dataset.rf === "token" && !n0Busy()) inst.disabled = !el.value && !(nodesList.find(x => x.id === id)?.runner_tokens || []).includes(c.runEdit.slot);
+  });
+  const n0Busy = () => { const n = nodesList.find(x => x.id === id); return !!(n?.applying || nodeStale(n)); };
+  fold.querySelectorAll("[data-nruncancel]").forEach(b => b.onclick = () => { c.runEdit = null; readMoved("nodes"); drawPanes(); });
   fold.querySelectorAll("[data-nrunner]").forEach(b => b.onclick = async () => {
     const n = nodesList.find(x => x.id === id);
     const want = b.dataset.nrunner === "install", slot = b.dataset.slot;
     if (!want && !await askYes(`Remove the runner ${slot} from ${n?.name || "this node"}?\n\nIt is deregistered `
         + `from its host first; workflows that target its label will wait for a runner.`)) return;
-    // The runner's own labels, kept on its record since it was added; new
-    // ones typed in an open form apply to the install pressed next.
-    const typed = (c.draft.runner?.labels || "").split(",").map(x => x.trim()).filter(Boolean);
-    await pressing(b, () => { busy(b, want ? "Installing" : "Removing");
-      return nodeAct({action: "runner", id, slot, want, ...(c.addRunner && typed.length ? {labels: typed} : {})}); });
+    // The labels typed in its open record, or in the add form, apply to
+    // the install pressed next; a token typed there is stored first.
+    const form = c.runEdit?.slot === slot ? c.runEdit.form : null;
+    const typed = ((form ? form.labels : c.addRunner ? c.draft.runner?.labels : "") || "").split(",").map(x => x.trim()).filter(Boolean);
+    await pressing(b, async () => {
+      if (want && form?.token){
+        busy(b, "Storing the token");
+        const rec = n?.services?.runners?.[slot] || {};
+        const t = await nodeAct({action: "runner-token", id, url: rec.url || "", forge: rec.forge || "", token: form.token, labels: typed});
+        form.token = "";
+        if (t.error) return;
+      }
+      busy(b, want ? "Installing" : "Removing");
+      const r = await nodeAct({action: "runner", id, slot, want, ...(typed.length ? {labels: typed} : {})});
+      if (!r.error){ c.runEdit = null; readMoved("nodes"); drawPanes(); }
+    });
   });
   const showBtn = fold.querySelector("[data-nrunnershow]");
   if (showBtn) showBtn.onclick = () => { c.addRunner = true; readMoved("nodes"); drawPanes(); };

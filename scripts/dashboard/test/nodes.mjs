@@ -856,11 +856,16 @@ await section("the configuration plane on the row", async () => {
   await page.fill(`${RROW} [data-k="runner:labels"]`, 'gpu');
   await page.click(`${RROW} [data-nrunneradd]`);
   await page.waitForSelector(RUN, { timeout: 10000 });
-  ok(await page.$eval(RUN, r => /not installed/.test(r.querySelector('.ndrunstate').textContent) && !/no token stored/.test(r.textContent))
+  // A runner is a record (the operator, 17 Nov): read-only in the table,
+  // its Edit opening its actions in place.
+  const shut = await page.$eval(RUN, r => !r.querySelector('[data-nrunner]') && !!r.querySelector('[data-nredit]'));
+  await page.click(`${RUN} [data-nredit]`);
+  await page.waitForSelector(`${RUN} [data-nrunner="install"]`, { timeout: 5000 });
+  ok(shut && await page.$eval(RUN, r => /not installed/.test(r.querySelector('.ndrunstate').textContent) && !/no token stored/.test(r.textContent))
      && await page.$eval(`${RUN} [data-nrunner="install"]`, b => !b.disabled && /Install runner/.test(b.textContent))
      && !!(await page.$(`${RUN} [data-nrunnerforget]`))
      && await page.$(`${RROW} [data-k="runner:token"]`) === null && await page.$('.runnertab [data-nrunnershow]') !== null,
-     'Add runner keeps the token root-only, rolls the form up, and lists the runner with Install awake and Forget token beside it');
+     'Add runner keeps the token root-only, rolls the form up, and lists the runner as a record whose Edit has Install awake and Forget token beside it');
   // Dead the moment it is pressed, not when the answer comes back. Every
   // action here awaits a POST, then loadNodes(), then a repaint: a second
   // or two in which the button looked untouched, so there was no telling a
@@ -880,6 +885,8 @@ await section("the configuration plane on the row", async () => {
   // The runner section says so itself, in its own state line, with the
   // buttons it has taken away: the operator pressed Install, then Remove,
   // and read nothing but two dead buttons while the first job ran.
+  if (!(await page.$(`${RUN} [data-nrunner="install"]`))) await page.click(`${RUN} [data-nredit]`);
+  await page.waitForSelector(`${RUN} [data-nrunner="install"]`, { timeout: 5000 }).catch(() => {});
   ok(await page.$eval(`${RUN} .ndrunstate`, e => /installing now/.test(e.textContent))
      && await page.$eval(`${RUN} [data-nrunner="install"]`, b => b.disabled),
      'while the install runs the runner\'s row says installing now, beside the buttons it has disabled');
@@ -1031,38 +1038,39 @@ await section("the configuration plane on the row", async () => {
   // A node with mounts and no saved config opens on the ones it reports.
   // An empty editor for a machine with three shares was the first thing the
   // operator hit.
-  const seeded = await page.$$eval(`${ROW} .ndmount [data-k="source"]`, es => es.map(e => e.value));
+  const seeded = await page.$$eval(`${ROW} .ndmounts .ndmount .tline .td.lead`, es => es.map(e => e.textContent.trim()));
   ok(seeded.includes('nas:/mnt/user/old'),
-     `the mount editor opens on what the node reports, not on an empty list (${seeded.join(', ')})`);
+     `the mounts open on what the node reports, not on an empty list (${seeded.join(', ')})`);
   ok(await page.$eval(`${ROW} .ndconf`, e => /As the node reports them/.test(e.textContent)),
      '...and says they came from the node rather than from anything saved here');
-  // The new row lands after the seeded ones.
-  const last = seeded.length;
+  // The mounts are records (the record-lists rule): Add a mount opens the
+  // form at the table's top, its source taking the caret.
+  const NEW = `${ROW} .ndmount.open[data-i="-1"]`;
   await openSection(page, 'nodes:storage', ROW);
   await page.click(`${ROW} [data-madd]`);
-  await page.waitForSelector(`${ROW} .ndmount[data-i="${last}"] [data-k="source"]`, { timeout: 5000 });
-  ok(await page.evaluate(() => document.activeElement?.dataset.k === 'source'),
-     '+ mount adds a row and puts the caret in it');
-  await page.fill(`${ROW} .ndmount[data-i="${last}"] [data-k="source"]`, 'nas:/mnt/user/appdata');
-  await page.fill(`${ROW} .ndmount[data-i="${last}"] [data-k="path"]`, '/mnt/appdata');
+  await page.waitForSelector(`${NEW} [data-mf="source"]`, { timeout: 5000 });
+  ok(await page.evaluate(() => document.activeElement?.dataset.mf === 'source'),
+     'Add a mount opens its form over the table and puts the caret in it');
+  await page.fill(`${NEW} [data-mf="source"]`, 'nas:/mnt/user/appdata');
+  await page.fill(`${NEW} [data-mf="path"]`, '/mnt/appdata');
   await page.fill(`${ROW} [data-k="store:cache"]`, '/scratch/cache');
   ok(await page.$(`${ROW} [data-k="store:artifacts"]`) !== null,
      'the fold carries the artifacts store: this node\'s copy of what spaces built');
   // Its first line keeps room under the heading (the operator, 23 Oct:
-  // "Mounts at boot." sat on it), and a mount is one line at a desk: its
-  // source, mountpoint, kind, read-only and × ending at one height.
+  // "Mounts at boot." sat on it), and a mount's form is one line at a desk:
+  // its source, mountpoint, kind and read-only ending at one height.
   {
     const lay = await page.evaluate(sel => {
       const d = document.querySelector(`${sel} details.sect[data-sect="nodes:storage"]`);
       const head = d?.querySelector(':scope > summary')?.getBoundingClientRect();
       const first = d?.querySelector(':scope > .body > :first-child')?.getBoundingClientRect();
-      const m = d?.querySelector('.ndmount');
-      const bottoms = m ? ['[data-k="source"]', '[data-k="path"]', '[data-k="type"]', '[data-mrm]']
+      const m = d?.querySelector('.ndmount.open');
+      const bottoms = m ? ['[data-mf="source"]', '[data-mf="path"]', '[data-mf="type"]', '.ndmro']
         .map(q => Math.round(m.querySelector(q).getBoundingClientRect().bottom)) : [];
       return { gap: head && first ? Math.round(first.top - head.bottom) : null, bottoms };
     }, ROW);
     ok(lay.gap >= 6 && lay.bottoms.length === 4 && Math.max(...lay.bottoms) - Math.min(...lay.bottoms) <= 4,
-       `the Storage section's first line has room under its head, and a mount is one line at a desk (${JSON.stringify(lay)})`);
+       `the Storage section's first line has room under its head, and a mount's form is one line at a desk (${JSON.stringify(lay)})`);
     if (process.env.BB_SHOTS){
       await page.locator(`${ROW} details.sect[data-sect="nodes:storage"]`).screenshot({ path: `${process.env.BB_SHOTS}/storage-desk.png` });
       const vp = page.viewportSize();
@@ -1076,16 +1084,25 @@ await section("the configuration plane on the row", async () => {
   // The heartbeat repaints the tab; the draft and the caret survive it.
   // Repainted once the box that was typed in is no longer the page's: the
   // repaint writes every box anew and hands the caret back as it does.
-  const typedBox = await page.$(`${ROW} .ndmount[data-i="${last}"] [data-k="path"]`);
+  const typedBox = await page.$(`${NEW} [data-mf="path"]`);
   await page.evaluate(() => loadNodes());
   await page.waitForFunction(e => !e.isConnected, typedBox, { timeout: 10000 }).catch(() => {});
-  const kept = await page.$eval(`${ROW} .ndmount[data-i="${last}"] [data-k="path"]`, e => e.value);
+  const kept = await page.$eval(`${NEW} [data-mf="path"]`, e => e.value);
   const caret = await page.evaluate(() => document.activeElement?.dataset?.k || document.activeElement?.tagName);
   ok(kept === '/mnt/appdata' && caret === 'store:cache',
      `a repaint under the editor keeps what was typed and where the caret was (kept ${kept}, caret ${caret})`);
-  ok(await page.$eval(`${ROW} .ndmount[data-i="${last}"] .ndmstate`, e => /not applied yet/.test(e.textContent))
+  // A record's Save writes it at once (the operator, 17 Nov), the store
+  // typed beside it staying a draft of its own.
+  await page.click(`${NEW} [data-msave]`);
+  await page.waitForFunction(id => (nodesList.find(n => n.id === id)?.config?.desired?.mounts || []).some(m => m.path === '/mnt/appdata'),
+                             minted.id, { timeout: 15000 });
+  const mSaved = (await napi('/api/v1/nodes')).nodes.find(n => n.id === minted.id).config.desired;
+  const mRow = await page.$$eval(`${ROW} .ndmounts .ndmount:not(.open)`, rs => rs.map(r => r.textContent.replace(/\s+/g, ' ')))
+    .then(rs => rs.find(t => /\/mnt\/appdata/.test(t)) || '');
+  ok(mSaved.mounts.some(m => m.path === '/mnt/appdata') && mSaved.mounts.some(m => m.path === '/mnt/old') && !mSaved.stores?.cache
+     && /not applied yet/.test(mRow) && /Edit/.test(mRow) && await page.$eval(`${ROW} [data-k="store:cache"]`, e => e.value === '/scratch/cache')
      && await page.$eval(`${ROW} [data-napply="storage"]`, b => b.disabled),
-     '...the new mount says it is not applied yet, and Apply waits for Save');
+     `...a mount's Save writes it and the reported ones at once, its row read-only with Edit and not applied yet, the store still a draft and Apply waiting for its Save (${mRow.trim().slice(0, 80)})`);
   // What is at a path is the node's to say (R120): the page asks before it
   // saves. Answered here as an agent would, from what this map says the
   // node's disk holds; any path it does not name is not there.
@@ -1182,9 +1199,11 @@ await section("the configuration plane on the row", async () => {
     const told = [];
     for (let i = 0; i < 4; i++) page.answers.push(q => { told.push(q.text); return 0; });
     await page.click(`${ROW} [data-madd]`);
-    const mi = await page.$$eval(`${ROW} .ndmount`, e => e.length - 1);
-    await page.fill(`${ROW} .ndmount[data-i="${mi}"] [data-k="source"]`, 'nas:/mnt/user/new');
-    await page.fill(`${ROW} .ndmount[data-i="${mi}"] [data-k="path"]`, '/srv/newshare');
+    await page.fill(`${NEW} [data-mf="source"]`, 'nas:/mnt/user/new');
+    await page.fill(`${NEW} [data-mf="path"]`, '/srv/newshare');
+    await page.click(`${NEW} [data-msave]`);
+    await page.waitForFunction(id => (nodesList.find(n => n.id === id)?.config?.desired?.mounts || []).some(m => m.path === '/srv/newshare'),
+                               minted.id, { timeout: 15000 });
     await page.fill(`${ROW} [data-k="store:toolchains"]`, '/srv/newshare/tc');
     disk['/srv/newshare/tc'] = { exists: true, dir: true, files: true };     // the node's own disk, under it
     await page.click(`${ROW} [data-nsave]`);
@@ -1354,8 +1373,9 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     document.querySelector(sel + ' .ndconfstate')?.textContent || ''), ROW, { timeout: 10000 });
   // ...and taking one away does ask, naming what goes: unmounting a share
   // out from under whatever is using it is not a thing to do on one click.
-  await page.click(`${ROW} .ndmount[data-i="0"] [data-mrm]`);
-  await page.click(`${ROW} [data-nsave]`);
+  const oldAt = await page.$$eval(`${ROW} .ndmounts .ndmount[data-i]`, rs => rs.find(r => /\/mnt\/old/.test(r.textContent))?.dataset.i);
+  await page.click(`${ROW} .ndmount[data-i="${oldAt}"] [data-medit]`);
+  await page.click(`${ROW} .ndmount.open [data-mdel]`);
   await page.waitForFunction(sel => !document.querySelector(sel + ' [data-napply="storage"]')?.disabled,
                              ROW, { timeout: 10000 });
   page.dialogs.length = 0;
@@ -1898,6 +1918,9 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
   // hidden view, every control measured nothing, and this passed vacuously.
   const skin = await page.evaluate(sel => {
     const ref = document.getElementById('pName');
+  // A mount's form open among them, its fields being the fold's too.
+  await page.evaluate(sel => document.querySelector(sel + ' [data-madd]')?.click(), ROW);
+  await page.waitForSelector(`${ROW} .ndmount.open [data-mf="source"]`, { timeout: 5000 }).catch(() => {});
     const key = el => { const c = getComputedStyle(el);
       return [c.backgroundColor, c.borderTopLeftRadius, c.borderTopColor, c.fontFamily].join('|'); };
     return [...document.querySelectorAll(sel + ' .ndconf input:not([type=checkbox]), ' + sel + ' .ndconf select')]
@@ -1918,6 +1941,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
      `...and at phone width it does not scroll sideways (${phone.over}px) and its ${phone.seen} controls are the field type, ${phone.field}px (${phone.small} smaller)`);
   // A guest node's one line where Storage and Network would be (B157): inset
   // from the screen's edges and clear of the next section's head, in the
+  await page.evaluate(sel => document.querySelector(sel + ' .ndmount.open [data-mcancel]')?.click(), ROW);
   // note voice, at phone width as at a desk.
   const guest = await page.evaluate(sel => {
     const body = document.querySelector(sel + ' .ndconfbody');
@@ -2609,6 +2633,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
     openRunnerTab(id);
     const b = await drawn(`.runnertab .ndrow[data-node="${id}"] [data-nrunner="install"]`);
     const was = b?.disabled; openNodesTab(); await drawn(`.nodestab .ndrow[data-node="${id}"] [data-napply="storage"]`); return was; }, minted.id);
+    (await drawn(`.runnertab .ndrow[data-node="${id}"] [data-nredit]`))?.click();
   const off = await page.evaluate(sel => ({
     storage: document.querySelector(sel + ' [data-napply="storage"]')?.disabled,
     network: document.querySelector(sel + ' [data-napply="network"]')?.disabled,
@@ -2850,9 +2875,30 @@ await section("a node's path mapping", async () => {
   await page.waitForSelector('.pane .bar #ndPick', { timeout: 15000 });
   await pickNode(page, sb.id);
   await openSection(page, 'nodes:advanced', `.nodestab .ndrow[data-node="${sb.id}"]`);
-  await page.waitForSelector(`.nodestab .ndrow[data-node="${sb.id}"] .ndpaths [data-k="paths"]`, { timeout: 15000 });
-  ok(await page.$eval(`.nodestab .ndrow[data-node="${sb.id}"] .ndpaths [data-k="paths"]`, e => e.value) === '/workspace:/workspace, /devdata:/mnt/user/bb-dev',
-     '...and the node\'s row shows it, editable');
+  // As records (the record-lists rule): a pair a row, read-only with Edit,
+  // its form in place, its Save writing the mapping at once.
+  const PM = `.nodestab .ndrow[data-node="${sb.id}"] .ndpaths`;
+  await page.waitForSelector(`${PM} .ndpath`, { timeout: 15000 });
+  const pairs = await page.$$eval(`${PM} .ndpath`, rs => rs.map(r => [...r.querySelectorAll('.tline .td code')].map(c => c.textContent).join(':')));
+  ok(pairs.join(', ') === '/workspace:/workspace, /devdata:/mnt/user/bb-dev' && !(await page.$(`${PM} input`)),
+     `...and the node's row lists it, a pair a read-only row (${pairs.join(', ')})`);
+  const at = pairs.findIndex(x => x.startsWith('/devdata:'));
+  const editAt = `${PM} .ndpath[data-i="${at}"] [data-pedit]`;
+  await page.click(editAt, { timeout: 15000 }).catch(async e => {
+    console.log('[diag] path Edit: ' + JSON.stringify(await page.evaluate(sel => { const b = document.querySelector(sel);
+      const r = b?.getBoundingClientRect(); const top = r ? document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2) : null;
+      return { there: !!b, disabled: b?.disabled, rect: r && [r.x, r.y, r.width, r.height], top: top ? `${top.tagName}.${top.className}` : null,
+               rows: document.querySelectorAll(sel.split(' .ndpath[')[0] + ' .ndpath').length }; }, editAt)) + ' ' + String(e).split('\n').slice(0, 6).join(' | '));
+    throw e;
+  });
+  await page.fill(`${PM} .ndpath.open [data-pf="there"]`, '/mnt/user/bb-dev2');
+  await page.click(`${PM} .ndpath.open [data-psave]`);
+  const sbPaths = async () => (await (await fetch(base + '/api/v1/nodes', { headers: H })).json()).nodes.find(n => n.id === sb.id)?.config?.paths;
+  const moved = await until(async () => (await sbPaths())?.['/devdata'] === '/mnt/user/bb-dev2' || null, 15000, 300);
+  await page.waitForFunction(sel => !document.querySelector(sel + ' .ndpath.open'), PM, { timeout: 10000 }).catch(() => {});
+  const shut = !(await page.$(`${PM} .ndpath.open`));
+  ok(moved && shut, `...Edit opens a pair in place, and its Save writes the mapping at once and folds the row back (${JSON.stringify({ moved: !!moved, shut,
+    paths: await sbPaths() })})`);
   ok(await page.$('.nodestab .ndrow[data-node="local"] .ndpaths') === null,
      '...while the controller, whose paths are its own, is not a row here at all');
 

@@ -2403,10 +2403,10 @@ button[aria-busy="true"]{opacity:.75}
   grid-template-columns:minmax(0,7em) minmax(0,1.2fr) minmax(0,1fr) minmax(0,1.4fr) minmax(0,1fr)}
 /* The whole of a mount's reason, under its row (B660): the cell at the end
    of the line keeps the state's first words. */
-.ndmount .ndmwhy{grid-column:1 / -1;white-space:normal;overflow-wrap:anywhere;margin-top:-2px}
-/* The mapping's row is an action bar (its field, then Save and Check), so
-   it lays out like every other bar; the input takes the room before them. */
-.ndpaths input,.ndname input{flex:1 1 auto;min-width:0}
+.ndmount .ndmwhy{white-space:normal;overflow-wrap:anywhere;padding:0 var(--row-x) var(--row-y)}
+/* The name's row is an action bar (its field, then Rename), so it lays out
+   like every other bar; the input takes the room before it. */
+.ndname input{flex:1 1 auto;min-width:0}
 /* Its margin sits under a dialog field's own for its children, which
    outranks it there. */
 .setgrid{margin:6px 0 2px}
