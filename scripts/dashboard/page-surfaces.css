@@ -1336,6 +1336,13 @@ body.firstrun #panes{display:none}
 /* Pushed right on a desktop; on a phone the buttons take their own line, the
    same line, on every row: evenness beats compactness at that width. */
 .artrow .acts{display:flex;gap:6px;flex:0 0 auto;margin-left:auto}
+/* A file row that opens: its line a press, a caret saying so, and what it
+   opens to under the line in the small mono, a line each. */
+.artrow.artfile.opens{cursor:pointer}
+.artrow .artcaret{color:var(--dim);font:var(--f-note);width:9px;flex:0 0 auto}
+.artrow .top>.dim{white-space:nowrap}
+.artrow .artprov{display:flex;flex-direction:column;gap:2px;padding-left:16px}
+.artrow .artprov[hidden]{display:none}
 @media(max-width:900px){
   .artrow .acts{flex:1 1 100%;margin-left:0;justify-content:flex-end}
 }

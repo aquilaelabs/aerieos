@@ -891,7 +891,7 @@ function actMore(items, always = false){
     <div class="actmenu" hidden role="menu">${have.join("")}</div></span>`;
 }
 function wireMore(root){
-  root.querySelectorAll(".actbar .more > button").forEach(b => b.onclick = () => {
+  root.querySelectorAll(".actbar .more > button, .acts .more > button").forEach(b => b.onclick = () => {
     const m = b.nextElementSibling;
     const open = m.hidden;
     closeMore();

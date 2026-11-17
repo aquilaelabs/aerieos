@@ -32,6 +32,8 @@ function nbArtifactsView({$, nb, project, root, sheet}){
     // What this project has built. Fetched on open like Analysis, and polled
     // only while a push is live: the one time it changes on its own.
     art: null, artTimer: null,
+    // The file rows opened to their provenance, by path, across redraws.
+    artOpen: new Set(),
     ver: null,
     // A bump is staged, not written. Pressing Patch/Minor/Major only records
     // the intent: Save commits it, Revert and leaving the tab throw it away.
@@ -106,9 +108,15 @@ function nbArtLoad(av, kept){
     // step 13); each row is named by its place in `rows`, which a page from
     // the top keeps.
     const artLim = pageLimit(list, "artList", rows.length);
+    const apks = !ro && rows.some(a => a.kind === "apk"), xpis = !ro && rows.some(a => a.kind === "xpi");
+    const deadSaid = [
+      (apks || xpis) && phoneWhy ? `${apks && xpis ? "Install and Push" : apks ? "Install" : "Push"} cannot go: ${phoneWhy}.` : "",
+      xpis && !phoneWhy && !art.webext ? `Push cannot go: web-ext is not on ${art.node_name || "the node"}; install it there first.` : "",
+    ].filter(Boolean).map(t => `<div class="hint artwhy">${esc(t)}</div>`).join("");
     const filesBody = !rows.length
       ? `<div class="hint">Nothing in <b>dist/</b> yet: a build copies what it keeps there.</div>`
-      : devNote + jobHtml + instHtml + rows.slice(0, artLim).map((a, i) => nbArtFileRow(project, art, a, i, {ro, relWhy, inst, job, phoneWhy})).join("");
+      : devNote + deadSaid + jobHtml + instHtml + rows.slice(0, artLim).map((a, i) => nbArtFileRow(project, art, a, i, {ro, relWhy, inst, job, phoneWhy,
+          open: av.artOpen.has(a.path)})).join("");
     // Patched (R244): a field or a fold in the list stays as the person left
     // it when a build lands or the dev instance moves.
     patch(list, (devHtml ? docSection("artifacts", "dev", "Docker",
@@ -261,60 +269,76 @@ function nbArtDevNote(art, rows){
 
 // One file in dist/ as its row: what it is, what built and signed it, and
 // what this account may do with it.
-function nbArtFileRow(project, art, a, i, {ro, relWhy, inst, job, phoneWhy}){
+// One line closed: what it is, its size and age, and the two presses it is
+// most often for (Download, and Install, Push or View), the rest behind its
+// More. A press on the line opens it to what is long and read now and then:
+// where it sits, who pinned it, what built it and what signed it, with its
+// certificate's fingerprint. What is acted on stays on the line: a build
+// named with no version. Why Install or Push cannot go is the same for
+// every row, so it is said once over them (nbArtLoad).
+function nbArtFileRow(project, art, a, i, {ro, relWhy, inst, job, phoneWhy, open}){
+  const install = a.kind === "apk" && !ro ? `<button type="button" data-artinstall="${i}"${
+      inst.running || phoneWhy ? " disabled" : ""} title="${
+      phoneWhy ? esc(phoneWhy)
+      : inst.running ? "one install at a time"
+      : "install it on the phone, replacing any copy already there"
+      }">Install</button>` : "";
+  const push = a.kind === "xpi" && !ro ? `<button type="button" data-artpush="${i}"${
+      job.running || phoneWhy || !art.webext ? " disabled" : ""} title="${
+      phoneWhy ? esc(phoneWhy)
+      : !art.webext ? `web-ext is not on ${esc(art.node_name || "the node")}: install it there first`
+      : job.running ? "one push at a time"
+      : "install it on the phone, temporarily"}">Push</button>` : "";
+  const view = a.view ? `<button type="button" data-artview="${i}"
+      title="read it here, without downloading it">View</button>` : "";
+  const signs = (a.kind === "apk" || a.kind === "aab") && !relWhy && !/-signed\.(apk|aab)$/.test(a.name)
+    ? (art.sign_routes || []).map(r => `<button type="button" data-artsign="${i}" data-route="${r}"
+      title="sign it on the space's node with its ${r === "play" ? "Play upload key" : "sideload signing key"}; it arrives beside it as -signed">Sign${
+        (art.sign_routes || []).length > 1 ? (r === "play" ? " for Play" : " to sideload") : ""}</button>`) : [];
+  const remove = a.unversioned && !ro ? `<button type="button" class="danger" data-artunnamed="${i}"
+      title="remove it from dist/ now, for everybody">Remove</button>` : "";
+  const first = install || push || view;
+  const rest = [install, push, view].filter(b => b && b !== first).concat(signs, remove ? [remove] : []);
+  // What it opens to: each line said once, under the closed one.
+  const prov = [
+    a.path !== a.name ? `<span class="dim">in ${esc(a.path)}</span>` : "",
+    a.pinned && a.pinned_by ? `<span class="dim">pinned by ${esc(a.pinned_by)}</span>` : "",
+    // What built it, when a job did: the job, the node, the snapshot. A
+    // file somebody copied in says nothing.
+    a.prov ? `<span class="dim">built by ${esc(a.prov.job)} on ${
+      esc((nodesList || []).find(n => n.id === a.prov.node)?.name || a.prov.node || "?")}${
+      a.prov.source?.digest ? ` from snapshot ${esc(a.prov.source.digest.slice(7, 19))}` : ""}${
+      a.prov.sha256 ? ` · sha256 ${esc(a.prov.sha256.slice(0, 12))}` : ""}</span>` : "",
+    // What signed it: the key, what verified, and the certificate's whole
+    // fingerprint, which a store's metadata asks for (F-Droid's
+    // AllowedAPKSigningKeys) and a person compares.
+    a.prov?.signed ? `<span class="dim">signed with the ${
+      a.prov.signed.key && a.prov.signed.key !== "default" ? `${esc(a.prov.signed.key)} key's ` : ""}${
+      a.prov.signed.route === "play" ? "Play upload key" : "sideload signing key"}${
+      a.prov.signed.from ? ` from ${esc(a.prov.signed.from)}` : ""}${
+      a.prov.signed.schemes?.length ? `, verified ${esc(a.prov.signed.schemes.join(", "))}` : ""}${
+      a.prov.signed.rotated_from ? `, rotated from ${esc(a.prov.signed.rotated_from)}: Android 8.1 and older still see ${esc(a.prov.signed.rotated_from)}` : ""}</span>
+      <span class="artfp">SHA-256 ${esc(a.prov.signed.cert.match(/../g).join(":"))}
+        <button type="button" class="link" data-artfp="${i}" title="the fingerprint as F-Droid's AllowedAPKSigningKeys takes it: lowercase, no colons">Copy for F-Droid</button></span>` : "",
+  ].filter(Boolean).join("");
   return `
-          <div class="artrow">
+          <div class="artrow artfile${prov ? " opens" : ""}${prov && open ? " open" : ""}" data-artpath="${esc(a.path)}"${
+            prov ? ` aria-expanded="${!!open}"` : ""}>
             <span class="grow">
-              <span class="top"><span class="pill">${esc(a.kind)}</span>
+              <span class="top">${prov ? `<span class="artcaret" aria-hidden="true">${open ? "\u25BE" : "\u25B8"}</span>` : ""}<span class="pill">${esc(a.kind)}</span>
                 <b>${esc(a.name)}</b>${a.pinned ? ` <span class="pill on">pinned</span>` : ""}${
-                a.prov?.signed ? ` <span class="pill ok">signed</span>` : ""}</span>
-              <span class="dim">${esc(nbArtHuman(a.size))} · ${esc(ago(a.at))}${
-                a.path !== a.name ? ` · ${esc(a.path)}` : ""}${
-                a.pinned && a.pinned_by ? ` · pinned by ${esc(a.pinned_by)}` : ""}</span>${
+                a.prov?.signed ? ` <span class="pill ok">signed</span>` : ""}
+                <span class="dim">${esc(nbArtHuman(a.size))} · ${esc(ago(a.at))}</span></span>${
               // A build named with no version (the operator, 6 Oct): the
               // sweep cannot tell when it is out of date, so it says so, in
               // the warning color, and offers Remove.
               a.unversioned ? `<span class="vermark">named with no version, so nothing can tell when it is out of date: name builds with aerie version --file</span>` : ""}${
-              // What built it, when a job did (docs/nodes.md §6): the job,
-              // the node, the snapshot. A file somebody copied in says nothing.
-              a.prov ? `<span class="dim">built by ${esc(a.prov.job)} on ${
-                esc((nodesList || []).find(n => n.id === a.prov.node)?.name || a.prov.node || "?")}${
-                a.prov.source?.digest ? ` from snapshot ${esc(a.prov.source.digest.slice(7, 19))}` : ""}${
-                a.prov.sha256 ? ` · sha256 ${esc(a.prov.sha256.slice(0, 12))}` : ""}</span>` : ""}${
-              // What signed it (R106 step 4): the key, what verified, and the
-              // certificate's whole fingerprint, which a store's metadata asks
-              // for (F-Droid's AllowedAPKSigningKeys) and a person compares.
-              a.prov?.signed ? `<span class="dim">signed with the ${
-                a.prov.signed.key && a.prov.signed.key !== "default" ? `${esc(a.prov.signed.key)} key's ` : ""}${
-                a.prov.signed.route === "play" ? "Play upload key" : "sideload signing key"}${
-                a.prov.signed.from ? ` from ${esc(a.prov.signed.from)}` : ""}${
-                a.prov.signed.schemes?.length ? `, verified ${esc(a.prov.signed.schemes.join(", "))}` : ""}${
-                a.prov.signed.rotated_from ? `, rotated from ${esc(a.prov.signed.rotated_from)}: Android 8.1 and older still see ${esc(a.prov.signed.rotated_from)}` : ""}</span>
-                <span class="artfp">SHA-256 ${esc(a.prov.signed.cert.match(/../g).join(":"))}
-                  <button type="button" class="link" data-artfp="${i}" title="the fingerprint as F-Droid's AllowedAPKSigningKeys takes it: lowercase, no colons">Copy for F-Droid</button></span>` : ""}</span>
+              prov ? `<span class="artprov"${open ? "" : " hidden"}>${prov}</span>` : ""}</span>
             <span class="acts">
-              ${a.kind === "apk" && !ro ? `<button type="button" data-artinstall="${i}"${
-                  inst.running || phoneWhy ? " disabled" : ""} title="${
-                  phoneWhy ? esc(phoneWhy)
-                  : inst.running ? "one install at a time"
-                  : "install it on the phone, replacing any copy already there"
-                  }">Install</button>` : ""}
-              ${a.kind === "xpi" && !ro ? `<button type="button" data-artpush="${i}"${
-                  job.running || phoneWhy || !art.webext ? " disabled" : ""} title="${
-                  phoneWhy ? esc(phoneWhy)
-                  : !art.webext ? `web-ext is not on ${esc(art.node_name || "the node")}: install it there first`
-                  : job.running ? "one push at a time"
-                  : "install it on the phone, temporarily"}">Push</button>` : ""}
-              ${(a.kind === "apk" || a.kind === "aab") && !relWhy && !/-signed\.(apk|aab)$/.test(a.name)
-                ? (art.sign_routes || []).map(r => `<button type="button" data-artsign="${i}" data-route="${r}"
-                  title="sign it on the space's node with its ${r === "play" ? "Play upload key" : "sideload signing key"}; it arrives beside it as -signed">Sign${
-                    (art.sign_routes || []).length > 1 ? (r === "play" ? " for Play" : " to sideload") : ""}</button>`).join("") : ""}
-              ${a.view ? `<button type="button" data-artview="${i}"
-                  title="read it here, without downloading it">View</button>` : ""}
-              ${a.unversioned && !ro ? `<button type="button" class="danger" data-artunnamed="${i}"
-                  title="remove it from dist/ now, for everybody">Remove</button>` : ""}
+              ${first}
               <a class="btn" href="/api/artifact?project=${encodeURIComponent(project)
-                }&path=${encodeURIComponent(a.path)}" download>Download</a>${ro ? "" : `
+                }&path=${encodeURIComponent(a.path)}" download>Download</a>
+              ${actMore(rest, true)}${ro ? "" : `
               <button type="button" class="eye pin${a.pinned ? " on" : ""}" data-artpin="${i}"
                 aria-label="${a.pinned ? "unpin" : "pin"}" title="${a.pinned
                   ? "unpin: it goes like any other build when newer ones arrive"
@@ -351,7 +375,7 @@ function nbArtCaptures(av, art, caps){
             <span class="acts">
               <a class="btn" href="/api/artifact?project=${encodeURIComponent(project)
                 }&path=${encodeURIComponent(c.path)}" download>Download</a>
-              ${projWriteWhy(project) ? "" : `<button type="button" data-artcap="${i}" title="remove it from dist/ now, for everybody">Remove</button>`}
+              ${projWriteWhy(project) ? "" : `<button type="button" class="danger" data-artcap="${i}" title="remove it from dist/ now, for everybody">Remove</button>`}
             </span>
           </div>`).join("")));
     wireSections(capBox);
@@ -420,6 +444,16 @@ function nbArtBranches(av, groups){
 // and Stop on the push row.
 function nbArtWireList(av, list, rows, cf, cfFiles){
   const {$, nb, project} = av;
+  list.querySelectorAll(".artfile.opens").forEach(r => r.onclick = e => {
+    if (e.target.closest("button, a, input, select, .more, .artfp")) return;
+    const path = r.dataset.artpath, open = !av.artOpen.has(path);
+    if (open) av.artOpen.add(path); else av.artOpen.delete(path);
+    r.classList.toggle("open", open);
+    r.setAttribute("aria-expanded", String(open));
+    setText(r.querySelector(".artcaret"), open ? "\u25BE" : "\u25B8");
+    setHidden(r.querySelector(".artprov"), !open);
+  });
+  wireMore(list);
   list.querySelectorAll("[data-devsend]").forEach(b => b.onclick = () => {
     const c = cfFiles[+b.dataset.devsend] || {};
     openSendToDocker(project, c.send_as || av.art.send_as, av.art.containers || 0, c.path || "");

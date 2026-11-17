@@ -129,6 +129,24 @@ await section("a signed build", async () => {
      && /SHA-256 65:57:99:0C:CC:68:E1:9D:2F:4C:E5:73:1C:8D:59:F9:84:5D:87:C9:95:2D:F0:9D:30:DF:F0:56:09:48:8C:2D/.test(r.text)
      && r.copy && !r.sign,
      `a signed build says so, with the key, what verified and the whole fingerprint to copy, and offers no Sign again (${r.text.slice(0, 120)})`);
+  // Closed, the row is its one line; a press on the line opens it to what
+  // built and signed it, and again shuts it. Its buttons past two are
+  // behind its More.
+  const ROW = '.artrow:has(b:text-is("alpha-1.2.0-signed.apk"))';
+  const shut = await page.$eval(ROW, e => ({ prov: e.querySelector('.artprov')?.hidden, top: Math.round(e.querySelector('.top').getBoundingClientRect().height),
+    line: getComputedStyle(e.querySelector('.top b')).lineHeight }));
+  await page.click(`${ROW} .top b`);
+  const opened = await page.$eval(ROW, e => ({ prov: e.querySelector('.artprov')?.hidden, open: e.classList.contains('open'), exp: e.getAttribute('aria-expanded') }));
+  await page.click(`${ROW} .top b`);
+  const again = await page.$eval(ROW, e => e.querySelector('.artprov')?.hidden);
+  ok(shut.prov === true && shut.top <= 34 && opened.prov === false && opened.open && opened.exp === 'true' && again === true,
+     `a file row is one line shut and opens on a press to what built and signed it, a press shutting it again (${JSON.stringify({ shut, opened, again })})`);
+  const lines = await page.$$eval('#artList .artrow.artfile', rs => rs.map(e => ({
+    name: e.querySelector('b')?.textContent,
+    onLine: [...e.querySelectorAll(':scope > .acts > button:not(.pin), :scope > .acts > a.btn')].map(b => b.textContent.trim()),
+    loose: e.querySelectorAll(':scope > .acts > [data-artsign], :scope > .acts > [data-artunnamed]').length })));
+  ok(lines.length > 1 && lines.every(l => l.onLine.length <= 2 && l.onLine.includes('Download') && !l.loose),
+     `...and every file row keeps two presses on its line, Download among them, a Sign or a Remove behind its More (${JSON.stringify(lines.slice(0, 4))})`);
 });
 
 // ---- the listing -----------------------------------------------------------
@@ -243,6 +261,8 @@ await section("the captures", async () => {
      `...each row says whose it is (${rows.join(' | ')})`);
   const dl = await page.$$eval('#artCaptures .artrow a.btn', as => as.map(a => a.getAttribute('href')));
   ok(dl.some(h => /path=dist%2Freel%2Fwalk%2Fsheet\.png/.test(h)), 'Download hands over the sheet');
+  ok(await page.$eval('#artCaptures .artrow:has(b:text-is("loose.png")) [data-artcap]', b => b.classList.contains('danger')),
+     "a capture's Remove reads as destructive, as a file's does");
   await page.click('#artCaptures .artrow:has(b:text-is("loose.png")) [data-artcap]');
   await page.waitForFunction(() => !document.querySelector('#artCaptures .artrow b')
     || ![...document.querySelectorAll('#artCaptures .artrow b')].some(b => b.textContent === 'loose.png'), null, { timeout: 15000 });
@@ -362,6 +382,11 @@ ok(await page.$eval('[data-artinstall]', b => b.disabled && /Phone page/.test(sa
    'with no phone on the space\'s node, Install is ghosted and says where to connect one');
 ok(await page.$eval('[data-artpush]', b => b.disabled && /Phone page/.test(saidOf(b))),
    'Push is there for the extension, ghosted for the same reason');
+await section("why Install and Push cannot go is said once over the files", async () => {
+  const said = await page.$$eval('#artList .artwhy', es => es.map(e => e.textContent));
+  ok(said.length === 1 && /^Install and Push cannot go: no phone is connected/.test(said[0]),
+     `...which is said once over the files, in words, rather than only to a pointer (${JSON.stringify(said)})`);
+});
 const pushed = await page.evaluate(async () => {
   const r = await fetch('/api/artifacts', { method: 'POST',
     headers: { 'Content-Type': 'application/json' },
