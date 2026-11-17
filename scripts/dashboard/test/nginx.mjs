@@ -298,7 +298,7 @@ await section("A certificate per domain", async () => {
   await page.waitForFunction(id => document.querySelector(`.nginxtab [data-ngnode="${id}"] .ngcert .name`)?.textContent === 'www.example.com', sandbox.node, { timeout: 10000 });
   await page.click(`${sect} [data-ngedit="0"]`);
   await page.waitForSelector(`${sect} .ngform`, { timeout: 5000 });
-  ok(await page.$eval(sect, s => /1 route/.test(s.querySelector('.ngcert .sub').textContent)
+  ok(await page.$eval(sect, s => /1 route/.test(s.querySelector('.ngcert').textContent)
        && [...s.querySelectorAll('.ngroute [data-ng="cert"] option')].some(o => o.value === 'www.example.com')
        && /443, whichever pair covers it \(now www\.example\.com's\)/.test(s.querySelector('.ngroute [data-ng="cert"] option[value=""]').textContent)
        && new Set([...s.querySelectorAll('.ngroute [data-ng="cert"] option')].map(o => o.textContent)).size

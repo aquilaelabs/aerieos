@@ -161,17 +161,17 @@ function nginxHostPick(r){
 }
 
 // The list itself, as records the way Routes is (the operator, 22 Oct):
-// each name with where it is routed, Delete on one routed nowhere, and a
-// box to add one under the table.
+// each name with where it is routed, Delete on one routed nowhere, and the
+// box to add one over the table (the record-lists rule).
 const NG_HOST_COLS = [{label: "Hostname"}, {label: "Routed on", w: "minmax(0,.7fr)"}, {act: true, w: "3rem"}];
 function nginxHostLines(){
   const rows = nginxHostnames.map(h => `<div class="row nghost">${tblLine(NG_HOST_COLS, [
       `<code>${esc(h.name)}</code>`,
       h.used.length ? esc([...new Set(h.used.map(u => u.node))].join(", ")) : `<span class="dim">not routed yet</span>`,
       h.used.length ? "" : rmIcon(`data-nghostrm="${esc(h.name)}"`, `delete ${h.name}`)])}</div>`).join("");
-  return `${rows ? tblWrap(NG_HOST_COLS, rows, "nghosts") : `<div class="field"><div class="hint">none yet</div></div>`}
-    <div class="field"><div class="actbar"><input id="ngHostNew" data-nghostnew value="${esc(nginxHostTyped)}" placeholder="www.example.com" aria-label="a hostname to add" autocomplete="off" spellcheck="false">
-      <button type="button" data-nghostadd>Add</button></div></div>`;
+  return `<div class="field"><div class="addbar ctlrow"><input id="ngHostNew" data-nghostnew value="${esc(nginxHostTyped)}" placeholder="www.example.com" aria-label="a hostname to add" autocomplete="off" spellcheck="false">
+      <button type="button" data-nghostadd>Add</button></div></div>
+    ${rows ? `<div class="field">${tblWrap(NG_HOST_COLS, rows, "nghosts")}</div>` : `<div class="field"><div class="hint">none yet</div></div>`}`;
 }
 
 // Routes as records (R218 step 44, the design's record-lists rule, the
@@ -248,22 +248,28 @@ function nginxAcmeLines(n){
     p.state === "failed" ? `no certificate: ${esc(p.error || "it failed")}` : `${esc(p.state || "asking")} (${esc(p.method || "http-01")}, ${esc(ago(p.at))})`}</div></div>`).join("");
 }
 
+// The pairs as records (the record-lists rule): a row a pair, read-only, its
+// domain, the names it covers, when it ends and the routes that serve it,
+// its bin at the right; a pair from Let's Encrypt says so as a pill, and a
+// public box's warning about a wide pair is said under its line.
+const NG_CERT_COLS = [{label: "Domain"}, {label: "Covers", w: "minmax(0,1fr)"}, {label: "Until", w: "7rem"},
+  {label: "Routes", w: "5rem", num: true}, {act: true, w: "3rem"}];
 function nginxCertLines(n, d){
   const own = Object.entries(n.certs || {}).filter(([, c]) => c?.set).sort(([a], [b]) => a.localeCompare(b));
   if (!own.length) return `<div class="hint">none yet: every route answers on 80 only</div>`;
   const routes = d?.routes || n.routes || [];
-  return own.map(([k, c]) => {
+  return tblWrap(NG_CERT_COLS, own.map(([k, c]) => {
     const when = c?.expires ? new Date(c.expires * 1000).toLocaleDateString() : "";
     const used = routes.filter(r => r.tls !== false && (r.cert === k || (!r.cert && nginxResolve(n, r.host) === k))).length;
-    return `<div class="row ngcert"><div class="grow"><div class="name">${esc(k)}</div>
-      <div class="sub">${esc(c.subject || "")}${c.names ? ` (${esc(c.names)})` : ""}${when ? `, until ${esc(when)}` : ""}${
-        used ? `; ${used} route${used === 1 ? "" : "s"}` : "; no route"}${
-        c.acme ? `; from Let's Encrypt by ${esc(c.acme.method)}, renewed thirty days before it ends` : ""}</div>${
+    return `<div class="row ngcert">${tblLine(NG_CERT_COLS, [
+      `<span class="name">${esc(k)}</span>${c.acme ? ` <span class="pill note" title="${esc(`by ${c.acme.method}, renewed thirty days before it ends`)}">Let's Encrypt</span>` : ""}`,
+      esc(c.names || c.subject || ""), esc(when),
+      used ? `${used} route${used === 1 ? "" : "s"}` : `<span class="dim">no route</span>`,
+      rmIcon(`data-ngcertrm="${esc(k)}"`, `take ${k}'s pair off`, {title: "take this pair off the node"})])}${
       // On a public box (R93) its key lives there: a pair wider than the
       // box's own routes lends every other name to whoever takes the box.
-      n.wide?.[k]?.length ? `<div class="sub warn ngwide">Its key sits on this public box and also answers for ${esc(n.wide[k].join(", "))}: a box taken over could pass as ${n.wide[k].length === 1 ? "it" : "them"}. A pair for this box's own names alone keeps the rest safe.</div>` : ""}</div>
-      ${rmIcon(`data-ngcertrm="${esc(k)}"`, `take ${k}'s pair off`, {title: "take this pair off the node"})}</div>`;
-  }).join("");
+      n.wide?.[k]?.length ? `<div class="sub warn ngwide">Its key sits on this public box and also answers for ${esc(n.wide[k].join(", "))}: a box taken over could pass as ${n.wide[k].length === 1 ? "it" : "them"}. A pair for this box's own names alone keeps the rest safe.</div>` : ""}</div>`;
+  }).join(""), "ngcerts");
 }
 
 // What the tab says about one node: the state row, the routes, the
@@ -348,10 +354,8 @@ function nginxBody(n){
   const open = nginxCertOpen || !!(d.cert.trim() || d.key.trim());
   const certs = ngSect("certs", pairs ? `${pairs} pair${pairs === 1 ? "" : "s"}` : "none yet",
     `<div class="field"><div class="hint">The pairs this node holds, each known by its domain.${helpIcon(
-      "A pair is known by the domain its names say: a wildcard pair for *.example.com is example.com's, and the same again is a renewal. A key is kept on the controller and never shown.")}</div>
-      ${nginxCertLines(n, d)}</div>
-    ${nginxAcmeLines(n)}
-    <div class="field ngcertadd"${open ? " hidden" : ""}><div class="actbar"><span class="sp"></span>
+      "A pair is known by the domain its names say: a wildcard pair for *.example.com is example.com's, and the same again is a renewal. A key is kept on the controller and never shown.")}</div></div>
+    <div class="field ngcertadd"${open ? " hidden" : ""}><div class="addbar ctlrow">
       <button type="button" data-ngacmeopen${nginxAcmeOpen ? " disabled" : ""}>Get one from Let's Encrypt</button>
       <button type="button" data-ngcertopen>Add a certificate</button></div></div>
     <div class="ngacmeform"${nginxAcmeOpen ? "" : " hidden"}>
@@ -392,7 +396,9 @@ function nginxBody(n){
       <div class="field"><div class="actbar ngcertbar"><span class="state"></span><span class="sp"></span>
         <button type="button" class="primary" data-ngcertsave disabled>Add</button>
         <button type="button" data-ngcertcancel>Cancel</button></div></div>
-    </div>`);
+    </div>
+    ${nginxAcmeLines(n)}
+    <div class="field ngcertlist">${nginxCertLines(n, d)}</div>`);
   // The page's head, deployed as undeployed: its state and what it runs.
   return `<div data-ngnode="${esc(n.node)}">
     ${pageHead({cls: "toolstate", pills: pill, facts})}
