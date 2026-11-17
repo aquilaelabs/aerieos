@@ -100,6 +100,15 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
     busy_on = job.get("current") if job.get("running") and job.get("action") != "check" else ""
     # What is queued behind it (a press while it ran): each such card says so.
     waiting = {str(x) for w in job.get("waiting") or [] if w.get("action") != "check" for x in w.get("names") or []}
+    # ...and the job's own names it has not reached: until its agent says
+    # which it is on, the first is the one it works on and the rest wait. A
+    # card pressed read as not pressed until then, its Software update still
+    # offered while the Jobs page said it ran (the operator, 17 Nov).
+    if job.get("running") and job.get("action") != "check":
+        ahead = [str(x) for x in job.get("queue") or []]
+        if not busy_on and ahead:
+            busy_on = ahead[0]
+        waiting |= set(ahead) - {busy_on}
     for r in agent_rows or []:
         out.append({"kind": "agent", "tier": "official", "name": r["name"], "label": r.get("label") or r["name"], "agent": r.get("agent", ""),
                     "maker": AGENT_MAKERS.get(r.get("agent", "")) or getattr(agents.get(r.get("agent", "")), "provider", "") or "",

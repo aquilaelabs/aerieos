@@ -33,6 +33,29 @@ COMP = {"apps": [{"name": "android", "title": "AerieOS for Android", "does": "th
                  {"name": "companion", "title": "Windows companion", "does": "not offered here", "offered": False, "version": "", "files": []}]}
 
 
+class RunningJob(unittest.TestCase):
+    """A job running before its agent says which name it is on: the first
+    is the one it works on and the rest wait, so a card pressed reads as
+    pressed (the operator, 17 Nov: Node.js kept its Software update while
+    the Jobs page said it ran)."""
+    def test_its_names_are_running_and_queued_before_the_agent_says(self):
+        tc = dict(TC, job={"running": True, "action": "install", "current": "", "queue": ["node", "jdk"]})
+        by = {r["name"]: r for r in library.rows(tc, [], [], {}, {"apps": []})}
+        self.assertEqual((by["node"]["running"], by["node"]["queued"]), (True, False))
+        self.assertEqual((by["jdk"]["running"], by["jdk"]["queued"]), (False, True))
+        self.assertEqual(by["node"]["doing"], "install")
+
+    def test_once_it_says_its_word_holds(self):
+        tc = dict(TC, job={"running": True, "action": "install", "current": "jdk", "queue": ["node"]})
+        by = {r["name"]: r for r in library.rows(tc, [], [], {}, {"apps": []})}
+        self.assertEqual((by["jdk"]["running"], by["node"]["running"], by["node"]["queued"]), (True, False, True))
+
+    def test_a_check_marks_nothing(self):
+        tc = dict(TC, job={"running": True, "action": "check", "current": "", "queue": ["node"]})
+        by = {r["name"]: r for r in library.rows(tc, [], [], {}, {"apps": []})}
+        self.assertEqual((by["node"]["running"], by["node"]["queued"]), (False, False))
+
+
 class Rows(unittest.TestCase):
     def setUp(self):
         self.rows = library.rows(TC, AGENTS, APPS, INDEX, COMP)
