@@ -2100,7 +2100,9 @@ function renderNodesInto(i){
         <div class="name">${skv(7)}</div>${ndFacts(null)}
         <div class="actbar ndagent"><span class="lead dim"></span>${ndAgentButtons(true)}</div></div>
       <div class="ndsections">${ND_SECTS.filter(([k]) => !["gpu", "usb", "machine", "power", "report"].includes(k)).map(([k, t], j) =>
-        docSection("nodes", k, t, "", skRows(j ? 1 : 3))).join("")}</div></div>`));
+        // Storage's mounts are a table of records, as the page draws them
+        // at a desk; on a phone its sections take turns and it lands shut.
+        docSection("nodes", k, t, "", k === "storage" && !isPhone() ? skTable(MOUNT_COLS, 2, "ndmounts") : skRows(j ? 1 : 3))).join("")}</div></div>`));
     sectJump(d.list.closest(".doctab") || d.el);
     loadNodes();
     return;
