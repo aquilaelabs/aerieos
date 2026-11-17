@@ -49,6 +49,11 @@
 - A node's Sessions section lists what keeps its sessions apart as four lines, each with its state as a pill and its reason only where it is not in force, and puts the settings in a group of their own above Save (e4c521c)
 - Setting up a space's file access over FTP needs File access Write on that space, so a role that gives it may, as the space's owner and an administrator could; each person on its list still reaches no more than their own roles give (0efa969)
 - While the controller restarts, the page stays as it was and says AerieOS is restarting and for how long, its buttons resting until it is back, where it turned red and went blank; after an update it says Updated to the version in one line with What changed, where the changelog opened over the page by itself (72394e2)
+- Controller settings opens on a Controller section: the doctor's checks with what each said and how to fix it, the free space under /config and on the spaces' share, the database's size, the nodes online and the sessions open, with Run again; the doctor's panel has a Controller settings button that opens it (6ed2274)
+- An Emulator system image is installed from its own row's Install; several at once are the bar's Select several, which gives the rows ticks and Install selected (447e9fc)
+- nginx's certificates are a table of domain, names covered, end date and routes, with Add a certificate and Let's Encrypt over it, and a hostname is added over its table (d3d5c70)
+- A node's mounts, path mapping and CI runners are tables you edit a row at a time: Edit opens one in place and its Save writes it at once; a mount still reaches the node with Apply storage, and a runner's Edit holds its new token, its labels, Reinstall, Forget token and Remove (f2e1cc1)
+- A space's Also reaches and Also works on are tables written a row at a time: an address is edited, added or deleted in place, and a node is added from a pick or taken off with its bin, each saved at once (dfa2dcb)
 
 ### Fixed
 
