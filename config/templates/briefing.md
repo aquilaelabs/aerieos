@@ -150,6 +150,13 @@ REF` runs a commit as it was (git archive, not the working tree), so a
 before-and-after needs no stash; `--loaded` runs a suite beside a whole run's
 load, and `aerie tests bisect SUITE GOOD BAD` names the commit that broke it.
 
+Each test a run records is on the notebook's Tests view with what it
+protects. A test named as a sentence says it already ("a press outside the
+dialog puts it away", `test_a_late_reply_is_dropped`); one named tersely
+(`test_login`, `LoginWorks`) gets its line as you write it, with `aerie tests
+note KEY "what it protects"` (`aerie tests show KEY` names its key), or the
+view counts it undescribed.
+
 A space whose build or test command is not set refuses and says so: `aerie
 settings set build|test|outputs "..."` fills the field in for the operator,
 under the space's gate. When the toolchain lacks what a build needs, say

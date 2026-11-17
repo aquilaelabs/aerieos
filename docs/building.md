@@ -44,7 +44,10 @@ each test protects, and what the suite actually spends its time on.
 
 The first half is written by hand, in the same change as the test: what
 breaks if it goes red, and what it really exercises (which fixtures, which
-stubs, what is real and what is faked). The second half is not written by hand
+stubs, what is real and what is faked). A test named as a sentence of four
+words or more already says what it protects, and counts as described with
+nothing written; one named tersely (`test_login`) is counted undescribed until
+`aerie tests note KEY "..."` gives it its line. The second half is not written by hand
 at all: `aerie tests ingest` parses a run's own output, because a self-reported
 estimate is a guess that ages and reads exactly like a measurement.
 

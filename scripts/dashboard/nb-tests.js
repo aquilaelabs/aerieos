@@ -219,7 +219,7 @@ function nbTestsView({$, nb, project}){
     $("tstUndoc").checked = nb.tstUndoc;
     const shown = all.filter(t => (!nb.tstSuite || t.suite === nb.tstSuite)
                                   && (!nb.tstFlagged || t.suspect)
-                                  && (!nb.tstUndoc || !t.protects));
+                                  && (!nb.tstUndoc || !(t.described ?? t.protects)));
     // ---- the list ----------------------------------------------------------
     // What a row's editor is built FROM, when it is opened. Not at draw:
     // two textareas each is nothing until there are two thousand rows, and

@@ -111,7 +111,7 @@ elif op == "show":
               "polling timeout rather than work")
     elif t.get("accepted"):
         print(f"  accepted: sits on {t['sits_on']}s, and that is the work: {t['accepted']}")
-    print(f"  protects: {t['protects'] or '(nothing written yet)'}")
+    print(f"  protects: {t['protects'] or ('(its name says it)' if t.get('described') else '(nothing written yet)')}")
     print(f"  exercises: {t['notes'] or '(nothing written yet)'}")
 elif op == "describe" and rest[:1] == ["--from"]:
     # A bulk fill, from a file of {key: {protects, notes}}: one load and one

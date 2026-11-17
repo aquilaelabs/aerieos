@@ -74,6 +74,32 @@ class Suspect(unittest.TestCase):
         self.assertIsNone(testreg.suspect(0))
 
 
+class Described(unittest.TestCase):
+    """A test whose name says what it protects counts as described; a terse
+    one wants a note (the operator, 17 Nov)."""
+    def test_a_sentence_is_its_own_description(self):
+        for n in ("a press on the page around it puts it away", "...and Escape or its own Done puts it away",
+                  "test_a_release_whose_apk_never_came_is_said", "testTheCardOpensOnAPress"):
+            self.assertTrue(testreg.name_says(n), n)
+        for n in ("test_login", "LoginWorks", "it renders", "", "...and again"):
+            self.assertFalse(testreg.name_says(n), n)
+
+    def test_the_counts_read_it(self):
+        store = {"projects": {"p": {"tests": {
+            "a/1": {"suite": "a.mjs", "ord": 1, "name": "a press on the page around it puts it away", "ms": [10]},
+            "a/2": {"suite": "a.mjs", "ord": 2, "name": "test_login", "ms": [10]},
+            "a/3": {"suite": "a.mjs", "ord": 3, "name": "LoginWorks", "protects": "the sign-in page", "ms": [10]}}}}}
+        import threading
+        was, lock = testreg.load, testreg._lock
+        testreg.load, testreg._lock = (lambda: store), threading.Lock()
+        self.addCleanup(setattr, testreg, "load", was)
+        self.addCleanup(setattr, testreg, "_lock", lock)
+        got = testreg.payload("p")
+        self.assertEqual(got["undocumented"], 1)
+        self.assertEqual(got["suites"][0]["undocumented"], 1)
+        self.assertEqual({t["key"]: t["described"] for t in got["tests"]}, {"a/1": True, "a/2": False, "a/3": True})
+
+
 class Running(unittest.TestCase):
     def setUp(self):
         testreg.RUNNING.clear()
