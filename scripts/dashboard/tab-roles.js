@@ -81,9 +81,9 @@ function rolesAccessFields(name){
   const d = rolesData;
   if (rolesWho !== name){ rolesWho = name; rolesPeopleDraft = null; }
   const p = rolesPerson();
-  if (!p) return `<div class="sub dim">${esc(name)}'s roles are not yours to give.</div>`;
+  if (!p) return `<div class="field"><div class="sub dim">${esc(name)}'s roles are not yours to give.</div></div>`;
   if (p.role === "owner")
-    return `<div class="sub">AerieOS's owner: every area, everywhere, and not changed here.</div>`;
+    return `<div class="field"><div class="sub">AerieOS's owner: every area, everywhere, and not changed here.</div></div>`;
   if (!rolesPeopleDraft) rolesPeopleDraft = rolesPeopleFrom(p);
   const dr = rolesPeopleDraft;
   // Accounts and roles Read alone: the same fields, to read (B34).

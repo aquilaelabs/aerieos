@@ -2652,6 +2652,11 @@ const DIALOGS = {
     resumeFor = null; openClaude('alpha'); },
   // The dialogs a page builds when it opens one, each as it opens empty.
   newvm: () => openNewVm(), useradd: () => usersAddOpen(), rolenew: () => rolesNewOpen(),
+  // A repository's move, on a plan of the shape the server answers (one
+  // node to bring, nothing else going), and a space's roles for its owner.
+  move: () => { moveConfirm({ label: 'beta', from: 'gamma', to: 'alpha', node_why: '', busy: [], things: [], lose: [],
+                              nodes: [{ id: 'n_x', name: 'ubu', have: false, as: 'works', instances: [] }] }); },
+  roleaccess: () => rolesAccessOpen('test'),
   // A schedule's form reads the Schedules page's nodes: opened from there.
   schedule: async () => { railGo('jobs', 'schedules');
     for (let i = 0; i < 40 && !schedData; i++) await new Promise(r => setTimeout(r, 250));
