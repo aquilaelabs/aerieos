@@ -1360,9 +1360,10 @@ ok(locked.menu.includes('Admin: Unlock'), `...and an administrator is offered Ad
      `...the padlock drawn as a line in the dim color, with its words beside it (${JSON.stringify(mark)})`);
 writeFileSync(`${DIR}/state/locked-projects.json`, JSON.stringify({ delta: { by: 'u_0000aaaa', admin: true } }));   // the fixture's own lock, kept
 await page.evaluate(() => refresh());
-// Archive (R119): out of sight and nothing else. Its card leaves the grid
-// for the Archived fold at the page's foot, its menu says Unarchive and
-// offers no Pin or Group, and Home's pinned projects leave it out.
+// Archive: a person's own, and the space works as any other. Its card
+// leaves the grid for the Archived fold at the page's foot, shut, with
+// Unarchive by its name and the same star, Group and controls as before;
+// a favorite stays on Home.
 await page.evaluate(() => setArchived('alpha', true));
 await page.waitForFunction(() => !!document.querySelector('.doc .projtab details.sect[data-sect="projects:archived"] .pcard[data-row="alpha"]'), { timeout: 15000 });
   const arch = await page.evaluate(() => {
@@ -1370,14 +1371,16 @@ await page.waitForFunction(() => !!document.querySelector('.doc .projtab details
     const fold = c?.closest('details.sect');
     return { fold: fold?.dataset.sect || '', foldShut: fold ? !fold.open : null,
              said: fold?.querySelector(':scope > summary .sst')?.textContent || '',
-             menu: [...(c?.querySelectorAll('.pcback .pcacts button') || [])].map(b => b.getAttribute('aria-label')),
+             back: [...(c?.querySelectorAll('.pcback .pcacts button') || [])].map(b => b.getAttribute('aria-label')),
+             star: !!c?.querySelector('.pcfront [data-pmark]'),
              unarchive: c?.querySelector('.pcfront [data-kmark]')?.getAttribute('aria-label') || '',
              mark: !!c?.querySelector('.lockmark'),
-             home: (state?.projects || []).filter(p => p.pinned && !p.archived).some(p => p.name === 'alpha') };
+             home: (state?.projects || []).find(p => p.name === 'alpha')?.pinned
+               ? projectList().filter(x => x.pinned).some(x => x.key === reposOf('alpha')) : null };
   });
   ok(arch.fold === 'projects:archived' && arch.foldShut === true && /^\d+ spaces?$/.test(arch.said)
-     && /^Unarchive/.test(arch.unarchive) && !arch.menu.some(t => /^Group/.test(t)) && !arch.home && !arch.mark,
-     `an archived space's card is folded away under Archived, Unarchive by its name and no Group on its back, not among the pinned, and not locked (${JSON.stringify(arch)})`);
+     && /^Unarchive/.test(arch.unarchive) && arch.star && arch.back.some(t => /^Group/.test(t)) && arch.home !== false && !arch.mark,
+     `an archived space's card is folded away under Archived, Unarchive by its name, its star and its Group as any card's, a favorite still a favorite, and not locked (${JSON.stringify(arch)})`);
 // Turned over inside the fold, its back is whole on the screen: every
 // control of it above the dock's line and nothing over it, the dock shut
 // as a person pulls it down to work on the page.
@@ -1637,6 +1640,37 @@ await section("The page is by name, and Favorites narrows it", async () => {
   await page.waitForFunction(n => document.querySelectorAll('.doc .projtab #pjGrid .pcard').length > n, narrowed.n, { timeout: 8000 }).catch(() => {});
   const back = await shown();
   ok(back.n > narrowed.n && !back.favs, `...and All puts the rest back (${JSON.stringify(back)})`);
+});
+// Full or Compact beside the search, as the Containers page's Cards and
+// List are: Compact folds every card to its name line, a press opens one,
+// a press on another opens that one and folds the first, and Full puts
+// every card back whole.
+await section("Full and Compact on the Spaces page", async () => {
+  const look = () => page.evaluate(() => { const cs = [...document.querySelectorAll('.doc .projtab #pjGrid .pcard[data-pkey]')];
+    return { n: cs.length, folded: cs.filter(c => c.classList.contains('compact') && !c.querySelector('.pcacts')?.checkVisibility()).length,
+             open: cs.filter(c => !c.classList.contains('compact')).map(c => c.dataset.pkey) }; });
+  const seg = await page.$$eval('.doc .projtab [data-pjview]', bs => bs.map(b => b.getAttribute('aria-label')));
+  await page.click('.doc .projtab [data-pjview="list"]');
+  await page.waitForFunction(() => [...document.querySelectorAll('.doc .projtab #pjGrid .pcard[data-pkey]')].every(c => c.classList.contains('compact')),
+    null, { timeout: 8000 }).catch(() => {});
+  const folded = await look();
+  const [k1, k2] = await page.$$eval('.doc .projtab #pjGrid .pcard[data-pkey]', cs => cs.slice(0, 2).map(c => c.dataset.pkey));
+  const openIs = k => page.waitForFunction(k => [...document.querySelectorAll('.doc .projtab #pjGrid .pcard[data-pkey]')]
+    .filter(c => !c.classList.contains('compact')).map(c => c.dataset.pkey).join() === k, k, { timeout: 8000 }).catch(() => {});
+  await page.click(`.doc .projtab .pcard[data-pkey="${k1}"] [data-pjopen]`);
+  await openIs(k1);
+  const one = await look();
+  // A press on the folded card's face, not its name.
+  await page.click(`.doc .projtab .pcard[data-pkey="${k2}"]`, { position: { x: 4, y: 4 } });
+  await openIs(k2);
+  const two = await look();
+  await page.click('.doc .projtab [data-pjview="cards"]');
+  await openIs(await page.$$eval('.doc .projtab #pjGrid .pcard[data-pkey]', cs => cs.map(c => c.dataset.pkey).join()));
+  const full = await look();
+  ok(seg.join() === 'Full,Compact' && folded.n > 1 && folded.folded === folded.n,
+     `Compact beside Full folds every space's card to its name line (${JSON.stringify({ seg, folded })})`);
+  ok(one.open.join() === k1 && two.open.join() === k2 && full.open.length === full.n,
+     `...a press opens one, a press on another opens it and folds the first, and Full puts every card back (${JSON.stringify({ one, two, full })})`);
 });
 // The tab is a document, not a card adrift in one. It used to draw itself
 // inside .card, rounded, bordered and floating on a darker gutter, while the

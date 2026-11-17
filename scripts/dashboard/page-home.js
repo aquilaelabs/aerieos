@@ -136,8 +136,9 @@ function homeJobsHtml(){
 }
 
 function homeGlanceHtml(){
-  // Your favorites, never an archived one.
-  const pinned = projectList().filter(c => c.pinned && !c.archived);
+  // Your favorites, archived or not: an archive only folds a card away on
+  // the Spaces page.
+  const pinned = projectList().filter(c => c.pinned);
   if (!pinned.length) return `<div class="empty">no favorite space yet: the star by a space's name on the Spaces page puts it here</div>`;
   // In groups, in the Projects page's order, each group's name over its
   // cards (R273): the page this glances at is sorted so. Each opens its

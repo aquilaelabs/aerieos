@@ -1415,7 +1415,6 @@ await section("the Profile tab", async () => {
     for (const [path, body, why] of [
         // Its owner's or an administrator's (R119), not a grant's.
         ['/api/lock', { name: 'alpha', locked: true }, /owner or an administrator/],
-        ['/api/archive', { name: 'alpha', archived: true }, /owner or an administrator/],
         ['/api/pin', { name: 'status', pinned: true }, /needs Controller Write/],
         ['/api/project-auth', { name: 'alpha' }, /needs .+ Write|rename/],
         ['/api/version', { project: 'alpha', action: 'bump', part: 'patch' }, /needs .+ Write/],
@@ -1444,6 +1443,16 @@ await section("the Profile tab", async () => {
       const sess = await act(sessAuth, '/api/project-pin', { name: 'alpha', pinned: true });
       ok(sess.status === 403 && /a session has no sidebar|a session's token does not reach this/.test(sess.error || ''), `...and a session pins for nobody (${sess.status})`);
       await act(plainAuth, '/api/project-pin', { name: 'alpha', pinned: true });
+      // An archive is each person's own too: anybody signed in folds a space
+      // away for themselves, nobody else's page changes, and a session
+      // archives nothing.
+      const arch = await act(plainAuth, '/api/archive', { name: 'alpha', archived: true });
+      const pa = (await rows(plainAuth)).find(p => p.name === 'alpha'), oa = (await rows(ownerAuth)).find(p => p.name === 'alpha');
+      ok(arch.status === 200 && pa?.archived === true && oa?.archived === false,
+         `a plain account's archive is its own: alpha archived for it and not for the owner (${arch.status}; ${pa?.archived}/${oa?.archived})`);
+      const sarch = await act(sessAuth, '/api/archive', { name: 'alpha', archived: true });
+      ok(sarch.status === 403, `...and a session archives for nobody (${sarch.status})`);
+      await act(plainAuth, '/api/archive', { name: 'alpha', archived: false });
     }
     // A project's signing keys (R106): a session never reaches them, not
     // even the listing, and never downloads one; a person who sees the

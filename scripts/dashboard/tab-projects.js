@@ -151,6 +151,14 @@ const projectName = n => state?.repos?.[reposOf(n)]?.name || projLabel(n);
 // The cards the Projects page shows, by key: which are turned over to their
 // controls (Edit). The page's while it is on show, never saved.
 const pjEditing = new Set();
+// The page's view, this browser's: every card whole (cards), or compact
+// (list), each card its name line until it is opened, one at a time.
+let pjView = (() => { try{ return localStorage.getItem("bb.pjview") === "list" ? "list" : "cards"; }catch(e){ return "cards"; } })();
+// The one card open in the compact view, by key; none on a fresh open.
+let pjOpen = "";
+// Whether a card is folded to its name line: in the compact view, all but
+// the one open and one turned over to its controls.
+const pjFolded = c => pjView === "list" && c.key !== pjOpen && !pjEditing.has(c.key);
 
 // One project's card (R138): the front is what is in it and who is working
 // there, the back the controls that change it. Edit turns it over in place,
@@ -159,7 +167,7 @@ const pjEditing = new Set();
 // the repositories' notebooks.
 function projectCard(c){
   const pc = colorAttrs(c.color), on = pjEditing.has(c.key);
-  return `<div class="pcard pflip${pc.cls}${on ? " flipped" : ""}" data-pkey="${esc(c.key)}" data-key="${esc(c.key)}"${c.first ? ` data-row="${esc(c.first.name)}"` : ""}${pc.style}>
+  return `<div class="pcard pflip${pc.cls}${on ? " flipped" : ""}${pjFolded(c) ? " compact" : ""}" data-pkey="${esc(c.key)}" data-key="${esc(c.key)}"${c.first ? ` data-row="${esc(c.first.name)}"` : ""}${pc.style}>
     <div class="pcface pcfront"${on ? " inert" : ""}>${cardFront(c)}</div>
     <div class="pcface pcback"${on ? "" : " inert"}>${cardBack(c)}</div>
   </div>`;
@@ -171,12 +179,12 @@ function projectCard(c){
 // can be called it.
 const PJ_FAV = "\u2605favorites";
 function cardMarks(c){
-  const pin = c.archived ? "" : `<button type="button" class="eye bare pcmark pcfav${c.pinned ? " on" : ""}" data-pmark="${esc(c.key)}" data-on="${c.pinned ? "0" : "1"}"
+  const pin = `<button type="button" class="eye bare pcmark pcfav${c.pinned ? " on" : ""}" data-pmark="${esc(c.key)}" data-on="${c.pinned ? "0" : "1"}"
       aria-pressed="${c.pinned}" aria-label="${c.pinned ? `Remove ${esc(c.name)} from your favorites` : `Make ${esc(c.name)} a favorite`}" title="${c.pinned
         ? "a favorite of yours: on Home and under Favorites; press to remove it" : "make it a favorite: on Home and under Favorites"}">${STAR}</button>`;
   const arch = c.may_archive ? `<button type="button" class="eye bare pcmark${c.archived ? " on" : ""}" data-kmark="${esc(c.key)}" data-on="${c.archived ? "0" : "1"}"
       aria-pressed="${c.archived}" aria-label="${c.archived ? "Unarchive" : "Archive"} ${esc(c.name)}" title="${c.archived
-        ? "archived: folded at the foot of this page; press to bring it back" : "archive it: out of sight at the foot of this page, and working as before"}">${ARCHIVE}</button>` : "";
+        ? "archived for you: folded at the foot of this page; press to bring it back" : "archive it for you: in Archived at the foot of this page, and working as before"}">${ARCHIVE}</button>` : "";
   return pin + arch;
 }
 // The lock as the card says it: by whom, or read-only where it is not this
@@ -190,7 +198,11 @@ function cardFront(c){
   const first = c.first, cls = {error: "bad", warning: "warn", locked: "locked"};
   const node = first ? first.node_name || first.session_at || "" : "";
   const many = c.rows.length > 1;
-  return `<div class="pcname"><span class="name">${esc(c.name)}</span>${cardLock(c)}<span class="sp"></span>${cardMarks(c)}</div>
+  // In the compact view its name is the press that opens and folds it.
+  const name = pjView !== "list" ? `<span class="name">${esc(c.name)}</span>`
+    : `<button type="button" class="name namelink" data-pjopen="${esc(c.key)}" aria-expanded="${!pjFolded(c)}"
+        title="${pjFolded(c) ? "open it" : "fold it"}">${esc(c.name)}</button>`;
+  return `<div class="pcname">${name}${cardLock(c)}<span class="sp"></span>${cardMarks(c)}</div>
     <div class="pcmeta"><span class="pcfacts">${[pidMark(c.pid), esc(node)].filter(Boolean).join(" · ")}</span>${first ? projectState(first) : ""}</div>
     <div class="pcrepos">${c.rows.length ? c.rows.map(p => `<div class="pcrepo">
       <button type="button" class="namelink" data-open="${esc(p.name)}" title="open ${esc(p.label || p.name)}'s notebook">${esc(p.label || p.name)}</button>
@@ -243,7 +255,7 @@ function cardBack(c){
   const tone = colorTone(c.color);
   const foot = [
     fb("data-pcolor", c.key, c.color ? `Color: ${c.color}` : "Color", SWATCH, tone ? ` data-sw data-style="--sw:${tone}"` : ""),
-    c.archived ? "" : fb("data-pgroup", c.key, c.group ? `Group: ${c.group}` : "Group", TAG),
+    fb("data-pgroup", c.key, c.group ? `Group: ${c.group}` : "Group", TAG),
     c.may_lock ? fb("data-lock", c.key, lockLabel(c), c.locked ? LOCK : LOCK_OPEN, ` data-on="${c.locked ? "0" : "1"}" aria-pressed="${!!c.locked}"`) : "",
     // No bug tracker on a project with no repository (R208).
     first && first.mine !== false && !first.work ? fb("data-bug", first.name, "Report bug", BUG) : "",
@@ -512,6 +524,12 @@ function wireProjectCards(grid){
   grid.querySelectorAll("[data-rmove]").forEach(b => b.onclick = () => moveRepository(b));
   grid.querySelectorAll("[data-pdel]").forEach(b => b.onclick = () => deleteProjectCard(b.dataset.pdel));
   grid.querySelectorAll("[data-pmark]").forEach(b => b.onclick = () => setProjectPinned(b.dataset.pmark, b.dataset.on === "1"));
+  // In the compact view a card's name opens it and folds the one open, or
+  // folds it again; a press anywhere on a folded card opens it too.
+  const openCard = key => { pjOpen = pjOpen === key ? "" : key; drawProjects(state.projects); };
+  grid.querySelectorAll("[data-pjopen]").forEach(b => b.onclick = () => openCard(b.dataset.pjopen));
+  grid.querySelectorAll(".pcard[data-pkey]").forEach(c => c.onclick = !c.classList.contains("compact") ? null
+    : e => { if (!e.target.closest("button, a, input, select, textarea")) openCard(c.dataset.pkey); });
   grid.querySelectorAll("[data-kmark]").forEach(b => b.onclick = () => setArchived(b.dataset.kmark, b.dataset.on === "1"));
   grid.querySelectorAll("[data-open]").forEach(b => b.onclick = () => openNotebook(b.dataset.open));
 }
@@ -528,8 +546,10 @@ function renderProjectsInto(i){
     const d = docSurface(i, "proj");
     d.setBar(`<input id="pjSearch" type="search" placeholder="name, branch or node" aria-label="narrow the spaces" autocomplete="off" spellcheck="false">
         <span class="sp"></span>
+        ${viewSeg("pjview", pjView, "every space's card whole", "each card its name line, opened one at a time", "", ["Full", "Compact"])}
         <span class="actbar"><button type="button" id="bTrashTab" aria-label="the trash" title="spaces you deleted: still on disk under .trash, and still recoverable">${BIN}</button>
-        <button type="button" class="primary" id="bNewProjTab" title="a space, by its name: its repositories are added on its card">New space</button></span>`);
+        <button type="button" class="primary" id="bNewProjTab" title="a space, by its name: its repositories are added on its card">${barSaid("New space", "New")}</button></span>`);
+    el.querySelector(".projtab .docbarrow")?.classList.add("pjbar");
     drawHTML(d.list, `<div class="field pjjob" id="pjJob" hidden></div><div id="pjChips"></div><div class="field pgridband"><div id="pjGrid"></div></div>`);
     el.querySelector("#pjGrid").addEventListener("click", pjFadeArm, true);
     el.querySelector("#bNewProjTab").onclick = newProjectByName;
@@ -537,6 +557,16 @@ function renderProjectsInto(i){
     const box = el.querySelector("#pjSearch");
     box.value = pjQuery;
     onTyping(box, () => { pjQuery = box.value; renderProjectsInto(i); });
+    // Full or Compact, kept for the next open; Compact opens with every
+    // card folded.
+    el.querySelectorAll("[data-pjview]").forEach(b => b.onclick = () => {
+      pjView = b.dataset.pjview === "list" ? "list" : "cards";
+      pjOpen = "";
+      try{ localStorage.setItem("bb.pjview", pjView); }catch(e){ /* private mode */ }
+      el.querySelectorAll("[data-pjview]").forEach(x => {
+        x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", String(x === b)); });
+      renderProjectsInto(i);
+    });
   }
   const grid = el.querySelector("#pjGrid");
   // New project and the trash are not drawn for an account whose roles do
@@ -564,12 +594,12 @@ function renderProjectsInto(i){
   // The ones in no group first, then each of this account's groups under
   // its name, by name (the operator, 18 Oct); and the archived ones apart,
   // folded at the foot, their own fold whatever group they were in.
-  // The chips count every space that is not archived, whatever the search
-  // says, so what the search hides is still counted (the chips rule): your
-  // favorites first, then each group; one in force narrows the grid, and
-  // the archived fold is All's. A chip with nothing under it is not drawn,
-  // and with none to draw neither is the band.
-  const all = ps.filter(p => !p.archived);
+  // The chips count every space, whatever the search says, so what the
+  // search hides is still counted (the chips rule): your favorites first,
+  // then each group; one in force narrows the grid and the Archived fold
+  // alike, an archived space being one like any other. A chip with nothing
+  // under it is not drawn, and with none to draw neither is the band.
+  const all = ps;
   const favs = all.filter(p => p.pinned).length;
   const groups = byProjectGroup(all).map(({group: g, list}) => ({key: g || "none", label: g || "No group", count: list.length}));
   const chips = [...(favs ? [{key: PJ_FAV, label: "Favorites", count: favs}] : []), ...(groups.some(c => c.key !== "none") ? groups : [])];
@@ -583,7 +613,7 @@ function renderProjectsInto(i){
       chipMove(() => document.querySelector(".pane .doc.on .projtab"), "#pjGrid .pcard, #pjGrid .pjgname",
                () => { pjChip = c.dataset.pjchip; pjChipMove = true; renderProjectsInto(i); pjChipMove = false; }));
   const inChip = p => !pjChip || (pjChip === PJ_FAV ? !!p.pinned : pjChip === "none" ? !p.group : p.group === pjChip);
-  const live = shown.filter(p => !p.archived && inChip(p)), gone = pjChip ? [] : shown.filter(p => p.archived);
+  const live = shown.filter(p => !p.archived && inChip(p)), gone = shown.filter(p => p.archived && inChip(p));
   const grid_ = list => `<div class="pgrid">${projectCards(list)}</div>`;
   const html = byProjectGroup(live).map(({group: g, list}) => {
         if (!g) return grid_(list);

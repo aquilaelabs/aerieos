@@ -1174,10 +1174,10 @@ function tblTracks(cols){
 // attribute the page's wiring reads (data-dmview, data-vmview).
 const VIEW_ICON_CARDS = `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>`;
 const VIEW_ICON_LIST = `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 4h12M2 8h12M2 12h12"/></svg>`;
-function viewSeg(attr, cur, cardsSay, listSay, dead = ""){
+function viewSeg(attr, cur, cardsSay, listSay, dead = "", words = ["Cards", "List"]){
   const b = (v, word, say, icon) => `<button type="button" data-${attr}="${v}" class="${cur === v ? "on" : ""}" aria-pressed="${cur === v}" title="${esc(word)}: ${esc(say)}" aria-label="${word}"${dead}>${icon}</button>`;
-  return `<div class="pseg dmviewseg" role="group" aria-label="cards or a list">${
-    b("cards", "Cards", cardsSay, VIEW_ICON_CARDS)}${b("list", "List", listSay, VIEW_ICON_LIST)}</div>`;
+  return `<div class="pseg dmviewseg" role="group" aria-label="${esc(`${words[0]} or ${words[1]}`.toLowerCase())}">${
+    b("cards", words[0], cardsSay, VIEW_ICON_CARDS)}${b("list", words[1], listSay, VIEW_ICON_LIST)}</div>`;
 }
 function tblWrap(cols, rows, cls = ""){
   return `<div class="tbl${cls ? " " + esc(cls) : ""}" data-style="--tcols:${tblTracks(cols)}">

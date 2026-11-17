@@ -207,7 +207,10 @@ page's menu, puts the space on Home and under the Spaces page's
 **Favorites** chip. Favorites are each person's own: taking one off takes it
 off your Home and nobody else's, and nothing else: the Spaces page lists
 everything under `/workspace`, favorite or not, by name, case aside, with
-the same controls on each card. Favorites live per account in
+the same controls on each card. **Full** and **Compact** beside its search
+choose how the cards are drawn: Compact folds each to its name line, and a
+press opens one, folding the one open before it; the choice is kept in your
+browser. Favorites live per account in
 `/config/pinned-projects.json`. An account made since 7 Oct starts with no
 favorite and stars what it wants from the Spaces page; one made before that
 with no set yet still has every space as a favorite.
@@ -257,11 +260,13 @@ already there when this arrived were recorded once, as they were.
 
 ## Archiving and locking a space
 
-**Archive**, by a space's name or on its back, puts a space out of sight and changes
-nothing else: its card folds under **Archived** at the foot of the Spaces
-page and leaves Home's favorites, and the space keeps working for
-everybody on it, sessions included. **Unarchive**, in the same places, brings
-it back. The space's owner or an administrator archives one.
+**Archive**, by a space's name, moves its card into **Archived**, a section
+shut at the foot of your Spaces page, and changes nothing else: the space
+keeps working for everybody on it, sessions included, its card keeps its
+star, group and every control, and a favorite stays on Home. An archive is
+each person's own, as favorites are: anybody signed in archives a space for
+themselves, and nobody else's page changes. **Unarchive**, in the same
+place, brings it back.
 
 **Lock** keeps people out of a space, and it comes in two kinds. The
 space's owner locks it with **Lock**: every other account's session on it

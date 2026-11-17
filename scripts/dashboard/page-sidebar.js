@@ -242,9 +242,9 @@ async function pJobAct(action){
 }
 
 // ---- a project's archive and lock ----------------------------------------
-// Two presses since the operator split them (R119, 23 Oct). Archive is out of
-// sight and nothing else: no question asked, since nothing stops. Lock holds
-// people out, so its question says whom, and names the sessions it ends.
+// Two presses. Archive is each person's own and folds a card away on their
+// Spaces page, nothing else: no question asked, since nothing stops. Lock
+// holds people out, so its question says whom, and names the sessions it ends.
 
 async function setArchived(name, on){
   const key = reposOf(name) || name;
@@ -252,7 +252,7 @@ async function setArchived(name, on){
     const j = await postJSON("/api/archive", {name, archived: on});
     if (j.error){ notify(j.error, true); return; }
     applyNow((p, k) => { if (k === key) p.archived = !!j.archived; });
-    notify(on ? `${projectName(key)} archived: in Archived at the foot of the Spaces page, and working as before`
+    notify(on ? `${projectName(key)} archived for you: in Archived at the foot of your Spaces page, and working as before`
               : `${projectName(key)} unarchived`);
   }catch(e){ notify("archive failed: " + failWords(e), true); }
   refresh();

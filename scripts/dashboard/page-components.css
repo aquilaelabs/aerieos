@@ -1690,6 +1690,9 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
 .pcard .pcmeta{display:flex;flex-wrap:wrap;align-items:center;gap:2px 14px;min-width:0}
 .pcard .pcmeta>.pcfacts{flex:none;max-width:100%}
 .pcard .pcrepo>.namelink{font:var(--f-ui);font-weight:600;min-height:0}
+/* In the compact view a card's name is the press that opens it, in the
+   name's own type. */
+.pcard .pcname>button.name{font-weight:600;font-size:1.05rem;line-height:1.3;text-align:left}
 .pcard .pcrepo>.pcfacts{flex:1}
 /* A repository on a card's back: its name, then the icons that change it,
    each a thumb wide and its picture in the middle. */
@@ -2343,7 +2346,7 @@ label.pick.nodepick{display:inline-flex;align-items:center;gap:var(--field-gap)}
   :is(.doctab,.nb) .field.docbarrow>.actbar>button.tcidle{display:none}
   :is(.doctab,.nb) .field.docbarrow>input{flex:1 1 0;min-width:7em}
   /* (the id's rule too, a desk's 12rem base and 8rem floor) */
-  :is(.doctab,.nb) .field.docbarrow.dmpick>input{flex:1 1 0;min-width:4em}
+  :is(.doctab,.nb) .field.docbarrow:is(.dmpick,.pjbar)>input{flex:1 1 0;min-width:4em}
   .lng{display:none}
   .shrt{display:inline}
 }

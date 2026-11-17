@@ -1299,12 +1299,12 @@ def lock_may(name, uid, admin, rec):
 def _project_cards(who, ps):
     """{key: card} for every project this account sees (R138): its name and
     id, its repositories in their order (those it sees), and its marks as
-    the account has them (pinned, group, color: a person's own; locked and
-    archived: the project's), with what the account may do about each."""
+    the account has them (pinned, group, color, archived: a person's own;
+    locked: the project's), with what the account may do about each."""
     me_uid = "" if (who or {}).get("session") else users.uid_of(who)
     me_admin = bool(me_uid) and users.is_admin(who)
     locked = projects.load_locks()
-    archived = set(projects.load_archived())
+    archived = set(projects.load_archived(users.uid_of(who)))
     pins = projects.load_project_pins(users.uid_of(who), users.starts_unpinned(who))
     groups = projects.load_project_groups(users.uid_of(who))
     colors = projects.load_marks("color", users.uid_of(who), start=_legacy_colors(prefs.all_projects(WORKSPACE)))
@@ -1321,7 +1321,7 @@ def _project_cards(who, ps):
                   "locked_me": k in locked and bool(projects.locked_out(k, me_uid)),
                   "may_lock": lock_may(k, me_uid, me_admin, locked.get(k)),
                   "archived": k in archived,
-                  "may_archive": me_admin or (bool(me_uid) and owner == me_uid),
+                  "may_archive": bool(me_uid),
                   "owner_name": membership.owner_name(k) or "",
                   "owner_mine": bool(me_uid) and owner == me_uid,
                   "pinned": True if pins is None else k in pins,
@@ -1345,10 +1345,11 @@ def _project_columns(who, facts):
     """
     _t0 = time.monotonic()
     locked = projects.load_locks()
-    archived = set(projects.load_archived())
-    # Who may archive and who may lock (R119): the project's owner or an
-    # administrator, never a session. An owner's lock is lifted by the owner,
-    # an administrator's by an administrator.
+    # This account's own archive: a person's view, as their favorites are.
+    archived = set(projects.load_archived(users.uid_of(who)))
+    # Who may archive: anybody signed in, for themselves, never a session.
+    # Who may lock: the project's owner or an administrator; an owner's lock
+    # is lifted by the owner, an administrator's by an administrator.
     me_uid = "" if (who or {}).get("session") else users.uid_of(who)
     me_admin = bool(me_uid) and users.is_admin(who)
     # Each directory's id and the name it is shown under (R154): synced with
@@ -1485,7 +1486,7 @@ def _project_columns(who, facts):
                     "owner_name": membership.owner_name(d.name) or "",
                     "owner_mine": bool(me_uid) and membership.owner_of(d.name) == me_uid,
                     "may_lock": lock_may(d.name, me_uid, me_admin, locked.get(pk)),
-                    "may_archive": me_admin or (bool(me_uid) and membership.owner_of(d.name) == me_uid),
+                    "may_archive": bool(me_uid),
                     "pinned": True if pins is None else pk in pins,
                     # The group this account files it under, or "".
                     "group": groups.get(pk, ""),
@@ -13689,15 +13690,17 @@ class Handler(BaseHTTPRequestHandler):
         return out
 
     def _archive(self, req):
-        """Archive or unarchive a project (R119): out of sight, and nothing
-        else; the project's owner or an administrator, never a session."""
+        """Archive or unarchive a space for the account asking: folded away
+        under Archived on their own Spaces page and nothing else, as their
+        favorites are theirs; anybody signed in, never a session."""
         name, on = req.get("name", ""), bool(req.get("archived"))
         if self._not_card(name):
             return None
         me = self._who()
-        if not me or not (users.is_admin(me) or users.uid_of(me) == membership.owner_of(name)):
-            return self._json({"error": "the space's owner or an administrator archives it"}, 403)
-        return self._json(*projects.archive_verb(name, on))
+        uid = "" if (me or {}).get("session") else users.uid_of(me)
+        if not uid:
+            return self._json({"error": "an archive is a person's own: a session keeps none"}, 403)
+        return self._json(*projects.archive_verb(uid, name, on))
 
     def _trash(self, req):
         """Move a project out of the workspace: projects.trash, once

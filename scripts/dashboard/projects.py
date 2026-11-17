@@ -2441,9 +2441,9 @@ def rekey(old, new):
                     if isinstance(v, dict) and old in v:
                         v.setdefault(new, v.pop(old))
                 write_json(STATE / MARK_FILES[kind], d)
-        arch = _names(_archived_file())
-        if old in arch:
-            write_json(_archived_file(), sorted({new if x == old else x for x in arch}))
+        arch = _load_archives()
+        if any(old in (v or []) for v in arch.values()):
+            write_json(_archived_file(), {u: sorted({new if x == old else x for x in (v or [])}) for u, v in arch.items()})
         try:
             locks = json.loads(_locks_file().read_text())
         except (OSError, ValueError):
@@ -2462,8 +2462,19 @@ def load_locks():
                    for k, r in v.items() if isinstance(k, str) and isinstance(r, dict)})
 
 
-def load_archived():
-    return sorted({_key(x) for x in _names(_archived_file())})
+def _load_archives():
+    """Every account's archived spaces, {uid: [names]}."""
+    v = statefile.read_json(_archived_file())  # read once while the same file (R228 step 1)
+    if not isinstance(v, dict):
+        return {}
+    return {k: sorted({x for x in names if isinstance(x, str)})
+            for k, names in v.items() if isinstance(k, str) and isinstance(names, list)}
+
+
+def load_archived(uid):
+    """The spaces this account has archived: each person's own, folded away
+    under Archived on their Spaces page and nowhere else."""
+    return sorted({_key(x) for x in _load_archives().get(str(uid or ""), [])})
 
 
 # What a locked project refuses, in one place: every write and every session
@@ -2501,7 +2512,7 @@ def app_flags(name, uid):
     Files API, which carry neither otherwise. `locked_why` is the refusal
     when the lock holds this account out, "" when it does not."""
     held = locked_out(name, uid)
-    return {"archived": _key(name) in set(load_archived()), "locked": _key(name) in load_locks(),
+    return {"archived": _key(name) in set(load_archived(uid)), "locked": _key(name) in load_locks(),
             "locked_why": (held or {}).get("error", "")}
 
 
@@ -2525,17 +2536,20 @@ def lock_verb(name, on, by="", admin=False):
     return {"locked": name in locks, "admin": bool(locks.get(name, {}).get("admin"))}, 200
 
 
-def archive_verb(name, on):
-    """Archive or unarchive a project, once the server has let this person:
-    out of sight, and nothing else. (payload, status)."""
+def archive_verb(uid, name, on):
+    """Archive or unarchive a space for one account: folded away under
+    Archived on that person's Spaces page, and nothing else, for nobody
+    else. (payload, status)."""
     if not _here(name):
         return {"error": f"unknown space: {name}"}, 400
     name = _key(name)
     with lock:
-        names = set(load_archived())
+        d = _load_archives()
+        names = set(d.get(str(uid or ""), []))
         names.add(name) if on else names.discard(name)
+        d[str(uid or "")] = sorted(names)
         try:
-            write_json(_archived_file(), sorted(names))
+            write_json(_archived_file(), d)
         except OSError as e:
             return {"error": f"could not save: {e}"}, 500
     return {"archived": name in names}, 200

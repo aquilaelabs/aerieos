@@ -1885,6 +1885,13 @@ body.firstrun #panes{display:none}
 .pcard.pflip>.pcback{transform:rotateY(180deg)}
 .pcard.pflip.flipped>.pcfront{transform:rotateY(-180deg)}
 .pcard.pflip.flipped>.pcback{transform:none}
+/* The compact view: a folded card is its name line alone, its back not
+   drawn at all (a face kept behind it held the card at its full height),
+   its whole face a press that opens it; a card in a row beside an open one
+   keeps its own height. */
+.pcard.pflip.compact{cursor:pointer;align-self:start}
+.pcard.pflip.compact>.pcfront>:not(.pcname),.pcard.pflip.compact>.pcback{display:none}
+.pgrid:has(>.pcard.compact)>.pcard{align-self:start}
 /* A project just made: a ring in the accent that fades (showNewCard). */
 .pcard.pjnew{animation:pjNew 2.4s cubic-bezier(.33,1,.68,1)}
 .pcard .pcname .lockmark svg{width:14px;height:14px}
@@ -2292,18 +2299,18 @@ body.firstrun #panes{display:none}
      (the operator's phone, 18 Oct: "Re-ch…" and "Rem…" beside a picker
      half the bar wide). */
   :is(.doctab,.nb) .field.docbarrow>.actbar>button{flex:0 0 auto;white-space:nowrap}
-  /* Containers is one line too (the operator, 18 Oct, reversing the second
-     line it had): the picker, the search taking what is left, Cards and List
-     as their pictures, and the buttons in their short words. Where the line
+  /* Containers is one line too, and Spaces: the picker where there is one,
+     the search taking what is left, Cards and List (Full and Compact) as
+     their pictures, and the buttons in their short words. Where the line
      leaves the search too little to type into, a fold's cover, it wraps to
      the next line rather than shrinking to nothing. */
-  :is(.doctab,.nb) .field.docbarrow.dmpick{flex-wrap:wrap;gap:6px}
+  :is(.doctab,.nb) .field.docbarrow:is(.dmpick,.pjbar){flex-wrap:wrap;gap:6px}
   /* The node's name read whole (up to 11em) and the search taking what is
      left from a small floor, so the line is laid out on that floor and not
      the search's full width, which had put the buttons on a line of their
      own; its hint is a word there. */
   :is(.doctab,.nb) .field.docbarrow.dmpick>label.pick{flex:0 1 auto;min-width:5em;max-width:11em;margin-inline-end:0}
-  :is(.doctab,.nb) .field.docbarrow.dmpick>.pseg>button{min-width:var(--tap);padding:4px 8px}
+  :is(.doctab,.nb) .field.docbarrow:is(.dmpick,.pjbar)>.pseg>button{min-width:var(--tap);padding:4px 8px}
   /* A runner's three actions, in their short words, on the row's one line. */
   .ndrun .actbar{flex-wrap:nowrap}
   .ndrun .actbar>button{flex:0 1 auto;min-width:0;white-space:nowrap}
