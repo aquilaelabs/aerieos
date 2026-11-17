@@ -5,18 +5,14 @@
 html[data-theme="nostromo"]:not([data-mode="light"]) .pane .bar{background:var(--glass)}
 
 /* The header is a steel ceiling: a sheen down its face and, at a desk, the
-   pipe runs and their lamp across its empty middle, kept out from under the
-   title and the controls by two flat bands of panel. Its foot is a steel
-   rail drawn over the border, which stays, so choosing the scheme moves
-   nothing by a pixel. */
+   pipe runs and their lamp across its empty middle, the spacer between the
+   search and the controls, so they never pass under the brand, the space's
+   name or the search. Its foot is a steel rail drawn over the border, which
+   stays, so choosing the scheme moves nothing by a pixel. */
 html[data-theme="nostromo"]:not([data-mode="light"]) header{background-image:linear-gradient(180deg, rgba(200,220,240,.05), rgba(0,0,0,.22))}
 @media(min-width:901px){
-  html[data-theme="nostromo"]:not([data-mode="light"]) header{
-    background-image:linear-gradient(90deg, var(--panel) 0 300px,
-        rgba(0,0,0,0) 300px calc(100% - 480px), var(--panel) calc(100% - 480px)),
-      url(/static/nostromo/pipes.svg),
-      linear-gradient(180deg, rgba(200,220,240,.05), rgba(0,0,0,.22));
-    background-repeat:no-repeat,repeat-x,no-repeat;background-position:0 0,0 center,0 0}
+  html[data-theme="nostromo"]:not([data-mode="light"]) header>.spacer{align-self:stretch;margin:0 6px;
+    background:url(/static/nostromo/pipes.svg) 0 center repeat-x}
 }
 html[data-theme="nostromo"]:not([data-mode="light"]) header::after{
   content:"";position:absolute;left:0;right:0;bottom:0;height:3px;z-index:1;
@@ -38,15 +34,83 @@ html[data-theme="nostromo"]:not([data-mode="light"]) .dockline .dtab.pc.on{
   box-shadow:0 0 10px 0 color-mix(in srgb, var(--pc) 45%, transparent)}
 html[data-mode="light"][data-theme="nostromo"] .pane .bar{background:var(--glass)}
 @media(min-width:901px){
-  html[data-mode="light"][data-theme="nostromo"] header{
-    background-image:linear-gradient(90deg, var(--panel) 0 300px,
-        rgba(0,0,0,0) 300px calc(100% - 480px), var(--panel) calc(100% - 480px)),
-      url(/static/nostromo/vents.svg);
-    background-repeat:no-repeat,repeat-x;background-position:0 0,0 center}
+  html[data-mode="light"][data-theme="nostromo"] header>.spacer{align-self:stretch;margin:0 6px;
+    background:url(/static/nostromo/vents.svg) 0 center repeat-x}
 }
 html[data-mode="light"][data-theme="nostromo"] header{box-shadow:0 2px 8px rgba(0,0,0,.06)}
 html[data-mode="light"][data-theme="nostromo"] header h1{
   text-transform:uppercase;letter-spacing:2px;font-size:13px}
+/* The rail, dark: a steel column lit as the ceiling is, a steel rail down
+   its edge, the group on show a lamp; its items are one surface, not
+   brushed plates. */
+html[data-theme="nostromo"]:not([data-mode="light"]) .rail{
+  background:linear-gradient(90deg, #2a333c, #c9d5df 45%, #5f6d7a) right top / 3px 100% no-repeat,
+    linear-gradient(90deg, rgba(0,0,0,.22), rgba(200,220,240,.05) 60%, rgba(0,0,0,.12)), var(--panel);
+  padding-right:3px}
+html[data-theme="nostromo"]:not([data-mode="light"]) .rail .ritem{background-image:none;box-shadow:none}
+html[data-theme="nostromo"]:not([data-mode="light"]) .rail .ritem.on{
+  background:linear-gradient(90deg, color-mix(in srgb, var(--accent) 16%, transparent), transparent 85%)}
+html[data-theme="nostromo"]:not([data-mode="light"]) .rail .ritem.on::before,
+html[data-theme="nostromo"]:not([data-mode="light"]) .rail>.slmark{
+  border-radius:0;box-shadow:0 0 8px 1px color-mix(in srgb, var(--accent) 55%, transparent)}
+/* ...and on a phone the bar along the foot, the steel rail along its top. */
+html[data-theme="nostromo"]:not([data-mode="light"]) .railbar{border-top:0;
+  background:linear-gradient(180deg, #5f6d7a, #c9d5df 45%, #2a333c) left top / 100% 3px no-repeat,
+    linear-gradient(180deg, rgba(200,220,240,.05), rgba(0,0,0,.22)), var(--panel);
+  padding-top:7px}
+html[data-theme="nostromo"]:not([data-mode="light"]) .railbar .ritem{background-image:none;box-shadow:none}
+html[data-theme="nostromo"]:not([data-mode="light"]) .railbar .ritem.on{color:var(--accent);background:transparent}
+/* The search, dark: a recessed readout with the scanlines of a terminal's
+   glass, lit amber when it has the keys. */
+html[data-theme="nostromo"]:not([data-mode="light"]) .jump input{
+  background:repeating-linear-gradient(180deg, rgba(200,220,240,.04) 0 1px, rgba(0,0,0,0) 1px 3px), var(--bg);
+  border-color:#232b33;box-shadow:inset 0 1px 3px rgba(0,0,0,.6)}
+html[data-theme="nostromo"]:not([data-mode="light"]) .jump input:focus{
+  border-color:var(--accent);box-shadow:inset 0 1px 3px rgba(0,0,0,.6), 0 0 10px color-mix(in srgb, var(--accent) 35%, transparent);outline:0}
+/* The tiles, dark: readouts on the same glass, the figure glowing faintly
+   in its own color as a phosphor does. */
+html[data-theme="nostromo"]:not([data-mode="light"]) .tile{
+  background:repeating-linear-gradient(180deg, rgba(200,220,240,.035) 0 1px, rgba(0,0,0,0) 1px 3px),
+    linear-gradient(180deg, rgba(200,220,240,.04), rgba(0,0,0,.18)), var(--sunk);
+  box-shadow:inset 0 1px 0 rgba(200,220,240,.08)}
+html[data-theme="nostromo"]:not([data-mode="light"]) .tile .tv{
+  text-shadow:0 0 8px color-mix(in srgb, currentColor 40%, transparent)}
+/* The cards' heads, dark: a steel plate lit along its top. */
+html[data-theme="nostromo"]:not([data-mode="light"]) :is(.hcard h3,.hsect h3,
+  :is(.doctab,.nbview) details.sect:not(details.sect details.sect):not(.row:not(.ndrow) details.sect)>summary){
+  background-image:linear-gradient(180deg, rgba(200,220,240,.05), rgba(0,0,0,.2));
+  box-shadow:inset 0 1px 0 rgba(200,220,240,.08)}
+/* The dock, both halves: a hatch, its edge a hazard stripe, amber and black
+   in the hallways, the door's red and white in the corridors. */
+html[data-theme="nostromo"] .panes.docked .pane.dock{border-top:0}
+html[data-theme="nostromo"]:not([data-mode="light"]) .pane .bar.dockbar{
+  background:repeating-linear-gradient(-45deg, #ffb000 0 6px, #0b0f13 6px 12px) left top / 100% 3px no-repeat,
+    linear-gradient(180deg, rgba(200,220,240,.05), rgba(0,0,0,.22)), var(--panel);
+  padding-top:7px}
+html[data-mode="light"][data-theme="nostromo"] .pane .bar.dockbar{
+  background:repeating-linear-gradient(-45deg, rgba(196,38,28,.75) 0 6px, rgba(255,255,255,.95) 6px 12px) left top / 100% 3px no-repeat,
+    linear-gradient(180deg, rgba(255,255,255,.7), rgba(0,0,0,.04)), var(--panel);
+  padding-top:7px}
+/* Light: the rail a white wall panel with a pressed seam down its edge,
+   its items one surface; the search pressed in; the tiles and the cards'
+   heads pale panels lit along their tops. */
+html[data-mode="light"][data-theme="nostromo"] .rail{
+  background:linear-gradient(90deg, rgba(255,255,255,.75), rgba(0,0,0,.03)), var(--panel);
+  box-shadow:inset -1px 0 0 var(--line), inset -2px 0 0 rgba(255,255,255,.9)}
+html[data-mode="light"][data-theme="nostromo"] :is(.rail,.railbar) .ritem{background-image:none;box-shadow:none;border:0}
+html[data-mode="light"][data-theme="nostromo"] .rail .ritem.on{background:color-mix(in srgb, var(--accent) 8%, transparent)}
+html[data-mode="light"][data-theme="nostromo"] .railbar .ritem.on{color:var(--accent);background:transparent}
+html[data-mode="light"][data-theme="nostromo"] .railbar{
+  background:linear-gradient(180deg, rgba(255,255,255,.7), rgba(0,0,0,.04)), var(--panel);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9)}
+html[data-mode="light"][data-theme="nostromo"] .jump input{box-shadow:inset 0 1px 2px rgba(0,0,0,.12)}
+html[data-mode="light"][data-theme="nostromo"] .tile{
+  background:linear-gradient(180deg, rgba(255,255,255,.6), rgba(0,0,0,.02)), var(--sunk);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.95)}
+html[data-mode="light"][data-theme="nostromo"] :is(.hcard h3,.hsect h3,
+  :is(.doctab,.nbview) details.sect:not(details.sect details.sect):not(.row:not(.ndrow) details.sect)>summary){
+  background-image:linear-gradient(180deg, rgba(255,255,255,.55), rgba(0,0,0,.02));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.95)}
 /* The one scheme whose swatch shows what it is, a half each (the operator,
    16 Oct): the dark one a strip of the hallway, silver pipe over the deck
    grating with an amber lamp on the pipe; the light one the corridor, a
