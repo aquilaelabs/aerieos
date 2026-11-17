@@ -55,6 +55,9 @@
 - A node's mounts, path mapping and CI runners are tables you edit a row at a time: Edit opens one in place and its Save writes it at once; a mount still reaches the node with Apply storage, and a runner's Edit holds its new token, its labels, Reinstall, Forget token and Remove (f2e1cc1)
 - A space's Also reaches and Also works on are tables written a row at a time: an address is edited, added or deleted in place, and a node is added from a pick or taken off with its bin, each saved at once (dfa2dcb)
 - Text that kept a phone's size at a desk (a dialog's links, logs, a commit's name, code in a row, the banner, the line under the header when the controller is away) now grows a pixel at a desk like the rest, and every thin line is the same hairline (6710524)
+- A node's Repositories and its USB controllers are tables at a desk, one line each; Network says the address, gateway, DNS and the service a change goes through as facts; Sessions counts the sessions open by space, gives each coding agent's version alone and says which you are signed in to as a fact; and Storage's waiting changes no longer repeat a mount's whole reason, which stays under its row (44f6a7f)
+- A list of rows in a section starts where the section's title does, on the Installed page, Storage, Profile and a node's USB devices; it sat further in (58ea9c9)
+- Nostromo dresses the rail, the search, the tiles, the cards' heads and the dock: steel, readouts with scanlines and a hazard stripe along the dock's edge in its dark half, wall panels and the door's red and white stripe in its light half; the header's pipes no longer run under the space's name and the search (586f9f7)
 
 ### Fixed
 
