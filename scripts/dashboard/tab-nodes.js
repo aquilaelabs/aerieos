@@ -250,21 +250,23 @@ function nodeTools(n){
       esc(TOOL_LABELS[k] || k)}</span>`).join(" ")}</div>${sys}`;
 }
 
-// A node's state as one pill: what it is set to (whether it takes new
-// work) and whether its agent is answering, said together, where two pills
-// read online and live as one word twice (the operator, 17 Nov). Set to take
-// work and answering is online; set to take work and gone quiet is not
-// answering, in --bad; draining or disabled as set, not answering after it
-// only when that is true too. When it was last heard is its facts' seen.
-function nodeStatePill(n){
-  if (n.state === "pending")
-    return `<span class="pill stat note ndstate">waiting for enrollment</span>`;
+// A node's state as one pill's word, tone and meaning: what it is set to
+// (whether it takes new work) and whether its agent is answering, said
+// together, where two pills read online and live as one word twice (the
+// operator, 17 Nov). Set to take work and answering is online; set to take
+// work and gone quiet is not answering, in --bad; draining or disabled as
+// set, not answering after it only when that is true too.
+function nodeState(n){
+  if (n.state === "pending") return {word: "waiting for enrollment", cls: "note", means: ""};
   const quiet = n.kind === "agent" && !n.live;
-  if (n.state === "online")
-    return quiet ? `<span class="pill stat bad ndstate" title="its agent has stopped checking in, so nothing from here reaches the machine">not answering</span>`
-      : `<span class="pill stat ok ndstate" title="takes new work${n.kind === "agent" ? ", and its agent is checking in" : ""}">online</span>`;
-  const cls = {draining: "warn", disabled: "warn"}[n.state] || "";
-  return `<span class="pill stat ${cls} ndstate">${esc(n.state)}${quiet ? " · not answering" : ""}</span>`;
+  if (n.state === "online") return quiet
+    ? {word: "not answering", cls: "bad", means: "its agent has stopped checking in, so nothing from here reaches the machine"}
+    : {word: "online", cls: "ok", means: `takes new work${n.kind === "agent" ? ", and its agent is checking in" : ""}`};
+  return {word: `${n.state}${quiet ? " · not answering" : ""}`, cls: {draining: "warn", disabled: "warn"}[n.state] || "", means: ""};
+}
+function nodeStatePill(n){
+  const s = nodeState(n);
+  return `<span class="pill stat ${s.cls} ndstate"${s.means ? ` title="${esc(s.means)}"` : ""}>${esc(s.word)}</span>`;
 }
 // The draft for a node: what is on the record, until the operator types.
 function nodeDraft(n){
@@ -2055,11 +2057,14 @@ function ndRowHtml(n, lead = ""){
             title="the agent's own journal, in the dock, read again every ten seconds">Agent log</button>`}
         </div>
         <div class="sub ndtest" data-own hidden></div>` : "";
+    // Whether it answers is the header's pill over the page (the operator,
+    // 17 Nov: said once); Health says only why a node that does not was
+    // turned away, which the pill cannot.
     const health = docSection("nodes", "health", ndTitle("health"),
-      n.kind === "agent" ? (n.live ? "answering" : n.agent?.token_reuse?.at
+      n.kind !== "agent" || n.live ? "" : n.agent?.token_reuse?.at
         ? "turned away: it presented a token it had already replaced, as a machine restored from a snapshot does, or a copy of its disk; Enroll script brings it back if you restored it"
         : n.agent?.refused?.at
-        ? `turned away: ${n.agent.refused.why || "its credential"}; enroll it again` : "not answering") : "", `
+        ? `turned away: ${n.agent.refused.why || "its credential"}; enroll it again` : "", `
         ${nodeMeters(n) || `<div class="empty">nothing measured yet</div>`}
         ${nodeCharts(n)}
         <div class="ndhmore">
@@ -2076,12 +2081,14 @@ function ndRowHtml(n, lead = ""){
     return askRows + `
     <div class="row stack2 ndrow" data-node="${esc(n.id)}">
       <div class="grow">
-        <div class="name">${
-          // Not its name: the group's header names the node on show (the
-          // operator, 29 Oct: no sub-tab says it again), so its pills lead.
-          // The controller's own machine, installed bare metal (R90): an
-          // ordinary node in every other way, behind the wall.
-          n.config?.own ? `<span class="tag ndown">this machine</span> ` : ""}${nodeStatePill(n)}${stalePill}</div>
+        ${
+          // Not its name or its state: the group's header names the node on
+          // show and says its state beside the picker (the operator, 29 Oct
+          // and 17 Nov), so what leads is a mark the header does not carry:
+          // the controller's own machine, installed bare metal (R90), an
+          // ordinary node in every other way, behind the wall, and an agent
+          // behind this controller's.
+          n.config?.own || stalePill ? `<div class="name">${n.config?.own ? `<span class="tag ndown">this machine</span> ` : ""}${stalePill}</div>` : ""}
         ${
         // Its facts in the facts voice, its id among them (R218 step 26):
         // the id is the one in its enroll script's name.

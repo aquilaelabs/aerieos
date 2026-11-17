@@ -595,21 +595,30 @@ function groupHeader(t, g){
     // drawn from them, so its picker is there with its rows.
     const have = t.kind === "storage" ? (typeof storageList !== "undefined" && storageList || []).map(n => ({id: n.node, name: n.name, live: n.live}))
       : t.kind === "nginx" ? (typeof nginxList !== "undefined" && nginxList || []).map(n => ({id: n.node, name: n.name, live: n.live})) : [];
-    if (!have.length) return `<span class="phead mchead">${nodePick("", null)}<span class="pfacts">${skv(14)}</span><span class="sp"></span></span>`;
-    return `<span class="phead mchead">${nodePick("ndPick", have, machinesNode(t.kind) || have[0].id)}<span class="pfacts">${skv(14)}</span><span class="sp"></span></span>`;
+    if (!have.length) return `<span class="phead mchead">${nodePick("", null)}${skv(5, "ndstatesk")}<span class="sp"></span></span>`;
+    return `<span class="phead mchead">${nodePick("ndPick", have, machinesNode(t.kind) || have[0].id)}${skv(5, "ndstatesk")}<span class="sp"></span></span>`;
   }
   const live = machinesLive(t.kind);
   const cur = groupNode(g, t.kind);
   const n = live.find(x => x.id === cur);
-  const seen = n?.agent?.last_seen ? `seen ${ago(n.agent.last_seen)}` : n ? "never seen" : "";
-  const from = n?.agent?.addr ? `dials in from ${n.agent.addr}` : "";
-  const ag = n?.agent?.version ? `agent ${n.agent.version}` : "";
-  const facts = [seen, from, ag].filter(Boolean).join(" · ");
+  // Beside the picker, the node's state as one pill and a press to its own
+  // page from any page of the group (the operator, 17 Nov: the facts line
+  // under the picker took a phone's second and third lines; when it was
+  // seen, where it dials in from and its agent are on that page).
+  const s = n ? nodeState(n) : null;
+  const pill = !s ? "" : `<button type="button" class="pill stat ${s.cls} ndstate" data-ndgo="${esc(n.id)}"
+      aria-label="${esc(n.name)} is ${esc(s.word)}: open its page" title="${esc(s.means ? `${s.means}: open its page` : "open its page")}">${esc(s.word)}</button>`;
   // The containers' pages leave the own machine out, so on a machine alone
   // there is no other node to show them for.
   const ownHere = state?.bare_metal && (nodesList || []).some(x => x.config?.own && x.state !== "retired");
   const pick = live.length ? nodePick("ndPick", live.map(x => ({id: x.id, name: x.config?.own ? `${x.name} (this machine)` : x.name, live: x.live})), cur) : `<span class="pname">${ownHere ? "No other node yet" : "No node yet"}</span>`;
-  return `<span class="phead mchead">${pick}${facts ? `<span class="pfacts">${esc(facts)}</span>` : ""}<span class="sp"></span></span>`;
+  return `<span class="phead mchead">${pick}${pill}<span class="sp"></span></span>`;
+}
+// A node's own page from anywhere: Machines' Nodes on it, the group's
+// picker following (a group header's state pill, the search's node rows).
+function openNodePage(nid){
+  railGo("machines", "nodes");
+  openNodesTab(nid);
 }
 // The Machines group's actions, on the sub-nav's line: dead with the enroll
 // feature off (the reason is on the Nodes page) and until the node list lands.
@@ -619,6 +628,8 @@ function machinesActions(){
     <button type="button" class="primary" id="ndEnroll"${dead}>${barSaid("Enroll node", "Enroll")}</button></span>`;
 }
 function wireGroupHeader(bar){
+  const go = bar.querySelector("[data-ndgo]");
+  if (go) go.onclick = () => openNodePage(go.dataset.ndgo);
   const pick = bar.querySelector("#ndPick");
   // A pick is a history entry (B31), so Back returns to the node before.
   if (pick) pick.onchange = () => navPush(() => groupPick(groupOf(tabOf(panes[0])?.kind || "nodes") || groupOf("nodes"), pick.value));
@@ -690,7 +701,7 @@ function jumpItems(q){
   for (const p of state?.projects || [])
     rows.push([projLabel(p.name), "space", () => { railWant = "projects"; openNotebook(p.name); }]);
   for (const n of nodesList || [])
-    rows.push([n.name || n.id, "node", () => { railGo("machines", "nodes"); openNodesTab(n.id); }]);
+    rows.push([n.name || n.id, "node", () => openNodePage(n.id)]);
   for (const c of dmJumpRows())
     rows.push([c.name, `container on ${c.where}`, () => dmJumpTo(c.node, c.name)]);
   const hit = rows.filter(([label]) => label.toLowerCase().includes(needle));

@@ -1096,6 +1096,31 @@ await section("a page's tab row on a phone", async () => {
   ok(new Set(Object.values(phone)).size === 1 && Object.values(phone).every(v => v === Object.values(tabRows)[0]),
      `...and the same height on a phone (${JSON.stringify(phone)})`);
 });
+// A group's head (Machines, Build, Containers) is one row a little taller
+// than its tab row, at a desk and on a phone: the node's picker and its
+// state pill, no facts line under them (the operator, 17 Nov).
+await section("a group's head is one row", async () => {
+  const got = {};
+  for (const w of [1280, 393]){
+    await page.setViewportSize({ width: w, height: w > 900 ? 900 : 851 });
+    for (const [g, t] of [['machines', 'nodes'], ['build', 'library'], ['containers', 'docker']]){
+      await page.evaluate(([g, t]) => railGo(g, t), [g, t]);
+      await page.waitForSelector('#pane0 .bar.page.grouped .phead', { timeout: 15000 }).catch(() => {});
+      await arrived();
+      got[`${t}@${w}`] = await page.evaluate(() => {
+        const h = document.querySelector('#pane0 .bar.page.grouped .phead'), row = document.querySelector('#pane0 .bar.page.grouped > .subrow');
+        if (!h || !row) return null;
+        const want = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ghead-h'));
+        return { h: Math.round(h.getBoundingClientRect().height), row: Math.round(row.getBoundingClientRect().height), want, facts: !!h.querySelector('.pfacts') };
+      });
+    }
+  }
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await arrived();
+  const off = Object.entries(got).filter(([, m]) => !m || m.h !== m.want || m.h <= m.row || m.facts).map(([k, m]) => `${k} ${JSON.stringify(m)}`);
+  ok(!off.length, `a group's head is one row of --ghead-h, taller than its tab row, with no facts line, at a desk and on a phone${
+     off.length ? `; not: ${off.join('; ')}` : ''}`);
+});
 }
 
 if (runs('a')) {

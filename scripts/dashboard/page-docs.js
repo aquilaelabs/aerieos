@@ -177,12 +177,11 @@ function bootPage(hash){
       ${bootView(view) || `<div class="nbview"><div class="field">${skRows(5)}</div></div>`}</div></div>`;
     return {rail: key, bar: `<div class="bar proj">${bar}</div>`, body: `<div class="skstack">${body}</div>`};
   }
-  // The Machines group's header over its sub-nav (R177): the picker's
-  // placeholder, the facts' shimmer and the two actions, dead.
   // A group's header over its sub-nav (R177, R178): the picker's
-  // placeholder, the facts' shimmer, the Machines group's two actions dead.
+  // placeholder, the state pill's shimmer, the Machines group's two
+  // actions dead.
   bar = ["machines", "build", "containers"].includes(key)
-    ? `<div class="bar page grouped${key === "machines" ? " machines" : ""}"><span class="phead mchead">${nodePick("", null)}<span class="pfacts">${skv(14)}</span><span class="sp"></span></span>
+    ? `<div class="bar page grouped${key === "machines" ? " machines" : ""}"><span class="phead mchead">${nodePick("", null)}${skv(5, "ndstatesk")}<span class="sp"></span></span>
         <span class="subrow">${seg(g.tools, tool)}<span class="sp"></span>${key === "machines" ? `<span class="actbar"><button type="button" disabled>${"New VM"}</button><button type="button" class="primary" disabled>${barSaid("Enroll node", "Enroll")}</button></span>` : ""}</span></div>`
     : `<div class="bar page">${seg(g.tools, tool)}</div>`;
   if (key === "home")

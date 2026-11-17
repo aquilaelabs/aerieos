@@ -3510,8 +3510,8 @@ chmod +x "$CODEX_INSTALL_DIR/codex"
     // looking for its row.
     await page.waitForSelector('.pane .bar #ndPick', { timeout: 15000 });
     await page.selectOption('.pane .bar #ndPick', minted.id);
-    await page.waitForSelector(`.nodestab .ndrow[data-node="${minted.id}"] .ndstate.ok`,
-                               { timeout: 15000 });
+    await page.waitForSelector(`.nodestab .ndrow[data-node="${minted.id}"]`, { timeout: 15000 });
+    await page.waitForSelector('#pane0 .bar .mchead .ndstate.ok', { timeout: 15000 });
     const row = await page.$eval(`.nodestab .ndrow[data-node="${minted.id}"]`,
                                  e => e.textContent.replace(/\s+/g, ' '));
     // Its facts a grid (R218 step 26): the account jobs run as is one.
@@ -3520,12 +3520,28 @@ chmod +x "$CODEX_INSTALL_DIR/codex"
     // The node's name is the Machines header's, in its picker (R177), not
     // the row's.
     const picked = await page.$eval('.pane .bar #ndPick', s => s.selectedOptions[0]?.textContent || '');
-    // One state pill (the operator, 17 Nov): online, never online and live.
-    const pills = await page.$$eval(`.nodestab .ndrow[data-node="${minted.id}"] .name .pill.stat`, ps => ps.map(p => p.textContent.trim()));
-    const missing = ['online', 'cpu', 'data'].filter(w => !row.includes(w)).concat(/agentbox/.test(picked) ? [] : ['agentbox in the picker'])
-      .concat(pills.join('|') === 'online' ? [] : [`one pill, not ${pills.join(' and ')}`]);
+    // Its state is one pill beside the header's picker (the operator, 17
+    // Nov): online, never online and live, and said there alone, not again
+    // on the row under it nor as a facts line in the header.
+    const head = await page.$eval('#pane0 .bar .mchead', h => ({ pills: [...h.querySelectorAll('.pill.stat')].map(p => p.textContent.trim()),
+      facts: !!h.querySelector('.pfacts'), text: h.textContent.replace(/\s+/g, ' ') }));
+    const rowPills = await page.$$eval(`.nodestab .ndrow[data-node="${minted.id}"] .pill.stat.ndstate`, ps => ps.length);
+    const missing = ['cpu', 'data'].filter(w => !row.includes(w)).concat(/agentbox/.test(picked) ? [] : ['agentbox in the picker'])
+      .concat(head.pills.join('|') === 'online' && !head.facts && !/dials in|seen /.test(head.text) && !rowPills ? []
+        : [`one pill in the header, not ${head.pills.join(' and ') || 'none'}${head.facts ? ' with its facts' : ''}${rowPills ? ', and again on the row' : ''}`]);
     ok(!missing.length && runsAs === (process.env.USER || 'builder'),
-       `the node named in the header's picker, its row the agent online in one pill, its numbers and the account jobs run as (${missing.map(w => 'no ' + w).join(', ') || 'all there'}; runs as ${runsAs}: ${row.slice(0, 160)}…)`);
+       `the node named in the header's picker with its state one pill beside it, its numbers and the account jobs run as (${missing.map(w => 'no ' + w).join(', ') || 'all there'}; runs as ${runsAs}: ${row.slice(0, 160)}…)`);
+    // ...and the pill is a press to the node's own page from any page of a
+    // group with a picker: from the Library on Build, it opens Machines'
+    // Nodes on that node.
+    await page.evaluate(id => { railGo('build', 'library'); groupPick(groupOf('library'), id); }, minted.id);
+    await page.waitForSelector(`#pane0 .bar .mchead [data-ndgo="${minted.id}"]`, { timeout: 15000 });
+    await page.click(`#pane0 .bar .mchead [data-ndgo="${minted.id}"]`);
+    await page.waitForFunction(id => tabOf(panes[0])?.kind === 'nodes' && document.querySelector('#pane0 .bar #ndPick')?.value === id
+      && !!document.querySelector(`.nodestab .ndrow[data-node="${id}"]`), minted.id, { timeout: 15000 }).catch(() => {});
+    const went = await page.evaluate(() => ({ kind: tabOf(panes[0])?.kind, node: document.querySelector('#pane0 .bar #ndPick')?.value, hash: location.hash }));
+    ok(went.kind === 'nodes' && went.node === minted.id && went.hash.startsWith('#/machines/nodes'),
+       `the header's state pill opens the node's own page from another group's page (${JSON.stringify(went)})`);
     // Each session kept to its own project's network (R79): a switch in the
     // row's Sessions section, a draft until the section's Save (the rule
     // apply-not-onchange: it wrote itself on the click at first, the
@@ -3590,10 +3606,12 @@ chmod +x "$CODEX_INSTALL_DIR/codex"
       os => os.filter(o => /second/.test(o.textContent)).map(o => o.value));
     ok(opt.length === 1, 'the newly minted node joins the picker');
     await page.selectOption('.pane .bar #ndPick', opt[0]);
-    await page.waitForFunction(id => /waiting for enrollment/.test(
-      document.querySelector(`.nodestab .ndrow[data-node="${id}"]`)?.textContent || ''),
+    // Its state is the header's pill beside the picker (the operator, 17
+    // Nov), over its row.
+    await page.waitForFunction(id => !!document.querySelector(`.nodestab .ndrow[data-node="${id}"]`)
+      && /waiting for enrollment/.test(document.querySelector(`#pane0 .bar .mchead [data-ndgo="${id}"]`)?.textContent || ''),
       opt[0], { timeout: 10000 });
-    ok(true, 'the pending row says it is waiting for enrollment');
+    ok(true, 'the pending node says it is waiting for enrollment, in its header\'s pill');
   }
 
   // ---- uninstall, from the Nodes tab ------------------------------------------

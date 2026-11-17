@@ -139,6 +139,9 @@
      its header and a page standing alone (Home, Spaces), with an action in
      it or not. The size a group's row has with a button in it. */
   --tabrow-h:40px;
+  /* A group's head over that row (Machines, Build, Containers): its node's
+     picker and state pill, a little taller than the tabs under it. */
+  --ghead-h:44px;
   /* The three corners on the page: a surface (card, panel, dialog), a
      control (tab, button, field) and a small thing (a pill's box, a bar's
      cap). Named so a scheme can square them all at once: nostromo does,
