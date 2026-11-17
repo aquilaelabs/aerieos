@@ -546,7 +546,7 @@ function rnFillReads(){
   const others = projectList().filter(c => c.key !== own).sort((a, b) => a.name.localeCompare(b.name));
   wrap.hidden = rnMode === "git" || !others.length;
   drawHTML(box, others.map(c => lrow(c.key, c.name,
-    c.rows.length === 1 && c.rows[0].branch ? `git: ${c.rows[0].branch}` : c.rows.length ? `${c.rows.length} repositories` : "no repository yet",
+    c.rows.length === 1 ? (c.rows[0].git ? `git: ${c.rows[0].git}` : "no git") : c.rows.length ? `${c.rows.length} repositories` : "no repository yet",
     was.has(c.key))).join(""));
   // AerieOS's owner's alone (the operator, 6 Oct): shown to everybody,
   // changed by the owner, and why not said on the row (not a tooltip).

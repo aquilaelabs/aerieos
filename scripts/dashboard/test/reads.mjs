@@ -34,6 +34,11 @@ const rows = await page.$$eval('#rnReads label.lrow', ls => ls.map(l => [l.query
 ok(rows.length >= 2 && !rows.some(([n]) => n === 'alpha') && rows.map(([n]) => n).join() === rows.map(([n]) => n).sort().join()
    && rows.every(([, on]) => !on),
    `the space's settings offer every other space as a listbox row, alphabetical, none ticked yet (${rows.map(([n]) => n).join(', ')})`);
+// A space of one repository says its branch at the row's right, or that it
+// has no git; one of several says how many.
+const subs = await page.$$eval('#rnReads label.lrow .lsub', ls => ls.map(l => l.textContent));
+ok(subs.some(s => /^git: \S/.test(s)) && subs.includes('no git') && !subs.includes('1 repositories'),
+   `a space of one repository is listed by its branch or as having no git, never as "1 repositories" (${subs.join(', ')})`);
 const look = await page.$eval('#rnReads', e => ({ overflow: getComputedStyle(e).overflowY, border: getComputedStyle(e).borderTopWidth,
   row: Math.round(e.querySelector('label.lrow').getBoundingClientRect().height), display: getComputedStyle(e.querySelector('label.lrow')).display,
   // A control's height, the page's own (--tap): never a number kept here.
