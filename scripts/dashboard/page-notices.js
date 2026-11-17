@@ -54,7 +54,7 @@ function noticesAskRows(){
         <div class="name">${askTag(a)}</div>
         <div class="sub">${esc(a.why || "")}</div>
         <div class="bcmd">${askCmd(a)}</div>
-        ${body ? `<details class="ntlong"${sectAttr("notices:ask:" + a.id)}><summary>${esc(what)}</summary><pre class="ntbox">${esc(body)}</pre></details>` : ""}
+        ${body ? `<details class="ntlong chev"${sectAttr("notices:ask:" + a.id)}><summary>${esc(what)}</summary><pre class="ntbox">${esc(body)}</pre></details>` : ""}
         <div class="sub dim">${a.asker ? esc(a.asker) + "'s session · " : ""}${askLeft(a)}</div>
       </div>
       <div class="actbar">${askActs(a, {deny: "data-ntdeny", allow: "data-ntallow"})}</div>

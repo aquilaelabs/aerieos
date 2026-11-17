@@ -2306,6 +2306,9 @@ label.pick.nodepick{display:inline-flex;align-items:center;gap:var(--field-gap)}
    control the rule above forbids everywhere else. */
 :is(.doctab,.nb) .field.docbarrow :is(input:not([type=checkbox]):not([type=radio]),select,textarea){
   max-width:min(var(--ctl-w),88%)}
+/* A pulldown straight in the bar is a picker beside what it filters, as a
+   label.pick's is: its own width, so the search beside it keeps the room. */
+:is(.doctab,.nb) .field.docbarrow>select{width:auto;flex:0 1 auto;min-width:0}
 /* A bar button's short words (barSaid): kept for a phone. */
 .shrt{display:none}
 /* On a phone a page's bar is one line of its picker and its buttons (the

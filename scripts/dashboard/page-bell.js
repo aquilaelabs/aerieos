@@ -215,7 +215,7 @@ function attRow(a){
       <div class="bsum">${a.tools.map(t => esc(t.label)).join(", ")}</div>
       ${cc ? `<div class="bwarn">Updating Claude Code ends the Claude sessions there
         (${a.sessions} running)</div>` : ""}
-      <details class="bdetail"${sectAttr((ag ? "bell:ag:" : "bell:tc:") + a.id)}><summary>versions${cc ? " and sessions" : ""}</summary><pre>${
+      <details class="bdetail chev"${sectAttr((ag ? "bell:ag:" : "bell:tc:") + a.id)}><summary>versions${cc ? " and sessions" : ""}</summary><pre>${
         a.tools.map(t => `${esc(t.label)}: ${esc(t.from || "?")} → ${t.to === "newer" ? "a newer version" : esc(t.to)}`).join("\n")}${
         cc ? `\n\nsessions there: ${a.projects.map(esc).join(", ")}` : ""}</pre></details>
       <div class="bfoot"><span>in the ${where}</span>
@@ -473,7 +473,7 @@ function attRow(a){
     <div class="bsum">runs agent ${esc(a.from)} and this controller ships ${esc(a.to)}${a.window
       ? `: ${a.projects.length ? `${a.projects.length} space${a.projects.length === 1 ? "" : "s"} cannot build, test or use the emulator there`
                                : "nothing works there"} until it is updated` : ""}</div>
-    ${a.window && a.projects.length ? `<details class="bdetail"${sectAttr("bell:agent:" + a.id)}><summary>projects</summary><pre>${
+    ${a.window && a.projects.length ? `<details class="bdetail chev"${sectAttr("bell:agent:" + a.id)}><summary>projects</summary><pre>${
       a.projects.map(esc).join(", ")}</pre></details>` : ""}
     ${a.back ? `<div class="bsum bad">it took the update and went back to the agent it had: it ${esc(a.back)}</div>` : ""}
     ${a.failed && !a.back ? `<div class="bsum bad">its last update failed: ${esc(a.failed)}</div>` : ""}
@@ -667,18 +667,18 @@ function drawBell(){
         // A push (R219) is approved by reading the lines that look like a
         // secret or something private, whole, open, each with its file and
         // line: Approve sends them and okays these exact lines.
-        a.kind === "push" ? `<details class="bdetail" open><summary>the ${a.count || ""} flagged line${a.count === 1 ? "" : "s"}: approving okays these exact lines until they change</summary><pre class="bflag">${
+        a.kind === "push" ? `<details class="bdetail chev" open><summary>the ${a.count || ""} flagged line${a.count === 1 ? "" : "s"}: approving okays these exact lines until they change</summary><pre class="bflag">${
             esc(a.detail || "")}</pre></details>` : ""}${
         // A container is approved by reading its compose file, the way root
         // is approved by reading its argv (R71): the file is the request, so
         // it is here whole, folded, with the env file's keys and never its
         // values, which is where a token would be.
-        a.kind === "container" ? `<details class="bdetail"${sectAttr("bell:detail:" + a.id)}><summary>the compose file${
+        a.kind === "container" ? `<details class="bdetail chev"${sectAttr("bell:detail:" + a.id)}><summary>the compose file${
             a.env_keys?.length ? `, and an env file setting ${a.env_keys.map(esc).join(", ")}` : ""}${
             a.for ? `, for ${esc(a.for)}` : ""}</summary><pre>${esc(a.detail || "")}</pre></details>` : ""}${
         // An edit of a release (R139) is approved by reading the notes it
         // would put on the page, whole.
-        a.kind === "release-edit" && a.detail ? `<details class="bdetail"${sectAttr("bell:detail:" + a.id)}><summary>the new notes</summary><pre>${
+        a.kind === "release-edit" && a.detail ? `<details class="bdetail chev"${sectAttr("bell:detail:" + a.id)}><summary>the new notes</summary><pre>${
             esc(a.detail)}</pre></details>` : ""}
         <div class="bfoot"><span>${a.asker || a.project ? esc(askWho(a)) + " · " : ""}${askLeft(a)}</span>
           <span class="acts"><a href="#" data-bdeny="${a.id}">Deny</a>${

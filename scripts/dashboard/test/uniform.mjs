@@ -928,6 +928,19 @@ for (const kind of kinds){
   if (m.colLefts.length) ok(m.colLefts.length === 1,
      `[${kind}] ...and every band in the column beside its list at one x of its own (${JSON.stringify(m.colLefts)}${
        m.colLefts.length > 1 ? ': ' + m.colLefts.map(x => `${x} is ${m.who[x]}`).join('; ') : ''})`);
+  // A fold that shows more of a row opens by the page's own triangle
+  // (.chev), never the browser's marker, which a summary drawn as a list
+  // item shows.
+  const marks = await page.evaluate(() => [...document.querySelectorAll('#pane0 details:not(.sect) > summary')]
+    .filter(x => x.checkVisibility() && getComputedStyle(x).display === 'list-item')
+    .map(x => x.parentElement.className || x.textContent.trim().slice(0, 30)));
+  ok(!marks.length, `[${kind}] every fold opens by the page's chevron, never the browser's marker${marks.length ? `; not: ${marks.join(', ')}` : ''}`);
+  // A search box in a page's bar keeps a search's room at a desk: the
+  // pickers beside it take their own width, never the whole bar.
+  const narrow = await page.evaluate(() => [...document.querySelectorAll('#pane0 input[type=search]')]
+    .filter(x => x.checkVisibility() && x.getBoundingClientRect().width < 12 * parseFloat(getComputedStyle(document.documentElement).fontSize))
+    .map(x => `${x.className || x.getAttribute('aria-label')} ${Math.round(x.getBoundingClientRect().width)}px`));
+  ok(!narrow.length, `[${kind}] a search box keeps a search's room${narrow.length ? `; not: ${narrow.join(', ')}` : ''}`);
   ok(m.offskin.length === 0,
      `[${kind}] every control wears the field skin${
        m.offskin.length ? `; not: ${m.offskin.join(', ')}` : ''} (${

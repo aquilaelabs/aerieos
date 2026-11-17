@@ -469,7 +469,7 @@ async function openConversation(project, id){
   drawHTML(body, (j.turns || []).map(t => `<div class="cvturn ${esc(t.who)}">
       <div class="cvwho">${esc(WHO[t.who] || t.who)}${t.at ? ` · ${esc(t.at)}` : ""}</div>
       ${t.text ? `<div class="cvtext">${esc(t.text)}</div>` : ""}
-      ${(t.tools || []).map(c => `<details class="cvtool${c.error ? " err" : ""}"><summary>${esc(c.call.split("\n")[0])}</summary>
+      ${(t.tools || []).map(c => `<details class="cvtool chev${c.error ? " err" : ""}"><summary>${esc(c.call.split("\n")[0])}</summary>
         <pre>${esc(c.result || "(nothing)")}${c.cut ? "\n[cut here: the download has the rest]" : ""}</pre></details>`).join("")}
     </div>`).join("") || `<div class="empty">Nothing said in it yet.</div>`);
   $("cvNote").textContent = j.partial ? "The newest part of a long conversation: the download has all of it." : "";

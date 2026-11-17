@@ -426,7 +426,7 @@ function openNewVm(forProject = ""){
       <div class="setrow col ctlrow">${lbl("vmFw", "Firmware", "UEFI for most current installers (Windows 11 also wants the TPM, under More); BIOS for an older one")}
         <select id="vmFw">${optionList([["uefi", "UEFI"], ["bios", "BIOS"]], "uefi")}</select></div>
     </div>
-    <details class="vmmore"><summary>More: disks, network, screen password, hardware</summary>
+    <details class="vmmore chev"><summary>More: disks, network, screen password, hardware</summary>
       <div class="field">${lbl("vmDisks", "Further disks, GB", "up to three more, each its own virtio disk (vdb, vdc, vdd), comma-separated: 100, 500")}
         <input id="vmDisks" spellcheck="false" autocomplete="off" placeholder="none"></div>
       <div class="prefrow ctlrow">

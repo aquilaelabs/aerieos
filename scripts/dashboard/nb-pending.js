@@ -162,7 +162,7 @@ function drawPendingModal(j){
       <input type="checkbox" checked data-pend="${r.id}" data-after="${r.after ?? ""}">
       <span><span class="psum">${tag(r) ? `<b>${esc(tag(r))}</b> · ` : ""}${esc(r.summary || "")}</span>
         <div class="pwhen">${esc(when(r.at))}${r.after != null ? " · needs the change above" : ""}</div>
-        ${d && d !== r.summary ? `<details${sectAttr("pending:full:" + r.id)}><summary>full text</summary><pre>${esc(d)}</pre></details>` : ""}
+        ${d && d !== r.summary ? `<details class="pdfull chev"${sectAttr("pending:full:" + r.id)}><summary>full text</summary><pre>${esc(d)}</pre></details>` : ""}
       </span></label>`;
   }
   drawHTML($("pendList"), html);
