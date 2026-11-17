@@ -336,6 +336,22 @@ body:has(.modal:not([hidden])) :is(.tourcard,.tourring){display:none}
 .newbuild{display:flex;align-items:center;gap:8px;padding:6px 12px;color:var(--warn-wash-ink);font:var(--f-ui);
   background:var(--warn-wash);border-bottom:var(--hair) solid var(--warn-edge)}
 .newbuild[hidden]{display:none}
+/* The controller away for a restart: the note voice under the header, and
+   the page quiet under it. Its presses are dead while it is away (they
+   would fail), the brand and the doctor's dot lose their color, and the
+   page a restart reloaded is its kept copy until the first read lands. */
+.awayband{padding:4px 12px;color:var(--note);font:var(--f-ui);border-bottom:var(--hair) solid var(--line);
+  border-left:3px solid var(--note);background:var(--bg)}
+.awayband[hidden]{display:none}
+body.away #panes button:not(.help){pointer-events:none;opacity:.55}
+body.away #docDot,body.away #docDot.ok,body.away #docDot.warn,body.away #docDot.bad{background:var(--line)}
+.snapback{display:contents}
+/* A build this account has not seen: one line, its version and the press
+   that opens what changed. */
+.updatedband{display:flex;align-items:center;gap:8px;padding:6px 12px;color:var(--ink);font:var(--f-ui);
+  background:var(--panel);border-bottom:var(--hair) solid var(--line)}
+.updatedband[hidden]{display:none}
+.updatedband>.grow{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
 .newbuild>.grow{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
 .uadd{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}
 .uadd .setrow{flex:1 1 12em}

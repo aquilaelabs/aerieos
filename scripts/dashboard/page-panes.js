@@ -16,7 +16,7 @@
 // whenever the same tab is still in it, because rebuilding it would reload the
 // iframe and drop a live terminal for no reason.
 function paintBar(pane, t, i){
-  const bar = pane.querySelector(".bar");
+  const bar = pane.querySelector(":scope > .bar");
   // The dock's pane wears the dock's line (R218 step 4), with or without a
   // terminal in it.
   if (i === 1){
@@ -183,7 +183,7 @@ function drawPanes(){
   // is nobody's, and a nobody's frame is still an attached tmux client.
   const liveTabs = new Set(tabs.map(t => t.id));
   for (let j = 0; j < 2; j++)
-    [...($("pane" + j).querySelector(".stack")?.children || [])]
+    [...($("pane" + j).querySelector(":scope > .stack")?.children || [])]
       .filter(c => c.dataset.key && !liveTabs.has(c.dataset.key.split("|")[0]))
       .forEach(c => c.remove());
   for (let i = 0; i < 2; i++){
@@ -368,7 +368,7 @@ let stackClock = 0;
 // client, and tmux sizes a window to its smallest one. Overlapping them keeps
 // every client on the same geometry, so there is nothing to fight about.
 function paneStack(pane){
-  let st = pane.querySelector(".stack");
+  let st = pane.querySelector(":scope > .stack");
   if (!st){
     drawHTML(pane, `<div class="bar"></div><div class="stack"></div>`);
     st = pane.querySelector(".stack");
@@ -418,7 +418,7 @@ function holdLeaving(st){
 function dropElsewhere(keep, key){
   for (let j = 0; j < 2; j++){
     if (j === keep) continue;
-    [...($("pane" + j).querySelector(".stack")?.children || [])]
+    [...($("pane" + j).querySelector(":scope > .stack")?.children || [])]
       .filter(c => c.dataset.key === key)
       .forEach(c => c.remove());
   }

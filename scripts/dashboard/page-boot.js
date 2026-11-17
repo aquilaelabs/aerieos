@@ -64,9 +64,17 @@ function bootWaits(){
     if (shape === "page"){
       const pg = bootPage(location.hash), rl = bootRail(pg.rail);
       const id = `skboot${Math.random().toString(36).slice(2)}`;
-      el.outerHTML = `<div class="loading skel skboot" id="${id}"><span class="sk-said">${esc(el.textContent.trim() || "loading")}</span>${pg.bar}${pg.body}</div>`;
-      drawn($(id));
-      if (pg.tool) bootOwn($(id), pg.tool);
+      // Reloaded by a restart a moment ago: the page as it was, until the
+      // first read draws it again (restartKeep).
+      const kept = restartKept();
+      if (kept){
+        el.outerHTML = `<div class="snapback" id="${id}" inert aria-busy="true">${kept.html}</div>`;
+        restartScrollTo($(id));
+      } else {
+        el.outerHTML = `<div class="loading skel skboot" id="${id}"><span class="sk-said">${esc(el.textContent.trim() || "loading")}</span>${pg.bar}${pg.body}</div>`;
+        drawn($(id));
+        if (pg.tool) bootOwn($(id), pg.tool);
+      }
       if (!$("rail").innerHTML.trim()) drawHTML($("rail"), rl.rail);
       if (!$("railbar").innerHTML.trim()) drawHTML($("railbar"), rl.bar);
       return;

@@ -30,6 +30,7 @@ html[data-mode="light"][data-theme="nostromo"] button:not(.link){
 html:not([data-theme]) .logo{color:var(--accent)}
 html:not([data-theme]) .logo.off{color:var(--bad)}
 .logo.off{color:var(--bad)}
+html:not([data-theme]) .logo.away,.logo.away{color:var(--dim)}
 .meta{color:var(--dim);font:var(--f-data);white-space:nowrap;
   overflow:hidden;text-overflow:ellipsis}
 /* A USB device's row (R116): its picker and Give to a VM are a wide pair, so

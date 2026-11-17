@@ -288,5 +288,31 @@ function welcomeOnce(){
   // An administrator has Home's Getting started for this (R267), and a
   // guide over it would be two at once; a person invited later has none.
   if (!w.seen){ if (!state?.can?.admin) openAbout("guide"); }
-  else if (rev && w.image_seen !== rev) openAbout("log");
+  else if (rev && w.image_seen !== rev) updatedShow();
+}
+
+// A build this account has not seen: one line under the header, Updated to
+// its version, with What changed opening the changelog (Perch: it opened
+// itself as a dialog over the page). The next press anywhere else puts it
+// away, and that is the acknowledgement, as closing the changelog is.
+function updatedShow(){
+  const band = $("updatedBand");
+  if (!band) return;
+  $("updatedSay").textContent = `Updated to ${state.image?.version || "a new build"}`;
+  band.hidden = false;
+  $("updatedLog").onclick = () => { updatedHide(); openAbout("log"); };
+  addEventListener("pointerdown", updatedElsewhere, true);
+}
+function updatedElsewhere(e){
+  if (!e.target.closest?.("#updatedBand")) updatedHide();
+}
+function updatedHide(){
+  removeEventListener("pointerdown", updatedElsewhere, true);
+  const band = $("updatedBand");
+  if (!band || band.hidden) return;
+  band.hidden = true;
+  const w = state?.welcome, rev = state?.image?.rev || "";
+  if (!state?.me || !w || !rev || w.image_seen === rev) return;
+  w.image_seen = rev;
+  postJSON("/api/users", {action: "prefs", prefs: {image_seen: rev}}).catch(() => {});
 }

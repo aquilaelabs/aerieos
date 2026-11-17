@@ -177,9 +177,12 @@ async function refresh(){
   refreshBusy = true;
   const adoptedBefore = adoptSeq;
   let fetched = false;     // the container answered; what failed is this page
+  let answered = false;    // the controller itself answered, if only with an error
   try{
     const r = preStatusUsed ? await fetch("/api/status")
                             : (preStatusUsed = true, await preStatus);
+    // A proxy in front answers for a controller that is not there.
+    answered = ![502, 503, 504].includes(r.status);
     // Signed out (the cookie expired, or the secret rotated): go to the
     // login page rather than showing a dead dashboard with a red dot.
     if (r.status === 401){ location.href = "/login?next=%2F"; return; }
@@ -285,13 +288,19 @@ async function refresh(){
     // that it takes from here is its last (bootFetch).
     if (!bootDrawn) bootReadsDone();
     render();
+    restartScrollBack();
     // Cleared at the END, not where the fetch landed: a poll that arrives
     // and then fails on this page is still a failed poll, and resetting the
     // count on arrival read every one of those as the first.
     pollFails = 0;
     const pw = $("pollWhy");
     if (pw && !pw.hidden){ pw.hidden = true; pw.textContent = ""; }
+    awayEnd();
+    lastOkAt = Date.now();
   }catch(e){
+    pollFails++;
+    // Away for a restart: said calmly, and asked again soon (awayCalm).
+    if (!answered && awayCalm()) return;
     // The light goes red either way; the console says whether the box was
     // unreachable or this page tripped over its own data.
     console.error("refresh:", e);
@@ -309,7 +318,6 @@ async function refresh(){
     // arrived and then broke this page is a bug in this file. Calling the
     // second "not reaching the container" sends whoever reads it to check
     // the wrong machine.
-    pollFails++;
     const n = `${pollFails} poll${pollFails === 1 ? "" : "s"} failed in a row`;
     const why = `Last reason: ${e && e.message ? e.message : e}`;
     // Said under the header from the second failure on (the light alone was
@@ -351,7 +359,9 @@ const STATUS_MS = 15000;
 let statusTimer = null;
 function statusLater(){
   clearTimeout(statusTimer);
-  statusTimer = document.hidden ? null : setTimeout(() => refresh(), STATUS_MS);
+  // Every two seconds while away for what reads as a restart.
+  const soon = awaySince && Date.now() - awaySince <= AWAY_GRACE_MS;
+  statusTimer = document.hidden ? null : setTimeout(() => refresh(), soon ? AWAY_POLL_MS : STATUS_MS);
 }
 
 // Consecutive failed polls. Zero is healthy; the header's light carries the
@@ -446,13 +456,115 @@ function unsavedHere(){
 }
 
 function restartSeen(){
+  awayEnd();
   const what = unsavedHere();
-  if (!what){ location.reload(); return; }
+  if (!what){ restartKeep(); location.reload(); return; }
   restartHeld = true;
   const band = $("newBuild");
   if (!band){ return; }
   $("newBuildSay").textContent = `The controller was updated. Reload to use it: ${what} is not saved yet.`;
   band.hidden = false;
+}
+
+// The page as it was, kept across the reload a restart brings (Perch): its
+// first pane copied into the browser's session store just before, and drawn
+// in the placeholder's place by the reloaded page (bootWaits) until its first
+// read lands, so the page does not go blank and come back as shapes. The
+// copy is inert and has no ids, so nothing draws into it; it is read once,
+// for the same address and within two minutes. Where it was scrolled is
+// kept too, and put back on the first draw.
+const RESTART_KEEP = "aerie.restartKeep";
+let restartScroll = null;
+function restartKeep(){
+  try{
+    const pane = $("pane0");
+    if (!pane) return;
+    const copy = pane.cloneNode(true);
+    // Only the page on show: what the stack keeps alive behind it, and any
+    // frame, stays behind.
+    copy.querySelectorAll(":scope > .stack > :not(.on)").forEach(e => e.remove());
+    copy.querySelectorAll("iframe, video, audio, canvas, script").forEach(e => e.remove());
+    copy.querySelectorAll("[id]").forEach(e => e.removeAttribute("id"));
+    copy.querySelectorAll("[data-key]").forEach(e => e.removeAttribute("data-key"));
+    const html = copy.innerHTML;
+    if (html.length > 2000000) return;
+    const at = [...pane.querySelectorAll("*")].find(e => e.scrollTop > 0);
+    sessionStorage.setItem(RESTART_KEEP, JSON.stringify({hash: location.hash, at: Date.now(), html,
+      scroll: at ? {cls: [...at.classList], top: at.scrollTop} : null}));
+  }catch{ /* no store here: the page reloads as it always did */ }
+}
+// The kept page for this address, read once, or null.
+function restartKept(){
+  try{
+    const k = JSON.parse(sessionStorage.getItem(RESTART_KEEP) || "null");
+    sessionStorage.removeItem(RESTART_KEEP);
+    if (!k || k.hash !== location.hash || !(Date.now() - k.at < 120000) || typeof k.html !== "string") return null;
+    restartScroll = k.scroll || null;
+    return k;
+  }catch{ return null; }
+}
+// The scroller with the kept one's classes under `root`, scrolled where it was.
+function restartScrollTo(root){
+  const sc = restartScroll;
+  if (!sc || !sc.cls?.length || !root) return;
+  const el = [...root.querySelectorAll("." + sc.cls.map(c => CSS.escape(c)).join("."))][0];
+  if (el) el.scrollTop = sc.top;
+}
+// ...on the first draw after the reload, once.
+function restartScrollBack(){
+  if (!restartScroll) return;
+  restartScrollTo($("pane0"));
+  restartScroll = null;
+}
+
+// ---- the controller away for a restart ---------------------------------------
+// The page across a restart is one calm state (Perch): reads that stop
+// landing after the page had been reading are a restart until they have
+// been away longer than one takes. Meanwhile the page stays drawn as it
+// was, one band in the note voice says AerieOS is restarting and for how
+// long, the brand and the doctor's dot go quiet, the presses that would fail
+// are dead, and the status is asked for every two seconds. The red line
+// with its reason is kept for a controller away past the grace, for one
+// that never answered this page, and for a page failing on an answer.
+const AWAY_GRACE_MS = 90000, AWAY_POLL_MS = 2000;
+let lastOkAt = 0;          // when a read last landed whole
+let awaySince = 0;         // when the reads stopped landing
+let awayTick = null;
+function awayCalm(){
+  if (!lastOkAt) return false;
+  if (!awaySince) awaySince = Date.now();
+  if (Date.now() - awaySince > AWAY_GRACE_MS){ awayQuiet(false); return false; }
+  awayQuiet(true);
+  awaySay();
+  if (!awayTick) awayTick = setInterval(awaySay, 1000);
+  return true;
+}
+function awaySay(){
+  const band = $("awayBand");
+  if (!band) return;
+  const s = Math.max(0, Math.round((Date.now() - awaySince) / 1000));
+  band.textContent = `AerieOS is restarting, ${s} second${s === 1 ? "" : "s"} so far: this page carries on where it is when it is back.`;
+  band.hidden = false;
+}
+// The calm look on or off: the band, the body's class the dead presses and
+// the quiet dots read, and the brand's light.
+function awayQuiet(on){
+  document.body.classList.toggle("away", on);
+  $("dot")?.classList.toggle("away", on);
+  if (on) $("dot")?.classList.remove("off");
+  const pw = $("pollWhy");
+  if (on && pw){ pw.hidden = true; pw.textContent = ""; }
+  if (!on){
+    clearInterval(awayTick); awayTick = null;
+    const band = $("awayBand");
+    if (band){ band.hidden = true; band.textContent = ""; }
+  }
+}
+// Back: the reads land again, or the page starts over on a new run.
+function awayEnd(){
+  if (!awaySince && !document.body.classList.contains("away")) return;
+  awaySince = 0;
+  awayQuiet(false);
 }
 
 async function pollRevs(){

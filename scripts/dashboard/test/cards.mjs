@@ -1188,16 +1188,32 @@ print(json.dumps({"kept": [s["title"] for s in kept], "held": held, "series": se
   await page.reload(); await ready(page);
   await quiet(800);
   ok(await page.$eval('#aboutModal', e => e.hidden), '...and a reload leaves it shut');
-  // An image this account has not seen: the changelog, once.
+  // An image this account has not seen: one line under the header, Updated
+  // to its version, never a dialog nobody asked for (Perch); its What
+  // changed opens the changelog.
   await prefs({ image_seen: 'ffffffffffffffffffffffffffffffffffffffff' });
   await page.reload(); await ready(page);
+  await page.waitForSelector('#updatedBand:not([hidden])', { timeout: 15000 });
+  await quiet(800);
+  const line = await page.evaluate(() => ({ said: $('updatedSay').textContent, about: !$('aboutModal').hidden }));
+  ok(/^Updated to \S/.test(line.said) && !line.about, `an image update is one line under the header, Updated to its version, and no dialog (${line.said})`);
+  await page.click('#updatedLog');
   await page.waitForSelector('#aboutModal:not([hidden])', { timeout: 15000 });
-  ok(await page.$eval('#abLog', e => !e.hidden) && await page.$eval('#abGuide', e => e.hidden),
-     'an image update opens the panel on the changelog');
+  ok(await page.$eval('#abLog', e => !e.hidden) && await page.$eval('#abGuide', e => e.hidden) && await page.$eval('#updatedBand', e => e.hidden),
+     '...its What changed opens the panel on the changelog, the line gone');
   await page.click('#aboutClose');
   await page.waitForSelector('#aboutModal', { state: 'hidden' });
   await page.waitForFunction(async () => (await (await fetch('/api/status')).json()).welcome.image_seen === 'abc1234def5678901234567890abcdef12345678', null, { timeout: 10000 });
-  ok(true, '...and closing it acknowledges this image, so the next update is the next time');
+  ok(true, '...and reading it acknowledges this image, so the next update is the next time');
+  // A press anywhere else puts the line away, and acknowledges it too.
+  await prefs({ image_seen: 'ffffffffffffffffffffffffffffffffffffffff' });
+  await page.reload(); await ready(page);
+  await page.waitForSelector('#updatedBand:not([hidden])', { timeout: 15000 });
+  await page.evaluate(() => document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })));
+  const gone = await page.waitForFunction(async () => $('updatedBand').hidden
+    && (await (await fetch('/api/status')).json()).welcome.image_seen === 'abc1234def5678901234567890abcdef12345678', null, { timeout: 10000 })
+    .then(() => true, () => false);
+  ok(gone && await page.$eval('#aboutModal', e => e.hidden), '...and the next press elsewhere puts it away and acknowledges it, with no dialog');
 });
 // An image built before versions existed still has a commit, and the header
 // falls back to it rather than going blank.

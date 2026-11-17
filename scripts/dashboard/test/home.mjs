@@ -260,12 +260,71 @@ await section("the controller restarts under the page", async () => {
   await ready(page);
   ok(await page.evaluate(() => window.__sameLoad !== true && document.getElementById('newBuild').hidden),
      '...and Reload starts the page again, the band gone');
-  // Nothing unsaved: the page starts again by itself.
+  // Nothing unsaved: the page starts again by itself, and stays drawn as it
+  // was until the new run's first read lands (Perch): the reload paints the
+  // page's kept copy, inert, where the placeholder's shapes went, and the
+  // first read draws the page in its place. The read is held back here for
+  // three seconds, so the copy can be seen.
   await page.evaluate(() => { window.__sameLoad = true; bootSeen = 'the run before this one'; });
+  let hold = true;
+  await page.route('**/api/status*', async r => {
+    if (hold) await new Promise(res => setTimeout(res, 3000));
+    r.continue().catch(() => {});
+  });
   const nav = page.waitForNavigation({ timeout: 15000 }).then(() => true, () => false);
   await page.evaluate(() => { refresh(); });
   ok(await nav, 'with nothing unsaved a restart reloads the page at once, as before');
+  const kept = await page.evaluate(() => {
+    const k = document.querySelector('#pane0 > .snapback');
+    return { kept: !!k, inert: !!k?.inert, words: (k?.textContent || '').trim().length, ids: k ? k.querySelectorAll('[id]').length : -1,
+             shapes: !!document.querySelector('#pane0 .skboot'), stored: sessionStorage.getItem('aerie.restartKeep') };
+  });
+  ok(kept.kept && kept.inert && kept.words > 40 && kept.ids === 0 && !kept.shapes && kept.stored === null,
+     `...and stays drawn as it was across it: the kept copy, inert and without ids, where the shapes went, read once (${JSON.stringify(kept)})`);
+  await page.waitForFunction(() => !document.querySelector('#pane0 > .snapback') && document.querySelector('#pane0 > .stack .doc.on'),
+                             null, { timeout: 15000 });
+  hold = false;
+  await page.unroute('**/api/status*');
+  ok(true, '...until the first read draws the page in its place');
   await ready(page);
+});
+
+// ---- the controller away for a restart (Perch) ------------------------------
+// Reads that stop landing after the page had been reading are a restart, said
+// calmly until they have been away longer than one takes: one band in the
+// note voice with how long, the brand and the doctor's dot quiet, the page's
+// presses dead, and the status asked for every two seconds. Past the grace it
+// is the red line with its reason, as before; back, it is all gone.
+await section("the controller away for a restart", async () => {
+  const before = page.errors.length;
+  await page.evaluate(() => refresh());
+  await page.route('**/api/status*', r => r.abort('connectionrefused'));
+  await page.evaluate(() => refresh());
+  const calm = await page.evaluate(() => {
+    const b = document.querySelector('#panes .pane button:not(.help)');
+    return { away: document.body.classList.contains('away'), band: !$('awayBand').hidden ? $('awayBand').textContent : '',
+             why: !$('pollWhy').hidden, red: $('dot').classList.contains('off'), quiet: $('dot').classList.contains('away'),
+             dead: b ? getComputedStyle(b).pointerEvents === 'none' : null, next: awaySince > 0 };
+  });
+  ok(calm.away && /^AerieOS is restarting, \d+ seconds? so far/.test(calm.band) && !calm.why && !calm.red && calm.quiet && calm.dead === true && calm.next,
+     `a read that does not land after the page had been reading says AerieOS is restarting, calmly, and the page's presses are dead (${JSON.stringify(calm)})`);
+  const asked = await page.evaluate(async () => { const n0 = pollFails; await new Promise(r => setTimeout(r, 4500)); return pollFails - n0; });
+  ok(asked >= 1, `...and it asks again every two seconds meanwhile (${asked} more in 4.5 seconds)`);
+  await page.evaluate(() => { awaySince = Date.now() - 91000; return refresh(); });
+  const red = await page.evaluate(() => ({ away: document.body.classList.contains('away'), band: !$('awayBand').hidden,
+                                           red: $('dot').classList.contains('off'), why: !$('pollWhy').hidden ? $('pollWhy').textContent : '' }));
+  ok(!red.away && !red.band && red.red && /not talking to the container/.test(red.why),
+     `...past the time a restart takes it is the red line with its reason, as before (${red.why})`);
+  await page.unroute('**/api/status*');
+  await page.evaluate(() => refresh());
+  const back = await page.evaluate(() => ({ away: document.body.classList.contains('away'), band: !$('awayBand').hidden,
+                                            red: $('dot').classList.contains('off') || $('dot').classList.contains('away'),
+                                            why: !$('pollWhy').hidden, since: awaySince }));
+  ok(!back.away && !back.band && !back.why && back.since === 0, `...and back, the page is as it was (${JSON.stringify(back)})`);
+  // The reads refused on purpose here are what the browser and the red
+  // line said about them, and nothing else.
+  const said = page.errors.splice(before);
+  ok(said.every(t => /api\/status|^refresh:/.test(t)), `...with nothing in the console but the refused reads (${said.length}: ${said.filter(t => !/api\/status|^refresh:/.test(t)).join(' | ')})`);
 });
 
 ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + page.errors.join(' | ') : ''}`);
