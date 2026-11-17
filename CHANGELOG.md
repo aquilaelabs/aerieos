@@ -10,6 +10,8 @@
 - An agent update that does not start no longer strands its node. The node runs the new agent once to see that it loads before installing it, keeps the one it replaces, and puts that one back by itself when the new one cannot be loaded, crashes three times, or runs ten minutes without reaching its controller. A node that went back says so on the bell and on its row, and is not sent that build again until Update agent is pressed. The first update onto this build is made the old way; every one after it is covered. (6e5a538)
 - A machine's own console can switch off every root command the controller sends: after `sudo aerieos-agent root-asks off` at the machine, that node refuses `aerie root run` and a schedule as root whoever allowed it, the controller says so before anybody is asked, and the node's row says it is off and where it is switched back on. What AerieOS does as root by name goes on, and Docker on a node that runs containers is still root's. (ff55bda)
 - The Spaces page has Full and Compact beside its search, as the Containers page has Cards and List: Compact folds every space's card to its name, a press opens one, and opening another folds the one open; your browser keeps the choice (2883407)
+- aerie map show NAME prints a definition whole, headed by where it is and its comment, and FILE:LINE the one holding that line (1cf46c9)
+- aerie design edit NAME changes one design rule or one page's notes in place and prints what changed, and --file writes docs/design-language.md with it (1cf46c9)
 
 ### Changed
 
@@ -112,6 +114,8 @@
 - New container, New space and four other dialogs keep their buttons at the right of the dialog's foot like every other, where a notice in the corner could lie over Create and Cancel. (4dd850e)
 - A VM keeps its console password through a hardware change, a start and a move to the LAN bridge. (3df960a)
 - A space's settings listed each other space of one repository as "1 repositories" under What sessions reach; it names the branch, or says the repository has no git (b5a5d69)
+- A session held while AerieOS is down can read and keep its memory, as the hold's message says it may (59bcfa3)
+- aerie map no longer names an arrow function in a conditional's else branch after the word before the colon (1cf46c9)
 
 ### Security
 
