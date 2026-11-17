@@ -84,10 +84,13 @@ class Record(unittest.TestCase):
         bugs = ["  [ ] B927  (low)  uniform-b's 'every view's first band starts at one height' finds ...",
                 "  [ ] B924  (low)  test/nodes.mjs stops in busyList with 'route.fulfill ...",
                 "  [ ] B930  (low)  uniform-bar.mjs is another suite",
-                "  [x] B931  (low)  test/nodes.mjs, a closed one"]
+                "  [x] B931  (low)  test/nodes.mjs, a closed one",
+                "  [ ] B914  (low)  A stale mount's reason ends mid-word: the agent's message is longer",
+                "  [ ] B905  (low)  aerie map suites lists agent.mjs, design.mjs and three unit tests"]
         self.assertEqual(flakes.bug_for("uniform-b", bugs), "B927")
         self.assertEqual(flakes.bug_for("nodes.mjs", bugs), "B924")
         self.assertEqual(flakes.bug_for("uniform", bugs), "", "a name inside another suite's is not it")
+        self.assertEqual(flakes.bug_for("agent", bugs), "", "a common word in a sentence is not the suite")
         said = flakes.said(rows, "nodes", "35117c1")
         self.assertIn("flaked again in a gate at 35117c1 (8 workers, load 9.1), 1 sightings on record", said)
         self.assertIn("failed 'before its first check', having waited: route.fulfill: Route is already handled!", said)

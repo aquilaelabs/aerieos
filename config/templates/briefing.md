@@ -145,7 +145,10 @@ A repository whose settings name a test node (Tests run, under Build and test) r
 its suites there: `aerie tests run`, `aerie dashboard test` and the gate send this
 tree as a job's snapshot, pick the workers from that node's cores and
 memory, stream the lines back and record the run as a local one; a run
-behind another there says how many are ahead.
+behind another there says how many are ahead. `aerie dashboard test SUITE --at
+REF` runs a commit as it was (git archive, not the working tree), so a
+before-and-after needs no stash; `--loaded` runs a suite beside a whole run's
+load, and `aerie tests bisect SUITE GOOD BAD` names the commit that broke it.
 
 A space whose build or test command is not set refuses and says so: `aerie
 settings set build|test|outputs "..."` fills the field in for the operator,

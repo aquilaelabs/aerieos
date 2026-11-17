@@ -112,10 +112,12 @@ BUG_LINE = re.compile(r"^\s*\[ \]\s+(B\d+)\s+\(\w+\)\s+(.*)$")
 
 
 def bug_for(suite, bug_lines):
-    """The open bug that names the suite in its title (`devapp.mjs`,
-    `test/devapp.mjs`, or `devapp's` first), the newest; "" if none does."""
-    name = suite.removesuffix(".mjs")
-    pat = re.compile(rf"(?<![\w-]){re.escape(name)}(?:\.mjs\b|'s\b)")
+    """The open bug whose title opens with the suite (`devapp.mjs`,
+    `test/devapp.mjs`, `devapp's`), the newest; "" if none does. Only at
+    the opening: a suite called by a common word is not named by "the
+    agent's message", nor by a title that lists agent.mjs in passing."""
+    name = re.escape(suite.removesuffix(".mjs"))
+    pat = re.compile(rf"^(?:test/)?{name}(?:\.mjs\b|'s\s)")
     found = [m.group(1) for m in map(BUG_LINE.match, bug_lines) if m and pat.search(m.group(2)[:200])]
     return max(found, key=lambda b: int(b[1:]), default="")
 
