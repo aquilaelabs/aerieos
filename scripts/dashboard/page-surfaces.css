@@ -613,9 +613,8 @@ body.firstrun #panes{display:none}
 /* ...its name a link to the project, not a box (a project card's is a
    heading), and its facts in the project card's voices. */
 .hproj .name.namelink{align-self:flex-start}
-.hproj .pcfacts{font:var(--f-data);color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hproj .pcfacts{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hproj .pstate{display:inline-flex;align-items:center;gap:6px;color:var(--dim);font:var(--f-ui)}
-.hproj .pnote{font:var(--f-ui)} .hproj .pnote.bad{color:var(--bad)} .hproj .pnote.warn{color:var(--warn)} .hproj .pnote.dim{color:var(--dim)}
 .jbrow.focus{box-shadow:inset 3px 0 var(--accent)}
 /* A job's line opens it (rows-you-open, R218 step 25): pressed like a
    list's row, with the lists' own hover. */
@@ -1822,7 +1821,7 @@ body.firstrun #panes{display:none}
 .pane .bar.page.grouped .subnav .navnote{font:var(--f-note);color:var(--dim);margin-left:5px}
 .pane .bar.proj .pname .lockmark svg{width:14px;height:14px}
 .pane .bar.proj .pstate{display:inline-flex;align-items:center;gap:6px;color:var(--dim);white-space:nowrap}
-.pane .bar.proj .pnote{flex:1 1 100%;font:var(--f-ui)}
+.pane .bar.proj .pnote{flex:1 1 100%}
 /* On a phone the actions sit on the name's row, at its right, as at a desk
    (the operator, 7 Nov: three rows of name, sessions and buttons); the facts
    and the sessions' states go under them, each a line; the name and the
@@ -1846,8 +1845,6 @@ body.firstrun #panes{display:none}
   border-color:color-mix(in srgb, var(--bad) 40%, var(--ground))}
 .pane .bar.proj .pnote.pband>.grow{flex:1 1 auto;min-width:0}
 .pane .bar.proj .pnote.pband>button.ic{flex:0 0 auto;min-width:28px;min-height:28px;padding:0 8px}
-.pane .bar.proj .pnote.bad{color:var(--bad)}
-.pane .bar.proj .pnote.dim{color:var(--dim)}
 /* The Projects page (R218 step 3): a searchable grid of cards with status. */
 .projtab .docbarrow #bTrashTab,.skboot .docbarrow button.ic{min-width:var(--tap);padding:4px 8px}
 /* The Claude chooser drawn in a project page's pane (R218 step 3): as wide
@@ -1920,7 +1917,6 @@ body.firstrun #panes{display:none}
 .termprev .tpcur{display:inline-block;width:.6em}
 .termprev .tpcur.bar{width:0;border-left:2px solid}
 .termprev .tpcur.under{border-bottom:2px solid}
-.pcard .pnote{font:var(--f-ui)}
 /* A row of another repository's list (R136, reposAlso): which repository,
    its number, its words. */
 .alsorow{display:flex;align-items:baseline;gap:var(--field-gap);min-height:var(--tap);padding:var(--label-gap) 0;
@@ -1928,7 +1924,6 @@ body.firstrun #panes{display:none}
 .alsorow>.namelink{font-weight:600;flex:none}
 .alsorow>.pid{font:var(--f-data);color:var(--dim);flex:none}
 .alsorow>.alsotext{min-width:0;overflow-wrap:anywhere}
-.pcard .pnote.bad{color:var(--bad)} .pcard .pnote.warn{color:var(--warn)} .pcard .pnote.dim{color:var(--dim)}
 @media(hover:hover){
   .nb .vbar button.on:hover{background:color-mix(in srgb, var(--ink) 15%, var(--btn));border-color:var(--line)}
 }

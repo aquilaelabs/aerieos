@@ -3172,6 +3172,22 @@ await section("a project on several nodes", async () => {
   ok(bands.band && bands.card === 'line' && bands.away === '' && bands.sameVisit === '' && bands.back,
      `a note in the header is a band with its x, the card's a line; put away it stays away through the notebook's views and is back once the notebook is left (${JSON.stringify(bands)})`);
   ok(bands.red && bands.yellow, `...a node removed from under it is an error's band in red, a node reconnecting a warning's in yellow (${JSON.stringify(bands)})`);
+  // A space's notes and facts are drawn once: its card and its notebook's
+  // header carry the same lines (the header's notice a band), and every
+  // facts line says a repository's branch and its id the same way.
+  const once = await page.evaluate(() => {
+    const p = { ...state.projects.find(x => x.name === 'alpha'), testing: { since: Date.now() / 1000 },
+                phone: { model: 'Pixel', owner: 'test', mine: true, lease: { project: 'alpha', by_name: 'test' } } };
+    const lines = h => [...new DOMParser().parseFromString(`<div>${h}</div>`, 'text/html').querySelectorAll('.pnote:not(.pband)')].map(e => e.textContent.trim());
+    const text = h => new DOMParser().parseFromString(`<div>${h}</div>`, 'text/html').body.textContent;
+    const pid = h => new DOMParser().parseFromString(`<div>${h}</div>`, 'text/html').querySelector('.pid')?.title || '';
+    return { card: lines(projNotes(p)), head: lines(projNotes(p, true)), facts: text(projFacts(p)), repo: text(repoFacts(p)),
+             none: text(repoFacts({ ...p, git: null })), pidHead: pid(projFacts(p)), pidCard: pid(pidMark(projId(p))) };
+  });
+  ok(once.card.length >= 2 && once.card.join('|') === once.head.join('|') && once.card.some(l => /^tests running/.test(l)) && once.card.some(l => /lent here/.test(l)),
+     `a space's card and its notebook's header draw the same notes (${JSON.stringify(once)})`);
+  ok(once.repo && once.facts.includes(once.repo) && !/git:/.test(once.facts) && once.none === 'no git' && once.pidHead && once.pidHead === once.pidCard,
+     `...and every facts line says the branch and the id the same way (${JSON.stringify(once)})`);
   await page.evaluate(() => { tabs = tabs.filter(t => !(t.kind === 'term' && String(t.arg).includes(':n:')));
     state.claude_where = {};
     state.sessions = (state.sessions || []).filter(s => s.name !== myClaude('alpha')); drawPanes(); });

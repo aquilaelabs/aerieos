@@ -118,6 +118,12 @@ function projectMatches(p, q){
 // A project's id as it is written (P3), as a roadmap item is R12 and a bug
 // B7: the registry's number, never reused, so it names one project for good.
 const projId = p => p?.pid ? `P${p.pid}` : "";
+// A space's id as every facts line carries it (P3, as written), with what it
+// is for under a pointer.
+const pidMark = pid => pid ? `<span class="pid" title="this space's id, which never changes: aerie -p ${esc(pid)} names it">${esc(pid)}</span>` : "";
+// A repository's branch and that it may push, or that it has no git: the
+// same words on a space's card, its notebook's header and Home's glance.
+const repoFacts = p => p.git ? `<span class="pbr">${esc(p.git)}</span>${p.push ? ` · <span class="ok">push</span>` : ""}` : "no git";
 // A project (R138, the operator, 25 Oct) is made first, with a name alone,
 // and its repositories are added to it; every repository is in one. The
 // page reads the projects off the status read's `repos` and each one's
@@ -181,32 +187,32 @@ function cardFront(c){
   const node = first ? first.node_name || first.session_at || "" : "";
   const many = c.rows.length > 1;
   return `<div class="pcname"><span class="name">${esc(c.name)}</span>${cardLock(c)}<span class="sp"></span>${cardMarks(c)}</div>
-    <div class="pcmeta"><span class="pcfacts">${[`<span class="pid" title="this space's id, which never changes">${esc(c.pid)}</span>`,
-      esc(node)].filter(Boolean).join(" · ")}</span>${first ? projectState(first) : ""}</div>
+    <div class="pcmeta"><span class="pcfacts">${[pidMark(c.pid), esc(node)].filter(Boolean).join(" · ")}</span>${first ? projectState(first) : ""}</div>
     <div class="pcrepos">${c.rows.length ? c.rows.map(p => `<div class="pcrepo">
       <button type="button" class="namelink" data-open="${esc(p.name)}" title="open ${esc(p.label || p.name)}'s notebook">${esc(p.label || p.name)}</button>
-      <span class="pcfacts">${p.git ? `<span class="pbr">${esc(p.git)}</span>${p.push ? ` · <span class="ok">push</span>` : ""}` : "no git"}</span>
+      <span class="pcfacts">${repoFacts(p)}</span>
     </div>${p.issues.map(i => `<div class="pnote ${cls[i.level] || ""}">${many ? esc(p.label || p.name) + ": " : ""}${esc(i.text)}</div>`).join("")}`).join("")
       : first?.work ? `<div class="pnote dim">no repository: a session here builds containers and VMs${c.may ? "; Add repository makes it a coding space" : ""}</div>`
       : `<div class="pnote dim">no repository yet${c.may ? ": Add repository makes or clones one" : ""}</div>`}</div>
-    ${first ? cardNotes(c) : ""}
+    ${first ? projNotes(first) : ""}
     <div class="pcacts actbar">${first ? agentButton(first)
       : `<button type="button" disabled title="Add a repository first">Start agent</button>`}${
       c.may && !c.archived && !state?.session && state?.can?.create !== false ? `<button type="button" data-repadd="${esc(c.key)}">Add repository</button>` : ""}
       <button type="button" data-pedit="${esc(c.key)}" aria-expanded="false">Edit</button></div>`;
 }
-// What the card says besides its repositories, from its first one, where a
-// session runs: mapping, a phone lent, tests running, the one notice.
-function cardNotes(c){
-  const p = c.first, m = state?.mapping?.[p.name];
+// What a space says besides its facts, from the repository a session runs
+// in: mapping, a phone lent, tests running, the one notice. Its card and its
+// notebook's header draw the same lines; the header's notice is a band.
+function projNotes(p, band = false){
+  const m = state?.mapping?.[p.name];
   return `${m ? (m.running ? `<div class="pnote dim">mapping the code<span class="dots"></span>${m.for > 4 ? ` · ${m.for}s` : ""}</div>`
         : m.error ? `<div class="pnote warn">the code map did not build: ${esc(m.error)}</div>`
         : `<div class="pnote dim">mapped ${m.files} file${m.files === 1 ? "" : "s"} in ${m.took}s</div>`) : ""}
     ${p.phone?.lease?.project === p.name ? `<div class="pnote dim">${esc(p.phone.model || "a phone")} lent here by ${
         esc(p.phone.lease.by_name || p.phone.owner)}${p.phone.lease.left != null ? `, ${Math.max(1, Math.round(p.phone.lease.left / 60))} min left` : ""}: each command asks ${
         p.phone.mine ? "you" : esc(p.phone.owner)}</div>` : ""}
-    ${p.testing ? `<div class="pnote dim">tests running, started ${esc(ago(p.testing.since))}</div>` : ""}
-    ${projectNote(p)}`;
+    ${p.testing ? `<div class="pnote dim ptesting">tests running, started ${esc(ago(p.testing.since))}</div>` : ""}
+    ${projectNote(p, band)}`;
 }
 // The back: the project's name with its pencil, each repository with the
 // icons that change it (a shell in it, its git host, rename, move to another

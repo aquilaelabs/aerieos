@@ -1551,7 +1551,7 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
 @media(hover:hover){ .pane .bar.page.grouped .phead>label.pick>select:hover{background-color:var(--btn);border-color:var(--line)}
 }
 .pane .bar.page.grouped .pname{font-weight:600;font-size:1.15rem;line-height:1.3;color:var(--ink);overflow-wrap:anywhere;min-width:0}
-.pane .bar.page.grouped .pfacts{font:var(--f-data);color:var(--dim);overflow-wrap:anywhere;min-width:0;flex:0 1 auto}
+.pane .bar.page.grouped .pfacts{overflow-wrap:anywhere;min-width:0;flex:0 1 auto}
 .pane .bar.page.grouped .phead>.sp{flex:1}
 .pane .bar.page.grouped>.subrow{display:flex;align-items:center;gap:10px;flex:1 1 100%;min-width:0;min-height:var(--tabrow-h);margin-top:6px;position:relative}
 /* ...its rule the pane's whole width, as the notebook's over its strip,
@@ -1572,7 +1572,7 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
 .pane .bar.page.grouped .subnav>button.off.on{color:var(--ink)}
 .pane .bar.proj .phead{display:flex;align-items:center;gap:10px;flex:1 1 auto;min-width:0;flex-wrap:wrap}
 .pane .bar.proj .pname{font-weight:600;font-size:1.15rem;line-height:1.3;color:var(--ink);overflow-wrap:anywhere;min-width:0;display:inline-flex;align-items:center;gap:6px}
-.pane .bar.proj .pfacts{font:var(--f-data);color:var(--dim);overflow-wrap:anywhere;min-width:0;max-width:40ch}
+.pane .bar.proj .pfacts{overflow-wrap:anywhere;min-width:0;max-width:40ch}
 .pane .bar.proj .sp{flex:1}
 .pane .bar.proj .phead>button{min-height:32px;padding:4px 12px;font:var(--f-ui)}
 /* ...and its pulldown one height with them (the operator, 27 Oct: it sat
@@ -1659,7 +1659,12 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
    quieter color. */
 .pcard .pcname .pinmark{display:inline-flex;align-items:center;color:var(--dim)}
 .pcard .pcname .pinmark svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
-.pcard .pcfacts{font:var(--f-data);color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* A space's facts and notes, one look wherever they are drawn (its card,
+   its notebook's header, Home's glance): the facts in the data voice, each
+   note in the control's voice in its tone. */
+:is(.pfacts,.pcfacts){font:var(--f-data);color:var(--dim)}
+.pnote{font:var(--f-ui)} .pnote.bad{color:var(--bad)} .pnote.warn{color:var(--warn)} .pnote.dim{color:var(--dim)}
+.pcard .pcfacts{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* A project's repositories (R138), one line each under its facts and who
    is there, with no rule between them (the operator, 25 Oct: the space
    groups them); a finger's height only where a finger presses. */

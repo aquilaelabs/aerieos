@@ -147,7 +147,7 @@ function homeGlanceHtml(){
     return `<div class="hproj${pc.cls}"${pc.style}>
       ${first ? `<button type="button" class="name namelink" data-hproj="${esc(first.name)}">${esc(c.name)}</button>`
               : `<span class="name">${esc(c.name)}</span>`}
-      <div class="pcfacts">${[`<span class="pid">${esc(c.pid)}</span>`,
+      <div class="pcfacts">${[pidMark(c.pid),
         c.rows.length > 1 ? `${c.rows.length} repositories` : first ? projFacts({...first, pid: 0}) : "no repository yet"]
         .filter(Boolean).join(" · ")}</div>
       ${first ? projectState(first) + projectNote(first) : ""}

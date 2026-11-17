@@ -974,7 +974,7 @@ function projectHeader(t){
     ${projectState(p)}
     <span class="sp"></span>
     ${projectActions(p)}
-  </div>${projectNote(p, true)}${p.testing ? `<div class="pnote dim ptesting">tests running, started ${esc(ago(p.testing.since))}</div>` : ""}`;
+  </div>${projNotes(p, true)}`;
 }
 // The row's handlers serve the header too (the same data-* names); the
 // menu's own button is the one thing the row did differently.
@@ -1067,8 +1067,5 @@ function lockMark(p){
 // A project's facts line, the same parts wherever it is drawn: its id, its
 // branch, that it may push, and the node it runs on.
 function projFacts(p){
-  const node = p.node_name || p.session_at || "";
-  return [p.pid ? `<span class="pid" title="this space's id, which never changes: aerie -p ${projId(p)} names it">${projId(p)}</span>` : "",
-          p.git ? `git: <span class="pbr">${esc(p.git)}</span>${p.push ? ` · <span class="ok">push</span>` : ""}` : "",
-          esc(node)].filter(Boolean).join(" · ");
+  return [pidMark(projId(p)), repoFacts(p), esc(p.node_name || p.session_at || "")].filter(Boolean).join(" · ");
 }
