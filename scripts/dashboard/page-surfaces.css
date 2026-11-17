@@ -2163,12 +2163,12 @@ body.firstrun #panes{display:none}
    title). A band brings its own inset, so its separators run edge to edge
    as a list's do on GitHub and its words start where the section's title
    does: a field, a row, a table, a note, an empty or loading line, a
-   section inside it, a block holding bands. Anything else placed straight
+   section inside it, a block of rows or of bands. Anything else placed straight
    in a body (a hint, a bar, a graph, a grid of cards, a placeholder's
    lines) takes the same inset here, and the room above it from whatever
    came before. */
-.sect>.body>:not(.field,.row,.sk-row,.tbl,.tcs,.tchead,.macros,details.sect,.fnote,.empty,.loading,:has(> .field)){margin-inline:var(--row-x)}
-.sect>.body>:not(.field,.row,.sk-row,.tbl,.tcs,.tchead,.macros,details.sect,.fnote,.empty,.loading,:has(> .field)):not(:first-child){margin-top:var(--field-gap)}
+.sect>.body>:not(.field,.row,.rows,.sk-row,.tbl,.tcs,.tchead,.macros,details.sect,.fnote,.empty,.loading,:has(> .field)){margin-inline:var(--row-x)}
+.sect>.body>:not(.field,.row,.rows,.sk-row,.tbl,.tcs,.tchead,.macros,details.sect,.fnote,.empty,.loading,:has(> .field)):not(:first-child){margin-top:var(--field-gap)}
 /* Containers' images box is a slot its read fills, not a box: its tiles,
    tables and notes are the section's own. */
 .dmimgbox{display:contents}
@@ -2178,7 +2178,7 @@ body.firstrun #panes{display:none}
 /* ...and a first line that is not a band keeps a band's room under the
    head, at every width (the operator, 23 Oct: "Mounts at boot." sat on the
    Storage heading; that should never happen anywhere). */
-.sect>.body>:not(.field,.row,.sk-row,.tbl,.tcs,.tchead,.macros,details.sect,.fnote,.empty,.loading,:has(> .field)):first-child{margin-top:var(--row-y)}
+.sect>.body>:not(.field,.row,.rows,.sk-row,.tbl,.tcs,.tchead,.macros,details.sect,.fnote,.empty,.loading,:has(> .field)):first-child{margin-top:var(--row-y)}
 /* A container's own folds (Ports and mounts, Log) start where its card's
    words do, not a section's inset further in (the operator's phone, 18 Oct). */
 :is(.dmtab,.dkview,.vmtab) .row>details.sect>summary,:is(.dmtab,.dkview,.vmtab) .row>details.sect>.body{padding-left:0;padding-right:0}
