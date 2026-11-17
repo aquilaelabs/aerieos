@@ -3510,7 +3510,7 @@ chmod +x "$CODEX_INSTALL_DIR/codex"
     // looking for its row.
     await page.waitForSelector('.pane .bar #ndPick', { timeout: 15000 });
     await page.selectOption('.pane .bar #ndPick', minted.id);
-    await page.waitForSelector(`.nodestab .ndrow[data-node="${minted.id}"] .ndlive`,
+    await page.waitForSelector(`.nodestab .ndrow[data-node="${minted.id}"] .ndstate.ok`,
                                { timeout: 15000 });
     const row = await page.$eval(`.nodestab .ndrow[data-node="${minted.id}"]`,
                                  e => e.textContent.replace(/\s+/g, ' '));
@@ -3520,9 +3520,12 @@ chmod +x "$CODEX_INSTALL_DIR/codex"
     // The node's name is the Machines header's, in its picker (R177), not
     // the row's.
     const picked = await page.$eval('.pane .bar #ndPick', s => s.selectedOptions[0]?.textContent || '');
-    const missing = ['live', 'cpu', 'data'].filter(w => !row.includes(w)).concat(/agentbox/.test(picked) ? [] : ['agentbox in the picker']);
+    // One state pill (the operator, 17 Nov): online, never online and live.
+    const pills = await page.$$eval(`.nodestab .ndrow[data-node="${minted.id}"] .name .pill.stat`, ps => ps.map(p => p.textContent.trim()));
+    const missing = ['online', 'cpu', 'data'].filter(w => !row.includes(w)).concat(/agentbox/.test(picked) ? [] : ['agentbox in the picker'])
+      .concat(pills.join('|') === 'online' ? [] : [`one pill, not ${pills.join(' and ')}`]);
     ok(!missing.length && runsAs === (process.env.USER || 'builder'),
-       `the node named in the header's picker, its row the agent live, its numbers and the account jobs run as (${missing.map(w => 'no ' + w).join(', ') || 'all there'}; runs as ${runsAs}: ${row.slice(0, 160)}…)`);
+       `the node named in the header's picker, its row the agent online in one pill, its numbers and the account jobs run as (${missing.map(w => 'no ' + w).join(', ') || 'all there'}; runs as ${runsAs}: ${row.slice(0, 160)}…)`);
     // Each session kept to its own project's network (R79): a switch in the
     // row's Sessions section, a draft until the section's Save (the rule
     // apply-not-onchange: it wrote itself on the click at first, the

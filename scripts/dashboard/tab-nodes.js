@@ -250,14 +250,21 @@ function nodeTools(n){
       esc(TOOL_LABELS[k] || k)}</span>`).join(" ")}</div>${sys}`;
 }
 
+// A node's state as one pill: what it is set to (whether it takes new
+// work) and whether its agent is answering, said together, where two pills
+// read online and live as one word twice (the operator, 17 Nov). Set to take
+// work and answering is online; set to take work and gone quiet is not
+// answering, in --bad; draining or disabled as set, not answering after it
+// only when that is true too. When it was last heard is its facts' seen.
 function nodeStatePill(n){
   if (n.state === "pending")
-    return `<span class="pill stat note">waiting for enrollment</span>`;
-  const cls = {online: "ok", draining: "warn", disabled: "warn"}[n.state] || "";
-  const live = n.kind !== "agent" ? ""
-    : n.live ? ` <span class="pill stat ok ndlive">live</span>`
-    : ` <span class="pill stat ndlive">quiet</span>`;
-  return `<span class="pill stat ${cls}">${esc(n.state)}</span>${live}`;
+    return `<span class="pill stat note ndstate">waiting for enrollment</span>`;
+  const quiet = n.kind === "agent" && !n.live;
+  if (n.state === "online")
+    return quiet ? `<span class="pill stat bad ndstate" title="its agent has stopped checking in, so nothing from here reaches the machine">not answering</span>`
+      : `<span class="pill stat ok ndstate" title="takes new work${n.kind === "agent" ? ", and its agent is checking in" : ""}">online</span>`;
+  const cls = {draining: "warn", disabled: "warn"}[n.state] || "";
+  return `<span class="pill stat ${cls} ndstate">${esc(n.state)}${quiet ? " · not answering" : ""}</span>`;
 }
 // The draft for a node: what is on the record, until the operator types.
 function nodeDraft(n){
@@ -2049,10 +2056,10 @@ function ndRowHtml(n, lead = ""){
         </div>
         <div class="sub ndtest" data-own hidden></div>` : "";
     const health = docSection("nodes", "health", ndTitle("health"),
-      n.kind === "agent" ? (n.live ? "live" : n.agent?.token_reuse?.at
+      n.kind === "agent" ? (n.live ? "answering" : n.agent?.token_reuse?.at
         ? "turned away: it presented a token it had already replaced, as a machine restored from a snapshot does, or a copy of its disk; Enroll script brings it back if you restored it"
         : n.agent?.refused?.at
-        ? `turned away: ${n.agent.refused.why || "its credential"}; enroll it again` : "quiet") : "", `
+        ? `turned away: ${n.agent.refused.why || "its credential"}; enroll it again` : "not answering") : "", `
         ${nodeMeters(n) || `<div class="empty">nothing measured yet</div>`}
         ${nodeCharts(n)}
         <div class="ndhmore">
