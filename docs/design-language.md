@@ -1467,6 +1467,14 @@ to what opened it. A dialog holding something shown once (Enroll's
 one-time token) is marked `data-keep-stray`: a press around it and Back
 pass it by, and Escape or its own Done puts it away.
 
+A dialog is the size of what it holds: a reader's full height (About's
+guide, a conversation) is for something to read, and the same box with
+one line in it (a conversation with nothing said) is that line's size.
+Its title shows wherever the dialog sits, a notebook's sheet included;
+uniform holds a title that stands first and shows, and the dialog walk
+(every dialog at 393 and 1440, on contact sheets) is how a pass over them
+is read.
+
 ### signing in (Web app)
 
 Platform: a responsive web app: the layout holds at phone and desktop widths, and every tap target is at least 44px on a coarse pointer.
