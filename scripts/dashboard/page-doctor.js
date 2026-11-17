@@ -18,6 +18,7 @@ function drawDoctor(){
     setClass(dot, "st");
     setAttr($("bDocDot"), "aria-label", "aerie doctor: no verdict yet");
     patch(el, `<div class="empty">${d?.running ? "running…" : "first run pending…"}</div>`);
+    settingsPaintDoctor();
     return;
   }
   const {level, probs, fine, html} = doctorChecks(d);
@@ -26,7 +27,9 @@ function drawDoctor(){
     : `aerie doctor: ${probs.length} to look at`);
   patch(el, html);
   // Controller settings from here, for an account that may open it, as the
-  // gear has Profile.
+  // gear has Profile; and its Controller card, when it is drawn, says the
+  // same as the panel at once.
+  settingsPaintDoctor();
   const go = $("docSettings");
   if (go) go.hidden = !railAllows("settings");
 }

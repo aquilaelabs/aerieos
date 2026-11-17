@@ -65,12 +65,27 @@ function settingsCardSaid(){
 }
 function settingsCard(){
   const d = state?.doctor;
-  const when = d?.running ? "running…" : d?.when ? `the doctor ran ${ago(d.when)}` : "";
-  const checks = d?.when ? doctorChecks(d).html : `<div class="empty">${d?.running ? "running…" : "first run pending…"}</div>`;
   return `<div class="field ctlcard"><div class="ctlfactbox" data-own>${factGrid(settingsFacts(), "ctlfacts meas")}</div>
-    <div class="ctlchecks doctor">${checks}</div>
-    <div class="actbar sectbar"><span class="state">${esc(when)}</span><span class="sp"></span>
+    <div class="ctlchecks doctor">${settingsChecks()}</div>
+    <div class="actbar sectbar"><span class="state ago">${esc(settingsDocWhen())}</span><span class="sp"></span>
       <button type="button" id="setDocRun"${d?.running ? " disabled" : ""}>Run again</button></div></div>`;
+}
+const settingsDocWhen = () => state?.doctor?.running ? "running…" : state?.doctor?.when ? `the doctor ran ${ago(state.doctor.when)}` : "";
+function settingsChecks(){
+  const d = state?.doctor;
+  return d?.when ? doctorChecks(d).html : `<div class="empty">${d?.running ? "running…" : "first run pending…"}</div>`;
+}
+// ...and painted in place whenever the doctor's verdict is (drawDoctor: each
+// status read, and a run from here or the panel), so the card says what the
+// dot says without waiting for the page's own redraw.
+function settingsPaintDoctor(){
+  const c = document.querySelector(".settingstab .ctlcard");
+  if (!c) return;
+  const checks = c.querySelector(":scope > .ctlchecks"), when = c.querySelector(":scope > .sectbar > .state");
+  if (checks) patch(checks, settingsChecks());
+  setText(when, settingsDocWhen());
+  const sst = c.closest("details.sect")?.querySelector(":scope > summary > .sst"), said = settingsCardSaid();
+  if (sst){ setText(sst, said.said); setClass(sst, "sst" + (said.cls ? " " + said.cls : "")); }
 }
 
 // ...painted in place after each status read, while the page is drawn.
