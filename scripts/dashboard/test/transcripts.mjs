@@ -162,6 +162,9 @@ await section("A label, a note and Kept", async () => {
     ok(await page.evaluate(() => !document.querySelector('.resumemenu') && !!document.querySelector('.nb .nbview[data-view="sessions"]:not([hidden]) .cvlogs')),
        'All conversations opens the notebook\'s Sessions view and shuts the chooser');
   }
+  // The chooser is a dialog over the page: put away before the page under
+  // it is pressed, as a person would.
+  await page.evaluate(() => closeResumeMenu());
   await page.evaluate(() => openNotebook('alpha', 'sessions'));
   await page.waitForSelector(`${SESS} .cvlogs .artrow`, { timeout: 10000 });
 });

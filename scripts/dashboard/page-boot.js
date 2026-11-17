@@ -747,7 +747,7 @@ function bootLast(){
   // Both popup menus dismiss on a click that is neither in them nor on the
   // control that opened them.
   document.addEventListener("click", e => {
-    if (resumeFor && !e.target.closest(".resumemenu") && !e.target.closest("[data-c]")){
+    if (resumeFor && !e.target.closest(".resumemenu, [data-c], .modal")){
       resumeFor = null;
       if (state) drawProjects(state.projects);
     }

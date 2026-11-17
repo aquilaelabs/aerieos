@@ -2937,6 +2937,11 @@ await section("a project on several nodes", async () => {
   writeFileSync(`${tdir}/aaaaaaaa-0000-4000-8000-000000000001.jsonl`,
     '{"type":"user","message":{"role":"user","content":"hi"}}\n'
     + '{"type":"assistant","message":{"model":"claude-fable-5-1","role":"assistant","content":[]}}\n');
+  // The chooser is the house dialog: over the dimmed page, centered as every
+  // dialog is, its box titled, its lines field bands, its presses the box's
+  // foot, held where it opened while its step changes.
+  const top1 = await page.evaluate(() => { const d = document.getElementById('rmModal');
+    return d && !d.hidden ? Math.round(d.querySelector('.box').getBoundingClientRect().top) : null; });
   await page.waitForFunction(() => { const b = document.querySelector('#resumemenu [data-n][data-node="n_ubu"]');
     if (!b) return false; b.click(); return true; }, null, { timeout: 10000 });
   // New conversation picked: the menu turns to the model and effort to start
@@ -2951,6 +2956,14 @@ await section("a project on several nodes", async () => {
      && step.efforts.includes('high') && step.buttons.join() === 'Back,Start'
      && !(await page.evaluate(() => tabs.some(t => t.kind === 'term' && String(t.arg) === 'claude:alpha:n:n_ubu'))),
      `...New conversation turns the menu to Model and Effort with Start, naming the last session's model on the default, and starts nothing yet (${step.text}; ${step.buttons.join(' | ')})`);
+  const dlg = await page.evaluate(() => { const d = document.getElementById('rmModal'), b = d?.querySelector(':scope > .box');
+    const r = b?.getBoundingClientRect();
+    return { up: !!d && !d.hidden, inIt: b?.id === 'resumemenu', dim: d ? getComputedStyle(d).backgroundColor : '',
+             top: r ? Math.round(r.top) : null, h3: !!b?.querySelector(':scope > h3'), fields: b ? b.querySelectorAll(':scope > .field').length : 0,
+             foot: !!b?.querySelector(':scope > .foot [data-start]'), mid: r ? Math.round(r.top + r.height / 2) : null, vmid: Math.round(innerHeight / 2) }; });
+  ok(dlg.up && dlg.inIt && !/^rgba\(0, 0, 0, 0\)$|^transparent$/.test(dlg.dim) && dlg.h3 && dlg.fields >= 2 && dlg.foot
+     && Math.abs(dlg.mid - dlg.vmid) <= 2 && top1 !== null && dlg.top === top1,
+     `the chooser is the house dialog over the dimmed page, centered, titled, its lines fields and its presses the box's foot, held where it opened as its step changes (${JSON.stringify({ ...dlg, top1 })})`);
   // A poll redraws the card: the step and what was picked stay.
   await page.selectOption('#rmModel', 'sonnet');
   await page.selectOption('#rmEffort', 'high');
@@ -3076,7 +3089,7 @@ await section("a project on several nodes", async () => {
   // past its edge (B140). Drawn by resumePicker itself, from alpha's card.
   {
     const desk = page.viewportSize();
-    // An XL phone, 449 wide: under 420 the two fields are one column.
+    // An XL phone, 449 wide: under 600 the two fields are one column.
     await page.setViewportSize({ width: 449, height: 900 });
     await page.evaluate(() => openProjectsTab());
     await atWidth(449);
@@ -3084,29 +3097,41 @@ await section("a project on several nodes", async () => {
     await page.waitForFunction(() => [...document.querySelectorAll('.doc.on .projtab .pcard[data-row="alpha"] [data-c="alpha"]')]
       .some(x => x.offsetParent !== null), null, { timeout: 15000 }).catch(() => {});
     const fit = await page.evaluate(() => {
-      // Hosted where the page hosts it, the pane, as placeResumeMenu does.
+      // Drawn as the dialog's box, shown, as placeResumeMenu does.
       resumeFor = 'alpha';
-      const card = resumeHostNow();
-      const anchor = card?.querySelector('[data-c="alpha"]');
-      if (!card || !anchor) return { card: !!card, anchor: !!anchor };
+      const slot = resumeHostNow();
+      if (!slot) return { slot: false };
       resumeModelNow = { project: 'alpha', model: 'claude-opus-4-1-20250805' };
       resumePick = { project: 'alpha', node: 'n_ubu', restart: true };
       const m = document.createElement('div');
-      m.className = 'pinmenu resumemenu'; m.id = 'resumemenu';
-      resumePicker(state.projects.find(x => x.name === 'alpha'), m, card, anchor,
+      m.className = 'box resumemenu'; m.id = 'resumemenu';
+      slot.hidden = false;
+      resumePicker(state.projects.find(x => x.name === 'alpha'), m, slot,
                    [{ id: 'n_ubu', name: 'ubu', where: 'node', why: '' }], false);
       const go = m.querySelector('[data-start]');
       const far = Math.max(...[...m.querySelectorAll('*')].map(e => e.getBoundingClientRect().right));
-      const out = { card: true, menu: Math.round(m.getBoundingClientRect().right), go: Math.round(go?.getBoundingClientRect().right || 0),
+      const out = { slot: true, menu: Math.round(m.getBoundingClientRect().right), go: Math.round(go?.getBoundingClientRect().right || 0),
                     far: Math.round(far), w: innerWidth, model: !!m.querySelector('#rmModel'),
                     longest: Math.max(...[...m.querySelectorAll('option')].map(o => o.textContent.length)) };
-      resumePick = null; resumeFor = null; m.remove();
+      closeResumeMenu();
       return out;
     });
     await page.setViewportSize(desk);
     await atWidth(desk.width);
     ok(fit.model && fit.menu > 0 && fit.far <= fit.menu && fit.menu <= fit.w && fit.go > 0 && fit.go <= fit.w,
        `on a phone the Restart step stays on the screen, its Restart too (${JSON.stringify(fit)})`);
+    // ...and its Close, its backdrop and Escape each put it away.
+    const away = {};
+    for (const how of ['close', 'backdrop', 'escape']){
+      await page.evaluate(() => { resumeFor = null; openClaude('alpha'); });
+      await page.waitForFunction(() => !document.getElementById('rmModal')?.hidden && !!document.querySelector('#resumemenu [data-rmclose]'), null, { timeout: 10000 }).catch(() => {});
+      if (how === 'close') await page.click('#resumemenu [data-rmclose]');
+      else if (how === 'backdrop') await page.mouse.click(4, 860);
+      else await page.keyboard.press('Escape');
+      await page.waitForFunction(() => document.getElementById('rmModal')?.hidden && !document.getElementById('resumemenu'), null, { timeout: 5000 }).catch(() => {});
+      away[how] = await page.evaluate(() => !!document.getElementById('rmModal')?.hidden && !document.getElementById('resumemenu') && resumeFor === null);
+    }
+    ok(Object.values(away).every(Boolean), `...and its Close, its backdrop and Escape each put it away (${JSON.stringify(away)})`);
   }
   // A project on one node: its chooser names that node with what it has,
   // as each of several gets.

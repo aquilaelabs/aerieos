@@ -582,16 +582,17 @@ if (named){
   ok(/^The phone walk · Claude · /.test(pick.picked) && /left off at the dock/.test(pick.note) && pick.cv === named && /^(All \d+ conversations|Your conversation here)$/.test(pick.all) && pick.wide === false,
      `phone: a labeled conversation is picked by its label with its agent and when, its note under it, Resume pointed at it, and a link to all of them (${JSON.stringify(pick)})`);
 }
-// ...where it can be seen. The sidebar scrolls, the chooser is placed inside
-// the card, and pressing Claude on a project whose session has ended opens
-// this and NOTHING ELSE, so one drawn below the fold is a press with no
-// visible result, which is what bug #65 was reported as.
+// ...where it can be seen. Pressing Claude on a project whose session has
+// ended opens this and NOTHING ELSE, so one drawn out of sight is a press
+// with no visible result, which is what bug #65 was reported as. It is a
+// dialog over the page, so wherever the page under it is scrolled it is on
+// the screen.
 //
 // Set up properly or this asserts nothing: the row has to be at the bottom
 // edge before the press, and the press has to be dispatched rather than
 // clicked, because Playwright scrolls a target into view for you and would
 // undo the very thing being reproduced.
-await phone.click('.pgrid .pcard[data-row="alpha"] [data-c]');          // put it away again
+await phone.click('.resumemenu [data-rmclose]');          // put it away again
 await phone.waitForFunction(() => !document.querySelector('.resumemenu'));
 // A window short enough that the row is at the bottom edge, which is the
 // only shape in which the chooser has nowhere to be drawn; on a tall one it
@@ -611,24 +612,16 @@ await phone.evaluate(() => {
 });
 await phone.evaluate(() => document.querySelector('.pgrid .pcard[data-row="alpha"] [data-c]').click());
 await phone.waitForSelector('.resumemenu', { timeout: 10000 });
-// Where it rests, not where it is mid-entrance: menuIn slides the chooser
-// down 5px over 140ms, and how far along that is when a round trip lands is
-// a fact about the box. Where it stops is what the operator sees (B77).
-// ...and in its pane: looked at before its entrance had begun it had no
-// animation to wait out, and read a moment later it was not yet in a pane
-// at all (two gates of 15 Nov, under load).
+// Where it rests, not where it is mid-entrance: a dialog's box grows into
+// place, and where it stops is what the operator sees (B77).
 await phone.waitForFunction(() => { const m = document.querySelector('.resumemenu');
-  return !!m && !!m.closest('.pane') && m.getAnimations().every(a => a.playState !== 'running'); }, null, { timeout: 10000 });
+  return !!m && !document.getElementById('rmModal').hidden && m.getAnimations().every(a => a.playState !== 'running'); }, null, { timeout: 10000 });
 const rest = await phone.$eval('.resumemenu', el => {
-  const m = el.getBoundingClientRect(), pane = el.closest('.pane').getBoundingClientRect();
-  const a = el._anchor, ap = a?.closest?.('.pane'), rb = document.querySelector('.railbar')?.getBoundingClientRect();
-  return { top: Math.round(m.top), bottom: Math.round(m.bottom), paneTop: Math.round(pane.top),
-           paneBottom: Math.round(pane.bottom), inner: innerHeight, cls: el.className,
-           anchor: a ? { on: a.isConnected, samePane: ap === el.closest('.pane'), paneBottom: ap && Math.round(ap.getBoundingClientRect().bottom) } : null,
-           railTop: rb && Math.round(rb.top), styleTop: el.style.top,
-           in: m.top >= pane.top - 1 && m.bottom <= Math.min(pane.bottom, innerHeight) + 1 };
+  const m = el.getBoundingClientRect();
+  return { top: Math.round(m.top), bottom: Math.round(m.bottom), inner: innerHeight, dialog: !!el.closest('#rmModal'),
+           in: m.top >= 0 && m.bottom <= innerHeight + 1 };
 });
-ok(rest.in, `...brought into the scrolled page, not left below its fold (${JSON.stringify(rest)})`);
+ok(rest.in && rest.dialog, `...a dialog over the page, wholly on the screen however the page under it is scrolled (${JSON.stringify(rest)})`);
 await phone.setViewportSize({ width: 400, height: 800 });
 await phone.click('.resumemenu [data-n]');
 // New conversation turns the menu to the model and effort it starts on

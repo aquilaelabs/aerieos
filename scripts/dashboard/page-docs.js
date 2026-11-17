@@ -900,7 +900,7 @@ function wireMore(root){
 // A menu over the page, never inside what holds its button (the operator,
 // 18 Oct: a card's ⋯ in Archived was cut off at the fold's foot): at a desk
 // under its button and lined up with it, above it when it would pass
-// the screen's foot, at every width. The ⋯ menus and the Claude chooser both. Fixed to the screen, measured
+// the screen's foot, at every width: the page's menus. Fixed to the screen, measured
 // against whatever box holds it as its frame (a scheme's glass makes one),
 // its entrance played from the start where it lands.
 function floatAt(m, anchor){

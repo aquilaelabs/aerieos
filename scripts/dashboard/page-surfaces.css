@@ -1847,7 +1847,6 @@ body.firstrun #panes{display:none}
 .projtab .docbarrow #bTrashTab,.skboot .docbarrow button.ic{min-width:var(--tap);padding:4px 8px}
 /* The Claude chooser drawn in a project page's pane (R218 step 3): as wide
    as its words, never the pane. */
-.pane>.resumemenu{max-width:min(440px,calc(100% - 8px));width:max-content}
 /* A group of this account's under its name (the operator, 18 Oct), and the
    archived projects folded at the foot; both in the band's own inset. */
 #pjGrid>.pjgroup{margin-top:20px}
@@ -2610,14 +2609,15 @@ body.firstrun #panes{display:none}
   gap:5px;box-shadow:0 6px 18px rgba(0,0,0,.5);
   animation:menuIn .22s cubic-bezier(.33,1,.68,1)}
 .pinmenu button{min-height:var(--tap)}
-/* The session box (the Perch pass, the operator, 17 Oct): a popover
-   of one column, each node a block of its name, what it has on a quiet mono
-   line, how this account stands there and its action bar; the model and
-   effort step two labeled fields side by side over Back and the press. */
-.resumemenu{flex-direction:column;flex-wrap:nowrap;gap:12px;padding:12px 14px;
-  width:min(360px,calc(100vw - 32px));max-width:calc(100% - 8px)}
-.resumemenu .rmnode{display:flex;flex-direction:column;gap:8px}
-.resumemenu .rmnode+.rmnode{border-top:var(--hair) solid var(--line);padding-top:12px}
+/* The agent chooser: the house dialog, each step its box, its first a
+   node's name, what it has on a quiet mono line and how this account
+   stands there, its second the model and effort, two labeled fields side by
+   side. A step keeps the height the taller one had (rmHold), its foot at
+   the box's foot, so the centered box never moves between them. */
+.modal.rmmodal>.box{display:flex;flex-direction:column}
+.modal.rmmodal>.box>*{flex:none}
+.modal.rmmodal>.box>.foot{margin-top:auto}
+.modal.rmmodal>.box.still{animation:none}
 .resumemenu .rmhead{display:flex;flex-direction:column;gap:2px;min-width:0}
 .resumemenu .rmhead b{font:var(--f-sect);color:var(--ink)}
 .resumemenu .rmfacts{font:var(--f-data);color:var(--dim);overflow-wrap:anywhere}
@@ -2641,10 +2641,9 @@ body.firstrun #panes{display:none}
 .resumemenu .rmline.live .rmsays{color:var(--pass)}
 .resumemenu .rmline .rmacts{margin-left:auto}
 .resumemenu .rmacts button{white-space:nowrap}
-/* ...in three bands (R143): yours running, Start, Resume, each headed in the
-   tag voice as the bell's groups are. */
-.resumemenu .rmgroup{display:flex;flex-direction:column;gap:8px;min-width:0}
-.resumemenu .rmtitle{font:var(--f-tag);letter-spacing:.6px;text-transform:uppercase;color:var(--dim)}
+/* ...in three bands: yours running, Start, Resume, each a dialog's field
+   headed by its label. */
+.resumemenu .rmgroup{gap:8px;min-width:0}
 .resumemenu .rmgroup .rmtitle+.rmline{border-top:0;padding-top:0}
 /* Resume is one pulldown (R236): it takes the line beside its press, the
    picked one's note or first words on a quiet line under them, and the way
