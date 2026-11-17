@@ -81,15 +81,16 @@ html[data-theme="nostromo"]:not([data-mode="light"]) :is(.hcard h3,.hsect h3,
   background-image:linear-gradient(180deg, rgba(200,220,240,.05), rgba(0,0,0,.2));
   box-shadow:inset 0 1px 0 rgba(200,220,240,.08)}
 /* The dock, both halves: a hatch, its edge a hazard stripe, amber and black
-   in the hallways, the door's red and white in the corridors. */
+   in the hallways, the door's red and white in the corridors, over the same
+   glass every bar wears. */
 html[data-theme="nostromo"] .panes.docked .pane.dock{border-top:0}
 html[data-theme="nostromo"]:not([data-mode="light"]) .pane .bar.dockbar{
   background:repeating-linear-gradient(-45deg, #ffb000 0 6px, #0b0f13 6px 12px) left top / 100% 3px no-repeat,
-    linear-gradient(180deg, rgba(200,220,240,.05), rgba(0,0,0,.22)), var(--panel);
+    linear-gradient(180deg, rgba(200,220,240,.05), rgba(0,0,0,.22)), var(--glass);
   padding-top:7px}
 html[data-mode="light"][data-theme="nostromo"] .pane .bar.dockbar{
   background:repeating-linear-gradient(-45deg, rgba(196,38,28,.75) 0 6px, rgba(255,255,255,.95) 6px 12px) left top / 100% 3px no-repeat,
-    linear-gradient(180deg, rgba(255,255,255,.7), rgba(0,0,0,.04)), var(--panel);
+    linear-gradient(180deg, rgba(255,255,255,.7), rgba(0,0,0,.04)), var(--glass);
   padding-top:7px}
 /* Light: the rail a white wall panel with a pressed seam down its edge,
    its items one surface; the search pressed in; the tiles and the cards'
