@@ -2650,6 +2650,15 @@ const DIALOGS = {
   chooser: async () => { railGo('projects');
     for (let i = 0; i < 40 && !document.querySelector('.projtab [data-c="alpha"]'); i++) await new Promise(r => setTimeout(r, 250));
     resumeFor = null; openClaude('alpha'); },
+  // The dialogs a page builds when it opens one, each as it opens empty.
+  newvm: () => openNewVm(), useradd: () => usersAddOpen(), rolenew: () => rolesNewOpen(),
+  // A schedule's form reads the Schedules page's nodes: opened from there.
+  schedule: async () => { railGo('jobs', 'schedules');
+    for (let i = 0; i < 40 && !schedData; i++) await new Promise(r => setTimeout(r, 250));
+    openSchedForm(null); },
+  // ...the harness's own answer to a question (lib.mjs) stood aside while
+  // it opens, or it is answered before it is measured.
+  question: () => { const was = window.__bbAsk; window.__bbAsk = null; ask({ title: 'A question', text: 'Is it so?' }); window.__bbAsk = was; },
   enroll: async () => { openNodesTab();
     for (let i = 0; i < 40 && !document.querySelector('.nodestab button'); i++) await new Promise(r => setTimeout(r, 250));
     [...document.querySelectorAll('.nodestab button')].find(b => /enroll/i.test(b.textContent))?.click(); },
@@ -2663,7 +2672,9 @@ async function dialogShape(pg = page){
     const loose = [...box.querySelectorAll('*')].filter(e => {
       // A section's heading is a heading, as the h3 is: a long dialog's
       // groups are sections (the project settings, 7 Oct).
-      if (e.offsetHeight === 0 || e.closest('h3, .field, .foot, details.sect > summary')) return false;
+      // ...and so is a fold's that shows more (.chev), which carries its own
+      // inset as a section's does.
+      if (e.offsetHeight === 0 || e.closest('h3, .field, .foot, details.sect > summary, details.chev > summary')) return false;
       return [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim());
     }).map(e => `${e.tagName.toLowerCase()} "${e.textContent.trim().slice(0, 24)}"`);
     // One scroller, not two: a box that scrolls around a part that scrolls
@@ -2684,8 +2695,18 @@ async function dialogShape(pg = page){
     const fb = box.querySelector('.foot');
     const btns = fb ? [...fb.querySelectorAll('button')].filter(b => b.offsetWidth) : [];
     const gap = btns.length ? Math.round(fb.getBoundingClientRect().right - Math.max(...btns.map(b => b.getBoundingClientRect().right))) : 0;
+    // The census of the one shape (R50 step 81): its title the box's first
+    // line, its foot the box's own, centered over the page, its width, and
+    // the order of its foot (a state, the spacer, the verbs).
+    const r = box.getBoundingClientRect();
+    const order = fb ? [...fb.children].filter(e => e.offsetWidth || e.classList.contains('sp')).map(e =>
+      e.classList.contains('sp') ? 'sp' : e.classList.contains('state') ? 'state' : e.tagName === 'BUTTON'
+        ? (e.classList.contains('primary') ? 'P' : e.classList.contains('danger') || e.dataset.danger ? 'D' : 'b') : e.tagName.toLowerCase()).join(' ') : '';
+    const census = { id: m.id || m.className, cls: [...box.classList].filter(c => c !== 'box').join('.') || '-', w: Math.round(r.width),
+      title: box.firstElementChild?.tagName === 'H3', ownFoot: !!box.querySelector(':scope > .foot, :scope > .dlgbody > .foot'),
+      mid: r.height < innerHeight - 40 ? Math.round(r.top + r.height / 2 - innerHeight / 2) : 'tall', order };
     return { nested, loose: loose.slice(0, 3), h4: box.classList.contains('prose') ? 0 : box.querySelectorAll('h4').length,
-             foot: !!fb && fb.offsetHeight > 0, gap };
+             foot: !!fb && fb.offsetHeight > 0, gap, census };
   });
 }
 for (const [name, open] of Object.entries(DIALOGS)) {
@@ -2698,6 +2719,16 @@ for (const [name, open] of Object.entries(DIALOGS)) {
   const d = seen ? await dialogShape() : { err: 'nothing opened' };
   const id = await page.evaluate(() => [...document.querySelectorAll('.modal')].find(m => !m.hidden)?.id || '');
   if (id) opened.add(id);
+  // One shape for every dialog (R50 step 81): its title the box's first
+  // line, its foot the box's own, centered over the page, its foot in the
+  // rule's order (only a state before the spacer; the primary first among
+  // the verbs; anything destructive last), and Escape puts it away.
+  const c = d.census || {};
+  const toks = String(c.order || '').split(' ').filter(Boolean), sp = toks.indexOf('sp'), verbs = toks.slice(sp + 1);
+  const ordered = sp >= 0 && toks.slice(0, sp).every(t => t === 'state')
+    && (!verbs.includes('P') || verbs[0] === 'P') && verbs.every((t, i) => t !== 'D' || verbs.slice(i).every(x => x === 'D'));
+  ok(!d.err && c.title && c.ownFoot && (c.mid === 'tall' || Math.abs(c.mid) <= 2) && ordered,
+     `[dialog ${name}] titled first, its foot its box's own in the rule's order, centered (${JSON.stringify(c)})`);
   ok(!d.err && d.loose.length === 0 && d.h4 === 0 && d.foot,
      `[dialog ${name}] its lines in .field bands, no h4, buttons in a .foot${
        d.err ? ` (${d.err})` : d.loose.length ? `: loose ${d.loose.join(', ')}` : d.h4 ? `: ${d.h4} h4` : !d.foot ? ': no foot' : ''}`);
@@ -2757,6 +2788,11 @@ for (const [name, open] of Object.entries(DIALOGS)) {
   ok(!rhythm.err && rhythm.odd.length === 0,
      `[dialog ${name}] one rhythm down the band (${rhythm.want}px, ${rhythm.tight}px under a label)${
        rhythm.err ? ` (${rhythm.err})` : rhythm.odd.length ? `: ${rhythm.odd.join('; ')}` : ''}`);
+  // ...and Escape puts it away, as a person shuts it (R50 step 81).
+  await page.keyboard.press('Escape');
+  const escaped = await page.waitForFunction(() => ![...document.querySelectorAll('.modal')].some(m => !m.hidden && !m.classList.contains('inline')),
+    null, { timeout: 3000 }).then(() => true).catch(() => false);
+  ok(escaped, `[dialog ${name}] Escape puts it away`);
   await page.evaluate(() => { document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }); resumeFor = null; resumePick = null; });
 }
 // ...and again on a small phone, where the room runs out first: every dialog

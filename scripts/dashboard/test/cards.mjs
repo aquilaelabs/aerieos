@@ -3020,7 +3020,7 @@ await section("a project on several nodes", async () => {
     models: [...m.querySelectorAll('#rmModel option')].map(o => o.value), efforts: [...m.querySelectorAll('#rmEffort option')].map(o => o.value),
     buttons: [...m.querySelectorAll('button')].map(b => b.textContent.trim()) }));
   ok(/^A new Claude conversation Claude Code on ubu$/.test(step.text) && step.models.includes('opus') && step.models.includes('fable')
-     && step.efforts.includes('high') && step.buttons.join() === 'Back,Start'
+     && step.efforts.includes('high') && step.buttons.join() === 'Start,Back'
      && !(await page.evaluate(() => tabs.some(t => t.kind === 'term' && String(t.arg) === 'claude:alpha:n:n_ubu'))),
      `...New conversation turns the menu to Model and Effort with Start, naming the last session's model on the default, and starts nothing yet (${step.text}; ${step.buttons.join(' | ')})`);
   const dlg = await page.evaluate(() => { const d = document.getElementById('rmModal'), b = d?.querySelector(':scope > .box');

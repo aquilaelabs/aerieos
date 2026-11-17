@@ -43,8 +43,8 @@ const dlg = await page.evaluate(() => {
            title: $('schT')?.textContent, inPage: !!document.querySelector('.schedulestab [data-schedform]'),
            foot: [...m.querySelectorAll('.foot button')].map(b => b.textContent.trim()).join(',') };
 });
-ok(dlg.dialog && dlg.title === 'New schedule' && !dlg.inPage && dlg.foot === 'Cancel,Add',
-   `New schedule opens a dialog, its foot Cancel and Add (${JSON.stringify(dlg)})`);
+ok(dlg.dialog && dlg.title === 'New schedule' && !dlg.inPage && dlg.foot === 'Add,Cancel',
+   `New schedule opens a dialog, its foot Add then Cancel (${JSON.stringify(dlg)})`);
 // As few fields as User Scripts (the operator, 26 Oct): a name, When as a
 // pick, where it runs (the controller first, and picked), and the script;
 // no timeout, and Runs as only for a sandbox node, where root is AerieOS's.

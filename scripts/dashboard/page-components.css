@@ -560,7 +560,10 @@ dialog.modal::backdrop{background:transparent;--sheen:none}
    being read (the operator, 16 Oct: the black fades read as dirt). Not in a
    box shown inline, which is a view's and scrolls with the page (B702). */
 .modal:not(.inline) .box>h3{position:sticky;top:0;z-index:2;background:var(--panel)}
-.modal:not(.inline) .box>.foot{position:sticky;bottom:0;z-index:2;background:var(--panel)}
+.modal:not(.inline) .box>.foot,.modal:not(.inline) .box>.dlgbody>.foot{position:sticky;bottom:0;z-index:2;background:var(--panel)}
+/* A dialog whose body a script draws (Enroll, Reset) draws it into a slot
+   laid out as the box itself: its fields and its foot are the box's. */
+.modal .box>.dlgbody{display:contents}
 .modal .sheetslot,.pane .doc{--edge-keep:rgba(0,0,0,.18)}  /* what is left of a line at the very edge: faded, not gone */
 /* Never while it holds an open dialog: a mask makes the box a stacking
    context and clips what it paints, so a dialog opened from a page (the
@@ -2282,6 +2285,9 @@ button.eye.bare{background:none;--sheen:none;border:0;padding:5px 4px;min-width:
 .fgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 20px;align-items:start;max-width:calc(var(--ctl-w) * 2 + 20px)}
 .fgrid>[hidden]{display:none}
 .fgrid>.fwide{grid-column:1 / -1}
+/* ...three across where a row is three short numbers (a VM's vCPUs,
+   memory and disk), at every width: three numbers fit a phone's row. */
+.fgrid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
 .fgrid :is(input:not([type=checkbox]):not([type=radio]),select,textarea){width:100%;max-width:100%;box-sizing:border-box;min-height:var(--ctl)}
 .fgrid>.setrow,.fgrid>label.pick{max-width:none;margin:0}
 @media(max-width:600px){ .fgrid{grid-template-columns:minmax(0,1fr);max-width:min(var(--ctl-w),88%)}

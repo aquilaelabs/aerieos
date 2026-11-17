@@ -577,8 +577,8 @@
       <div class="hint"></div>
     </div>
     <div class="foot"><span class="sp"></span>
-      <button type="button" id="devEnvCancel">Cancel</button>
       <button type="button" class="primary">Save</button>
+      <button type="button" id="devEnvCancel">Cancel</button>
     </div>
   </div>
 </div>
@@ -592,8 +592,8 @@
     <div class="field" id="outEndRow" hidden><label class="ndcap"><input type="checkbox" id="outEnd"> <span id="outEndSaid">Also end my sessions</span></label>
       <div class="hint">Unticked, they keep running and are there when you sign in again.</div></div>
     <div class="foot"><span class="sp"></span>
-      <button type="button" id="outCancel">Cancel</button>
-      <button type="button" class="primary" id="outGo">Sign out</button></div>
+      <button type="button" class="primary" id="outGo">Sign out</button>
+      <button type="button" id="outCancel">Cancel</button></div>
   </div>
 </div>
 <!-- A conversation with Claude, read here rather than downloaded (R83): its
@@ -1079,12 +1079,11 @@
     <div class="field" id="rnProjectNote" hidden><div class="hint"></div></div>
     <div class="foot">
       <!-- Each section saves itself (page-projsettings.js rnBars); the foot
-           only closes the dialog, and is not there in the notebook. -->
-      <button id="rnCancel">Close</button>
-      <!-- Pushed to the far end, like every other verb here that cannot be
-           undone. Only on the chain's door: it is about the remote, and the
-           gear is about the project. -->
+           only closes the dialog, and is not there in the notebook. Close
+           after the spacer and the verbs that cannot be undone after it,
+           last, as in every dialog. -->
       <span class="sp"></span>
+      <button id="rnCancel">Close</button>
       <!-- ...and the gear's own: the bin. It is also on the All projects
            tab's rows, behind the fold on a phone, which is where it was
            not being found (the operator, 15 Sep). Same confirm, same
@@ -1346,7 +1345,7 @@
 <div id="ndmodal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="ndTitle">
   <div class="box wide">
     <h3 id="ndTitle">Enroll a node</h3>
-    <div id="ndBody"></div>
+    <div id="ndBody" class="dlgbody"></div>
   </div>
 </div>
 <!-- The Debugging group's other half. A dialog rather than a fold inside the
@@ -1363,7 +1362,7 @@
 <div id="resetmodal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="resetTitle">
   <div class="box">
     <h3 id="resetTitle">Reset AerieOS</h3>
-    <div id="resetBody"></div>
+    <div id="resetBody" class="dlgbody"></div>
   </div>
 </div>
 <!-- Report a bug in AerieOS, from a project's row (page-report.js): a

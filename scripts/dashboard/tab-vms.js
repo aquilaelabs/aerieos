@@ -392,15 +392,15 @@ function openNewVm(forProject = ""){
         <option value="iso-add">Add an ISO…</option></optgroup>`;
   };
   drawHTML(m, `<div class="box"><h3>New VM</h3>
-    <div class="prefrow ctlrow">
+    <div class="field"><div class="fgrid">
       <div class="setrow col ctlrow">${lbl("vmName", "Name")}<input id="vmName" maxlength="31" autocomplete="off" spellcheck="false" placeholder="db"></div>
       <div class="setrow col ctlrow">${lbl("vmProject", "Belongs to", "a space, whose sessions reach it; or this machine's own, an administrator's alone")}<select id="vmProject">${optionList(projects.map(p => [p, vmOwner(p)]), forProject)}</select></div>
-    </div>
-    <div class="prefrow ctlrow">
+    </div></div>
+    <div class="field"><div class="fgrid">
       <div class="setrow col ctlrow">${lbl("vmNode", "Node", "a node with VM host installed")}<select id="vmNode">${optionList(hosts.map(h => [h.id, h.name]))}</select></div>
       <div class="setrow col ctlrow">${lbl("vmOs", "From", "a publisher's cloud image, checked against its checksums and set up by cloud-init; or an installer's ISO on the node, which you install on the VM's Screen yourself, the way Windows or your own system goes on")}
         <select id="vmOs">${fromOptions(hosts[0]?.id || "")}</select></div>
-    </div>
+    </div></div>
     <div id="vmIsoAdd" hidden>
       <div class="field">${lbl("vmIsoUrl", "The ISO's address", "an https link to the installer's .iso")}
         <input id="vmIsoUrl" type="url" spellcheck="false" autocomplete="off" placeholder="https://releases.ubuntu.com/…/ubuntu-26.04-live-server-amd64.iso"></div>
@@ -411,30 +411,30 @@ function openNewVm(forProject = ""){
         <input id="vmIsoFile" type="file" accept=".iso"></div>
       <div class="field"><div class="actbar"><button type="button" id="vmIsoUp" disabled>Upload it to the node</button></div></div>
     </div>
-    <div class="prefrow ctlrow">
+    <div class="field"><div class="fgrid three">
       <div class="setrow col ctlrow">${lbl("vmCpu", "vCPUs")}<input id="vmCpu" type="number" min="1" max="64" value="2"></div>
       <div class="setrow col ctlrow">${lbl("vmMem", "Memory, GB")}<input id="vmMem" type="number" min="1" max="256" value="2"></div>
       <div class="setrow col ctlrow">${lbl("vmDisk", "Disk, GB")}<input id="vmDisk" type="number" min="2" max="4096" value="20"></div>
-    </div>
+    </div></div>
     <div id="vmCloud">
       <div class="field">${lbl("vmKey", "SSH public key", "who may log in: yours, as in ~/.ssh/id_ed25519.pub. The account is builder (admin on a VM made a node), with sudo")}
         <textarea id="vmKey" rows="3" spellcheck="false" autocomplete="off" placeholder="ssh-ed25519 AAAA… you@laptop"></textarea></div>
       <div class="field"><label class="ndcap"><input type="checkbox" id="vmAgent"> Make it a node: enroll it with an agent at its first boot</label>
       <div class="hint" id="vmAgentHint" hidden>It joins your LAN as its own machine and appears on the Nodes page once it has booted, a node like any other, marked as a VM on its host; removing the VM retires the node and revokes its credential.</div></div>
     </div>
-    <div class="prefrow ctlrow" id="vmFwRow" hidden>
+    <div class="field" id="vmFwRow" hidden><div class="fgrid">
       <div class="setrow col ctlrow">${lbl("vmFw", "Firmware", "UEFI for most current installers (Windows 11 also wants the TPM, under More); BIOS for an older one")}
         <select id="vmFw">${optionList([["uefi", "UEFI"], ["bios", "BIOS"]], "uefi")}</select></div>
-    </div>
+    </div></div>
     <details class="vmmore chev"><summary>More: disks, network, screen password, hardware</summary>
       <div class="field">${lbl("vmDisks", "Further disks, GB", "up to three more, each its own virtio disk (vdb, vdc, vdd), comma-separated: 100, 500")}
         <input id="vmDisks" spellcheck="false" autocomplete="off" placeholder="none"></div>
-      <div class="prefrow ctlrow">
+      <div class="field"><div class="fgrid">
         <div class="setrow col ctlrow">${lbl("vmMac", "MAC address", "kept for good, so a DHCP reservation holds; libvirt picks one when empty")}
           <input id="vmMac" spellcheck="false" autocomplete="off" placeholder="52:54:00:…"></div>
         <div class="setrow col ctlrow">${lbl("vmPw", "Screen password", "asked when its Screen opens; one to eight characters, VNC's limit")}
           <input id="vmPw" type="password" maxlength="8" autocomplete="new-password"></div>
-      </div>
+      </div></div>
       <div class="field"><label class="ndcap"><input type="checkbox" id="vmAuto"> Starts with its host</label></div>
       <div id="vmHwBox"></div>
     </details>
@@ -549,19 +549,19 @@ function vmHwFields(host, hw, admin){
   return `<div class="field">${lbl("vmHwCpus", "CPU threads", "pin its vCPUs to these host threads, each core's pair together; none ticked leaves the host to schedule it")}
       <div class="vmcpus" id="vmHwCpus">${cpus || `<span class="sub">the node has not said its CPUs yet</span>`}</div>
       <label class="ndcap"><input type="checkbox" id="vmHwShareCpus"> Share them with another VM pinned there</label></div>
-    <div class="prefrow ctlrow">
+    <div class="field"><div class="fgrid">
       <div class="setrow col ctlrow">${lbl("vmHwMemMax", "Memory ceiling, GB", "it starts with its memory and may balloon up to this; empty for none")}
         <input id="vmHwMemMax" type="number" min="1" max="256" step="0.5" value="${hw?.mem_max_mb ? +(hw.mem_max_mb / 1024).toFixed(1) : ""}"></div>
-    </div>
+    </div></div>
     ${vmNetFields(host, hw, !!hw?.mac)}
     <div class="field"><label class="ndcap"><input type="checkbox" id="vmHwTpm"${hw?.tpm ? " checked" : ""}${host?.hw?.tpm || hw?.tpm ? "" : " disabled"}> TPM 2.0</label>
       <div class="hint">${host?.hw?.tpm || hw?.tpm ? "An emulated TPM whose state stays with the VM: Windows 11 will not install without one."
         : "This node has no software TPM (swtpm) yet: turning VM host on again under its Features installs it."}</div></div>
-    <div class="prefrow ctlrow">
+    <div class="field"><div class="fgrid">
       <div class="setrow col ctlrow">${lbl("vmHwShare", "Shared folder", "a folder of the space, seen inside the VM by: mount -t virtiofs space /mnt; empty for none, a dot for the whole space")}
         <input id="vmHwShare" spellcheck="false" autocomplete="off" placeholder="none" value="${esc(sh.path ? sh.path.replace(/^\/workspace\/[^/]+\/?/, "") || "." : "")}"></div>
       <label class="ndcap"><input type="checkbox" id="vmHwShareRo"${sh.ro ? " checked" : ""}> read-only</label>
-    </div>
+    </div></div>
     ${admin ? `<div class="field">${lbl("vmHwDevs", "Devices passed through", "the host's own, given to this VM alone while it runs; a PCI device needs the IOMMU on")}
       <div id="vmHwDevs">${devs.join("") || `<span class="sub">none on this node</span>`}${host?.hw?.iommu ? "" : `<div class="sub warn">The IOMMU is off on this node, so no PCI device can be passed through.</div>`}</div></div>` : ""}`;
 }

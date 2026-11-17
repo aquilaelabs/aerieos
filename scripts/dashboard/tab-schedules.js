@@ -98,13 +98,13 @@ function schedForm(s){
   return `<div data-schedform="${esc(s?.id || "new")}">
       <div class="field">${lbl("schName", "Name")}
         <input id="schName" data-schedf="name" type="text" value="${v("name")}" autocomplete="off"></div>
-      <div class="prefrow ctlrow">
+      <div class="field"><div class="fgrid">
         <div class="setrow col ctlrow">${lbl("schWhen", "When")}
           <select id="schWhen">${optionList([...SCHED_WHEN, ["", "Custom"]], custom ? "" : cron)}</select></div>
         <div class="setrow col ctlrow">${lbl("schNode", "Runs on")}
           <select id="schNode" data-schedf="node">${s?.node || schedDraft.node ? "" : `<option value="">pick where</option>`}${
             optionList(nodes.map(n => [n.id, n.name]), schedDraft.node ?? s?.node)}</select></div>
-      </div>
+      </div></div>
       <div class="field" id="schCronF"${custom ? "" : " hidden"}>${lbl("schCron", "Timetable", "cron's five fields: minute, hour, day of the month, month, weekday")}
         <input id="schCron" data-schedf="cron" type="text" value="${esc(cron)}" spellcheck="false" autocomplete="off"
           placeholder="0 4 * * 0">

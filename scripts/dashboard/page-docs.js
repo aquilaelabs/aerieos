@@ -1346,8 +1346,17 @@ function holdPanes(box, keys, show, cur){
   box.style.height = held + "px";
   return held;
 }
+// A dialog's foot in the dialog rule's one order: what it says (a .state
+// in `lead`) first, the spacer, then the verbs, the primary first and the
+// rest after it, the way out (`cancel`), and a verb that cannot be undone
+// last. A button handed in `lead` is a verb like the rest.
 function dlgFoot(cancel, acts, lead = ""){
-  return `<div class="foot">${lead}<span class="sp"></span>${cancel}${acts}</div>`;
+  const BUTTON = /<button\b[\s\S]*?<\/button>/g;
+  const btns = [...String(acts + lead).matchAll(BUTTON)].map(m => m[0]);
+  const is = (b, c) => new RegExp(`class="[^"]*\\b${c}\\b`).test(b.slice(0, b.indexOf(">")));
+  const verbs = [...btns.filter(b => is(b, "primary")), ...btns.filter(b => !is(b, "primary") && !is(b, "danger")),
+                 cancel, ...btns.filter(b => is(b, "danger"))];
+  return `<div class="foot">${String(lead).replace(BUTTON, "")}<span class="sp"></span>${verbs.join("")}</div>`;
 }
 
 // A row's remove, the bin, drawn one way on every page (consistency batch

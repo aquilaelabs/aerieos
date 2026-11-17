@@ -2571,8 +2571,7 @@ chmod 755 /usr/local/sbin/aerieos-agent
 aerieos-agent enroll --controller ${esc(m.url)} --token ${esc(m.token)}${
           m.user && m.user !== "bb" ? ` --user ${esc(m.user)}` : ""}</pre>
       </div>
-      <div class="foot"><span class="sp"></span>
-        <button type="button" id="ndTokDone">Done</button></div>`);
+      ${dlgFoot(`<button type="button" id="ndTokDone">Done</button>`, "")}`);
     body.querySelector("#ndTokDone").onclick = shut;
   };
   // ---- a machine to enroll, before there is one -------------------------
