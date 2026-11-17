@@ -474,9 +474,9 @@ function nbDsPagesSection(ds, p){
   const rows = nb.dsPages.map(x => `<div class="row dspagerow" data-dspagego="${nbDsKeyOf(x)}">${tblLine(DS_PAGE_COLS, [
       `<button type="button" class="namelink" title="open this page">${esc(x.name.trim() || "unnamed page")}</button>`,
       esc(nbDsPlatformOf(ds, x)?.label || x.platform), esc(P.frames?.[x.frame]?.label || x.frame || ""), String(x.blocks.length)])}</div>`).join("");
-  const body = p ? `<div class="field dspagehead"><div class="actbar">
+  const body = p ? `<div class="dspagehead">
         <button type="button" class="bare backbtn" data-dspageback title="back to every page">${ICON_BACK}<span>Pages</span></button>
-        <span class="dim dspagesaid">${esc(nbDsPageSaid(ds, p))}</span></div></div>
+        <span class="dim dspagesaid">${esc(nbDsPageSaid(ds, p))}</span></div>
       ${nbDsPageBody(ds, p)}`
     : add + (n ? tblWrap(DS_PAGE_COLS, rows, "dspages")
       : `<div class="field"><div class="hint">No pages yet: pick a platform and a template and press Add page.</div></div>`);

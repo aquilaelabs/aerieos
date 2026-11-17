@@ -1343,6 +1343,8 @@ body.firstrun #panes{display:none}
    to them in the shell's back voice. */
 .tbl.dspages>.row.dspagerow{cursor:pointer}
 @media(hover:hover){ .tbl.dspages>.row.dspagerow:hover{background:var(--btn)} }
+.dspagehead{display:flex;align-items:center;gap:8px;min-width:0}
+.dspagehead .dspagesaid{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dspagehead .backbtn{display:inline-flex;align-items:center;gap:4px;padding:2px 8px 2px 2px;color:var(--dim);background:none;--sheen:none;border:0}
 .dspagehead .backbtn:hover,.dspagehead .backbtn:focus-visible{color:var(--ink)}
 .artrow .artcaret{color:var(--dim);font:var(--f-note);width:9px;flex:0 0 auto}
