@@ -187,8 +187,11 @@ await section("the doctor: a dot in the top bar, its checks in a panel", async (
   ok(pass.dot === pass.pass && pass.dot !== pass.accent,
      `...its pass the fixed green on every scheme, not the accent (${JSON.stringify(pass)})`);
   await page.click('#bDocDot');
-  await page.waitForSelector('#docPanel:not([hidden]) #doctor .chips .pill', { timeout: 5000 });
-  ok(await page.$eval('#bDocDot', b => b.getAttribute('aria-expanded') === 'true'), '...and a press opens it, its passing checks as chips');
+  await page.waitForSelector('#docPanel:not([hidden]) #doctor .docsum', { timeout: 5000 });
+  const compact = await page.evaluate(() => ({ sum: document.querySelector('#doctor .docsum')?.textContent || '',
+    chips: document.querySelectorAll('#doctor .chips .pill').length }));
+  ok(await page.$eval('#bDocDot', b => b.getAttribute('aria-expanded') === 'true') && /^all \d+ pass/.test(compact.sum) && compact.chips === 0,
+     `...and a press opens it compact: its passing checks counted, not listed, the full ones being on Controller settings (${JSON.stringify(compact)})`);
   // One header panel at a time (the operator, 16 Oct): the gear pressed
   // with the doctor open shuts the doctor, and the bell shuts the gear.
   await page.click('#bCards');
@@ -206,13 +209,13 @@ await section("the doctor: a dot in the top bar, its checks in a panel", async (
   // (B742): no tooltip says the rest.
   const long = await page.evaluate(() => {
     const keep = state.doctor.checks;
-    state.doctor.checks = [...keep, { level: 'ok', text: '2 nodes can run a session (bb-dev-sandbox, bb-dev-sandbox-rh, a third node with a long name)' }];
+    state.doctor.checks = [...keep, { level: 'warn', text: '2 nodes can run a session (bb-dev-sandbox, bb-dev-sandbox-rh, a third node with a long name)' }];
     drawDoctor();
-    const pills = [...document.querySelectorAll('#doctor .chips .pill')];
+    const lines = [...document.querySelectorAll('#doctor .probs .sub')];
     const panel = document.getElementById('docPanel').getBoundingClientRect();
-    const out = { cut: pills.filter(p => p.scrollWidth > p.clientWidth + 1).length,
-                  out: pills.filter(p => p.getBoundingClientRect().right > panel.right + 1).length,
-                  tall: pills.some(p => p.getBoundingClientRect().height > 30) };
+    const out = { cut: lines.filter(p => p.scrollWidth > p.clientWidth + 1).length,
+                  out: lines.filter(p => p.getBoundingClientRect().right > panel.right + 1).length,
+                  tall: lines.some(p => p.getBoundingClientRect().height > 30) };
     state.doctor.checks = keep; drawDoctor();
     return out;
   });
@@ -233,8 +236,8 @@ await section("the doctor: a dot in the top bar, its checks in a panel", async (
   }));
   ok(probLines.length === 2 && probLines.every(l => l.same),
      `↻ runs it again, and a FAIL turns the dot red with each problem in its level's color (${JSON.stringify(probLines.map(l => l.same))})`);
-  ok(probLines.some(l => /runner offline/.test(l.text) && /aerie logs --runner/.test(l.why)),
-     '...and carries the rest of what the check said under it');
+  ok(probLines.some(l => /runner offline/.test(l.text)) && probLines.every(l => !l.why),
+     '...each a line alone in the compact panel, what the check said under it being on Controller settings');
   ok(await page.$eval('#docPanel', p => !p.hidden), '...with the panel still open after ↻ redrew it');
   await page.keyboard.press('Escape');
   ok(await page.$eval('#docPanel', p => p.hidden), 'Escape shuts the panel');
@@ -1569,11 +1572,10 @@ await section("Groups (the operator, 18 Oct)", async () => {
   // Time for a fade of the face that must not come, the pin's own redraw and the read after it.
   await quiet(800);
   const markFades = await page.evaluate(() => { const f = window.__fades.splice(0); window.__unfade(); return f; });
-  // A pin moves the card to the top, so it slides there rather than fading
-  // (the operator, 26 Oct: a card that moves slides).
+  // A star marks the card where it is, so nothing of it fades.
   ok(boxFades.length === 2 && /^gamma:.*\baskline\b/.test(boxFades[0]) && /^gamma:pcrepos/.test(boxFades[1])
      && !boxFades.some(f => /through|pcface/.test(f)) && !markFades.some(f => /through|pcface/.test(f)),
-     `a box on a card's back fades in alone and the repositories fade back as it shuts, the face never faded, and a pin, which moves the card, slides it rather than fading (${JSON.stringify({ boxFades, markFades })})`);
+     `a box on a card's back fades in alone and the repositories fade back as it shuts, the face never faded, and a star, which marks the card where it is, fades nothing (${JSON.stringify({ boxFades, markFades })})`);
   await page.evaluate(() => setProjectPinned(reposOf('gamma') || 'gamma', false));
   await pjMenu('gamma');
   // The pencil beside the group's name renames it in a box under the
@@ -1650,6 +1652,9 @@ await section("Full and Compact on the Spaces page", async () => {
     return { n: cs.length, folded: cs.filter(c => c.classList.contains('compact') && !c.querySelector('.pcacts')?.checkVisibility()).length,
              open: cs.filter(c => !c.classList.contains('compact')).map(c => c.dataset.pkey) }; });
   const seg = await page.$$eval('.doc .projtab [data-pjview]', bs => bs.map(b => b.getAttribute('aria-label')));
+  // Every card on its face first: one turned over to its controls stays
+  // open in the compact view, as it should, and is not what is measured.
+  await page.evaluate(() => { pjEditing.clear(); drawProjects(state.projects); });
   await page.click('.doc .projtab [data-pjview="list"]');
   await page.waitForFunction(() => [...document.querySelectorAll('.doc .projtab #pjGrid .pcard[data-pkey]')].every(c => c.classList.contains('compact')),
     null, { timeout: 8000 }).catch(() => {});

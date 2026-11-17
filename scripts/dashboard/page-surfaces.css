@@ -2541,6 +2541,12 @@ body.firstrun #panes{display:none}
 .ctlcard .ctlchecks .probs:not(:empty)+.chips{border-top:0}
 .doctor .probs:empty{display:none}
 .doctor .probs:not(:empty)+.chips{border-top:var(--hair) solid var(--line)}
+/* The panel's compact verdict: the passing checks counted in a quiet line,
+   in the pass color when nothing is wrong. */
+.doctor .docsum{padding:8px 12px;font:var(--f-note);color:var(--dim)}
+.doctor .docsum.ok{color:var(--pass)}
+.doctor .docsum:empty{display:none}
+.doctor .probs:not(:empty)+.docsum{border-top:var(--hair) solid var(--line)}
 .doctor .probs .sub.bad{color:var(--bad)}
 .doctor .probs .sub.warn{color:var(--warn)}
 /* What the check says after its first line: under it, not only in a title a

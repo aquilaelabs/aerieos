@@ -149,13 +149,17 @@ kept there as an answer, from the bell or from the page.
 
 **`aerie doctor`'s verdict** is the dot right after the bell, green, amber or
 red for the worst check. The server runs the checks in the background every
-30 minutes. Pressing the dot opens a panel with the bell's manners (Escape
-or a press elsewhere closes it): failures and warnings as full lines, each
-with the fix hint from `aerie doctor`'s own output beside it, passing checks as
-green chips, when it last ran, and a ↻ that runs `aerie doctor` now. A plain
-user's panel carries only the lines that are theirs to act on (whether a
-node can run their session); the runner tokens, ssh keys and the docker
-daemon are an administrator's.
+30 minutes. Pressing the dot opens a compact panel with the bell's manners
+(Escape or a press elsewhere closes it): each failure and warning as a line
+saying what is wrong, how many other checks pass, when it last ran, a ↻ that runs
+`aerie doctor` now, and **Controller settings** at its foot. That opens the
+full verdict, the Controller section of Controller settings: every check
+with what it said and the fix hint from `aerie doctor`'s own output, and the
+passing checks as green chips. An account that cannot open Controller
+settings has the full verdict in the panel itself. A plain user's panel
+carries only the lines that are theirs to act on (whether a node can run
+their session); the runner tokens, ssh keys and the docker daemon are an
+administrator's.
 
 The **About** control beside it is the version, and where the header is too
 narrow for a version string it becomes a **?** rather than a truncated number

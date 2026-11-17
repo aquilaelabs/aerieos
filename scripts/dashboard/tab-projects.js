@@ -279,11 +279,12 @@ function projectsShown(){
   drawProjects(state?.projects || []);
 }
 
-// A press on a card that changes what it holds (a mark, its color, its
-// group, a name) arms its fade: the next draw that changes that card fades
-// its face through (faceFade) rather than cutting to the new one. A press
-// that opens somewhere else does not.
-const PJ_ELSEWHERE = "[data-pedit],[data-open],[data-c],[data-s],[data-rn],[data-bug],[data-l],[data-ph],[data-tcinst],[data-repadd]";
+// A press on a card that changes what it holds (its color, its group, a
+// name) arms its fade: the next draw that changes that card fades its face
+// through (faceFade) rather than cutting to the new one. A press that opens
+// somewhere else does not, nor the star, which fills where it is, nor the
+// compact view's name, which opens the card in place.
+const PJ_ELSEWHERE = "[data-pedit],[data-open],[data-c],[data-s],[data-rn],[data-bug],[data-l],[data-ph],[data-tcinst],[data-repadd],[data-pmark],[data-pjopen]";
 let pjFade = null;               // {key, was: the card's markup at the press}
 // ...and the card a person last pressed on is the one the page follows when
 // it moves (the operator, 26 Oct), for a few seconds after the press: what
@@ -528,8 +529,8 @@ function wireProjectCards(grid){
   // folds it again; a press anywhere on a folded card opens it too.
   const openCard = key => { pjOpen = pjOpen === key ? "" : key; drawProjects(state.projects); };
   grid.querySelectorAll("[data-pjopen]").forEach(b => b.onclick = () => openCard(b.dataset.pjopen));
-  grid.querySelectorAll(".pcard[data-pkey]").forEach(c => c.onclick = !c.classList.contains("compact") ? null
-    : e => { if (!e.target.closest("button, a, input, select, textarea")) openCard(c.dataset.pkey); });
+  const openFolded = e => { if (!e.target.closest("button, a, input, select, textarea")) openCard(e.currentTarget.dataset.pkey); };
+  grid.querySelectorAll(".pcard[data-pkey]").forEach(c => { c.onclick = c.classList.contains("compact") ? openFolded : null; });
   grid.querySelectorAll("[data-kmark]").forEach(b => b.onclick = () => setArchived(b.dataset.kmark, b.dataset.on === "1"));
   grid.querySelectorAll("[data-open]").forEach(b => b.onclick = () => openNotebook(b.dataset.open));
 }

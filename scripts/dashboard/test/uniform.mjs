@@ -2645,6 +2645,11 @@ const DIALOGS = {
     $('cvBody').innerHTML = '<div class="empty">Nothing said in it yet.</div>';
     $('cvModal').hidden = false;
   },
+  // The agent chooser, the house dialog: opened from alpha's Start agent
+  // on the Spaces page.
+  chooser: async () => { railGo('projects');
+    for (let i = 0; i < 40 && !document.querySelector('.projtab [data-c="alpha"]'); i++) await new Promise(r => setTimeout(r, 250));
+    resumeFor = null; openClaude('alpha'); },
   enroll: async () => { openNodesTab();
     for (let i = 0; i < 40 && !document.querySelector('.nodestab button'); i++) await new Promise(r => setTimeout(r, 250));
     [...document.querySelectorAll('.nodestab button')].find(b => /enroll/i.test(b.textContent))?.click(); },
@@ -2752,7 +2757,7 @@ for (const [name, open] of Object.entries(DIALOGS)) {
   ok(!rhythm.err && rhythm.odd.length === 0,
      `[dialog ${name}] one rhythm down the band (${rhythm.want}px, ${rhythm.tight}px under a label)${
        rhythm.err ? ` (${rhythm.err})` : rhythm.odd.length ? `: ${rhythm.odd.join('; ')}` : ''}`);
-  await page.evaluate(() => document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }));
+  await page.evaluate(() => { document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }); resumeFor = null; resumePick = null; });
 }
 // ...and again on a small phone, where the room runs out first: every dialog
 // still scrolls in one place.
@@ -2768,7 +2773,7 @@ await section("and again on a small phone, where the room runs out first", async
     await settled(phone, { quiet: 250 });
     const d = await dialogShape(phone);
     if (d.nested) twice.push(`${name}: ${d.nested}`);
-    await phone.evaluate(() => document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }));
+    await phone.evaluate(() => { document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }); resumeFor = null; resumePick = null; });
   }
   ok(twice.length === 0, `on a 360px phone every dialog scrolls in one place${twice.length ? ': ' + twice.join(' | ') : ''}`);
   await phone.close();
@@ -2804,7 +2809,7 @@ await section("a finger, not a pointer", async () => {
     return bs.filter(b => b.getBoundingClientRect().height < tap - 0.5).length; });
   ok(shortFoot === 0, `...and a dialog's buttons are the tap height (${shortFoot} short)`);
   await phone.setViewportSize({ width: 344, height: 882 });
-  await phone.evaluate(() => document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }));
+  await phone.evaluate(() => { document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }); resumeFor = null; resumePick = null; });
   await atWidth(phone, 344);
   const cut = await phone.evaluate(() => [...document.querySelectorAll('.mobar > button')]
     .filter(b => b.offsetHeight > 0 && b.getBoundingClientRect().right > innerWidth + 1).map(b => b.textContent.trim()));
