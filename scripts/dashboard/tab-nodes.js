@@ -1022,7 +1022,8 @@ function nodeSessionsSection(n){
 function nodeSessSettings(n){
   const host = !!n.config?.host_only;
   const rows = host ? nodeHostRootRow(n) + nodePortsLocalRow(n)
-    : nodeSessNetRow(n) + nodePortsLocalRow(n) + nodeTurnsRow(n);
+    : nodeSessFacts(n) + `<div class="fgroup ndsetgroup"><div class="fgrouphead">Set here<span class="sub">Each a draft until Save below.</span></div>`
+      + nodeRootAsksRow(n) + nodePortsLocalRow(n) + nodeTurnsRow(n) + `</div>`;
   const t = n.turns || {};
   // Sessions, said so: under the test workers' field it read as them (B394).
   const now = host ? "" : `${t.working || 0} session${(t.working || 0) === 1 ? "" : "s"} working now${t.limit ? ` of ${t.limit}` : ""}${t.waiting ? `, ${t.waiting} waiting for a turn` : ""}`;
@@ -1125,67 +1126,53 @@ function nodePortsLocalRow(n){
   </div>`;
 }
 
-function nodeSessNetRow(n){
-  // Every session here is kept to its own project's network (R146): the
-  // switch went in 0.9.0, and it is on wherever sessions run. A draft until
-  // the section's Save is pressed (the rule apply-not-onchange, the
-  // operator, 24 Sep): each tick is kept across the repaints a heartbeat
-  // brings, and the press is where it is made.
-  const on = !n.config?.host_only;
+// What keeps sessions here apart, in force or not: a fact a line, its state
+// as a pill, its numbers on its line and its reason only where it is not in
+// force; what each one means is behind its help mark. The settings are
+// their own group under it (nodeSessSettings).
+function nodeSessFacts(n){
+  const pill = (tone, words) => `<span class="pill ${tone}">${esc(words)}</span>`;
+  const help = text => ` <span class="help" data-help="${esc(text)}" tabindex="0">?</span>`;
+  const why = text => ` <span class="dim">${esc(text)}</span>`;
+  const sn = n.reported?.session_net || {};
+  const own = !!n.config?.own;
+  const net = !Object.keys(sn).length ? ""
+    : !sn.can ? pill("bad", "not in force") + why(sn.why || "this node cannot do it")
+    : sn.error ? pill("bad", "not in force") + why(`${sn.error}; no session starts here until it is`)
+    : sn.active ? pill("ok", "in force")
+    : pill("warn", "setting up");
+  const ac = n.reported?.session?.accounts || {};
+  const acct = ac.error ? pill("bad", "not in force") + why(ac.error)
+    : ac.users === undefined ? ""
+    : ac.waiting ? pill("warn", "waiting") + why(`${ac.moved} of ${ac.users} homes moved; ${ac.waiting} wait${ac.waiting === 1 ? "s" : ""} for sessions started before to end`)
+    : pill("ok", "in force");
+  const sealed = Object.values(n.reported?.tokseal?.sealed || {}).reduce((t, a) => t + Object.keys(a).length, 0);
+  const seal = !n.reported?.tokseal ? ""
+    : !sealed ? pill("note", "nothing signed in yet")
+    : pill("ok", "in force") + why(`${sealed} sealed${n.tokseal_stale ? `, ${n.tokseal_stale} under an older key until its person opens a terminal here` : ""}`);
+  const rl = n.reported?.relay;
+  const relay = !rl ? pill("warn", "not yet") + why("this node's agent is from before it, and takes it up with its next update")
+    : rl.tls ? pill("ok", "in force")
+    : pill("bad", "not in force") + why("this node could not make itself a certificate (it has neither Python's cryptography library nor openssl)");
+  return `<div class="field">${factGrid([
+    ["Its own network", net && net + help(`Each session here reaches the internet, the controller and its own space's containers, and nothing else${own ? "; it is also what keeps a session off the controller's own ports" : ""}.`), {html: true}],
+    ["Its own user", acct && acct + help("Each account here is a Unix user of its own: its home, its sign-ins and its terminals are its alone, and only root reaches them."), {html: true}],
+    ["Sign-ins sealed", seal && seal + help("The coding agents' sign-ins are kept sealed here, opened only while their person has a terminal open, so a copy of the disk signs in to nothing."), {html: true}],
+    ["Encrypted", relay + help("Terminals, files and VMs' screens reach this node from the controller alone, over TLS to the certificate the node made for itself; a request to it is good once."), {html: true}],
+  ], "ndprot")}</div>`;
+}
+// Whether a session here may ask for a root command at all: a draft, saved
+// with the section's one Save.
+function nodeRootAsksRow(n){
   const c = nodeDraft(n);
-  // Whether a session here may ask for a root command at all (the
-  // operator, 24 Sep): the same draft, the same Save.
   const rootOn = !n.config?.no_root;
   if (c.draft.rootAsks === undefined || c.draft.rootFrom !== rootOn){
     c.draft.rootAsks = rootOn; c.draft.rootFrom = rootOn;
   }
-  // Each account is a Unix user of its own here (R125) and its coding
-  // agents' sign-ins are sealed (R126): on wherever sessions run since
-  // 0.9.0, the boxes gone with it; the rows say whether each is in force.
-  const sealed = Object.values(n.reported?.tokseal?.sealed || {}).reduce((t, a) => t + Object.keys(a).length, 0);
-  const sealLine = !n.reported?.tokseal ? ""
-    : !sealed ? `<div class="sub dim">Nothing is signed in here yet: a sign-in made here is sealed as the login writes it.</div>`
-    : `<div class="sub">${sealed} sign-in${sealed === 1 ? "" : "s"} sealed here. Each opens only while its person has a terminal open on this node, so a copy of its disk signs in to nothing.</div>`
-      + (n.tokseal_stale ? `<div class="sub">${n.tokseal_stale} still sealed under an older key: ${n.tokseal_stale === 1 ? "it moves" : "each moves"} to its account's own key when ${n.tokseal_stale === 1 ? "its person opens" : "their people open"} a terminal here.</div>` : "");
-  // How the controller reaches this node's terminals, files and VMs'
-  // screens (R243): over TLS to the certificate the node made for itself,
-  // or not, said with why.
-  const rl = n.reported?.relay;
-  const relayLine = !rl ? `<div class="sub warn">Not encrypted yet: this node's agent is from before they were, and takes it up with its next update.</div>`
-    : rl.tls ? `<div class="sub">Encrypted, to the certificate this node made for itself and no other. A request to it is good once.</div>`
-    : `<div class="sub warn">Not encrypted: this node could not make itself a certificate (it has neither Python's cryptography library nor openssl), so what is typed in a terminal here crosses the network readable.</div>`;
-  const ac = n.reported?.session?.accounts || {};
-  const acctLine = ac.error ? `<div class="sub bad">Not in force: ${esc(ac.error)}.</div>`
-    : ac.users === undefined ? ""
-    : ac.waiting ? `<div class="sub dim">${ac.moved} of ${ac.users} homes moved; ${ac.waiting} wait${ac.waiting === 1 ? "s" : ""} for ${ac.waiting === 1 ? "its" : "their"} sessions started before to end.</div>`
-    : `<div class="sub">Every account here runs as a user of its own: its home, its sign-ins and its terminals are its alone, and only root reaches them.</div>`;
-  const sn = n.reported?.session_net || {};
-  const told = Object.keys(sn).length > 0;
-  const line = !told
-      ? ""
-    : on && !sn.can ? `<div class="sub bad">Not in force: ${esc(sn.why || "this node cannot do it")}.</div>`
-    : on && sn.error ? `<div class="sub bad">Not in force, so no session starts here until it is: ${esc(sn.error)}.</div>`
-    : on && sn.active ? `<div class="sub">Sessions started here reach the internet, the controller and their own space's containers at this node's address, and nothing else.</div>`
-    : on ? `<div class="sub dim">Setting it up.</div>`
-    : sn.sessions ? `<div class="sub dim">${sn.sessions} session${sn.sessions === 1 ? "" : "s"} started while it was on keep their own network until they end.</div>`
-    : "";
-  // The controller's own machine (R90): on, and staying on, since it is
-  // what keeps a session there off the controller's own ports; said on the
-  // row, muted, rather than a box that refuses at Save.
-  const own = !!n.config?.own;
-  return `<div class="field"><div class="sub">Each session here is kept to its own space's network${
-      own ? ", which is what keeps one off the controller's own ports" : ""}.</div>
-    ${line}</div>
-    <div class="field"><label class="ndcap"><input type="checkbox" data-k="rootasks" ${c.draft.rootAsks ? "checked" : ""}>
+  return `<div class="field"><label class="ndcap"><input type="checkbox" data-k="rootasks" ${c.draft.rootAsks ? "checked" : ""}>
       let a session ask for a root command (aerie root run), which a person then allows or denies</label>
     ${rootOn ? "" : `<div class="sub dim">A session that asks is refused and told this is off.</div>`}
-    ${nodeRootOffLine(n)}</div>
-    <div class="field"><div class="sub">Each account here is a user of its own, so no account and no shell as the session account reaches another's sign-ins or terminals.</div>
-    ${acctLine}</div>
-    <div class="field"><div class="sub">The coding agents' sign-ins are kept sealed here, opened only while their person has a terminal open.</div>
-    ${sealLine}</div>
-    <div class="field"><div class="sub">Terminals, files and VMs' screens reach this node from the controller alone.</div>
-    ${relayLine}</div>`;
+    ${nodeRootOffLine(n)}</div>`;
 }
 
 // How many Claude sessions here may work on a prompt at once (turns.py on
