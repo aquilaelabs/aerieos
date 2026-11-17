@@ -100,7 +100,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | POST | `/api/lock` | prefix | `_lock` | Lock or unlock a project (R119), never a session's. |  |
 | POST | `/api/archive` | prefix | `_archive` | Archive or unarchive a project (R119): out of sight, and nothing else; the project's owner or an administrator, never a session. |  |
 | POST | `/api/repos` | prefix | `_repos` | Projects and their repositories (R138): create (a project with a name and nothing in it), rename, move (a repository into another project) with move-check (what it changes, asked first: the nodes, containers and VMs it t | refused: create |
-| POST | `/api/project-pin` | prefix | `_project_pin` | Pin or unpin a project: whether the sidebar card shows it (projects.pin). |  |
+| POST | `/api/project-pin` | prefix | `_project_pin` | A space made one of this account's favorites or not, kept as its pin: whether Home shows it and the Spaces page's Favorites chip finds it (projects.pin). |  |
 | POST | `/api/project-group` | prefix | `_project_group` | Put a project in one of this account's groups, take it out, or rename a group (projects.set_group, rename_group), or delete one (delete_group): a label for the Projects page, nothing more. |  |
 | POST | `/api/apps` | prefix | `_apps` | POST /api/apps: look at the release again now (apps.check_now). | refused: controller |
 | POST | `/api/pc` | prefix | `_pc` | POST /api/pc: a session's word with a PC lent to its project (pcwork.py, aerie pc): lent (which PCs lend which verbs), run (ask one, under the project's Agents may: Use a lent PC) and result (an ask's answer, held a whil |  |

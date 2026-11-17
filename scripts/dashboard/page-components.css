@@ -1666,11 +1666,9 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
    accent where it is, the quiet ink where it is not. */
 .pcard .pcname .pcmark{color:var(--dim)}
 .pcard .pcname .pcmark.on{color:var(--accent)}
+/* A favorite's star is filled; the others an outline. */
+.pcard .pcname .pcfav.on svg{fill:currentColor}
 .pcard .pcname button.eye.bare{min-height:var(--tap);min-width:var(--tap);display:inline-flex;align-items:center;justify-content:center}
-/* The pin beside a pinned project's name, in the lock's size and the text's
-   quieter color. */
-.pcard .pcname .pinmark{display:inline-flex;align-items:center;color:var(--dim)}
-.pcard .pcname .pinmark svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
 /* A space's facts and notes, one look wherever they are drawn (its card,
    its notebook's header, Home's glance): the facts in the data voice, each
    note in the control's voice in its tone. */

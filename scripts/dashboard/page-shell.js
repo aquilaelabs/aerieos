@@ -962,7 +962,7 @@ function projectActions(p){
     // ...and Lock, which is: its owner's holds everybody else out, an
     // administrator's its owner too, and says so on the press.
     c.may_lock ? `<button type="button" data-lock="${esc(key)}" data-on="${c.locked ? "0" : "1"}">${lockLabel(c)}</button>` : "",
-    c.archived ? "" : `<button type="button" data-p="${esc(key)}" data-on="${c.pinned ? "0" : "1"}">${c.pinned ? "Unpin" : "Pin"}</button>`,
+    c.archived ? "" : `<button type="button" data-p="${esc(key)}" data-on="${c.pinned ? "0" : "1"}">${c.pinned ? "Remove from favorites" : "Add to favorites"}</button>`,
     `<button type="button" data-rn="${esc(name)}">Settings</button>`,
   ].filter(Boolean).join("");
   return `${agentButton(p)}

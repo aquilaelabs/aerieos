@@ -191,7 +191,7 @@ function bootPage(hash){
         "sessions open", "updates due", "CI red"].map(l => `<span class="tile"><span class="tv">${skv(1.4)}</span><span class="tl">${l}</span></span>`).join("")}</div></div>
       <div class="field"><div class="homegrid"><section class="hcard"><h3>Attention</h3>${skRows(2)}</section>
         <section class="hcard"><h3>Last jobs</h3>${skRows(3)}</section></div></div>
-      <div class="field"><section class="hsect"><h3>Spaces at a glance</h3>${skRows(2)}</section></div>`);
+      <div class="field"><section class="hsect"><h3>Favorites</h3>${skRows(2)}</section></div>`);
   else if (key === "projects" && tool === "projects")
     body = doc(`<input type="search" disabled placeholder="name, branch or node"><span class="sp"></span>
       <span class="actbar"><button type="button" class="ic" disabled>${BIN}</button><button type="button" class="primary" disabled>New space</button></span>`,
@@ -208,7 +208,7 @@ function bootPage(hash){
 function skProjectCard(j = 0){
   const repo = k => `<div class="pcrepo">${skv(4 + (SKW[(j + k) % 8] % 5))}${skv(5)}</div>`;
   const mark = icon => `<button type="button" class="eye bare pcmark" disabled>${icon}</button>`;
-  return `<div class="pcard skpcard"><div class="pcname">${skv(5 + (SKW[j % 8] % 6), "name")}<span class="sp"></span>${mark(PIN)}${mark(ARCHIVE)}</div>
+  return `<div class="pcard skpcard"><div class="pcname">${skv(5 + (SKW[j % 8] % 6), "name")}<span class="sp"></span>${mark(STAR)}${mark(ARCHIVE)}</div>
     <div class="pcmeta"><span class="pcfacts">${skv(7)}</span></div>
     <div class="pcrepos">${repo(0)}${j % 3 === 1 ? repo(3) : ""}</div>
     <div class="pcacts actbar"><button type="button" disabled>Start agent</button><button type="button" disabled>Add repository</button><button type="button" disabled>Edit</button></div></div>`;
@@ -1471,7 +1471,8 @@ function versionChips(rows, verOf, none){
 // Whether a row is under the release chip in force ("" is All).
 const inRelease = (v, on) => !on || (on === "none" ? !relOf(v) : relOf(v) === on);
 // The chips alone, for a band that holds more than them (a list's search
-// beside them, R254 step 1): "" when fewer than two groups have anything.
+// beside them, R254 step 1): "" when fewer than two groups have anything,
+// but for one that holds less than the whole, which narrows all the same.
 // `all` is All's count where the groups overlap (a branch both Active and
 // Yours), the groups' sum otherwise. `allWord` names the first chip where a
 // second row under another would say All again (the Library's sources,
@@ -1480,8 +1481,11 @@ function chipButtons(groups, on, attr, all, allWord = "All"){
   // A group with no count to give (a disk, a key: count null) is a chip
   // with its name alone; one whose count is 0 has nothing to show.
   const gs = (groups || []).filter(g => g && (g.count || g.count === null));
-  if (gs.length < 2) return "";
+  if (!gs.length) return "";
   const total = all ?? (gs.some(g => g.count === null) ? null : gs.reduce((n, g) => n + g.count, 0));
+  // One group alone is drawn only where it holds less than the whole (a
+  // list's favorites): otherwise All says the same.
+  if (gs.length < 2 && !(total !== null && gs[0].count !== null && gs[0].count < total)) return "";
   const chip = (key, label, count) => `<button type="button" class="chip${(on || "") === key ? " on" : ""}"
     ${attr}="${esc(key)}" aria-pressed="${(on || "") === key}">${esc(label)}${
       count === null || count === undefined ? "" : `<span class="pill">${count}</span>`}</button>`;

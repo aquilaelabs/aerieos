@@ -387,7 +387,7 @@ async function setProjectPinned(name, on){
     // /api/status put a poll's latency between the click and the button
     // moving, on a control whose whole job is instant.
     applyNow((p, k) => { p.pinned = (j.pinned || []).includes(k); });
-  }catch(e){ notify("pin failed: " + failWords(e), true); }
+  }catch(e){ notify("the favorite was not saved: " + failWords(e), true); }
   refresh();                       // ...and reconcile, in the background
 }
 

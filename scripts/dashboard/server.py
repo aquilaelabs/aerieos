@@ -13833,9 +13833,10 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(v)
 
     def _project_pin(self, req):
-        """Pin or unpin a project: whether the sidebar card shows it
-        (projects.pin). No session is touched and nothing is blocked: this is
-        the one control of the three that is purely about the view."""
+        """A space made one of this account's favorites or not, kept as its
+        pin: whether Home shows it and the Spaces page's Favorites chip finds
+        it (projects.pin). No session is touched and nothing is blocked: this
+        is the one control of the three that is purely about the view."""
         # A person's own set (the operator, 27 Sep): any signed-in account
         # may pin for itself.
         me = self._who() or {}

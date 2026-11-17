@@ -3,7 +3,7 @@
 // whole install and a link into the page that holds it; under them
 // Attention (the bell's rows, put away there as on the bell) and the last
 // ten jobs, side by side at a desk and stacked on a phone; under those, the
-// pinned projects at a glance. A glance, not a place to act: a tile opens
+// favorite spaces, this person's. A glance, not a place to act: a tile opens
 // its page, a row opens what it is about, and nothing here is a setting.
 //
 // What the status poll carries (sessions, updates, CI) is counted here;
@@ -136,9 +136,9 @@ function homeJobsHtml(){
 }
 
 function homeGlanceHtml(){
-  // Not an archived one (the operator, 18 Oct), pinned or not.
+  // Your favorites, never an archived one.
   const pinned = projectList().filter(c => c.pinned && !c.archived);
-  if (!pinned.length) return `<div class="empty">no space is pinned: the pin by a space's name on the Spaces page puts it here</div>`;
+  if (!pinned.length) return `<div class="empty">no favorite space yet: the star by a space's name on the Spaces page puts it here</div>`;
   // In groups, in the Projects page's order, each group's name over its
   // cards (R273): the page this glances at is sorted so. Each opens its
   // first repository's page (R138).
@@ -210,7 +210,7 @@ function homeStartHtml(){
     ${steps.map(([t, done, act]) => `<div class="hsrow${done ? " done" : ""}"><span class="setnum">${done ? "✓" : ""}</span><span class="grow">${esc(t)}</span>${done ? "" : act}</div>`).join("")}</section></div>`;
 }
 
-// Attention, Last jobs and the pinned projects: the cards under the tiles,
+// Attention, Last jobs and the favorite spaces: the cards under the tiles,
 // with Last jobs' rows handed in (its own, or the shapes of them on the way).
 function homeCards(jobs){
   const needs = needsRows(), hidden = state?.bell_hidden || 0;
@@ -221,7 +221,7 @@ function homeCards(jobs){
               <button type="button" data-brestore>Show again</button></div>` : ""}</section>
         <section class="hcard"><h3>Last jobs</h3>${jobs}</section>
       </div></div>
-      <div class="field"><section class="hsect"><h3>Spaces at a glance</h3>${state ? homeGlanceHtml() : skRows(1)}</section></div>`;
+      <div class="field"><section class="hsect"><h3>Favorites</h3>${state ? homeGlanceHtml() : skRows(1)}</section></div>`;
 }
 
 // The Attention card brought into view and marked a moment: where the
@@ -239,7 +239,7 @@ function renderHomeInto(i){
   if (!d) return;
   if (homeData === null){
     // Its template while /api/home is on its way (R218 step 16): the poll
-    // already holds Attention, the pinned projects and three of the tiles,
+    // already holds Attention, the favorite spaces and three of the tiles,
     // so only the node, container and job numbers and Last jobs wait.
     const tiles = homeTiles().map(t => t.key === "jobs" ? {...t, wait: true, sub: ""} : t);
     if (railAllows("nodes")) tiles.unshift({key: "nodes", label: "nodes online", wait: true},

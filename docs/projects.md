@@ -202,16 +202,15 @@ on the Spaces page, and nothing else follows from it.
 header is the node its work runs on. A space with none says nothing more;
 its Start agent is ghosted with where to pick one.
 
-**A pin** per space, the pin by its name or **Pin** on its back, decides whether
-Home's glance shows it.
-The pins are each person's own: unpinning takes a space off your glance
-and nobody else's, and nothing else: the Spaces page lists everything
-under `/workspace`, pinned or not, with the same controls on each card and
-*unpinned* after the name of one that is not. Pins live per account in
-`/config/pinned-projects.json`. An account made since 7 Oct starts with
-nothing pinned and pins what it wants from the Spaces page; one made
-before that with no set yet still sees everything pinned. The page lists
-spaces by name, case aside.
+**A favorite**, the star by a space's name or **Add to favorites** in its
+page's menu, puts the space on Home and under the Spaces page's
+**Favorites** chip. Favorites are each person's own: taking one off takes it
+off your Home and nobody else's, and nothing else: the Spaces page lists
+everything under `/workspace`, favorite or not, by name, case aside, with
+the same controls on each card. Favorites live per account in
+`/config/pinned-projects.json`. An account made since 7 Oct starts with no
+favorite and stars what it wants from the Spaces page; one made before that
+with no set yet still has every space as a favorite.
 
 **Delete**, a repository's bin icon on a card's back, moves it to
 `/workspace/.trash/<name>` with every file kept: a second delete of the same
@@ -260,7 +259,7 @@ already there when this arrived were recorded once, as they were.
 
 **Archive**, by a space's name or on its back, puts a space out of sight and changes
 nothing else: its card folds under **Archived** at the foot of the Spaces
-page and leaves Home's pinned spaces, and the space keeps working for
+page and leaves Home's favorites, and the space keeps working for
 everybody on it, sessions included. **Unarchive**, in the same places, brings
 it back. The space's owner or an administrator archives one.
 

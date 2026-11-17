@@ -93,9 +93,9 @@ const BIN = `<svg viewBox="0 0 16 16" aria-hidden="true">
   <path d="M4.2 4.3l.7 8.3a1 1 0 0 0 1 .9h4.2a1 1 0 0 0 1-.9l.7-8.3"/>
   <path d="M6.8 6.8v4"/><path d="M9.2 6.8v4"/></svg>`;
 
-// Every project, and the whole of each one. Home is a view of this filtered
-// to what is pinned, so a project that is not on Home has lost nothing but
-// its place there, which is the only promise a pin makes.
+// Every space, and the whole of each one. Home is a view of this filtered
+// to this person's favorites, so a space that is not on Home has lost
+// nothing but its place there, which is the only promise a favorite makes.
 function openProjectsTab(){
   openTab({kind: "projects", arg: "__projects", label: "Spaces"});
 }
@@ -164,12 +164,16 @@ function projectCard(c){
     <div class="pcface pcback"${on ? "" : " inert"}>${cardBack(c)}</div>
   </div>`;
 }
-// A project's mark by its name: pressed in where it is set, a press setting
-// or clearing it. Archive and pin are a person's sight of it, so they sit
-// where the name is read.
+// A space's marks by its name: pressed in where it is set, a press setting
+// or clearing it. Favorite and archive are a person's sight of it, so they
+// sit where the name is read. A favorite is kept as the account's pin.
+// The Favorites chip's key on the Spaces page: no group a person names
+// can be called it.
+const PJ_FAV = "\u2605favorites";
 function cardMarks(c){
-  const pin = c.archived ? "" : `<button type="button" class="eye bare pcmark${c.pinned ? " on" : ""}" data-pmark="${esc(c.key)}" data-on="${c.pinned ? "0" : "1"}"
-      aria-pressed="${c.pinned}" aria-label="${c.pinned ? "Unpin" : "Pin"} ${esc(c.name)}" title="${c.pinned ? "pinned: on Home's glance; press to unpin" : "pin it to Home's glance"}">${PIN}</button>`;
+  const pin = c.archived ? "" : `<button type="button" class="eye bare pcmark pcfav${c.pinned ? " on" : ""}" data-pmark="${esc(c.key)}" data-on="${c.pinned ? "0" : "1"}"
+      aria-pressed="${c.pinned}" aria-label="${c.pinned ? `Remove ${esc(c.name)} from your favorites` : `Make ${esc(c.name)} a favorite`}" title="${c.pinned
+        ? "a favorite of yours: on Home and under Favorites; press to remove it" : "make it a favorite: on Home and under Favorites"}">${STAR}</button>`;
   const arch = c.may_archive ? `<button type="button" class="eye bare pcmark${c.archived ? " on" : ""}" data-kmark="${esc(c.key)}" data-on="${c.archived ? "0" : "1"}"
       aria-pressed="${c.archived}" aria-label="${c.archived ? "Unarchive" : "Archive"} ${esc(c.name)}" title="${c.archived
         ? "archived: folded at the foot of this page; press to bring it back" : "archive it: out of sight at the foot of this page, and working as before"}">${ARCHIVE}</button>` : "";
@@ -234,7 +238,7 @@ function cardBack(c){
   }).join("");
   // The foot is one line of icons at every width (the operator, 25 Oct: one
   // line on either side), each named for a screen reader and a pointer's
-  // hover; Pin and Archive are by the name on the front, a press away.
+  // hover; Favorite and Archive are by the name on the front, a press away.
   const fb = (attr, val, label, icon, extra = "") => `<button type="button" class="ic" ${attr}="${esc(val)}" aria-label="${esc(label)}" title="${esc(label)}"${extra}>${icon}</button>`;
   const tone = colorTone(c.color);
   const foot = [
@@ -552,30 +556,33 @@ function renderProjectsInto(i){
                                        : "no spaces are yours yet: an administrator grants them on the Users page"}</div>`);
     return;
   }
-  // The pinned first, each part by name (the operator, 18 Oct, where on 7
-  // Oct it was by name alone): what is pinned is what is looked for. Sorted
-  // here rather than by the server, which reports the directory order every
-  // other reader wants; each group, and the ungrouped, keeps the order.
-  const shown = ps.filter(p => projectMatches(p, pjQuery))
-    .sort((a, b) => (b.pinned && !b.archived) - (a.pinned && !a.archived) || byProjectName(a, b));
+  // By name, a favorite where its name puts it: the Favorites chip is
+  // what finds them. Sorted here rather than by the server, which reports
+  // the directory order every other reader wants; each group, and the
+  // ungrouped, keeps the order.
+  const shown = ps.filter(p => projectMatches(p, pjQuery)).sort(byProjectName);
   // The ones in no group first, then each of this account's groups under
   // its name, by name (the operator, 18 Oct); and the archived ones apart,
   // folded at the foot, their own fold whatever group they were in.
-  // The chips count every project that is not archived, whatever the search
-  // says, so what the search hides is still counted (the chips rule); one
-  // in force narrows the grid to its group, and the archived fold is All's.
+  // The chips count every space that is not archived, whatever the search
+  // says, so what the search hides is still counted (the chips rule): your
+  // favorites first, then each group; one in force narrows the grid, and
+  // the archived fold is All's. A chip with nothing under it is not drawn,
+  // and with none to draw neither is the band.
   const all = ps.filter(p => !p.archived);
-  const chips = byProjectGroup(all).map(({group: g, list}) => ({key: g || "none", label: g || "No group", count: list.length}));
+  const favs = all.filter(p => p.pinned).length;
+  const groups = byProjectGroup(all).map(({group: g, list}) => ({key: g || "none", label: g || "No group", count: list.length}));
+  const chips = [...(favs ? [{key: PJ_FAV, label: "Favorites", count: favs}] : []), ...(groups.some(c => c.key !== "none") ? groups : [])];
   if (pjChip && !chips.some(c => c.key === pjChip)) pjChip = "";
   const cb = el.querySelector("#pjChips");
-  if (patch(cb, chips.some(c => c.key !== "none") ? chipBar(chips, pjChip, "data-pjchip") : ""))
+  if (patch(cb, chips.length ? chipBar(chips, pjChip, "data-pjchip", all.length) : ""))
     cb.querySelectorAll("[data-pjchip]").forEach(c => c.onclick = () =>
       // The cards and the groups' headings, never a group's box itself: a
       // card in a group that moved slid twice as far, and a group left out
       // was copied whole over the grid.
       chipMove(() => document.querySelector(".pane .doc.on .projtab"), "#pjGrid .pcard, #pjGrid .pjgname",
                () => { pjChip = c.dataset.pjchip; pjChipMove = true; renderProjectsInto(i); pjChipMove = false; }));
-  const inChip = p => !pjChip || (pjChip === "none" ? !p.group : p.group === pjChip);
+  const inChip = p => !pjChip || (pjChip === PJ_FAV ? !!p.pinned : pjChip === "none" ? !p.group : p.group === pjChip);
   const live = shown.filter(p => !p.archived && inChip(p)), gone = pjChip ? [] : shown.filter(p => p.archived);
   const grid_ = list => `<div class="pgrid">${projectCards(list)}</div>`;
   const html = byProjectGroup(live).map(({group: g, list}) => {
@@ -588,7 +595,7 @@ function renderProjectsInto(i){
       }).join("")
     + (gone.length ? docSection("projects", "archived", "Archived", `${gone.length} space${gone.length === 1 ? "" : "s"}`,
                                 grid_(gone), {open: false, cls: "dim", fold: true}) : "");
-  // Any rearrangement slides (the operator, 26 Oct): a rename, a pin, an
+  // Any rearrangement slides (the operator, 26 Oct): a rename, a favorite, an
   // archive, a group, a project made or gone, another person's change on
   // the poll. Each card's place is read before the grid is drawn again, and
   // each that lands elsewhere slides there from it while the rest close up.

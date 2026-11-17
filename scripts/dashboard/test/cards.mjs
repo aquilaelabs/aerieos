@@ -1610,15 +1610,33 @@ ok(await page.$$eval('.doc .projtab .pcard .name',
 ok(await page.$eval('.doc .projtab .pcard[data-row="alpha"]',
      r => !!r.querySelector('[data-c]') && !!r.querySelector('[data-open]')),
    '...still carrying every control, which is the whole promise of the pin');
-// The pinned first on the page, each part by name (the operator, 18 Oct).
-await section("The pinned first on the page, each part by name", async () => {
+// The page is by name, a favorite where its name puts it; the star by a
+// space's name says which are this person's favorites, and the Favorites
+// chip narrows the grid to them, All putting the rest back.
+await section("The page is by name, and Favorites narrows it", async () => {
   const order = await page.evaluate(() => [...document.querySelectorAll('.doc .projtab #pjGrid > .pgrid .pcard')]
-    .map(c => { const p = state.repos[c.dataset.pkey]; return { n: p.name, pin: !!p.pinned }; }));
-  const firstLoose = order.findIndex(o => !o.pin);
-  const sorted = part => part.every((o, i) => !i || part[i - 1].n.localeCompare(o.n) <= 0);
-  ok(firstLoose > 0 && order.slice(firstLoose).every(o => !o.pin)
-     && sorted(order.slice(0, firstLoose)) && sorted(order.slice(firstLoose)),
-     `the pinned spaces come first, each part by name (${order.map(o => `${o.n}${o.pin ? '*' : ''}`).join(', ')})`);
+    .map(c => { const p = state.repos[c.dataset.pkey]; return { n: p.name, fav: !!p.pinned }; }));
+  const sorted = order.every((o, i) => !i || order[i - 1].n.localeCompare(o.n) <= 0);
+  ok(order.length > 1 && sorted && order.some(o => o.fav) && order.some(o => !o.fav),
+     `the spaces are by name, favorite or not (${order.map(o => `${o.n}${o.fav ? '*' : ''}`).join(', ')})`);
+  const star = await page.$eval('.doc .projtab .pcard[data-row="beta"] .pcfront [data-pmark]', b => ({ on: b.getAttribute('aria-pressed'),
+    label: b.getAttribute('aria-label'), filled: getComputedStyle(b.querySelector('svg')).fill }));
+  ok(star.on === 'true' && /^Remove beta from your favorites$/.test(star.label) && star.filled !== 'none',
+     `a favorite's star by its name is pressed in and filled (${JSON.stringify(star)})`);
+  const fav = await page.evaluate(() => PJ_FAV);
+  await page.click(`.doc .projtab [data-pjchip="${fav}"]`);
+  const shown = () => page.evaluate(() => { const cs = [...document.querySelectorAll('.doc .projtab #pjGrid .pcard')];
+    return { n: cs.length, favs: cs.every(c => !!state.repos[c.dataset.pkey]?.pinned),
+             want: projectList().filter(c => c.pinned && !c.archived).length }; });
+  await page.waitForFunction(() => [...document.querySelectorAll('.doc .projtab #pjGrid .pcard')].every(c => !!state.repos[c.dataset.pkey]?.pinned),
+    null, { timeout: 8000 }).catch(() => {});
+  const narrowed = await shown();
+  ok(narrowed.n > 0 && narrowed.favs && narrowed.n === narrowed.want,
+     `the Favorites chip narrows the page to this person's favorites (${JSON.stringify(narrowed)})`);
+  await page.click('.doc .projtab [data-pjchip=""]');
+  await page.waitForFunction(n => document.querySelectorAll('.doc .projtab #pjGrid .pcard').length > n, narrowed.n, { timeout: 8000 }).catch(() => {});
+  const back = await shown();
+  ok(back.n > narrowed.n && !back.favs, `...and All puts the rest back (${JSON.stringify(back)})`);
 });
 // The tab is a document, not a card adrift in one. It used to draw itself
 // inside .card, rounded, bordered and floating on a darker gutter, while the

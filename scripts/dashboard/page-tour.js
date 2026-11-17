@@ -32,7 +32,7 @@ const TOUR_STEPS = {
     // VMs do; the three steps after it turn the card over, the example or
     // the first card on the page, and back again after (the operator, 26 Oct).
     {at: `${TOUR_PANE} .pcard:not(.flipped) .pcfront`, sample: () => tourSampleProject(false), sampleKey: "project", part: true,
-     say: "A space's card: its repositories with their branches, who has a session there, and Start agent. A repository's name opens its notebook; the pin keeps it on Home and the box beside it archives it. Edit turns the card over."},
+     say: "A space's card: its repositories with their branches, who has a session there, and Start agent. A repository's name opens its notebook; the star makes it one of your favorites, on Home, and the box beside it archives it. Edit turns the card over."},
     {at: `${TOUR_PANE} .pcard.flipped .pcback .pcrepo`, sample: () => tourSampleProject(true), sampleKey: "project", part: true, flip: true,
      say: "The back of the card. Each repository has a shell in it, its git host, a rename, a move to another space, and delete, which puts it in the trash."},
     {at: `${TOUR_PANE} .pcard.flipped .pcback .pcfoot`, sample: () => tourSampleProject(true), sampleKey: "project", part: true, flip: true,
@@ -296,7 +296,7 @@ function tourSampleProject(back){
   const fb = (icon, label) => `<button type="button" class="ic" aria-label="${label}">${icon}</button>`;
   return `<div class="field pgridband"><div class="pgrid"><div class="pcard pflip${back ? " flipped" : ""}">
     <div class="pcface pcfront"><div class="pcname"><span class="name">example</span><span class="sp"></span>
-        <button type="button" class="eye bare pcmark">${PIN}</button><button type="button" class="eye bare pcmark">${ARCHIVE}</button></div>
+        <button type="button" class="eye bare pcmark pcfav">${STAR}</button><button type="button" class="eye bare pcmark">${ARCHIVE}</button></div>
       <div class="pcmeta"><span class="pcfacts"><span class="pid">P1</span> · your-node</span></div>
       <div class="pcrepos"><div class="pcrepo"><button type="button" class="namelink">example-web</button><span class="pcfacts"><span class="pbr">main</span></span></div></div>
       <div class="pcacts actbar"><button type="button">Start agent</button><button type="button">Add repository</button><button type="button">Edit</button></div></div>

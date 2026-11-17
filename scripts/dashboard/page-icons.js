@@ -47,10 +47,9 @@ const LOCK = `<svg viewBox="0 0 16 16" aria-hidden="true">${LOCK_BODY}
   <path d="M5 7.2V4.9a3 3 0 0 1 6 0v2.3"/></svg>`;
 const LOCK_OPEN = `<svg viewBox="0 0 16 16" aria-hidden="true">${LOCK_BODY}
   <path d="M5 7.2V4.9a3 3 0 0 1 6 0"/></svg>`;
-// A pushpin: its head, the body widening to its rim, and the needle, beside
-// a pinned project's name on its card (the operator, 19 Oct: a pin where it
-// is pinned, rather than the word on every card that is not).
-const PIN = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 2h5M6.5 2v4L4.5 9h7l-2-3V2M8 9v5"/></svg>`;
+// A five-pointed star by a space's name on its card: filled while the space
+// is one of this person's favorites, an outline while it is not.
+const STAR = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.9l1.85 3.85 4.2.55-3.05 2.95.75 4.2L8 11.45l-3.75 2 .75-4.2-3.05-2.95 4.2-.55z"/></svg>`;
 // A box with its lid and a handle, by a project's name on its card: Archive,
 // pressed in where it is archived (R138).
 const ARCHIVE = `<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.2" y="3" width="11.6" height="3" rx=".8"/>

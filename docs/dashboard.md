@@ -101,9 +101,11 @@ within a few seconds counts as unknown and the tile says "as last seen".
 Under the tiles, Attention is the bell's own rows (a node behind, a red CI
 run, a file changed in two places), dismissed there as on the bell, and
 Last jobs is the ten newest, each opening its row on the Jobs page with
-the log open. Under those, the pinned spaces at a glance, each with its
-repositories, its session state and the one notice it carries; the pin by a
-space's name on the Spaces page puts it here or takes it off. Home reads its numbers when
+the log open. Under those, your favorite spaces, each with its
+repositories, its session state and the one notice it carries; the star by a
+space's name on the Spaces page makes it a favorite or takes it off, and the
+Spaces page's Favorites chip narrows its grid to them. Favorites are each
+person's own. Home reads its numbers when
 it opens, and the queue's again when a job moves; the containers are asked
 only on opening, and nothing is read on a timer. A browser with nothing open lands on it.
 
