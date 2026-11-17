@@ -253,45 +253,6 @@ if __name__ == "__main__":
     unittest.main()
 
 
-class Migration(unittest.TestCase):
-    """users.migrate_r152, once: user accounts to no role, each project's
-    owner to PROJECT_owner on it; the owner role moves with the project."""
-
-    def setUp(self):
-        import users
-        self.users = users
-        self.tmp = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, self.tmp, True)
-        wj = lambda p, d, mode=0o644: open(p, "w").write(json.dumps(d))  # noqa: E731
-        roles.configure(state=self.tmp, write_json=wj)
-        users.configure(state=self.tmp, write_json=wj)
-        with users._lock:
-            d = users.load()
-            d["users"] = {"boss": {"uid": "u_1", "role": "owner", "projects": ["*"]},
-                          "adm": {"uid": "u_2", "role": "admin", "projects": []},
-                          "ann": {"uid": "u_3", "role": "user", "projects": ["alpha"], "roles": ["user", "tester"]},
-                          "bob": {"uid": "u_4", "role": "user", "projects": ["beta"]}}
-            users._save(d)
-
-    def test_users_lose_user_and_owners_hold_their_projects(self):
-        u = self.users
-        self.assertTrue(u.migrate_r152({"alpha": "u_3", "beta": "u_1"}))
-        self.assertEqual(u.get("ann")["roles"], ["tester"], "user taken off, a role of its own kept")
-        self.assertEqual(u.get("bob")["roles"], [])
-        self.assertEqual(u.get("ann")["project_roles"], {"alpha": ["alpha_owner"]})
-        self.assertNotIn("beta", u.get("boss").get("project_roles") or {}, "AerieOS's owner needs none")
-        self.assertEqual(u.get("adm")["role"], "admin")
-        self.assertFalse(u.migrate_r152({"alpha": "u_4"}), "once")
-
-    def test_the_owner_gets_the_owner_role(self):
-        u = self.users
-        u.migrate_r152({"alpha": "u_3"})
-        u.give_owner_role("alpha", "u_4")
-        self.assertNotIn("alpha", u.get("ann").get("project_roles") or {})
-        self.assertEqual(u.get("bob")["project_roles"]["alpha"], ["alpha_owner"])
-        self.assertIn("alpha", u.get("bob")["projects"], "the owner works on what it owns")
-
-
 def write_json(p, d, mode=0o644):
     with open(p, "w") as f:
         json.dump(d, f)
@@ -317,14 +278,6 @@ class R155(unittest.TestCase):
                         "roles": ["dev", "ops"], "project_roles": {"gamma": ["dev"]}},
             }
             users._save(d)
-
-    def test_the_migration_gives_a_listed_project_role_on_each_project(self):
-        self.assertTrue(self.users.migrate_r155())
-        a = self.users.get("ann")
-        self.assertEqual(a["roles"], ["ops"], "an Everywhere role stays the account's")
-        self.assertEqual(a["project_roles"], {"alpha": ["dev"], "beta": ["dev"], "gamma": ["dev"]})
-        self.assertEqual(a["projects"], ["alpha", "beta", "gamma"])
-        self.assertFalse(self.users.migrate_r155(), "once")
 
     def test_assign_follows_the_roles_and_keeps_kinds_apart(self):
         boss = self.users.get("boss")

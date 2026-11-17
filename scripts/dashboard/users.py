@@ -1445,26 +1445,6 @@ def set_projects(name, projects):
     return {"ok": True, "name": name, "projects": u["projects"]}
 
 
-def migrate_star(names):
-    """An owner record that carried "*" (every project, taken on by
-    construction, until R135) gets the projects that exist now by name, so
-    nobody is locked out of what they were on; from then on a new project
-    is taken on like an administrator's. Run once at start, with the
-    projects on disk. Returns how many records moved."""
-    moved = 0
-    with _lock:
-        d = load()
-        for u in d["users"].values():
-            have = list(u.get("projects") or [])
-            if "*" not in have:
-                continue
-            kept = [p for p in have if p != "*"]
-            u["projects"] = (kept + [n for n in sorted(names) if n not in kept])[:200]
-            moved += 1
-        if moved:
-            _save(d)
-    return moved
-
 def give_owner_role(project, new_uid, old_uid=""):
     """PROJECT_owner moves with the project (R152): off the account that
     owned it, onto the one that does, on that project alone."""
@@ -1489,27 +1469,6 @@ def give_owner_role(project, new_uid, old_uid=""):
     return name
 
 
-def migrate_r152(owned):
-    """Once (R152, the operator, 7 Oct): an account on `user` carries no role
-    and so no permission, and each project's owner (`owned`, {project: uid},
-    AerieOS's owner's own projects left out, since it holds everything)
-    holds PROJECT_owner on it. Marked done in the store."""
-    with _lock:
-        d = load()
-        if d.get("r152"):
-            return False
-        for u in d["users"].values():
-            if u.get("role") not in ("owner", "admin"):
-                u["role"] = "user"
-                u["roles"] = [r for r in (u.get("roles") or []) if r not in ("user", "owner", "admin")]
-        d["r152"] = True
-        _save(d)
-    for project, uid in sorted((owned or {}).items()):
-        if uid and uid != owner_uid():
-            give_owner_role(project, uid)
-    return True
-
-
 def give_project_role(project, uid, role):
     """Add one role on one project to an account, which puts it on the
     project (R155): an invitation accepted."""
@@ -1526,44 +1485,6 @@ def give_project_role(project, uid, role):
             if project not in u["projects"] and "*" not in u["projects"]:
                 u["projects"].append(project)
         _save(d)
-
-
-def migrate_r155():
-    """Once (R155, the operator, 8 Oct): a role on a project is given on the
-    project, never through the account's own list, and being on a project is
-    holding a role there. A project role an account held through its list
-    is given on each project it was on, so nobody gains or loses anything
-    (an account on every project, "*", gets it on each one there is now);
-    a project it was on with no role, which allowed nothing, is let go.
-    AerieOS's owner and administrators hold everything and are left as
-    they are. Marked done in the store."""
-    import registry
-    known = roles.all_roles()
-    every = sorted(registry.labels()) if registry.FILE is not None else []
-    with _lock:
-        d = load()
-        if d.get("r155"):
-            return False
-        for u in d["users"].values():
-            if u.get("role") in ("owner", "admin"):
-                continue
-            pr = u.get("project_roles") if isinstance(u.get("project_roles"), dict) else {}
-            on = list(u.get("projects") or [])
-            on = every if "*" in on else on
-            keep = []
-            for rn in u.get("roles") or []:
-                r = known.get(rn)
-                if r and r.get("scope") == "projects":
-                    for p in on:
-                        pr[p] = sorted(set((pr.get(p) or []) + [rn]))
-                else:
-                    keep.append(rn)
-            u["roles"] = keep
-            u["project_roles"] = {p: rs for p, rs in pr.items() if rs}
-            u["projects"] = sorted(u["project_roles"])
-        d["r155"] = True
-        _save(d)
-    return True
 
 
 def take_on(name, project):

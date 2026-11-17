@@ -324,8 +324,6 @@ function startClaude(name, sessionId, node, slot = 1){
 // one of the project's nodes, a new conversation in a tab of its own, named
 // for the agent. Its session is its own beside a Claude one, in a tree of
 // its own (session_dir), so one person may run both on a project at once.
-const agentLiveOn = (id, name, n, slot = 1) => (state?.sessions || []).some(s => s.name === myAgentSession(id, name, slot)
-  && (!n.id || s.node_id === n.id));
 function launchAgent(id, name, node, model = "", effort = "", sessionId = "", slot = 1){
   const a = agentById(id);
   if (!a) return;

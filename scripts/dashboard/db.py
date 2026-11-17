@@ -11,16 +11,12 @@ The one-way doors this module owns were paid when the store first landed
   * ids are minted, never addresses, never reused (door 1);
   * every mutation is attributed and audited from the first day there is a
     table to write it in (door 2);
-  * the SQL runs on two engines behind numbered migrations from 0001:
-    parameters go through _q(), JSON is TEXT, ids and times are app-side
-    (door 6);
+  * the schema moves only by numbered migrations from 0001: JSON is TEXT,
+    ids and times are app-side (door 6);
   * nothing in the schema assumes one operator: pools, token kinds and
     principals are data, not booleans (door 8).
 
-Storage is /config/builderbot.db unless DATABASE_URL says otherwise. SQLite
-is the homelab default; a postgres:// URL is the enterprise seam (E1) and is
-refused loudly until that phase is built, which beats accepting it and
-half-working. The notebook's JSON files are NOT this module's business: they
+Storage is /config/builderbot.db, SQLite. The notebook's JSON files are NOT this module's business: they
 are small, human-edited and read whole, and they stay where they are.
 """
 
@@ -42,8 +38,7 @@ MIGRATIONS = HERE / "migrations"
 STATE = None
 _db = None
 # One connection, one lock. sqlite3 serializes on its own, but a lock makes
-# read-modify-write sequences whole, and it is the shape the postgres
-# implementation will keep, so callers never learn a difference.
+# read-modify-write sequences whole.
 _lock = threading.RLock()
 
 
@@ -68,24 +63,11 @@ def open_readonly(state):
 
 
 # ---------------------------------------------------------------------------
-# the engine seam
-
-def _url():
-    return (os.environ.get("DATABASE_URL") or "").strip()
-
+# the engine
 
 def _open():
     global _db
-    url = _url()
-    if url and not url.startswith("sqlite:"):
-        # The seam exists so this becomes a config change (docs/nodes.md §5);
-        # accepting the URL before the engine is built would half-work, which
-        # is worse than refusing with the phase that fixes it named.
-        raise RuntimeError(
-            f"DATABASE_URL={url.split('://')[0]}://… is not supported yet: "
-            "SQLite is the built engine; Postgres is enterprise track E1")
-    path = url[len("sqlite:"):].lstrip("/") if url else ""
-    dbfile = Path("/" + path) if path else STATE / "builderbot.db"
+    dbfile = STATE / "builderbot.db"
     dbfile.parent.mkdir(parents=True, exist_ok=True)
     _db = sqlite3.connect(dbfile, check_same_thread=False)
     _db.row_factory = sqlite3.Row
@@ -96,19 +78,9 @@ def _open():
     _db.execute("PRAGMA synchronous=NORMAL")
 
 
-def _q(sql):
-    """The paramstyle seam: written as `?`, translated per engine.
-
-    SQLite wants qmark and postgres wants format. Trivial today, and the whole
-    point is that it stays trivial: every statement goes through here, so the
-    day E1 lands, this function and _open() are the diff rather than a hunt.
-    """
-    return sql
-
-
 def _exec(sql, args=()):
     with _lock:
-        cur = _db.execute(_q(sql), args)
+        cur = _db.execute(sql, args)
         if not (_held and _held_by == threading.get_ident()):
             _db.commit()
         return cur
@@ -147,7 +119,7 @@ def transaction():
 
 def _rows(sql, args=()):
     with _lock:
-        return [dict(r) for r in _db.execute(_q(sql), args).fetchall()]
+        return [dict(r) for r in _db.execute(sql, args).fetchall()]
 
 
 # ---------------------------------------------------------------------------

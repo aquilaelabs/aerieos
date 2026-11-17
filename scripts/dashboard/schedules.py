@@ -392,10 +392,7 @@ def _record(sid, **fields):
 
 def _argv(s):
     """What the job runs: the script, by bash."""
-    script = s.get("script") or ""
-    env = s.get("env") or {}
-    pre = "".join(f"export {k}={json.dumps(v)}\n" for k, v in env.items() if v)
-    return ["bash", "-c", pre + script]
+    return ["bash", "-c", s.get("script") or ""]
 
 
 def fire(s, by, queue, late="", at=None):

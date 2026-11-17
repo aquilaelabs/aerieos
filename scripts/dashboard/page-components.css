@@ -2396,9 +2396,6 @@ button[aria-busy="true"]{opacity:.75}
 /* The whole of a mount's reason, under its row (B660): the cell at the end
    of the line keeps the state's first words. */
 .ndmount .ndmwhy{grid-column:1 / -1;white-space:normal;overflow-wrap:anywhere;margin-top:-2px}
-.ndstore{display:grid;grid-template-columns:minmax(0,7em) minmax(0,1fr);gap:6px;align-items:center}
-.ndstore label{font:var(--f-ui);color:var(--ink)}
-.ndstore .sub{grid-column:2}
 /* The mapping's row is an action bar (its field, then Save and Check), so
    it lays out like every other bar; the input takes the room before them. */
 .ndpaths input,.ndname input{flex:1 1 auto;min-width:0}

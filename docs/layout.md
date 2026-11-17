@@ -446,13 +446,11 @@ test/nettest/Dockerfile          its image: alpine with curl, dig and nc, runnin
 test/nettest/probe.sh            the probe itself: DNS, the internet, the controller, the node's 80 and 443, and not its 22, the private ranges or IPv6; PASS/FAIL per line in the log
 test/nettest/.env.example        the two addresses it needs: the controller's and the node's
 tools/american-spelling.sh       the house rule spelling's check: no British spelling on a line this branch adds
-tools/no-net-growth.sh           the everything-files against their ceilings in tools/ratchet.txt (R77)
 tools/upgrade-snapshot.py        a lived-in /config made by this tree's controller through its API, written to scripts/dashboard/test/upgrade/VERSION/ for the upgrade suite, one taken at an older state kept beside it as VERSION-stateN; a release runs it
 tools/upgrade-image.sh           the built image started on each release snapshot of /config through its own entrypoint: it answers, the stamp is the image's state, a copy was taken, the owner signs in (the image workflow's upgrade job)
 tools/vscode-vsix.py             packages apps/vscode/ as a .vsix with python's zipfile, AerieOS's version inside (R159)
 tools/companion-build.py         builds the Windows companion as one .pyz with the four agent modules its sync is (R270)
 tools/app-schemes.py             writes the Android app's twelve color schemes, both halves, from the design record (aerie design json | tools/app-schemes.py)
-tools/ratchet.txt                those ceilings, one per file
 pyrightconfig.json               how pyright (the pyright-lsp plugin, or the CLI) reads this repo: each directory's imports and Python
                                  version, with the None checks off, since a module's configure() fills what it declares as None
 tools/version-stamp              this repo's own stamp hook: a bump moves the compatibility

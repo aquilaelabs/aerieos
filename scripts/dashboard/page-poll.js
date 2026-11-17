@@ -269,7 +269,6 @@ async function refresh(){
       const p = (state.projects || []).find(x => x.name === nb.project);
       if (p) nb.poll(p);
     }));
-    drawCard(null, gateFindings);
     drawCard("doctor", drawDoctor);
     drawCard(null, watchSignin);
     // A scan re-ran on the host: drop the cache, and any notebook showing
@@ -381,10 +380,6 @@ function dropGoneNotebooks(){
   gone.forEach(t => hideTab(t.id));
   if (front && gone.includes(front) && !tabOf(front.id)){ railWant = "projects"; openProjectsTab(); }
 }
-
-// The Analysis page stays where it was put when there are no reports: it is a
-// page, which says so on itself, not a tab somebody has to close by hand.
-function gateFindings(){}
 
 // ---- what changed, and who cares ------------------------------------------
 

@@ -272,14 +272,6 @@ function termPreview(theme, look = {}){
   </div>`;
 }
 
-// The project a terminal's argument is about, for its person's colors there.
-function termProject(arg){
-  const a = String(arg || "");
-  const ag = agentOfArg(a);
-  if (ag) return ag.project;
-  const m = /^(?:sh:\d+:|shell:|vm:)([^:]+)/.exec(a);
-  return m ? m[1] : "";
-}
 
 // This person's look for this tab: their Profile's, for every space alike
 // (R223: a space's own colors went, its card's color telling spaces apart).

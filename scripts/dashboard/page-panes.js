@@ -41,12 +41,6 @@ function paintBar(pane, t, i){
     }
     return;
   }
-  // Only the kinds that still declare it. Toolchains moved its own into the tab
-  // beside the node picker, where a control belongs: this bar is the tab's
-  // name and its close button everywhere else, and a third thing in it was a
-  // shape one tab had and no other.
-  const reload = TABKINDS[t.kind]?.reload
-    ? `<button class="ic" data-reload="${esc(t.kind)}" data-style="margin-left:8px">reload</button>` : "";
   // A page (R218 step 2) wears its group's sub-nav, or its name, and no
   // close: the rail is how you leave it. A project (step 3) wears its
   // header: the name, the facts, the session's state and its actions.
@@ -58,9 +52,9 @@ function paintBar(pane, t, i){
   // every draw, the page's sub-nav and a project's header were rebuilt by
   // each poll under the pointer that was about to press them; patched, the
   // header's repository pulldown and its menus are kept as they are (R244).
-  const fresh = patch(bar, isToolKind(t.kind) ? shellBar(t, i) + reload
+  const fresh = patch(bar, isToolKind(t.kind) ? shellBar(t, i)
     : proj ? projectHeader(t)
-    : `<span title="${esc(tabTitle(t))}">${esc(tabLabel(t))}</span>${reload}`, true);
+    : `<span title="${esc(tabTitle(t))}">${esc(tabLabel(t))}</span>`, true);
   bar.classList.toggle("page", isToolKind(t.kind));
   bar.classList.toggle("proj", proj);
   bar.classList.toggle("machines", isToolKind(t.kind) && groupOf(t.kind)?.key === "machines");
@@ -68,9 +62,6 @@ function paintBar(pane, t, i){
   if (fresh){
     wireShellBar(bar);
     if (proj) wireProjectHeader(bar);
-    bar.querySelectorAll("[data-reload]").forEach(b =>
-      b.onclick = e => { e.stopPropagation();
-        loadFindings(true); });
   }
   if (proj) syncResumeMenu();
   // The project's color on the strip too, so a split pane says whose it is.

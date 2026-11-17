@@ -567,9 +567,8 @@ homelab with off-LAN nodes.
 
 ## 5. Storage
 
-**SQLite by default, Postgres by configuration.** Nodes, jobs, job logs,
-artifacts, tokens, audit: all in one database, which is `/config/builderbot.db`
-until somebody sets `DATABASE_URL`.
+**SQLite.** Nodes, jobs, job logs, artifacts, tokens, audit: all in one
+database, `/config/builderbot.db`.
 
 This reverses an earlier decision (the notebook chose flock'd JSON over
 SQLite), and the reversal does not contradict it: the notebook is small,
@@ -1456,8 +1455,8 @@ power-off the node reads away until somebody switches the machine on.
 
 Profiles rather than knobs: the config surface stays one file/env-set, and the
 **defaults are the homelab** (SQLite, single-use tokens auto-approved, local
-node enabled, no OIDC). An enterprise install sets `DATABASE_URL`, an OIDC
-block, and approval mode, and nothing else changes meaning.
+node enabled, no OIDC). An enterprise install would add a database server, an
+OIDC block, and approval mode, and nothing else would change meaning.
 
 ### The unhardwiring
 
@@ -1470,7 +1469,7 @@ shift to be explicit. So it is a standing rule with a precedence contract,
 not a one-off migration:
 
 - **Every env var gets a scope from §13.** Container-scoped ones (ports,
-  mounts, credentials, `DATABASE_URL`) stay env forever; that is what env is
+  mounts, credentials) stay env forever; that is what env is
   for. Everything controller-scoped moves to the DB-backed settings
   Controller settings edits.
 - **Precedence: env seeds, the database owns.** On first boot a set env var
@@ -1831,7 +1830,7 @@ zone. Per viewer, cosmetic, instant. Stays where it is: the gear's popup.
 Nothing here changes.
 
 **Container-scoped**, what the process needs before it can think: ports,
-mounts, credentials, PUID/PGID, `DATABASE_URL` itself. Stays in the
+mounts, credentials, PUID/PGID. Stays in the
 environment and the five documented places. The test for this scope: *if
 changing it means recreating the container, it is env.* This list should only
 ever shrink: `DOCKER_HOST` leaving it (§11) is the pattern. *Where it stands
@@ -2170,8 +2169,8 @@ anything, and the order is a sketch of how it would go if the fantasy ever
 grew a name. The binding part of this document for enterprise purposes is not
 this list; it is §15, the doors.
 
-- **E1: Postgres** via `DATABASE_URL` (the storage rule from phase 1 is what
-  makes this a config change).
+- **E1: Postgres** (the storage rule from phase 1, every statement through
+  db.py's few calls, is what keeps that change small).
 - **E2: bulk enrollment + approval queue + agent self-update + the Go
   agent.** The fleet phase.
 - **E3: OIDC/SSO + roles** (admin/operator/viewer, then per-pool) on the
