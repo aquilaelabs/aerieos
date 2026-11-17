@@ -1203,23 +1203,39 @@ function rnLoadSnapshots(name, keep = false){
   });
 }
 
+// A space's snapshots as a record list (the record-lists rule): a day a row,
+// read-only in its columns (when, files, size, whether it is pinned), its
+// Restore opening the row in place, where a file is restored by its path or
+// the whole tree, and the day pinned or let go. Take one now is the
+// section's own bar, over the list.
+const SNAP_COLS = [{label: "Taken"}, {label: "Files", w: "5rem", num: true}, {label: "Size", w: "6rem", num: true},
+  {label: "Kept", w: "6rem"}, {act: true, w: "6rem"}];
+let rnSnapOpen = "";              // the day whose row is open
 function rnDrawSnapshots(){
   if (!rnSnap) return;
   const name = rnFor;
   $("rnSnapField").hidden = false;
   const days = rnSnap.days || [];
+  if (!days.some(d => d.day === rnSnapOpen)) rnSnapOpen = "";
   const when = d => d.at ? new Date(d.at * 1000).toLocaleString([], {dateStyle: "medium", timeStyle: "short"}) : d.day;
-  drawHTML($("rnSnapRows"), (days.length ? days.map(d => `<div class="rnsnap actbar" data-day="${esc(d.day)}">
-      <span class="grow">${esc(when(d))}${d.pinned ? ` <span class="pill note" title="kept whatever the days kept say">pinned</span>` : ""}${d.why ? ` <span class="dim">(${esc(d.why.replace(/-/g, " "))})</span>` : ""}
-        <span class="dim">· ${d.files} files · ${esc(humanBytes(d.bytes))}</span></span>
-      <input type="text" data-snapfile placeholder="a file, from the tree's top" spellcheck="false" autocomplete="off"
-             aria-label="the file to restore from this day">
-      <button type="button" data-snapone disabled>Restore file</button>
-      <button type="button" data-snapall>Restore all</button>
-      <button type="button" data-snappin="${d.pinned ? "unpin" : "pin"}" title="${d.pinned ? "let it go with the rest when it is older than the days kept" : "keep this day whatever the days kept say"}">${d.pinned ? "Unpin" : "Pin"}</button>
-    </div>`).join("")
-    : `<div class="dim">none yet: the first is taken within half an hour of the setting being above 0</div>`)
-    + `<div class="actbar"><button type="button" data-snaptake>Take one now</button></div>`);
+  const form = d => `<div class="snapform">
+      <label class="setrow col ctlrow snapfile"><span class="lbl">A file, from the tree's top</span>
+        <input type="text" data-snapfile placeholder="src/app.js" spellcheck="false" autocomplete="off"></label>
+      <div class="actbar"><button type="button" class="lead" data-snappin="${d.pinned ? "unpin" : "pin"}" title="${d.pinned
+        ? "let it go with the rest when it is older than the days kept" : "keep this day whatever the days kept say"}">${d.pinned ? "Unpin" : "Pin"}</button>
+        <span class="sp"></span>
+        <button type="button" data-snapcancel>Cancel</button>
+        <button type="button" data-snapone disabled>Restore file</button>
+        <button type="button" data-snapall>Restore all</button></div>
+    </div>`;
+  const row = d => `<div class="row snaprec${rnSnapOpen === d.day ? " open" : ""}" data-day="${esc(d.day)}">${tblLine(SNAP_COLS, [
+      `${esc(when(d))}${d.why ? ` <span class="dim">(${esc(d.why.replace(/-/g, " "))})</span>` : ""}`,
+      esc(String(d.files)), esc(humanBytes(d.bytes)),
+      d.pinned ? `<span class="pill note" title="kept whatever the days kept say">pinned</span>` : "",
+      rnSnapOpen === d.day ? "" : `<button type="button" data-snapopen>Restore</button>`])}${rnSnapOpen === d.day ? form(d) : ""}</div>`;
+  drawHTML($("rnSnapRows"), `<div class="addbar ctlrow"><button type="button" data-snaptake>Take one now</button></div>`
+    + (days.length ? tblWrap(SNAP_COLS, days.map(row).join(""), "snaprecords")
+       : `<div class="dim">none yet: the first is taken within half an hour of the setting being above 0</div>`));
   const pinned = days.filter(d => d.pinned).length;
   $("rnSnapHint").textContent = (rnSnap.keep
     ? `One a day, kept ${rnSnap.keep} day${rnSnap.keep === 1 ? "" : "s"}. A restore snapshots the tree first, so it can be undone from the line it leaves.`
@@ -1238,8 +1254,12 @@ function rnDrawSnapshots(){
       rnLoadSnapshots(name);
     });
   };
-  $("rnSnapRows").querySelectorAll(".rnsnap").forEach(row => {
+  $("rnSnapRows").querySelectorAll(".snaprec").forEach(row => {
     const day = row.dataset.day;
+    const open = row.querySelector("[data-snapopen]");
+    if (open) open.onclick = () => { rnSnapOpen = day; rnDrawSnapshots(); row.closest(".body")?.querySelector(`.snaprec[data-day="${CSS.escape(day)}"] [data-snapfile]`)?.focus(); };
+    if (!row.classList.contains("open")) return;
+    row.querySelector("[data-snapcancel]").onclick = () => { rnSnapOpen = ""; rnDrawSnapshots(); };
     row.querySelector("[data-snapall]").onclick = e => act(e.target, {action: "restore", day},
       `Put all of ${name} back as it was on ${day}?\n\nFiles changed since are written back and files added since are removed, on the controller and then every node. The tree as it is now is snapshotted first.`);
     const pin = row.querySelector("[data-snappin]");

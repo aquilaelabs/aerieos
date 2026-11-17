@@ -944,6 +944,12 @@ body.firstrun #panes{display:none}
 .ngrecords>.ngrec.open{background:var(--sunk);padding:var(--row-y) var(--row-x)}
 .ngrecords>.ngrec.open>.tline{display:none}
 .ngform{display:flex;flex-direction:column;gap:var(--field-gap);min-width:0}
+/* A snapshot's row opened: its line stays, its restore under it, the file's
+   field the width of the row and the day's verbs in the bar's order. */
+.snaprecords>.snaprec.open{background:var(--sunk)}
+.snapform{display:flex;flex-direction:column;gap:var(--field-gap);min-width:0;padding:0 var(--row-x) var(--row-y)}
+.snapform>.snapfile{margin:0;max-width:none}
+.snapform>.actbar{margin:0;padding:0}
 /* The fields sit under the table's own columns, the buttons' column left
    empty, so a route's form lines up with the line it opened from; the row
    of them is the record's, so its fields are not capped one by one. */

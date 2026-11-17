@@ -690,13 +690,23 @@ await section("a project's daily snapshots", async () => {
   ok(took.status === 200 && took.body.files > 0, `Take one now snapshots the tree (${took.body.files} files)`);
   await page.evaluate(() => { openProjectSettings('alpha'); });
   await openFold(page, 'details.sect[data-sect="rn:snapshots"]');
-  await page.waitForSelector('#rnSnapRows .rnsnap', { timeout: 15000 });
+  await page.waitForSelector('#rnSnapRows .snaprec', { timeout: 15000 });
+  // The days are a record list (Perch): a row read-only in its columns, a
+  // Take one now in the section's own bar over it, and its Restore opening
+  // the row in place.
+  const shape = await page.$eval('#rnSnapRows', b => ({ take: !!b.querySelector(':scope > .addbar [data-snaptake]'),
+    heads: [...b.querySelectorAll('.tbl.snaprecords .thead .th')].map(h => h.textContent.trim()).filter(Boolean),
+    shut: !b.querySelector('.snaprec [data-snapfile]') }));
+  ok(shape.take && shape.heads.join(',') === 'Taken,Files,Size,Kept' && shape.shut,
+     `the days are a record list with Take one now over it, each row shut until its Restore opens it (${JSON.stringify(shape)})`);
+  await page.click('#rnSnapRows .snaprec [data-snapopen]');
+  await page.waitForSelector('#rnSnapRows .snaprec.open [data-snapfile]', { timeout: 10000 });
   writeFileSync(`${DIR}/ws/alpha/snapped.txt`, 'tampered\n');
   page.dialogs.length = 0;
-  await page.fill('#rnSnapRows .rnsnap [data-snapfile]', 'snapped.txt');
-  await page.click('#rnSnapRows .rnsnap [data-snapone]');
+  await page.fill('#rnSnapRows .snaprec.open [data-snapfile]', 'snapped.txt');
+  await page.click('#rnSnapRows .snaprec.open [data-snapone]');
   await page.waitForFunction(() => /restored: 1 written/.test(document.querySelector('#notify, .notify, .toast')?.textContent || '')
-                             || document.querySelectorAll('#rnSnapRows .rnsnap').length >= 2, null, { timeout: 15000 });
+                             || document.querySelectorAll('#rnSnapRows .snaprec').length >= 2, null, { timeout: 15000 });
   ok(readFileSync(`${DIR}/ws/alpha/snapped.txt`, 'utf8') === 'as it was\n' && page.dialogs.length === 1
      && /Put snapped.txt back/.test(page.dialogs[0]),
      'Restore file asks, then puts the file back as it was that day');
@@ -707,15 +717,17 @@ await section("a project's daily snapshots", async () => {
   {
     await page.evaluate(() => { openProjectSettings('alpha'); });
     await openFold(page, 'details.sect[data-sect="rn:snapshots"]');
-    await page.waitForSelector('#rnSnapRows .rnsnap [data-snappin="pin"]', { timeout: 15000 });
-    const day = await page.$eval('#rnSnapRows .rnsnap', r => r.dataset.day);
-    await page.click(`#rnSnapRows .rnsnap[data-day="${day}"] [data-snappin]`);
-    await page.waitForSelector(`#rnSnapRows .rnsnap[data-day="${day}"] [data-snappin="unpin"]`, { timeout: 15000 });
-    const marked = await page.$eval(`#rnSnapRows .rnsnap[data-day="${day}"]`, r => /pinned/.test(r.textContent));
+    await page.waitForSelector('#rnSnapRows .snaprec', { timeout: 15000 });
+    const day = await page.$eval('#rnSnapRows .snaprec:not([data-day*="before"])', r => r.dataset.day);
+    if (!await page.$(`#rnSnapRows .snaprec.open[data-day="${day}"]`)) await page.click(`#rnSnapRows .snaprec[data-day="${day}"] [data-snapopen]`);
+    await page.waitForSelector(`#rnSnapRows .snaprec[data-day="${day}"] [data-snappin="pin"]`, { timeout: 15000 });
+    await page.click(`#rnSnapRows .snaprec[data-day="${day}"] [data-snappin]`);
+    await page.waitForSelector(`#rnSnapRows .snaprec[data-day="${day}"] [data-snappin="unpin"]`, { timeout: 15000 });
+    const marked = await page.$eval(`#rnSnapRows .snaprec[data-day="${day}"]`, r => /pinned/.test(r.textContent));
     const listed = (await page.evaluate(async () => (await (await fetch('/api/snapshots?project=alpha')).json())));
     const hint = await page.$eval('#rnSnapHint', h => h.textContent);
-    await page.click(`#rnSnapRows .rnsnap[data-day="${day}"] [data-snappin]`);
-    await page.waitForSelector(`#rnSnapRows .rnsnap[data-day="${day}"] [data-snappin="pin"]`, { timeout: 15000 });
+    await page.click(`#rnSnapRows .snaprec[data-day="${day}"] [data-snappin]`);
+    await page.waitForSelector(`#rnSnapRows .snaprec[data-day="${day}"] [data-snappin="pin"]`, { timeout: 15000 });
     ok(marked && listed.days.find(d => d.day === day)?.pinned === true && /1 pinned/.test(hint),
        `Pin keeps a day and its row says pinned, Unpin lets it go again (${day} ${hint})`);
   }
