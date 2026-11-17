@@ -58,6 +58,7 @@
 - A node's Repositories and its USB controllers are tables at a desk, one line each; Network says the address, gateway, DNS and the service a change goes through as facts; Sessions counts the sessions open by space, gives each coding agent's version alone and says which you are signed in to as a fact; and Storage's waiting changes no longer repeat a mount's whole reason, which stays under its row (44f6a7f)
 - A list of rows in a section starts where the section's title does, on the Installed page, Storage, Profile and a node's USB devices; it sat further in (58ea9c9)
 - Nostromo dresses the rail, the search, the tiles, the cards' heads and the dock: steel, readouts with scanlines and a hazard stripe along the dock's edge in its dark half, wall panels and the door's red and white stripe in its light half; the header's pipes no longer run under the space's name and the search (586f9f7)
+- The Git view's history lists the commits by day, with the branch lanes under a Graph switch, and goes past a hundred commits as you scroll to its foot, its head saying how many there are; Changes says each file's lines added and removed and opens the diffs by themselves only when three files or fewer have changed (a549e40)
 
 ### Fixed
 
