@@ -2330,6 +2330,9 @@ body.firstrun #panes{display:none}
    operator, 22 Oct: on a phone the switches ran to the edge under the inset
    facts). */
 .ndsettings>.field{padding:2px var(--row-x);margin:0}
+/* A node's Sessions settings as a group of their own: its heading at the
+   fields' inset. */
+.ndsettings>.ndsetgroup>.fgrouphead{padding:0 var(--row-x)}
 .ndsettings>.field>.ndcap{min-height:32px}
 .ndsettings>.field>.sub{margin-top:2px}
 /* ...its two numbers side by side, a phone stacking them. */
