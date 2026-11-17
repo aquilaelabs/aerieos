@@ -41,7 +41,7 @@ async function drawTrash(){
     let r = await postJSON("/api/trash-restore", {name: b.dataset.trestore});
     // Its project is gone (R138): which one it goes back into is asked.
     if (r?.pick){
-      const to = projectList().filter(c => c.may && !c.archived);
+      const to = projectList().filter(c => c.may);
       const got = to.length ? await askInline(b.closest(".trow"), {label: `Put ${b.dataset.trestore} back into`, ok: "Put back",
                                                                    options: to.map(c => c.name)}) : null;
       const c = got && to.find(x => x.name.toLowerCase() === got.toLowerCase());
@@ -213,7 +213,7 @@ function cardFront(c){
     ${first ? projNotes(first) : ""}
     <div class="pcacts actbar">${first ? agentButton(first)
       : `<button type="button" disabled title="Add a repository first">Start agent</button>`}${
-      c.may && !c.archived && !state?.session && state?.can?.create !== false ? `<button type="button" data-repadd="${esc(c.key)}">Add repository</button>` : ""}
+      c.may && !state?.session && state?.can?.create !== false ? `<button type="button" data-repadd="${esc(c.key)}">Add repository</button>` : ""}
       <button type="button" data-pedit="${esc(c.key)}" aria-expanded="false">Edit</button></div>`;
 }
 // What a space says besides its facts, from the repository a session runs
@@ -400,7 +400,7 @@ async function renameRepository(btn){
 // change; refused while a session runs on either.
 async function moveRepository(btn){
   const name = btn.dataset.rmove, from = reposOf(name);
-  const to = projectList().filter(c => c.key !== from && c.may && !c.archived);
+  const to = projectList().filter(c => c.key !== from && c.may);
   if (!to.length){ notify("there is no other space of yours to move it to: New space makes one", true); return; }
   const got = await askInline(btn.closest(".pcback")?.querySelector(".pcname") || btn.closest(".pcrepo"), {label: `Move ${projLabel(name)} to`, ok: "Move",
                                                        options: to.map(c => c.name)});

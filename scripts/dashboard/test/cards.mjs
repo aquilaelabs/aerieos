@@ -1375,6 +1375,7 @@ await page.waitForFunction(() => !!document.querySelector('.doc .projtab details
     return { fold: fold?.dataset.sect || '', foldShut: fold ? !fold.open : null,
              said: fold?.querySelector(':scope > summary .sst')?.textContent || '',
              back: [...(c?.querySelectorAll('.pcback .pcacts button') || [])].map(b => b.getAttribute('aria-label')),
+             add: !!c?.querySelector('.pcfront [data-repadd]'),
              star: !!c?.querySelector('.pcfront [data-pmark]'),
              unarchive: c?.querySelector('.pcfront [data-kmark]')?.getAttribute('aria-label') || '',
              mark: !!c?.querySelector('.lockmark'),
@@ -1382,8 +1383,8 @@ await page.waitForFunction(() => !!document.querySelector('.doc .projtab details
                ? projectList().filter(x => x.pinned).some(x => x.key === reposOf('alpha')) : null };
   });
   ok(arch.fold === 'projects:archived' && arch.foldShut === true && /^\d+ spaces?$/.test(arch.said)
-     && /^Unarchive/.test(arch.unarchive) && arch.star && arch.back.some(t => /^Group/.test(t)) && arch.home !== false && !arch.mark,
-     `an archived space's card is folded away under Archived, Unarchive by its name, its star and its Group as any card's, a favorite still a favorite, and not locked (${JSON.stringify(arch)})`);
+     && /^Unarchive/.test(arch.unarchive) && arch.star && arch.back.some(t => /^Group/.test(t)) && arch.add && arch.home !== false && !arch.mark,
+     `an archived space's card is folded away under Archived, Unarchive by its name, its star, its Group and Add repository as any card's, a favorite still a favorite, and not locked (${JSON.stringify(arch)})`);
 // Turned over inside the fold, its back is whole on the screen: every
 // control of it above the dock's line and nothing over it, the dock shut
 // as a person pulls it down to work on the page.
