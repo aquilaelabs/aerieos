@@ -81,9 +81,9 @@ function rolesAccessFields(name){
   const d = rolesData;
   if (rolesWho !== name){ rolesWho = name; rolesPeopleDraft = null; }
   const p = rolesPerson();
-  if (!p) return `<div class="field"><div class="sub dim">${esc(name)}'s roles are not yours to give.</div></div>`;
+  if (!p) return `<div class="sub dim">${esc(name)}'s roles are not yours to give.</div>`;
   if (p.role === "owner")
-    return `<div class="field"><div class="sub">AerieOS's owner: every area, everywhere, and not changed here.</div></div>`;
+    return `<div class="sub">AerieOS's owner: every area, everywhere, and not changed here.</div>`;
   if (!rolesPeopleDraft) rolesPeopleDraft = rolesPeopleFrom(p);
   const dr = rolesPeopleDraft;
   // Accounts and roles Read alone: the same fields, to read (B34).
@@ -226,8 +226,10 @@ async function rolesAccessOpen(name, saved = () => {}){
   rolesWho = ""; rolesPeopleDraft = null;
   drawHTML(m, `<div class="box"><h3>${esc(name)}'s roles</h3><div id="raFields"></div>
     ${dlgFoot(`<button type="button" id="raCancel">Cancel</button>`, `<button type="button" id="raSave" class="primary">Save</button>`)}</div>`);
-  const draw = () => { const box = m.querySelector("#raFields");
-    drawHTML(box, rolesAccessFields(name)); wireRolesAccess(box, draw); };
+  // In the dialog a line said alone is a field band, as every dialog's
+  // lines are; the Users page draws it in its detail column as it is.
+  const draw = () => { const box = m.querySelector("#raFields"), h = rolesAccessFields(name);
+    drawHTML(box, /^\s*<div class="field/.test(h) ? h : `<div class="field">${h}</div>`); wireRolesAccess(box, draw); };
   draw();
   m.hidden = false;
   m.onclick = e => { if (e.target === m) m.hidden = true; };
