@@ -118,6 +118,8 @@
 - aerie map no longer names an arrow function in a conditional's else branch after the word before the colon (1cf46c9)
 - A tool pack's Manifest update pressed on the Library keeps the catalog's newer pin, where its Add was refused as a pin the catalog does not make and the card stayed counted under Updates (c3da2f9)
 - Minimize on a session's row on the Sessions page takes its tab away even after the tab was opened again, where the press could do nothing (562e2fb)
+- A notebook's Roadmap and Bugs history shows its title again, and on a phone its time window sits beside the search (070a1f9)
+- A conversation with nothing said in it opens as a small dialog, not a screen-tall one (070a1f9)
 
 ### Security
 
