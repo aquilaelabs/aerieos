@@ -772,8 +772,11 @@ await section("the configuration plane on the row", async () => {
   // one node at a time, chosen in the bar.
   await openSection(page, 'nodes:storage', ROW);
   await page.waitForSelector(`${ROW} .ndconf [data-madd]`, { timeout: 5000 });
-  ok(await page.$eval(`${ROW} .ndconf`, e => /now 10\.0\.0\.40\/24 on ens3 via 10\.0\.0\.1/.test(e.textContent)),
-     'it reports the address the node is on');
+  {
+    const net = await page.$eval(`${ROW} .ndnetfacts`, e => e.textContent.replace(/\s+/g, ' '));
+    ok(/Now ?10\.0\.0\.40\/24 on ens3/.test(net) && /Gateway ?10\.0\.0\.1/.test(net),
+       `it reports the address the node is on and its gateway, as Network's facts (${net.slice(0, 120)})`);
+  }
   // The census's numbers as meters rather than as a sentence: one per store,
   // labeled, with the free space on the right.
   const meters = await page.$$eval(`${ROW} .ndmeter`, ms => ms.map(m => ({
@@ -4008,9 +4011,10 @@ await section("Claude Code on a node", async () => {
   await page.waitForSelector('.pane .bar #ndPick', { timeout: 15000 });
   await pickNode(page, en.id);
   const ROWC = `.nodestab .ndrow[data-node="${en.id}"]`;
-  await page.waitForFunction(sel => /Claude installed/.test(document.querySelector(sel + ' [data-sect="nodes:sessions"] .ndagents')?.textContent || ''), ROWC, { timeout: 15000 });
+  await page.waitForFunction(sel => /Coding agents\s*Claude Code 1\.0\.0/.test(document.querySelector(sel + ' [data-sect="nodes:sessions"] .ndsessfacts')?.textContent || '')
+    && document.querySelector(sel + ' [data-sect="nodes:sessions"] .ndsessfacts .ndagents'), ROWC, { timeout: 15000 });
   ok(!await page.$(`${ROWC} [data-nd="claude-update"]`) && !await page.$(`${ROWC} [data-ndag]`),
-     'the Nodes page says which coding agents are installed there in one line, with no update of its own (R95) and no button to the coding agents\' page (the operator, 26 Oct)');
+     'the Nodes page says which coding agents are installed there and which you are signed in to, as facts, with no update of its own (R95) and no button to the coding agents\' page (the operator, 26 Oct)');
   await page.evaluate(id => openInstalledOn(id, 'claude'), en.id);
   const AGC = `.thingtab [data-instnode="${en.id}"][data-thing="agent:claude-code"]`;
   await page.waitForFunction(sel => /update available/.test(document.querySelector(sel + ' .pghead .state')?.textContent || ''), AGC, { timeout: 15000 });

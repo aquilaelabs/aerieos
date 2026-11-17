@@ -85,7 +85,7 @@ ok(drawn.rows.length === 3 && /SanDisk Ultra Fit/.test(drawn.rows[0].text) && /s
 ok(/the host/.test(drawn.rows[1].text) && /boots from it/.test(drawn.rows[1].text) && !drawn.rows[1].give,
    `the stick the host boots from is the host's, says so, and offers no Give (${drawn.rows[1].text.slice(0, 120)})`);
 ok(/3 devices/.test(drawn.head), `the section's head counts them (${drawn.head.trim()})`);
-ok(drawn.ctls.length === 2 && /0000:00:14\.0/.test(drawn.ctls[0]) && /carries SanDisk Ultra Fit, SanDisk Ultra Fit/.test(drawn.ctls[0]) && /The host needs it/.test(drawn.ctls[0])
+ok(drawn.ctls.length === 2 && /0000:00:14\.0/.test(drawn.ctls[0]) && /SanDisk Ultra Fit, SanDisk Ultra Fit/.test(drawn.ctls[0]) && /The host needs it/.test(drawn.ctls[0])
    && /0000:03:00\.0/.test(drawn.ctls[1]) && /Shares IOMMU group 12 with 0000:03:00\.1/.test(drawn.ctls[1]) && /LAN/.test(drawn.ctls[1]),
    `the controllers say what hangs off each, and the one sharing its group with the LAN says it stays (${drawn.ctls[1].slice(0, 140)})`);
 

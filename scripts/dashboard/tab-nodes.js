@@ -559,24 +559,32 @@ function nodeUsbSection(n){
   // Its USB controllers (step 4): the advanced way, a whole controller to a
   // VM through VFIO, from the VM's Hardware dialog; what hangs off each,
   // its IOMMU group, and what the host needs that shares the group.
+  // One line each, as a table: what is true of all of them (the IOMMU off,
+  // or how one is given) said once over it, and a reason one stays the
+  // host's under its own line.
   const ctls = (hw.pci || []).filter(p => (p.class || "").startsWith("0x0c03"));
+  const ctlCols = [{label: "Controller"}, {label: "Driver", w: "minmax(0,.7fr)"},
+    ...(ctls.some(p => p.group) ? [{label: "IOMMU group", w: "minmax(0,.6fr)"}] : []), {label: "Carries", w: "minmax(0,1.6fr)"}];
   const ctlRows = ctls.map(p => {
     const on = (hw.usb || []).filter(u => u.ctl === p.addr).map(u => u.name || `${u.vendor.slice(2)}:${u.product.slice(2)}`);
     const mates = (hw.pci || []).filter(q => q.addr !== p.addr && p.group && q.group === p.group && q.host);
     const holder = vmsHere.find(v => (v.hw?.devices || []).some(d => d.type === "pci" && d.addr === p.addr));
-    const cant = !hw.iommu ? "The IOMMU is off here: the Features section turns it on."
+    const cant = !hw.iommu ? ""
       : mates.length ? `Shares IOMMU group ${esc(p.group)} with ${esc(mates.map(m => `${m.addr} (${m.host})`).join(", "))}, which the host needs, so it stays.`
       : p.host ? `The host needs it: ${esc(p.host)}.` : "";
-    return `<div class="row ndusbctl" data-usbctl="${esc(p.addr)}"><div class="grow">
-        <div class="name">USB controller ${esc(p.addr)} ${holder ? `<span class="pill ok">${esc(holder.project)}/${esc(holder.name)}</span>` : ""}</div>
-        <div class="sub">${esc([p.driver || "no driver", p.group ? `IOMMU group ${p.group}` : "", on.length ? `carries ${on.join(", ")}` : "nothing on it"].filter(Boolean).join(" · "))}</div>
-        ${cant ? `<div class="sub dim">${cant}</div>` : `<div class="sub dim">Given whole to a stopped VM under Hardware… on the VMs page, with everything on it; the VM must be off.</div>`}</div></div>`;
+    return `<div class="row ndusbctl" data-usbctl="${esc(p.addr)}">${tblLine(ctlCols, [
+        `${esc(p.addr)}${holder ? ` <span class="pill ok">${esc(holder.project)}/${esc(holder.name)}</span>` : ""}`,
+        esc(p.driver || "no driver"), ...(ctlCols.length === 4 ? [esc(p.group || "")] : []),
+        esc(on.length ? on.join(", ") : "nothing")])}${cant ? `<div class="sub dim">${cant}</div>` : ""}</div>`;
   });
+  const ctlSaid = !hw.iommu ? "The IOMMU is off here, so none can go to a VM: the Features section turns it on."
+    : "Each is given whole to a stopped VM under Hardware… on the VMs page, with everything on it.";
   const body = `<div class="field"><div class="sub">A device given to a VM is attached now if it runs, and from its next start if not${
       helpIcon("It is kept in the VM's definition and found again by its serial after a replug or a reboot, by its port when two are alike. A device the host boots from, serves storage on or has in a pool stays the host's.")}</div></div>
     ${why ? `<div class="sub dim">${why}</div>` : ""}
     ${rows.length ? `<div class="rows">${rows.join("")}</div>` : `<div class="empty">No USB device on this machine${n.reported?.at ? "" : " that it has reported yet"}.</div>`}
-    ${ctlRows.length ? `<div class="field"><div class="hint">Controllers</div></div><div class="rows">${ctlRows.join("")}</div>` : ""}`;
+    ${ctlRows.length ? `<div class="field"><div class="hint">Controllers</div><div class="sub">${esc(ctlSaid)}</div></div>${
+      tblWrap(ctlCols, ctlRows.join(""), "ndusbctls")}` : ""}`;
   const held = (hw.usb || []).filter(u => usbHolder(u, vmsHere)).length;
   return docSection("nodes", "usb", title, hw.usb?.length ? `${hw.usb.length} device${hw.usb.length === 1 ? "" : "s"}${held ? `, ${held} in a VM` : ""}` : "", body);
 }
@@ -955,25 +963,25 @@ function nodeProjects(id){
   return (state?.projects || []).filter(p => (p.prefs?.nodes || []).includes(id) || p.prefs?.node === id)
     .sort((a, b) => projLabel(a.name).localeCompare(projLabel(b.name), undefined, {sensitivity: "base"}));
 }
+// One line each, as a table (the tables rule): the repository, whether this
+// node is its primary or one it also works on, its copy here, and Settings.
+const NODE_PROJ_COLS = [{label: "Repository"}, {label: "This node is", w: "minmax(0,.8fr)"},
+  {label: "Its copy here", w: "minmax(0,1fr)"}, {act: true, w: "7rem"}];
 function nodeProjectsSection(n){
   const list = nodeProjects(n.id);
-  const rows = list.map(p => {
-    const primary = p.prefs?.node === n.id, sync = nodeSyncSaid(n, p.name);
-    return `<div class="row ndproj">
-      <div class="grow"><div class="name"><button type="button" class="namelink" data-ndopen="${esc(p.name)}" title="open its notebook">${esc(projLabel(p.name))}</button>${
-          primary ? ` <span class="dim">· primary</span>` : ""}</div>
-        ${sync ? `<div class="sub">${sync}</div>` : ""}
-        ${p.mine ? "" : `<div class="sub dim">Not one of your repositories: add yourself to its space to change its nodes.</div>`}</div>
-      ${p.mine ? `<button type="button" data-ndproj="${esc(p.name)}" title="its nodes are set in its settings, under where it builds, tests and runs">Settings</button>` : ""}
-    </div>`;
-  }).join("");
+  const rows = list.map(p => `<div class="row ndproj">${tblLine(NODE_PROJ_COLS, [
+    `<button type="button" class="namelink" data-ndopen="${esc(p.name)}" title="open its notebook">${esc(projLabel(p.name))}</button>`,
+    p.prefs?.node === n.id ? "its primary" : "one it also works on",
+    nodeSyncSaid(n, p.name) || (n.kind === "agent" ? `<span class="dim">not reported</span>` : ""),
+    p.mine ? `<button type="button" data-ndproj="${esc(p.name)}" title="its nodes are set in its settings, under where it builds, tests and runs">Settings</button>`
+      : `<span class="dim">not yours</span>${helpIcon("Add yourself to its space to change which nodes it uses.")}`])}</div>`).join("");
   // Stop syncing, where the copies it stops are listed (R164).
   const conf = n.config || {};
   const stop = n.kind === "agent" && !conf.host_only && (conf.workspace || "sync") === "sync" && !conf.leaving
     ? `<button type="button" data-nd="sync-stop" ${n.live ? "" : "disabled"}>Stop syncing</button>` : "";
   // The sentence and the button on one line: copies you cannot see may still
   // be here, so the button stands whether or not any row does.
-  const body = rows ? `${rows}${stop ? `<div class="field"><div class="actbar"><span class="sp"></span>${stop}</div></div>` : ""}`
+  const body = rows ? `${tblWrap(NODE_PROJ_COLS, rows, "ndprojs")}${stop ? `<div class="field"><div class="actbar"><span class="sp"></span>${stop}</div></div>` : ""}`
     : `<div class="field"><div class="actbar"><span class="grow sub">No repository you can see is on this node. A space's settings add one.</span>${stop}</div></div>`;
   return docSection("nodes", "projects", ndTitle("projects"), list.length ? `${list.length}` : "none", body);
 }
@@ -993,13 +1001,26 @@ function nodeSessionsSection(n){
   const d = n.kind === "agent" ? (n.reported?.door || n.config?.door) : null;
   const door = !d?.kind ? "none" : `${d.kind}${d.host ? ` at ${d.host}` : ""}, ${!n.reported?.door ? "not reported yet" : !d.installed ? "not installed" : d.active ? "open" : "shut"}`;
   const ready = !host && se && typeof se === "object" && se.up;
+  // The coding agents here, each with its version (the operator, 23 Oct:
+  // their own section said less than this line, and said it apart), and
+  // which of them this account is signed in to here, each installed and
+  // updated from the Library and signed in to on the Installed page.
+  const agents = ready ? nodeAgentsHere(n) : [];
+  const signed = agents.filter(a => a.id === "claude" ? claudeOn(n.id) : agentOn(a.id, n.id));
+  // The sessions open, counted by the space each is on rather than listed
+  // by their tmux names; one this page cannot place is counted elsewhere.
+  const bySpace = {};
+  for (const x of list){ const p = sessionProject(x.name); bySpace[p] = (bySpace[p] || 0) + 1; }
+  const open = Object.entries(bySpace).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([p, k]) => p ? `${k} on ${projLabel(p)}` : `${k} elsewhere`).join(", ");
   const facts = factGrid([
     ["Sessions", host ? "none: it hosts containers only" : ready ? `run as ${se.user || "?"}` : ""],
-    // The coding agents here, each with its version (the operator, 23 Oct:
-    // their own section said less than this line, and said it apart).
-    ["Coding agents", ready ? (nodeAgentsHere(n).map(a => `${a.product} ${a.version}`).join(", ") || "none installed yet") : ""],
+    ["Coding agents", ready ? (agents.map(a => `${a.product} ${a.version}`).join(", ")
+      || "none installed yet: a session cannot start until one is") : "", agents.length ? null : {cls: "bad"}],
+    ["You are signed in to", agents.length ? (signed.map(a => a.name).join(", ") || "none of them") : "",
+     {cls: `ndagents${signed.length ? "" : " warn"}`}],
     ["Each session", ready && iso ? (iso.sessions ? "sees only its own space" : "can read other spaces") : ""],
-    ["Open now", ready && list.length ? list.map(x => x.name).join(", ") : ""],
+    ["Open now", ready ? open : ""],
     ["Reaches the controller", reach],
     ["SSH door", door],
   ], "ndsessfacts");
@@ -1026,7 +1047,6 @@ function nodeSessionsSection(n){
       ${nodeDoorRow(n)}
       ${nodeHostRow(n)}
       ${host ? "" : nodeSyncRow(n)}
-      ${host ? "" : nodeAgentsLine(n)}
     </div>`;
   return docSection("nodes", "sessions", ndTitle("sessions"), status, body, {cls});
 }
@@ -1066,23 +1086,11 @@ function nodeAgentsHere(n){
   const me = (state?.claude_code || {}).nodes?.[n.id] || {};
   const se = n.reported?.session || {};
   return AGENTS.filter(a => a.id === "claude" ? !!me.installed : !!se?.[a.id])
-    .map(a => ({...a, version: String((a.id === "claude" ? se.claude : se[a.id]) || "").replace(/ \(.*$/, "")}));
-}
-
-// ...and in the Sessions section, one line: which this account is signed in
-// to here; each is installed and updated from the Library and signed in to
-// on the Installed page (the operator, 23 Oct: the Coding agents section rolled
-// into Sessions).
-function nodeAgentsLine(n){
-  const se = n.reported?.session;
-  if (!(se && typeof se === "object" && se.up)) return "";
-  const have = nodeAgentsHere(n);
-  const signed = have.filter(a => a.id === "claude" ? claudeOn(n.id) : agentOn(a.id, n.id));
-  const said = !have.length ? "No coding agent is installed here: a session cannot start until one is."
-    : `${have.map(a => a.name).join(", ")} installed; ${signed.length ? `you are signed in to ${signed.map(a => a.name).join(", ")}` : "you are signed in to none of them"} here.`;
-  return `<div class="actbar ndagents">
-      <span class="state${have.length ? (signed.length ? "" : " warn") : " bad"}">${esc(said)}</span>
-    </div>`;
+    .map(a => {
+      // The number alone: what a CLI's --version prints may repeat its name.
+      const raw = String((a.id === "claude" ? se.claude : se[a.id]) || "").replace(/ \(.*$/, "");
+      return {...a, version: raw.match(/\d+(?:\.\d+)+/)?.[0] || raw};
+    });
 }
 
 // Whether each session here reaches only its own project's containers, the
@@ -1469,7 +1477,7 @@ function nodeDrift(n){
   const storage = [];
   for (const m of d.mounts || []){
     const [st, cls] = mountState(m, rep.mounts);
-    if (cls) storage.push(`${m.path || m.source || "a mount"}: ${st}`);
+    if (cls) storage.push(`${m.path || m.source || "a mount"}: ${mountHead(st, cls)}`);
   }
   // A stale mount is drift whether or not the desired list names it: it
   // reads as mounted to every list and fails every read (roadmap R41).
@@ -1540,6 +1548,12 @@ function nodePathsTable(n, c){
 // form (Delete, Cancel, Save), Add a mount over the table opening the form
 // at its top. Apply still puts what is saved on the node. A node set up at
 // its own console lists what it reports until one is saved here.
+// A mount's state as its cell and the state line say it: a reason with a
+// fix in it is cut to its first words, the whole of it under the mount's row.
+function mountHead(st, cls){
+  const cut = cls && st.length > 40 ? st.indexOf(": ") : -1;
+  return cut > 0 ? st.slice(0, cut) : st;
+}
 const MOUNT_COLS = [{label: "Source"}, {label: "Mountpoint"}, {label: "Kind", w: "minmax(0,.6fr)"},
   {label: "State", w: "minmax(0,1fr)"}, {act: true, w: "5rem"}];
 function nodeMountsTable(n, c){
@@ -1552,15 +1566,14 @@ function nodeMountsTable(n, c){
     // the last apply's failure instead of it once one has failed (B660): the
     // cell keeps the state up to its first colon and the whole reason goes
     // under the row, where it can wrap.
-    const cut = cls && st.length > 40 ? st.indexOf(": ") : -1;
-    const head = cut > 0 ? st.slice(0, cut) : st;
+    const head = mountHead(st, cls), cut = head !== st;
     const open = ed?.i === i;
     return `<div class="row ndmount${open ? " open" : ""}" data-i="${i}">${tblLine(MOUNT_COLS, [
       `<code>${esc(m.source || "")}</code>`, `<code>${esc(m.path || "")}</code>`,
       `${esc(m.type || "nfs")}${m.ro ? ", read-only" : ""}`,
       `<span class="sub ndmstate ${cls}">${esc(head)}</span>`,
       open ? "" : `<button type="button" data-medit="${i}"${locked ? ` disabled title="${esc(LOCKED_WHY)}"` : ""}>Edit</button>`])}${
-      cut > 0 ? `<div class="sub ndmwhy ${cls}">${esc(m.path || m.source || "this mount")}: ${esc(st)}</div>` : ""}${
+      cut ? `<div class="sub ndmwhy ${cls}">${esc(m.path || m.source || "this mount")}: ${esc(st)}</div>` : ""}${
       open ? nodeMountForm(ed.form, i) : ""}</div>`;
   };
   const fresh = ed?.i === -1 ? `<div class="row ndmount open" data-i="-1">${nodeMountForm(ed.form, -1)}</div>` : "";
@@ -1635,9 +1648,6 @@ function nodeConfSections(n){
   // What a store may sit on, offered: the mounts this node has (the forms rule).
   const storePlaces = `<datalist id="ndStorePlaces">${[...new Set((rep.mounts || []).map(m => m.path).filter(Boolean))].map(p => `<option value="${esc(p)}">`).join("")}</datalist>`;
   const net = rep.network || {};
-  const now = net.addresses?.length
-    ? `now ${net.addresses.join(", ")} on ${net.interface || "?"}${net.gateway ? " via " + net.gateway : ""}${
-        net.dns?.length ? " · dns " + net.dns.join(", ") : ""}` : "address not reported";
   const isStatic = d.network.mode === "static";
   const stale = nodeStale(n);
   const drift = nodeDrift(n);
@@ -1726,12 +1736,21 @@ function nodeConfSections(n){
   const NET_BACKENDS = {netplan: "netplan", networkmanager: "NetworkManager",
     "systemd-networkd": "systemd-networkd", wicked: "wicked", ifupdown: "/etc/network/interfaces",
     dhcpcd: "dhcpcd"};
-  const via = !dist ? ""
-    : NET_BACKENDS[dist.network] ? ` Through ${NET_BACKENDS[dist.network]} on this node.`
-    : ` <b class="warn">This node reports no network backend the agent drives${
-        dist.pretty ? " (" + esc(dist.pretty) + ")" : ""}; a change would be refused.</b>`;
+  const TRIED = "A change is tried for three minutes, and undone unless the machine dials back in.";
+  // What the node is on now and how a change reaches it, as facts: its
+  // address, gateway and DNS as it reports them, and the service the agent
+  // writes a change into, the three minutes behind its help mark.
+  const netFacts = factGrid([
+    ["Now", net.addresses?.length ? `${net.addresses.join(", ")} on ${net.interface || "?"}` : "not reported"],
+    ["Gateway", net.gateway || ""],
+    ["DNS", (net.dns || []).join(", ")],
+    ["Set through", !dist ? "" : NET_BACKENDS[dist.network]
+      ? `${esc(NET_BACKENDS[dist.network])}${helpIcon(TRIED)}`
+      : `none the agent drives${dist.pretty ? ` (${esc(dist.pretty)})` : ""}: a change would be refused`,
+     NET_BACKENDS[dist?.network] ? {html: true} : {cls: "warn"}],
+  ], "ndnetfacts");
   const network = `
-      <div class="sub">A change is tried for three minutes, and undone unless the machine dials back in.${via}</div>
+      <div class="field">${netFacts}</div>
       <div class="ndnet ctlline${isStatic ? "" : " dhcp"}">
         <select data-k="net:mode" aria-label="mode">
           <option value="dhcp" ${isStatic ? "" : "selected"}>dhcp</option>
@@ -1755,7 +1774,6 @@ function nodeConfSections(n){
           autocomplete="off" placeholder="10.20.0.0/24 via 192.168.1.1" aria-label="static routes">${
           esc((d.network.routes || []).map(r => `${r.to} via ${r.via}`).join("\n"))}</textarea></div>
       </div>
-      <div class="sub">${esc(now)}</div>
       <div class="actbar">
         <span class="state ndconfstate${(failedFor("network") || [0, statusCls])[1] ? " " + (failedFor("network") || [0, statusCls])[1] : ""}">${
           esc((failedFor("network") || [status])[0])}</span>
@@ -2101,9 +2119,10 @@ function renderNodesInto(i){
         <div class="name">${skv(7)}</div>${ndFacts(null)}
         <div class="actbar ndagent"><span class="lead dim"></span>${ndAgentButtons(true)}</div></div>
       <div class="ndsections">${ND_SECTS.filter(([k]) => !["gpu", "usb", "machine", "power", "report"].includes(k)).map(([k, t], j) =>
-        // Storage's mounts are a table of records, as the page draws them
-        // at a desk; on a phone its sections take turns and it lands shut.
-        docSection("nodes", k, t, "", k === "storage" && !isPhone() ? skTable(MOUNT_COLS, 2, "ndmounts") : skRows(j ? 1 : 3))).join("")}</div></div>`));
+        // Storage's mounts and the Repositories are tables of records, as
+        // the page draws them at a desk; on a phone its sections take turns.
+        docSection("nodes", k, t, "", isPhone() ? skRows(j ? 1 : 3) : k === "storage" ? skTable(MOUNT_COLS, 2, "ndmounts")
+          : k === "projects" ? skTable(NODE_PROJ_COLS, 2, "ndprojs") : skRows(j ? 1 : 3))).join("")}</div></div>`));
     sectJump(d.list.closest(".doctab") || d.el);
     loadNodes();
     return;

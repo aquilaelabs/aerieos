@@ -745,6 +745,7 @@ button.danger[disabled]{background:color-mix(in srgb, var(--bad) 8%, var(--groun
    machine's From the stick, R161 step 8). */
 .facts dd.ok{color:var(--pass)}
 .facts dd.warn{color:var(--warn)}
+.facts dd.bad{color:var(--bad)}
 /* Its colors sit under the look a disabled button keeps when pointed at (a
    press leaves its button disabled while it works), which outranks them. */
 .fxplace{border:var(--hair) solid transparent;background:transparent}
