@@ -1457,8 +1457,12 @@ fresh() {
     # Tests view has rows, and testreg.mjs counts what it ingests.
     rm -f "$S/state/tests.json"
     echo '{"delta": {"by": "u_0000aaaa", "admin": true}}' > "$S/state/locked-projects.json"  # a test that locks must not hand that on
-    python3 -c 'import json, sys; u = json.load(open(sys.argv[1]))["users"]["test"]["uid"]; open(sys.argv[2], "w").write(json.dumps({u: ["delta"]}))' \
-      "$S/state/users.json" "$S/state/archived-projects.json"   # ...nor one that archives
+    # ...nor one that archives: delta archived for the test owner once that
+    # account is made (an archive is each person's own), nothing before.
+    python3 -c 'import json, os, sys
+f = sys.argv[1]
+u = (json.load(open(f)).get("users") or {}).get("test", {}).get("uid", "") if os.path.exists(f) else ""
+open(sys.argv[2], "w").write(json.dumps({u: ["delta"]} if u else {}))' "$S/state/users.json" "$S/state/archived-projects.json"
     rm -f "$S/state/pinned-projects.json"                  # ...nor one that unpins
     # ...nor one that binds a project to a node. nodes.mjs saves alpha's node
     # from the settings dialog; agent.mjs then asserts that a project with no
