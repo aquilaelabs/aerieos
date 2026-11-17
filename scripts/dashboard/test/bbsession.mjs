@@ -196,7 +196,8 @@ await section("A toolchain the project's settings switch off", async () => {
   const offd = plan({ off: 'flutter' });
   const os2 = offd.code === 0 ? JSON.parse(offd.out) : [];
   const ix = (...s) => os2.findIndex(x => JSON.stringify(x) === JSON.stringify(s));
-  ok(ix('hide', join(pkg, 'flutter')) > ix('bindro', pkg, pkg) && ix('hide', join(pkg, 'flutter')) > ix('bindrw', join(pkg, 'flutter'), join(pkg, 'flutter'))
+  ok(ix('hide', join(pkg, 'flutter')) > ix('bindro', pkg, pkg)
+     && !os2.some(x => x[0] === 'overlay' && x[1] === join(pkg, 'flutter'))
      && !os2.some(x => x[0] === 'hide' && x[1] === join(pkg, 'jdk')),
      `--off hides that toolchain's directory in the store, after it is bound, and no other (${offd.code}: ${offd.out.slice(0, 60)})`);
   const bad = plan({ off: '../etc' });
@@ -204,9 +205,12 @@ await section("A toolchain the project's settings switch off", async () => {
 });
 const at = (...s) => steps.findIndex(x => JSON.stringify(x) === JSON.stringify(s));
 const fl = join(pkg, 'flutter');
-ok(at('bindro', pkg, pkg) < at('bindrw', fl, fl) && at('bindrw', fl, fl) < at('bindro', join(fl, 'bin'), join(fl, 'bin'))
-   && at('bindro', join(fl, 'bin'), join(fl, 'bin')) < at('bindrw', join(fl, 'bin', 'cache'), join(fl, 'bin', 'cache')),
-   '...but flutter, which writes its own tree on every run, gets it back, with its bin on PATH still read-only and only bin/cache writable again');
+// Flutter writes its own tree on every run: a session gets a layer of its own
+// over the read-only tree, in its own /tmp, and nothing of the tree is bound
+// writable (B888: a session that changed bin/cache's dart had others run it).
+ok(at('bindro', pkg, pkg) >= 0 && !steps.some(x => x[0] === 'bindrw' && String(x[1]).startsWith(fl))
+   && at('overlay', fl, '/tmp/.bb-flutter') > at('tmpfs', '/tmp', 'mode=1777'),
+   '...but flutter, which writes its own tree on every run, gets a layer of its own over the read-only tree, in the session\'s own /tmp');
 const versions = join(homeRoot, '.local', 'share', 'claude', 'versions');
 ok(has('bindro', `${STAGE}/base/.local/share/claude`, join(homeRoot, '.local', 'share', 'claude'))
    && has('bindro', `${STAGE}/base/.local/bin`, join(homeRoot, '.local', 'bin')),

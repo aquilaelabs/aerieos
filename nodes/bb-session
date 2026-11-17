@@ -881,7 +881,8 @@ def plan(c, a, uid, wall=None):
     for t in ("/tmp", "/var/tmp", "/dev/shm"):
         if _real_dir(t):
             steps.append(("tmpfs", t, "mode=1777"))
-    if flutter:
+    # Not over a flutter this space switched off: its cover stays as it is.
+    if flutter and "flutter" not in off:
         steps.append(("overlay", flutter, "/tmp/.bb-flutter"))
     # The host's per-user runtime folders: a user manager's bus there runs
     # a command as the session account outside every view (systemd-run
