@@ -647,8 +647,10 @@ function splitDraw(root){
   }
   all.forEach(d => { const on = splitId(d) === pick;
     const s = d.querySelector(":scope > summary");
+    // Code's own (data-own), so a patch of the page steps over it rather
+    // than matching it to the title span the markup starts the head with.
     if (s && !s.querySelector(":scope > .shback"))
-      s.insertAdjacentHTML("afterbegin", `<span class="shback" role="img" aria-label="Back to ${esc(o.back)}">\u2039</span>`);
+      s.insertAdjacentHTML("afterbegin", `<span class="shback" role="img" aria-label="Back to ${esc(o.back)}" data-own>\u2039</span>`);
     if (d.classList.contains("scur") !== on) d.classList.toggle("scur", on);
     if (on && !d.open) d.open = true; });
   root.classList.toggle("sopen", st.open);
