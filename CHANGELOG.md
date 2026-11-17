@@ -9,6 +9,7 @@
 - A managed node cuts the network for a declared pack's install steps even where its system keeps network namespaces from ordinary accounts (Ubuntu does): the node's agent installs a small root helper, `bb-netcut`, with one sudo rule for the account its jobs run as, and the helper runs each step as that account again with no network. A node whose agent is not root still installs such a pack with the network and says so. (d987f70)
 - An agent update that does not start no longer strands its node. The node runs the new agent once to see that it loads before installing it, keeps the one it replaces, and puts that one back by itself when the new one cannot be loaded, crashes three times, or runs ten minutes without reaching its controller. A node that went back says so on the bell and on its row, and is not sent that build again until Update agent is pressed. The first update onto this build is made the old way; every one after it is covered. (6e5a538)
 - A machine's own console can switch off every root command the controller sends: after `sudo aerieos-agent root-asks off` at the machine, that node refuses `aerie root run` and a schedule as root whoever allowed it, the controller says so before anybody is asked, and the node's row says it is off and where it is switched back on. What AerieOS does as root by name goes on, and Docker on a node that runs containers is still root's. (ff55bda)
+- The Spaces page has Full and Compact beside its search, as the Containers page has Cards and List: Compact folds every space's card to its name, a press opens one, and opening another folds the one open; your browser keeps the choice (2883407)
 
 ### Changed
 
@@ -70,6 +71,7 @@
 - The header over Machines, Build and Containers is one row: the machine's picker and its state pill beside it, which opens that machine's page from any of their pages; when it was seen, where it dials in from and its agent's version are on that page, no longer a line under the picker, and the page under the header no longer says the state again (e9b80fb)
 - Start agent and Manage agent open their choices in a dialog over the dimmed page, like every other dialog, rather than a menu beside the button that was hard to see on a phone and moved when New or Restart changed its height; its Close, its backdrop and Escape each put it away (89c7709)
 - A space is one of your favorites rather than pinned: a star by its name marks it, your favorites are on Home under Favorites, and the Spaces page lists every space by name with a Favorites chip that narrows it to yours; favorites are each person's own, and the spaces you had pinned are your favorites (63adcc9)
+- Archiving a space is your own, as favorites are: anybody signed in archives a space for themselves and nobody else's page changes, and an archived space works as any other, its card kept with its star, group and controls in the Archived section at the foot of the Spaces page; a space archived before this update stays archived for every account that had it (2883407)
 
 ### Fixed
 
