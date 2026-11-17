@@ -296,7 +296,7 @@ function phonePanel(n){
           <div class="name">${esc(k.model || k.ip)}${
             dev && (dev.serial === k.serial || (dev.model && dev.model === k.model))
               ? ` <span class="pill ok">connected</span>` : ""}</div>
-          <div class="sub">${esc(k.ip)}${k.model ? "" : " · paired, never connected from here"} · ${
+          <div class="sub data">${esc(k.ip)}${k.model ? "" : " · paired, never connected from here"} · ${
             esc(ago(k.last || k.first || 0))}${k.by ? ` by ${esc(k.by)}` : ""}</div>
           <div class="actbar">
             <button type="button" data-kconnect="${esc(k.ip)}"${off ? ' data-off="1"' : ""}${off || !phConnPort.trim() ? " disabled" : ""} title="${offWhy}">Connect</button>

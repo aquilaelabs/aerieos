@@ -229,7 +229,7 @@ function nodeGit(n){
                     || (+m[1] === GIT_FLOOR[0] && +m[2] < GIT_FLOOR[1]));
   return old
     ? `<div class="sub ndgit warn">${esc(v)}: older than ${GIT_FLOOR.join(".")}, which merging needs; update it on the machine</div>`
-    : `<div class="sub ndgit dim">${esc(v)}</div>`;
+    : `<div class="sub data ndgit dim">${esc(v)}</div>`;
 }
 
 function nodeTools(n){
@@ -553,7 +553,7 @@ function nodeUsbSection(n){
       : u.use?.length ? "" : pick(u, key);
     return `<div class="row ndusb" data-usb="${esc(u.vendor)}:${esc(u.product)}"><div class="grow">
         <div class="name">${esc(u.name || "USB device")} ${pill}</div>
-        <div class="sub">${esc(usbWords(u))}</div>${uses}${heldLine}</div>
+        <div class="sub data">${esc(usbWords(u))}</div>${uses}${heldLine}</div>
         <span class="acts">${acts}</span></div>`;
   });
   // Its USB controllers (step 4): the advanced way, a whole controller to a
@@ -1642,7 +1642,7 @@ function nodeConfSections(n){
       ${lbl("", role, STORE_ABOUT[role] || "")}
       <input data-k="store:${esc(role)}" list="ndStorePlaces" value="${esc(d.stores[role] || "")}" spellcheck="false"
         autocomplete="off" placeholder="${esc(r?.path || "/var/lib/aerieos/" + role)}">
-      <div class="sub">${now ? "now " + esc(now) : "not reported"}</div>
+      <div class="sub data">${now ? "now " + esc(now) : "not reported"}</div>
     </div>`;
   }).join("");
   // What a store may sit on, offered: the mounts this node has (the forms rule).

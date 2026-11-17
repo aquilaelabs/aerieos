@@ -107,7 +107,7 @@ function emuAddRows(d, why){
       const body = `<span class="grow">
           <span class="nm">API ${esc(r.api)}</span>
           ${now ? `<span class="sub prog plain">${job.current === r.id ? "adding" : "waiting its turn"}<span class="dots"></span></span>`
-                : `<span class="sub where">${[r.size, r.id].filter(Boolean).map(esc).join(" · ")}</span>`}
+                : `<span class="sub data where">${[r.size, r.id].filter(Boolean).map(esc).join(" · ")}</span>`}
         </span>`;
       // Selecting: the row is its tick's label. Otherwise its Install at
       // its right, gone while the image is on its way.
@@ -125,12 +125,12 @@ function emuAddRows(d, why){
 // one image exactly, and two flavors at one API level are not interchangeable.
 function emuRow(im, why){
   const avds = (im.avds || []).length
-    ? `<span class="sub">${im.avds.length === 1 ? "AVD" : "AVDs"}: ${esc(im.avds.join(", "))}</span>`
+    ? `<span class="sub data">${im.avds.length === 1 ? "AVD" : "AVDs"}: ${esc(im.avds.join(", "))}</span>`
     : `<span class="sub dim">no AVD uses it</span>`;
   return `<div class="tc done emimg">
     <span class="grow">
       <span class="nm">${esc(im.api)} <span class="pill">${esc(im.kind)}</span></span>
-      <span class="sub where on">${[im.size ? `<span${im.size_from ? ` title="${esc(im.size_from)}"` : ""}>${esc(im.size)}</span>` : "",
+      <span class="sub data where on">${[im.size ? `<span${im.size_from ? ` title="${esc(im.size_from)}"` : ""}>${esc(im.size)}</span>` : "",
         esc(im.id)].filter(Boolean).join(" · ")}</span>
       ${avds}
     </span>

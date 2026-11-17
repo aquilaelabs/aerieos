@@ -331,7 +331,7 @@ function nginxBody(n){
   const pairs = Object.values(n.certs || {}).filter(c => c?.set).length;
   const image = ngSect("image", n.behind ? (rebuild ? "a newer build is out" : `${out} is out`) : `nginx:${im.tag || "?"}`,
     `<div class="field">
-      <div class="sub ngimage">${esc(pinned)}</div>
+      <div class="sub data ngimage">${esc(pinned)}</div>
       <div class="hint${n.behind ? " warn" : ""}">${esc(news)}.${helpIcon("The registry is read once a week by itself; a node is pinned to a digest when it is deployed or updated, so a Save never moves it.")}</div>
       <div class="actbar ngimgbar"><span class="state">${esc(checked)}${lt.error ? ` · ${esc(lt.error)}` : ""}</span><span class="sp"></span>
         <button type="button" data-ngcheck>Check for updates</button>

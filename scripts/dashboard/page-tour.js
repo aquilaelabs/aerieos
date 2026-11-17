@@ -329,7 +329,7 @@ function tourSampleCard(){
   return `<section class="dmcard"><div class="field dmgroup" data-style="--gc:var(--accent)"><b>example</b></div>
     <div class="row stack2"><div class="grow"><div class="dmhead"><div class="dmid">
       <div class="name">web<span class="pill stat dmpill ok live">running</span></div>
-      <div class="sub dmorigin">nginx:1.31-alpine<span class="sep"></span>your-node</div>
+      <div class="sub data dmorigin">nginx:1.31-alpine<span class="sep"></span>your-node</div>
       <div class="sub dmstate ok">answers at http://your-node:8080/</div></div>
       <div class="actbar dmacts"><button type="button">Shell</button><button type="button">Rebuild</button>
         <span class="more"><button type="button" class="moreb" aria-label="More">${DOTS}</button></span></div></div></div></div></section>`;

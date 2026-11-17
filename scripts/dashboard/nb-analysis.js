@@ -166,7 +166,7 @@ function nbAnalysisView({$, nb, project}){
         + `the space's CLAUDE.md.</div>
         <textarea id="preText" readonly rows="16" spellcheck="false"
           aria-label="what a session started here is sent">${esc(d.text)}</textarea>
-        <div class="sub dim" id="preParts">${
+        <div class="sub data dim" id="preParts">${
           (d.parts || []).map(x => `${esc(x.name)} ${preSize(x.bytes)}${
             x.share ? ` of ${preSize(x.share)}` : ""}`).join(" · ")
         }</div>${(d.topics || []).length ? `<div class="sub dim" id="preTopics">pointed at, not sent: ${

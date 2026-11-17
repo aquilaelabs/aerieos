@@ -1275,7 +1275,7 @@ function nbRmDrawFinished($, nb){
   drawHTML(host, vis.slice(0, lim).map(r => `<details class="grp done" data-done="${r.id}"${
       held.has(String(r.id)) ? " open" : ""}>
       <summary><div class="roadmap"><span class="n id">R${r.id}</span> <span class="body"><span class="txt">${esc(r.text || "")}</span>
-        <span class="sub dim">done ${r.done_at ? esc(when(r.done_at)) : ""}${(() => { const v = shippedIn(r.done_at, nb.roadmapReleases);
+        <span class="sub data dim">done ${r.done_at ? esc(when(r.done_at)) : ""}${(() => { const v = shippedIn(r.done_at, nb.roadmapReleases);
         return v ? ` · in ${esc(v)}` : ""; })()}</span></span></div></summary>
       ${factGrid([["Added", r.added ? `${rmDay(r.added)}, by ${r.by === "claude" ? agentAsker(r) : "you"}` : ""],
                 ["Target", r.target || ""],
@@ -1285,7 +1285,7 @@ function nbRmDrawFinished($, nb){
                 ["Changelog", clRefs((nb.roadmapChangelog || {})["R" + r.id]), {html: true}]], "dfacts")}
       ${r.info ? `<div class="dinfo">${esc(r.info)}</div>` : ""}${
     (r.steps || []).map((st, i) => `<div class="roadmap step"><span class="n">${st.done ? "✓" : i + 1 + "."}</span>
-        <span class="body"><span class="txt">${esc(st.text || "")}</span>${st.done ? `<span class="sub dim">done ${esc(when(st.done))}</span>` : ""}${
+        <span class="body"><span class="txt">${esc(st.text || "")}</span>${st.done ? `<span class="sub data dim">done ${esc(when(st.done))}</span>` : ""}${
         st.info ? `<div class="dinfo">${esc(st.info)}</div>` : ""}</span></div>`).join("")}
       <div class="actbar">${r.reopenable
       ? `<button type="button" data-reopen="${r.id}" title="put it back on the list as it was, for more work on the same goal">Reopen</button>`

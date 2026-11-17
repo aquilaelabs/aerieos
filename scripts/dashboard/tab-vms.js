@@ -133,9 +133,9 @@ function vmRow(v){
       <div class="dmhead">
         <div class="dmid">
           <div class="name">${esc(v.name)}${vmPill(v)}</div>
-          ${origin ? `<div class="sub dmorigin">${origin}</div>` : ""}
+          ${origin ? `<div class="sub data dmorigin">${origin}</div>` : ""}
           ${reach ? `<div class="sub dmstate${v.ip ? " ok" : ""}">${reach}</div>` : ""}
-          ${inside ? `<div class="sub dmorigin vmguest">${inside}</div>` : ""}
+          ${inside ? `<div class="sub data dmorigin vmguest">${inside}</div>` : ""}
           ${asNode}
           ${vmHwLine(v)}
           ${onLine}${ignored}
@@ -526,7 +526,7 @@ function vmHwLine(v){
   if (usb.length) bits.push(`USB: ${usb.map(u => u.name || `${u.vendor.slice(2)}:${u.product.slice(2)}`).join(", ")}`);
   const rest = (hw.devices || []).filter(d => d.type !== "usb" || !usb.some(u => u.vendor === d.vendor && u.product === d.product));
   if (rest.length) bits.push(`${rest.length} device${rest.length > 1 ? "s" : ""} passed through`);
-  return bits.length ? `<div class="sub dmorigin">${esc(bits.join(" · "))}</div>` : "";
+  return bits.length ? `<div class="sub data dmorigin">${esc(bits.join(" · "))}</div>` : "";
 }
 function vmHwFields(host, hw, admin){
   const pin = new Set(hw?.cpuset || []);

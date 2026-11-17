@@ -1877,7 +1877,7 @@ function dmRowsHtml(ins, job, blind){
             !blind && d.running && st[1] === "ok" ? " live" : ""}">${
             esc(st[0])}${dockerList?.stale && !blind ? ", as last seen" : ""}</span>${
             meta ? `<span class="dmmeta state">${esc(meta)}</span>` : ""}</div>
-        ${origin ? `<div class="sub dmorigin">${origin}</div>` : ""}
+        ${origin ? `<div class="sub data dmorigin">${origin}</div>` : ""}
         ${said ? `<div class="sub dmstate state${
           // A job that failed is said in the bad tone even while the old
           // container still runs (B96: a failed Rebuild read in green).

@@ -131,7 +131,7 @@ function homeJobsHtml(){
   const names = homeData.jobs.nodes || {};
   return last.map(j => `<button type="button" class="row hjob" data-hjob="${esc(j.id)}">
       <span class="grow"><span class="name">${jobTitle(j)} ${jobStatePill(j)}</span>
-        <span class="sub">${esc(names[j.node] || j.node || "")}${j.node ? " · " : ""}${esc(ago(j.ended || j.started || j.queued))}</span></span>
+        <span class="sub data">${esc(names[j.node] || j.node || "")}${j.node ? " · " : ""}${esc(ago(j.ended || j.started || j.queued))}</span></span>
     </button>`).join("");
 }
 

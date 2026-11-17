@@ -80,6 +80,7 @@ html[data-motion="reduce"] .pane .stack > .doc.leaving{visibility:hidden}
    row only, and the dialog's "never backed up", the Claude chooser's
    reasons and a sign-in's refusals were not. */
 .sub.bad{color:var(--bad)}
+.sub.data{font:var(--f-data)}
 /* ...and a warning the same everywhere: what has to happen first (end the
    sessions before signing out) is a warning, never red, which is for what
    failed (the operator, 22 Oct). */

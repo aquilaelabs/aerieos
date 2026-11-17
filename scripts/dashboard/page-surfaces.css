@@ -804,7 +804,7 @@ body.firstrun #panes{display:none}
   font:var(--f-ui);min-height:var(--tap);text-align:left;
   text-decoration:underline;cursor:pointer}
 .sgview a.link{display:inline-flex;align-items:center}
-.sgview .sub{font:var(--f-note);color:var(--dim)}@media(hover:hover){ .sgview .link:hover{color:var(--accent)}
+@media(hover:hover){ .sgview .link:hover{color:var(--accent)}
 }
 /* A project's people (membership.py): a pending invitation per line, and
    the picker with its Invite. */
@@ -2100,7 +2100,7 @@ body.firstrun #panes{display:none}
 .tstsuite:last-child{border-bottom:0}
 .tstsuite .tstms{min-width:5.5em}
 .tstsname{font:var(--f-ui);color:var(--ink);flex:0 0 auto;min-width:9em}
-.tstsuite .sub{color:var(--dim);font:var(--f-note);flex:1 1 auto;min-width:0}
+.tstsuite .sub{flex:1 1 auto;min-width:0}
 .clashpair{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
 .clashpair > div{flex:1 1 220px;min-width:0}
 .clashwho{font:var(--f-tag);letter-spacing:.04em;text-transform:uppercase;
@@ -2278,7 +2278,7 @@ body.firstrun #panes{display:none}
 .fgroup + .actbar{margin-top:16px}
 .ndstores{margin-top:8px}
 .fgrouphead{font:var(--f-ui);font-weight:600;color:var(--ink);margin-bottom:12px}
-.fgrouphead .sub{display:block;font:var(--f-note);font-weight:400;color:var(--dim);margin-top:2px}
+.fgrouphead .sub{display:block;font-weight:400;margin-top:2px}
 .fgroup>.ndcap{display:flex;margin-top:12px}
 .fgroup>.ndcap:first-of-type{margin-top:0}
 .fgroup>.fgrid + .ndcap,.fgroup>.ndcap + .fgrid{margin-top:12px}

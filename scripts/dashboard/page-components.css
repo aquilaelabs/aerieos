@@ -350,7 +350,10 @@ body.firstrun .rail, body.firstrun .railbar, body.firstrun .railmore{display:non
   text-align:left;white-space:normal;cursor:pointer;display:inline}
 @media(hover:hover){ .namelink:hover{background:none;--sheen:none;text-decoration:underline}
 }
-.row .sub{color:var(--dim);font:var(--f-data);overflow-wrap:anywhere}
+/* One .sub, the note voice, wherever it is (the operator, 17 Nov): a line
+   under a name says something in words. A line of facts (ids, sizes,
+   paths, versions, a node and an age) is .sub.data, in the data voice. */
+.sub{color:var(--dim);font:var(--f-note);overflow-wrap:anywhere}
 /* A NOTICE: what is wrong or what to know, under a row, in a voice of its
    own (the operator, 13 Oct: facts, warnings and settings all wore the same
    dim mono and read as one gray block). Sans, in the level's color, behind
@@ -425,8 +428,8 @@ button.on{background:var(--accent-deep);border-color:var(--accent-mid);color:var
 .tc:last-child{border-bottom:0}
 .tc input{margin:3px 0 0;width:16px;height:16px;flex:0 0 auto}
 .tc .nm{font:var(--f-row);font-weight:600}
-.tc .sub{display:block;color:var(--dim);font:var(--f-note)}
-.tc .where{font-family:var(--mono);overflow-wrap:anywhere}
+.tc .sub{display:block}
+
 /* An image nothing is built on: said, but quietly. It is the answer to "can
    this go", not a warning. */
 .tc .sub.dim{opacity:.6}
@@ -664,7 +667,6 @@ textarea.proseline{resize:none;overflow:hidden;white-space:pre-wrap;
 /* A note in a dialog is the quiet explainer, as it is on a row: with no rule
    here it drew at body size in full ink, larger than the label it explains
    (project settings' People, the bug report's conversation line, B452). */
-.modal .sub{font:var(--f-note);color:var(--dim)}
 .modal .sub.bad{color:var(--bad)}
 .modal .sub.warn{color:var(--warn)}
 .modal .sub.ok{color:var(--pass)}
@@ -963,7 +965,6 @@ a.btn svg{width:12px;height:12px;flex:0 0 auto}
 .fx details.grp .roadmap.step{padding-right:var(--row-x)}
 /* What is under a row's words (done Oct 19, in 0.5.0) is a row's sub line,
    in the data voice, not the summary's bold body text. */
-.roadmap .sub{color:var(--dim);font:var(--f-data);overflow-wrap:anywhere}
 .histbar label{flex:0 0 auto;margin:0;color:var(--dim);font:var(--f-note);align-self:center;line-height:1}
 /* The badge: one voice for every small uppercase chip in the notebook:
    the log's verb, the who-mark, a memory's type, a bug's severity and
@@ -1803,7 +1804,7 @@ button:has(> svg:only-child),a.btn:has(> svg:only-child){display:inline-flex;ali
    commit, compose file), and its buttons at the right on the same line,
    under it when the card is narrow. */
 .dmid .name{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
-.dmid .dmorigin{font:var(--f-data);color:var(--dim);margin-top:2px;overflow-wrap:anywhere}
+.dmid .dmorigin{margin-top:2px}
 .dmid .dmorigin .sep{display:inline-block;width:14px}
 .dmid .dmstate.bad{color:var(--bad)}
 .dmsvctbl>.thead,.dmsvctbl>.tline{padding:7px 12px}
@@ -2220,7 +2221,6 @@ button.eye.bare{background:none;--sheen:none;border:0;padding:5px 4px;min-width:
 /* A section's own explainer line, straight in its body, is the quiet note
    it is everywhere else: the Git view's Branches line read at body size
    (the design pass, 4 Oct). */
-.sect>.body>.sub{font:var(--f-note)}
 /* A control never spans its container. The cap goes on the ROW where there
    is one, and every row of controls wears one class for it, .ctlrow (a
    filter row, a field and its label, a picker row, an add row), so the
@@ -2397,7 +2397,6 @@ button[aria-busy="true"]{opacity:.75}
    and what a section says in the prose voice, not the facts' mono (the
    operator, 4 Nov). */
 .machinetab .ndrow>.grow>.name{display:none}
-:is(.machinetab,.nodestab) .ndsections .sub:not(.warn,.bad,.note),.machinetab .doclist>.row>.grow>.sub{font:var(--f-note)}
 /* The controller's own machine (R90): a reference, in the reference's color. */
 .ndrow .name .tag.ndown{color:var(--purple);border-color:var(--purple-edge)}
 .ndnet{display:grid;gap:6px;align-items:center;
