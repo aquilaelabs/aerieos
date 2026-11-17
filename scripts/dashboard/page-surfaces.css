@@ -1262,6 +1262,13 @@ body.firstrun #panes{display:none}
 .glines path{fill:none;stroke-width:2;opacity:.8}
 .glines .gn{fill:var(--panel);stroke-width:2}
 .glines .gn.on{fill:var(--ink)}
+/* The history by day: a head where the day changes, as a forge's Commits
+   on, and each commit a band of its own under it; a changed file's lines
+   added and removed on its head, in the data voice. */
+.gdays .gdayhead{padding:var(--label-gap) var(--row-x);font:var(--f-note);color:var(--dim);
+  background:var(--sunk);border-bottom:var(--hair) solid var(--line)}
+.gdays .grow[data-sha]{padding:var(--row-y) var(--row-x)}
+.gfile>summary .gcount{font:var(--f-data);flex:0 0 auto}
 #gitDetail{border-top:var(--hair) solid var(--line);padding:var(--row-y) 0 0}
 .gcommit .name{font:var(--f-row);font-weight:600;overflow-wrap:anywhere}
 .gmsg{font:var(--f-code);white-space:pre-wrap;overflow-wrap:anywhere;margin:6px 0;color:var(--dim)}

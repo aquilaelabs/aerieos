@@ -27,7 +27,7 @@ function nbGitView({$, nb, project}){
   // history is a git call per question. What is open stays open across a
   // redraw: the commit picked and the files unfolded are kept by sha and
   // path, not by position.
-  let git = null, gitPick = "", gitOpenFiles = new Set();
+  let git = null, gitPick = "", gitOpenFiles = new Set(), gitShutFiles = new Set();
   // The branch whose comparison with main is on show, its own page (R269
   // step 2: #/projects/NAME/git/compare/BRANCH), "" for the view itself;
   // and what that page last read, by the two heads it was read at.
@@ -35,6 +35,12 @@ function nbGitView({$, nb, project}){
   // Which branches the table shows (R269 step 1): a chip, Active until one
   // is pressed, and the search typed beside it; a view, never saved.
   let gitBranchChip = "active", gitBranchFind = "";
+  // The history a hundred commits at a time (the long-lists rule): how many
+  // pages of it are on show is paginate's to keep, by the notebook, and a
+  // read asks for that many; by day or as the graph is the browser's.
+  const GIT_PAGE = 100;
+  const gitWant = () => { const h = $("gitBody"); return GIT_PAGE * Math.max((h && pageState[pageKey(h, "gitlog")]) || 1, 1); };
+  let gitGraph = (() => { try{ return localStorage.getItem("bb.gitgraph") === "graph"; }catch(e){ return false; } })();
   // What an open fold last showed, by what it shows (B833): a redraw draws
   // the view whole, and every open diff and comparison used to read itself
   // again on each one, a hundred reads in a few minutes on the controller.
@@ -107,7 +113,7 @@ function nbGitView({$, nb, project}){
     return reading(`${project}:git`, async () => {
       const hint = $("gitHint"), body = $("gitBody");
       try{
-        git = await getJSON("/api/git?project=" + encodeURIComponent(project) + "&what=all");
+        git = await getJSON("/api/git?project=" + encodeURIComponent(project) + "&what=all&n=" + gitWant());
       }catch(e){ viewGlance(hint, [], esc("git: " + e), "", "bad"); return; }
       if (git.error){
         const none = git.error === "not a git repository";
@@ -278,9 +284,13 @@ function nbGitView({$, nb, project}){
     // state moves, and two files in the same state are never one another's
     // when the list is patched (R244).
     const fileKey = f => `${f.path}|${f.state}|${f.staged ? 1 : 0}|${f.at || ""}`;
+    // A few changed files open with their diffs; past three they wait shut
+    // to be opened, each saying its lines added and removed on its head.
+    const fileOpen = f => gitOpenFiles.has(f.path) || (files.length <= 3 && !gitShutFiles.has(f.path));
     const fileRows = files.map(f => `<details class="sect gfile" data-path="${esc(f.path)}" data-key="${esc(fileKey(f))}"${
-        gitOpenFiles.has(f.path) ? " open" : ""}>
-        <summary><span class="t"><code>${esc(f.path)}</code></span>
+        fileOpen(f) ? " open" : ""}>
+        <summary><span class="t"><code>${esc(f.path)}</code></span>${
+          f.added != null ? `<span class="gcount"><span class="gadd">+${f.added}</span> <span class="gdel">\u2212${f.removed}</span></span>` : ""}
           <span class="sst${f.state === "conflict" ? " bad" : f.state === "untracked" ? " note" : ""}">${
             esc(f.state)}${f.staged ? " · staged" : ""}</span></summary>
         <div class="body gdiff">${keptBody("file", f.path, fileKey(f), skel("lines", 5))}</div>
@@ -306,7 +316,25 @@ function nbGitView({$, nb, project}){
     // ago() takes seconds, which is what the server sends. Times a thousand
     // put every commit and branch in the future, and the future is "just now".
     const ago_ = t => t ? ago(t) : "";
-    const graph = commits.length ? `<div class="gitgraph" data-style="--glanes:${lanesN}">
+    const row = c => `<div class="grow${c.sha === gitPick ? " on" : ""}" data-sha="${esc(c.sha)}"${gitGraph ? ` data-style="height:${H}px"` : ""}>
+          <span class="gsub">${c.refs.map(r => `<span class="pill${r.startsWith("HEAD") ? " ok" : ""}">${esc(r.replace(/^HEAD -> /, ""))}</span>`).join("")} ${esc(c.subject)}</span>
+          <span class="gmeta">${esc(c.author)} · ${esc(ago_(c.when))} · <code>${esc(c.short)}</code></span>
+        </div>`;
+    // By day, newest first as git lists them: a head where the day changes.
+    const thisYear = new Date().getFullYear();
+    const dayOf = t => { const d = new Date(t * 1000);
+      return fmtTime(t * 1000, {day: "numeric", month: "short", ...(d.getFullYear() === thisYear ? {} : {year: "numeric"})}); };
+    const byDay = () => { let was = "";
+      return commits.map(c => { const day = c.when ? dayOf(c.when) : "";
+        const head = day !== was ? `<div class="gdayhead">Commits on ${esc(day || "an unknown day")}</div>` : "";
+        was = day; return head + row(c); }).join(""); };
+    const histSeg = commits.length ? `<div class="actbar ghistbar"><span class="sp"></span>
+      <div class="pseg" role="group" aria-label="the history by day or as a graph">${
+        [["day", "By day", "the commits under the day each was made"], ["graph", "Graph", "the commits with the lanes their branches took"]].map(([v, w, say]) =>
+          `<button type="button" data-ghist="${v}" class="${(v === "graph") === gitGraph ? "on" : ""}" aria-pressed="${(v === "graph") === gitGraph}" title="${say}">${w}</button>`).join("")}</div></div>` : "";
+    const graph = !commits.length ? `<div class="empty">no commits yet</div>`
+      : !gitGraph ? `<div class="ghist gdays rows">${byDay()}</div>`
+      : `<div class="ghist gitgraph" data-style="--glanes:${lanesN}">
       <svg class="glines" width="${lanesN * W}" height="${commits.length * H}" aria-hidden="true">${
         lanes.edges.map(e => {
           const x1 = e.from.lane * W + W / 2, y1 = e.from.row * H + H / 2;
@@ -315,11 +343,8 @@ function nbGitView({$, nb, project}){
         }).join("")}${
         commits.map((c, i) => `<circle cx="${c.lane * W + W / 2}" cy="${i * H + H / 2}" r="4" class="gn gl${c.lane % 5}${c.sha === gitPick ? " on" : ""}"/>`).join("")}
       </svg>
-      <div class="grows">${commits.map(c => `<div class="grow${c.sha === gitPick ? " on" : ""}" data-sha="${esc(c.sha)}" data-style="height:${H}px">
-          <span class="gsub">${c.refs.map(r => `<span class="pill${r.startsWith("HEAD") ? " ok" : ""}">${esc(r.replace(/^HEAD -> /, ""))}</span>`).join("")} ${esc(c.subject)}</span>
-          <span class="gmeta">${esc(c.author)} · ${esc(ago_(c.when))} · <code>${esc(c.short)}</code></span>
-        </div>`).join("")}</div>
-    </div>` : `<div class="empty">no commits yet</div>`;
+      <div class="grows">${commits.map(row).join("")}</div>
+    </div>`;
     // Branches by what there is to do with them, not by date: the one the
     // tree is on; main; work not yet in main, which is what Merge into main
     // is for; branches already in main, which are only there to delete; and,
@@ -428,8 +453,8 @@ function nbGitView({$, nb, project}){
     // a fold turned stay as they are when a session's work moves the view.
     patch(body, docSection("git", "changes", gitTitle("changes"), files.length ? String(files.length) : "none",
         conflictBar + (files.length ? treeNote : "") + commitBar + (files.length ? fileRows : `<div class="empty">nothing changed since the last commit</div>`))
-      + docSection("git", "history", gitTitle("history"), commits.length ? `${commits.length}${commits.length >= 100 ? "+" : ""}` : "none",
-        graph + `<div id="gitDetail"${gitPick ? "" : " hidden"} data-own></div>`)
+      + docSection("git", "history", gitTitle("history"), commits.length ? String(Math.max(git.total || 0, commits.length)) : "none",
+        histSeg + graph + `<div id="gitDetail"${gitPick ? "" : " hidden"} data-own></div>`)
       + docSection("git", "branches", gitTitle("branches"), String(local.length), (branchRows || `<div class="empty">no branches</div>`))
       + ciSection());
     wireSections(body);
@@ -501,7 +526,8 @@ function nbGitView({$, nb, project}){
     // Set, not added: the patch keeps a fold from one draw to the next.
     body.querySelectorAll(".gfile").forEach(d => {
       d.ontoggle = () => {
-        if (d.open) gitOpenFiles.add(d.dataset.path); else gitOpenFiles.delete(d.dataset.path);
+        if (d.open){ gitOpenFiles.add(d.dataset.path); gitShutFiles.delete(d.dataset.path); }
+        else { gitOpenFiles.delete(d.dataset.path); gitShutFiles.add(d.dataset.path); }
         if (d.open && d.querySelector(".loading")) loadGitFile(d);
       };
       if (d.open && d.querySelector(".loading")) loadGitFile(d);
@@ -511,6 +537,18 @@ function nbGitView({$, nb, project}){
       gitReveal = gitPick;
       drawGit();                 // which loads the picked commit's detail
     });
+    body.querySelectorAll("[data-ghist]").forEach(b => b.onclick = () => {
+      const on = b.dataset.ghist === "graph";
+      if (on === gitGraph) return;
+      gitGraph = on;
+      try{ localStorage.setItem("bb.gitgraph", on ? "graph" : "day"); }catch(e){ /* private mode */ }
+      drawGit();
+    });
+    // More of the history as the reader reaches its foot: the next hundred
+    // read with the ones on show, so the graph's lanes stay whole.
+    const hist = body.querySelector('[data-sect="git:history"] > .body');
+    if (hist) paginate(hist, ".grow[data-sha]", {key: "gitlog", size: GIT_PAGE, total: Math.max(git.total || 0, commits.length),
+      noun: "commits", more: () => loadGit()});
     if (gitPick) loadGitCommit(gitPick);
   }
 

@@ -59,7 +59,9 @@ HOST_OF = None            # a remote's URL -> {name, kind} of the git host it is
 CI_OF = None              # project -> what the last look at its CI found (ciwatch.read)
 CI_FIX = None             # (project, where) -> that finding's line written (ciwatch.fix, R117 step 4)
 
-LOG_MAX = 100             # commits the graph shows
+LOG_MAX = 100             # commits the history shows first, a page
+LOG_MOST = 2000           # ...and the most one read brings, paged a hundred at a time
+COUNT_MAX = 1 << 20       # an untracked file's lines are counted up to this size
 DIFF_MAX = 200_000        # bytes of diff the page is handed
 SHA_RE = re.compile(r"^[0-9a-f]{4,40}$")
 US = "\x1f"
@@ -468,6 +470,30 @@ def status(repo):
             st["files"].append({"path": line.split(" ", 10)[-1], "state": "conflict", "staged": False})
         elif line.startswith("? "):
             st["files"].append({"path": line[2:], "state": "untracked", "staged": False})
+    # Each file's lines added and removed against the last commit, staged
+    # and not together, as Commit all would take them; an untracked text
+    # file is all added; a binary one, or one too big to count, has none.
+    counts = {}
+    head = _git(repo, "rev-parse", "--verify", "-q", "HEAD")
+    numstat = (_git(repo, "diff", "--numstat", "--no-renames", "HEAD") if head
+               else _git(repo, "diff", "--numstat", "--no-renames", "--cached"))
+    for line in (numstat or "").splitlines():
+        parts = line.split("\t", 2)
+        if len(parts) == 3 and parts[0].isdigit() and parts[1].isdigit():
+            counts[parts[2]] = (int(parts[0]), int(parts[1]))
+    for f in st["files"]:
+        if f["state"] == "untracked":
+            p = os.path.join(repo, f["path"])
+            try:
+                if os.path.isfile(p) and os.path.getsize(p) <= COUNT_MAX:
+                    with open(p, "rb") as fh:
+                        body = fh.read()
+                    if b"\0" not in body:
+                        counts[f["path"]] = (body.count(b"\n") + (0 if not body or body.endswith(b"\n") else 1), 0)
+            except OSError:
+                pass
+        if f["path"] in counts:
+            f["added"], f["removed"] = counts[f["path"]]
     # Each file's time and size, so the page can tell a diff it already has
     # from one that moved and read only those again (B833).
     for f in st["files"]:
@@ -486,7 +512,7 @@ def log(repo, n=LOG_MAX):
         [{"sha", "short", "parents": [...], "author", "when", "refs": [...],
           "subject"}]
     """
-    n = max(1, min(int(n or LOG_MAX), 500))
+    n = max(1, min(int(n or LOG_MAX), LOG_MOST))
     fmt = US.join(["%H", "%h", "%P", "%an", "%at", "%D", "%s"])
     out = _git(repo, "log", "--all", "--date-order", f"--max-count={n}",
                f"--format={fmt}")
@@ -502,6 +528,16 @@ def log(repo, n=LOG_MAX):
                      "author": f[3], "when": int(f[4] or 0), "refs": refs,
                      "subject": f[6]})
     return rows
+
+
+def log_total(repo):
+    """How many commits the history holds across every branch, so the page
+    can say how much of it is on screen of the whole."""
+    out = _git(repo, "rev-list", "--all", "--count")
+    try:
+        return int((out or "0").strip() or 0)
+    except ValueError:
+        return 0
 
 
 def show(repo, sha):
@@ -833,7 +869,7 @@ def payload(project, what, sha="", path="", n=None, branch=""):
     if what == "status":
         return status(repo)
     if what == "log":
-        return {"commits": log(repo, n or LOG_MAX)}
+        return {"commits": log(repo, n or LOG_MAX), "total": log_total(repo)}
     if what == "show":
         return show(repo, sha)
     if what == "diff":
@@ -844,7 +880,7 @@ def payload(project, what, sha="", path="", n=None, branch=""):
         return compare(repo, branch)
     if what in ("", "all"):
         return {"status": status(repo), "commits": log(repo, n or LOG_MAX),
-                **branches(repo)}
+                "total": log_total(repo), **branches(repo)}
     return {"error": "unknown question"}
 
 

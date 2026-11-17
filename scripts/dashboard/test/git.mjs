@@ -150,6 +150,17 @@ await section("An open diff is read once, not on every redraw of the view", asyn
 });
 // One section open at a time (the operator, 5 Oct): History is opened.
 await openFold(page, `${NB} [data-sect="git:history"]`);
+// By day first, as a forge lists commits: a head where the day changes and
+// each commit under it, with the graph a switch away.
+await section("History lists the commits by day, with the graph a switch away", async () => {
+  const days = await page.$eval(`${NB} [data-sect="git:history"]`, d => ({
+    heads: [...d.querySelectorAll('.gdays .gdayhead')].map(h => h.textContent), rows: d.querySelectorAll('.gdays .grow[data-sha]').length,
+    graph: !!d.querySelector('.gitgraph'), on: d.querySelector('[data-ghist].on')?.dataset.ghist }));
+  ok(days.heads.length >= 2 && days.heads.every(h => /^Commits on /.test(h)) && days.rows >= 5 && !days.graph && days.on === 'day',
+     `History lists the commits by day, a head where the day changes, with no graph until it is asked for (${JSON.stringify(days)})`);
+  await page.click(`${NB} [data-ghist="graph"]`);
+  await page.waitForSelector(`${NB} .gitgraph`, { timeout: 10000 });
+});
 const graph = await page.$eval(`${NB} .gitgraph`, g => ({
   rows: g.querySelectorAll('.grow[data-sha]').length, nodes: g.querySelectorAll('circle').length,
   edges: g.querySelectorAll('path').length, lanes: parseInt(getComputedStyle(g).getPropertyValue('--glanes')) }));
@@ -200,7 +211,7 @@ ok(await page.$eval(`${NB}`, e => { const r = [...e.querySelectorAll('.gbranch')
    'a branch row says how old its last commit is, not "just now" for everything');
 // A commit made elsewhere reaches the open view on the git revision, not a poll.
 writeFileSync(`${B}/a.txt`, 'one\ntwo\nthree\n'); git('commit', '-q', '-am', 'Third line');
-await refreshUntil(page, () => /Third line/.test(document.querySelector('.nb .nbview[data-view="git"] .gitgraph')?.textContent || ''),
+await refreshUntil(page, () => /Third line/.test(document.querySelector('.nb .nbview[data-view="git"] .ghist')?.textContent || ''),
                    { timeout: 30000 });
 ok(true, 'a commit made outside the dashboard arrives on the view by itself');
 
@@ -776,18 +787,18 @@ print(json.dumps(g._done(said, "fetched", ${JSON.stringify(`${DIR}/ws/beta`)})))
     await page.keyboard.type('From the', { delay: 30 });
     const box = await page.$(`${V} #gitMsg`);
     git('commit', '-q', '--allow-empty', '-m', 'A session commits meanwhile');
-    const moved = await refreshUntil(page, () => /A session commits meanwhile/.test(document.querySelector('.nb .nbview[data-view="git"] .gitgraph')?.textContent || ''), { timeout: 15000 })
+    const moved = await refreshUntil(page, () => /A session commits meanwhile/.test(document.querySelector('.nb .nbview[data-view="git"] .ghist')?.textContent || ''), { timeout: 15000 })
       .then(() => true, () => false);
     await page.keyboard.type(' view', { delay: 30 });
     const r = await page.evaluate(b => ({ kept: b.isConnected, focus: document.activeElement === b, value: b.value, caret: b.selectionStart }), box);
     ok(moved && r.kept && r.focus && r.value === 'From the view' && r.caret === 13,
        `a commit message being typed keeps its box, its focus and its caret while a commit draws the view again (${JSON.stringify({ moved, ...r })})`);
     git('reset', '-q', '--soft', 'HEAD~1');
-    await refreshUntil(page, () => !/A session commits meanwhile/.test(document.querySelector('.nb .nbview[data-view="git"] .gitgraph')?.textContent || ''), { timeout: 15000 }).catch(() => {});
+    await refreshUntil(page, () => !/A session commits meanwhile/.test(document.querySelector('.nb .nbview[data-view="git"] .ghist')?.textContent || ''), { timeout: 15000 }).catch(() => {});
   }
   await page.fill('.nb .nbview[data-view="git"] #gitMsg', 'From the view');
   await page.click('.nb .nbview[data-view="git"] #gitCommit');
-  await refreshUntil(page, () => /From the view/.test(document.querySelector('.nb .nbview[data-view="git"] .gitgraph')?.textContent || ''), { timeout: 20000 });
+  await refreshUntil(page, () => /From the view/.test(document.querySelector('.nb .nbview[data-view="git"] .ghist')?.textContent || ''), { timeout: 20000 });
   ok(git('log', '-1', '--format=%s') === 'From the view', 'Commit from the view commits, and the graph shows it');
   await openFold(page, '.nb .nbview[data-view="git"] [data-sect="git:history"]');   // one section open at a time (the operator, 5 Oct)
   await page.click('.nb .nbview[data-view="git"] .grow[data-sha]');
@@ -1595,6 +1606,33 @@ await section("the CI watch", async () => {
   await page.waitForFunction(() => !(state?.ci_red || []).length, null, { timeout: 15000 });
   ok(true, '...and the bell row leaves with the red run');
   rmSync(`${DIR}/state/ciwatch/beta.json`, { force: true });
+});
+
+// The history a hundred commits at a time (the long-lists rule): its head
+// says how many there are, its foot how many are on show of them, and Show
+// more brings the next hundred, read with the ones above so the lanes stay
+// whole. The commits are made with plumbing on top of HEAD, so the index
+// and the tree's changes are left as they are, and HEAD goes back after.
+await section("The history pages past a hundred commits", async () => {
+  const was = git('rev-parse', 'HEAD'), tree = git('rev-parse', 'HEAD^{tree}');
+  let top = was;
+  for (let i = 0; i < 110; i++) top = git('commit-tree', tree, '-p', top, '-m', `Paging ${i}`);
+  git('update-ref', '-m', 'paging', 'HEAD', top);
+  const total = Number(git('rev-list', '--all', '--count'));
+  await openFold(page, `${NB} [data-sect="git:history"]`);
+  await refreshUntil(page, () => /Paging 109/.test(document.querySelector('.nb .nbview[data-view="git"] .ghist')?.textContent || ''), { timeout: 30000 });
+  const first = await page.$eval(`${NB} [data-sect="git:history"]`, d => ({ head: d.querySelector(':scope > summary .sst')?.textContent,
+    rows: d.querySelectorAll('.grow[data-sha]').length, foot: d.querySelector('.pagemore span')?.textContent || '' }));
+  ok(first.head === String(total) && first.rows === 100 && first.foot === `100 of ${total} commits`,
+     `History shows its first hundred commits, its head saying how many there are and its foot how many are on show (${JSON.stringify(first)}, ${total} in all)`);
+  // The first view's history: the suite has a second notebook open on beta.
+  const HIST = `${NB} [data-sect="git:history"]`;
+  await page.click(`${HIST} .pagemore .next`);
+  const all = await page.waitForFunction(([sel, n]) => document.querySelector(sel)?.querySelectorAll('.grow[data-sha]').length === n, [HIST, total],
+    { timeout: 15000 }).then(() => true, () => false);
+  const after = await page.$eval(HIST, d => ({ rows: d.querySelectorAll('.grow[data-sha]').length, foot: !!d.querySelector('.pagemore') }));
+  ok(all && !after.foot, `...and Show more brings the rest, the foot going with nothing more to show (${after.rows} of ${total})`);
+  git('update-ref', '-m', 'paging done', 'HEAD', was);
 });
 
 await done(browser);
