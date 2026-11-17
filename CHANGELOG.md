@@ -75,6 +75,7 @@
 - The Doctor's panel is compact: each problem a line saying what is wrong and how many other checks pass, with Controller settings at its foot opening the full verdict, every check with what it said and its fix (a2bcdf0)
 - Every dialog's buttons are in one order: the main one first, the way out after it, and anything that cannot be undone last; the buttons stay at the foot of a dialog that scrolls (a6403f5)
 - A press on the dimmed page around a dialog puts it away, as Escape does, in every dialog but the one that shows a node's one-time enrollment token (a9ab7bc)
+- Back closes the dialog on show and leaves the page under it where it was, and closing any dialog puts the focus back on what opened it (8acd882)
 
 ### Fixed
 
