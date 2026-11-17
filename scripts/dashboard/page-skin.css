@@ -35,12 +35,14 @@
      scheme and no space's color moves, its words in --ground-ink: mixed
      over a space's panel, the warning's band read as a dirty olive. A
      warning's own surface (a band, a banner) is --warn-wash with
-     --warn-wash-ink: in the dark half the yellow itself with dark words,
-     since any thin yellow over a dark ground reads olive; in the light half
-     a pale wash. */
+     --warn-wash-ink and its edge --warn-edge: in the dark half a faint
+     yellow over --ground that the page shows through, the yellow carried by
+     the words and the edge (the operator, 17 Nov: see-through, where the
+     solid yellow had replaced a tint over the space's color that read
+     dirty); in the light half a pale wash. */
   --pass:#3fb950;
   --ground:#141922; --ground-ink:#eef1f6;
-  --warn-wash:#facc15; --warn-wash-ink:#1f1a00; --warn-edge:#facc15;
+  --warn-wash:color-mix(in srgb, #facc15 12%, var(--ground)); --warn-wash-ink:#facc15; --warn-edge:#facc15;
   /* Derived, not chosen. Buttons and the active/primary family were hardcoded
      hex: #232b34 eleven times, #1f6f36 and #2ea043 across every tab, pane and
      primary, which meant a scheme could repaint the page and leave every

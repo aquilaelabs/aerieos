@@ -1840,8 +1840,16 @@ await section("good, warning and error are one trio on every scheme, and a warni
       const lin = x => { x /= 255; return x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); };
       const lum = a => 0.2126 * lin(a[0]) + 0.7152 * lin(a[1]) + 0.0722 * lin(a[2]);
       const R = (a, b) => { const x = lum(px(a)), y = lum(px(b)); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+      // The wash as the page resolves it: a mix over --ground since the
+      // operator's see-through band (17 Nov), which a canvas cannot read
+      // from the token's text.
+      const probe = document.createElement('div');
+      probe.style.background = 'var(--warn-wash)';
+      document.body.appendChild(probe);
+      const wantWash = getComputedStyle(probe).backgroundColor;
+      probe.remove();
       const out = { trio: ['--pass', '--warn', '--bad'].map(k => px(rs.getPropertyValue(k).trim()).join(',')).join(' '),
-                    wash: px(cs.backgroundColor).join(','), wantWash: px(rs.getPropertyValue('--warn-wash').trim()).join(','),
+                    wash: px(cs.backgroundColor).join(','), wantWash: px(wantWash).join(','),
                     words: +R(cs.color, cs.backgroundColor).toFixed(2) };
       host.remove();
       return out;
