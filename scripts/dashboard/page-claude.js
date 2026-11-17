@@ -483,7 +483,7 @@ function resumePicker(p, m, card, anchor, ns, several){
       r.restart ? (r.when ? `ending the one running, resuming the one from ${esc(ago(r.when))} · ` : "ending the one running, resuming its conversation · ")
         : r.sessionId ? `from ${esc(ago(r.when ?? p.last_claude?.when))} · ` : ""}Claude Code${
       several || n.name ? ` on ${esc(n.name || "")}` : ""}${r.restart ? "" : esc(as)}</span></div>
-    <div class="rmfields">
+    <div class="fgrid rmfields">
       <div class="setrow col ctlrow"><label class="lbl" for="rmModel">Model</label><select id="rmModel" aria-label="model this session starts on">${opts(MODELS, r.model)}</select></div>
       <div class="setrow col ctlrow"><label class="lbl" for="rmEffort">Effort</label><select id="rmEffort" aria-label="effort this session starts on">${opts(EFFORTS, r.effort)}</select></div>
     </div>
@@ -572,7 +572,7 @@ function agentPicker(p, m, card, anchor, n, several){
       r.restart ? (r.sessionId ? "ending the one running, resuming its conversation · " : "ending the one running · ")
         : r.sessionId && r.when ? `from ${esc(ago(r.when))} · ` : ""}${esc(a.product)}${
       several || n.name ? ` on ${esc(n.name || "")}` : ""}${r.restart ? "" : esc(as)}</span></div>
-    <div class="rmfields">
+    <div class="fgrid rmfields">
       <div class="setrow col ctlrow"><label class="lbl" for="rmModel">Model</label><select id="rmModel" aria-label="model this session starts on">${opts(t.models, r.model)}</select></div>
       <div class="setrow col ctlrow"><label class="lbl" for="rmEffort">Effort</label><select id="rmEffort" aria-label="effort this session starts on">${opts(t.efforts, r.effort)}</select></div>
     </div>

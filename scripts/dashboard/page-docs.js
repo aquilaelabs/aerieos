@@ -591,7 +591,7 @@ function splitSects(root, key, {says = {}, sel = ":scope > details.sect", marks 
     root.addEventListener("click", e => {
       const s = e.target.closest("summary"), d = s?.parentElement;
       if (!d || d.parentElement !== root || !d.classList.contains("scur") || !root.classList.contains("sopen")
-          || !matchMedia("(max-width: 900px)").matches) return;
+          || !isPhone()) return;
       e.preventDefault();
       SPLIT[root._split.key].open = false; splitMove(root, "back"); splitDraw(root);
     });
@@ -636,13 +636,13 @@ function splitDraw(root){
       // so a press there still opens it.
       // It is still the one open, which a narrower window shows in place of
       // the list.
-      if (b.classList.contains("on") && !matchMedia("(max-width: 900px)").matches){ st.open = true; return; }
+      if (b.classList.contains("on") && !isPhone()){ st.open = true; return; }
       st.pick = b.dataset.spick; st.open = true;
       // At a desk the section fades through, as a rail page does; on a
       // phone it slides in over the list.
       splitAway(() => [...root.querySelectorAll(o.sel)].filter(d => d.classList.contains("scur")),
                 () => { splitMove(root, "in"); splitDraw(root); });
-      if (matchMedia("(max-width: 900px)").matches) root.scrollIntoView?.({block: "start"});
+      if (isPhone()) root.scrollIntoView?.({block: "start"});
     });
   }
   all.forEach(d => { const on = splitId(d) === pick;
@@ -660,7 +660,7 @@ function splitDraw(root){
 // A pick on a list beside its detail: a fade through at a desk (fadeThrough),
 // and on a phone the redraw alone, which plays its slide (splitMove).
 function splitAway(parts, swap){
-  return matchMedia("(max-width: 900px)").matches ? swap() : fadeThrough(parts, swap);
+  return isPhone() ? swap() : fadeThrough(parts, swap);
 }
 
 // The phone's slide: in from the right to a section, back from the left to

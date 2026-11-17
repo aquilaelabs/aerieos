@@ -1,7 +1,9 @@
 """The page's text is set in its voices' tokens (Perch step 70): a font or a
 font size in pixels is a glyph's or a control's, named below, and a hairline
-is --hair, never 1px. A new rule with a pixel font or a 1px border fails here
-by its selector."""
+is --hair, never 1px. A control's height is --tap, never its 32px written
+out, and a script asks whether it is on a phone with isPhone() (Perch step
+69). A new rule with a pixel font, a 1px border or a 32px control fails here
+by its selector, and a script with the phone's query of its own by name."""
 import re
 import unittest
 from pathlib import Path
@@ -45,6 +47,19 @@ class Tokens(unittest.TestCase):
         ones = sorted({f"{n}: {sel}" for n, sel, body in rules()
                        if re.search(r"(?<![-\w])(?:border(?:-top|-bottom|-left|-right)?|outline):1px\b", body)})
         self.assertEqual(ones, [], "a 1px line is var(--hair)")
+
+    def test_a_controls_height_is_the_tap(self):
+        written = sorted({f"{n}: {sel}" for n, sel, body in rules()
+                          if re.search(r"(?<![-\w])min-(?:height|width):32px\b", body)})
+        self.assertEqual(written, [], "a control's height is var(--tap)")
+
+    def test_a_script_asks_isphone(self):
+        # The page's own listeners on the query's change are the one place
+        # it is written besides isPhone itself.
+        own = {"page-tabs.js", "page-boot.js"}
+        asked = sorted(p.name for p in DASH.glob("*.js")
+                       if p.name not in own and re.search(r"matchMedia\(\s*[\"']\(max-width:\s*900px\)", p.read_text()))
+        self.assertEqual(asked, [], "ask isPhone(), never the 900px query written out")
 
 
 if __name__ == "__main__":

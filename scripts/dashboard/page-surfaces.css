@@ -574,10 +574,8 @@ body.firstrun #panes{display:none}
 }
 .setstepbody .setcmd{margin:6px 0 8px;padding:8px 9px;font:var(--f-data);color:var(--ink);background:var(--panel);border:var(--hair) solid var(--line);border-radius:var(--r-control,6px);white-space:pre-wrap;overflow-wrap:anywhere}
 .setstep>.actbar{justify-content:flex-end;flex-wrap:wrap}
-.setfields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--field-gap);margin-top:8px}
+.setfields{margin-top:8px}
 :is(.setfields,.setstepbody .fgrid) input:not([type=checkbox]):not([type=radio]):not([type=file]){width:100%;box-sizing:border-box;min-height:var(--ctl);padding:6px 9px;font:var(--f-field)}
-@media(max-width:600px){ .setfields{grid-template-columns:minmax(0,1fr)}
-}
 .setfinish{display:flex;flex-direction:column;gap:8px;padding-top:4px}
 .setfinish p{margin:0;font:var(--f-note)}
 .setfinish>.actbar{justify-content:flex-end}
@@ -2409,7 +2407,7 @@ body.firstrun #panes{display:none}
 /* A node's Sessions settings as a group of their own: its heading at the
    fields' inset, its switches set as close as the section's own. */
 .ndsettings>.ndsetgroup>.fgrouphead{padding:0 var(--row-x)}
-.ndsettings>.field>.ndcap,.ndsettings>.ndsetgroup>.field>.ndcap{min-height:32px}
+.ndsettings>.field>.ndcap,.ndsettings>.ndsetgroup>.field>.ndcap{min-height:var(--tap)}
 .ndsettings>.field>.sub,.ndsettings>.ndsetgroup>.field>.sub{margin-top:2px}
 /* ...its two numbers side by side, a phone stacking them. */
 .ndsettings>.logdays.setrow.col{display:inline-flex;width:auto}
@@ -2436,9 +2434,8 @@ body.firstrun #panes{display:none}
 .ndrunrecs>.ndrun>.ndrunnote{padding:0 var(--row-x) var(--row-y)}
 .ndrunrecs>.ndrun.open{background:var(--sunk)}
 .ndrunform{padding:0 var(--row-x) var(--row-y)}
-.ndrunfields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:var(--row-x);row-gap:var(--field-gap);min-width:0}
-.ndrunfields>.setrow.col{margin:0;min-width:0;max-width:none}
-@media (max-width:600px){ .ndrunfields{grid-template-columns:minmax(0,1fr)} }
+.ndrunfields{min-width:0}
+.ndrunfields>.setrow.col{min-width:0}
 /* The path mapping's records, the same shape: two fields across its form. */
 .tbl.ndpaths>.row.ndpath{align-items:stretch}
 .ndpaths>.ndpath.open{background:var(--sunk);padding:var(--row-y) var(--row-x)}
@@ -2548,7 +2545,7 @@ body.firstrun #panes{display:none}
    line, a thumb's height on a phone. */
 /* Under the line it fixes, in its words' font (the operator, 26 Oct: run on
    after the line, in another face, it read as part of it). */
-.doctor .probs .pagelink{display:flex;width:fit-content;align-items:center;min-height:32px;color:var(--accent);font:inherit}
+.doctor .probs .pagelink{display:flex;width:fit-content;align-items:center;min-height:var(--tap);color:var(--accent);font:inherit}
 @media (pointer:coarse){.doctor .probs .pagelink{min-height:44px}
 }
 .row code{font:var(--f-field);background:var(--btn);padding:1px 5px;
@@ -2660,10 +2657,7 @@ body.firstrun #panes{display:none}
 .resumemenu .rmconv .rmin{margin-left:auto;font:var(--f-note);color:var(--dim)}
 /* ...a note in the person's own lines, and in ink: it is theirs to read. */
 .resumemenu .rmconv .rmnote{white-space:pre-line;color:var(--ink);overflow-wrap:anywhere;max-height:6.5em;overflow-y:auto}
-.resumemenu .rmfields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
-.resumemenu .rmfields select{width:100%;min-width:0}
-@media(max-width:420px){ .resumemenu .rmfields{grid-template-columns:minmax(0,1fr)}
-}
+.resumemenu .rmfields select{min-width:0}
 /* The dock (R218 step 4): the second pane at the page's foot, one line when
    shut, --dock-h tall when up (half the area to begin with, a drag on its
    line changes it); on a phone up is the whole height above the bottom bar.

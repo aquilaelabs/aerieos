@@ -209,7 +209,7 @@ function wireUsers(el){
       usersPick = b.dataset.upick; usersEdit = null; usersPhoneOpen = true; usersMoveNext = "in"; usersRedraw(); });
   });
   // The picked account's head is the way back on a phone (splitSects).
-  el.querySelectorAll("[data-uback]").forEach(b => b.onclick = () => { if (!matchMedia("(max-width: 900px)").matches) return; usersPhoneOpen = false; usersMoveNext = "back"; usersRedraw(); });
+  el.querySelectorAll("[data-uback]").forEach(b => b.onclick = () => { if (!isPhone()) return; usersPhoneOpen = false; usersMoveNext = "back"; usersRedraw(); });
   // What is typed is kept across the repaints a poll brings (B422's lesson).
   el.querySelectorAll("[data-ufield]").forEach(f => f.oninput = f.onchange = () => {
     usersEdit[f.dataset.ufield] = f.value;

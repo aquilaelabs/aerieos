@@ -371,7 +371,7 @@ function nodeRunnerSection(n, c, between = "", acts = ""){
     const open = c.runEdit?.slot === slot;
     const f = open ? c.runEdit.form : {};
     const form = !open ? "" : `<div class="ngform ndrunform">
-        <div class="ndrunfields">
+        <div class="fgrid ndrunfields">
           <label class="setrow col ctlrow"><span class="lbl">Token</span><input data-rf="token" type="password" value="${esc(f.token || "")}" spellcheck="false" autocomplete="off"
             placeholder="${stored ? "stored: paste one only to replace it" : "paste a token that may register runners there"}" aria-label="runner token"></label>
           <label class="setrow col ctlrow"><span class="lbl">Extra labels</span><input data-rf="labels" value="${esc(f.labels || "")}" spellcheck="false" autocomplete="off"

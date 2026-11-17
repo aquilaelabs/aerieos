@@ -466,7 +466,7 @@ function wireRoles(el){
   });
   // The picked role's head is the way back on a phone, as a page of
   // settings' section head is (splitSects).
-  el.querySelectorAll("[data-rback]").forEach(b => b.onclick = () => { if (!matchMedia("(max-width: 900px)").matches) return; rolesPhoneOpen = false; rolesMoveNext = "back"; rolesRedraw(); });
+  el.querySelectorAll("[data-rback]").forEach(b => b.onclick = () => { if (!isPhone()) return; rolesPhoneOpen = false; rolesMoveNext = "back"; rolesRedraw(); });
 
   const nw = el.querySelector("#rolesNewOpen");
   if (nw) nw.onclick = () => rolesNewOpen();
