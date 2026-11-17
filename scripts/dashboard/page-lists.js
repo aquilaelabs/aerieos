@@ -36,6 +36,14 @@ function pageLimit(host, name, total, size = PAGE){
   return Math.min(total, size * Math.max(pageState[key] || 1, 1));
 }
 
+// ...and a row somebody is working in (one being edited, one just added)
+// kept on show: the pages shown grow to reach the first `count` rows.
+function pageReach(host, name, count, size = PAGE){
+  if (!host || !(count > 0)) return;
+  const key = pageKey(host, name);
+  pageState[key] = Math.max(pageState[key] || 1, Math.ceil(count / size));
+}
+
 function paginate(host, rowSel, opts = {}){
   if (!host) return;
   const key = pageKey(host, opts.key);

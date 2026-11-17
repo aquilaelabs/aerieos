@@ -1339,6 +1339,12 @@ body.firstrun #panes{display:none}
 /* A file row that opens: its line a press, a caret saying so, and what it
    opens to under the line in the small mono, a line each. */
 .artrow.artfile.opens{cursor:pointer}
+/* The Design view's pages as rows, each a press; a page open, its line back
+   to them in the shell's back voice. */
+.tbl.dspages>.row.dspagerow{cursor:pointer}
+@media(hover:hover){ .tbl.dspages>.row.dspagerow:hover{background:var(--btn)} }
+.dspagehead .backbtn{display:inline-flex;align-items:center;gap:4px;padding:2px 8px 2px 2px;color:var(--dim);background:none;--sheen:none;border:0}
+.dspagehead .backbtn:hover,.dspagehead .backbtn:focus-visible{color:var(--ink)}
 .artrow .artcaret{color:var(--dim);font:var(--f-note);width:9px;flex:0 0 auto}
 .artrow .top>.dim{white-space:nowrap}
 .artrow .artprov{display:flex;flex-direction:column;gap:2px;padding-left:16px}

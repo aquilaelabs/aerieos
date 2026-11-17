@@ -39,6 +39,9 @@ function nbDesignView({$, nb, project, root}){
   // ($), its state (nb), the project, the notebook's element (root), and
   // the count that keys a page added before a Save.
   const ds = {$, nb, project, root, tmpN: 0};
+  // The page an address names (#/spaces/NAME/design/KEY), "" for the list:
+  // before the design is read it is the page the read lands on.
+  nb.designAt = key => { if ((key || null) === nb.dsShow.page) return; nb.dsShow.page = key || null; if (nb.dsData) nbDsDrawDesign(ds); };
   $("dsWrite").onclick = () => nbDsWriteFile(ds);
   nbDsStageSections(ds);
   return {loadDesign: () => nbDsLoadDesign(ds), drawDesign: () => nbDsDrawDesign(ds)};
@@ -137,7 +140,7 @@ function nbDsWireAdd(ds){
       : {id: 0, tmp: ++ds.tmpN, name: "", platform: $("dsPlatform").value, template: t.key,
          frame: t.frame, blocks: nbDsClone(t.blocks), notes: ""};
     nb.dsPages.push(p);
-    nb.dsShow.page = nbDsKeyOf(p);
+    navPush(() => { nb.dsShow.page = nbDsKeyOf(p); });
     // The section opens on what was just added, whatever its fold said.
     sectOpen["design:pages"] = true;
     nbDsTouched(ds);
@@ -177,13 +180,13 @@ function nbDsCtl(id, text, help, control, grow){
   return `<div class="dsctl${grow ? " grow" : ""}">${lbl(id, text, help)}${control}</div>`;
 }
 
-// What each section shows, kept in range: a removed page or theme
-// leaves the pulldown on the first one.
+// What each section shows, kept in range: a removed theme leaves the
+// pulldown on the first one, and a page that is not there the list.
 function nbDsShown(ds){
   const {nb} = ds;
   const L = nb.dsLang, S = nb.dsShow;
   S.theme = Math.min(Math.max(0, S.theme), Math.max(0, (L.themes || []).length - 1));
-  if (!nb.dsPages.some(p => nbDsKeyOf(p) === S.page)) S.page = nb.dsPages.length ? nbDsKeyOf(nb.dsPages[0]) : null;
+  if (!nb.dsPages.some(p => nbDsKeyOf(p) === S.page)) S.page = null;
   return {theme: (L.themes || [])[S.theme], page: nb.dsPages.find(p => nbDsKeyOf(p) === S.page)};
 }
 
@@ -202,7 +205,13 @@ function nbDsDrawDesign(ds){
   nbDsWireLanguage(ds, body);
   nbDsWireThemes(ds, body, sh.theme);
   if (sh.page) nbDsWirePage(ds, body.querySelector(`[data-dspage="${nbDsKeyOf(sh.page)}"]`), sh.page);
-  body.querySelectorAll("[data-dsrules]").forEach(host => nbDsWireRulesList(ds, host));
+  body.querySelectorAll("[data-dsrules]").forEach(host => {
+    nbDsWireRulesList(ds, host);
+    // A page of rules at a time, the one being edited always among them.
+    const key = "dsrules:" + host.dataset.dsrules;
+    pageReach(host, key, Math.max(0, ...[...nbDsRuleUI(ds, host.dataset.dsrules).editing].map(i => i + 1)));
+    paginate(host, ":scope > details.rulerow", {key, noun: "rules"});
+  });
   // A project read-only to you reads its design: what a role does not give
   // is not drawn (the operator, 21 Oct), so every press that would change
   // it is gone, a fold's own toggle kept, and the fields stay to read,
@@ -442,10 +451,15 @@ function nbDsLightHalf(t, i){
 // of them, and the chosen one's board and fields. Shut on a new tab,
 // like the language and the themes (the operator, 29 Sep): the board is
 // the big thing on this view, and it opens on what is added.
+// A page's line: what it is for, its platform and how many blocks.
+function nbDsPageSaid(ds, p){
+  return `${p.name.trim() || "unnamed page"} · ${nbDsPlatformOf(ds, p)?.label || p.platform} · ${p.blocks.length} block${p.blocks.length === 1 ? "" : "s"}`;
+}
+const DS_PAGE_COLS = [{label: "Page"}, {label: "Platform", w: "minmax(0,.6fr)"}, {label: "Frame", w: "minmax(0,.6fr)"}, {label: "Blocks", w: "5rem", num: true}];
 function nbDsPagesSection(ds, p){
   const {nb} = ds;
   const n = nb.dsPages.length;
-  const rows = nb.dsPages.map(x => ({key: nbDsKeyOf(x), label: `${x.name.trim() || "unnamed page"} (${nbDsPlatformOf(ds, x)?.label || x.platform}, ${x.blocks.length} block${x.blocks.length === 1 ? "" : "s"})`}));
+  const P = nbDsPresets(ds);
   // A new page starts from a template, or as a copy of a page here (its
   // blocks, layouts, rules and notes), blank by default (the operator,
   // 29 Sep).
@@ -455,12 +469,17 @@ function nbDsPagesSection(ds, p){
         <select id="dsPageFrom" aria-label="a page here to copy, or none"><option value="" selected>not a copy</option>${
           nb.dsPages.map(x => `<option value="${nbDsKeyOf(x)}">a copy of ${esc(x.name.trim() || "unnamed page")}</option>`).join("")}</select>
         <button id="dsAdd" class="primary" type="button">Add page</button></div></div>`;
-  const body = add + (n ? `
-      <div class="field"><div class="dsrow">
-        ${nbDsPick("dsPagePick", "Page", rows, nb.dsShow.page || "", "each laid out as blocks on a frame and named for what it is for")}
-      </div></div>
-      ${p ? nbDsPageBody(ds, p) : ""}`
-    : `<div class="field"><div class="hint">No pages yet: pick a platform and a template and press Add page.</div></div>`);
+  // Every page a row, a press on it opening that page at an address of its
+  // own; the page open, a line back to the rows over it and the page.
+  const rows = nb.dsPages.map(x => `<div class="row dspagerow" data-dspagego="${nbDsKeyOf(x)}">${tblLine(DS_PAGE_COLS, [
+      `<button type="button" class="namelink" title="open this page">${esc(x.name.trim() || "unnamed page")}</button>`,
+      esc(nbDsPlatformOf(ds, x)?.label || x.platform), esc(P.frames?.[x.frame]?.label || x.frame || ""), String(x.blocks.length)])}</div>`).join("");
+  const body = p ? `<div class="field dspagehead"><div class="actbar">
+        <button type="button" class="bare backbtn" data-dspageback title="back to every page">${ICON_BACK}<span>Pages</span></button>
+        <span class="dim dspagesaid">${esc(nbDsPageSaid(ds, p))}</span></div></div>
+      ${nbDsPageBody(ds, p)}`
+    : add + (n ? tblWrap(DS_PAGE_COLS, rows, "dspages")
+      : `<div class="field"><div class="hint">No pages yet: pick a platform and a template and press Add page.</div></div>`);
   return docSection("design", "pages", "Pages", n ? `${n} page${n === 1 ? "" : "s"}` : "none yet",
                     body + nb.sectBar("design:pages"));
 }
@@ -629,11 +648,9 @@ function nbDsRepaintBoard(ds, p){
   }
   nbDsPageOption(ds, p);
 }
-// The page's line on the Pages pulldown: its name, platform and count.
+// The page's line over it: its name, platform and count, as it is typed.
 function nbDsPageOption(ds, p){
-  const {root} = ds;
-  const o = root.querySelector(`#dsPagePick option[value="${nbDsKeyOf(p)}"]`);
-  if (o) o.textContent = `${p.name.trim() || "unnamed page"} (${nbDsPlatformOf(ds, p)?.label || p.platform}, ${p.blocks.length} block${p.blocks.length === 1 ? "" : "s"})`;
+  setText(ds.root.querySelector(".dspagehead .dspagesaid"), nbDsPageSaid(ds, p));
 }
 // Inside the frame, two ways: a block being SIZED keeps its corner and is
 // capped at the edge, a block being MOVED keeps its size and stops at the
@@ -746,7 +763,7 @@ function nbDsWirePage(ds, el, p){
   el.querySelector("[data-dspagerm]").onclick = () => {
     nb.dsPages = nb.dsPages.filter(x => x !== p);
     delete nb.dsSel[key];
-    nb.dsShow.page = null;
+    navPush(() => { nb.dsShow.page = null; });
     nbDsTouched(ds); nbDsDrawDesign(ds);
   };
   nbDsWireBoard(ds, el.querySelector(".dsboard"), p);
@@ -915,8 +932,13 @@ function nbDsWireLanguage(ds, body){
   const L = nb.dsLang;
   const sc = body.querySelector("#dsScope");
   if (sc) sc.oninput = e => { L.scope = e.target.value; nbDsTouched(ds); };
-  const pp = body.querySelector("#dsPagePick");
-  if (pp) pp.onchange = e => { nb.dsShow.page = e.target.value; nbDsDrawDesign(ds); };
+  // A page from its row, and back to the rows: each a step Back returns
+  // from, the address naming the page.
+  body.querySelectorAll("[data-dspagego]").forEach(r => r.onclick = () =>
+    navPush(() => { nb.dsShow.page = r.dataset.dspagego; nbDsDrawDesign(ds); }));
+  const back = body.querySelector("[data-dspageback]");
+  if (back) back.onclick = () => navPush(() => { nb.dsShow.page = null; nbDsDrawDesign(ds); });
+  paginate(body.querySelector(".tbl.dspages"), ":scope > .row", {key: "dspages", noun: "pages"});
 }
 
 // A theme from a preset is the ten colors in its hexes, named for it.

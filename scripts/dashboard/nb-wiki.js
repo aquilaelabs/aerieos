@@ -344,6 +344,8 @@ function nbWikiView({$, nb, project}){
     // page's editor, stay as they are when the wiki is read again.
     patch($("wkAddBox"), add);
     patch(box, log + `<div class="field wkreader">${articles().length ? nav() : ""}${article()}</div>`);
+    // The log a page of changes at a time, newest first.
+    paginate(box.querySelector(".wklog"), ":scope > .wklogrow", {key: "wklog", noun: "changes"});
     wire(box);
     wire($("wkAddBox"));
   }

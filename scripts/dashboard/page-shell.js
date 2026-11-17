@@ -218,7 +218,8 @@ function routeOf(t){
     // view's name on the page, so the address says overview.
     const n = notebooks.get(t.arg), v = n?.where?.() || "";
     // ...and a branch's comparison, its own page (R269 step 2).
-    const page = v === "wiki" ? n?.wikiPage?.() || "" : v === "git" && n?.gitPage?.() ? "compare/" + encodeURIComponent(n.gitPage()) : "";
+    const page = v === "wiki" ? n?.wikiPage?.() || "" : v === "git" && n?.gitPage?.() ? "compare/" + encodeURIComponent(n.gitPage())
+      : v === "design" ? n?.designPage?.() || "" : "";
     return "#/spaces/" + encodeURIComponent(t.arg) + (v ? "/" + (v === "briefing" ? "overview" : v) : "")
       + (page ? "/" + (v === "git" ? page : encodeURIComponent(page)) : "");
   }
@@ -260,8 +261,12 @@ function openRoute(hash){
     // it read /git, so Back from it went nowhere.
     const cmp = v === "git" ? (c === "compare" && d ? decodeURIComponent(d) : "") : null;
     if (cmp !== null) notebooks.get(name)?.gitAt?.(cmp);
+    // ...and a design page, or the list, for the same reason.
+    const dpage = v === "design" ? (c ? decodeURIComponent(c) : "") : null;
+    if (dpage !== null) notebooks.get(name)?.designAt?.(dpage);
     openNotebook(name, v ? (v === "overview" ? "briefing" : v) : undefined);
     if (v === "wiki" && c) notebooks.get(name)?.wikiAt?.(decodeURIComponent(c));
+    if (dpage !== null) notebooks.get(name)?.designAt?.(dpage);
     if (cmp !== null) notebooks.get(name)?.gitAt?.(cmp);
     return true;
   }

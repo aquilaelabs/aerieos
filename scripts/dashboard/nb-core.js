@@ -130,6 +130,7 @@ function openNotebook(name, view){
 //   loadGit             reads and draws the Git view; nbGitView
 //   gitPage             the branch whose comparison is on show; nb-git.js
 //   gitAt               shows a branch's comparison, from an address; nb-git.js
+//   designAt            shows a design page, or the list of them, from an address; nb-design.js
 //   loadPerms           reads and draws the Permissions view; nbPermsView
 //   leavePerms          hands the settings dials back when Permissions is left; nbPermsView
 //   drawPush            redraws the push policy and the view's glance; nbPermsView
@@ -1257,6 +1258,9 @@ function nbCoreHandle(nb){
     // The branch whose comparison is on show, and set from an address (R269 step 2).
     gitPage: () => nb.gitPage?.() || "",
     gitAt: name => nb.gitAt?.(name),
+    // The design page on show, and set from an address.
+    designPage: () => nb.nbWhere === "design" ? (nb.dsShow?.page || "") : "",
+    designAt: key => nb.designAt?.(key),
     poll(p){ nbCorePoll(nb, p); },
     escape(){ if (nb.roadmapSel){ nb.cancelSend(); nb.redrawRoadmap(); return true; } return false; },
     // Says this tab has left the notebook without taking the notebook down:

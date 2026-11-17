@@ -282,6 +282,10 @@ function nbRulesView({$, nb, project}){
     if (keep) keep.onclick = () => loadRules();          // their list, my edits dropped
     if (mine) mine.onclick = () => saveRules(true);
     wireSections(box);
+    // A page of rules at a time, the one being edited always among them.
+    const rl = box.querySelector("#rlList");
+    pageReach(rl, "rlList", Math.max(0, ...[...nb.ruleEditing].map(i => i + 1)));
+    paginate(rl, ":scope > .rulerow", {key: "rlList", noun: "rules"});
     nb.ruleStagedCount = () => (ruleDirty() ? 1 : 0);
     nb.ruleClearStaged = () => { nb.rulePending = null; nb.globalOffPending = null; nb.globalEditing = null;
                                  nb.ruleEditing.clear(); nb.ruleOpen.clear(); nb.ruleWas.clear(); drawRules(); };

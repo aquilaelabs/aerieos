@@ -88,6 +88,25 @@ ok(await page.$$eval(`${NB} #dsBody > details.sect`, ds => ds.map(d => `${d.data
    && !!(await page.$(`${NB} [data-sect="design:pages"] #dsAdd`)) && !(await page.$(`${NB} [data-sect="design:language"]`)),
    'the view opens with Pages and Themes open and no folds, Add page inside Pages, and no Design language section of its own: the language is each theme\'s');
 // The sections start shut, so each is opened before its controls are used.
+// A page is picked from the Pages rows, which a page open stands in for
+// behind its line back to them.
+const pagesList = async () => {
+  await openSect('pages');
+  const back = page.locator(`${NB} [data-dspageback] >> visible=true`);
+  if (await back.count()) await back.first().click();
+  await page.waitForSelector(`${NB} .dspages .dspagerow`, { timeout: 10000 });
+};
+const pageRows = () => page.$$eval(`${NB} .dspages .dspagerow`, rs => rs.map(r => ({ key: r.dataset.dspagego, text: r.textContent.replace(/\s+/g, ' ').trim() })));
+const pickPage = async which => {
+  await pagesList();
+  const r = (await pageRows()).find(x => typeof which === 'string' ? x.key === which : which.test(x.text));
+  await page.locator(`${NB} .dspagerow[data-dspagego="${r.key}"] >> visible=true`).first().click();
+  await page.waitForSelector(`${NB} [data-dspage="${r.key}"]`, { timeout: 5000 });
+  return r.key;
+};
+// ...and a page open, the first when none is: what the checks on a page's
+// board and fields stand on.
+const onPage = async () => { if (!(await page.$(`${NB} [data-dspage]`))) await pickPage(/./); };
 const openSect = async id => { if (!(await page.$eval(`${NB} [data-sect="design:${id}"]`, d => d.open))) await openFold(page, `${NB} [data-sect="design:${id}"]`); };
 await openSect('pages');
 await page.selectOption(`${NB} #dsTemplate`, 'dashboard');
@@ -99,8 +118,8 @@ ok(labels.join(',') === 'Header,Card,Card,Card,Chart,List'
    && await page.$eval(`${NB} [data-ssave="design:themes"]`, b => b.disabled),
    `Add page lays the Dashboard template out as blocks on a desktop frame and wakes the Pages section's Save and not the Themes' (${labels.join(',')})`);
 await page.fill(`${NB} [data-dspage] [data-dsf="name"]`, 'the home dashboard');
-await page.waitForFunction(() => /^the home dashboard \(/.test(document.querySelector('.nb #dsPagePick option:checked')?.textContent || ''), null, { timeout: 5000 });
-ok(true, "naming the page names its line on the Pages pulldown: the name is what the page is for");
+await page.waitForFunction(() => /^the home dashboard · /.test(document.querySelector('.nb .dspagehead .dspagesaid')?.textContent || ''), null, { timeout: 5000 });
+ok(true, "naming the page names its line over it: the name is what the page is for");
 // Drag: the chart one column to the right, by the pointer.
 const blocks = await page.$$(`${NB} [data-dspage] .dsblock`);
 await blocks[4].click();
@@ -318,8 +337,9 @@ await section("nothing takes effect until Save", async () => {
   await page.click(`${NB} #dsThemeAdd`);
   await page.waitForSelector(`${NB} [data-dstheme="2"]`, { timeout: 5000 });
   if (!(await page.$eval(`${NB} [data-sect="design:pages"]`, d => d.open))) await openFold(page, `${NB} [data-sect="design:pages"]`);
+  await pagesList();
   await page.click(`${NB} #dsAdd`);
-  await page.waitForFunction(() => document.querySelector('.nb #dsPagePick')?.options.length === 2, null, { timeout: 5000 });
+  await page.waitForFunction(() => document.querySelector('.nb [data-sect="design:pages"] > summary .sst')?.textContent === '2 pages', null, { timeout: 5000 });
   // Every picker shows its whole choice, on a desk and at 360 (B44: 'Theme
   // (dark), the defa' on a desk, 'Web a' and 'Blanl' at 360).
   {
@@ -364,7 +384,8 @@ await section("nothing takes effect until Save", async () => {
      'a changed choice, a theme added, a page added and a rule typed change nothing on the server until Save, which is awake');
   await revertAll();
   // (The choices are made further down, so the saved font here is none.)
-  await page.waitForFunction(() => document.querySelector('.nb #dst-0-font')?.value === '' && document.querySelector('.nb #dsPagePick')?.options.length === 1, null, { timeout: 10000 });
+  await page.waitForFunction(() => document.querySelector('.nb #dst-0-font')?.value === ''
+    && document.querySelector('.nb [data-sect="design:pages"] > summary .sst')?.textContent === '1 page', null, { timeout: 10000 });
   ok(/^2 themes/.test(await page.$eval(`${NB} [data-sect="design:themes"] > summary .sst`, e => e.textContent))
      && !(await page.$(`${NB} [data-dsrules="t0"] .rulerow.editing`)) && !(await saveAwake()),
      'Revert puts the view back to what is saved: the choice, the themes, the pages and the rules, and Save sleeps again');
@@ -491,6 +512,7 @@ await section("beyond the ten", async () => {
   await page.waitForSelector(`${NB} #dst-0-fonts`, { timeout: 5000 });
   await page.fill(`${NB} #dst-0-fonts`, 'Inter for text, JetBrains Mono for code');
   await openSect('pages');   // one section open at a time (the operator, 5 Oct)
+  await onPage();
   await page.selectOption(`${NB} [data-dspage] [data-dsf="frame"]`, 'landscape');
   await page.waitForFunction(() => document.querySelector('.nb [data-dspage] .dsboard')?.dataset.frame === 'landscape', null, { timeout: 5000 });
   await page.selectOption(`${NB} [data-dspage] [data-dsf="newkind"]`, 'overlay');
@@ -556,21 +578,34 @@ await section("a session writes one", async () => {
      && after.pages[1].id === 2 && after.pages[1].name === 'the login screen' && after.pages[1].frame === 'phone' && after.by === 'session:alpha',
      `a session's aerie design save writes the record back: the language, the page by its id, a new page with the next (${said.trim()})`);
   await page.evaluate(n => getNotebook(n).view('design'), P);
-  await page.waitForFunction(() => document.querySelector('.nb #dsPagePick')?.options.length === 2, null, { timeout: 15000 });
+  await page.waitForFunction(() => document.querySelector('.nb [data-sect="design:pages"] > summary .sst')?.textContent === '2 pages', null, { timeout: 15000 });
+  await openSect('pages');
+  await pagesList();
   ok(/^2 themes/.test(await page.$eval(`${NB} [data-sect="design:themes"] > summary .sst`, e => e.textContent))
-     && /^the login screen \(/.test(await page.$eval(`${NB} #dsPagePick option[value="p2"]`, e => e.textContent))
-     && await page.$eval(`${NB} [data-sect="design:pages"] > summary .sst`, e => e.textContent) === '2 pages',
-     '...and the tab shows what the session saved when it is shown again: two themes, and the new page on the Pages pulldown');
+     && /the login screen/.test((await pageRows()).find(r => r.key === 'p2')?.text || ''),
+     '...and the tab shows what the session saved when it is shown again: two themes, and the new page among the Pages rows');
   let refused = '';
   try { bb('save', '/nonexistent.json'); } catch (e) { refused = String(e.stderr); }
   ok(/could not read \/nonexistent.json/.test(refused), 'a file that is not there is refused by name');
   await openSect('pages');   // one section open at a time (the operator, 5 Oct)
-  await page.selectOption(`${NB} #dsPagePick`, 'p2');
+  await pickPage('p2');
   await page.waitForSelector(`${NB} [data-dspage="p2"] .dsboard`, { timeout: 5000 });
-  ok(!(await page.$(`${NB} [data-dspage="p1"]`)), 'the Pages pulldown shows the page chosen and no other');
+  ok(!(await page.$(`${NB} [data-dspage="p1"]`)) && !(await page.$(`${NB} .dspages`)),
+     'a page picked from its row is shown, and no other page and not the rows');
+  // ...at an address of its own, which Back leaves for the rows and a link
+  // lands on again.
+  const addr = await page.evaluate(() => location.hash);
+  await page.evaluate(() => history.back());
+  await page.waitForSelector(`${NB} .dspages .dspagerow`, { timeout: 5000 });
+  const backTo = await page.evaluate(() => location.hash);
+  await page.evaluate(h => openRoute(h), addr);
+  await page.waitForSelector(`${NB} [data-dspage="p2"]`, { timeout: 5000 });
+  ok(/\/design\/p2$/.test(addr) && /\/design$/.test(backTo),
+     `...at an address naming it, which Back leaves for the rows and a link lands on again (${addr}, then ${backTo})`);
   await page.click(`${NB} [data-dspage="p2"] [data-dspagerm]`);
-  await page.waitForFunction(() => document.querySelector('.nb #dsPagePick')?.options.length === 1 && document.querySelector('.nb [data-dspage="p1"]'), null, { timeout: 5000 });
-  ok(true, 'Remove page takes it off the pulldown, which shows the first page again');
+  await page.waitForFunction(() => document.querySelector('.nb [data-sect="design:pages"] > summary .sst')?.textContent === '1 page'
+    && document.querySelector('.nb .dspages .dspagerow[data-dspagego="p1"]'), null, { timeout: 5000 });
+  ok(true, 'Remove page takes it off the rows, which the view goes back to');
 });
 
 // ---- the design's rules reach a session the way house rules do ---------------------------
@@ -762,9 +797,10 @@ await section("the design's rules reach a session the way house rules do", async
         (shown2.match(/^(Shape|Type): .*$/m) || ['no Shape line'])[0].slice(0, 60)}, ${(shown2.match(/^ {2}Header .*$/m) || ['no Header line'])[0].slice(0, 60)})`);
   // Rows, in the view: a draft like the rest, and the board grows with it.
   await page.evaluate(n => { openNotebook(n, 'briefing'); openNotebook(n, 'design'); }, P);
-  await page.waitForFunction(() => [...(document.querySelector('.nb #dsPagePick')?.options || [])].some(o => /^a long page/.test(o.textContent)), null, { timeout: 10000 });
   await openSect('pages');   // one section open at a time (the operator, 5 Oct)
-  await page.selectOption(`${NB} #dsPagePick`, { label: await page.$eval(`${NB} #dsPagePick`, e => [...e.options].find(o => /^a long page/.test(o.textContent)).textContent) });
+  await pagesList();
+  await page.waitForFunction(() => [...document.querySelectorAll('.nb .dspages .dspagerow')].some(r => /a long page/.test(r.textContent)), null, { timeout: 10000 });
+  await pickPage(/a long page/);
   await page.waitForSelector(`${NB} [data-dspage] [data-dsf="rows"]`, { timeout: 5000 });
   const board = () => page.$eval(`${NB} [data-dspage] .dsboard`, e => ({ rows: e.style.gridTemplateRows, tall: e.getBoundingClientRect().height / e.getBoundingClientRect().width }));
   const b12 = await board();
@@ -795,9 +831,8 @@ await section("the design's rules reach a session the way house rules do", async
      `a design of half a megabyte saves: the design is the one body here that is a document (${big.status} ${(big.error || '').slice(0, 60)})`);
   ok((await post({ language: was.language, pages: was.pages })).status === 200, '...and the record is put back');
   await page.evaluate(n => { openNotebook(n, 'briefing'); openNotebook(n, 'design'); }, P);
-  await page.waitForFunction(() => ![...(document.querySelector('.nb #dsPagePick')?.options || [])].some(o => /^a long page/.test(o.textContent))
-    && document.querySelector('.nb #dsPagePick')?.options.length > 0, null, { timeout: 10000 });
-  await page.selectOption(`${NB} #dsPagePick`, 'p1');
+  await page.waitForFunction(() => document.querySelector('.nb [data-sect="design:pages"] > summary .sst')?.textContent === '1 page', null, { timeout: 10000 });
+  await pickPage('p1');
   await page.waitForSelector(`${NB} [data-dspage="p1"]`, { timeout: 5000 });
   const dials = execFileSync('bash', [`${REPO}/scripts/aerie`, 'settings'], { encoding: 'utf8',
     env: { ...process.env, BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws`, BB_PROJECT: P }, cwd: `${DIR}/ws/${P}` });
@@ -911,6 +946,7 @@ await section("the dial: Agents may", async () => {
 
 // ---- a page removed, and the record put back ------------------------------------------
 await openSect('pages');   // one section open at a time (the operator, 5 Oct)
+await onPage();
 await page.click(`${NB} [data-dspage] [data-dspagerm]`);
 await page.waitForFunction(() => !document.querySelector('.nb [data-dspage]'), null, { timeout: 5000 });
 await openSect('themes');   // one section open at a time (the operator, 5 Oct)
