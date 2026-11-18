@@ -2239,7 +2239,9 @@ await section("Steps between items", async () => {
   // The list as the checks above left it is narrowed and paged: the search
   // brings these two to the front, whatever chip is on.
   await page.evaluate(() => openNotebook('alpha', 'roadmap'));
-  await page.evaluate(() => { const n = getNotebook('alpha'); n.roadmapChip = ''; n.roadmapVer = ''; n.roadmapFind = 'r168'; });
+  // On the state object, the handle's nb: set on the handle itself the three
+  // did nothing and the list stayed unnarrowed (B911).
+  await page.evaluate(() => { const n = getNotebook('alpha').nb; n.roadmapChip = ''; n.roadmapVer = ''; n.roadmapFind = 'r168'; });
   await page.evaluate(() => getNotebook('alpha').reload());
   await page.waitForSelector(`#roadmapList .grp[data-id="${src}"]`, { timeout: 10000 });
   // A group's steps are behind its fold: opened outright, as a press would.

@@ -27,7 +27,7 @@ const saved = async () => {
     await page.waitForFunction(k => { const b = document.querySelector(`.nb [data-ssave="${k}"]`);
       return !b || (b.disabled && b.getAttribute('aria-busy') !== 'true'); }, key, { timeout: 20000 })
       .catch(async e => {
-        const why = await page.evaluate(k => { const nb = notebooks.find(n => n.dsData); const b = document.querySelector(`.nb [data-ssave="${k}"]`);
+        const why = await page.evaluate(k => { const nb = [...notebooks.values()].map(h => h.nb).find(n => n?.dsData); const b = document.querySelector(`.nb [data-ssave="${k}"]`);
           const a = JSON.stringify(nb?.dsLang), w = JSON.stringify(nb?.dsData?.language); let i = 0; while (i < a.length && a[i] === w[i]) i++;
           const p = JSON.stringify(nb?.dsPages), q = JSON.stringify(nb?.dsData?.pages); let j = 0; while (j < p.length && p[j] === q[j]) j++;
           return `button ${b?.disabled}/${b?.getAttribute('aria-busy')}; language from ${i}: ${a.slice(i - 30, i + 50)} ||| ${w.slice(i - 30, i + 50)}; pages same ${p === q} from ${j}: ${p.slice(j - 30, j + 40)} ||| ${q.slice(j - 30, j + 40)}`; }, key);
