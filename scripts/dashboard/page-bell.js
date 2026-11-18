@@ -64,9 +64,26 @@ function notify(msg, bad, opts = {}){
   keepNotice({text: String(msg), level: lv, kind: opts.kind || "said", job: opts.job || ""});
 }
 
+// Where the stack sits while a dialog is open on a phone: there every
+// dialog is the whole screen and covers the dock's line the stack sits
+// above, which left a toast floating over the dialog's words half way up.
+// Just above the dialog's foot instead, its buttons, which is where the
+// press it answers was; back above the dock's line when the dialog goes.
+// At a desk a dialog is a box over the page and the stack stays put.
+function toastPlace(){
+  const stack = $("toast");
+  if (!stack) return;
+  const m = innerWidth <= 900 ? topModal() : null;
+  const sheet = m && !m.classList.contains("inline") ? m : null;
+  const r = sheet?.querySelector(":scope > .box > .foot, :scope > .box > .dlgbody > .foot")?.getBoundingClientRect();
+  stack.style.bottom = r?.height ? `${Math.round(innerHeight - r.top + 8)}px`
+    : sheet ? "calc(8px + env(safe-area-inset-bottom))" : "";
+}
+
 function toastAdd(text, lv){
   const stack = $("toast");
   if (!stack) return null;
+  toastPlace();
   const el = document.createElement("div");
   el.className = "tst " + lv;
   drawHTML(el, `<span class="tic">${TOAST_ICONS[lv] || TOAST_ICONS.info}</span><span class="tmsg"></span>

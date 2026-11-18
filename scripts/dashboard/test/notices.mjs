@@ -239,6 +239,7 @@ await section("a session an outage held is offered back", async () => {
 });
 
 // ---- on a phone the stack spans the width above the dock's line -------------
+// ...or, while a dialog is open there, above its buttons.
 await section("on a phone the stack spans the width above the dock's line", async () => {
   await page.setViewportSize({ width: 393, height: 851 });
   await page.evaluate(() => notify('on a phone'));
@@ -252,11 +253,20 @@ await section("on a phone the stack spans the width above the dock's line", asyn
   ok(r.l <= 12 && r.r <= 12 && r.bottom <= r.dock, `on a phone a toast spans the width, above the dock's line (${JSON.stringify(r)})`);
   await page.evaluate(() => { document.querySelectorAll('#toast .tst').forEach(t => t.remove()); openAbout(); notify('over a phone dialog', true); });
   await toastRests();
-  const pd = await page.$eval('#toast .tst', t => { const b = t.getBoundingClientRect(); return { l: b.left, r: innerWidth - b.right, bottom: b.bottom }; });
+  // A dialog on a phone is the whole screen and covers the dock's line, so
+  // the stack there floated over the dialog's words half way up: it sits
+  // just above the dialog's foot instead, its buttons.
+  const pd = await page.$eval('#toast .tst', t => { const b = t.getBoundingClientRect();
+    const f = document.querySelector('#aboutModal > .box .foot')?.getBoundingClientRect();
+    return { l: b.left, r: innerWidth - b.right, bottom: Math.round(b.bottom), foot: f ? Math.round(f.top) : null }; });
   const px = await xWorks();
-  ok(pd.l <= 12 && pd.r <= 12 && Math.abs(pd.bottom - r.bottom) < 2 && px,
-     `...and with a dialog open it stays there, its × to put it away (${JSON.stringify({ ...pd, px })})`);
-  await page.evaluate(() => { document.querySelectorAll('#toast .tst').forEach(t => t.remove()); closeAbout(); });
+  ok(pd.l <= 12 && pd.r <= 12 && pd.foot !== null && pd.bottom <= pd.foot && pd.foot - pd.bottom <= 12 && px,
+     `...and with a dialog open, which is the whole screen, it sits just above the dialog's buttons, its × to put it away (${JSON.stringify({ ...pd, px })})`);
+  await page.evaluate(() => { document.querySelectorAll('#toast .tst').forEach(t => t.remove()); closeAbout(); notify('after the phone dialog'); });
+  await toastRests();
+  const back = await page.$eval('#toast .tst', t => Math.round(t.getBoundingClientRect().bottom));
+  ok(Math.abs(back - r.bottom) < 2, `...and back above the dock's line once it is put away (${back} against ${Math.round(r.bottom)})`);
+  await page.evaluate(() => document.querySelectorAll('#toast .tst').forEach(t => t.remove()));
   // ...and the page there shows one section, History while nothing waits.
   await page.evaluate(() => { openNotices(); notify('one for the phone'); });
   await until(() => page.evaluate(() => !!document.querySelector('.noticestab .ntrow')), 10000);

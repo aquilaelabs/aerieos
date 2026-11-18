@@ -140,6 +140,7 @@ function modalOpened(el){
   // box itself otherwise, not its first field: a phone would raise its
   // keyboard over a dialog the person came to read.
   requestAnimationFrame(() => {
+    toastPlace();
     if (el.hidden || el.contains(document.activeElement)) return;
     const box = el.querySelector(":scope > .box") || el;
     if (!box.hasAttribute("tabindex")) box.setAttribute("tabindex", "-1");
@@ -150,6 +151,7 @@ function modalOpened(el){
 function modalClosed(el){
   const i = openModals.indexOf(el);
   if (i >= 0) openModals.splice(i, 1);
+  toastPlace();
   if (el.__backTok){ backRelease(el.__backTok); el.__backTok = 0; }
   const back = el.__opener, a = document.activeElement;
   el.__opener = null;
