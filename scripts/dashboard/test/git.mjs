@@ -1193,7 +1193,9 @@ await section("step 3: the policy, and Send to Claude", async () => {
   {
     const r = await page.evaluate(() => {
       const was = state.sessions;
-      state.sessions = [...(was || []), { name: myAgentSession('codex', 'beta') }];
+      // Without a Claude session on beta: one an earlier check started may
+      // still be up, and sendAgent takes Claude's first (B917).
+      state.sessions = [...(was || []).filter(s => s.name !== myAgentSession('claude', 'beta')), { name: myAgentSession('codex', 'beta') }];
       const opened = [], realL = window.launchAgent, realS = window.startClaude;
       window.launchAgent = (id, p) => opened.push(`agent:${id}:${p}`);
       window.startClaude = p => opened.push(`claude:${p}`);

@@ -311,9 +311,11 @@ await section("Add your own", async () => {
   await page.waitForFunction(() => !document.getElementById('tpmodal').hidden && document.querySelector('#tpmodal #tpAppCompose')?.value.includes('notes:2.4.1'), null, { timeout: 10000 });
   ok(await page.$eval('#tpmodal #tpAppId', i => i.disabled && i.value === 'notes'), 'Edit opens it as kept, its id fixed');
   await page.click('#tpmodal [data-tprmapp]');
-  await page.waitForSelector('.modal.askdlg:not([hidden]) [data-ai="0"]', { timeout: 10000 });
-  // The ask slides in, so it is pressed by the page rather than by a pointer waiting for it to settle.
-  await page.evaluate(() => document.querySelector('.modal.askdlg:not([hidden]) [data-ai="0"]').click());
+  // The ask slides in, so it is pressed by the page rather than by a pointer
+  // waiting for it to settle; found and pressed in one look, since under a
+  // whole run's load it was gone again between a wait and the press (B933).
+  await page.waitForFunction(() => { const b = document.querySelector('.modal.askdlg:not([hidden]) [data-ai="0"]');
+    if (!b) return false; b.click(); return true; }, null, { timeout: 10000 });
   await page.waitForFunction(() => document.getElementById('tpmodal').hidden && !lib?.rows.some(r => r.kind === 'app' && r.name === 'notes'), null, { timeout: 15000 });
   ok(true, 'Remove in there takes it off the catalog, and the card goes');
 });
@@ -411,8 +413,8 @@ await section("an app's panel", async () => {
   await page.evaluate(() => openEditContainer('ledger-one'));
   await page.waitForFunction(() => cEditing === 'ledger-one' && cAppCur?.id === 'ledger', null, { timeout: 15000 });
   await page.click('#cByHand');
-  await page.waitForSelector('.modal.askdlg:not([hidden]) [data-ai="0"]', { timeout: 10000 });
-  await page.evaluate(() => document.querySelector('.modal.askdlg:not([hidden]) [data-ai="0"]').click());
+  await page.waitForFunction(() => { const b = document.querySelector('.modal.askdlg:not([hidden]) [data-ai="0"]');
+    if (!b) return false; b.click(); return true; }, null, { timeout: 10000 });
   await page.waitForFunction(() => cAppHand && !document.getElementById('cAppLeft').hidden, null, { timeout: 10000 });
   ok(await page.evaluate(() => $('cAppPanel').hidden && /Edited by hand: Ledger's fields no longer apply/.test($('cAppLeft').textContent)
      && !$('cYml').readOnly && /CURRENCY=EUR/.test($('cEnv').value) && /LEDGER_LOG=info/.test($('cEnv').value)),
