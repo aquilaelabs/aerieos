@@ -13,6 +13,7 @@
 - aerie map show NAME prints a definition whole, headed by where it is and its comment, and FILE:LINE the one holding that line (1cf46c9)
 - aerie design edit NAME changes one design rule or one page's notes in place and prints what changed, and --file writes docs/design-language.md with it (1cf46c9)
 - Pack format 4: a Docker app's manifest declares its own fields (fields: each the variable it fills, its label, its kind, a folder, a port, a line of text, a secret made for it, a choice or a switch, with a default and a line of help), in place of the six blanks every app shared; an app on the machine's own network says so (network: host), and one being replaced says what to install in its place (going). The catalog can hold apps written so for this AerieOS and every later one (d41d0ea)
+- An app from the Library that calls models picks the model router it uses on its panel, and the container gets a key of its own at that router: its spend shows on the router's row under the container's name, and the key is deleted when the container is removed. Apps declare it in pack format 4 as a router field (a08dcee)
 
 ### Changed
 
