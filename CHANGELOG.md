@@ -14,6 +14,7 @@
 - aerie design edit NAME changes one design rule or one page's notes in place and prints what changed, and --file writes docs/design-language.md with it (1cf46c9)
 - Pack format 4: a Docker app's manifest declares its own fields (fields: each the variable it fills, its label, its kind, a folder, a port, a line of text, a secret made for it, a choice or a switch, with a default and a line of help), in place of the six blanks every app shared; an app on the machine's own network says so (network: host), and one being replaced says what to install in its place (going). The catalog can hold apps written so for this AerieOS and every later one (d41d0ea)
 - An app from the Library that calls models picks the model router it uses on its panel, and the container gets a key of its own at that router: its spend shows on the router's row under the container's name, and the key is deleted when the container is removed. Apps declare it in pack format 4 as a router field (a08dcee)
+- A pool last used by another system, as the machine's own pools are after its stick died, is imported from the Storage page with its name typed again (Import anyway), and a new stick's Restoring a saved configuration brings one back to find the copies it holds (2d591be)
 
 ### Changed
 
@@ -91,6 +92,9 @@
 - A container made from an app keeps which app it came from, and its row's press under More reads Configure (it read Compose and env): it opens the same panel with each value read back from the container's environment, and offers a newer definition of the app the Library has kept since. Upgrading: /config moves to state 26, so a build from before this one no longer starts on it; a container made before keeps its Compose and env (d41d0ea)
 - Home Assistant from the Library runs on the machine's own network and is no longer privileged: it still finds the devices around it and reaches Bluetooth through the machine's dbus; a USB radio needs its device passed by hand for now. The arr stack is marked going: Sonarr, Radarr and Prowlarr come as an app each, and a stack made from it keeps running (d41d0ea)
 - On a phone every dialog takes the whole screen, as the History sheet did: its title at the top, its buttons at the bottom under your thumb however little it holds, and only what is between them scrolls (1277b83)
+- Taking the old array over waits until every data disk the plan names is adopted, since the old parity it formats is their only copy; and a disk that is not on the machine no longer stops the others being adopted read only (2d591be)
+- A move's landing names the old controller's version and what to do when the bundle is newer than this install, checks the stick has room for the state, and says what it could not bring (the install key when it was not ticked, a space with no folder here); its confirmation says when the bundle was packed (2d591be)
+- The held start's banner says what it holds: no session starts until Start, while what the machine already had comes up as it was (2d591be)
 
 ### Fixed
 
@@ -136,6 +140,24 @@
 - A conversation with nothing said in it opens as a small dialog, not a screen-tall one (070a1f9)
 - A toolchain's card on the Library says it is updating as soon as Software update is pressed, where it kept offering the update until the node reported (bbe559b)
 - A second container made from the same Library app is offered a name, folders and ports of its own (immich-2, its folders under that name, the next free ports on the node). It was offered the first one's name and port, so Create refused it, or, renamed while the first was still starting, made it on the first one's port. (6f8491c)
+- A node that checked in after the move's bundle was packed now follows the move: each check-in handed it a new key the new home had never seen, so it was refused there for good. Nodes keep their key while a move is armed, and a node refused at the new home takes itself back by a key it held before (2d591be)
+- A node on your network follows a move to the address it knocked at, with the certificate it met there; it was sent to the home tunnel's public name with a certificate that name never serves, and could not reach the controller after (2d591be)
+- A move lands on a home that keeps deploy keys, a stick among them: the landing stopped at the deploy keys and put everything back, so no move carrying one could land. The old controller's deploy keys are kept on the new home and loaded (2d591be)
+- A move's landing no longer starts a second dashboard on the half-moved state: it brought the old controller's process files with it, so the controller looked stopped and was started again in the middle of the landing (2d591be)
+- A move or a configuration copy no longer carries the copies the controller keeps of itself before each update, nor its earlier configuration copies: a controller of a few tens of megabytes packed as gigabytes, copies of copies, which a stick could not hold (2d591be)
+- A hosting-only or locked-down node can follow a move; it was refused at the new home (2d591be)
+- A moved controller still offers Download the bundle, for a new home that is lost, as its band says; the button was not drawn (2d591be)
+- The line a node that missed a move runs by hand names this page's address when the move named none; it had no address in it (2d591be)
+- The configuration's copies reach the machine's pools, where a new stick finds them; they were written to the stick alone, and died with it (2d591be)
+- A configuration restored onto a new stick takes back the old stick's system pool, with its containers, VMs and spaces; it was refused as another install's, and the only way on set all of it aside (2d591be)
+- A stick prepared from another NAS keeps its people and their share passwords when it names no owner; they were dropped, and the shares served to nobody (2d591be)
+- A converted machine keeps the fixed address its stick was given once its network becomes a bridge; it took an address from DHCP and was lost on the network (2d591be)
+- The first run's disks step never offers the old system's disks to erase: its pool disks, the disks set apart and a disk holding only a partition, such as an old parity disk, were offered and some ticked (2d591be)
+- A disabled or missing disk on the old array is said, set apart, and nothing writes to the array until the old system rebuilds it; it was adopted as healthy, and a writable adoption or the takeover lost what only the parity held (2d591be)
+- A pool of two disks on the old system is adopted as one pool; its second disk was taken for a pool of its own, and the shares never mounted (2d591be)
+- A stick's prepared configuration survives a reset before the controller has applied it; it was lost, and the next boot was a plain stick (2d591be)
+- Both stick makers refuse a stick too small for the image before anything on it is erased; the write failed part way, and blamed the stick (2d591be)
+- AerieOS USB Maker writes the newest dev build when no stable release is published yet, and says where to pick the dev channel for its updates; its default stopped with no way back (2d591be)
 
 ### Security
 
