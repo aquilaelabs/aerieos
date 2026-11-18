@@ -153,6 +153,12 @@ class Fields(unittest.TestCase):
         self.assertEqual(nasapps.check_app({"format": 4, "going": "  install  Sonarr  instead "}, COMPOSE)["going"], "install Sonarr instead")
         self.assertIn("going says", nasapps.check_app({"format": 4, "going": "x" * 201}, COMPOSE)["error"])
 
+    def test_an_about_past_the_cards_200_is_said_to_its_author(self):
+        # The card keeps 200 characters; past that it was cut mid-word with
+        # nothing said to the catalog's author (B932).
+        self.assertNotIn("error", nasapps.check_app({"about": "a word " * 28}, COMPOSE))
+        self.assertIn("about says", nasapps.check_app({"about": "a word " * 29}, COMPOSE)["error"])
+
 
 class Shipped(unittest.TestCase):
     """The apps AerieOS ships until the catalog holds them (R238): each held

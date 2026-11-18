@@ -545,6 +545,11 @@ def check_app(meta, compose):
     network = meta.get("network") or ""
     if network not in ("", "host"):
         errors.append('network is "host", the machine\'s own network, or left out')
+    # The card and New container keep 200 characters of it, as a person's
+    # own app is held to; said here, where the catalog's check hears it,
+    # rather than cut mid-word on the card (B932).
+    if len(" ".join(str(meta.get("about") or "").split())) > 200:
+        errors.append("about says what the app is in a line of up to 200 characters")
     going = " ".join(str(meta.get("going") or "").split())
     if meta.get("going") is not None and not 1 <= len(going) <= 200:
         errors.append("going says, in a line of up to 200 characters, that the app is going and what to install in its place")
