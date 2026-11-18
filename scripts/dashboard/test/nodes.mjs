@@ -984,7 +984,7 @@ await section("the configuration plane on the row", async () => {
   await page.evaluate(async id => { await loadNodes(); delete nodesConf[id]; readMoved('nodes'); drawPanes(); }, minted.id);
   await page.waitForFunction(sel => document.querySelector(sel + ' .ndrunbusy'), RUN, { timeout: 10000 });
   ok(await page.$eval(RUN, r => /running a job/.test(r.querySelector('.ndrunstate').textContent)
-       && /registered as shed/.test(r.querySelector('.ndrunfacts')?.textContent || '')),
+       && /^shed\b/.test(r.querySelector('.ndrunfacts')?.textContent || '')),
      '...and one that is working says which job-taking state it is in, by name');
   // The label is the only thing that pins a workflow to THIS machine.
   // `self-hosted` alone matches the controller and every other node, so
