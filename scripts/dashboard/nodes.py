@@ -2293,8 +2293,21 @@ def _c_mounts(c, out):
                 "type": str(m.get("type") or "")[:16], "ro": bool(m.get("ro")),
                 "mounted": bool(m.get("mounted")), "real": str(m.get("real") or "")[:200],
                 "stale": bool(m.get("stale")),
-                # What mount said when it failed: the server's own reason.
-                "error": str(m.get("error") or "")[:200]})
+                # What mount said when it failed: the server's own reason,
+                # or the agent's for a stale handle, which ends on what to
+                # do and ran past 200, so the row read 'then Apply s' (B914).
+                # Long enough for either, and cut at a word when it is not.
+                "error": _words_upto(str(m.get("error") or ""), 400)})
+
+
+def _words_upto(s, n):
+    """`s` kept to `n` characters, cut at the last word that fits, with an
+    ellipsis, rather than inside a word."""
+    if len(s) <= n:
+        return s
+    cut = s[:n - 1]
+    at = cut.rfind(" ")
+    return (cut[:at] if at > n // 2 else cut).rstrip(" ,;:") + "\u2026"
 
 
 def _c_door(c, out):

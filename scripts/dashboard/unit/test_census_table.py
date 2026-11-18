@@ -436,6 +436,18 @@ class Table(unittest.TestCase):
         got = nodes._census({"tokseal": {"E": "ab", "sealed": {"u_0123abcd": seals}}})["tokseal"]["sealed"]
         self.assertEqual(sorted(got["u_0123abcd"]), ["claude", "codex", "copilot", "grok", "kimi"])
 
+    def test_a_mounts_long_reason_ends_on_a_word(self):
+        # The agent's stale-handle reason ends on what to do and ran past
+        # the 200 kept, so the row read 'then Apply s' (B914).
+        why = ("mounted, but the handle is stale: the export was re-created under it on the host; "
+               "re-export it there (on a NAS host: the share's NFS setting off and on, or a pool the "
+               "mover leaves alone), then Apply storage here")
+        got = nodes._census({"mounts": [{"path": "/mnt/a", "error": why}]})["mounts"][0]["error"]
+        self.assertEqual(got, why)
+        got = nodes._census({"mounts": [{"path": "/mnt/a", "error": "word " * 100}]})["mounts"][0]["error"]
+        self.assertLessEqual(len(got), 400)
+        self.assertTrue(got.endswith("word\u2026"), got[-12:])
+
     def test_an_unknown_key_is_said_once_per_process(self):
         err = io.StringIO()
         with mock.patch.object(nodes, "_census_said", set()), contextlib.redirect_stderr(err):
