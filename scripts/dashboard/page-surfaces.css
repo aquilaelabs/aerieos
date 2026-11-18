@@ -273,6 +273,13 @@ body:has(.modal:not([hidden])) :is(.tourcard,.tourring){display:none}
   .bellpanel,.uimenu{left:8px;right:8px;width:auto;max-height:calc(100dvh - 190px)}
 }
 .popbar>.popmeta{font:var(--f-pill);color:var(--dim);margin-left:auto}
+/* What floats over the page wears the float surface (page-skin.css): the
+   panel, the buttons and the banded heads inside it re-pointed at it, so
+   what it holds draws on it as it would on a panel, and its edge firmer. */
+:is(.tourcard,.bellpanel,.uimenu,.actmenu,.helppop,.railmore,#toast .tst){
+  --panel:var(--float);--btn:var(--float-btn);--btn-hi:var(--float-btn-hi);--sunk:var(--float-sunk)}
+:is(.tourcard,.bellpanel,.uimenu,.actmenu,.helppop,.railmore){border-color:var(--float-edge)}
+#toast .tst:not(.warn):not(.bad){border-color:var(--float-edge)}
 .uimenu h4{margin:0}
 .uimenu .popbody{padding:8px 12px 10px}
 .uimenu>button{width:100%;min-height:var(--tap);justify-content:flex-start}
@@ -2636,7 +2643,7 @@ body.firstrun #panes{display:none}
 }
 #toast .tst{pointer-events:auto;display:flex;align-items:flex-start;gap:8px;width:100%;
   padding:9px 8px 9px 12px;border-radius:var(--r-surface);overflow-wrap:anywhere;
-  background:var(--btn);border:var(--hair) solid var(--line);color:var(--ink);
+  background:var(--float);border:var(--hair) solid var(--line);color:var(--ink);
   font:var(--f-row);box-shadow:0 8px 24px rgba(0,0,0,.45)}
 #toast .tic svg{width:16px;height:16px;display:block;margin-top:2px;fill:none;stroke:currentColor;
   stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}

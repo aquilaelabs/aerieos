@@ -442,6 +442,8 @@ The edge of a filled accent surface, and the tick of a checkbox, is `--accent-mi
 
 **In the light half a lit control is a tint, not a block (the operator, 16 Oct: too dark).** `--accent-deep` there is the panel with 16% of the second color, `--accent-mid` (its edge) the color itself and `--on-fill` the ink, which clears AA on the tint in every scheme; the second color as text is the lightest of its hue that holds AA on the page and the panel. **A state that can be good or bad never wears the accent (the operator, 17 Oct: a healthy container read red in a scheme whose accent is red).** Healthy, running, passed, on, a meter with room: `--pass`, the same green in every scheme (darkened in a light half), as the doctor's checks are; a warning `--warn` and a failure `--bad`. The accent and the second color are for what is chosen and what is pressed, never for how a thing is.
 
+**What floats over the page wears `--float` (the operator, 18 Nov: a tour's card read as part of the page).** The tour, the header's pop-outs (the bell's, the doctor's, the gear's), a row's ⋯ menu, a help pop, the phone's More sheet and a toast: the panel a step brighter with a breath of the second color in the dark half, so each scheme keeps its own, and white in the light half, each with `--float-edge`, a firmer edge than `--line`. What sits on it is re-pointed with it (`--btn`, `--btn-hi`, `--sunk` and `--panel` inside it are the float's), so a button still stands off the surface it is on. A dialog is not a float: it has its backdrop, and on a phone it is the whole screen. `test/uniform.mjs` holds it brighter than the panel (white in the light half), the ink and the quiet words on it at AA, and a button on it its own color, on every scheme.
+
 ### shape
 
 Applies to: scripts/dashboard/index.html; corner, radius, rounded, hairline, border
@@ -1227,6 +1229,8 @@ What the page says to a person is a system, not a box that flashes (R218 step 6,
 The bell's panel is a short list: what waits on an answer, then what needs attention, then the five latest of what was said with how many there are, and See all at its foot.
 
 The Notifications page is at #/notifications, on no group of the rail; See all opens it. Waiting on you comes first, drawn only while something waits (and then, on a phone, the one section open): every ask, invitation and held change, each a row whose Approve and Deny (Accept and Decline, Review) are on the row, at every width, and whose long part (a compose file, the lines a push flagged, a release's notes) is whole in a box that scrolls inside itself behind a fold (the nothing-acted-on-in-a-fold rule). History follows: the account's notices, each a row with its kind's icon, its words, its kind and when, its own × to delete it, and a Job button when it is about one; chips narrow it (Said, Answers, Jobs, Failures), and Clear empties it, or the chip in force, asked first. An answer to an ask, from the bell or the page, is kept as an answer.
+
+**On a phone a toast sits just above an open dialog's buttons.** A dialog there is the whole screen and covers the dock's line the stack sits above, so the stack moves to just above the dialog's foot while one is open, and back when it goes (the operator, 18 Nov: it floated over the dialog's words half way up). At a desk, where a dialog is a box over the page, the stack stays where it was.
 
 ##### the-dashboard/library
 

@@ -1899,6 +1899,50 @@ await section("good, warning and error are one trio on every scheme, and a warni
   if (seen.light.size !== 1) bad.push(`the light half's trio differs by scheme: ${[...seen.light].join(' | ')}`);
   ok(bad.length === 0, `one trio on all ${SCHEMES.length} schemes in each half, and a warning's band its own wash with its words at AA${bad.length ? `: ${bad.join('; ')}` : ''}`);
 });
+
+// What floats over the page stands off it (the operator, 18 Nov: a tour's
+// card read as part of the page): the tour, the header's pop-outs, a row's
+// menu, a help pop, the More sheet and a toast wear --float, a step brighter
+// than the panel in the dark half and white in the light, on every scheme,
+// with the ink and the quiet words on it at AA and a button on it still
+// standing off it.
+await section("what floats over the page stands off it on every scheme", async () => {
+  const SCHEMES = await page.evaluate(() => THEMES.map(t => t[0]));
+  const bad = [];
+  for (const [t, mode] of SCHEMES.flatMap(t => [[t, ''], [t, 'light']])) {
+    const r = await page.evaluate(([th, m]) => {
+      const root = document.documentElement;
+      root.dataset.theme = th;
+      if (m) root.dataset.mode = m; else delete root.dataset.mode;
+      const host = document.createElement('div');
+      host.style.cssText = 'position:absolute;left:-9999px;top:0;width:400px';
+      host.innerHTML = '<div class="tourcard" style="position:static"><div class="tourstep">1 of 6</div><button type="button">Skip tour</button></div>'
+        + '<div class="bellpanel" style="position:static" hidden></div><div class="panelprobe" style="background:var(--panel)"></div>';
+      document.body.appendChild(host);
+      const card = host.querySelector('.tourcard'), cs = getComputedStyle(card);
+      const c = document.createElement('canvas'); c.width = c.height = 1;
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      const px = v => { ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 1, 1); ctx.fillStyle = v; ctx.fillRect(0, 0, 1, 1);
+                        const d = ctx.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2]]; };
+      const lin = x => { x /= 255; return x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); };
+      const lum = a => 0.2126 * lin(a[0]) + 0.7152 * lin(a[1]) + 0.0722 * lin(a[2]);
+      const R = (a, b) => { const x = lum(px(a)), y = lum(px(b)); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+      const bg = cs.backgroundColor, panel = getComputedStyle(host.querySelector('.panelprobe')).backgroundColor;
+      const btn = getComputedStyle(card.querySelector('button')).backgroundColor;
+      const out = { lighter: lum(px(bg)) > lum(px(panel)), white: px(bg).join(',') === '255,255,255',
+                    ink: +R(cs.color, bg).toFixed(2), dim: +R(getComputedStyle(card.querySelector('.tourstep')).color, bg).toFixed(2),
+                    btnOff: px(btn).join(',') !== px(bg).join(',') };
+      host.remove();
+      return out;
+    }, [t, mode]);
+    const name = mode ? `${t} (light)` : t;
+    if (mode ? !r.white : !r.lighter) bad.push(`${name}: the float is not ${mode ? 'white' : 'brighter than the panel'}`);
+    if (!(r.ink >= 4.5) || !(r.dim >= 4.5)) bad.push(`${name}: the words on it ${r.ink}:1, the quiet ones ${r.dim}:1`);
+    if (!r.btnOff) bad.push(`${name}: a button on it is its own color`);
+  }
+  await page.evaluate(() => { delete document.documentElement.dataset.theme; delete document.documentElement.dataset.mode; });
+  ok(bad.length === 0, `what floats over the page stands off it on all ${SCHEMES.length} schemes in each half, its words at AA${bad.length ? `: ${bad.join('; ')}` : ''}`);
+});
 }
 
 if (runs('b')) {

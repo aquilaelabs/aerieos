@@ -95,6 +95,18 @@
      operator, 17 Oct: tinted with the accent it clashed in a theme whose
      two colors differ). */
   --flyout:#243633;     --flyout:color-mix(in srgb, var(--panel), var(--lit, var(--accent)) 8%);
+  /* What floats over the page and is easy to miss on it (the operator, 18
+     Nov: a tour's card read as part of the page): the tour, the header's
+     pop-outs (the bell's, the doctor's, the gear's), a row's menu, a help
+     pop, the phone's More sheet and a toast. The panel a step brighter,
+     with a breath of the second color so each scheme keeps its own, and a
+     firmer edge; the buttons and the banded heads on it moved with it, so
+     a button still stands off the surface it sits on. */
+  --float:#222c3e;      --float:color-mix(in srgb, color-mix(in srgb, var(--panel), #ffffff 8%), var(--lit, var(--accent)) 4%);
+  --float-edge:#5d6f8f; --float-edge:color-mix(in srgb, var(--line), var(--ink) 25%);
+  --float-btn:#2d3749;  --float-btn:color-mix(in srgb, var(--float), #ffffff 6%);
+  --float-btn-hi:#364052; --float-btn-hi:color-mix(in srgb, var(--float), #ffffff 11%);
+  --float-sunk:#1c2535; --float-sunk:color-mix(in srgb, var(--float), #000000 12%);
   /* The tail matters on Android: none of the named desktop faces exist
      there, and bare `monospace` lets Chrome and Firefox each pick their own
      default: the same page in two fonts. Roboto/Noto/Droid Mono are what
@@ -331,6 +343,13 @@ html[data-mode="light"]{
   --btn:#f0f2f5;        --btn:color-mix(in srgb, var(--panel), #000000 4%);
   --btn-hi:#e6e9ee;     --btn-hi:color-mix(in srgb, var(--panel), #000000 8%);
   --sunk:#f3f5f8;       --sunk:color-mix(in srgb, var(--panel), #000000 5%);
+  /* ...and in the light half the brightest there is, white, the firmer
+     edge doing what the step brighter does in the dark. */
+  --float:#ffffff;
+  --float-edge:#9eaabb; --float-edge:color-mix(in srgb, var(--line), var(--ink) 22%);
+  --float-btn:#f5f5f5;  --float-btn:color-mix(in srgb, var(--float), #000000 4%);
+  --float-btn-hi:#ebebeb; --float-btn-hi:color-mix(in srgb, var(--float), #000000 8%);
+  --float-sunk:#f2f2f2; --float-sunk:color-mix(in srgb, var(--float), #000000 5%);
   --purple:#6b45a8; --purple-edge:#dcd0f0;
   --green2:#2f7a3e; --green2-edge:#cfe8d4;
   --blue2:#2b6fa8;  --blue2-edge:#d3e4f3;
