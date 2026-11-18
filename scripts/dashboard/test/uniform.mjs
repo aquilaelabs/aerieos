@@ -2890,7 +2890,7 @@ for (const [name, open] of Object.entries(DIALOGS)) {
 await page.evaluate(() => document.getElementById('dlgProbe')?.remove());
 // A page opened the moment a dialog is put away stays open: the dialog's
 // entry is given back after it closes, and a page pushed meanwhile was
-// undone by that give-back (cards.mjs, 18 Nov: Settings cancelled, then a
+// undone by that give-back (cards.mjs, 18 Nov: Settings canceled, then a
 // notebook's Signing opened, and the page went back to Spaces).
 {
   await page.evaluate(() => { location.hash = '#/home'; });

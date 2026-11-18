@@ -544,7 +544,7 @@ function wireProjectCards(grid){
       // A tween still running from the press before (a second press while
       // the first card grew) holds the height where it is: measured under
       // it, where it was and where it goes read the same and nothing moved.
-      // It is cancelled and this one starts from where the card was seen.
+      // It is canceled and this one starts from where the card was seen.
       const c = cardOf(k), from = was.get(k);
       c?.getAnimations().filter(an => JSON.stringify(an.effect?.getKeyframes?.() || []).includes('"height"')).forEach(an => an.cancel());
       const to = c?.getBoundingClientRect().height || 0;
