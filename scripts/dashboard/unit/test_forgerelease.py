@@ -125,7 +125,9 @@ class Release(unittest.TestCase):
         made = [b for m, p, b in SEEN if m == "POST"][0]
         self.assertTrue(made["prerelease"])
         self.assertEqual(made["make_latest"], "false")
-        self.assertEqual(made["body"], "### Fixed\n\n- The rc's fix")
+        # Under the table of its files (R255), which every release opens with.
+        self.assertTrue(made["body"].startswith(fr.FILES_HEAD), made["body"])
+        self.assertTrue(made["body"].endswith("### Fixed\n\n- The rc's fix"), made["body"])
 
     def test_a_version_cut_without_a_bump_releases_what_is_under_unreleased(self):
         # v0.5.0 went out reading "builderbot-2 0.5.0" (B116): its changes
@@ -133,7 +135,8 @@ class Release(unittest.TestCase):
         r = fr.publish("app", "v0.6.0", "0.6.0", "65298e0")
         self.assertTrue(r.get("made"), r)
         made = [b for m, p, b in SEEN if m == "POST"][0]
-        self.assertEqual(made["body"], "- not yet")
+        self.assertTrue(made["body"].endswith("\n\n- not yet"), made["body"])
+        self.assertIn("| `app-0.5.0-dev.12-65298e0-release-signed.apk` |", made["body"], "its file, in the table over the notes")
 
     def test_a_tag_on_a_merge_carries_the_builds_of_the_same_files(self):
         # The builds were made and signed on the branch tip; the tag went on

@@ -1327,9 +1327,15 @@ function shippedIn(at, rel){
 
 // What the changelog says about an item or a bug (R254 step 4), as a fact's
 // value: each entry with the release it went out in, or Unreleased.
-function clRefs(refs){
+function clRefs(refs, untie = false){
   if (!refs || !refs.length) return "";
-  return `<ul class="clrefs">${refs.map(e => `<li><span class="clin">${esc(e.in)}</span> ${esc(e.text)}</li>`).join("")}</ul>`;
+  // A bug's tied line (R255) carries its bin where the bug may be written:
+  // the line stays, it only stops answering this bug. One found by the
+  // bug's fix commit says so, and has nothing to untie.
+  return `<ul class="clrefs">${refs.map(e => `<li><span class="clin">${esc(e.in)}</span><span class="cltx">${esc(e.text)}${
+    e.by === "commit" ? ` <span class="dim">(names its fix commit)</span>` : ""}</span>${
+    untie && e.tied ? rmIcon(`data-untie="${esc(e.words || "")}"`, "this line no longer answers it",
+                             {title: "untie: the line stays, and no longer answers this bug"}) : ""}</li>`).join("")}</ul>`;
 }
 
 // Whether an item answers a search (R254 step 1): its number (R12 or 12), its

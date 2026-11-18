@@ -109,9 +109,28 @@ before it, or when its fix (a commit naming the bug, or the one it was closed
 on) changes a line the release's own copy has; a fix touching only tests and
 CI, or code that came after the release, owes nothing. `aerie changelog
 missing` lists what is owed at any time; `aerie changelog add "..." --cat
-Fixed --bug N` writes the line and ties it to the bug, and `aerie changelog
-skip N "why"` answers for a bug that needs none. Both answers are kept in
-the bug's notes. A line never names a bug's or a roadmap item's number: the
+Fixed --bug N` writes the line and ties it to the bug (several by repeating
+`--bug`), `aerie changelog link N BUG...` ties a line already written to the
+bugs it answers, and `aerie changelog skip N "why"` answers for a bug that
+needs none. A bug that names the commit that fixed it (recorded when it is
+closed, or set with `aerie bug fixed-in`) is answered by any line naming that
+commit too. A tie is kept in the notebook, on the bug's row, which shows the
+line and the release that carried it, and in the changelog editor, where
+each line shows its bugs and the ones the next release owes are listed over
+the lines; an edit, a merge or the editor's Save keeps a line's bugs tied. A
+repository's Settings, Releases, says whether what is owed holds a release
+or goes out with it said.
+
+## What each file is for
+
+Every release AerieOS makes, and every draft published from Drafts, opens with
+a table of its files: each one's name and what it is for, from the list in the
+repository's Settings, Releases, where a name may hold `@VER@` for the version
+and `*` for anything. Checksums and signatures share one row, and a file the
+list says nothing of is listed by its name, which the draft's row says before
+it is published. A repository holding `docs/release-notes/downloads.md` has
+that file put over its notes instead, `@TAG@`, `@VER@` and `@REPO@` filled in;
+the same switch turns either off. A line never names a bug's or a roadmap item's number: the
 tool refuses one, since those are the notebook's and a reader of the
 repository cannot open them.
 

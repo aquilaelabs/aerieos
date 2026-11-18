@@ -1136,16 +1136,25 @@ _REF = re.compile(r"(?<![\w-])([RB])(\d{1,5})(?![\w-])")
 _SECTION = re.compile(r"^## (Unreleased|\d+\.\d+\.\d+[^:\s]*)")
 
 
-def changelog_refs(project, kind="R"):
+# A line's commits at its end, "(1a2b3c4, 5d6e7f8)", which its words are read without.
+_LINE_SHAS = re.compile(r"\s*\(\s*[0-9a-f]{7,40}(?:\s*,\s*[0-9a-f]{7,40})*\s*\)\s*$")
+
+
+def changelog_refs(project, kind="R", linked=None, commits=None):
     """The changelog entries that name a roadmap item (kind R) or a bug (B),
     by its id: {"R12": [{"in": "0.7.0" or "Unreleased", "text": ...}]},
     newest first, at most ten each (R254 step 4), so an item lists what was
-    written about it and the release it went out in."""
+    written about it and the release it went out in. `linked` is the lines
+    the notebook ties to each ({"B12": [words, ...]}, bugs.link_changelog),
+    found by their words: the public file names commits, never the id. Each
+    of those carries its words and tied, so the row can untie it. `commits`
+    ({"B12": [sha, ...]}, a bug's fix commits, R255) finds, for a key with no
+    tied line, the lines naming one of them, marked by: commit."""
     try:
         text = (Path(os.environ.get("WORKSPACE", "/workspace")) / project / "CHANGELOG.md").read_text(errors="replace")
     except OSError:
         return {}
-    out, where = {}, ""
+    out, where, found = {}, "", []
     for line in text.splitlines():
         m = _SECTION.match(line)
         if m:
@@ -1153,11 +1162,54 @@ def changelog_refs(project, kind="R"):
             continue
         if not where or not line.startswith("- "):
             continue
+        shown = line[2:].strip()[:240]
         for k, n in {(k, n) for k, n in _REF.findall(line) if k == kind}:
             got = out.setdefault(f"{k}{int(n)}", [])
             if len(got) < 10:
-                got.append({"in": where, "text": line[2:].strip()[:240]})
+                got.append({"in": where, "text": shown})
+        words = " ".join(_LINE_SHAS.sub("", line[2:]).split())
+        for key, texts in (linked or {}).items():
+            if words in texts:
+                got = out.setdefault(key, [])
+                if len(got) < 10 and not any(g["text"] == shown for g in got):
+                    got.append({"in": where, "text": shown, "words": words, "tied": True})
+        if commits:
+            m2 = _LINE_SHAS.search(line[2:])
+            named = re.findall(r"[0-9a-f]{7,40}", m2.group(0)) if m2 else []
+            if named:
+                found.append((where, shown, words, named))
+    for key, shas in (commits or {}).items():
+        if out.get(key):
+            continue
+        hits = [{"in": w, "text": t, "words": ws, "by": "commit"} for w, t, ws, named in found
+                if any(n.startswith(c[:7]) or c.startswith(n[:7]) for n in named for c in shas)]
+        if hits:
+            out[key] = hits[:10]
     return out
+
+
+def unreleased_lines(project):
+    """The Unreleased lines a bug can be tied to (R255): [{words, cat}], in the
+    file's order."""
+    try:
+        text = (Path(os.environ.get("WORKSPACE", "/workspace")) / project / "CHANGELOG.md").read_text(errors="replace")
+    except OSError:
+        return []
+    out, where, cat = [], "", ""
+    for line in text.splitlines():
+        m = _SECTION.match(line)
+        if m:
+            where, cat = m.group(1), ""
+            continue
+        if where != "Unreleased":
+            continue
+        if line.startswith("### "):
+            cat = line[4:].strip()
+        elif line.startswith("- "):
+            words = " ".join(_LINE_SHAS.sub("", line[2:]).split())
+            if words:
+                out.append({"words": words, "cat": cat})
+    return out[:400]
 
 
 def last_release(project):

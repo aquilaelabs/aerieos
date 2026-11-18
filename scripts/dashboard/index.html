@@ -1005,6 +1005,21 @@
         <input id="rnDevKeep" type="number" min="0" max="99" step="1" inputmode="numeric" aria-label="dev builds kept of each product"> <span class="dim">builds</span></div>
     </div>
     </div></details>
+    <!-- Releases (R255): what a release waits for, and what each of its
+         files is for, put over its notes. The repository's own. -->
+    <details class="sect rngroup" data-sect="rn:releases"><summary><span class="t">Releases</span></summary><div class="body">
+    <div class="field">
+      <div class="setrow col ctlrow"><label for="rnRelGate">A fixed bug with no changelog line<span class="help" data-help="a bug fixed since the last release that it had, with no line tied to it and no reason it needs none: the release check lists them on the changelog editor and on each bug's row" tabindex="0">?</span></label>
+        <select id="rnRelGate"><option value="refuse">Holds the release until it has a line or a reason</option><option value="warn">Is said, and the release goes ahead</option></select></div>
+      <div class="setrow col ctlrow"><label for="rnRelTable">The notes start with what each file is for<span class="help" data-help="a table over a release's notes: each file the release holds, with what it is for from the list below; checksums and attestations fold into one row, and a file nobody described is listed by its name" tabindex="0">?</span></label>
+        <select id="rnRelTable"><option value="on">Yes</option><option value="off">No</option></select></div>
+    </div>
+    <div class="field" id="rnRelFilesF">
+      <label>What each file is for</label>
+      <div id="rnRelFiles"></div>
+      <div class="hint">A name may hold @VER@ for the version and * for anything. A repository holding docs/release-notes/downloads.md uses that file in place of this list.</div>
+    </div>
+    </div></details>
     <details class="sect rngroup" data-sect="rn:sees"><summary><span class="t">What sessions reach</span></summary><div class="body">
     <!-- The projects a session here may read (prefs.reads): their trees
          bound read-only into its view on a node, their notebooks answering

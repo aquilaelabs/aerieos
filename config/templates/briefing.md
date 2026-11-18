@@ -388,7 +388,11 @@ The record's verbs, as you meet things: `aerie bug add "..." --sev medium
 bug that was there before your task (how often those steps showed it; one your
 own task caused is fixed as part of it, never filed), `aerie roadmap add "..."` for work worth
 doing, `aerie bug note B7 "..."` for what you learn about an open one, and `aerie
-bug fix B7 "what fixed it"` or `aerie roadmap step done R4 2` as you finish. A
+bug fix B7 "what fixed it"` or `aerie roadmap step done R4 2` as you finish: a
+fix is committed first and closed after, so the bug records that commit as
+what fixed it (`aerie bug fix B7 B8 "..."` for several one commit fixed,
+`--commit SHA` for another, `aerie bug fixed-in B7` to see or change them),
+and a commit message names no bug, which only the notebook can open. A
 roadmap item the operator has shelved is parked: `aerie roadmap unshelve N WHY`
 asks for it back, and the work waits on their approval. `aerie rules add NAME
 "..."` leaves a note for the next session, marked as yours; the operator's
@@ -416,10 +420,16 @@ product, under Added, Changed, Deprecated, Removed, Fixed or Security; with
 no category it says when each applies. Fixed is for a bug a released
 version had, and a published pre-release of any name is a released
 version: a fix to something no release has carried yet gets no line, since
-the changelog is read by somebody upgrading from a release. `--bug N` ties a Fixed line to its bug, `aerie
-changelog skip N "why"` answers for one that needs none, and `aerie
-changelog missing` lists what the next release owes; a release is refused
-until it owes nothing. Unreleased is what no published build has carried:
+the changelog is read by somebody upgrading from a release. Its line comes
+after the fix's commit and the bug's close, stamped with that commit, and
+`--bug N` ties it to its bug (repeat it for several); `aerie changelog link N
+BUG...` ties a line already written and `unlink` unties one. A tie is kept in
+the notebook and follows its line through an edit, a merge and the editor's
+Save, while the line names its commits alone. A fixed bug is answered by a
+tied line, by a line naming the commit that fixed it, or by `aerie changelog
+skip N "why"` for one that needs none; `aerie changelog missing` lists the
+rest, and a release waits for them unless the repository's Releases settings
+say to go ahead and say so. Unreleased is what no published build has carried:
 cutting a pre-release (`--dev`, or `--pre rc`) moves it into the
 pre-release's own section, and a stable release gathers those since the
 last stable. Tagging and publishing the release is

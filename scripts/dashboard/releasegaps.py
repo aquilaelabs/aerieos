@@ -187,7 +187,15 @@ def _ours(project, sha):
     return bool(sha) and _at_or_before(project, sha, "HEAD")
 
 
+def _commits(project, bug):
+    """The commits the notebook says fixed `bug` (R255), the ones this branch
+    holds."""
+    return [c[:7] for c in bug.get("commits") or [] if isinstance(c, str) and _ours(project, c)]
+
+
 def _closed_after(project, bug, tag, tag_time):
+    if named := _commits(project, bug):
+        return any(not _at_or_before(project, c, tag) for c in named)
     sha, dirty = _stamp_sha(bug.get("fixed_in"))
     if _ours(project, sha):
         if not _at_or_before(project, sha, tag):
@@ -205,6 +213,11 @@ def fix_commits(project, bug, tag):
     it, and the one it was closed on when that came after the tag."""
     names = re.compile(re.escape(_label(bug)) + r"([^0-9]|$)", re.M)
     shas = [h for h, msg in _since(project, tag) if names.search(msg)]
+    if named := _commits(project, bug):
+        for c in named:
+            if not _at_or_before(project, c, tag) and not any(s.startswith(c) or c.startswith(s) for s in shas):
+                shas.append(c)
+        return shas
     sha, dirty = _stamp_sha(bug.get("fixed_in"))
     if not dirty and _ours(project, sha) and not _at_or_before(project, sha, tag):
         short = _git(project, "rev-parse", "--short=7", sha) or sha[:7]
@@ -290,6 +303,27 @@ def answer_of(bug):
     return said[-1].strip() if said else ""
 
 
+def _words(t):
+    return " ".join(_LINE_SHAS.sub("", str(t or "")).split())
+
+
+_LINE_SHAS = re.compile(r"\s*\((?:[0-9a-f]{7,40}(?:,\s*)?)+\)\s*$")
+
+
+def _tied(where, bug):
+    """Whether a line the bug is tied to in the notebook (R255: aerie
+    changelog link, the row's Tie to a line) is in the changelog: a tie is an
+    answer itself."""
+    ties = {_words(t) for t in bug.get("changelog") or [] if isinstance(t, str)} - {""}
+    if not ties or where is None:
+        return False
+
+    def make():
+        text = changelog.read(where) or ""
+        return {_words(e.get("text")) for sec in changelog.sections(text) for e in sec["entries"]}
+    return bool(ties & _once(("lines", str(where)), make))
+
+
 def _named(where, shas):
     """Whether a changelog line names one of `shas`."""
     def make():
@@ -318,7 +352,7 @@ def _gaps(project, comp, since):
     with bugs._lock:
         listed = list((bugs.load()["projects"].get(project) or []))
     for b in listed:
-        if b.get("status") != "fixed" or answer_of(b):
+        if b.get("status") != "fixed" or answer_of(b) or _tied(where, b):
             continue
         if not _closed_after(project, b, tag, tag_time):
             continue
@@ -342,8 +376,9 @@ def refusal(g, limit=8):
                       for r in owed[:limit])
     more = f"; and {len(owed) - limit} more (aerie changelog missing)" if len(owed) > limit else ""
     return (f"{len(owed)} bug(s) fixed since {g['since']} that it carried, or may have, have no Fixed line: "
-            f"{shown}{more}. Give each one: aerie changelog add \"...\" --cat Fixed --bug N, or say why "
-            "it needs none: aerie changelog skip N \"why\"")
+            f"{shown}{more}. Give each one: aerie changelog add \"...\" --cat Fixed --bug N, tie a line already "
+            "written with aerie changelog link N BUG, or say why it needs none: aerie changelog skip N \"why\"; "
+            "the changelog editor and each bug's row do the same")
 
 
 def last_stable(project, comp=""):

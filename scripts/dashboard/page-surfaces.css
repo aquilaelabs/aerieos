@@ -1159,6 +1159,20 @@ body.firstrun #panes{display:none}
 .clog .clmeta .sp{flex:1 1 auto}
 .clog .clsha{font:var(--f-pill);color:var(--dim);flex:0 1 auto;
   overflow-wrap:anywhere}
+/* The bugs a line answers (R255): pills under it, each with its remove, and
+   + Bug; one tied when the line is saved is dashed until then. */
+.clog .clbugs{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.clog .clbug{display:inline-flex;align-items:center;gap:4px;color:var(--ink)}
+.clog .clbug.pend{border-style:dashed}
+.clog .pillx{border:0;background:none;padding:0 2px;min-height:0;height:auto;
+  color:var(--dim);font:inherit;cursor:pointer}
+.clog .pillx:hover{color:var(--bad)}
+/* The fixed bugs the next release owes a line, over the lines. */
+.clog .clowed{display:grid;gap:6px;padding:8px 10px;border:var(--hair) solid var(--warn);
+  border-radius:var(--r-surface)}
+.clog .clowe{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.clog .clowe .clowt{flex:1 1 16rem;min-width:0;font:var(--f-row)}
+.clog .clowe .actbar{margin:0}
 @media(max-width:900px){
   /* The commit is a lookup, not a label: on a phone it is on the row's own
      title and out of the layout, where it was taking the space between the
@@ -1456,6 +1470,11 @@ body.firstrun #panes{display:none}
 .hist .hid{font:inherit}
 .clrefs{margin:0;padding:0;list-style:none;display:grid;gap:4px}
 .clrefs .clin{font:var(--f-data);color:var(--dim);margin-right:6px}
+/* A bug's tied line carries its bin at the right (R255). */
+.clrefs li{display:flex;align-items:flex-start;gap:6px}
+.clrefs .cltx{flex:1;min-width:0}
+.clrefs .eye.rm{flex:none;margin-top:-4px}
+.tiebox select{width:100%;max-width:100%;text-overflow:ellipsis}
 /* The open row's actions (R223): shelve, reword and drop, under the words. */
 .roadmap .rowacts{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;padding:0}
 .roadmap .rowacts[hidden]{display:none}
@@ -1470,7 +1489,8 @@ body.firstrun #panes{display:none}
 /* A card's door on the project's settings (R208): the repository's own
    sections are each notebook's, and a project with no repository has no
    dial, test-run pick or commit identity that needs code. */
-#rnmodal .box.rnproject details.rngroup:is([data-sect="rn:repo"],[data-sect="rn:build"],[data-sect="rn:files"],[data-sect="rn:snapshots"]){display:none}
+#rnmodal .box.rnproject details.rngroup:is([data-sect="rn:repo"],[data-sect="rn:build"],[data-sect="rn:releases"],[data-sect="rn:files"],[data-sect="rn:snapshots"]){display:none}
+#rnmodal .box.rnwork details.rngroup[data-sect="rn:releases"]{display:none}
 #rnmodal .box.rnwork .rncode{display:none}
 /* ...and General holds nothing to save on that door (its name is the
    card's back's), so its bar is not drawn. */

@@ -37,7 +37,7 @@ const EFFORTS = [["", "Claude's default"], ["low", "low"], ["medium", "medium"],
 // a menu.
 let rnPrefWas = {git_name: "", git_email: "",
                  node: "", nodes: "", hosts: "", hosts_off: "", reads: "", tc_off: "", packs_on: "", sees: "", reaches: "", build: "", test: "", outputs: "",
-                 capture_days: "7", snapshot_days: "14", dev_keep: "3", gate: ""};
+                 capture_days: "7", snapshot_days: "14", dev_keep: "3", gate: "", release_gate: "refuse", files_table: "on"};
 // The colors a project can be, by the names prefs.py stores (COLORS there)
 // and the tone each is drawn in. Named at the store and mapped here so the
 // tone can be retuned for a scheme without touching what anybody saved.
@@ -139,6 +139,8 @@ function rnPrefsOf(p){
                capture_days: String(p?.prefs?.capture_days ?? 7),
                snapshot_days: String(p?.prefs?.snapshot_days ?? 14),
                dev_keep: String(p?.prefs?.dev_keep ?? 3),
+               release_gate: p?.prefs?.release_gate === "warn" ? "warn" : "refuse",
+               files_table: p?.prefs?.files_table === false ? "off" : "on",
                gate: Object.keys(GATE_IDS).map(k => rnDialVal(p, "gate." + k, "auto")).join(","),
                tests_in: p?.prefs?.tests_in || "node", test_node: rnDialVal(p, "test_node", ""),
                test_change: rnDialVal(p, "test_change", "wait"),
@@ -461,6 +463,55 @@ async function rnMoreSave(set, btn){
   rnBars();
 }
 
+// ---- Releases: what each of a release's files is for (R255) ---------------
+// A list of records (the record-lists rule): a file's name and what it is
+// for, each row's Edit opening it in place and its Save writing the whole
+// list at once; Add a file over the table.
+const REL_COLS = [{label: "File", w: "minmax(0,14rem)"}, {label: "What it is for", w: "minmax(0,1fr)"}, {act: true, w: "4.5rem"}];
+let rnRelFiles = [], rnRelEdit = null;     // the saved rows; the row open for editing (-1: a new one)
+function rnDrawRelFiles(){
+  const box = $("rnRelFiles");
+  if (!box) return;
+  const ro = rnFor && (state?.projects || []).find(x => x.name === rnFor)?.may_settings === false;
+  const edit = (r, i) => `<div class="row rnrelf editing" data-relf="${i}">
+      <div class="two"><div><label>File</label><input data-relname maxlength="160" spellcheck="false" autocomplete="off"
+        value="${esc(r.name)}" placeholder="myapp-@VER@.apk"></div>
+      <div><label>What it is for</label><input data-relwhat maxlength="400" autocomplete="off"
+        value="${esc(r.what)}" placeholder="The Android app"></div></div>
+      <div class="actbar">${i >= 0 ? `<button type="button" class="danger" data-relrm="${i}">Delete</button>` : ""}<span class="sp"></span>
+        <button type="button" class="stop" data-relstop>Cancel</button>
+        <button type="button" class="primary" data-relsave>Save</button></div></div>`;
+  const rows = (rnRelEdit === -1 ? edit({name: "", what: ""}, -1) : "")
+    + rnRelFiles.map((r, i) => rnRelEdit === i ? edit(r, i)
+    : `<div class="row rnrelf" data-relf="${i}">${tblLine(REL_COLS, [
+        `<span class="data">${esc(r.name)}</span>`, esc(r.what || "not described: listed by its name"),
+        ro ? "" : `<button type="button" data-reledit>Edit</button>`])}</div>`).join("");
+  drawHTML(box, `${ro || rnRelEdit !== null ? "" : `<div class="addbar ctlrow"><button type="button" data-reladd>Add a file</button></div>`}
+    ${rows ? tblWrap(REL_COLS, rows, "rnrelfs") : `<div class="hint">none described: a release's files are listed by their names</div>`}`);
+  box.querySelector("[data-reladd]")?.addEventListener("click", () => { rnRelEdit = -1; rnDrawRelFiles(); box.querySelector("[data-relname]")?.focus(); });
+  box.querySelectorAll("[data-reledit]").forEach(b => b.onclick = () => { rnRelEdit = Number(b.closest("[data-relf]").dataset.relf); rnDrawRelFiles(); });
+  box.querySelectorAll("[data-relstop]").forEach(b => b.onclick = () => { rnRelEdit = null; rnDrawRelFiles(); });
+  box.querySelectorAll("[data-relrm]").forEach(b => b.onclick = () => rnSaveRelFiles(rnRelFiles.filter((_, i) => i !== Number(b.dataset.relrm)), b));
+  box.querySelectorAll("[data-relsave]").forEach(b => b.onclick = () => {
+    const row = b.closest("[data-relf]"), i = Number(row.dataset.relf);
+    const name = row.querySelector("[data-relname]").value.trim(), what = row.querySelector("[data-relwhat]").value.trim();
+    if (!name) return notify("a file's name is needed: myapp-@VER@.apk, or *.sha256", true);
+    if (rnRelFiles.some((r, k) => k !== i && r.name === name)) return notify(`${name} is described already`, true);
+    const next = rnRelFiles.slice();
+    if (i < 0) next.push({name, what}); else next[i] = {name, what};
+    rnSaveRelFiles(next, b);
+  });
+}
+async function rnSaveRelFiles(files, btn){
+  const word = btn.textContent;
+  busy(btn, "Saving");
+  const j = await postJSON("/api/prefs", {project: rnFor, scope: "repository", files});
+  if (j.error){ unbusy(btn, word); notify(j.error, true); return; }
+  rnRelFiles = files;
+  rnRelEdit = null;
+  rnDrawRelFiles();
+}
+
 // The projects a session here may read: every other project this account
 // sees, a listbox row each, ticked from the settings. Read-only there by
 // construction (users.with_reads), so the hint under it can say so plainly.
@@ -647,6 +698,11 @@ function rnFillPrefsRest(p){
   $("rnOutputs").value = (p?.prefs?.outputs || []).join(", ");
   $("rnCaptureDays").value = String(p?.prefs?.capture_days ?? 7);
   $("rnSnapDays").value = String(p?.prefs?.snapshot_days ?? 14);
+  $("rnRelGate").value = p?.prefs?.release_gate === "warn" ? "warn" : "refuse";
+  $("rnRelTable").value = p?.prefs?.files_table === false ? "off" : "on";
+  rnRelFiles = (p?.prefs?.files || []).map(r => ({name: r.name, what: r.what}));
+  rnRelEdit = null;
+  rnDrawRelFiles();
   $("rnDevKeep").value = String(p?.prefs?.dev_keep ?? 3);
   // Every dial here is a select filled once with its words and set to the
   // project's value: one helper for all of them (consistency pass), where
@@ -820,7 +876,8 @@ const RN_LIST = {
   claude: "what its sessions do on their own, ask about, or may not",
   yours: "your replies, questions and commit name here",
   repo: "how it pushes and pulls", runs: "the space's nodes, and where its containers go",
-  build: "commands, outputs, and what is kept", sees: "other spaces, shares, addresses",
+  build: "commands, outputs, and what is kept", releases: "what a release waits for, and its files described",
+  sees: "other spaces, shares, addresses",
   tools: "the toolchains and tool packs its sessions use",
   files: "its files over FTP and in an editor", snapshots: "the days kept, and putting one back",
   sessions: "every account's sessions here, to end",
@@ -1641,7 +1698,7 @@ function closeRename(){
 // and moved on had saved nothing (Reads on AerieOS, 10 Oct). Where the
 // section holds something a running session takes only when it starts, its
 // bar offers both answers at once: Save, keep it running and Save and end it.
-const RN_SECTS = ["project", "people", "repo", "runs", "files", "sees", "tools", "build", "claude", "yours"];
+const RN_SECTS = ["project", "people", "repo", "runs", "files", "sees", "tools", "build", "releases", "claude", "yours"];
 // Which section each of rnPrefWas's fields is in, and what it is called.
 const RN_WAS = {
   node: ["runs", "Node"], nodes: ["runs", "Node"], hosts: ["runs", "Hosts its containers on"], hosts_off: ["runs", "Its containers may go to"], gpu: ["runs", "The node's GPU"], tests_in: ["build", "Tests run"], test_node: ["build", "Tests run"],
@@ -1649,6 +1706,7 @@ const RN_WAS = {
   tc_off: ["tools", "Toolchains"], packs_on: ["tools", "Tool packs"],
   build: ["build", "Build"], test: ["build", "Test"], outputs: ["build", "Outputs"],
   capture_days: ["build", "Captures kept"], snapshot_days: ["build", "Snapshots kept"], dev_keep: ["build", "Dev builds kept"],
+  release_gate: ["releases", "A fixed bug with no changelog line"], files_table: ["releases", "What each file is for"],
   gate: ["claude", "Agents may"], test_change: ["claude", "During a test run, a change asked for"], agents_off: ["claude", "Coding agents"], agent_default: ["claude", "Start opens"], agent_slots: ["claude", "Sessions of one agent"],
   devbuild: ["claude", "Agents may"], makevms: ["claude", "Agents may"], vm_caps: ["claude", "Its VMs may hold"], report: ["claude", "Agents may"], sign: ["claude", "Agents may"],
   keys: ["claude", "Agents may"], release: ["claude", "Agents may"], pc: ["claude", "Agents may"], version: ["claude", "Move the version"],
@@ -1695,6 +1753,7 @@ function rnEnc(){
           outputs: $("rnOutputs").value.trim(),
           capture_days: $("rnCaptureDays").value.trim(), snapshot_days: $("rnSnapDays").value.trim(),
           dev_keep: $("rnDevKeep").value.trim(), gate: gateKey(rnGateNow()),
+          release_gate: $("rnRelGate").value || "refuse", files_table: $("rnRelTable").value || "on",
           tests_in: $("rnDevTest").value || "node", test_node: $("rnTestNode")?.value || "", test_change: $("rnTestChange").value || "wait",
           gpu: $("rnGpu").value || "on", reply: $("rnReply").value || "", asks: $("rnAsks").value || "",
           devbuild: $("rnGateDocker").value || "deny", makevms: $("rnGateVms").value || "deny", vm_caps: rnVmCapsNow(),
@@ -1811,6 +1870,8 @@ function rnRevertSect(sect){
     $("rnBuildCmd").value = w.build; $("rnTestCmd").value = w.test; $("rnOutputs").value = w.outputs;
     $("rnCaptureDays").value = w.capture_days; $("rnSnapDays").value = w.snapshot_days;
     $("rnDevKeep").value = w.dev_keep;
+  } else if (sect === "releases"){
+    $("rnRelGate").value = w.release_gate; $("rnRelTable").value = w.files_table;
   } else if (sect === "claude"){
     const g = String(w.gate).split(",");
     Object.values(GATE_IDS).forEach((id, i) => { $(id).value = g[i] || "auto"; });
@@ -1930,6 +1991,7 @@ async function rnSubmit(sect, end = false){
                               build: v.build, test: v.test, gate: v.gate,
                               tests_in: v.tests_in, test_node: v.test_node, test_change: v.test_change, gpu: v.gpu, reply: v.reply, asks: v.asks,
                               devbuild: v.devbuild, makevms: v.makevms, vm_caps: JSON.parse(v.vm_caps || "{}"), report: v.report, sign: v.sign, keys: v.keys, release: v.release, pc: v.pc,
+                              release_gate: v.release_gate, files_table: v.files_table !== "off",
                               outputs: v.outputs.split(",").map(x => x.trim()).filter(Boolean),
                               ...(v.capture_days !== "" ? {capture_days: +v.capture_days} : {}),
                               ...(v.snapshot_days !== "" ? {snapshot_days: +v.snapshot_days} : {}),

@@ -142,7 +142,8 @@ aerie changelog add "..." --cat NAME   log what a change means for the person us
                    Added (somebody can do something they could not), Changed
                    (already here, now different), Deprecated (going away),
                    Removed (gone), Fixed (was wrong in a released version,
-                   now right; --bug N says which bug), Security (act on it
+                   now right; --bug N says which bug, several by repeating
+                   it), Security (act on it
                    because of what it exposed). When two fit, the one a reader would look under;
                    something nobody using the product would notice gets no
                    entry, and neither does a fix to something no release has
@@ -176,6 +177,11 @@ aerie changelog missing [TAG]  the bugs fixed since the last release (or TAG)
 aerie changelog skip N "why"   a fixed bug that needs no Fixed line, and why
                    (the release never had it, nobody using it meets it); kept
                    in the bug's notes, as add's --bug N is for the line itself
+aerie changelog link N BUG...  the unreleased line N answers these bugs: kept in
+                   the notebook, where each bug's row lists the line and the
+                   release that carried it; the public line names its commits
+                   alone, and an edit, a merge or the editor's Save keeps the
+                   bugs tied; `unlink N BUG...` unties them
 aerie projects        the space dirs here and their branches
 aerie shell           login shell as the builder user
 aerie login           Claude Code subscription auth flow, on the machine it is
@@ -428,6 +434,12 @@ aerie bug add "..."   report one (--sev, --area, --repro, ...); `note N`, `fix N
                    --repro, --reproduces always|sometimes|once|untried says how
                    often those steps showed it; --report N files diagnostics
                    report N with its words, area, repro and that answer
+aerie bug fix N [N...] "what fixed it" [--commit SHA]
+                   close the bugs one commit fixed, after committing it: each
+                   records the commit the space is on (or the ones --commit
+                   names) as its Fixed in, which ties it to the changelog
+aerie bug fixed-in N [SHA...] [--drop SHA...]
+                   the commits that fixed a bug: listed, added or taken off
 aerie tests run [ARGS]  run the space's test command, time it, and record the run: says first when it should
                    finish, and ends by NAMING what went wrong: the failed assertions per file, and for a file
                    that CRASHED the line it died on, the assertions that had already failed before it did,

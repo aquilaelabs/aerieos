@@ -856,6 +856,9 @@ function nbArtLoadDrafts(av, force){
           <div class="verln"><span>${d.prerelease ? "dev build" : "release"}</span><a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer">${esc(d.tag)}</a></div>
           ${miss.length ? `<div class="hint warn">Not whole yet: ${esc(miss.join(", "))} still missing; CI may still be building it.</div>` : ""}
           ${holds.map(h => `<div class="hint warn" data-drafthold="${esc(h.what)}">Not published yet: ${esc(h.why)}.</div>`).join("")}
+          ${(d.undescribed || []).length ? `<div class="hint" data-draftundesc>Publish puts a table of its files over the notes; ${
+            esc(d.undescribed.join(", "))} ${d.undescribed.length === 1 ? "is" : "are"} listed by name alone, with nothing said of what ${
+            d.undescribed.length === 1 ? "it is" : "they are"} for. Describe them in Settings, Releases.</div>` : ""}
           <textarea rows="12" aria-label="${esc(d.tag)}'s notes"${may ? "" : " readonly"}>${esc(d.notes)}</textarea>
           ${may ? `<div class="actbar"><span class="sp"></span><button type="button" data-draftsave>Save the notes</button><button type="button" class="primary" data-draftpub${stop ? " disabled" : ""}>Publish</button></div>` : ""}
         </div>`;
@@ -1109,6 +1112,36 @@ async function nbArtPostVersion(av, body, quiet){
 function nbArtDrawChangelog(av, pane, comp, j){
   const {nb, project} = av;
   let gs = JSON.parse(JSON.stringify(j.groups || []));
+  // The tracker's half (R255): the bugs each saved line answers, by its
+  // words as saved (`orig`); a line written here for a bug carries it as
+  // `pend` until Save has put the line in the file, then it is tied.
+  const norm = t => String(t || "").split(/\s+/).filter(Boolean).join(" ");
+  let meta = {ties: j.ties || {}, fixed: j.fixed || [], owed: j.owed || []};
+  const ro = !!projWriteWhy(project);
+  const marked = () => gs.forEach(g => g.entries.forEach(e => { if (e.orig === undefined && !e.pend) e.orig = norm(e.text); }));
+  marked();
+  const tiedTo = e => [...(e.orig !== undefined ? meta.ties[e.orig] || [] : []), ...(e.pend || [])];
+  const titleOf = n => meta.fixed.find(b => b.id === n)?.title || "";
+  const owedNow = () => meta.owed.filter(o => !gs.some(g => g.entries.some(e => tiedTo(e).includes(o.id))));
+  const clBugs = e => {
+    const ids = tiedTo(e);
+    if (ro && !ids.length) return "";
+    return `<div class="clbugs">${ids.map(n => `<span class="pill clbug${(e.pend || []).includes(n) ? " pend" : ""}"
+        title="${esc(`B${n} ${titleOf(n)}${(e.pend || []).includes(n) ? ": tied when the line is saved" : ""}`)}">B${n}${
+        ro ? "" : `<button type="button" class="pillx" data-clun="${n}" aria-label="this line no longer answers B${n}">✕</button>`}</span>`).join("")}${
+      ro ? "" : `<button type="button" class="ghost" data-cltie title="tie a fixed bug to this line: kept in the notebook, the file names its commits">+ Bug</button>`}</div>`;
+  };
+  const owedBand = () => {
+    const rows = ro ? [] : owedNow();
+    if (!rows.length) return "";
+    return `<div class="clowed" role="group" aria-label="fixed bugs the next release owes a line">
+      <div class="sub">${rows.length} fixed bug${rows.length === 1 ? "" : "s"} the next release owes a line: tie each to a line below with + Bug, write one, or say why it needs none. A release waits for them.</div>
+      ${rows.map(o => `<div class="row clowe" data-ow="${o.id}">
+        <div class="clowt"><span class="n id">B${o.id}</span> ${esc(titleOf(o.id))}</div>
+        <div class="actbar"><button type="button" data-owline>Write a line</button>
+          <button type="button" data-ownone title="a release never had it, or nobody using it meets it">Needs no line</button></div>
+      </div>`).join("")}</div>`;
+  };
   const dated = (j.text || "").split(/\n(?=## (?!Unreleased))/s).slice(1).join("\n");
   const names = () => [...new Set(gs.map(g => g.name))];
   const flat = () => gs.flatMap(g => g.entries.map(e => [g, e]));
@@ -1131,7 +1164,8 @@ function nbArtDrawChangelog(av, pane, comp, j){
     const top = box ? box.scrollTop : null;
     drawHTML(pane,
       `<div class="clog">
-             <div class="hint">Sessions add the lines; the order and the words are yours. Save writes CHANGELOG.md.</div>
+             <div class="hint">Sessions add the lines; the order and the words are yours. Save writes CHANGELOG.md. The bugs a line answers are kept in the notebook, never in the file.</div>
+             ${owedBand()}
              ${gs.length ? gs.map((g, gi) => `
                <div class="clgroup" data-g="${gi}">
                  ${g.name ? `<div class="clhead">
@@ -1155,6 +1189,7 @@ function nbArtDrawChangelog(av, pane, comp, j){
                        <button type="button" class="danger" data-erm
                          title="drop this line: the commit is untouched">✕</button>
                      </div>
+                     ${clBugs(e)}
                    </div>`).join("")}
                </div>`).join("")
              : `<div class="empty">nothing unreleased here yet</div>`}
@@ -1230,16 +1265,88 @@ function nbArtDrawChangelog(av, pane, comp, j){
         draw();
       };
     });
+    // The tracker's half (R255): a tie to a saved line is written at once,
+    // one to a line written here waits for Save.
+    const tie = async (e, n, on) => {
+      if (e.orig === undefined){
+        e.pend = on ? [...new Set([...(e.pend || []), n])] : (e.pend || []).filter(x => x !== n);
+        return draw(e, "[data-cltie]");
+      }
+      const r = await postJSON("/api/bugs", {project, action: on ? "tie" : "untie", id: n, line: e.orig});
+      if (r?.error) return notify(r.error, true);
+      const have = meta.ties[e.orig] || [];
+      meta.ties[e.orig] = on ? [...new Set([...have, n])] : have.filter(x => x !== n);
+      draw(e, "[data-cltie]");
+    };
+    q(".clrow", row => {
+      const e = gs[Number(row.dataset.g)].entries[Number(row.dataset.e)];
+      row.querySelectorAll("[data-clun]").forEach(x => x.onclick = () => tie(e, Number(x.dataset.clun), false));
+      const plus = row.querySelector("[data-cltie]");
+      if (plus) plus.onclick = () => {
+        if (row.querySelector(".tiebox")) return;
+        const have = tiedTo(e), owed = new Set(owedNow().map(o => o.id));
+        const offer = meta.fixed.filter(b => !have.includes(b.id)).sort((a, b) => owed.has(b.id) - owed.has(a.id));
+        if (!offer.length) return notify("no fixed bug is left to tie to this line", true);
+        const box = document.createElement("div");
+        box.className = "dropbox ctlown tiebox";
+        drawHTML(box, `<div class="q">Which fixed bug does this line answer?<span>: kept in the notebook</span></div>
+          <select aria-label="a fixed bug">${optionList(offer.map(b => [String(b.id),
+            `B${b.id}${owed.has(b.id) ? " (owed)" : ""}: ${b.title.length > 90 ? b.title.slice(0, 88) + "…" : b.title}`]), "")}</select>
+          <div class="actbar"><button type="button" class="stop">Cancel</button>
+            <button type="button" class="primary" data-tiego>Tie it</button></div>`);
+        row.appendChild(box);
+        arriveBox(box);
+        box.querySelector(".stop").onclick = () => box.remove();
+        box.querySelector("[data-tiego]").onclick = () => tie(e, Number(box.querySelector("select").value), true);
+      };
+    });
+    q("[data-ow]", r => {
+      const n = Number(r.dataset.ow), b = meta.fixed.find(x => x.id === n);
+      r.querySelector("[data-owline]").onclick = () => {
+        // A line under Fixed holding the bug's title and its commits, to
+        // reword before Save; the bug is tied once it is saved.
+        let g = gs.find(x => x.name === "Fixed");
+        if (!g){ g = {name: "Fixed", entries: []}; gs.push(g); }
+        const e = {text: b?.title || "", shas: b?.commits || [], pend: [n]};
+        g.entries.push(e);
+        draw(e, "textarea");
+      };
+      r.querySelector("[data-ownone]").onclick = () => {
+        if (r.querySelector(".dropbox")) return;
+        dropBox(r, {q: "Why does it need no line?", sub: ": kept in its notes, which the release check reads",
+                    placeholder: "no release had it; nobody using it meets it", verb: "Needs no line",
+                    go: async why => {
+                      const a = await postJSON("/api/bugs", {project, action: "noline", id: n, why});
+                      if (a?.error) return notify(a.error, true);
+                      meta.owed = meta.owed.filter(o => o.id !== n);
+                      draw();
+                    }});
+      };
+    });
     const save = pane.querySelector("#clSave");
     if (save) save.onclick = async () => {
       busy(save, "Saving");
       try{
+        const pend = flat().filter(([, e]) => (e.pend || []).length).map(([, e]) => ({words: norm(e.text), ids: e.pend}));
         const a = await postJSON("/api/changelog", {project, component: comp, groups: gs});
         if (a.error){ notify(a.error, true); return; }
         // Drawn again from what the server kept, not what was sent: a
         // tidy-up on the way in shows (B820: it set the list and never
         // drew it).
         gs = a.groups || [];
+        // ...the bugs a new line was written for are tied to its words as
+        // saved, and the ties and what is owed read again: a reworded line
+        // carried its bugs on the server.
+        for (const p of pend)
+          for (const n of p.ids){
+            const t = await postJSON("/api/bugs", {project, action: "tie", id: n, line: p.words});
+            if (t?.error) notify(`B${n}: ${t.error}`, true);
+          }
+        try{
+          const f = await getJSON(`/api/changelog?project=${encodeURIComponent(project)}&component=${encodeURIComponent(comp)}`);
+          if (!f.error){ meta = {ties: f.ties || {}, fixed: f.fixed || [], owed: f.owed || []}; gs = f.groups || gs; }
+        }catch{ /* drawn from the save's own answer */ }
+        marked();
         draw();
         const st = pane.querySelector("#clState");
         if (st) st.textContent = `saved: ${a.entries} line${a.entries === 1 ? "" : "s"}`;

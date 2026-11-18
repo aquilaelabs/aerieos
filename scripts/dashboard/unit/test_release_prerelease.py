@@ -224,9 +224,9 @@ class PreRelease(unittest.TestCase):
         bugs.set_status("app", a, "fixed", "fixed")
         b = next(x for x in bugs.load()["projects"]["app"] if x["id"] == a)
         self.assertEqual(releasegaps.fix_commits("app", b, releasegaps.last_release("app")), [sha])
-        self.assertEqual(releasegaps.fix_commits("app", {**b, "id": int(f"{a}7"), "fixed_in": ""},
+        self.assertEqual(releasegaps.fix_commits("app", {**b, "id": int(f"{a}7"), "fixed_in": "", "commits": []},
                                                  releasegaps.last_release("app")), [sha])
-        self.assertEqual(releasegaps.fix_commits("app", {**b, "id": int(f"{a}9"), "fixed_in": ""},
+        self.assertEqual(releasegaps.fix_commits("app", {**b, "id": int(f"{a}9"), "fixed_in": "", "commits": []},
                                                  releasegaps.last_release("app")), [])
 
 

@@ -1048,6 +1048,27 @@ def _section_commit(project, comp, title, env=None, keep=None):
     return ""
 
 
+# Whether what the changelog owes stops a release or goes out with it said
+# (R255): the repository's Releases setting, "refuse" or "warn", handed over
+# by whoever configures this module (the server, the verbs); refuse unless.
+release_gate = None
+
+
+def _gaps_check(project, comp=""):
+    """(why the release is refused, what it owes and goes out with anyway):
+    at most one of them is said."""
+    why = _gaps_refusal(project, comp)
+    if not why:
+        return "", ""
+    try:
+        mode = release_gate(project) if release_gate else "refuse"
+    except Exception:  # noqa: BLE001  (a setting that cannot be read refuses, as the default does)
+        mode = "refuse"
+    if mode == "warn":
+        return "", f"Released with lines still owed (this repository's Releases setting warns): {why}"
+    return why, ""
+
+
 def _gaps_refusal(project, comp=""):
     """Why a release is refused while the changelog owes a Fixed line, or ""."""
     if bugs is None or changelog is None:
@@ -1257,7 +1278,7 @@ def _plan_in_tree(project, comp, dev, stable, label):
         return {"error": f"{name} already exists: bump to the next number first"}
     if why := _not_from_here(project, name, label):
         return {"error": why}
-    if why := _gaps_refusal(project, comp):
+    if why := _gaps_check(project, comp)[0]:
         return {"error": why}
     # A dev build is no release an install upgrades from, so it needs no
     # snapshot, as release() has it; planned with one, it was refused.
@@ -1441,7 +1462,8 @@ def _release_in_tree(project, comp, env, may_push, push, label):
                              f"from. Check out {branch} and pull, then release."}
     if why := _not_from_here(project, name, label):
         return {"error": why}
-    if why := _gaps_refusal(project, comp):
+    why, owed = _gaps_check(project, comp)
+    if why:
         return {"error": why}
     wrote = ""
     if section:
@@ -1465,15 +1487,15 @@ def _release_in_tree(project, comp, env, may_push, push, label):
     if _git(project, "tag", "-a", name, "-m", msg, env=env) is None:
         return {"error": f"could not create the tag {name}"}
     out = {"ok": True, "tag": name, "sha": sha, "target": tgt, "pushed": False,
-           **({"section": wrote} if wrote else {})}
+           **({"section": wrote} if wrote else {}), **({"note": owed} if owed else {})}
     if not push:
         return out
     if not may_push:
         # The tag is made either way: a project with no push rights still
         # gets its marker, and the sentence says what is missing rather than
         # undoing the half that worked.
-        out["note"] = (f"{name} is on this commit here. This space has no push "
-                       f"rights, so nothing was pushed.")
+        out["note"] = " ".join(x for x in (owed, f"{name} is on this commit here. This space has no push "
+                                                 f"rights, so nothing was pushed.") if x)
         return out
     return _push_tag(project, name, out, env)
 
@@ -1513,9 +1535,9 @@ def _push_tag(project, name, out, env=None):
     if failed:
         # Never a credential: a URL with one in it is cut to its host.
         said = re.sub(r"(https?://)[^@/\s]*@", r"\1", said)[-400:]
-        out["note"] = (f"{name} is on this commit here, but the push failed"
-                       + (f": {said}" if said else "")
-                       + f"; push it with `git push origin {name}` once that is put right.")
+        out["note"] = " ".join(x for x in (out.get("note", ""), f"{name} is on this commit here, but the push failed"
+                                           + (f": {said}" if said else "")
+                                           + f"; push it with `git push origin {name}` once that is put right.") if x)
         return out
     out["pushed"] = True
     return out

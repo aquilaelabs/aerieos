@@ -4277,7 +4277,8 @@ import bugs                                                      # noqa: E402
 bugs.configure(write_json=write_json, state=STATE, tell=notify.tell,
                tmux_name=tmux_name, workspace=WORKSPACE, actor=writer_name,
                releases=lambda p: roadmap.releases(p),
-               changelog_refs=lambda p, k: roadmap.changelog_refs(p, k))
+               changelog_refs=lambda p, k, linked=None, commits=None: roadmap.changelog_refs(p, k, linked, commits),
+               changelog_lines=lambda p: roadmap.unreleased_lines(p))
 
 # The notebook's fourth view keeps a log too, and it is the odd one: nothing
 # here writes findings, so the entries are derived by comparing one read of
@@ -5081,6 +5082,45 @@ nodes.ON_ENROLL.append(lambda nid: nginxproxy.deploy(nid, containers, devactions
 # the case for a bump is "what has happened since the target last moved", and
 # only the roadmap's and the tracker's dated logs know that.
 import changelog                                                 # noqa: E402
+
+
+# A line reworded or merged on the notebook's Changelog editor keeps the bugs
+# it answers (bugs.relink_changelog): the space is the folder it is under.
+def _changelog_relinked(d, olds, new):
+    try:
+        project = Path(d).resolve().relative_to(WORKSPACE.resolve()).parts[0]
+    except (ValueError, IndexError):
+        return
+    bugs.relink_changelog(project, olds, new)
+
+
+changelog.relinked = _changelog_relinked
+
+
+def _changelog_bugs(project, comp=""):
+    """What the changelog editor shows of the tracker (R255): the bugs each
+    line answers, by its words; the fixed bugs a line can be tied to, newest
+    first; and the ones the next release owes a line (releasegaps.gaps), each
+    with whether the last release had it."""
+    with bugs._lock:
+        rows = list(bugs.load()["projects"].get(project) or [])
+    ties = {}
+    for b in rows:
+        for w in b.get("changelog") or []:
+            if isinstance(w, str):
+                ties.setdefault(w, []).append(b["id"])
+    fixed = sorted((b for b in rows if b.get("status") == "fixed"), key=lambda b: -int(b.get("closed_at") or 0))[:300]
+    owed = []
+    try:
+        import releasegaps                                       # noqa: PLC0415  (beside this file)
+        releasegaps.configure(version_mod=version, bugs_mod=bugs, changelog_mod=changelog)
+        owed = [{"id": r["id"], "carried": r.get("carried"), "why": r.get("why", "")}
+                for r in (releasegaps.gaps(project, comp).get("owed") or [])]
+    except Exception as e:                                       # noqa: BLE001  (the editor opens without it)
+        print(f"dashboard: changelog: what the release owes could not be read for {project}: {e}", file=sys.stderr)
+    return {"ties": ties, "owed": owed,
+            "fixed": [{"id": b["id"], "title": str(b.get("title") or "")[:200], "commits": b.get("commits") or []}
+                      for b in fixed]}
 import claudegrant                                              # noqa: E402
 # The Claude sign-in's verbs are signin.py's; the record of what each node
 # reported is claudegrant.py's.
@@ -5213,8 +5253,13 @@ version.configure(workspace=WORKSPACE, state=STATE, write_json=write_json,
                   tell_fn=notify.tell, tmux_name_fn=tmux_name,
                   )
 changelog.component_dir = version._sub
+# Whether what the changelog owes refuses a release or goes out with it said:
+# the repository's Releases setting (R255).
+version.release_gate = lambda p: prefs.get(p).get("release_gate", "refuse")
 # Release's forge half (R123; Gitea and GitLab, R124): the release beside a pushed tag.
 import forgerelease                                              # noqa: E402
+# What each of a release's files is for, over its notes (R255).
+forgerelease.files_setting = lambda p: (prefs.get(p).get("files_table", True), prefs.get(p).get("files") or [])
 import featuresoff                                               # noqa: E402
 forgerelease.configure(state=STATE, workspace=WORKSPACE, write_json_fn=write_json)
 # A release's APK, built unsigned in CI and signed on the project's node with
@@ -8800,7 +8845,11 @@ class Handler(BaseHTTPRequestHandler):
         name = q.get("project", [""])[0]
         if self._not_project(name):
             return
-        return self._json(*changelog.reading(name, q.get("component", [""])[0]))
+        comp = q.get("component", [""])[0]
+        out, code = changelog.reading(name, comp)
+        if code == 200 and isinstance(out, dict) and out.get("text") is not None:
+            out = out | _changelog_bugs(name, comp)
+        return self._json(out, code)
 
     def _get_tls(self):
         """GET /api/tls: what the dashboard is served over (tls.status), for
@@ -12671,7 +12720,13 @@ class Handler(BaseHTTPRequestHandler):
             return
         if (bad := projects.locked_out(name, users.whose(self._who()))):
             return self._json(bad, 409)
-        return self._json(*changelog.editor_verb(name, req))
+        out, code = changelog.editor_verb(name, req)
+        # A line written for fixed bugs (R255) is tied to them in the
+        # notebook, by the words it was written with.
+        if code == 200 and req.get("action") == "line" and out.get("words"):
+            for b in (req.get("bugs") or [])[:20]:
+                bugs.link_changelog(name, b, out["words"])
+        return self._json(out, code)
 
     def _nodelog(self, req):
         """A machine's own log, for a session that has been granted it.

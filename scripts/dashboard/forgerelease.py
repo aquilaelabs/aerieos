@@ -36,6 +36,7 @@ files under another id (Shebang-DevBoard's v0.5.4, 5 Oct, released with
 nothing attached). Signed ones are what a release carries when there are any; an
 unsigned or debug build only where nothing signed was built.
 """
+import fnmatch
 import json
 import mimetypes
 import os
@@ -126,6 +127,88 @@ def notes(where, version, tag="", repo=""):
         if pending is None and title == "Unreleased":
             pending = sec
     return _listed(pending) if pending else ""
+
+
+# ---- what each of a release's files is for (R255) -----------------------------
+# Over the notes of every release AerieOS makes or publishes, unless the
+# repository's Releases settings switch it off: a row for each file the
+# release holds with what it is for, from the repository's list, the
+# checksums and signatures folded into one row, a file nobody described
+# listed by its name. A repository holding docs/release-notes/downloads.md
+# has that file put over its notes instead, @TAG@, @VER@ and @REPO@ filled.
+FILES_HEAD = "### Which download is for what"
+# project -> (on, [{name, what}]): the repository's setting, the server's.
+files_setting = None
+_COMPANION = re.compile(r"\.(sha256|sha512|asc|sig|minisig|attestation\.jsonl|intoto\.jsonl)$")
+
+
+def _cell(t):
+    return " ".join(str(t or "").split()).replace("|", "\\|")
+
+
+def _version_of(tag):
+    m = re.search(r"v(\d+\.\d+\.\d+[^\s/]*)$", str(tag or ""))
+    return m.group(1) if m else str(tag or "")
+
+
+def files_table(project, names, version="", tag="", repo="", where=None):
+    """The table, or "" when it is switched off or there is no file."""
+    try:
+        on, rows = files_setting(project) if files_setting else (True, [])
+    except Exception:  # noqa: BLE001  (a setting that cannot be read is the default)
+        on, rows = True, []
+    if not on:
+        return ""
+    version = version or _version_of(tag)
+    own = Path(where or (WORKSPACE / project)) / "docs" / "release-notes" / "downloads.md"
+    try:
+        return (own.read_text().replace("@TAG@", tag or f"v{version}").replace("@VER@", version)
+                .replace("@REPO@", repo)).strip()
+    except OSError:
+        pass
+    names = [str(n) for n in names or () if n]
+    if not names:
+        return ""
+
+    def what(n):
+        for r in rows or ():
+            pat = str(r.get("name") or "").replace("@VER@", version).replace("@TAG@", tag)
+            if pat and fnmatch.fnmatchcase(n, pat):
+                return str(r.get("what") or "")
+        return ""
+    main = [n for n in names if not _COMPANION.search(n)]
+    extra = [n for n in names if _COMPANION.search(n)]
+    out = [FILES_HEAD, "", "| File | What it is for |", "|---|---|"]
+    out += [f"| `{_cell(n)}` | {_cell(what(n))} |" for n in main]
+    if extra:
+        kinds = sorted({"*" + m.group(0) for n in extra if (m := _COMPANION.search(n))})
+        said = next((w for n in extra if (w := what(n))), "") or \
+            "The checksum or signature of the file of the same name, to check a download; nothing to install."
+        out.append(f"| {', '.join(f'`{k}`' for k in kinds)} | {_cell(said)} |")
+    return "\n".join(out)
+
+
+def with_files_table(project, notes, names, version="", tag="", repo="", where=None):
+    """`notes` with the table over them, once: notes that carry it already
+    are left as they are."""
+    if FILES_HEAD in (notes or ""):
+        return notes
+    t = files_table(project, names, version, tag, repo, where)
+    return f"{t}\n\n{notes or ''}".strip() if t else notes
+
+
+def undescribed(project, names, version="", tag=""):
+    """The files of a release the repository's list says nothing about, the
+    checksums aside: [] when the table is off or a downloads.md stands in."""
+    try:
+        on, rows = files_setting(project) if files_setting else (True, [])
+    except Exception:  # noqa: BLE001
+        return []
+    if not on or (WORKSPACE / project / "docs" / "release-notes" / "downloads.md").is_file():
+        return []
+    version = version or _version_of(tag)
+    pats = [str(r.get("name") or "").replace("@VER@", version).replace("@TAG@", tag) for r in rows or ()]
+    return [n for n in names if not _COMPANION.search(n) and not any(p and fnmatch.fnmatchcase(n, p) for p in pats)]
 
 
 def _listed(sec):
@@ -270,6 +353,7 @@ def publish(project, tag, version, sha, comp="", pre=False):
     where = WORKSPACE / project / comp if comp else WORKSPACE / project
     title = f"{comp + ' ' if comp else ''}{version}"
     body = notes(where, version, tag, at["path"]) or f"{_shown(project)} {version}"
+    body = with_files_table(project, body, [f.name for f in assets(project, sha)], version, tag, at["path"], where)
     try:
         made = _gitlab(_Forge(base, entry, token), at, project, tag, version, sha, title, body) \
             if entry["kind"] == "gitlab" else \
@@ -297,6 +381,8 @@ def _github(project, tag, version, sha, comp="", pre=False):
                     "forge": "GitHub"}
         where = WORKSPACE / project / comp if comp else WORKSPACE / project
         body = notes(where, version, tag, repo) or f"{_shown(project)} {version}"
+        body = with_files_table(project, body, [f.name for f in assets(project, sha) if f.stat().st_size <= ASSET_MAX],
+                                version, tag, repo, where)
         rel = _req("POST", base, token, {"tag_name": tag, "name": f"{comp + ' ' if comp else ''}{version}",
                                          "body": body, "draft": False, "prerelease": bool(pre),
                                          **({"make_latest": "false"} if pre else {})})
@@ -954,8 +1040,10 @@ def drafts(project):
             tag = str(r["name"])
         if not TAG.fullmatch(tag):
             continue
+        names = [str(a.get("name") or "") for a in r.get("assets") or [] if isinstance(a, dict)]
         out.append({"tag": tag, "prerelease": r.get("prerelease") is True, "notes": str(r.get("body") or ""),
-                    "url": str(r.get("html_url") or ""), "holds": holds(repo, token, tag, str(r.get("body") or ""))})
+                    "url": str(r.get("html_url") or ""), "holds": holds(repo, token, tag, str(r.get("body") or "")),
+                    "undescribed": undescribed(project, names, tag=tag)})
     return {"forge": name, "drafts": out}
 
 
@@ -1047,8 +1135,11 @@ def publish_draft(project, tag, notes=None, missing=()):
         if held:
             return {"error": f"{tag} is not published: " + "; ".join(h["why"] for h in held), "holds": held}
         pre = is_pre(tag)
+        said = str(notes) if notes is not None else str(rel.get("body") or "")
+        names = [str(a.get("name") or "") for a in rel.get("assets") or [] if isinstance(a, dict)]
+        told = with_files_table(project, said, names, tag=tag, repo=repo)
         body = {"draft": False, "tag_name": tag, "prerelease": pre, "make_latest": "false" if pre else "legacy",
-                **({"body": str(notes)[:120000]} if notes is not None else {})}
+                **({"body": told[:120000]} if notes is not None or told != said else {})}
         out = _req("PATCH", f"{API}/repos/{repo}/releases/{int(rel['id'])}", token, body) or {}
     except Refused as e:
         return {"error": str(e)}

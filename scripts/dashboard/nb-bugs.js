@@ -21,7 +21,7 @@ function bugMatch(b, q){
 // who reported it and when, the build it was seen in and on, when and how
 // it was closed, the build that closed it and the release that shipped
 // the fix (shippedIn, from the CHANGELOG's dated headings).
-function bugFacts(b, rel, words, refs){
+function bugFacts(b, rel, words, refs, untie = false){
   const who = x => x === "claude" ? "Claude" : x === "you" ? "you" : x || "";
   const closed = b.status !== "open";
   const shipped = closed && b.status === "fixed" ? shippedIn(b.closed_at, rel) : "";
@@ -32,10 +32,17 @@ function bugFacts(b, rel, words, refs){
     ["Happens", REPRO_WORDS[b.reproduces || "untried"] || ""],
     ["Closed", closed ? `${words[b.status] || b.status}${b.closed_at ? ", " + rmDay(b.closed_at) : ""}${
       b.status_by ? `, by ${who(b.status_by)}` : ""}${b.status_note ? `: ${b.status_note}` : ""}` : ""],
-    ["Fixed in", closed ? b.fixed_in || "" : ""],
+    // The commits that fixed it (R255), or the build it was closed in
+    // where none is named.
+    ["Fixed in", closed ? (b.commits || []).join(", ") || b.fixed_in || "" : ""],
     ["Shipped in", shipped === null ? "not yet: planned for the next release" : shipped || ""],
-    ["Changelog", clRefs(refs), {html: true}]]);
+    ["Changelog", clRefs(refs, untie), {html: true}]]);
 }
+
+// A fixed bug's answer for the release check (R255): a tied line, a line
+// naming its fix commit, or its notes saying why it needs none.
+const BUG_ANSWER = /(?:^|\n)(?:\[[^\]\n]*\]\s*)?Changelog:\s*(.+)/;
+const bugOwed = (b, refs) => b.status === "fixed" && !(refs || []).length && !BUG_ANSWER.test(b.notes || "");
 
 // Whether a report's steps reproduce it (R124), in the order a reader
 // weighs them: every time first, the ones nobody has tried last.
@@ -70,8 +77,9 @@ function nbBugsView({$, nb, project}){
 
   // Wrapped so the poll can tell this panel's own write from somebody
   // else's while it is still out. See nbWriting.
-  async function postBug(body){ return nb.writing(() => postBugDo(body)); }
-  async function postBugDo(body){
+  async function postBug(body, o){ return nb.writing(() => postBugDo(body, o)); }
+  // `keepOpen`: the first of two writes from one form, which stays drawn.
+  async function postBugDo(body, {keepOpen = false} = {}){
     // The batch guard reaches here too: a report would survive a session's
     // commit untouched (different file), but "held" has to mean the notebook,
     // or the banner is a lie about its other tabs. Reading is never held.
@@ -99,7 +107,7 @@ function nbBugsView({$, nb, project}){
       // poll reads it as somebody else's and reloads on top of the answer
       // just received.
       if (nb.bugRev !== null) nb.bugRev += 1;
-      drawBugs(true);
+      if (!keepOpen) drawBugs(true);
       return j;
     }catch(e){ notify("could not reach the server: " + failWords(e), true); return null; }
   }
@@ -175,6 +183,9 @@ function nbBugsView({$, nb, project}){
           <textarea class="bfActual proseline" rows="1" maxlength="1000"
             >${v("actual")}</textarea></div>
       </div>
+      ${b?.status === "fixed" ? `<label>Fixed in<span class="help" data-help="the commits that fixed it, by their hash; one commit may fix several bugs" tabindex="0">?</span></label>
+      <input class="bfCommits" spellcheck="false" autocomplete="off" value="${esc((b.commits || []).join(", "))}"
+        placeholder="2d591be, 0d90688">` : ""}
       <label>Notes<span class="help" data-help="cause, analysis, fix plan" tabindex="0">?</span></label>
       <textarea class="bfNotes" spellcheck="false"
         placeholder="what is known about why; mostly the agent's half">${v("notes")}</textarea>
@@ -313,7 +324,9 @@ function nbBugsView({$, nb, project}){
         <div class="body">
           ${["area", "repro", "expected", "actual", "notes"].map(k => b[k]
             ? `<div class="bfield"><label>${k}</label><div class="bval">${esc(b[k])}</div></div>` : "").join("")}
-          ${bugFacts(b, nb.bugReleases, STATUS_WORDS, (nb.bugs.changelog || {})["B" + b.id])}
+          ${bugFacts(b, nb.bugReleases, STATUS_WORDS, (nb.bugs.changelog || {})["B" + b.id], !ro)}
+          ${bugOwed(b, (nb.bugs.changelog || {})["B" + b.id]) ? `<div class="hint bowed">No changelog line answers this fix yet:
+            tie it to one, write one, or say why it needs none, from ⋯ below. A release waits for it.</div>` : ""}
           ${ro ? "" : `<div class="actbar macts">
             <span class="sp"></span>
             <button type="button" class="bSend"${b.status === "open" ? "" : " disabled"}
@@ -330,6 +343,13 @@ function nbBugsView({$, nb, project}){
               ? `<button type="button" class="bFix">Mark fixed</button>
                  ${actMore([`<button type="button" class="bWont">Won't fix</button>`,
                    `<button type="button" class="bNa" title="it was real and stopped applying: the feature went away">Not applicable</button>`,
+                   `<button type="button" class="danger bRm" title="for a report that should not exist: mis-filed, a duplicate, the wrong space">Remove</button>`])}`
+              : b.status === "fixed"
+              // What the changelog says of it (R255) under More, Remove last.
+              ? `<button type="button" class="bReopen">Reopen</button>
+                 ${actMore([`<button type="button" class="bTie"${(nb.bugs.lines || []).length ? "" : ` disabled title="nothing is unreleased to tie it to"`}>Tie to a line</button>`,
+                   `<button type="button" class="bLine">Write a line</button>`,
+                   `<button type="button" class="bNoLine" title="a release never had it, or nobody using it meets it">Needs no line</button>`,
                    `<button type="button" class="danger bRm" title="for a report that should not exist: mis-filed, a duplicate, the wrong space">Remove</button>`])}`
               : `<button type="button" class="bReopen">Reopen</button>
                  <!-- Last, because it is the one that cannot be undone. -->
@@ -367,6 +387,59 @@ function nbBugsView({$, nb, project}){
         () => ask("na", "What stopped it applying?", "Close: not applicable"));
       onPress(d, ".bReopen",
         () => postBug({action: "status", id, status: "open", note: ""}));
+      // The changelog's half of a fixed bug (R255): kept in the notebook,
+      // the public line naming its commits alone.
+      d.querySelectorAll("[data-untie]").forEach(x => x.onclick = () =>
+        postBug({action: "untie", id, line: x.dataset.untie}));
+      onPress(d, ".bTie", () => {
+        closeMore();
+        const body = d.querySelector(".body");
+        if (body.querySelector(".tiebox")) return;
+        const lines = nb.bugs.lines || [];
+        const cats = [...new Set(lines.map(l => l.cat))];
+        const box = document.createElement("div");
+        box.className = "dropbox ctlown tiebox";
+        drawHTML(box, `<div class="q">Which line says this was fixed?<span>: kept in the notebook; the public line names its commits</span></div>
+          <select aria-label="an unreleased changelog line">${cats.map(c => `<optgroup label="${esc(c || "no category")}">${
+            lines.filter(l => l.cat === c).map(l => `<option value="${esc(l.words)}">${esc(l.words.length > 110 ? l.words.slice(0, 108) + "…" : l.words)}</option>`).join("")
+          }</optgroup>`).join("")}</select>
+          <div class="actbar"><button type="button" class="stop">Cancel</button>
+            <button type="button" class="primary" data-tiego>Tie it</button></div>`);
+        body.appendChild(box);
+        arriveBox(box);
+        box.querySelector(".stop").onclick = () => { box.remove(); drawBugs(true); };
+        box.querySelector("[data-tiego]").onclick = () => {
+          const line = box.querySelector("select").value;
+          box.remove();
+          if (line) postBug({action: "tie", id, line});
+        };
+      });
+      onPress(d, ".bLine", () => {
+        closeMore();
+        const body = d.querySelector(".body");
+        if (body.querySelector(".dropbox")) return;
+        const b = (nb.bugs.bugs || []).find(x => x.id === id);
+        const box = dropBox(body, {q: "The changelog's line for this fix", sub: ": what a person upgrading now finds right, filed under Fixed with its commits",
+                                   placeholder: "A move lands on a stick that keeps deploy keys", verb: "Add the line", max: 300,
+                                   cancel: () => drawBugs(true),
+                                   go: async text => {
+                                     const j = await postJSON("/api/changelog", {project, action: "line", text, cat: "Fixed",
+                                                                                 shas: b?.commits || [], bugs: [id]});
+                                     if (j?.error){ notify(j.error, true); drawBugs(true); return; }
+                                     loadBugs(true);
+                                   }});
+        const ta = box.querySelector("textarea");
+        ta.value = b?.title || "";
+        ta.dispatchEvent(new Event("input"));
+      });
+      onPress(d, ".bNoLine", () => {
+        closeMore();
+        const body = d.querySelector(".body");
+        if (body.querySelector(".dropbox")) return;
+        dropBox(body, {q: "Why does it need no line?", sub: ": kept in its notes, which the release check reads",
+                       placeholder: "no release had it; nobody using it meets it", verb: "Needs no line",
+                       cancel: () => drawBugs(true), go: why => postBug({action: "noline", id, why})});
+      });
       // Handing a bug over. Same box the roadmap opens under a step, opened
       // under the report instead; it asks the same question and the pickers
       // behind it are the same two.
@@ -442,6 +515,20 @@ function nbBugsView({$, nb, project}){
         // away is the thing that would otherwise hold the redraw off.
         body.querySelector(".bfCancel").onclick = () => drawBugs(true);
         body.querySelector(".bfGo").onclick = async () => {
+          // Fixed in (R255): the commits added and taken off, written first
+          // so a refused hash leaves the form open to put right.
+          const field = body.querySelector(".bfCommits");
+          if (field){
+            const was = b?.commits || [], now = field.value.split(/[\s,]+/).map(x => x.trim().toLowerCase()).filter(Boolean);
+            const add = now.filter(x => !was.some(w => w.startsWith(x) || x.startsWith(w)));
+            const drop = was.filter(w => !now.some(x => w.startsWith(x) || x.startsWith(w)));
+            if (add.length || drop.length){
+              const c = await postBug({action: "commits", id, add, drop}, {keepOpen: true});
+              if (!c || c.error) return;
+              // ...which moved the report's revision: the edit is over that.
+              form.dataset.rev = (c.bugs || []).find(x => x.id === id)?.rev ?? form.dataset.rev;
+            }
+          }
           const j = await postBug({action: "edit", id, rev: form.dataset.rev || undefined,
                                    ...readBugForm(body)});
           if (j?.conflict) form.dataset.rev = j.conflict.rev;

@@ -372,17 +372,59 @@ elif op in ("rm", "remove"):
     print(f"removed {B(n)}; closing keeps a bug, this does not")
 elif op in ("fix", "wontfix", "na", "reopen"):
     if not rest:
-        print(f"usage: aerie bug {op} <n> [\"note\"]", file=sys.stderr); sys.exit(1)
+        print(f"usage: aerie bug {op} <n> [<n>...] [\"note\"]"
+              + (" [--commit SHA]..." if op == "fix" else ""), file=sys.stderr); sys.exit(1)
     status = {"fix": "fixed", "wontfix": "wontfix", "na": "na",
               "reopen": "open"}[op]
-    n = ident(rest[0]); behind(n, None, None, None)
-    r = bugs.set_status(proj, n, status,
-                        note=" ".join(rest[1:]), by="claude")
-    bail(r)
-    # A sentence, not "B7 na" (B58): what the bug is now, in words.
-    said = {"fixed": "marked fixed", "wontfix": "closed as won't fix",
-            "na": "closed as not applicable", "open": "reopened"}[status]
-    print(f"{B(n)} {said}")
+    # The commits that fixed it (R255), when it is not the one the space is
+    # on: --commit SHA, repeated or comma-separated for several.
+    commits, words = [], []
+    i = 0
+    while i < len(rest):
+        if rest[i] == "--commit" and op == "fix" and i + 1 < len(rest):
+            commits += [c for c in rest[i + 1].split(",") if c.strip()]
+            i += 2
+        else:
+            words.append(rest[i])
+            i += 1
+    # Several bugs one commit fixed, closed together: every leading word that
+    # is a bug's number (B7 or 7), the rest the note.
+    ns = []
+    while words and ids.parse("bugs", words[0])[0] is not None and not ids.parse("bugs", words[0])[1]:
+        ns.append(ident(words.pop(0)))
+    if not ns:
+        ns = [ident(words.pop(0))]
+    for n in ns:
+        behind(n, None, None, None)
+        r = bugs.set_status(proj, n, status, note=" ".join(words), by="claude", commits=commits or None)
+        bail(r)
+        # A sentence, not "B7 na" (B58): what the bug is now, in words.
+        said = {"fixed": "marked fixed", "wontfix": "closed as won't fix",
+                "na": "closed as not applicable", "open": "reopened"}[status]
+        fixes = (r.get("bug") or {}).get("commits") or []
+        print(f"{B(n)} {said}" + (f", fixed in {', '.join(fixes)}" if fixes else
+                                   ("; no commit recorded: the fix was not committed yet, so name it with "
+                                    f"aerie bug fixed-in {B(n)} SHA" if status == "fixed" else "")))
+elif op == "fixed-in":
+    # A bug's fix commits (R255): listed, added, or taken off with --drop.
+    if not rest:
+        print("usage: aerie bug fixed-in <n> [SHA...] [--drop SHA...]", file=sys.stderr); sys.exit(1)
+    n = ident(rest[0])
+    add, drop, into = [], [], None
+    for w in rest[1:]:
+        if w == "--drop":
+            into = drop
+            continue
+        (into if into is not None else add).extend(c for c in w.split(",") if c.strip())
+    if add or drop:
+        behind(n, None, None, None)
+        r = bugs.fixed_by(proj, n, add=add, drop=drop, by="claude")
+        bail(r)
+        b = r.get("bug") or {}
+    else:
+        b = next((x for x in (bugs.load()["projects"].get(proj) or []) if x.get("id") == n), None) or {}
+    have = b.get("commits") or []
+    print(f"{B(n)} fixed in {', '.join(have)}" if have else f"{B(n)} names no commit that fixed it")
 elif op == "pending":
     # The tracker's half of what is waiting for the operator (roadmap #27).
     rs = pending.listing(proj, "bugs")
@@ -438,7 +480,7 @@ elif op == "--prompt":
     sys.stdout.write(bugs.prompt(proj))
 else:
     print("usage: aerie bug [list|all|show N|find TEXT|begin|commit|revert|add TITLE [--sev S] [--area ..] [--here] "
-          "[--repro ..]|note N TEXT|edit N FIELD TEXT|fix N [NOTE]|"
+          "[--repro ..]|note N TEXT|edit N FIELD TEXT|fix N [N...] [NOTE] [--commit SHA]|fixed-in N [SHA...] [--drop SHA]|"
           "wontfix N [WHY]|na N [WHY]|reopen N|rm N [WHY]|pending|"
           "history [-n N] [--since D] [--find TEXT]]", file=sys.stderr)
     sys.exit(1)
