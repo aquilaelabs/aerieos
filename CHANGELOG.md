@@ -90,6 +90,7 @@
 - New container from the Library draws the app's own panel over the rest of the dialog: its icon, its name and who it is by, then the fields it declares (Immich asks for its photos and videos and its database's folder, Nextcloud for its files, its admin account and their passwords), then who it runs as, the time zone as a pulldown and its port where its compose reads them. A folder suggests each of the node's pools and shares, a secret is made for it once and kept on every later edit, and a port something on the node already answers on is refused. The panel owns those values: the compose file shows as the app wrote it, read-only, the Environment tab holds only the other variables and refuses one the panel sets by name, and Edit the definition by hand, said first, leaves the app for good. Fill the definition in is gone (d41d0ea)
 - A container made from an app keeps which app it came from, and its row's press under More reads Configure (it read Compose and env): it opens the same panel with each value read back from the container's environment, and offers a newer definition of the app the Library has kept since. Upgrading: /config moves to state 26, so a build from before this one no longer starts on it; a container made before keeps its Compose and env (d41d0ea)
 - Home Assistant from the Library runs on the machine's own network and is no longer privileged: it still finds the devices around it and reaches Bluetooth through the machine's dbus; a USB radio needs its device passed by hand for now. The arr stack is marked going: Sonarr, Radarr and Prowlarr come as an app each, and a stack made from it keeps running (d41d0ea)
+- On a phone every dialog takes the whole screen, as the History sheet did: its title at the top, its buttons at the bottom under your thumb however little it holds, and only what is between them scrolls (1277b83)
 
 ### Fixed
 
@@ -134,6 +135,7 @@
 - A notebook's Roadmap and Bugs history shows its title again, and on a phone its time window sits beside the search (070a1f9)
 - A conversation with nothing said in it opens as a small dialog, not a screen-tall one (070a1f9)
 - A toolchain's card on the Library says it is updating as soon as Software update is pressed, where it kept offering the update until the node reported (bbe559b)
+- A second container made from the same Library app is offered a name, folders and ports of its own (immich-2, its folders under that name, the next free ports on the node). It was offered the first one's name and port, so Create refused it, or, renamed while the first was still starting, made it on the first one's port. (6f8491c)
 
 ### Security
 
