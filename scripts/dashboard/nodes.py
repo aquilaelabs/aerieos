@@ -1628,8 +1628,12 @@ def _c_tokseal(c, out):
         for acct, seals in list((tk.get("sealed") or {}).items())[:500] if isinstance(tk.get("sealed"), dict) else []:
             if not re.fullmatch(r"u_[0-9a-f]{8}", str(acct)) or not isinstance(seals, dict):
                 continue
-            for ag, v in seals.items():
-                if ag in ("claude", "codex") and isinstance(v, dict) and re.fullmatch(r"[0-9a-f]{1,520}", str(v.get("R") or "")):
+            # Every agent the node seals a sign-in for: the four shipped
+            # (base.SIGNINS) and a pack's, named as a pack's agent may be
+            # (base.pack_signins). Kept to claude and codex, Grok's and
+            # Copilot's seals never reached a terminal's open (B902).
+            for ag, v in list(seals.items())[:24]:
+                if re.fullmatch(r"[a-z][a-z0-9]{1,15}", str(ag)) and isinstance(v, dict) and re.fullmatch(r"[0-9a-f]{1,520}", str(v.get("R") or "")):
                     sealed.setdefault(acct, {})[ag] = {"R": v["R"], "K": re.sub(r"[^0-9a-f]", "", str(v.get("K") or ""))[:24],
                                                        "email": str(v.get("email") or "")[:120],
                                                        "plan": str(v.get("plan") or "")[:40]}

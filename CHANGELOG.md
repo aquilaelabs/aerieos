@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- A node's CI runner that has updated itself shows as listening, where its row said not listening and asked for Reinstall runner while it took jobs (d02e808)
+- The CI runner row on a phone reads Registered as NAME, where it said registered twice (b5c9e61)
+- `aerie changelog add --bug N` names the commits that fixed the bug, where it named whichever commit was newest when the line was written (b11f332)
+- Terminals: an Any model session starts where OpenCode is installed, where Linux refused it as not installed; a terminal with no space opens on a node that builds on its own disk; resuming a Claude conversation that is no longer kept says so; two terminals of one space opened at once both start; and a space's shell asks for your commit name and email as the other terminals do (80828f9)
+- `aerie bug fix` on a node just after a commit waits for the commit to reach the controller, where it said there was no such commit (1fb767b)
+
 ## 0.9.0-dev.5641: 2026-11-18
 
 ### Added
