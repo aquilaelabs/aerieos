@@ -78,6 +78,8 @@
 - Every dialog's buttons are in one order: the main one first, the way out after it, and anything that cannot be undone last; the buttons stay at the foot of a dialog that scrolls (a6403f5)
 - A press on the dimmed page around a dialog puts it away, as Escape does, in every dialog but the one that shows a node's one-time enrollment token (a9ab7bc)
 - Back closes the dialog on show and leaves the page under it where it was, and closing any dialog puts the focus back on what opened it (8acd882)
+- The warning bands (Restart your session, the new build's line) are see-through in the dark themes, a faint yellow with yellow words, where they were solid yellow (4318716)
+- A test named as a sentence counts as described on the Tests view; only a terse name wants a note from aerie tests note (4b5c08b)
 
 ### Fixed
 
@@ -120,6 +122,7 @@
 - Minimize on a session's row on the Sessions page takes its tab away even after the tab was opened again, where the press could do nothing (562e2fb)
 - A notebook's Roadmap and Bugs history shows its title again, and on a phone its time window sits beside the search (070a1f9)
 - A conversation with nothing said in it opens as a small dialog, not a screen-tall one (070a1f9)
+- A toolchain's card on the Library says it is updating as soon as Software update is pressed, where it kept offering the update until the node reported (bbe559b)
 
 ### Security
 
