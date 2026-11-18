@@ -106,6 +106,22 @@ class Links(unittest.TestCase):
                                                      "words": "A move lands on a stick", "by": "commit"}])
         self.assertEqual(bugs.set_status("p", self.bug, "open")["bug"].get("commits"), None, "reopened, it names none")
 
+    def test_a_line_added_for_a_bug_names_its_fix_not_the_newest_commit(self):
+        # Two fixes committed, then logged one after the other: the first
+        # line is about the first fix, whatever HEAD is when it is written.
+        bugs.set_status("p", self.bug, "fixed", note="it lands", commits=[self.head])
+        (self.d / "a.txt").write_text("two\n")
+        git(self.d, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qam", "two")
+        here = Path(__file__).resolve().parents[2]
+        out = subprocess.run([sys.executable, str(here / "lib" / "changelog-verbs.py"), str(here / "dashboard" / "version.py"),
+                              "p", "add", "A move lands on a stick", "--cat", "Fixed", "--bug", f"B{self.bug}"],
+                             capture_output=True, text=True, check=False,
+                             env={**os.environ, "BB_WORKSPACE": str(self.ws), "DASHBOARD_STATE": self.tmp})
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertIn(f"- A move lands on a stick ({self.head})", (self.d / "CHANGELOG.md").read_text())
+        tie = bugs.payload("p")["changelog"][f"B{self.bug}"][0]
+        self.assertEqual((tie["words"], tie.get("tied")), ("A move lands on a stick", True), "and tied to it")
+
     def test_fixed_in_is_edited_and_only_takes_a_commit_the_repository_holds(self):
         r = bugs.set_status("p", self.bug, "fixed", note="by hand", commits=[self.head])
         self.assertEqual(r["bug"]["commits"], [self.head])

@@ -109,8 +109,9 @@ before it, or when its fix (a commit naming the bug, or the one it was closed
 on) changes a line the release's own copy has; a fix touching only tests and
 CI, or code that came after the release, owes nothing. `aerie changelog
 missing` lists what is owed at any time; `aerie changelog add "..." --cat
-Fixed --bug N` writes the line and ties it to the bug (several by repeating
-`--bug`), `aerie changelog link N BUG...` ties a line already written to the
+Fixed --bug N` writes the line, ties it to the bug (several by repeating
+`--bug`) and names the commits that fixed it rather than whatever HEAD is
+then, `aerie changelog link N BUG...` ties a line already written to the
 bugs it answers, and `aerie changelog skip N "why"` answers for a bug that
 needs none. A bug that names the commit that fixed it (recorded when it is
 closed, or set with `aerie bug fixed-in`) is answered by any line naming that

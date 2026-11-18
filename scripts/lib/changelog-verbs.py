@@ -137,10 +137,19 @@ if argv and argv[0] == "add":
         print(f"filed under {cat!r}, which is this space's own category rather than one "
               "of the six; kept as typed", file=sys.stderr)
     # Stamped with HEAD: the instruction in the template is to log after
-    # committing, so the sha names the commit the entry describes.
+    # committing, so the sha names the commit the entry describes. A line
+    # tied to bugs names the commits that fixed them instead, where they are
+    # recorded: two fixes committed and then logged one after the other
+    # would otherwise both name the second.
     sha = version._git(proj, "rev-parse", "--short=7", "HEAD") or ""
     tied = [_bug_of(w) for w in bug_ns]
-    r = changelog.add(d, argv[1], sha=sha, cat=cat)
+    fixes = []
+    for b in tied:
+        fixes += [c for c in (b.get("commits") or []) if c not in fixes]
+    text = argv[1]
+    if fixes and not changelog._STAMP.search(text):
+        text = f"{text.rstrip()} ({', '.join(fixes)})"
+    r = changelog.add(d, text, sha=sha, cat=cat)
     if r.get("error"):
         print(r["error"], file=sys.stderr)
         raise SystemExit(1)
@@ -306,7 +315,7 @@ if argv:
           'aerie changelog skip N "why"        a fixed bug that needs no line, and why\n'
           "aerie changelog link N BUG...       the unreleased line N answers these bugs (kept in the notebook)\n"
           "aerie changelog unlink N BUG...     the line no longer answers them\n"
-          "  add ... --bug N                  the Fixed line is about bug N (repeat it for several)\n"
+          "  add ... --bug N                  the Fixed line is about bug N (repeat it for several), stamped with its fix commits\n"
           "\nA category is a `### Name` subsection. Which ones exist and what\n"
           "order they and their lines sit in is the operator's, on the\n"
           "Changelog editor beside the version.",

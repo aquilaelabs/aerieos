@@ -421,8 +421,9 @@ no category it says when each applies. Fixed is for a bug a released
 version had, and a published pre-release of any name is a released
 version: a fix to something no release has carried yet gets no line, since
 the changelog is read by somebody upgrading from a release. Its line comes
-after the fix's commit and the bug's close, stamped with that commit, and
-`--bug N` ties it to its bug (repeat it for several); `aerie changelog link N
+after the fix's commit and the bug's close, and `--bug N` ties it to its bug
+(repeat it for several) and stamps it with the bug's fix commits, where
+otherwise it names HEAD; `aerie changelog link N
 BUG...` ties a line already written and `unlink` unties one. A tie is kept in
 the notebook and follows its line through an edit, a merge and the editor's
 Save, while the line names its commits alone. A fixed bug is answered by a
