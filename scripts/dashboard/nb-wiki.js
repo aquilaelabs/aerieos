@@ -245,17 +245,17 @@ function nbWikiView({$, nb, project}){
     const n = articles().length;
     const rem = d.remote;
     // The glance (R109): its pages, none while it has none, whose empty
-    // state is said where the article would be.
-    viewGlance($("wkHint"), [{label: n === 1 ? "page" : "pages", value: n, omit: !n}], d.error ? esc("wiki: " + d.error) : "", "", d.error ? "bad" : "");
+    // state is said where the article would be; its status line, on the
+    // control row's slot, where it goes, or why it could not be read.
+    // An empty wiki is its empty state, not a fault: the line says its
+    // buttons wait for a page, in the bar's voice, not in red.
+    viewGlance($("wkHint"), [{label: n === 1 ? "page" : "pages", value: n, omit: !n}],
+      d.error ? esc("wiki: " + d.error) : esc((rem?.label ? `${rem.label}'s wiki` : "no remote: Export is how it leaves")
+        + (pages().length ? "" : rem?.label ? "; Export and Push wait for a page" : "; it waits for a page")), "", d.error ? "bad" : "");
     $("wkNew").hidden = !!projWriteWhy(project);
     $("wkNew").setAttribute("aria-expanded", String(!!nb.wkAdding));
     $("wkExport").disabled = !pages().length;
     $("wkPull").hidden = $("wkPush").hidden = !rem?.label;
-    // An empty wiki is its empty state, not a fault: the bar's own line
-    // says its buttons wait for a page, in the bar's voice, not in red.
-    // In the control row's slot, a note as every view's status line is.
-    patch($("wkNetState"), `<div class="notice note">${esc((rem?.label ? `${rem.label}'s wiki` : "no remote: Export is how it leaves")
-      + (pages().length ? "" : rem?.label ? "; Export and Push wait for a page" : "; it waits for a page"))}</div>`);
     // A role that reads the project and does not write it (B101): Pull and
     // Push dead, and that is the reason said under them.
     const ro = projWriteWhy(project);
@@ -421,6 +421,9 @@ function nbWikiView({$, nb, project}){
   // The control row's and the status line's controls: wired once, they
   // live in the markup.
   // New page, the control row's primary: its form unrolls under the row.
+  // New page waits on the control row where it lands, for a role that
+  // writes the space, which is known before the wiki is read.
+  $("wkNew").hidden = !!projWriteWhy(project);
   $("wkNew").onclick = () => {
     if (!nb.wkAdding) nb.wkAdding = {name: articles().length ? "" : "Home", text: ""};
     drawWiki(); $("wkNewName")?.focus();
