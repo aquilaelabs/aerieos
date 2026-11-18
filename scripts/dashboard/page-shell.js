@@ -172,6 +172,9 @@ function railGo(key, tool){
 // there (B313).
 function shellPush(to, from = location.hash){
   shellCame(from, to);
+  // While a dialog's entry is being given back the push waits for it to
+  // have gone (backPressed), or the give-back would undo the page.
+  if (backGiving){ backAfter = to; shellSeen = to; return; }
   // From a dialog's entry the page takes it over (hashGo's way).
   if (history.state?.dlg) history.replaceState(null, "", to);
   else history.pushState(null, "", to);
@@ -318,6 +321,9 @@ function openRoute(hash){
 // page being left, which the handler then opened (B303).
 let shellSeen = null;
 function shellSync(){
+  // Not while a dialog's entry is being given back: written over it, the
+  // give-back went to the page before (backPressed syncs once it lands).
+  if (backGiving) return;
   const to = routeOf(tabOf(panes[0]));
   if (shellSeen !== null && location.hash && location.hash !== shellSeen && location.hash !== to) return;
   shellSeen = to || "";

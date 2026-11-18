@@ -172,7 +172,7 @@ function modalClosed(el){
 // on, each as Escape would. Put away any other way, a dialog gives its entry
 // back, unless the page has moved on from it. One holding something shown
 // once (data-keep-stray) holds none, and Back passes it by.
-let backHolds = [], backSeq = 0, backGiving = false;
+let backHolds = [], backSeq = 0, backGiving = false, backAfter = null;
 
 // Hold an entry for something Back puts away with `shut`; its number.
 function backHold(shut){
@@ -202,6 +202,11 @@ function backPressed(){
   const at = history.state?.dlg || 0;
   if (backGiving){
     backGiving = false;
+    // A page opened while the entry was being given back is put in the
+    // history now that it has gone: pushed before, the give-back landed
+    // after it and took the page back with it (shellPush, shellSync).
+    if (backAfter){ const to = backAfter; backAfter = null; history.pushState(null, "", to); shellSeen = to; }
+    else shellSync();
     // One opened while its entry was being given back holds one again.
     const top = backHolds.at(-1);
     if (top && at < top.tok) history.pushState({...(history.state || {}), dlg: top.tok}, "", location.href);
