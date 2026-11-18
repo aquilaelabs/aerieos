@@ -1587,7 +1587,7 @@ function cAppDraw(a, vals = null){
   wireLibrary($("cAppHead"));
   $("cAppWhat").textContent = a.what || "";
   $("cAppNet").hidden = a.network !== "host";
-  $("cAppNet").textContent = a.network === "host" ? `Runs on the machine's own network, so it finds the devices around it. It answers on ${a.port}, which is not picked.` : "";
+  $("cAppNet").textContent = a.network === "host" ? `On the machine's own network: it answers on port ${a.port} there, which is not picked here.` : "";
   $("cAppGoing").hidden = !a.going;
   $("cAppGoing").textContent = a.going || "";
   // A folder with a default of its own (apps/immich) starts at the first
