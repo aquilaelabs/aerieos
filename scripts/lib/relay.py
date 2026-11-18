@@ -20,8 +20,11 @@ project = os.environ.get("BB_RELAY_PROJECT", "")
 # A verb that reads or changes the project's tree, which on the controller is
 # its own copy: on a node holding a synced copy (R163), what was saved here
 # goes up first, and what the verb changed comes back down before it is used.
+# A bug's close names the commit that fixed it (R255): the one asked for,
+# or the tree's own when it is clean, read off the controller's copy, which
+# a commit made here a moment ago had not reached.
 TREE = {"git", "version", "changelog"}
-tree = bool(argv) and argv[0] in TREE and bool(project)
+tree = bool(project) and bool(argv) and (argv[0] in TREE or argv[:2] in (["bug", "fix"], ["bug", "fixed-in"]))
 if tree:
     import syncwait
     if not syncwait.up(project) and argv[0] == "git":
