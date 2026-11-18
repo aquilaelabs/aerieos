@@ -142,7 +142,12 @@ await section("What a report knows is facts above its verbs", async () => {
   const bar = await page.$eval('#bugList .bug[data-id="1"]', el => ({
     bar: el.querySelector('.macts')?.classList.contains('actbar'),
     facts: Object.fromEntries([...el.querySelectorAll('.facts .fact')].map(f => [f.querySelector('dt').textContent, f.querySelector('dd').textContent])),
-    last: el.querySelector('.macts button:last-of-type')?.className || '' }));
+    // Last on the bar, or last under its ⋯ where a fixed bug keeps it with
+    // the changelog's three (R255).
+    last: (() => {
+      const l = [...el.querySelectorAll('.macts > button, .macts > .more')].at(-1);
+      return (l?.matches('.more') ? l.querySelector('.actmenu > button:last-of-type') : l)?.className || '';
+    })() }));
   ok(bar.bar && /, by /.test(bar.facts.Reported || '') && /^fixed, .+, by you: the select re-measures on rotate now$/.test(bar.facts.Closed || ''),
      `a report's facts say who reported it, and when and how it was closed with its note (${JSON.stringify(bar.facts)})`);
   ok(/bRm/.test(bar.last),

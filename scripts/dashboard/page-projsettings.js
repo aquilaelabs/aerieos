@@ -934,7 +934,8 @@ function renameProject(name, mode = "all"){
   $("rnTitle").textContent = git ? `${where} settings for ${projLabel(name)}`
     : proj ? `${projectName(name)} settings` : projLabel(name);
   for (const id of ["rnNameField", "rnMineField",
-                    "rnGateField", "rnBuildField", "rnReadsField", "rnAgentsField"])
+                    "rnGateField", "rnBuildField", "rnReadsField", "rnAgentsField",
+                    "rnRelGateF", "rnRelTableF", "rnRelFilesF"])
     $(id).hidden = git;
   // The project's name is renamed on its card's back; the field here
   // renames a repository, which the project's door is not about.

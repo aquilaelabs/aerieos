@@ -1008,9 +1008,11 @@
     <!-- Releases (R255): what a release waits for, and what each of its
          files is for, put over its notes. The repository's own. -->
     <details class="sect rngroup" data-sect="rn:releases"><summary><span class="t">Releases</span></summary><div class="body">
-    <div class="field">
+    <div class="field" id="rnRelGateF">
       <div class="setrow col ctlrow"><label for="rnRelGate">A fixed bug with no changelog line<span class="help" data-help="a bug fixed since the last release that it had, with no line tied to it and no reason it needs none: the release check lists them on the changelog editor and on each bug's row, and the release waits until each has a line or a reason, or goes ahead saying which it lacked" tabindex="0">?</span></label>
         <select id="rnRelGate"><option value="refuse">Holds the release</option><option value="warn">Is said; the release goes ahead</option></select></div>
+    </div>
+    <div class="field" id="rnRelTableF">
       <div class="setrow col ctlrow"><label for="rnRelTable">The notes start with what each file is for<span class="help" data-help="a table over a release's notes: each file the release holds, with what it is for from the list below; checksums and attestations fold into one row, and a file nobody described is listed by its name" tabindex="0">?</span></label>
         <select id="rnRelTable"><option value="on">Yes</option><option value="off">No</option></select></div>
     </div>
