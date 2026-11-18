@@ -9,6 +9,12 @@
 - `aerie changelog add --bug N` names the commits that fixed the bug, where it named whichever commit was newest when the line was written (b11f332)
 - Terminals: an Any model session starts where OpenCode is installed, where Linux refused it as not installed; a terminal with no space opens on a node that builds on its own disk; resuming a Claude conversation that is no longer kept says so; two terminals of one space opened at once both start; and a space's shell asks for your commit name and email as the other terminals do (80828f9)
 - `aerie bug fix` on a node just after a commit waits for the commit to reach the controller, where it said there was no such commit (1fb767b)
+- A node's Grok and Copilot sign-ins sealed there open with a terminal, as Claude's and ChatGPT's do: the controller kept only those two of what the node reported (3d9c03d)
+- A stale mount's reason on a node's Storage section reads whole, where it ended mid-word (2a57da9)
+- The catalog's check refuses an app description longer than the 200 characters its card shows, where the card cut it mid-word (6679086)
+- The Git view's history shows a commit's subject however many branches point at it: two branch names and a count of the rest (e38c6ba)
+- A page whose scripts never arrive says it did not finish loading, with Reload, where it said loading forever (5a53495)
+- `aerie bug add --from FILE`, `aerie roadmap add --from FILE` and `aerie design edit` work in a session on a node (4eae63f, 460ba1c)
 
 ## 0.9.0-dev.5641: 2026-11-18
 
