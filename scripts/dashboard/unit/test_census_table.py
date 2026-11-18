@@ -448,6 +448,19 @@ class Table(unittest.TestCase):
         self.assertLessEqual(len(got), 400)
         self.assertTrue(got.endswith("word\u2026"), got[-12:])
 
+    def test_a_field_in_a_shape_it_cannot_read_is_left_out_not_the_hello(self):
+        # A list where a dict goes, a word where a number does: that field
+        # is left out and said once, and the rest kept (B904: it raised, and
+        # the whole hello was refused).
+        err = io.StringIO()
+        nodes._census_said.discard("shape store_dirs")    # said once a process, and the frozen cases came first
+        with contextlib.redirect_stderr(err):
+            out = nodes._census({"cpu": 4, "store_dirs": {"top": True}, "storage": {"at": "soon"},
+                                 "network": {"addresses": 5}})
+        self.assertEqual(out["cpu"], 4)
+        self.assertNotIn("store_dirs", out)
+        self.assertIn("store_dirs", err.getvalue())
+
     def test_an_unknown_key_is_said_once_per_process(self):
         err = io.StringIO()
         with mock.patch.object(nodes, "_census_said", set()), contextlib.redirect_stderr(err):
@@ -1007,44 +1020,44 @@ FROZEN_DEEP = r'''{
  "toolchain_verified": {"answers": "dfc1e94f67982a90", "raises": []},
  "toolchain_receipts": {"answers": "6c4c6ee899430a7d", "raises": []},
  "tokseal": {"answers": "91fd701e15921744", "raises": []},
- "store_dirs": {"answers": "7d061c0bc0aa7008", "raises": ["top 2 TypeError", "top 4 TypeError", "top 5 TypeError", "top 6 TypeError", "top 12 KeyError", "android 2 TypeError", "android 4 TypeError", "android 5 TypeError", "android 6 TypeError", "android 12 KeyError", "incomplete 2 TypeError", "incomplete 4 TypeError", "incomplete 5 TypeError", "incomplete 6 TypeError", "incomplete 12 KeyError", "roots 2 TypeError", "roots 4 TypeError", "roots 5 TypeError", "roots 6 TypeError", "roots 12 KeyError"]},
- "images": {"answers": "f1eb4fdd36eb8fe0", "raises": ["avds 2 TypeError", "avds 4 TypeError", "avds 5 TypeError", "avds 6 TypeError", "avds 12 KeyError"]},
+ "store_dirs": {"answers": "0436714d6e537277", "raises": []},
+ "images": {"answers": "c035b9a185123167", "raises": []},
  "toolchains": {"answers": "3f80b77146bd7b0e", "raises": []},
  "features": {"answers": "8b06346637fc5085", "raises": []},
- "disks": {"answers": "937b986ade1c1f3c", "raises": ["parts 2 TypeError", "parts 4 TypeError", "parts 5 TypeError", "parts 6 TypeError", "parts 12 KeyError"]},
+ "disks": {"answers": "7fe718ac3bf83a4c", "raises": []},
  "shares": {"answers": "019cf40f909a1d17", "raises": []},
- "pools": {"answers": "a5869a8badb63969", "raises": ["vdevs 2 TypeError", "vdevs 4 TypeError", "vdevs 5 TypeError", "vdevs 6 TypeError", "vdevs 12 KeyError"]},
+ "pools": {"answers": "416660fb29265549", "raises": []},
  "pools_importable": {"answers": "f1c5b4532e287416", "raises": []},
  "snapshots": {"answers": "d32d9ed40b415212", "raises": []},
- "array": {"answers": "52c4c6926eac4fa8", "raises": ["data 2 TypeError", "data 4 TypeError", "data 5 TypeError", "data 6 TypeError", "data 12 KeyError", "parity 2 TypeError", "parity 4 TypeError", "parity 5 TypeError", "parity 6 TypeError", "parity 12 KeyError"]},
+ "array": {"answers": "09fe824b5c19e347", "raises": []},
  "console": {"answers": "ee28b3cff147c756", "raises": []},
- "adopted": {"answers": "d91cab7f646227b6", "raises": ["mounts 2 TypeError", "mounts 4 TypeError", "mounts 5 TypeError", "mounts 6 TypeError", "mounts 12 KeyError", "parity 2 TypeError", "parity 4 TypeError", "parity 5 TypeError", "parity 6 TypeError", "parity 12 KeyError", "folders 2 TypeError", "folders 4 TypeError", "folders 5 TypeError", "folders 6 TypeError", "folders 12 KeyError"]},
+ "adopted": {"answers": "943c14cf4543aa1c", "raises": []},
  "store_backups": {"answers": "c23b336607273888", "raises": []},
  "ext_mounts": {"answers": "088b1f87e303b0ab", "raises": []},
  "ups": {"answers": "e2c0c0a191cb85b5", "raises": []},
  "host_updates": {"answers": "0fbf01dd682a530c", "raises": []},
  "os_image": {"answers": "4f43e6e221b9528f", "raises": []},
  "os_kept": {"answers": "f24183454fc3d70d", "raises": []},
- "os_stick": {"answers": "b33f49a3ae9b3229", "raises": ["on_stick 2 TypeError", "on_stick 4 TypeError", "on_stick 5 TypeError", "on_stick 6 TypeError", "others 2 TypeError", "others 4 TypeError", "others 5 TypeError", "others 6 TypeError"]},
+ "os_stick": {"answers": "c93d521375185bde", "raises": []},
  "vms_other": {"answers": "8746351418f6c9ed", "raises": []},
- "vms": {"answers": "a411ff9457e2f464", "raises": ["snapshots 2 TypeError", "snapshots 4 TypeError", "snapshots 5 TypeError", "snapshots 6 TypeError", "snapshots 12 KeyError"]},
+ "vms": {"answers": "1056fac6bf8e9e77", "raises": []},
  "vm_pool": {"answers": "f558c8b80393a80b", "raises": []},
- "vm_host": {"answers": "51ba574afd52cb18", "raises": ["cpus 2 TypeError", "cpus 4 TypeError", "cpus 5 TypeError", "cpus 6 TypeError", "cpus 12 KeyError", "usb 2 TypeError", "usb 4 TypeError", "usb 5 TypeError", "usb 6 TypeError", "usb 12 KeyError", "pci 2 TypeError", "pci 4 TypeError", "pci 5 TypeError", "pci 6 TypeError", "pci 12 KeyError", "bridges 2 TypeError", "bridges 4 TypeError", "bridges 5 TypeError", "bridges 6 TypeError", "bridges 12 KeyError", "vnets 2 TypeError", "vnets 4 TypeError", "vnets 5 TypeError", "vnets 6 TypeError", "vnets 12 KeyError"]},
+ "vm_host": {"answers": "25d61ca9746c445d", "raises": []},
  "vm_isos": {"answers": "84f1b0c1cc35e7b0", "raises": []},
- "gpu_driver": {"answers": "cf976c40ece77e44", "raises": ["options 2 TypeError", "options 4 TypeError", "options 5 TypeError", "options 6 TypeError", "options 12 KeyError"]},
+ "gpu_driver": {"answers": "0305b7c57ebadddc", "raises": []},
  "gpu_container": {"answers": "20ea790c2a9562d3", "raises": []},
- "sound": {"answers": "1d7f5d75b664b01a", "raises": ["cards 2 TypeError", "cards 4 TypeError", "cards 5 TypeError", "cards 6 TypeError", "cards 12 KeyError", "virtual 2 TypeError", "virtual 4 TypeError", "virtual 5 TypeError", "virtual 6 TypeError", "virtual 12 KeyError"]},
+ "sound": {"answers": "f513ec1e34904923", "raises": []},
  "isolation": {"answers": "2b2ff6102348bf10", "raises": []},
  "session_net": {"answers": "ba23187cd54322bc", "raises": []},
  "sysdeps": {"answers": "33ebfc7a136679bb", "raises": []},
- "storage": {"answers": "ef75048985f8fd26", "raises": ["at 8 ValueError", "at 10 TypeError", "at 12 TypeError", "took_s 8 ValueError", "took_s 10 TypeError", "took_s 12 TypeError", "filesystems 2 TypeError", "filesystems 4 TypeError", "filesystems 5 TypeError", "filesystems 6 TypeError", "filesystems 12 KeyError", "stores 2 AttributeError", "stores 4 AttributeError", "stores 5 AttributeError", "stores 6 AttributeError", "stores 8 AttributeError", "stores 10 AttributeError", "projects 2 AttributeError", "projects 4 AttributeError", "projects 5 AttributeError", "projects 6 AttributeError", "projects 8 AttributeError", "projects 10 AttributeError", "workspace 2 AttributeError", "workspace 4 AttributeError", "workspace 5 AttributeError", "workspace 6 AttributeError", "workspace 8 AttributeError", "workspace 10 AttributeError", "homes 2 AttributeError", "homes 4 AttributeError", "homes 5 AttributeError", "homes 6 AttributeError", "homes 8 AttributeError", "homes 10 AttributeError", "docker 2 AttributeError", "docker 4 AttributeError", "docker 5 AttributeError", "docker 6 AttributeError", "docker 8 AttributeError", "docker 10 AttributeError", "slow 2 TypeError", "slow 4 TypeError", "slow 5 TypeError", "slow 6 TypeError", "slow 12 KeyError", "phones 2 TypeError", "phones 4 TypeError", "phones 5 TypeError", "phones 6 TypeError", "phones 12 KeyError"]},
+ "storage": {"answers": "2c34dff43e660a12", "raises": []},
  "mounts": {"answers": "809acfce0f413f2a", "raises": []},
  "door": {"answers": "580ba02bea210b45", "raises": []},
  "services": {"answers": "57e616438b6d1b86", "raises": []},
  "files": {"answers": "e9c738bf5c56e4cd", "raises": []},
  "relay": {"answers": "94f65bb6733a2fc4", "raises": []},
  "session": {"answers": "d8296b27e3e98923", "raises": []},
- "network": {"answers": "d374740766edaf01", "raises": ["addresses 2 TypeError", "addresses 4 TypeError", "addresses 5 TypeError", "addresses 6 TypeError", "addresses 12 KeyError", "dns 2 TypeError", "dns 4 TypeError", "dns 5 TypeError", "dns 6 TypeError", "dns 12 KeyError", "routes 2 TypeError", "routes 4 TypeError", "routes 5 TypeError", "routes 6 TypeError", "routes 12 KeyError"]},
+ "network": {"answers": "7445aebab963eb80", "raises": []},
  "distro": {"answers": "e9d1a29ec449468f", "raises": []},
  "evil": {"answers": "0aeb5e9de1b37121", "raises": []}
 }'''

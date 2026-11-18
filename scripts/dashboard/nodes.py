@@ -2551,8 +2551,21 @@ def _census(c):
     for k in CENSUS_STRINGS:
         if c.get(k):
             out[k] = str(c[k])[:120]
-    for _, clean in CENSUS:
-        clean(c, out)
+    # One field the machine sent in a shape its cleaner does not take (a
+    # list where a dict goes, a word where a number does) is left out and
+    # said once, never the whole hello refused with it (B904).
+    for keys, clean in CENSUS:
+        was = dict(out)
+        try:
+            clean(c, out)
+        except (TypeError, ValueError, KeyError, AttributeError, IndexError) as e:
+            out.clear()
+            out.update(was)
+            name = "/".join(keys)
+            if "shape " + name not in _census_said and len(_census_said) < CENSUS_SAID_MOST:
+                _census_said.add("shape " + name)
+                print(f"[nodes] a node's census has {json.dumps(name[:80])} in a shape the controller "
+                      f"does not read ({type(e).__name__}): left out of its record", file=sys.stderr, flush=True)
     return out
 
 
