@@ -66,6 +66,7 @@ tmux_name = None
 WORKSPACE = None
 releases = None
 changelog_refs = None
+changelog_lines = None
 
 
 def configure(*, write_json, state, tell=None, tmux_name=None, workspace=None,

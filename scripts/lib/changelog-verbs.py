@@ -28,8 +28,8 @@ try:
     _prefs = dash.load("prefs", _here)
     _prefs.configure(write_json=statefile.write_json, state=_state)
     version.release_gate = lambda p: _prefs.get(p).get("release_gate", "refuse")
-except Exception:  # noqa: BLE001  (the default, refuse, stands)
-    pass
+except Exception as e:  # noqa: BLE001  (the default, refuse, stands)
+    print(f"the Releases setting could not be read, so owed lines refuse a release: {e}", file=sys.stderr)
 releasegaps = dash.load("releasegaps", _here)
 releasegaps.configure(version_mod=version, bugs_mod=bugs, changelog_mod=changelog)
 
