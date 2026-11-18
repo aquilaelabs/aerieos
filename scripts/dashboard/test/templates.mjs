@@ -61,7 +61,12 @@ const VIEWS = ['briefing', 'roadmap', 'bugs', 'git', 'tests', 'analysis', 'desig
 const MORE_TILES = { analysis: "the fixture's scan has a finding at every level, where a scan mostly has two or three" };
 // The fixture's tracker holds under two bugs, so the Bugs view lands
 // without its search; a tracker mostly holds more and waits with it.
-const VIEW_SKIP = { git: ['title:CI', 'title:README.md', 'phone:table'], briefing: ['title:Brief'], bugs: ['barSig'] };
+// The fixture's node has no signing tool, so the Signing view heads itself
+// with why above its sections; a node that signs has no such head, and the
+// view waits without it. The fixture's repository has no remote, so the
+// Git view lands without Fetch, Pull and Push; a repository mostly has one,
+// and its row waits with them.
+const VIEW_SKIP = { git: ['title:CI', 'title:README.md', 'phone:table', 'barSig'], briefing: ['title:Brief'], bugs: ['barSig'], signing: ['top'] };
 const HELD = /\/api\/(?!status|layout|revs|presence)/;
 // Reads held while a template is measured, then let go: a request held and
 // never answered keeps one of the browser's six connections to the server,
@@ -157,7 +162,7 @@ const differ = (got, tpl, skip = []) => {
   if (!skip.includes('card') && !!got.card !== !!tpl.card) out.push(`card: page ${got.card ? 'floats one' : 'floats none'}, template ${tpl.card ? 'floats one' : 'floats none'}`);
   else if (got.card && (Math.abs(got.card.l - tpl.card.l) > 2 || Math.abs(got.card.r - tpl.card.r) > 2))
     out.push(`card edges ${got.card.l} to ${got.card.r} on the page, ${tpl.card.l} to ${tpl.card.r} in the template`);
-  else if (got.card && !skip.includes('tiles') && Math.abs(got.top - tpl.top) > 24)
+  else if (got.card && !skip.includes('tiles') && !skip.includes('top') && Math.abs(got.top - tpl.top) > 24)
     out.push(`the first card starts ${got.top}px down on the page, ${tpl.top}px in the template`);
   return out.join('; ');
 };

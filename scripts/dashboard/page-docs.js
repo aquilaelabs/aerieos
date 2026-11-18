@@ -301,13 +301,12 @@ const SKTPLS = {
       + sects.map(([k, t, open], j) => docSection("briefing", k, t, "", skRows(j ? 1 : 3), {open})).join(""));
   },
   // The Signing view as a project with its one key lands (nb-signing.js
-  // drawSigning): the head that names its node, the jump bar over its
-  // sections, the backup password, the default key, the apps and the
-  // releases.
+  // drawSigning) on a node that signs: the jump bar over its sections, the
+  // backup password, the default key, the apps and the releases. A node
+  // without the tools heads the view with why, which is not the common case.
   signing: () => {
     const sects = [["lock", "Backup password", 1], ["key:default", "Default key", 2], ["apps", "Apps", 1], ["releases", "Releases", 2]];
-    return skTpl(pageHead({cls: "sghead", facts: [["Node", GHOST]]})
-      + `<nav class="sectjump">${sects.map(([, t]) => `<a href="#">${esc(t)}</a>`).join("")}</nav>`
+    return skTpl(`<nav class="sectjump">${sects.map(([, t]) => `<a href="#">${esc(t)}</a>`).join("")}</nav>`
       + sects.map(([k, t, n]) => docSection("signing", k, t, "", skRows(n))).join(""));
   },
   // ...and the Version box above it, which the view fills on its own.

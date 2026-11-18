@@ -109,13 +109,19 @@ function nbGitView({$, nb, project}){
     const owner = git?.owner || "", notMine = !!owner && owner !== state?.me;
     return {owner, notMine, barred: notMine && !state?.admin};
   };
+  // The control row waits as it lands, the branch a shimmer and Fetch, Pull
+  // and Push in their places but inert (the markup's), until the read says
+  // which of them this tree and this role have; a read that fails takes the
+  // row away.
+  const rowGone = () => { $("gitNet").hidden = true; $("gitNet").inert = false; $("gitPicker").hidden = true; };
   function loadGit(){
     return reading(`${project}:git`, async () => {
       const hint = $("gitHint"), body = $("gitBody");
       try{
         git = await getJSON("/api/git?project=" + encodeURIComponent(project) + "&what=all&n=" + gitWant());
-      }catch(e){ viewGlance(hint, [], esc("git: " + e), "", "bad"); return; }
+      }catch(e){ rowGone(); viewGlance(hint, [], esc("git: " + e), "", "bad"); return; }
       if (git.error){
+        rowGone();
         const none = git.error === "not a git repository";
         viewGlance(hint, [], none ? "no repository yet" : esc("git: " + git.error), "", none ? "" : "bad");
         // The way on, where the dead end was: Init makes the repository here
@@ -168,6 +174,7 @@ function nbGitView({$, nb, project}){
       if (net){
         const locked = !!(state?.projects || []).find(p => p.name === project)?.locked_me;
         net.hidden = locked || !git.remote;
+        net.inert = false;
         // A role that only reads the project is shown none of them (the
         // operator, 21 Oct: what a role does not give is not drawn).
         const ro = !!projWriteWhy(project);
