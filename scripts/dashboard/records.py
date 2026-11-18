@@ -249,3 +249,36 @@ def apply_plan(doc, rows):
                 if k in st and (st.get(k) or "") != (old.get(k) or ""):
                     changes.append((row["id"], k, i, st.get(k) or ""))
     return changes, adds
+
+
+# ---- a design's names (design.py's, kept here for a node's aerie design) ----
+
+def design_slug(name):
+    """A color's or a theme's name as a CSS token: letters, digits and dashes."""
+    return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "color"
+
+
+def design_page_key(p):
+    """What a page's rules are addressed under: its key where it has one,
+    else its name as a slug, which is what it always was."""
+    return p.get("key") or design_slug(p["name"] or f"page-{p['id']}")
+
+
+def design_rules(rec):
+    """Every rule the design carries, with the theme's or the page's rules
+    named under it: `nostromo/hull` is the Nostromo theme's rule hull, and
+    `aerie design show nostromo/hull` reads it. [(name, rule, holder)].
+    Here rather than in design.py so a node's aerie design edit, whose
+    bundle carries this module and not that one, finds a rule by its name
+    (B934)."""
+    lang = rec["language"]
+    themes = lang["themes"]
+    # The default theme's rules are the design's, bare; the others' under
+    # their theme's slug.
+    out = [(r["name"], r, "") for r in (themes[0].get("rules") if themes else [])]
+    for t in themes[1:]:
+        out += [(f"{design_slug(t['name'])}/{r['name']}", r, f"the {t['name']} theme") for r in t.get("rules") or []]
+    for p in rec["pages"]:
+        out += [(f"{design_page_key(p)}/{r['name']}", r, p["name"] or f"page {p['id']}")
+                for r in p.get("rules") or []]
+    return out

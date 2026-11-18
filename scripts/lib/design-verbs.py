@@ -167,11 +167,10 @@ if verb == "edit":
     if not isinstance(r, dict) or r.get("error"):
         fail((r or {}).get("error") if isinstance(r, dict) else "the controller answered something that is not a design")
     rec = json.loads(str(r.get("text") or "{}"))
-    import design
-    rules = {n: rule for n, rule, _ in design.scoped_rules(rec)}
+    rules = {n: rule for n, rule, _ in records.design_rules(rec)}
     pages = {}
     for p in rec.get("pages") or []:
-        pages.setdefault(design.page_key(p), p)
+        pages.setdefault(records.design_page_key(p), p)
         pages.setdefault(str(p.get("name") or ""), p)
     if name in rules:
         holder, key, what = rules[name], "text", f"the rule {name}"

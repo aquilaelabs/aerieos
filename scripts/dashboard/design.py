@@ -33,6 +33,11 @@ from pathlib import Path
 
 import pending
 import statefile
+# A rule's and a page's names, which a node's aerie design edit reads too
+# (B934: a node's bundle carries records.py, not this).
+from records import design_page_key as page_key  # noqa: E402
+from records import design_rules as scoped_rules  # noqa: E402
+from records import design_slug as _slug  # noqa: E402
 
 WORKSPACE = None
 FILE = None
@@ -630,23 +635,6 @@ def _clean_rules(raw, whose):
     return rules
 
 
-def scoped_rules(rec):
-    """Every rule the design carries, with the theme's or the page's rules
-    named under it: `nostromo/hull` is the Nostromo theme's rule hull, and
-    `aerie design show nostromo/hull` reads it. [(name, rule, holder)]."""
-    lang = rec["language"]
-    themes = lang["themes"]
-    # The default theme's rules are the design's, bare; the others' under
-    # their theme's slug.
-    out = [(r["name"], r, "") for r in (themes[0].get("rules") if themes else [])]
-    for t in themes[1:]:
-        out += [(f"{_slug(t['name'])}/{r['name']}", r, f"the {t['name']} theme") for r in t.get("rules") or []]
-    for p in rec["pages"]:
-        out += [(f"{page_key(p)}/{r['name']}", r, p["name"] or f"page {p['id']}")
-                for r in p.get("rules") or []]
-    return out
-
-
 def saved(project):
     """The project's record when somebody saved one (the briefing's line),
     None when the design is still the default nobody touched. Asked of a
@@ -797,12 +785,6 @@ def _page_key(value, called):
         _bad(f"{called}'s key is {key!r}: a key is up to 24 lowercase letters, digits and dashes")
         return ""
     return key
-
-
-def page_key(p):
-    """What a page's rules are addressed under: its key where it has one,
-    else its name as a slug, which is what it always was."""
-    return p.get("key") or _slug(p["name"] or f"page-{p['id']}")
 
 
 def page_rows(p):
@@ -1060,11 +1042,6 @@ def _rule_lines(rules, head, scope, indent):
         on = "; ".join(x for x in [", ".join(r["paths"]), ", ".join(r["words"])] if x)
         out.append(f"{indent}  {scope}/{r['name']}: " + (f"{on} (`aerie design show {scope}/{r['name']}` reads it)" if on else r["text"]))
     return out
-
-
-def _slug(name):
-    """A color's name as a CSS token: letters, digits and dashes."""
-    return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "color"
 
 
 def _cap(text):
