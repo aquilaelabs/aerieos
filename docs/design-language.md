@@ -1109,6 +1109,12 @@ A list of things a person keeps (nginx's routes, hostnames and certificates, a n
 
 As built (Perch step 43, the operator 17 Nov): a record's Save writes that one record at once, its list sent with it changed, and a section's own Save is for its other fields alone (a node's stores; Also sees); a node's mounts are still put on the node by Apply storage. A record with nothing on it to edit (a hostname, a node a space also works on, a certificate) has its bin on its row and no Edit. A CI runner's Edit opens its token and labels with its actions: Remove at the form's left, Forget token, Cancel, and Install or Reinstall as its primary. In order: nginx's Routes, Hostnames and Certificates; a node's mounts, path mapping and runners; a space's Also reaches and Also works on.
 
+### pulldowns
+
+Applies to: scripts/dashboard/page-*.css, scripts/dashboard/tab-*.js, scripts/dashboard/nb-*.js, scripts/dashboard/page-*.js; pulldown, select, picker, dropdown
+
+A pulldown in a bar or a row of controls (a page's bar, a band over a list, a picker row, an add row, a grid cell of controls) is as wide as its longest answer and no wider (the operator, 18 Nov): it never grows into the room around it and a grid cell does not stretch it. Where its row runs short it shrinks, to a thumb's width (--tap) at least, its words clipped with an ellipsis; the controls rule's cap holds where a rule sets one. A form's field fills its cell (forms), and a group header's or a notebook's head sizes its own picker. One rule in page-overrides.css holds it, and uniform.mjs measures every such pulldown against its own width on every page.
+
 ## Pages
 
 Each page is a layout of labeled blocks on a frame, named for what it is for, on the platform it is built for.
