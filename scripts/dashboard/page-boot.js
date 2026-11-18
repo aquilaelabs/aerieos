@@ -17,6 +17,7 @@ function boot(){
   bootMenuHeld();
   bootTermWindow();
   bootMotion();
+  bootPickers();
   bootMoreMenus();
   bootPanes();
   bootDockDrag();
@@ -183,6 +184,17 @@ function bootTermWindow(){
 }
 
 // ---- motion ----------------------------------------------------------
+function bootPickers(){
+  // A pulldown in a bar or a row is as wide as its longest answer, where a
+  // base select is as wide as its chosen one (fitPickers, page-docs.js):
+  // measured as the page draws one, or shows one it had hidden. Not where
+  // the browser draws its own select, which is that wide already. Its own
+  // writes are its style and a data attribute, which nothing here watches.
+  if (!CSS.supports("appearance", "base-select")) return;
+  new MutationObserver(fitPickersSoon).observe(document.body,
+    {childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["hidden", "class", "open"]});
+  fitPickersSoon();
+}
 function bootMotion(){
   // FLIP, for both reorder surfaces: measure where the keyed elements sit,
   // let the caller do the (instant) DOM reorder, then play each element from

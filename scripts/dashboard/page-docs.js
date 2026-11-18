@@ -1200,6 +1200,43 @@ function tblTracks(cols){
 // attribute the page's wiring reads (data-dmview, data-vmview).
 const VIEW_ICON_CARDS = `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>`;
 const VIEW_ICON_LIST = `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 4h12M2 8h12M2 12h12"/></svg>`;
+// A pulldown in a bar or a row is as wide as its longest answer (the
+// operator, 18 Nov; page-overrides.css keeps it from stretching). A base
+// select (page-skin.css) is as wide as the answer chosen, so the width is
+// set here from what it measures: itself with its longest answer chosen
+// and nothing sizing it, then put back as it was, its choice and its style.
+// The canvas only says which answer is longest. Kept by its answers' words,
+// so it is measured again only when they change; one not on show waits for
+// its turn. A browser without base-select sizes a select by its longest
+// answer itself.
+const PICKERS = ":is(.docbarrow,.histbar,.actbar,.ctlrow,.ctlline,.lfilter,.rninvitebar,label.wkpick) select:not([multiple],[size]):not(:is(.fgrid,.setgrid,.setrow.col,.prefrow,.phead) select)";
+let pickFitDue = 0;
+let pickInk = null;
+function fitPickers(){
+  pickFitDue = 0;
+  pickInk = pickInk || document.createElement("canvas").getContext("2d");
+  for (const s of document.querySelectorAll(PICKERS)){
+    const words = [...s.options].map(o => o.label || o.textContent || "");
+    const key = words.join("\n");
+    if (!words.length || s.dataset.fitFor === key || !s.checkVisibility()) continue;
+    const cs = getComputedStyle(s);
+    pickInk.font = cs.font || `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    const ink = words.map(w => pickInk.measureText(w).width);
+    const longest = ink.indexOf(Math.max(...ink)), at = s.selectedIndex;
+    const was = s.getAttribute("style") || "";
+    s.style.cssText = `${was};width:auto;flex:none;max-width:none;min-width:0`;
+    s.selectedIndex = longest;
+    const w = s.getBoundingClientRect().width;
+    s.selectedIndex = at;
+    s.setAttribute("style", was);
+    s.style.width = `${Math.ceil(w)}px`;
+    s.dataset.fitFor = key;
+  }
+}
+// ...asked for on a draw, once a frame however many draws there were.
+function fitPickersSoon(){
+  if (!pickFitDue) pickFitDue = requestAnimationFrame(fitPickers);
+}
 function viewSeg(attr, cur, cardsSay, listSay, dead = "", words = ["Cards", "List"]){
   const b = (v, word, say, icon) => `<button type="button" data-${attr}="${v}" class="${cur === v ? "on" : ""}" aria-pressed="${cur === v}" title="${esc(word)}: ${esc(say)}" aria-label="${word}"${dead}>${icon}</button>`;
   return `<div class="pseg dmviewseg" role="group" aria-label="${esc(`${words[0]} or ${words[1]}`.toLowerCase())}">${

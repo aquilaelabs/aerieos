@@ -90,7 +90,9 @@ html[data-motion="reduce"] .pane .stack > .doc.leaving{visibility:hidden}
    stretched across its row with its words at one end): it never grows into
    the room around it, a grid cell no longer stretches it, and where its row
    runs short it shrinks to a thumb's width at least, its words clipped with
-   an ellipsis. The controls rule's cap still holds where a rule sets it. A
+   an ellipsis. Its width is set by fitPickers (page-docs.js), since a base
+   select is as wide as the answer chosen; here it is kept from growing.
+   The controls rule's cap still holds where a rule sets it. A
    form's field fills its cell (forms), so a form's grid and a settings row
    are left out; so is a group header's or a notebook's head, which size
    their own. Here, since the rules that stretched them sit in every layer

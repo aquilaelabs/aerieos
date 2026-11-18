@@ -741,20 +741,36 @@ function rowsWearTheClass(){
 }
 // A pulldown in a bar or a row is as wide as its longest answer and no wider
 // (the operator, 18 Nov: Sort and the wiki's page stretched across a phone):
-// each one on show measured against its own width with nothing stretching
-// it, which is the width of its longest option; narrower is its row running
-// short, which clips it, and is allowed. The selector is the overrides
-// layer's, so the check and the rule cannot drift apart.
-const PICKERS = ':is(.docbarrow,.histbar,.actbar,.ctlrow,.ctlline,.lfilter,.rninvitebar,label.wkpick) select:not([multiple],[size]):not(:is(.fgrid,.setgrid,.setrow.col,.prefrow,.phead) select)';
+// each one on show measured against itself with its longest answer chosen
+// and nothing sizing it, which is how wide its longest answer makes it. Wider
+// is stretched; narrower is allowed only where its row has no room left,
+// which clips it. The pulldowns are the page's own PICKERS (page-docs.js),
+// so the check and what sizes them cannot drift apart.
 function pickersFit(){
-  return page.evaluate(sel => [...document.querySelectorAll(`.doc.on ${sel}, .pane .bar ${sel}`)].filter(s => s.checkVisibility()).map(s => {
-    const was = s.getAttribute('style');
-    const w = s.getBoundingClientRect().width;
-    s.style.cssText += ';flex:none;width:auto;max-width:none;min-width:0;justify-self:start';
-    const own = s.getBoundingClientRect().width;
-    if (was === null) s.removeAttribute('style'); else s.setAttribute('style', was);
-    return w > own + 2 ? `${s.id || s.getAttribute('aria-label') || '?'} is ${Math.round(w)}px for ${Math.round(own)}px of answers` : '';
-  }).filter(Boolean), PICKERS);
+  return page.evaluate(() => {
+    const ink = document.createElement('canvas').getContext('2d');
+    return [...document.querySelectorAll(PICKERS)].filter(s => s.checkVisibility() && s.options.length && s.closest('.doc.on, .pane .bar')).map(s => {
+      const name = s.id || s.getAttribute('aria-label') || '?';
+      const w = s.getBoundingClientRect().width;
+      const style = s.getAttribute('style'), at = s.selectedIndex;
+      ink.font = getComputedStyle(s).font;
+      const words = [...s.options].map(o => o.label || o.textContent || '');
+      const longest = words.reduce((j, t, i) => ink.measureText(t).width > ink.measureText(words[j]).width ? i : j, 0);
+      s.selectedIndex = longest;
+      s.style.cssText = (style || '') + ';flex:none;width:auto;max-width:none;min-width:0;justify-self:start';
+      const own = s.getBoundingClientRect().width;
+      s.selectedIndex = at;
+      if (style === null) s.removeAttribute('style'); else s.setAttribute('style', style);
+      if (w > own + 3) return `${name} is ${Math.round(w)}px for ${Math.round(own)}px of its longest answer`;
+      if (w >= own - 3) return '';
+      // Short of it: only where the row it sits in had no more to give.
+      const row = s.parentElement, rs = getComputedStyle(row), kids = [...row.children].filter(k => k.checkVisibility());
+      const used = kids.reduce((n, k) => n + k.getBoundingClientRect().width, 0) + (parseFloat(rs.columnGap) || 0) * Math.max(0, kids.length - 1);
+      const free = row.getBoundingClientRect().width - parseFloat(rs.paddingLeft) - parseFloat(rs.paddingRight) - used;
+      return free > 3
+        ? `${name} is ${Math.round(w)}px, short of the ${Math.round(own)}px its longest answer needs, with ${Math.round(free)}px free beside it` : '';
+    }).filter(Boolean);
+  });
 }
 // The forms rule (the operator, 4 Nov: fields crammed together, each page its
 // own way): a label over its field, never beside it, and fields that do not

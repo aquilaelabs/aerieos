@@ -79,7 +79,7 @@ const SURFACE = [ 'adoptLayout', 'adoptMode', 'adoptMotion', 'applyMotion', 'ado
   'signinRev', 'signinCannot', 'signinBusy', 'signinBlock', 'wireSignin', 'openNodeClaude', 'signinCancel', 'claudeSigninFirst', 'claudeNodes', 'claudeEnd', 'modalTop', 'keepOpen', 'keepLine', 'pollRevsOnce', 'oneOpen', 'sectGroup', 'soleOpen', 'sectJump', 'topModal', 'modalOpened', 'modalClosed', 'modalFocusables', 'dismissModal', 'modalWayOut', 'backHold', 'backRelease', 'backPressed', 'hashGo', 'dmBackHold', 'dmBackLet', 'modalKeys', 'scrollHint', 'scrollHints', 'hintSoon',
   'nodeGpuSection', 'nodeSound', 'nodeInternet', 'ndOffLine', 'ndNotHereHtml', 'tcTickDots',
   'claudeNodeFacts', 'placeResumeMenu', 'resumeButton', 'closeResumeMenu', 'rmPut', 'rmTitle', 'pollRevs', 'restartSeen', 'restartKeep', 'restartKept', 'restartScrollTo', 'restartScrollBack', 'awayCalm', 'awaySay', 'awayQuiet', 'awayEnd', 'unsavedHere', 
-  'phoneWhy', 'dmBootLine', 'dmLanLine', 'nodePick', 'openRunnerTab', 'renderPhoneInto', 'renderRunnerInto', 'phoneRowPress', 'openPhoneLend', 'openProjectSettings', 'settingsInto', 'settingsOut', 'pushLayout', 'readLocalPanes', 'keepLocalPanes', 'quietFields', 'reapDeadTerminals',
+  'phoneWhy', 'dmBootLine', 'dmLanLine', 'nodePick', 'fitPickers', 'fitPickersSoon', 'openRunnerTab', 'renderPhoneInto', 'renderRunnerInto', 'phoneRowPress', 'openPhoneLend', 'openProjectSettings', 'settingsInto', 'settingsOut', 'pushLayout', 'readLocalPanes', 'keepLocalPanes', 'quietFields', 'reapDeadTerminals',
   'reattachTerminals', 'openFindingsTab', 'openJobsTab', 'openSchedulesTab', 'openDebugTab', 'debugGrant', 'renderDebugInto', 'wireDebug', 'loadSchedules', 'postSchedule', 'schedWhen', 'schedRow', 'schedForm', 'schedAs', 'openSchedForm', 'closeSchedForm', 'wireSchedForm', 'renderSchedulesInto', 'wireSchedules', 'openNodesTab', 'openSettingsTab', 'settingsKeep', 'settingsWake', 'loadReports', 'deleteReport', 'gitLanes', 'renderDiff',
   'openPhoneTab', 'phonePanel', 'wirePhoneTab',
   'openStorageTab', 'loadStorage', 'storageHeld', 'storageRow', 'andList', 'storageDisks', 'storageMachineDisks', 'movePools', 'moveLandOpts', 'moveMoverOpts', 'moveSaid', 'moveFields', 'moveRead', 'storageShares', 'wireStorageShares', 'storagePools', 'wireStoragePools', 'storageSnapshots', 'wireStorageSnapshots', 'storageArray', 'storageAdopt', 'arrayVerifyWord', 'wireStorageArray', 'storageOther', 'wireStorageOther', 'storageBackups', 'wireStorageBackups', 'storageProjects', 'storageBody', 'storagePick', 'renderStorageInto', 'wireStorageTab',
@@ -99,7 +99,7 @@ const SURFACE = [ 'adoptLayout', 'adoptMode', 'adoptMotion', 'applyMotion', 'ado
   // arrival, and boot()'s parts.
   'answerOf', 'boot', 'bootAway', 'bootContainerDialogs', 'bootCreating', 'bootDockDrag', 'bootDocs', 'bootDoctor',
   'bootFindings', 'bootFirstSession', 'bootKeys', 'bootLast', 'bootLogs', 'bootMarkup', 'bootMenuHeld',
-  'bootMoreMenus', 'bootMotion', 'bootNewProject', 'bootNotebooks', 'bootNotices', 'bootPanes',
+  'bootMoreMenus', 'bootMotion', 'bootPickers', 'bootNewProject', 'bootNotebooks', 'bootNotices', 'bootPanes',
   'bootProjectSettings', 'bootShell', 'bootTabs', 'bootTermWindow', 'bootWaits', 'bootWatches', 'bootWelcome',
   'chipsBack', 'dockerImagesRead', 'dockerStatsRead', 'drawHTML', 'drawn', 'getJSON', 'phLanded', 'phRead', 'phSend',
   'nodesKnown', 'postFile', 'pressHook', 'pressOf', 'pressQuiet', 'pressRun', 'pressTie', 'readFor', 'readMoved', 'readSettle',
