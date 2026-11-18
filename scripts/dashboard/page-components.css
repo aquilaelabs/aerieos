@@ -595,9 +595,20 @@ dialog.modal::backdrop{background:transparent;--sheen:none}
   display:flex;flex-direction:column}
 .box.sheet .sheetslot>*{display:block;flex:0 0 auto}
 .box.sheet .sheetslot>*:last-child{flex:1 1 auto}
+/* On a phone every dialog is the whole screen, a sheet as a log's is: the
+   box runs to the screen's edges with no page round it, its title at the
+   top, its foot at the bottom under the thumb however little it holds, and
+   what is between scrolls. The overlay keeps the screen's safe areas (a
+   notch, the home bar) and wears the box's color there, so the two read as
+   one surface. A part that takes the rest (a sheet's slot, About's page)
+   says so with a flex of its own; everything else keeps its height. */
 @media(max-width:900px){
-  .modal .box.sheet{width:100%;height:100%;max-height:none;
-    border:0;border-radius:0}
+  .modal:not(.inline){padding:env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);background:var(--panel)}
+  .modal:not(.inline)>.box{width:100%;height:100%;max-width:none;max-height:none;
+    border:0;border-radius:0;box-shadow:none;display:flex;flex-direction:column}
+  :where(.modal:not(.inline)>.box,.modal:not(.inline)>.box>.dlgbody)>*{flex:none}
+  .modal:not(.inline)>.box>.foot,.modal:not(.inline)>.box>.dlgbody>.foot{margin-top:auto}
 }
 .modal h3{margin:0;padding:var(--row-y) var(--row-x);border-bottom:var(--hair) solid var(--line);
   font:600 13px/1.2 system-ui,sans-serif;letter-spacing:.3px;text-transform:uppercase}

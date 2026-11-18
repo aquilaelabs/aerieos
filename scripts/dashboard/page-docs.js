@@ -1395,12 +1395,13 @@ function saveBar({save, revert, state = "", dead = false, cls = "", attrs = ""})
 // (the operator, 26 Oct): each pane is drawn in turn before a frame is
 // painted, and the box is held at the tallest, never past its own
 // max-height; what fills in later (a node list, a file read) scrolls inside
-// it rather than growing it. `show(key)` draws a pane; `cur` is the one to
-// leave on show. Returns the height held.
+// it rather than growing it. On a phone the box is the whole screen on
+// every pane, so nothing is held. `show(key)` draws a pane; `cur` is the one
+// to leave on show. Returns the height held.
 function holdPanes(box, keys, show, cur){
   if (!box) return 0;
   box.style.height = "";
-  if (keys.length < 2) return 0;
+  if (keys.length < 2 || isPhone()) return 0;
   let h = 0;
   for (const k of keys){ show(k); h = Math.max(h, box.getBoundingClientRect().height); }
   show(cur);

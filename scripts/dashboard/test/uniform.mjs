@@ -2941,11 +2941,11 @@ await section("a page opened as a dialog is put away stays open", async () => {
      `a page opened as a dialog is put away stays open, its address with it (${JSON.stringify(after)})`);
 });
 // ...and again on a small phone, where the room runs out first: every dialog
-// still scrolls in one place.
+// is the whole screen, its foot at the bottom, and still scrolls in one place.
 await section("and again on a small phone, where the room runs out first", async () => {
   const phone = await newPage(browser, { viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true });
   await phone.goto(URL); await ready(phone);
-  const twice = [];
+  const twice = [], short = [];
   for (const [name, open] of Object.entries(DIALOGS)) {
     await phone.evaluate(open);
     await phone.waitForFunction(() => [...document.querySelectorAll('.modal')].some(m => !m.hidden),
@@ -2954,8 +2954,20 @@ await section("and again on a small phone, where the room runs out first", async
     await settled(phone, { quiet: 250 });
     const d = await dialogShape(phone);
     if (d.nested) twice.push(`${name}: ${d.nested}`);
+    // Its box from edge to edge and top to bottom, and its foot's bottom the
+    // screen's, however little the dialog holds.
+    const fill = await phone.evaluate(() => {
+      const box = [...document.querySelectorAll('.modal:not(.inline)')].find(m => !m.hidden)?.querySelector('.box');
+      if (!box) return 'no dialog';
+      const r = box.getBoundingClientRect(), f = box.querySelector(':scope > .foot, :scope > .dlgbody > .foot')?.getBoundingClientRect();
+      const off = [r.left, r.top, innerWidth - r.right, innerHeight - r.bottom].map(Math.round);
+      return off.some(v => Math.abs(v) > 1) ? `box ${off.join(',')} in from the edges`
+        : f && Math.abs(Math.round(innerHeight - f.bottom)) > 1 ? `foot ${Math.round(innerHeight - f.bottom)}px over the bottom` : '';
+    });
+    if (fill) short.push(`${name}: ${fill}`);
     await phone.evaluate(() => { document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }); resumeFor = null; resumePick = null; });
   }
+  ok(short.length === 0, `on a 360px phone every dialog is the whole screen, its foot at the bottom${short.length ? ': ' + short.join(' | ') : ''}`);
   ok(twice.length === 0, `on a 360px phone every dialog scrolls in one place${twice.length ? ': ' + twice.join(' | ') : ''}`);
   await phone.close();
 });

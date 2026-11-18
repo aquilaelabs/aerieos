@@ -1473,9 +1473,15 @@ to what opened it. A dialog holding something shown once (Enroll's
 one-time token) is marked `data-keep-stray`: a press around it and Back
 pass it by, and Escape or its own Done puts it away.
 
-A dialog is the size of what it holds: a reader's full height (About's
-guide, a conversation) is for something to read, and the same box with
-one line in it (a conversation with nothing said) is that line's size.
+At a desk a dialog is the size of what it holds: a reader's full height
+(About's guide, a conversation) is for something to read, and the same box
+with one line in it (a conversation with nothing said) is that line's size.
+On a phone every dialog is the whole screen, as a log's sheet is (the
+operator, 18 Nov): the box runs to the screen's edges with no page round
+it, its title at the top and its foot at the bottom under the thumb
+however little it holds, and what is between scrolls; the overlay keeps
+the safe areas (a notch, the home bar) in the box's color. With no page
+showing round it, its way out there is its foot, Escape and Back.
 Its title shows wherever the dialog sits, a notebook's sheet included;
 uniform holds a title that stands first and shows, and the dialog walk
 (every dialog at 393 and 1440, on contact sheets) is how a pass over them

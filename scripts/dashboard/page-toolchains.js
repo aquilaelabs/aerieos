@@ -458,7 +458,9 @@ function tpDraw(first){
   m.hidden = false;
   if (first){
     tpHeld = 0;
-    if (m.querySelector("[data-tpfrom]")){
+    // On a phone the box is the whole screen whatever From is chosen, so
+    // nothing is held.
+    if (m.querySelector("[data-tpfrom]") && !isPhone()){
       const was = tpForm.from;
       let h = 0;
       for (const k of [...m.querySelectorAll("[data-tpfrom]")].map(x => x.dataset.tpfrom)){
