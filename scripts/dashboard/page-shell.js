@@ -621,7 +621,8 @@ function groupHeader(t, g){
   // The containers' pages leave the own machine out, so on a machine alone
   // there is no other node to show them for.
   const ownHere = state?.bare_metal && (nodesList || []).some(x => x.config?.own && x.state !== "retired");
-  const pick = live.length ? nodePick("ndPick", live.map(x => ({id: x.id, name: x.config?.own ? `${x.name} (this machine)` : x.name, live: x.live})), cur) : `<span class="pname">${ownHere ? "No other node yet" : "No node yet"}</span>`;
+  const pick = live.length ? nodePick("ndPick", live.map(x => ({id: x.id, name: x.config?.own ? `${x.name} (this machine)` : x.name, live: x.live})), cur,
+    undefined, {stated: !!pill}) : `<span class="pname">${ownHere ? "No other node yet" : "No node yet"}</span>`;
   return `<span class="phead mchead">${pick}${pill}<span class="sp"></span></span>`;
 }
 // A node's own page from anywhere: Machines' Nodes on it, the group's

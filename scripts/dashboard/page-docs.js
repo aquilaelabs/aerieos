@@ -30,17 +30,21 @@
 // the same label, the same place (the bar's left, verbs at its right) and the
 // same list on Toolchains, the Emulator, the Phone and the CI runner. A node
 // that cannot be picked for this tab says why in its option, and a quiet one
-// says so. `why(n)` is "" for one that can.
+// says so. `why(n)` is "" for one that can. `stated`: the page says the
+// node's state beside the picker (a group header's pill), so the node on
+// show is its name alone there, where "draconis (qui..." was cut off beside
+// a pill already saying NOT ANSWERING (the operator, 18 Nov); the others in
+// the list still say so, which is where it helps the choice.
 // `nodes` null is the page's placeholder (R218, the operator 18 Oct: a
 // placeholder drawn by the page's own code, so it cannot drift from it):
 // the same label and word, the picker's box shimmering.
-function nodePick(id, nodes, cur, why = () => ""){
+function nodePick(id, nodes, cur, why = () => "", {stated = false} = {}){
   if (nodes === null) return `<label class="pick nodepick"><span class="pickw">Node</span> ${skv(7, "ctl")}</label>`;
   if (!nodes.length) return "";
   return `<label class="pick nodepick"><span class="pickw">Node</span> <select id="${esc(id)}" aria-label="node">${nodes.map(n => {
     const w = why(n);
     return `<option value="${esc(n.id)}"${n.id === cur ? " selected" : ""}${w ? " disabled" : ""}>${esc(n.name)}${
-      w ? `: ${esc(w)}` : n.live === false ? " (quiet)" : ""}</option>`;
+      w ? `: ${esc(w)}` : n.live === false && !(stated && n.id === cur) ? " (quiet)" : ""}</option>`;
   }).join("")}</select></label>`;
 }
 

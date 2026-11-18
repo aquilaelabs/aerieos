@@ -478,6 +478,31 @@ m._exec("UPDATE nodes SET agent = ? WHERE id = ?", (json.dumps(ag), "${added.id}
 });
 
 // ---- phase 2: the docker manager's picker ----------------------------------
+// A group header says its node's state as a pill beside the picker, so the
+// node on show is its name alone in the picker (the operator, 18 Nov:
+// "draconis (qui..." beside NOT ANSWERING); the others in its list still say
+// they are quiet, where it helps the choice, and a picker with no pill says
+// it for every node.
+await section("a group header's picker leaves the quiet word to its pill", async () => {
+  await page.evaluate(() => openNodesTab());
+  await page.waitForSelector('.pane .bar #ndPick', { timeout: 15000 });
+  const opts = await page.evaluate(() => {
+    const nodes = [{ id: 'a', name: 'draconis', live: false }, { id: 'b', name: 'vega', live: false }];
+    const read = html => { const d = document.createElement('div'); d.innerHTML = html; return d; };
+    const names = d => [...d.querySelectorAll('option')].map(o => o.textContent).join('|');
+    // The Nodes page's own header drawn with its node gone quiet, and put
+    // back as it was.
+    const t = tabOf(panes[0]), cur = groupNode(groupOf(t.kind), t.kind), n = nodesList.find(x => x.id === cur);
+    const was = n.live, kind = n.kind;
+    n.live = false; n.kind = 'agent';
+    const head = read(groupHeader(t, groupOf(t.kind)));
+    n.live = was; n.kind = kind;
+    return { stated: names(read(nodePick('x', nodes, 'a', undefined, { stated: true }))), plain: names(read(nodePick('x', nodes, 'a'))),
+             picked: head.querySelector('#ndPick')?.selectedOptions[0]?.textContent || '', pill: head.querySelector('.ndstate')?.textContent.trim() || '' };
+  });
+  ok(opts.stated === 'draconis|vega (quiet)' && opts.plain === 'draconis (quiet)|vega (quiet)' && !/quiet/.test(opts.picked) && /not answering/.test(opts.pill),
+     `a group header's picker names its node alone beside the pill, the others quiet as they are (${JSON.stringify(opts)})`);
+});
 await section("phase 2: the docker manager's picker", async () => {
   // Opened with the node list DELIBERATELY not loaded, because that is the
   // state a fresh page is in: the picker is drawn from that list, and the
