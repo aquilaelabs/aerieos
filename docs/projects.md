@@ -181,15 +181,15 @@ itself opens nothing. A space with no repository yet says so, and its
 Start agent waits for one.
 
 **Edit** turns the card over in place, to its **back**, the same size as the
-front: the space's name with a pencil to rename it; each repository with
-icons for a **shell** in it, its **git host** (linking it, or the host's
-settings once linked), lending it **your phone** when your phone is
-connected on its node, **rename**, **move** to another space and
-**delete**; and along the foot one line of icons, each named when hovered:
-**Color**, **Group**, **Lock** (its owner's or an administrator's), **Report
-bug** (which repository it is about, the first unless you pick another) and
-**Settings**. **Done** turns it back. Each face's buttons are one line, and
-there is no menu on a card.
+front: the space's name with a pencil to rename it and **Settings**, a gear,
+at the top right where Edit stood; each repository with icons for a
+**shell** in it, its **git host** (linking it, or the host's settings once
+linked), lending it **your phone** when your phone is connected on its node,
+**rename**, **move** to another space and **delete**; and along the foot one
+line of icons, each named when hovered: **Color**, **Group**, **Lock** (its
+owner's or an administrator's), **Report bug** (which repository it is
+about, the first unless you pick another) and, last, **Back**, which turns
+it back. Each face's buttons are one line, and there is no menu on a card.
 
 A repository's own page keeps **Start agent**, **Shell** and a menu in its
 header (link, phone, report, archive, lock, pin, settings). **Color** is your

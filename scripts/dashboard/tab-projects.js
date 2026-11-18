@@ -259,11 +259,14 @@ function cardBack(c){
     c.may_lock ? fb("data-lock", c.key, lockLabel(c), c.locked ? LOCK : LOCK_OPEN, ` data-on="${c.locked ? "0" : "1"}" aria-pressed="${!!c.locked}"`) : "",
     // No bug tracker on a project with no repository (R208).
     first && first.mine !== false && !first.work ? fb("data-bug", first.name, "Report bug", BUG) : "",
-    first ? fb("data-rn", first.name, "Settings", GEAR) : "",
     may && !c.rows.length ? fb("data-pdel", c.key, "Delete space", BIN, ' data-danger="1"') : "",
+    // Back to the front, the last of the row's icons; Settings is the gear
+    // at the top right, where the front's Edit stands (the operator, 18 Nov:
+    // the gear and Back trade places).
+    fb("data-pedit", c.key, "Back to the front", ICON_BACK, ' aria-expanded="true"'),
   ].filter(Boolean).join("");
   return `<div class="pcname"><span class="name">${esc(c.name)}</span>${may ? ic("data-prn", c.key, `Rename ${c.name}`, PENCIL) : ""}
-      <span class="sp"></span><span class="actbar"><button type="button" data-pedit="${esc(c.key)}" aria-expanded="true">Back</button></span></div>
+      <span class="sp"></span><span class="actbar">${first ? fb("data-rn", first.name, "Settings", GEAR) : ""}</span></div>
     <div class="pcrepos">${rows || `<div class="pnote dim">no repository yet</div>`}</div>
     <div class="pcacts actbar pcfoot">${foot}</div>`;
 }
@@ -526,8 +529,30 @@ function wireProjectCards(grid){
   grid.querySelectorAll("[data-pdel]").forEach(b => b.onclick = () => deleteProjectCard(b.dataset.pdel));
   grid.querySelectorAll("[data-pmark]").forEach(b => b.onclick = () => setProjectPinned(b.dataset.pmark, b.dataset.on === "1"));
   // In the compact view a card's name opens it and folds the one open, or
-  // folds it again; a press anywhere on a folded card opens it too.
-  const openCard = key => { pjOpen = pjOpen === key ? "" : key; drawProjects(state.projects); };
+  // folds it again; a press anywhere on a folded card opens it too. The one
+  // opened grows from its name to its whole height and the one folded
+  // shrinks back, as a row on the Containers page slides open (the
+  // operator, 18 Nov): each measured before the draw and after it.
+  const openCard = key => {
+    const moving = [...new Set([pjOpen, key])].filter(Boolean);
+    const cardOf = k => document.querySelector(`.pane .doc.on .projtab .pcard[data-pkey="${CSS.escape(k)}"]`);
+    const was = new Map(moving.map(k => [k, cardOf(k)?.getBoundingClientRect().height || 0]));
+    pjOpen = pjOpen === key ? "" : key;
+    drawProjects(state.projects);
+    if (noMotion()) return;
+    for (const k of moving){
+      // A tween still running from the press before (a second press while
+      // the first card grew) holds the height where it is: measured under
+      // it, where it was and where it goes read the same and nothing moved.
+      // It is cancelled and this one starts from where the card was seen.
+      const c = cardOf(k), from = was.get(k);
+      c?.getAnimations().filter(an => JSON.stringify(an.effect?.getKeyframes?.() || []).includes('"height"')).forEach(an => an.cancel());
+      const to = c?.getBoundingClientRect().height || 0;
+      if (!c || !from || Math.abs(from - to) < 2) continue;
+      c.animate([{height: `${from}px`, overflow: "hidden"}, {height: `${to}px`, overflow: "hidden"}],
+                {duration: 220, easing: "cubic-bezier(.2,.7,.2,1)"});
+    }
+  };
   grid.querySelectorAll("[data-pjopen]").forEach(b => b.onclick = () => openCard(b.dataset.pjopen));
   const openFolded = e => { if (!e.target.closest("button, a, input, select, textarea")) openCard(e.currentTarget.dataset.pkey); };
   grid.querySelectorAll(".pcard[data-pkey]").forEach(c => { c.onclick = c.classList.contains("compact") ? openFolded : null; });
@@ -566,7 +591,9 @@ function renderProjectsInto(i){
       try{ localStorage.setItem("bb.pjview", pjView); }catch(e){ /* private mode */ }
       el.querySelectorAll("[data-pjview]").forEach(x => {
         x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", String(x === b)); });
-      renderProjectsInto(i);
+      // ...the cards faded through the change, as the Containers page's
+      // Full and Compact are (the operator, 18 Nov).
+      fadeThrough(".pane .doc.on .projtab #pjGrid .pcard[data-pkey]", () => renderProjectsInto(i));
     });
   }
   const grid = el.querySelector("#pjGrid");

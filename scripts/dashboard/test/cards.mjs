@@ -578,7 +578,7 @@ await section("a project's card on the Projects page, at a phone and at a desk",
   // The back's foot is one line of icons, each named (the operator, 25 Oct).
   const foot = await page.$$eval(`${card} .pcback .pcacts > button`, bs => ({
     names: bs.map(b => b.getAttribute('aria-label')), tops: new Set(bs.map(b => Math.round(b.getBoundingClientRect().top))).size }));
-  ok(foot.tops === 1 && ['Color', 'Group', 'Report bug', 'Settings'].every(n => foot.names.includes(n)),
+  ok(foot.tops === 1 && ['Color', 'Group', 'Report bug', 'Back to the front'].every(n => foot.names.includes(n)) && !foot.names.includes('Settings'),
      `the back's controls are one line of named icons (${JSON.stringify(foot)})`);
   // A box opening on the back fades in by itself, with no copy of the face
   // fading out over it: the card's ground showed between the two, a flicker
@@ -1660,6 +1660,21 @@ await section("Full and Compact on the Spaces page", async () => {
   // Every card on its face first: one turned over to its controls stays
   // open in the compact view, as it should, and is not what is measured.
   await page.evaluate(() => { pjEditing.clear(); drawProjects(state.projects); });
+  // What moves as it changes, recorded as the page asks for it: each
+  // card's height tween, and the switch's fade through (the operator, 18
+  // Nov: animated, as the Containers page's are).
+  await page.evaluate(() => {
+    window.__pjMoves = []; window.__pjFades = 0;
+    const animate = Element.prototype.animate;
+    Element.prototype.__pjWas = animate;
+    Element.prototype.animate = function(k, o){
+      if (this.dataset?.pkey && Array.isArray(k) && k[0] && 'height' in k[0]) window.__pjMoves.push(`${this.dataset.pkey}:${k[0].height}>${k[k.length - 1].height}`);
+      return animate.call(this, k, o);
+    };
+    const fade = fadeThrough;
+    window.__pjFadeWas = fade;
+    fadeThrough = (pick, swap) => { if (/projtab/.test(String(pick))) window.__pjFades++; return fade(pick, swap); };
+  });
   await page.click('.doc .projtab [data-pjview="list"]');
   await page.waitForFunction(() => [...document.querySelectorAll('.doc .projtab #pjGrid .pcard[data-pkey]')].every(c => c.classList.contains('compact')),
     null, { timeout: 8000 }).catch(() => {});
@@ -1677,6 +1692,16 @@ await section("Full and Compact on the Spaces page", async () => {
   await page.click('.doc .projtab [data-pjview="cards"]');
   await openIs(await page.$$eval('.doc .projtab #pjGrid .pcard[data-pkey]', cs => cs.map(c => c.dataset.pkey).join()));
   const full = await look();
+  const moved = await page.evaluate(() => {
+    const out = { moves: window.__pjMoves, fades: window.__pjFades };
+    Element.prototype.animate = Element.prototype.__pjWas; delete Element.prototype.__pjWas;
+    fadeThrough = window.__pjFadeWas;
+    return out;
+  });
+  const grew = (k, up) => moved.moves.some(m => { const [key, h] = m.split(':'); const [a, b] = h.split('>').map(parseFloat);
+    return key === k && (up ? b > a : b < a); });
+  ok(moved.fades === 2 && grew(k1, true) && grew(k2, true) && grew(k1, false),
+     `...each animated as the Containers page's are: the switch fades the cards through, a card opened grows from its name and the one it folds shrinks (${JSON.stringify(moved)})`);
   ok(seg.join() === 'Full,Compact' && folded.n > 1 && folded.folded === folded.n,
      `Compact beside Full folds every space's card to its name line (${JSON.stringify({ seg, folded })})`);
   ok(one.open.join() === k1 && two.open.join() === k2 && full.open.length === full.n,
@@ -2350,24 +2375,23 @@ await page.waitForFunction(() => document.querySelector('.doc .projtab [data-row
 const kept = await page.evaluate(() => { const p = state.projects.find(x => x.name === 'alpha'); return { mine: p.color, project: p.prefs?.color || '' }; });
 ok(kept.mine === 'teal' && kept.project === '' && !await page.$('.doc .projtab [data-row="alpha"] .pcpop'),
    `a pick wears it on the card at once and rolls the swatches up, kept as this account's and not the space's (${JSON.stringify(kept)})`);
-// Back turns the card over without saving anything, so it is no primary,
-// and wears the card's color as the front's buttons do.
-const back = await page.$eval('.doc .projtab [data-row="alpha"] .pcback [data-pedit]', b => {
-  const edit = b.closest('.pcard').querySelector('.pcfront [data-pedit]');
-  return { text: b.textContent.trim(), primary: b.classList.contains('primary'),
-           bg: getComputedStyle(b).backgroundColor, front: getComputedStyle(edit).backgroundColor,
-           plain: getComputedStyle(document.querySelector('.doc .projtab [data-row]:not(.pc) .pcfront [data-pedit]')).backgroundColor };
-});
-ok(back.text === 'Back' && !back.primary && back.bg === back.front && back.bg !== back.plain,
-   `a colored card's Back is a plain button in the card's color, as its Edit is (${JSON.stringify(back)})`);
-// A long name wraps on the back with Back held at the card's top right
-// (the operator, 26 Oct: it pushed Back onto a line of its own).
+// Settings is the gear at the back's top right, where the front's Edit
+// stands, and Back, which turns the card over saving nothing, is the last of
+// the foot's icons and no primary (the operator, 18 Nov: the two traded).
+const back = await page.$eval('.doc .projtab [data-row="alpha"] .pcback', b => ({
+  top: b.querySelector('.pcname .actbar [data-rn]')?.getAttribute('aria-label') || '',
+  foot: [...b.querySelectorAll('.pcfoot > button')].map(x => x.dataset.pedit !== undefined ? 'Back' : x.getAttribute('aria-label')),
+  primary: !!b.querySelector('.pcfoot [data-pedit].primary') }));
+ok(back.top === 'Settings' && back.foot.at(-1) === 'Back' && !back.foot.includes('Settings') && !back.primary,
+   `a card's back has Settings at its top right and Back last in its foot (${JSON.stringify(back)})`);
+// A long name wraps on the back with its Settings held at the card's top
+// right (the operator, 26 Oct: it pushed the button onto a line of its own).
 for (const w of [1280, 393]){
   await page.setViewportSize({ width: w, height: 900 });
   const line = await page.evaluate(() => {
     const p = state.projects.find(x => x.name === 'alpha'), key = reposOf('alpha') || 'alpha', was = state.repos[key].name;
     state.repos[key].name = 'Destiny-2-Armor-Stat-Planner-with-a-longer-name-still'; drawProjects(state.projects);
-    const c = document.querySelector('.doc .projtab .pcard[data-row="alpha"]'), back = c.querySelector('.pcback .pcname [data-pedit]');
+    const c = document.querySelector('.doc .projtab .pcard[data-row="alpha"]'), back = c.querySelector('.pcback .pcname [data-rn]');
     const name = c.querySelector('.pcback .pcname .name'), cr = c.getBoundingClientRect(), br = back.getBoundingClientRect(), nr = name.getBoundingClientRect();
     const out = { top: Math.round(br.top - cr.top), right: Math.round(cr.right - br.right), wraps: nr.height > 30, beside: nr.right <= br.left,
                   rowTop: Math.abs(nr.top - br.top) < 12 };
@@ -2381,7 +2405,7 @@ for (const w of [1280, 393]){
     return out;
   });
   ok(line.top < 40 && line.right < 40 && line.wraps && line.beside && line.rowTop && line.marks,
-     `a long name wraps beside Back, which stays at the card's top right, and beside pin and archive on the front, at ${w} (${JSON.stringify(line)})`);
+     `a long name wraps beside Settings, which stays at the card's top right, and beside the marks on the front, at ${w} (${JSON.stringify(line)})`);
 }
 await page.setViewportSize({ width: 1280, height: 800 });
 // One card on its back at a time (the operator, 26 Oct): Edit on another
