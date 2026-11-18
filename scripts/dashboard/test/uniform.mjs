@@ -2892,7 +2892,7 @@ await page.evaluate(() => document.getElementById('dlgProbe')?.remove());
 // entry is given back after it closes, and a page pushed meanwhile was
 // undone by that give-back (cards.mjs, 18 Nov: Settings canceled, then a
 // notebook's Signing opened, and the page went back to Spaces).
-{
+await section("a page opened as a dialog is put away stays open", async () => {
   await page.evaluate(() => { location.hash = '#/home'; });
   await page.waitForFunction(() => location.hash === '#/home', null, { timeout: 5000 }).catch(() => {});
   await page.evaluate(() => openAbout());
@@ -2904,7 +2904,7 @@ await page.evaluate(() => document.getElementById('dlgProbe')?.remove());
   const after = await page.evaluate(() => ({ hash: location.hash, kind: tabOf(panes[0])?.kind || '', dlg: history.state?.dlg || 0 }));
   ok(/^#\/jobs/.test(after.hash) && after.kind === 'jobs' && !after.dlg,
      `a page opened as a dialog is put away stays open, its address with it (${JSON.stringify(after)})`);
-}
+});
 // ...and again on a small phone, where the room runs out first: every dialog
 // still scrolls in one place.
 await section("and again on a small phone, where the room runs out first", async () => {
