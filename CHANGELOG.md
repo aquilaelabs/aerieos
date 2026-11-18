@@ -12,6 +12,7 @@
 - The Spaces page has Full and Compact beside its search, as the Containers page has Cards and List: Compact folds every space's card to its name, a press opens one, and opening another folds the one open; your browser keeps the choice (2883407)
 - aerie map show NAME prints a definition whole, headed by where it is and its comment, and FILE:LINE the one holding that line (1cf46c9)
 - aerie design edit NAME changes one design rule or one page's notes in place and prints what changed, and --file writes docs/design-language.md with it (1cf46c9)
+- Pack format 4: a Docker app's manifest declares its own fields (fields: each the variable it fills, its label, its kind, a folder, a port, a line of text, a secret made for it, a choice or a switch, with a default and a line of help), in place of the six blanks every app shared; an app on the machine's own network says so (network: host), and one being replaced says what to install in its place (going). The catalog can hold apps written so for this AerieOS and every later one (d41d0ea)
 
 ### Changed
 
@@ -85,6 +86,9 @@
 - Every notebook view waits in the shape it lands in: the tiles it mostly draws, its status line on its row and its buttons under the tiles, where a view waited with extra tiles and its buttons beside them; Signing waits as its sections, not plain rows (a2e4bf4)
 - A node picker beside its state's pill names the node alone, where a quiet one read "draconis (quiet)" beside a pill saying Not answering, cut short on a phone (2e9ce87)
 - A pulldown in a bar or a row of controls is as wide as its longest answer, where several stretched across their row; it clips its words with an ellipsis where the row runs short (4fda6c4)
+- New container from the Library draws the app's own panel over the rest of the dialog: its icon, its name and who it is by, then the fields it declares (Immich asks for its photos and videos and its database's folder, Nextcloud for its files, its admin account and their passwords), then who it runs as, the time zone as a pulldown and its port where its compose reads them. A folder suggests each of the node's pools and shares, a secret is made for it once and kept on every later edit, and a port something on the node already answers on is refused. The panel owns those values: the compose file shows as the app wrote it, read-only, the Environment tab holds only the other variables and refuses one the panel sets by name, and Edit the definition by hand, said first, leaves the app for good. Fill the definition in is gone (d41d0ea)
+- A container made from an app keeps which app it came from, and its row's press under More reads Configure (it read Compose and env): it opens the same panel with each value read back from the container's environment, and offers a newer definition of the app the Library has kept since. Upgrading: /config moves to state 26, so a build from before this one no longer starts on it; a container made before keeps its Compose and env (d41d0ea)
+- Home Assistant from the Library runs on the machine's own network and is no longer privileged: it still finds the devices around it and reaches Bluetooth through the machine's dbus; a USB radio needs its device passed by hand for now. The arr stack is marked going: Sonarr, Radarr and Prowlarr come as an app each, and a stack made from it keeps running (d41d0ea)
 
 ### Fixed
 
