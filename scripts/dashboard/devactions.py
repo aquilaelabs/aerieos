@@ -976,6 +976,11 @@ def _remove_records(project, instance):
     if devapp.is_file_source(project, instance):
         devapp.forget_container(project)
         devapp._bump()
+        # ...and a key of its own at a model router goes with it (R238 step
+        # 7), asked behind the remove: one the router misses goes at its
+        # next spend read.
+        import router
+        threading.Thread(target=router.drop_container, args=(project,), daemon=True).start()
         return
     with devapp._lock:
         d = devapp._load()

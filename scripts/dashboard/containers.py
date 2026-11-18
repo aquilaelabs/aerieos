@@ -399,22 +399,31 @@ def app_of(name):
     return d if isinstance(d, dict) and d.get("id") and isinstance(d.get("fields"), list) else None
 
 
-def app_made(req, a, node="", keep=None):
+def app_made(req, a, node="", keep=None, name=""):
     """An app's compose file and environment from what its panel sent:
-    {compose, env, app} or {error}. `a` is the app as the Library holds it
-    or as a container kept it; `keep` the container's values on an edit,
-    so a secret is made once and a port it holds is its own."""
+    {compose, env, app, routers} or {error}. `a` is the app as the Library
+    holds it or as a container kept it; `keep` the container's values on an
+    edit, so a secret is made once and a port it holds is its own; `name`
+    the container's, whose own key a router field takes at the router
+    picked (R238 step 7), `routers` the nodes whose routers it uses."""
     import nasapps
+    import router
     extra, why = nasapps.extra_env(a, req.get("env"))
     if why:
         return {"error": why}
-    r = nasapps.render_with(a, req.get("values"), field(req, "ids") or "1000:1000", field(req, "tz") or "UTC", req.get("port"), keep)
+    used = set()
+
+    def at(v):
+        nid = router.which(v) if str(v).startswith("http") else str(v)
+        used.add(nid)
+        return router.container_key(nid, devapp._slug(name), "")
+    r = nasapps.render_with(a, req.get("values"), field(req, "ids") or "1000:1000", field(req, "tz") or "UTC", req.get("port"), keep, router=at)
     if r.get("error"):
         return r
     busy = nasapps.ports_taken(a, r["values"], node, keep)
     if busy:
         return {"error": f"port {busy[0]} is taken on that node already: pick another for {a.get('name') or 'the app'}"}
-    return {"compose": a.get("compose") or "", "env": r["env"] + extra, "app": nasapps.snapshot(a)}
+    return {"compose": a.get("compose") or "", "env": r["env"] + extra, "app": nasapps.snapshot(a), "routers": sorted(used)}
 
 
 def app_view(name, env_text):
@@ -426,8 +435,13 @@ def app_view(name, env_text):
     snap = app_of(name)
     if not snap:
         return None
+    import router
     vals = nasapps.env_values(env_text)
-    mine = {f["var"] for f in snap["fields"]} | set(snap.get("own") or [])
+    mine = {v for f in snap["fields"] for v in (f["var"], f.get("key")) if v} | set(snap.get("own") or [])
+    # A router field reads back as the node whose router its address is.
+    for f in snap["fields"]:
+        if f.get("kind") == "router" and vals.get(f["var"]):
+            vals[f["var"]] = router.which(vals[f["var"]]) or ""
     extra = [ln for ln in str(env_text or "").splitlines() if ln.strip() and ln.partition("=")[0].strip() not in mine]
     now = next((a for a in nasapps.catalog() if a["id"] == snap["id"]), None)
     # Newer: kept from another pin since, and its file or its fields differ.
@@ -783,13 +797,17 @@ def tab_verb(act, name, req, seen):
             a = next((x for x in nasapps.catalog() if x["id"] == snap["id"]), None) if req.get("newer") else snap
             if not a:
                 return {"error": f"{snap.get('name') or snap['id']} is not in the Library any more: its newer definition cannot be taken"}, 400
-            made = app_made(req, {**a, "compose": a.get("compose") or _compose_of(name)}, devapp._instance_node(name, devapp.MAIN), kept)
+            made = app_made(req, {**a, "compose": a.get("compose") or _compose_of(name)}, devapp._instance_node(name, devapp.MAIN), kept, name)
             if made.get("error"):
                 return made, 400
             compose, env = made["compose"], made["env"]
         r = update_container(name, compose, env)
         if snap and not r.get("error") and (req.get("by_hand") or req.get("newer")):
             keep_app(name, None if req.get("by_hand") else made.get("app"))
+        # A router it no longer uses lets go of its key (R238 step 7).
+        if snap and not r.get("error") and not req.get("by_hand"):
+            import router
+            router.drop_container(name, keep=made.get("routers") or ())
         # ...and a new name with it, while it is down (rename_container):
         # the file is saved first, so what was typed is kept either way.
         new = field(req, "rename")
@@ -823,11 +841,21 @@ def tab_verb(act, name, req, seen):
         a = next((x for x in nasapps.catalog() if x["id"] == field(req, "app")), None)
         if not a:
             return {"error": f"no app called {field(req, 'app')} in the Library"}, 400
-        made = app_made(req, a, field(req, "node"))
+        # A name already taken is refused before a router makes it a key:
+        # its key is the container that has the name.
+        with devapp._lock:
+            taken = name_free(devapp._slug(name)) if devapp._slug(name) else ""
+        if taken:
+            return {"error": taken}, 400
+        made = app_made(req, a, field(req, "node"), name=name)
         if made.get("error"):
             return made, 400
         compose, env, app = made["compose"], made["env"], made["app"]
     r = create_container(name, compose, env, field(req, "node"), under, app=app)
+    # Refused after a router made it a key: the key goes again.
+    if r.get("error") and app:
+        import router
+        router.drop_container(devapp._slug(name))
     # Made for a project: its sessions may reach it (R79).
     if not r.get("error") and under:
         net_nudge()

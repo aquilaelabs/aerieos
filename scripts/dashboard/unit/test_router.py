@@ -200,6 +200,39 @@ class Router(unittest.TestCase):
         signing.PREVIOUS = None
         self.assertIn("ANTHROPIC_API_KEY: \"sk-ant-old\"", router.compose_text("n1", router.record("n1")), "opened by the previous key, sealed again under today's")
 
+    def test_a_container_s_own_key_is_made_kept_read_back_and_dropped(self):
+        """R238 step 7: an app's router field takes a key of the container's
+        own, made once at the router, found again by its address, deleted
+        with the container, and counted in the router's spend."""
+        self.assertIn("not deployed", router.container_key("n1", "paperclip")["error"])
+        self.assertEqual(router.routers(), [])
+        router.set_keys("n1", {"providers": {"anthropic": "sk-a"}})
+        with router._lock:
+            d = router._load()
+            d["n1"].update(port=self.port, deployed=True)
+            router._save(d)
+        self.assertEqual(router.routers(), [{"node": "n1", "name": "GPU Box"}])
+        got = router.container_key("n1", "paperclip", "ann")
+        self.assertEqual(got, {"url": f"http://127.0.0.1:{self.port}", "key": "sk-proj-builderbot-container-paperclip"})
+        self.assertNotIn("sk-proj-builderbot-container-paperclip", open(os.path.join(self.tmp, "router.json")).read(), "kept sealed")
+        made = len([x for x in FakeLiteLLM.seen if x[0] == "/key/generate"])
+        self.assertEqual(router.container_key("n1", "paperclip")["key"], got["key"])
+        self.assertEqual(len([x for x in FakeLiteLLM.seen if x[0] == "/key/generate"]), made, "asked again, the key it has: none made")
+        self.assertEqual(router.which(got["url"] + "/v1"), "n1")
+        self.assertEqual(router.which("http://elsewhere:4000"), "")
+        self.assertEqual(router.refresh_spend("n1"), {"paperclip (container)": 1.25})
+        router.drop_container("paperclip", keep=("n1",))
+        self.assertIn("paperclip", router.record("n1").get("containers") or {}, "kept where it is still used")
+        router.drop_container("paperclip")
+        self.assertEqual(next(x for x in FakeLiteLLM.seen if x[0] == "/key/delete")[2], {"keys": ["sk-proj-builderbot-container-paperclip"]})
+        self.assertNotIn("paperclip", router.record("n1").get("containers") or {})
+        # One whose container went while the router was away goes at the next spend read.
+        router.container_key("n1", "gone")
+        router.configure(container_gone=lambda name: name == "gone")
+        self.addCleanup(router.configure, container_gone=None)
+        router.refresh_spend("n1")
+        self.assertNotIn("gone", router.record("n1").get("containers") or {})
+
     def test_deploy_allow_and_the_sessions_reach_it(self):
         self.assertIn("nothing behind it", router.deploy("n1", self.containers, self.devactions, self.devapp)["error"])
         router.set_keys("n1", {"providers": {"openai": "sk-x"}})

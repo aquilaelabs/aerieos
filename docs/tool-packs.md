@@ -374,7 +374,7 @@ AerieOS carries. These are the format's primitives:
 | A node's package managers (`system`) | `apt`, `dnf`, `pacman`, `zypper`, `apk` |
 | A config field's kind | `secret`, `text`, `choice`, `list`, `switch`, `projects` |
 | A Docker app's blanks before format 4 | `${PORT}`, `${DATA}`, `${MEDIA}`, `${PUID}`, `${PGID}`, `${TZ}` |
-| AerieOS's own fields of a Docker app, and the kinds of its own | `${PUID}`, `${PGID}`, `${TZ}`, `${PORT}`; `folder`, `port`, `text`, `secret`, `choice`, `switch` |
+| AerieOS's own fields of a Docker app, and the kinds of its own | `${PUID}`, `${PGID}`, `${TZ}`, `${PORT}`; `folder`, `port`, `text`, `secret`, `choice`, `switch`, `router` |
 | The network a Docker app runs on | `host` |
 | How an agent takes the briefing | `flag-text`, `flag-file`, `env-file`, `hook`, `none` |
 | A named hooks file shape and payload | `grouped`, `flat`; `snake`, `camel` |

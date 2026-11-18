@@ -4890,7 +4890,8 @@ router.configure(state=STATE, write_json=write_json, seal=signing.seal, unseal=s
                  node_name=lambda nid: (nodes.node(nid) or {}).get("name") or nid,
                  node_addr=lambda nid: str((nodes.node(nid) or {}).get("addr") or ((nodes.node(nid) or {}).get("agent") or {}).get("addr") or ""),
                  project_names=lambda: list(prefs.all_projects(WORKSPACE)), job_add=nodes.job_add,
-                 job_get=lambda jid: nodes.job(jid, with_log=True))
+                 job_get=lambda jid: nodes.job(jid, with_log=True),
+                 container_gone=lambda name: not devapp.is_file_source(name))
 # Every module that seals under the install key: one left out kept its
 # secrets under the key before, and lost them when that went (B567).
 installkey.configure(passes=(signing.seal_all, gitcreds.seal_all, settings.seal_all, mfa.seal_all,
@@ -13099,7 +13100,8 @@ class Handler(BaseHTTPRequestHandler):
         nid, why = self._node_asked(q.get("node", [""])[0]) if q.get("node") else ("", "")
         n = nodes.node(nid) if nid and nid != "local" and not why and not NODES_OK else None
         roots = [r for r in fileexplorer.roots(n) if nasapps.PATH_RE.fullmatch(r["path"])] if n else []
-        return self._json({"apps": nasapps.catalog(), "roots": roots})
+        # ...and the model routers a router field can be given a key at (R238 step 7).
+        return self._json({"apps": nasapps.catalog(), "roots": roots, "routers": router.routers()})
 
     def _nasapps(self, req):
         """POST /api/nasapps (R164 step 2): one app's compose and environment

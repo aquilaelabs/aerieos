@@ -175,7 +175,11 @@ default a folder under the pool or share picked, as `apps/whoami`; always
 asked for), `port` (a number, checked against what the node already
 answers on), `text` (one line), `secret` (made for it when left empty,
 once, and kept on every later edit), `choice` (`choices`, each a `value`
-and a `label`) and `switch` (true or false). `${PUID}`, `${PGID}`, `${TZ}`
+and a `label`), `switch` (true or false) and `router` (the model router
+the app calls models through: `var` takes the router's address, with
+`path` after it where the app's client wants one, as `/v1`, and the
+variable `key` names takes a key of the container's own, made at the router
+picked on the panel and deleted with the container). `${PUID}`, `${PGID}`, `${TZ}`
 and `${PORT}` are AerieOS's own: never declared, asked for in the same
 words for every app whose compose reads them, `${PORT}` the port it
 answers on. An app that has to be on the machine's own network says

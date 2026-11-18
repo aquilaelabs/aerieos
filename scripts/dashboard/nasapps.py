@@ -37,7 +37,9 @@ COMPOSE_MAX = 64 * 1024
 # in the same words for every app whose compose reads them: who it runs as,
 # the time zone, and the port it answers on.
 OWN = ("PUID", "PGID", "TZ", "PORT")
-FIELD_KINDS = ("folder", "port", "text", "secret", "choice", "switch")
+FIELD_KINDS = ("folder", "port", "text", "secret", "choice", "switch", "router")
+# A router field's address may end in a path the app's client wants (/v1).
+ROUTE_PATH = re.compile(r"(/[\w.-]{1,40}){0,4}")
 FIELDS_MAX, FIELDS_FORMAT = 16, 4
 VAR_RE = re.compile(r"[A-Z][A-Z0-9_]{0,40}")
 SUB_RE = re.compile(r"[\w.+-]{1,60}(/[\w.+-]{1,60}){0,5}")
@@ -301,7 +303,7 @@ def extra_env(a, text):
     (text, why). One the app's panel sets is refused by name, so a value is
     set in one place and never two (R238 step 3)."""
     mine, own = (a.get("fields"), a.get("own")) if "own" in a else app_fields(a)
-    taken = {f["var"]: f["label"] for f in mine} | {v: OWN_LABELS[v] for v in own}
+    taken = {f["var"]: f["label"] for f in mine} | {f["key"]: f["label"] for f in mine if f.get("key")} | {v: OWN_LABELS[v] for v in own}
     lines = [ln for ln in str(text or "").splitlines() if ln.strip()]
     for ln in lines:
         k = ln.partition("=")[0].strip()
@@ -481,6 +483,19 @@ def fields_of(raw, errors):
             d = str(d) if str(d or "") in [c["value"] for c in out_f["choices"]] else out_f["choices"][0]["value"]
         elif kind == "secret":
             d = ""
+        elif kind == "router":
+            # The model router (R238 step 7): its address in `var`, a key of
+            # the container's own in `key`, the router picked on the panel.
+            key, path = str(f.get("key") or ""), str(f.get("path") or "")
+            if not VAR_RE.fullmatch(key) or key in OWN or key == var or key in seen:
+                errors.append(f"field {var}: a router field names the variable its key fills in key, another of A-Z, 0-9 and _")
+                continue
+            if not ROUTE_PATH.fullmatch(path):
+                errors.append(f"field {var}: path is what the app's client adds to the router's address, as /v1")
+                continue
+            seen.add(key)
+            out_f.update(key=key, **({"path": path} if path else {}))
+            d = ""
         else:
             d = str(d or "")
             if not VALUE_RE.fullmatch(d) and d:
@@ -586,7 +601,7 @@ def check(compose, fields=None, network=""):
         if odd:
             return {"error": f"unknown blank {', '.join(odd)}: the blanks New container fills are {', '.join(BLANKS)}"}
     else:
-        mine = [f["var"] for f in fields]
+        mine = [v for f in fields for v in (f["var"], f.get("key")) if v]
         odd = [b for b in blanks if b not in mine and b not in OWN]
         if odd:
             return {"error": f"unknown blank {', '.join(odd)}: a blank is one of the app's own fields ({', '.join(mine) or 'none'}) "
@@ -726,13 +741,15 @@ def env_values(text):
     return out
 
 
-def render_with(a, values=None, ids="1000:1000", tz="UTC", port=None, keep=None):
+def render_with(a, values=None, ids="1000:1000", tz="UTC", port=None, keep=None, router=None):
     """The environment for one app's record `a` (as catalog() reads it, or
     a container's own copy of it) with its fields filled: {env, values} or
     {error}. `values` is {VAR: what the form holds}; `keep` the values the
     container already has, so a secret is made once and never again on an
     edit, and a field the panel left empty keeps what it had. The
-    environment is where the choices live, so the file stays the catalog's."""
+    environment is where the choices live, so the file stays the catalog's.
+    `router` is (node) -> {url, key} or {error}: the container's own key at
+    that node's model router, for a router field."""
     import secrets as _secrets
     values = values if isinstance(values, dict) else {}
     keep = keep if isinstance(keep, dict) else {}
@@ -761,6 +778,21 @@ def render_with(a, values=None, ids="1000:1000", tz="UTC", port=None, keep=None)
             v = str(p)
         elif kind == "switch":
             v = "true" if v.lower() in ("true", "1", "on", "yes") else "false"
+        elif kind == "router":
+            # The node whose router it uses, or none: the address and a key
+            # of its own filled in from that router.
+            if not v:
+                if f.get("required"):
+                    return {"error": f"{f['label']} is needed: pick the model router it uses"}
+                env += [f"{var}=", f"{f['key']}="]
+                got.update({var: "", f["key"]: ""})
+                continue
+            r = router(v) if router else {"error": "no model router is reached from here"}
+            if r.get("error"):
+                return {"error": f"{f['label']}: {r['error']}"}
+            env += [f"{var}={r['url']}{f.get('path', '')}", f"{f['key']}={r['key']}"]
+            got.update({var: r["url"] + f.get("path", ""), f["key"]: r["key"]})
+            continue
         elif kind == "choice":
             ch = [c for c in f.get("choices") or [] if isinstance(c, dict)]
             if v not in [c.get("value") for c in ch]:

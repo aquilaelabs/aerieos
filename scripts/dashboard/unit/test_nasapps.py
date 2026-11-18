@@ -125,6 +125,30 @@ class Fields(unittest.TestCase):
                                                                    host.replace("/config\n", "/config\n    environment:\n      P: ${PORT}\n"))["error"])
         self.assertIn('network is "host"', nasapps.check_app({"format": 4, "network": "bridge", "fields": conf}, host)["error"])
 
+    def test_a_router_field_names_the_variable_its_key_fills(self):
+        rf = {"var": "LLM_URL", "kind": "router", "label": "Model router", "key": "LLM_KEY", "path": "/v1"}
+        compose = LEDGER.replace("      SIGNUPS: ${SIGNUPS}\n", "      SIGNUPS: ${SIGNUPS}\n      LLM_BASE: ${LLM_URL}\n      LLM_API_KEY: ${LLM_KEY}\n")
+        seen = nasapps.check_app({**META, "fields": FIELDS + [rf]}, compose)
+        self.assertNotIn("error", seen, seen)
+        self.assertEqual({k: seen["fields"][-1].get(k) for k in ("kind", "key", "path")}, {"kind": "router", "key": "LLM_KEY", "path": "/v1"})
+        self.assertIn("unknown blank LLM_KEY", nasapps.check_app(META, compose.replace("      LLM_BASE: ${LLM_URL}\n", ""))["error"])
+        for bad, said in (({**rf, "key": ""}, "names the variable its key fills"), ({**rf, "key": "PORT"}, "names the variable its key fills"),
+                          ({**rf, "key": "LLM_URL"}, "names the variable its key fills"), ({**rf, "path": "v1"}, "path is what")):
+            errors = []
+            nasapps.fields_of([bad], errors)
+            self.assertTrue(errors and said in errors[0], (bad, errors))
+        a = {"id": "ledger", "port": 8020, "compose": compose, "fields": seen["fields"]}
+        asked = []
+        at = lambda nid: asked.append(nid) or ({"url": "http://10.0.0.5:4000", "key": "sk-own"} if nid == "n1" else {"error": "no router there"})  # noqa: E731
+        env = nasapps.env_values(nasapps.render_with(a, {"BOOKS": "/mnt/a", "LLM_URL": "n1"}, router=at)["env"])
+        self.assertEqual((env["LLM_URL"], env["LLM_KEY"], asked), ("http://10.0.0.5:4000/v1", "sk-own", ["n1"]))
+        self.assertIn("Model router: no router there", nasapps.render_with(a, {"BOOKS": "/mnt/a", "LLM_URL": "n9"}, router=at)["error"])
+        env = nasapps.env_values(nasapps.render_with(a, {"BOOKS": "/mnt/a", "LLM_URL": ""}, router=at)["env"])
+        self.assertEqual((env["LLM_URL"], env["LLM_KEY"]), ("", ""), "none picked: both empty")
+        a["fields"][-1]["required"] = True
+        self.assertIn("pick the model router", nasapps.render_with(a, {"BOOKS": "/mnt/a", "LLM_URL": ""}, router=at)["error"])
+        self.assertIn("LLM_KEY is set in", nasapps.extra_env(a, "LLM_KEY=x\n")[1])
+
     def test_a_going_app_says_what_takes_its_place(self):
         self.assertEqual(nasapps.check_app({"format": 4, "going": "  install  Sonarr  instead "}, COMPOSE)["going"], "install Sonarr instead")
         self.assertIn("going says", nasapps.check_app({"format": 4, "going": "x" * 201}, COMPOSE)["error"])

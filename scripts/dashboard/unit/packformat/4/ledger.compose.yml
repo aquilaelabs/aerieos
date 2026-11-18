@@ -9,6 +9,8 @@ services:
       TITLE: ${SITE_NAME}
       CURRENCY: ${CURRENCY}
       SIGNUPS: ${SIGNUPS}
+      LLM_BASE: ${LLM_URL}
+      LLM_API_KEY: ${LLM_KEY}
       DB_PASSWORD: ${DB_PASSWORD}
     ports:
       - "${PORT}:8020"

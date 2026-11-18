@@ -1375,7 +1375,7 @@ async function openEditContainer(name){
       $("cTitle").textContent = "Configure " + name;
       await loadNasApps();
       if (cEditing !== name) return;
-      cAppDraw(j.app, j.app.values || {});
+      cAppDraw({...j.app, env: j.env || ""}, j.app.values || {});
       $("cTabForm").hidden = true;
       $("cEnv").value = j.app.extra || "";
       cAppOwns(true);
@@ -1523,6 +1523,7 @@ function cUnderPicked(){
 let cApps = null;
 let cAppRoots = [];       // the node's pools and shares a folder field suggests
 let cAppRootsAt = null;   // ...read for this node
+let cAppRouters = [];     // the model routers a router field can be given a key at (R238 step 7)
 let cAppWant = "";        // the app the Library asked New container to open on (R170)
 let cAppCur = null;       // the app on the panel: the Library's, or a container's own copy on Configure
 let cAppHand = false;     // its definition was edited by hand, so its panel no longer applies
@@ -1537,7 +1538,7 @@ function openNewContainerApp(id, node = ""){
 async function loadNasApps(node = ""){
   if (!cApps || cAppRootsAt !== node) await reading("nasapps", async () => {
     const j = await getJSON("/api/nasapps" + (node ? "?node=" + encodeURIComponent(node) : ""));
-    cApps = j.apps || []; cAppRoots = j.roots || []; cAppRootsAt = node;
+    cApps = j.apps || []; cAppRoots = j.roots || []; cAppRootsAt = node; cAppRouters = j.routers || [];
   });
   return cApps;
 }
@@ -1555,6 +1556,14 @@ function cAppFieldHtml(f, v, i){
   const plain = `autocomplete="off" spellcheck="false"`;
   if (f.kind === "switch") return `<div class="setrow col ctlrow fwide"><label class="ndcap"><input type="checkbox" id="${id}" ${at}${
     String(v) === "true" ? " checked" : ""}> ${esc(f.label)}${helpIcon(f.help)}</label></div>`;
+  // A model router (R238 step 7): the node whose router it uses, a key of
+  // the container's own made there; dead, with why, where none is deployed.
+  if (f.kind === "router"){
+    const none = !cAppRouters.length;
+    return `<div class="setrow col ctlrow">${lbl(id, f.label, f.help)}<select id="${id}" ${at}${none ? " disabled" : ""}>${optionList(
+      [...(f.required && !none ? [] : [["", "none"]]), ...cAppRouters.map(r => [r.node, `the router on ${r.name}`])], String(v))}</select>${
+      none ? `<div class="hint">No model router is deployed: deploy one from a node's Installed page, and this app gets a key of its own there.</div>` : ""}</div>`;
+  }
   const ctl = f.kind === "folder"
     ? `<input id="${id}" ${at} ${plain} list="${id}L" value="${esc(v)}" placeholder="${esc(f.example || "/mnt/…/" + (f.default || ""))}"><datalist id="${id}L">${
         cAppFolders(f).map(x => `<option value="${esc(x)}"></option>`).join("")}</datalist>`
@@ -1584,7 +1593,8 @@ function cAppDraw(a, vals = null){
   // A folder with a default of its own (apps/immich) starts at the first
   // place the node offers; one with none (a library, a share's files) is
   // the person's to pick from the suggestions.
-  const start = f => !fresh ? (v[f.var] ?? (f.kind === "folder" ? "" : f.default ?? "")) : f.kind === "folder" ? (f.default && cAppFolders(f)[0] || "") : f.default ?? "";
+  const start = f => !fresh ? (v[f.var] ?? (f.kind === "folder" ? "" : f.default ?? ""))
+    : f.kind === "folder" ? (f.default && cAppFolders(f)[0] || "") : f.kind === "router" ? (cAppRouters[0]?.node || "") : f.default ?? "";
   const ids = v.PUID !== undefined ? `${v.PUID}:${v.PGID ?? v.PUID}` : "1000:1000";
   const tz = v.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
   drawHTML($("cAppFields"), (a.fields || []).map((f, i) => cAppFieldHtml(f, start(f), i)).join("")
@@ -1660,7 +1670,11 @@ async function cAppByHand(){
   if (!a) return;
   if (!await askYes(`Edit ${a.name}'s definition by hand? Its fields no longer apply: the compose file and the environment become plain text with the values as they stand now, and only Start over from the Library puts the fields back.`)) return;
   const sent = cAppSent();
-  const lines = [...(a.fields || []).map(f => `${f.var}=${sent.values[f.var] === true ? "true" : sent.values[f.var] === false ? "false" : sent.values[f.var] ?? ""}`),
+  // A router field's address and key are the container's own as it has
+  // them (Configure), or empty to fill by hand on a new one.
+  const was = Object.fromEntries((a.env || "").split("\n").filter(l => l.includes("=")).map(l => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1)]));
+  const lines = [...(a.fields || []).flatMap(f => f.kind === "router" ? [`${f.var}=${was[f.var] ?? ""}`, `${f.key}=${was[f.key] ?? ""}`]
+    : [`${f.var}=${sent.values[f.var] === true ? "true" : sent.values[f.var] === false ? "false" : sent.values[f.var] ?? ""}`]),
     ...(a.own || []).includes("PUID") ? [`PUID=${sent.ids.split(":")[0] || ""}`, `PGID=${sent.ids.split(":")[1] || ""}`] : [],
     ...(a.own || []).includes("TZ") ? [`TZ=${sent.tz}`] : [], ...(a.own || []).includes("PORT") ? [`PORT=${sent.port}`] : []];
   // A secret left empty on a new one is made here, so the text holds a value.

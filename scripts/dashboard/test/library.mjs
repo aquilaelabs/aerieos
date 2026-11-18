@@ -326,14 +326,15 @@ await section("Add your own", async () => {
 // and Edit the definition by hand leaves it a written container.
 await section("an app's panel", async () => {
   const LEDGER = 'services:\n  ledger:\n    image: ghcr.io/example/ledger:3.1.0\n    environment:\n      TZ: ${TZ}\n      DB_PASSWORD: ${DB_PASSWORD}\n'
-    + '      CURRENCY: ${CURRENCY}\n      SIGNUPS: ${SIGNUPS}\n    ports:\n      - "${PORT}:8020"\n      - "${SYNC_PORT}:7070"\n    volumes:\n      - ${BOOKS}:/books\n';
+    + '      CURRENCY: ${CURRENCY}\n      SIGNUPS: ${SIGNUPS}\n      LLM_BASE: ${LLM_URL}\n      LLM_API_KEY: ${LLM_KEY}\n    ports:\n      - "${PORT}:8020"\n      - "${SYNC_PORT}:7070"\n    volumes:\n      - ${BOOKS}:/books\n';
   const FIELDS = [
     {var: 'BOOKS', kind: 'folder', label: 'Its books', default: 'ledger/books', example: '/mnt/tank/ledger', help: '', required: true},
     {var: 'SYNC_PORT', kind: 'port', label: 'Sync port', default: 7070, help: '', required: true},
     {var: 'DB_PASSWORD', kind: 'secret', label: 'Database password', default: '', help: '', required: false},
     {var: 'CURRENCY', kind: 'choice', label: 'Currency', default: 'USD', help: '', required: false,
      choices: [{value: 'EUR', label: 'Euro'}, {value: 'USD', label: 'US dollar'}]},
-    {var: 'SIGNUPS', kind: 'switch', label: 'Others may sign up', default: false, help: '', required: false}];
+    {var: 'SIGNUPS', kind: 'switch', label: 'Others may sign up', default: false, help: '', required: false},
+    {var: 'LLM_URL', kind: 'router', label: 'Model router', key: 'LLM_KEY', path: '/v1', default: '', help: '', required: false}];
   const f = `${DIR}/state/sideapps.json`;
   let d = {};
   try { d = JSON.parse(readFileSync(f, 'utf8')); } catch { d = {}; }
@@ -345,8 +346,11 @@ await section("an app's panel", async () => {
   await page.waitForFunction(() => cAppCur?.id === 'ledger' && !document.getElementById('cAppField').hidden, null, { timeout: 15000 });
   const drawn = await page.evaluate(() => Object.fromEntries([...document.querySelectorAll('#cAppFields [data-avar]')].map(e =>
     [e.dataset.avar, e.type === 'checkbox' ? 'tick' : e.tagName === 'SELECT' ? `pulldown:${e.value}` : e.list ? 'suggested' : e.type])));
-  ok(JSON.stringify(drawn) === JSON.stringify({BOOKS: 'suggested', SYNC_PORT: 'number', DB_PASSWORD: 'password', CURRENCY: 'pulldown:USD', SIGNUPS: 'tick'}),
-     `each kind is drawn as its answer is: a folder with suggestions, a port a number, a secret masked, a choice a pulldown at its default, a switch a tick (${JSON.stringify(drawn)})`);
+  ok(JSON.stringify(drawn) === JSON.stringify({BOOKS: 'suggested', SYNC_PORT: 'number', DB_PASSWORD: 'password', CURRENCY: 'pulldown:USD', SIGNUPS: 'tick', LLM_URL: 'pulldown:'}),
+     `each kind is drawn as its answer is: a folder with suggestions, a port a number, a secret masked, a choice a pulldown at its default, a switch a tick, a model router a pulldown (${JSON.stringify(drawn)})`);
+  ok(await page.evaluate(() => { const r = document.querySelector('#cAppFields [data-avar="LLM_URL"]');
+       return r.disabled && /No model router is deployed/.test(r.parentElement.querySelector('.hint')?.textContent || ''); }),
+     '...and with no model router deployed, the router field is dead with why on its row');
   ok(await page.evaluate(() => /Ledger/.test($('cAppHead').textContent) && /Example Labs/.test($('cAppHead').textContent)
      && !!$('cAppTz') && !!$('cAppPort') && !$('cAppIds')),
      "...headed by its name and who it is by, with AerieOS's own its compose reads (time zone and port) and not one it does not (who it runs as)");
@@ -369,7 +373,7 @@ await section("an app's panel", async () => {
   const read = await page.evaluate(() => postJSON('/api/container', {action: 'read', name: 'ledger-one'}));
   const env = Object.fromEntries((read.env || '').split('\n').filter(Boolean).map(l => [l.split('=')[0], l.slice(l.indexOf('=') + 1)]));
   ok(read.app?.id === 'ledger' && env.BOOKS === '/mnt/tank/ledger' && env.CURRENCY === 'USD' && env.SIGNUPS === 'false' && env.SYNC_PORT === '7070'
-     && (env.DB_PASSWORD || '').length >= 20 && env.LEDGER_LOG === 'info' && read.app.extra === 'LEDGER_LOG=info\n',
+     && (env.DB_PASSWORD || '').length >= 20 && env.LEDGER_LOG === 'info' && read.app.extra === 'LEDGER_LOG=info\n' && env.LLM_URL === '' && env.LLM_KEY === '',
      'its environment is the panel\'s values, a secret made for it, and the other variable kept apart; the container keeps which app it came from');
   await page.evaluate(() => openEditContainer('ledger-one'));
   await page.waitForFunction(() => cEditing === 'ledger-one' && cAppCur?.id === 'ledger' && !document.getElementById('cAppField').hidden, null, { timeout: 15000 });
@@ -396,6 +400,11 @@ await section("an app's panel", async () => {
   const left = await page.evaluate(() => postJSON('/api/container', {action: 'read', name: 'ledger-one'}));
   ok(left.app === null && /CURRENCY=EUR/.test(left.env), '...and saved so, it is a written container like any other');
   await page.evaluate(() => postJSON('/api/devapp', {project: 'ledger-one', instance: 'main', action: 'remove'}));
+  // ...gone before the next section: a remove job still running moves the
+  // page's reads under whatever comes after it.
+  await page.waitForFunction(async () => {
+    try { return !!(await postJSON('/api/container', {action: 'read', name: 'ledger-one'})).error; } catch (e) { return true; }
+  }, null, { timeout: 60000, polling: 500 });
   delete d.apps.ledger;
   writeFileSync(f, JSON.stringify(d));
 });

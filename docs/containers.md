@@ -176,7 +176,11 @@ declares (Immich asks for its photos and videos and for its database's
 folder, a media server for its media), then who it runs as, the time zone
 and its port where its compose reads them. A folder suggests each of the
 node's pools and shares with the app's own folder under it; a secret is
-made for it when left empty, once, and kept on every later edit. The panel
+made for it when left empty, once, and kept on every later edit; an app
+that calls models picks the model router it uses, which makes the container
+a key of its own there, counted in the router's spend under the
+container's name and deleted with it, given by whoever may set the router
+up. The panel
 owns those values: the Compose tab shows the app's file as the catalog
 wrote it, read-only, and the Environment tab holds only the other
 variables, one the panel sets refused there by name. **Edit the definition

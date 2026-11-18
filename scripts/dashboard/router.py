@@ -49,6 +49,7 @@ node_addr = None            # nid -> the node's address, as the sessions and thi
 project_names = None        # () -> every project's name
 job_add = None
 job_get = None              # jid -> the job row with its log
+container_gone = None       # name -> True once no written container has that name (R238)
 _lock = threading.Lock()
 _rev = 0
 SEALED = "bbseal:"
@@ -490,6 +491,76 @@ def disallow(nid, project):
     return {"ok": True}
 
 
+# ---- a container's own key (R238 step 7) -------------------------------------
+# An app that talks to a model (Paperclip) runs on the router with a key of
+# its own, made at the router when New container makes it and given by
+# whoever may set the router up (the operator, 18 Nov): the router's own
+# gate, docker-write, which is also New container's. Kept sealed under the
+# container's name, its spend read with the spaces', and deleted at the
+# router when the container goes.
+
+def routers():
+    """The routers a container can be given a key at: [{node, name}], each
+    deployed and with an address."""
+    return [{"node": nid, "name": (node_name(nid) if node_name else nid) or nid}
+            for nid, rec in _load().items() if rec.get("deployed") and _url(nid, rec)]
+
+
+def container_key(nid, name, by=""):
+    """{url, key} of container `name` at node `nid`'s router: the one it
+    has there, or one made now; {error} when none can be."""
+    rec = record(nid)
+    if not rec.get("deployed"):
+        return {"error": "the router is not deployed on that node"}
+    url = _url(nid, rec)
+    if not url:
+        return {"error": "the router's node has no address here"}
+    have = (rec.get("containers") or {}).get(str(name))
+    if have:
+        return {"url": url, "key": _open(have.get("key"))}
+    try:
+        got = _api(nid, "/key/generate", {"key_alias": f"builderbot-container-{name}", "metadata": {"container": name, "by": by}})
+    except Exception as e:                                  # noqa: BLE001 (said to the person)
+        return {"error": f"no key for {name}: {_why(e)}"}
+    key = str(got.get("key") or "")
+    if not key:
+        return {"error": "the router made no key"}
+    with _lock:
+        d = _load()
+        d.setdefault(str(nid), {}).setdefault("containers", {})[str(name)] = {"key": _keep(key), "made": int(time.time())}
+        _save(d)
+    return {"url": url, "key": key}
+
+
+def drop_container(name, keep=()):
+    """Delete container `name`'s key at every router but the nodes in
+    `keep`, and forget it where the router said so: one whose router does
+    not answer stays on the record, deleted at its next spend read."""
+    for nid, rec in _load().items():
+        c = (rec.get("containers") or {}).get(str(name))
+        if not c or nid in keep:
+            continue
+        if rec.get("deployed"):
+            try:
+                _api(nid, "/key/delete", {"keys": [_open(c.get("key"))]})
+            except Exception:                               # noqa: BLE001 (tried again at the next spend read)
+                continue
+        with _lock:
+            d = _load()
+            (d.get(nid) or {}).get("containers", {}).pop(str(name), None)
+            _save(d)
+
+
+def which(url):
+    """The node whose router answers at `url` (a container's environment
+    holds the address), or ""."""
+    for nid, rec in _load().items():
+        base = _url(nid, rec)
+        if base and str(url or "").startswith(base):
+            return nid
+    return ""
+
+
 def for_project(project):
     """{url, key, node} a session of `project` is handed (bb-tty's launcher,
     the open agent's config), from the first router that allows it; {}."""
@@ -587,6 +658,16 @@ def refresh_spend(nid):
     time), kept per project and model."""
     rec = record(nid)
     out, rate = {}, {}
+    # A key whose container is gone, its delete missed while the router was
+    # away, goes now.
+    for name in list(rec.get("containers") or {}):
+        if container_gone and container_gone(name):
+            drop_container(name)
+    rec = record(nid)
+    for name, c in (rec.get("containers") or {}).items():
+        with contextlib.suppress(Exception):
+            got = _api(nid, "/key/info?key=" + urllib.parse.quote(_open(c.get("key"))))
+            out[f"{name} (container)"] = float((got.get("info") or got).get("spend") or 0)
     for project, p in (rec.get("projects") or {}).items():
         key = _open(p.get("key"))
         with contextlib.suppress(Exception):
@@ -683,6 +764,8 @@ def seal_all(again=False):
                     again_(c, "key")
             for p in (rec.get("projects") or {}).values():
                 again_(p, "key")
+            for c in (rec.get("containers") or {}).values():
+                again_(c, "key")
         if n:
             _save(d)
     return n
