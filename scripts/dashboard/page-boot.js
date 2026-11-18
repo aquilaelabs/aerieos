@@ -10,6 +10,8 @@
 "use strict";
 
 function boot(){
+  // Said for the head's watch over a page whose scripts never came (B930).
+  document.documentElement.dataset.booted = "1";
   bootMarkup();
   bootWaits();
   bootTabs();

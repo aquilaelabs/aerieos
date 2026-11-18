@@ -70,6 +70,19 @@
     // ...and less motion, where the account asked for it in the gear's menu.
     if (localStorage.getItem("bb.motion") === "reduce") document.documentElement.dataset.motion = "reduce";
   }catch(e){ /* private mode: the default scheme is a fine answer */ }
+  // A page whose scripts never arrived sat on loading forever with nothing
+  // said (B930): a document served by a dashboard being replaced, its
+  // scripts never sent. Twenty seconds on with no boot, the placeholder
+  // says so and offers Reload; a boot that comes later draws over it.
+  setTimeout(() => {
+    const at = document.documentElement.dataset.booted ? null : document.querySelector("#pane0 .loading");
+    if (!at) return;
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = "Reload";
+    b.addEventListener("click", () => location.reload());
+    at.textContent = "This page did not finish loading. ";
+    at.append(b);
+  }, 20000);
 </script>
 <!-- Inline so the browser never asks the server for /favicon.ico: the only
      404 this page would otherwise produce. -->
