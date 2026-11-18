@@ -1182,6 +1182,11 @@ function nbCoreWireDocker(nb){
   const {$} = nb;
   nb.dkGot = null;
   $("dkOpen").onclick = () => openDocker();
+  // Cards and List wait on the control row where they land: a press before
+  // the read keeps the choice for when it is drawn. A space with nothing
+  // to show takes them away then.
+  const seg = () => { patch($("dkSeg"), dmViewSeg()); dmViewWire($("dkSeg"), () => nb.dkGot ? nbCoreDrawDocker(nb) : seg()); };
+  seg();
 }
 function nbCoreLoadDocker(nb){
   const {$, project} = nb;

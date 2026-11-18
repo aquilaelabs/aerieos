@@ -48,12 +48,20 @@ const PAGES = [
 ];
 // A notebook view's template is what a project not yet read shows: the view
 // is drawn loaded on one project and waiting on another.
-const VIEWS = ['briefing', 'roadmap', 'bugs', 'git', 'tests', 'analysis', 'design', 'artifacts', 'settings'];
+// Every view of the notebook (the operator, 18 Nov: the Docker view waited
+// as four tiles and a lone Containers, and lands as two and a bar).
+const VIEWS = ['briefing', 'roadmap', 'bugs', 'git', 'tests', 'analysis', 'design', 'artifacts', 'docker', 'vms', 'signing',
+               'wiki', 'sessions', 'permissions', 'settings'];
 // Sections a view draws only from what the project holds: a red CI, a
 // README, a Brief to keep.
 // A phone opens one section of a view at a time, so the Git view's
 // Branches table is folded under Changes on the page and not in its wait.
-const VIEW_SKIP = { git: ['title:CI', 'title:README.md', 'phone:table'], briefing: ['title:Brief'] };
+// A view the fixture fills past what a space mostly has, so its markup
+// declares fewer: the waiting shape is the common one, not the fullest.
+const MORE_TILES = { analysis: "the fixture's scan has a finding at every level, where a scan mostly has two or three" };
+// The fixture's tracker holds under two bugs, so the Bugs view lands
+// without its search; a tracker mostly holds more and waits with it.
+const VIEW_SKIP = { git: ['title:CI', 'title:README.md', 'phone:table'], briefing: ['title:Brief'], bugs: ['barSig'] };
 const HELD = /\/api\/(?!status|layout|revs|presence)/;
 // Reads held while a template is measured, then let go: a request held and
 // never answered keeps one of the browser's six connections to the server,
@@ -113,9 +121,13 @@ const outline = sel => {
     // operator 18 Oct: Containers and Nodes waited as pages they had
     // stopped being): the bar's parts in order (its picker with its word or
     // without, a search, Cards and List, its buttons), the jump bar, and
-    // the titles of the sections on show.
+    // the titles of the sections on show. A notebook view's status line on
+    // its control row counts as the row's words: a row waiting without them
+    // and landing with them moved its buttons from beside the tiles to under
+    // them (the operator, 18 Nov).
     barSig: bar ? [...bar.children].filter(shown).map(e => e.matches('label.pick') ? (e.querySelector('.pickw') ? 'picker' : 'picker without its word')
-      : e.matches('input') ? 'search' : e.matches('.pseg') ? 'a switch' : e.matches('.actbar') ? 'buttons' : null).filter(Boolean).join(', ') : '',
+      : e.matches('input') ? 'search' : e.matches('.pseg') ? 'a switch' : e.matches('.actbar') ? 'buttons'
+      : e.matches('.nbsaidslot') ? 'words' : null).filter(Boolean).join(', ') : '',
     jump: !!first('.sectjump'),
     titles: [...root.querySelectorAll('details.sect > summary .t')].filter(shown).map(e => e.textContent.trim()).filter(Boolean),
   };
@@ -242,7 +254,7 @@ for (const [W, H] of [[1280, 1000], [393, 852]]){
       const g = [...document.querySelectorAll('.nb .nbview:not([hidden]) .nbglance')].find(e => e.checkVisibility());
       return g ? { declared: +g.dataset.tiles || 0, drawn: g.querySelectorAll('.tile').length } : null;
     });
-    ok(!decl || decl.drawn <= decl.declared,
+    ok(!decl || decl.drawn <= decl.declared || MORE_TILES[v],
        `the notebook's ${v} view draws no more tiles than its markup declares for its waiting shape ${where} (${JSON.stringify(decl)})`);
     const release = await hold(page);
     await page.evaluate(([p, v]) => openNotebook(p, v), [waiting, v]);

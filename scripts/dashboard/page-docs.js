@@ -280,11 +280,14 @@ const SKTPLS = {
   design: () => skTpl(`<nav class="sectjump"><a href="#">Pages</a><a href="#">Themes</a></nav>`
     + docSection("design", "pages", "Pages", "", skRows(2))
     + docSection("design", "themes", "Themes", "", skRows(2))),
-  // Its list, by the view's own titles (nb-artifacts.js ART_TITLES)...
-  // ...with the jump bar the view draws over its three sections (sectJump:
-  // Build, Version and Files), so the page does not move down as it lands.
-  artifacts: () => skTpl(`<nav class="sectjump">${["build", "version", "files"].map(k => `<a href="#">${esc(artTitle(k))}</a>`).join("")}</nav>`
-    + [["build", 1], ["files", 2]].map(([k, n]) => docSection("artifacts", k, artTitle(k), "", skRows(n))).join("")),
+  // Its sections by the view's own titles (nb-artifacts.js ART_TITLES), in
+  // the order it lands them: Build first, in its own box above the Version
+  // (nbArtBuildSection), under the jump bar the view draws over the three
+  // (sectJump), so the page does not move down as it lands; then Files
+  // under the Version.
+  artbuild: () => skTpl(`<nav class="sectjump">${["build", "version", "files"].map(k => `<a href="#">${esc(artTitle(k))}</a>`).join("")}</nav>`
+    + docSection("artifacts", "build", artTitle("build"), "", skRows(1))),
+  artifacts: () => skTpl(docSection("artifacts", "files", artTitle("files"), "", skRows(2))),
   // The Overview's box of sections (nb-rules.js BRIEF_SECTS) as drawRules
   // lands it, the Brief left out, with the jump bar over them and the
   // Memories under them that the markup holds.
@@ -292,6 +295,16 @@ const SKTPLS = {
     const sects = BRIEF_SECTS.filter(([k]) => k !== "brief");
     return skTpl(`<nav class="sectjump">${[...sects.map(([, t]) => t), "Memories"].map(t => `<a href="#">${esc(t)}</a>`).join("")}</nav>`
       + sects.map(([k, t, open], j) => docSection("briefing", k, t, "", skRows(j ? 1 : 3), {open})).join(""));
+  },
+  // The Signing view as a project with its one key lands (nb-signing.js
+  // drawSigning): the head that names its node, the jump bar over its
+  // sections, the backup password, the default key, the apps and the
+  // releases.
+  signing: () => {
+    const sects = [["lock", "Backup password", 1], ["key:default", "Default key", 2], ["apps", "Apps", 1], ["releases", "Releases", 2]];
+    return skTpl(pageHead({cls: "sghead", facts: [["Node", GHOST]]})
+      + `<nav class="sectjump">${sects.map(([, t]) => `<a href="#">${esc(t)}</a>`).join("")}</nav>`
+      + sects.map(([k, t, n]) => docSection("signing", k, t, "", skRows(n))).join(""));
   },
   // ...and the Version box above it, which the view fills on its own.
   version: () => skTpl(docSection("artifacts", "version", artTitle("version"), "", skRows(1))),
@@ -1097,8 +1110,18 @@ function glanceWaiting(el){
   const was = glanceSeen[el.id];
   const n = was ? was.tiles : +el.dataset.tiles || 0;
   const said = was ? was.said : "said" in el.dataset;
-  return patch(el, statTiles(Array.from({length: n}, () => ({value: GHOST, label: "\u00a0"})))
-               + (said ? viewSaid(skel("word")) : ""));
+  const tiles = statTiles(Array.from({length: n}, () => ({value: GHOST, label: "\u00a0"})));
+  // ...its words where the view will say them: on the control row's slot
+  // where it has one, as viewGlance does, so the row's buttons wait beside
+  // the words under the tiles. With the slot empty a row of a button or two
+  // shares the tiles' line, and the buttons rode up beside the tiles while
+  // the view waited, dropping under them as it landed (the operator, 18 Nov).
+  const slot = el.closest(".nbview")?.querySelector(":scope > .nbhead > .nbsaidslot");
+  if (slot){
+    const wrote = patch(el, tiles);
+    return patch(slot, said ? `<div class="notice note">${skel("word")}</div>` : "") || wrote;
+  }
+  return patch(el, tiles + (said ? viewSaid(skel("word")) : ""));
 }
 // What a view has to say beside its tiles, in the notice voice (the operator,
 // 25 Oct: no loose words at a page's top): an error in red, a warning in
