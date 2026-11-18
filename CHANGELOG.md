@@ -80,9 +80,13 @@
 - Back closes the dialog on show and leaves the page under it where it was, and closing any dialog puts the focus back on what opened it (8acd882)
 - The warning bands (Restart your session, the new build's line) are see-through in the dark themes, a faint yellow with yellow words, where they were solid yellow (4318716)
 - A test named as a sentence counts as described on the Tests view; only a terse name wants a note from aerie tests note (4b5c08b)
+- A space card's back has its Settings gear at the top right and Back last in its foot, where the two were the other way around (797308b)
+- The Spaces page's Full and Compact switch fades the cards through the change, and a compact card opens and folds in motion, as the Containers page's do (797308b)
+- Every notebook view waits in the shape it lands in: the tiles it mostly draws, its status line on its row and its buttons under the tiles, where a view waited with extra tiles and its buttons beside them; Signing waits as its sections, not plain rows (a2e4bf4)
 
 ### Fixed
 
+- A wiki that could not be read says why on its status line, where the line said only where the wiki goes (9f8d3ef)
 - A press on the rail, a page of a sub-nav or a notebook's view tab no longer grows a spinning ring while its page reads, which pushed everything beside it; the ring is kept for a button with room for it (2cad430)
 - Certificates the nginx page got from Let's Encrypt renew whatever the image-update checks are set to. Renewals were started under that switch, so turning image updates off stopped them without a word. A renewal round that fails is now said in the log. (71a209b)
 - The page no longer throws away unsaved work when the controller restarts. With a staged edit, a page being written or a half-typed message on it, a band under the header says the controller was updated, with Reload, and the page waits; with nothing unsaved it reloads at once as before. A space's settings edited in its notebook now ask before another view is opened. (71a209b)
