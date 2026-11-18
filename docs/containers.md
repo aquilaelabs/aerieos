@@ -170,14 +170,25 @@ opens this dialog on that app (Jellyfin, Plex, the arr stack, qBittorrent,
 Immich, Nextcloud, Home Assistant, Syncthing, any an administrator added
 from the Library's Add your own, and any kept from the vetted catalog's
 apps); New container opened anywhere else offers no apps, since they are
-picked on the Library alone. Each is a compose file pinned to a tag with its blanks
-in the environment: where its data goes and which share's folder it serves
-or syncs (folders under a pool, the array or a share), the user it runs as
-(the one that owns those folders), the time zone and its port, with a
-database password or an admin password made for the apps that need one.
-Fill the definition in puts the compose file and the environment in the
-dialog's own tabs, to read and change before Create makes it as any
-container; the registry update check says when an image's tag moves. The
+picked on the Library alone. The app's part of the dialog is a panel of its
+own over the rest, headed as its Library card is, with the fields the app
+declares (Immich asks for its photos and videos and for its database's
+folder, a media server for its media), then who it runs as, the time zone
+and its port where its compose reads them. A folder suggests each of the
+node's pools and shares with the app's own folder under it; a secret is
+made for it when left empty, once, and kept on every later edit. The panel
+owns those values: the Compose tab shows the app's file as the catalog
+wrote it, read-only, and the Environment tab holds only the other
+variables, one the panel sets refused there by name. **Edit the definition
+by hand** under the compose file asks first, then folds the panel to a line
+and leaves the file and the environment as plain text, the values as they
+stood; Start over from the Library puts the fields back. Create makes it
+as any container, keeping beside its compose file which app it came from,
+and its row's **Configure** opens the same panel with each value read back
+from its environment, offering a newer definition the Library has kept
+since; the registry update check says when an image's tag moves. Home
+Assistant runs on the machine's own network and answers on its own port.
+The
 app answers on its port on the node; a hostname and a certificate for it
 are that node's nginx page. On the controller's own machine these run
 where the Containers page runs them, under R165's arrangement of the own

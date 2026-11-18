@@ -4,7 +4,8 @@
 // /api/library; the search and the chips narrow the list and save nothing;
 // a row opens on its description; the verbs are the pages' own (an install
 // is the toolchain job, which the bb stub runs in a second).
-import { launch, newPage, ok, done, ready, URL, section } from './lib.mjs';
+import { launch, newPage, ok, done, ready, URL, DIR, section } from './lib.mjs';
+import { readFileSync, writeFileSync } from 'node:fs';
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
@@ -197,15 +198,15 @@ await section("a toolchain card to open", async () => {
 });
 
 // ---- the whole description (step 2) -----------------------------------------
-// An app's page holds its compose file with the blanks New container fills;
+// An app's page holds its compose file and what its panel asks for;
 // a toolchain's what it adds to a session and its terms.
 await section("the whole description", async () => {
   const app = await page.evaluate(() => lib.rows.find(r => r.kind === 'app' && !r.wrong_platform) ? `app:${lib.rows.find(r => r.kind === 'app' && !r.wrong_platform).name}` : '');
   if (app){
     await toEntry(app);
     ok(await page.$eval(ENTRY(app), r => /image:/.test(r.querySelector('.libcompose')?.textContent || '')
-       && r.querySelector('.ldetail code') && /New container opens the Containers page/.test(r.querySelector('.ldetail').textContent)),
-       `an app's page holds its compose file, its blanks and how New container makes it one (${app})`);
+       && /Asks for /.test(r.querySelector('.ldetail').textContent) && /New container opens the Containers page/.test(r.querySelector('.ldetail').textContent)),
+       `an app's page holds its compose file, what its panel asks for and how New container makes it one (${app})`);
   } else ok(true, 'no app rows here (the account may not make containers)');
   const tc = await page.evaluate(() => {
     const r = lib.rows.find(x => x.kind === 'toolchain' && (x.tool || x.terms?.length));
@@ -242,16 +243,16 @@ await section("the verbs are the pages' own", async () => {
        said.installed ? '...and an installed row offers Remove' : '...and what failed is said under the row');
   } else ok(true, 'nothing uninstalled to install on the stub');
 });
-// Install on an app row opens New container with that app picked.
+// Install on an app row opens New container on that app's panel (R238).
 if (await page.$('.doc .librarytab [data-libkind="app"][data-libact="install"]')){
   const id = await page.$eval('.doc .librarytab [data-libkind="app"][data-libact="install"]', b => b.dataset.libname);
   await page.click('.doc .librarytab [data-libkind="app"][data-libact="install"]');
   await page.waitForFunction(() => !document.getElementById('cmodal').hidden, null, { timeout: 10000 });
-  await page.waitForFunction(id => document.getElementById('cApp').value === id && !document.getElementById('cAppFields').hidden, id, { timeout: 10000 });
+  await page.waitForFunction(id => cAppCur?.id === id && !document.getElementById('cAppField').hidden, id, { timeout: 10000 });
   ok(await page.$eval('.doc .librarytab [data-libkind="app"][data-libact="install"]', b => b.textContent.trim() === 'New container'),
-     `an app's press reads New container, and opens that dialog with ${id} picked and its blanks shown`);
-  const eg = await page.$eval('#cAppData', e => e.placeholder);
-  ok(eg === `/mnt/tank/apps/${id}`, `...its data folder's example names that app, not one app for every one (${eg})`);
+     `an app's press reads New container, and opens that dialog on ${id}'s panel`);
+  const data = await page.evaluate(() => { const e = document.querySelector('#cAppFields [data-avar="DATA"]'); return e ? e.value || e.placeholder : null; });
+  ok(data === null || data.endsWith(`apps/${id}`), `...a data folder, where it asks for one, is that app's own, not one app's for every one (${data})`);
   await page.evaluate(() => { $('cmodal').hidden = true; });
 }
 
@@ -315,6 +316,88 @@ await section("Add your own", async () => {
   await page.evaluate(() => document.querySelector('.modal.askdlg:not([hidden]) [data-ai="0"]').click());
   await page.waitForFunction(() => document.getElementById('tpmodal').hidden && !lib?.rows.some(r => r.kind === 'app' && r.name === 'notes'), null, { timeout: 15000 });
   ok(true, 'Remove in there takes it off the catalog, and the card goes');
+});
+
+// ---- an app's own fields (R238) --------------------------------------------
+// An app of pack format 4, kept as the catalog's are, opens New container on
+// its panel: each kind of field drawn as its answer is, its file read-only,
+// a variable it sets refused in the Environment by name; a container made
+// from it opens again with Configure on the same panel, its secret kept,
+// and Edit the definition by hand leaves it a written container.
+await section("an app's panel", async () => {
+  const LEDGER = 'services:\n  ledger:\n    image: ghcr.io/example/ledger:3.1.0\n    environment:\n      TZ: ${TZ}\n      DB_PASSWORD: ${DB_PASSWORD}\n'
+    + '      CURRENCY: ${CURRENCY}\n      SIGNUPS: ${SIGNUPS}\n    ports:\n      - "${PORT}:8020"\n      - "${SYNC_PORT}:7070"\n    volumes:\n      - ${BOOKS}:/books\n';
+  const FIELDS = [
+    {var: 'BOOKS', kind: 'folder', label: 'Its books', default: 'ledger/books', example: '/mnt/tank/ledger', help: '', required: true},
+    {var: 'SYNC_PORT', kind: 'port', label: 'Sync port', default: 7070, help: '', required: true},
+    {var: 'DB_PASSWORD', kind: 'secret', label: 'Database password', default: '', help: '', required: false},
+    {var: 'CURRENCY', kind: 'choice', label: 'Currency', default: 'USD', help: '', required: false,
+     choices: [{value: 'EUR', label: 'Euro'}, {value: 'USD', label: 'US dollar'}]},
+    {var: 'SIGNUPS', kind: 'switch', label: 'Others may sign up', default: false, help: '', required: false}];
+  const f = `${DIR}/state/sideapps.json`;
+  let d = {};
+  try { d = JSON.parse(readFileSync(f, 'utf8')); } catch { d = {}; }
+  d.apps = {...(d.apps || {}), ledger: {name: 'Ledger', what: 'a ledger with a database beside it', port: 8020, media: false, compose: LEDGER,
+    secrets: [], by: 'test', at: 1, tier: 'aerie', maker: 'Example Labs', credits: [], fields: FIELDS,
+    pin: {url: 'https://example.com/catalog', commit: 'a'.repeat(40), sha256: 'b'.repeat(64), path: 'packs/apps/ledger'}}};
+  writeFileSync(f, JSON.stringify(d));
+  await page.evaluate(() => { cApps = null; openNewContainerApp('ledger'); });
+  await page.waitForFunction(() => cAppCur?.id === 'ledger' && !document.getElementById('cAppField').hidden, null, { timeout: 15000 });
+  const drawn = await page.evaluate(() => Object.fromEntries([...document.querySelectorAll('#cAppFields [data-avar]')].map(e =>
+    [e.dataset.avar, e.type === 'checkbox' ? 'tick' : e.tagName === 'SELECT' ? `pulldown:${e.value}` : e.list ? 'suggested' : e.type])));
+  ok(JSON.stringify(drawn) === JSON.stringify({BOOKS: 'suggested', SYNC_PORT: 'number', DB_PASSWORD: 'password', CURRENCY: 'pulldown:USD', SIGNUPS: 'tick'}),
+     `each kind is drawn as its answer is: a folder with suggestions, a port a number, a secret masked, a choice a pulldown at its default, a switch a tick (${JSON.stringify(drawn)})`);
+  ok(await page.evaluate(() => /Ledger/.test($('cAppHead').textContent) && /Example Labs/.test($('cAppHead').textContent)
+     && !!$('cAppTz') && !!$('cAppPort') && !$('cAppIds')),
+     "...headed by its name and who it is by, with AerieOS's own its compose reads (time zone and port) and not one it does not (who it runs as)");
+  ok(await page.evaluate(() => $('cYml').readOnly && $('cYml').value.includes('ghcr.io/example/ledger:3.1.0') && $('cTabForm').hidden && !$('cByHandBar').hidden),
+     "...its file read-only as the catalog wrote it, no From an image, and Edit the definition by hand under it");
+  await page.fill('#cName', 'ledger-one');
+  await page.fill('#cAppFields [data-avar="BOOKS"]', '/mnt/tank/ledger');
+  await page.evaluate(() => { cSwitch('env'); });
+  await page.fill('#cEnv', 'SYNC_PORT=1\n');
+  await page.click('#cGo');
+  await page.waitForFunction(() => !document.getElementById('cErrWrap').hidden, null, { timeout: 15000 });
+  ok(/SYNC_PORT is set in Ledger's fields above, as Sync port/.test(await page.$eval('#cErr', e => e.textContent)),
+     'a variable its panel sets, typed in the Environment, is refused by name');
+  await page.fill('#cEnv', 'LEDGER_LOG=info\n');
+  await page.evaluate(() => { $('cErrWrap').hidden = true; });
+  await page.click('#cGo');
+  await page.waitForFunction(() => document.getElementById('cmodal').hidden || !document.getElementById('cErrWrap').hidden, null, { timeout: 30000 });
+  const madeIt = await page.$eval('#cmodal', m => m.hidden);
+  ok(madeIt, `Create makes it${madeIt ? '' : ` (${await page.$eval('#cErr', e => e.textContent)})`}`);
+  const read = await page.evaluate(() => postJSON('/api/container', {action: 'read', name: 'ledger-one'}));
+  const env = Object.fromEntries((read.env || '').split('\n').filter(Boolean).map(l => [l.split('=')[0], l.slice(l.indexOf('=') + 1)]));
+  ok(read.app?.id === 'ledger' && env.BOOKS === '/mnt/tank/ledger' && env.CURRENCY === 'USD' && env.SIGNUPS === 'false' && env.SYNC_PORT === '7070'
+     && (env.DB_PASSWORD || '').length >= 20 && env.LEDGER_LOG === 'info' && read.app.extra === 'LEDGER_LOG=info\n',
+     'its environment is the panel\'s values, a secret made for it, and the other variable kept apart; the container keeps which app it came from');
+  await page.evaluate(() => openEditContainer('ledger-one'));
+  await page.waitForFunction(() => cEditing === 'ledger-one' && cAppCur?.id === 'ledger' && !document.getElementById('cAppField').hidden, null, { timeout: 15000 });
+  ok(await page.evaluate(s => $('cTitle').textContent === 'Configure ledger-one' && document.querySelector('#cAppFields [data-avar="DB_PASSWORD"]').value === s
+     && document.querySelector('#cAppFields [data-avar="BOOKS"]').value === '/mnt/tank/ledger' && $('cEnv').value === 'LEDGER_LOG=info\n', env.DB_PASSWORD),
+     'Configure opens the same panel, each value read back from its environment');
+  await page.selectOption('#cAppFields [data-avar="CURRENCY"]', 'EUR');
+  await page.click('#cGo');
+  await page.waitForFunction(() => document.getElementById('cmodal').hidden || !document.getElementById('cErrWrap').hidden, null, { timeout: 30000 });
+  const again = await page.evaluate(() => postJSON('/api/container', {action: 'read', name: 'ledger-one'}));
+  ok(/CURRENCY=EUR/.test(again.env) && again.app?.values?.DB_PASSWORD === env.DB_PASSWORD,
+     '...a value changed in its field is saved there, and the secret is never made again');
+  await page.evaluate(() => openEditContainer('ledger-one'));
+  await page.waitForFunction(() => cEditing === 'ledger-one' && cAppCur?.id === 'ledger', null, { timeout: 15000 });
+  await page.click('#cByHand');
+  await page.waitForSelector('.modal.askdlg:not([hidden]) [data-ai="0"]', { timeout: 10000 });
+  await page.evaluate(() => document.querySelector('.modal.askdlg:not([hidden]) [data-ai="0"]').click());
+  await page.waitForFunction(() => cAppHand && !document.getElementById('cAppLeft').hidden, null, { timeout: 10000 });
+  ok(await page.evaluate(() => $('cAppPanel').hidden && /Edited by hand: Ledger's fields no longer apply/.test($('cAppLeft').textContent)
+     && !$('cYml').readOnly && /CURRENCY=EUR/.test($('cEnv').value) && /LEDGER_LOG=info/.test($('cEnv').value)),
+     'Edit the definition by hand asks first, folds the panel to a line and leaves the file and the environment as text, the values as they stood');
+  await page.click('#cGo');
+  await page.waitForFunction(() => document.getElementById('cmodal').hidden || !document.getElementById('cErrWrap').hidden, null, { timeout: 30000 });
+  const left = await page.evaluate(() => postJSON('/api/container', {action: 'read', name: 'ledger-one'}));
+  ok(left.app === null && /CURRENCY=EUR/.test(left.env), '...and saved so, it is a written container like any other');
+  await page.evaluate(() => postJSON('/api/devapp', {project: 'ledger-one', instance: 'main', action: 'remove'}));
+  delete d.apps.ledger;
+  writeFileSync(f, JSON.stringify(d));
 });
 
 // ---- a service's card: the catalog's entry alone (R172) ----------------------

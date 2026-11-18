@@ -404,8 +404,8 @@ what it is in full, its platforms, terms, size and source,
 what it adds to a session and what it asks for per node; a pack's
 **Look**, which fetches its manifest at the commit it is pinned to and says
 what it fetches and runs, as the Add tool pack dialog does; an app's
-compose file as the catalog holds it, with the blanks New container fills
-and the secrets made for it; a companion's other files. What is on the
+compose file as the catalog holds it, with what its panel asks for and the
+secrets made for it; a companion's other files. What is on the
 node (an agent's sign-in, a toolchain's path and system packages, a
 service's configuration, Remove) is the Installed page's under Machines
 ([machines.md](machines.md#installed)). A search box under the head matches a
@@ -419,8 +419,8 @@ Nothing installs a second way from here. A toolchain's Install is the
 toolchain job described below, with its agreements asked the same way; an
 agent's is the agents' own verb; a pack's Install opens the Add tool pack dialog
 on the catalog's commit, with Look first; an app's Install opens New
-container with the app picked and its blanks shown, and Create makes it a
-container on the Containers page. **Check for updates** asks
+container on the app's panel, and Create makes it a container on the
+Containers page. **Check for updates** asks
 about every row that installs on the node, and **Add your own** is the
 sideload, one dialog asking what is being added: a tool pack (from a
 repository, a pasted bbtool.json or an upload of its files, docs/tool-packs.md;

@@ -29,12 +29,17 @@ def kept(n):
     return sorted(p for p in (KEPT / str(n)).glob("*.json") if not p.name.endswith(".bbapp.json"))
 
 
+def apps(n):
+    """The Docker apps kept at format n: bbapp.json beside its compose."""
+    return sorted((KEPT / str(n)).glob("*.bbapp.json"))
+
+
 class Kept(unittest.TestCase):
     def test_every_format_this_build_reads_has_manifests_kept(self):
         self.assertEqual(sorted(int(p.name) for p in KEPT.iterdir()), list(range(1, packformat.FORMAT + 1)))
         self.assertEqual(sorted(packformat.FORMATS), list(range(1, packformat.FORMAT + 1)), "and each says what it added")
         for n in range(1, packformat.FORMAT + 1):
-            self.assertTrue(kept(n), n)
+            self.assertTrue(kept(n) or apps(n), n)
 
     def test_a_manifest_valid_at_a_number_is_valid_at_every_later_one(self):
         for n in range(1, packformat.FORMAT + 1):
@@ -47,11 +52,12 @@ class Kept(unittest.TestCase):
 
     def test_a_docker_app_s_manifest_and_compose_are_held_the_same_way(self):
         for n in range(1, packformat.FORMAT + 1):
-            for p in sorted((KEPT / str(n)).glob("*.bbapp.json")):
+            for p in apps(n):
                 meta = json.loads(p.read_text())
                 self.assertEqual(packformat.of(meta), n, p.name)
                 self.assertIsInstance(int(meta["port"]), int)
-                seen = nasapps.check(p.with_name(p.name.replace(".bbapp.json", ".compose.yml")).read_text())
+                self.assertEqual(packformat.needs(meta, packformat.uses_of(meta)), [], p.name)
+                seen = nasapps.check_app(meta, p.with_name(p.name.replace(".bbapp.json", ".compose.yml")).read_text())
                 self.assertFalse(seen.get("error"), (p.name, seen))
 
 

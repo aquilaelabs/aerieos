@@ -1327,6 +1327,9 @@ function cLock(running){
 const C_MANAGED = "AerieOS manages this one: its name, compose file and env are written where it was deployed from (the nginx page).";
 async function openEditContainer(name){
   cEditing = name;
+  cAppCur = null; cAppHand = false;
+  $("cAppField").hidden = true;
+  cAppOwns(false);
   $("cTabForm").hidden = false;
   $("cEnvHint").hidden = true;
   $("cTitle").textContent = "Edit " + name;
@@ -1366,6 +1369,22 @@ async function openEditContainer(name){
     if (cEditing !== name) return;          // reopened on another one meanwhile
     $("cYml").value = j.compose || "";
     $("cEnv").value = j.env || "";
+    // Made from an app (R238 step 3): Configure on its panel, each value
+    // read back from its environment, the other variables alone below.
+    if (j.app && !j.managed && !managed){
+      $("cTitle").textContent = "Configure " + name;
+      await loadNasApps();
+      if (cEditing !== name) return;
+      cAppDraw(j.app, j.app.values || {});
+      $("cTabForm").hidden = true;
+      $("cEnv").value = j.app.extra || "";
+      cAppOwns(true);
+      cAppNewerSay(j.app);
+      const locked = $("cGo").disabled;
+      $("cAppFields").querySelectorAll("input,select").forEach(e => { e.disabled = locked; });
+      $("cByHand").disabled = locked;
+      cHold();
+    }
     // Opened while the list was put away, it had no row to say AerieOS
     // manages it: the read says so (B810), and it is for reading.
     if (j.managed && !managed){
@@ -1384,6 +1403,9 @@ async function openEditContainer(name){
 async function openEditInstance(project, instance){
   const key = {project, instance};
   cEditing = key;
+  cAppCur = null; cAppHand = false;
+  $("cAppField").hidden = true;
+  cAppOwns(false);
   $("cTitle").textContent = "Edit " + projLabel(project) + (instance === "main" ? "" : ` (${instance})`);
   // Its own name, whatever its owner calls it (the operator, 11 Oct: not
   // tied to the project, since a project sends several), changed while it
@@ -1493,71 +1515,194 @@ function cUnderPicked(){
   $("cGo").disabled = false;
 }
 
-// Apps a NAS runs (R164 step 2): the catalog the dialog offers, read once,
-// and the pick that fills the name, the compose file and the environment.
+// Apps a NAS runs (R164 step 2, R238): the apps the Library holds, read
+// once an open, and the panel New container draws for the one picked (the
+// design's app-panel rule). The panel owns what the app declares: the
+// Compose tab is its file as the catalog wrote it, read-only, and the
+// Environment tab holds only the other variables.
 let cApps = null;
-let cAppWant = "";       // the app the Library asked New container to open on (R170)
-// The Library's Install on an app (R170): New container with that app
-// picked and its blanks shown, as if the person had chosen it in the list.
+let cAppRoots = [];       // the node's pools and shares a folder field suggests
+let cAppRootsAt = null;   // ...read for this node
+let cAppWant = "";        // the app the Library asked New container to open on (R170)
+let cAppCur = null;       // the app on the panel: the Library's, or a container's own copy on Configure
+let cAppHand = false;     // its definition was edited by hand, so its panel no longer applies
+// The Library's Install on an app (R170): New container with that app on
+// its panel, as if the person had chosen it in a list.
 function openNewContainerApp(id, node = ""){
   cAppWant = id;
   // ...on the Library's node when it runs Docker (R170 step 7).
   if (node) dockerNode = node;
   openNewContainer();
 }
-async function loadNasApps(){
-  if (!cApps) await reading("nasapps", async () => { cApps = cApps || (await getJSON("/api/nasapps")).apps || []; });
+async function loadNasApps(node = ""){
+  if (!cApps || cAppRootsAt !== node) await reading("nasapps", async () => {
+    const j = await getJSON("/api/nasapps" + (node ? "?node=" + encodeURIComponent(node) : ""));
+    cApps = j.apps || []; cAppRoots = j.roots || []; cAppRootsAt = node;
+  });
   return cApps;
 }
-async function cAppPicked(){
-  const id = $("cApp").value, a = (cApps || []).find(x => x.id === id);
-  $("cAppFields").hidden = !a;
-  $("cAppWhat").textContent = a ? a.what : "";
-  if (!a) return;
-  $("cAppMediaField").hidden = !a.media;
-  // The example names the app picked, not one app for all of them (B803).
-  $("cAppData").placeholder = "/mnt/tank/apps/" + id;
-  $("cAppPort").value = a.port;
-  if (!$("cAppTz").value) $("cAppTz").value = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-  if (!$("cName").value) $("cName").value = id;
+
+// Where a folder field suggests putting it: each of the node's places with
+// the app's own folder under it (apps/immich), as the forms rule draws a
+// path, a field with suggestions.
+const cAppFolders = f => [...new Set(cAppRoots.map(r => f.default ? `${r.path}/${f.default}` : r.path))];
+
+// One field of the panel, as its kind's answer is drawn (the forms rule): a
+// folder a path with suggestions, a port a number, a choice a pulldown, a
+// switch a tick, a secret a masked field made for it when left empty.
+function cAppFieldHtml(f, v, i){
+  const id = `cAppF${i}`, at = `data-avar="${esc(f.var)}"`;
+  const plain = `autocomplete="off" spellcheck="false"`;
+  if (f.kind === "switch") return `<div class="setrow col ctlrow fwide"><label class="ndcap"><input type="checkbox" id="${id}" ${at}${
+    String(v) === "true" ? " checked" : ""}> ${esc(f.label)}${helpIcon(f.help)}</label></div>`;
+  const ctl = f.kind === "folder"
+    ? `<input id="${id}" ${at} ${plain} list="${id}L" value="${esc(v)}" placeholder="${esc(f.example || "/mnt/…/" + (f.default || ""))}"><datalist id="${id}L">${
+        cAppFolders(f).map(x => `<option value="${esc(x)}"></option>`).join("")}</datalist>`
+    : f.kind === "port" ? `<input id="${id}" ${at} type="number" min="1" max="65535" value="${esc(v)}">`
+    : f.kind === "choice" ? `<select id="${id}" ${at}>${optionList((f.choices || []).map(c => [c.value, c.label]), String(v))}</select>`
+    : f.kind === "secret" ? `<input id="${id}" ${at} type="password" autocomplete="new-password" value="${esc(v)}" placeholder="made for it when left empty">`
+    : `<input id="${id}" ${at} ${plain} value="${esc(v)}" placeholder="${esc(f.example || "")}">`;
+  return `<div class="setrow col ctlrow${f.kind === "port" ? " fshort" : ""}">${lbl(id, f.label, f.help)}${ctl}</div>`;
 }
-async function cAppFill(){
-  const id = $("cApp").value, a = (cApps || []).find(x => x.id === id);
-  if (!a) return;
-  const b = $("cAppFill");
-  busy(b, "Filling in");
-  try{
-    const j = await postJSON("/api/nasapps", {app: id, data: $("cAppData").value.trim(), media: $("cAppMedia").value.trim(), ids: $("cAppIds").value.trim(),
-                                                      tz: $("cAppTz").value.trim(), port: parseInt($("cAppPort").value, 10)});
-    if (j.error){ $("cErr").textContent = j.error; $("cErrWrap").hidden = false; return; }
-    $("cErrWrap").hidden = true;
-    $("cYml").value = j.compose; $("cEnv").value = j.env; cYmlTouched = true;
-    if (!$("cName").value) $("cName").value = id;
-    $("cEnvHint").hidden = false;
-    $("cEnvHint").textContent = `${a.name}'s choices: the folders, the user, the time zone and the port${a.secrets?.length ? `, and ${a.secrets.join(" and ")} made for it` : ""}. Saved with the container when you press Create.`;
-    cSeg("yml");
-  }catch(e){ $("cErr").textContent = "the catalog: " + failWords(e); $("cErrWrap").hidden = false; }
-  finally{ unbusy(b, "Fill the definition in"); }
+
+// The panel for app `a`: its head as its Library card's, its own fields in
+// its manifest's order, then AerieOS's own its compose reads. `vals` are a
+// container's values on Configure; a new one starts each field at its
+// default and a folder at the first place the node offers.
+function cAppDraw(a, vals = null){
+  cAppCur = a; cAppHand = false;
+  const v = vals || {}, own = a.own || [];
+  const fresh = !vals;
+  const row = {...a, kind: "app", label: a.name};
+  drawHTML($("cAppHead"), `${libIcon(row)}<div class="aptitle"><b>${esc(a.name)}</b><span class="apby">${libPills(row)}</span></div>`);
+  wireLibrary($("cAppHead"));
+  $("cAppWhat").textContent = a.what || "";
+  $("cAppNet").hidden = a.network !== "host";
+  $("cAppNet").textContent = a.network === "host" ? `Runs on the machine's own network, so it finds the devices around it. It answers on ${a.port}, which is not picked.` : "";
+  $("cAppGoing").hidden = !a.going;
+  $("cAppGoing").textContent = a.going || "";
+  // A folder with a default of its own (apps/immich) starts at the first
+  // place the node offers; one with none (a library, a share's files) is
+  // the person's to pick from the suggestions.
+  const start = f => !fresh ? (v[f.var] ?? (f.kind === "folder" ? "" : f.default ?? "")) : f.kind === "folder" ? (f.default && cAppFolders(f)[0] || "") : f.default ?? "";
+  const ids = v.PUID !== undefined ? `${v.PUID}:${v.PGID ?? v.PUID}` : "1000:1000";
+  const tz = v.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  drawHTML($("cAppFields"), (a.fields || []).map((f, i) => cAppFieldHtml(f, start(f), i)).join("")
+    + (own.includes("PUID") || own.includes("PGID") ? `<div class="setrow col ctlrow">${lbl("cAppIds", "Runs as", "uid:gid, the user that owns its folders: a share's files are written as it")}<input id="cAppIds" value="${esc(ids)}" autocomplete="off" spellcheck="false"></div>` : "")
+    + (own.includes("TZ") ? `<div class="setrow col ctlrow">${lbl("cAppTz", "Time zone")}<select id="cAppTz">${tzOptions(tz)}</select></div>` : "")
+    + (own.includes("PORT") ? `<div class="setrow col ctlrow fshort">${lbl("cAppPort", "Its port", "what it answers on, on the node; a hostname and a certificate for it are the node's nginx page")}<input id="cAppPort" type="number" min="1" max="65535" value="${esc(v.PORT || a.port)}"></div>` : ""));
+  $("cAppField").hidden = false;
+  $("cAppPanel").hidden = false;
+  $("cAppLeft").hidden = true;
+  $("cAppNewer").hidden = true;
 }
+
+// Another node picked for a new one: its places suggested in each folder
+// field, and a folder still at the first place the last node offered moved
+// to the first this one offers.
+async function cAppNodePicked(){
+  if (!cAppCur || cEditing !== null || cAppHand) return;
+  const was = new Map((cAppCur.fields || []).filter(f => f.kind === "folder").map(f => [f.var, cAppFolders(f)[0] || ""]));
+  await loadNasApps($("cNode").value);
+  (cAppCur.fields || []).forEach((f, i) => {
+    const inp = $(`cAppF${i}`), list = $(`cAppF${i}L`);
+    if (f.kind !== "folder" || !inp || !list) return;
+    drawHTML(list, cAppFolders(f).map(x => `<option value="${esc(x)}"></option>`).join(""));
+    if (inp.value === was.get(f.var)) inp.value = cAppFolders(f)[0] || "";
+  });
+}
+
+// A newer definition of the app in the Library than the one a container
+// was made with (a Manifest update kept since): said on the panel, with the
+// press that takes it on Save, any field it adds shown at its default.
+function cAppNewerSay(a){
+  const n = a.newer, box = $("cAppNewer");
+  box.hidden = !n;
+  if (!n) return;
+  drawHTML(box, `The Library holds a newer ${esc(a.name)}${n.commit ? ` (${esc(n.commit.slice(0, 12))})` : ""} than this container was made with.
+    <button type="button" class="link" id="cAppTake">Take it on Save</button>`);
+  $("cAppTake").onclick = () => {
+    const vals = {...(a.values || {}), ...cAppSent().values};
+    cAppDraw({...a, fields: n.fields, own: n.own, take: true, newer: null}, vals);
+    $("cYml").value = n.compose || $("cYml").value;
+    cAppOwns(true);
+    $("cAppNewer").hidden = false;
+    drawHTML($("cAppNewer"), `Save moves it to ${esc(a.name)}'s newer definition; a field it adds starts at its default.`);
+  };
+}
+
+// What the panel holds: {values, ids, tz, port}, as /api/container takes it.
+function cAppSent(){
+  const values = {};
+  $("cAppFields").querySelectorAll("[data-avar]").forEach(e => { values[e.dataset.avar] = e.type === "checkbox" ? e.checked : e.value.trim(); });
+  return {values, ids: $("cAppIds")?.value.trim() || "", tz: $("cAppTz")?.value || "", port: $("cAppPort") ? parseInt($("cAppPort").value, 10) || "" : ""};
+}
+
+// The Compose and Environment tabs while an app owns them: its file
+// read-only with the one press that leaves it, and only the other
+// variables to type.
+function cAppOwns(on){
+  const name = cAppCur?.name || "the app";
+  $("cYml").readOnly = on || $("cGo").disabled;
+  $("cByHandBar").hidden = !on;
+  $("cImport").closest(".actbar").hidden = on;
+  $("cByHandSaid").textContent = on ? `${name}'s file as the catalog wrote it. Its fields above fill it in.` : "";
+  $("cEnv").placeholder = on ? "OTHER=value, one a line: what its fields above do not set" : "PUID=99\nPGID=100\nTZ=America/New_York";
+  $("cEnvHint").hidden = !on;
+  if (on) $("cEnvHint").textContent = `The other variables for ${name}. Its fields above set the rest, and one of theirs typed here is refused by name.`;
+}
+
+// Edit the definition by hand (R238 step 3): one way, said first. The
+// panel folds to a line and the compose file and environment become plain
+// text with the values as they stood.
+async function cAppByHand(){
+  const a = cAppCur;
+  if (!a) return;
+  if (!await askYes(`Edit ${a.name}'s definition by hand? Its fields no longer apply: the compose file and the environment become plain text with the values as they stand now, and only Start over from the Library puts the fields back.`)) return;
+  const sent = cAppSent();
+  const lines = [...(a.fields || []).map(f => `${f.var}=${sent.values[f.var] === true ? "true" : sent.values[f.var] === false ? "false" : sent.values[f.var] ?? ""}`),
+    ...(a.own || []).includes("PUID") ? [`PUID=${sent.ids.split(":")[0] || ""}`, `PGID=${sent.ids.split(":")[1] || ""}`] : [],
+    ...(a.own || []).includes("TZ") ? [`TZ=${sent.tz}`] : [], ...(a.own || []).includes("PORT") ? [`PORT=${sent.port}`] : []];
+  // A secret left empty on a new one is made here, so the text holds a value.
+  const made = (a.fields || []).filter(f => f.kind === "secret" && !sent.values[f.var]).map(f => f.var);
+  const env = lines.map(ln => made.includes(ln.split("=")[0]) ? `${ln}${cMakeSecret()}` : ln).join("\n") + "\n" + $("cEnv").value.trim();
+  cAppHand = true;
+  $("cEnv").value = env.trim() + "\n";
+  $("cAppPanel").hidden = true;
+  $("cAppLeft").hidden = false;
+  drawHTML($("cAppLeft"), `Edited by hand: ${esc(a.name)}'s fields no longer apply. Start over from the Library puts them back.`);
+  cAppOwns(false);
+  $("cEnvHint").hidden = true;
+  cSwitch("yml");
+}
+function cMakeSecret(){
+  const b = new Uint8Array(18);
+  crypto.getRandomValues(b);
+  return btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
 function openNewContainer(){
   cLock(false);
   cEditing = null;
-  $("cApp").value = ""; $("cAppFields").hidden = true; $("cAppWhat").textContent = "";
+  cAppCur = null; cAppHand = false;
   $("cAppField").hidden = true;
-  for (const id of ["cAppData", "cAppMedia", "cAppTz", "cAppPort"]) $(id).value = "";
+  cAppOwns(false);
   // Only the app the Library opened this on: the catalog is browsed there.
   const want = cAppWant;
   cAppWant = "";
-  if (want) loadNasApps().then(apps => {
+  if (want) loadNasApps(dockerNode).then(apps => {
     const a = apps.find(x => x.id === want);
-    if ($("cmodal").hidden || !a) return;
-    drawHTML($("cApp"), `<option value="${esc(a.id)}">${esc(a.name)}</option>`);
-    $("cApp").value = a.id;
-    $("cAppName").textContent = a.name;
-    $("cAppField").hidden = false;
-    cAppPicked();
+    if ($("cmodal").hidden || !a || cEditing !== null) return;
+    cAppDraw(a);
+    // Its file is the catalog's and its fields are above: no From an image.
+    $("cTabForm").hidden = true;
+    $("cYml").value = a.compose || "";
+    cYmlTouched = true;
+    cAppOwns(true);
+    if (!$("cName").value) $("cName").value = a.id;
+    cSeg("yml");
+    cHold();
   });
-  $("cAppFill").onclick = cAppFill;
   $("cTabForm").hidden = false;
   $("cEnvHint").hidden = true;
   $("cName").disabled = false;
@@ -1680,6 +1825,10 @@ async function cSubmit(){
   if (!$("cName").value.trim()) return fail("a name is needed");
   busy($("cGo"), editing ? "Saving" : "Creating");
   try{
+    // An app's panel sends its values, and its file stays the catalog's
+    // (R238 step 3); edited by hand, what was typed is the container.
+    const app = cAppCur && !cAppHand ? {app: cAppCur.id, ...cAppSent(), ...(cAppCur.take ? {newer: true} : {})}
+      : cAppCur && editing ? {by_hand: true} : {};
     const j = await postJSON("/api/container", {action: editing ? "save" : "create",
                             name: editing || $("cName").value,
                             ...(editing && $("cName").value.trim() && $("cName").value.trim() !== editing
@@ -1687,12 +1836,13 @@ async function cSubmit(){
                             node: editing ? "" : ($("cNodeField").hidden
                               ? (dockerNode || "") : $("cNode").value),
                             owner: editing ? "" : $("cUnder").value,
-                            compose: $("cYml").value, env: $("cEnv").value});
+                            compose: $("cYml").value, env: $("cEnv").value, ...app});
     if (j.error){
       unbusy($("cGo"), verb);
       // Compose's own complaint, which names the line: shown on the tab the
-      // text is on, since that is where it has to be fixed.
-      cSeg("yml");
+      // text is on, since that is where it has to be fixed. An app's panel
+      // says its own above, where its fields are.
+      if (!app.app) cSeg("yml");
       return fail(j.error);
     }
     $("cmodal").hidden = true;
@@ -1940,9 +2090,11 @@ function dmRowsHtml(ins, job, blind){
               many ? `Log of ${esc(c.service || c.name)}` : "Log"}</button>`) : []),
           ...(shellAt && !shellWhy ? shellAt.slice(1).map(c => `<button type="button" data-dmshell="${esc(c.name)}"
             title="a shell inside ${esc(c.service || c.name)}, in the dock">Shell in ${esc(c.service || c.name)}</button>`) : []),
+          // One made from an app is configured on that app's panel (R238).
           managed || !mayDocker() ? "" : `<button type="button" data-dm="edit" data-src="${d.source === "file" ? "file" : "project"}"
-            title="${d.source === "file" ? "edit this container's compose file and env"
-                    : "edit the space's compose file and this container's env"}">Compose and env</button>`,
+            title="${d.app ? `${esc(d.app)}'s fields, as its panel asks for them, with its compose file and env`
+                    : d.source === "file" ? "edit this container's compose file and env"
+                    : "edit the space's compose file and this container's env"}">${d.app ? "Configure" : "Compose and env"}</button>`,
           !mayDocker() || managed ? "" : `<button type="button" data-dmrel ${busy || d.relocating?.busy ? "disabled" : ""}
             title="to another node, its data with it: a copy beside it, or this one moved">Copy or move…</button>`,
           !mayDocker() ? "" : `<button type="button" class="danger" data-dm="remove" ${

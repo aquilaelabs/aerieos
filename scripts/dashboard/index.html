@@ -1107,28 +1107,27 @@
 <div id="cmodal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="cTitle">
   <div class="box wide">
     <h3 id="cTitle">New container</h3>
-    <!-- Apps a NAS runs (R164 step 2): an app's New container on the
-         Library opens this on it, and its few blanks fill the name, the
-         compose file and the environment. Apps are picked on the Library
-         alone (the operator, 10 Nov): opened anywhere else, this part is
-         hidden and the dialog is the image-or-compose one. -->
+    <!-- Apps a NAS runs (R164 step 2, R238): an app's New container on the
+         Library opens this on it, as Configure on a container made from one
+         does. The app's part is a panel of its own (the design's app-panel
+         rule): its head as its Library card's, then the fields its manifest
+         declares and AerieOS's own its compose reads, drawn by cAppDraw.
+         The panel owns those values: the Compose tab is the app's file,
+         read-only, and the Environment tab holds only the other variables.
+         Apps are picked on the Library alone (the operator, 10 Nov): opened
+         anywhere else, this part is hidden and the dialog is the
+         image-or-compose one. -->
     <div class="field" id="cAppField" hidden>
-      <label>From the Library: <b id="cAppName"></b></label>
-      <select id="cApp" hidden aria-hidden="true" tabindex="-1"><option value=""></option></select>
-      <div class="hint" id="cAppWhat"></div>
-      <div id="cAppFields" hidden>
-        <div class="prefrow ctlrow">
-          <div class="setrow col ctlrow"><label for="cAppData">Its data</label><input id="cAppData" placeholder="/mnt/tank/apps/jellyfin" autocomplete="off" spellcheck="false"></div>
-          <div class="setrow col ctlrow" id="cAppMediaField"><label for="cAppMedia">Its media or files</label><input id="cAppMedia" placeholder="/mnt/tank/media" autocomplete="off" spellcheck="false"></div>
-        </div>
-        <div class="prefrow ctlrow">
-          <div class="setrow col ctlrow"><label for="cAppIds">Runs as (uid:gid)</label><input id="cAppIds" value="1000:1000" autocomplete="off" spellcheck="false"></div>
-          <div class="setrow col ctlrow"><label for="cAppTz">Time zone</label><input id="cAppTz" placeholder="Europe/Paris" autocomplete="off" spellcheck="false"></div>
-          <div class="setrow col ctlrow"><label for="cAppPort">Its port</label><input id="cAppPort" type="number" min="1" max="65535"></div>
-        </div>
-        <div class="hint">The folders are a share's or a pool's on the node; the user is the one that owns them (a share's files are written as it). The app answers on its port on the node; a hostname and a certificate for it are the node's nginx page.</div>
-        <div class="actbar"><span class="sp"></span><button type="button" id="cAppFill">Fill the definition in</button></div>
+      <div class="apppanel" id="cAppPanel">
+        <div class="aphead" id="cAppHead"></div>
+        <div class="hint" id="cAppWhat"></div>
+        <div class="hint" id="cAppNet" hidden></div>
+        <div class="hint warn" id="cAppGoing" hidden></div>
+        <div class="notice note" id="cAppNewer" hidden></div>
+        <div class="fgrid" id="cAppFields"></div>
       </div>
+      <!-- ...folded to a line once the definition is edited by hand. -->
+      <div class="notice note" id="cAppLeft" hidden></div>
     </div>
     <div class="field">
       <label for="cName">Name</label>
@@ -1187,6 +1186,10 @@
            old system's containers come as a zip of them, one each). -->
       <div class="actbar cimport"><span class="grow hint">Checked by compose before it is saved; relative bind sources are inside this container's data directory.</span>
         <button type="button" id="cImport">Import a compose file…</button></div>
+      <!-- An app's file as the catalog wrote it (R238 step 3): read-only,
+           and left by one press that asks first. -->
+      <div class="actbar" id="cByHandBar" hidden><span class="grow hint" id="cByHandSaid"></span>
+        <button type="button" id="cByHand">Edit the definition by hand…</button></div>
       <input id="cImportFile" type="file" hidden accept=".yml,.yaml,.json,.txt">
     </div>
     <div class="field" id="cEnvField" hidden>

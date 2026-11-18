@@ -307,9 +307,13 @@ function libDetail(r){
   }
   if (r.kind === "app"){
     if (r.tier === "sideloaded") lines.push(`<span class="sub">Added${r.by ? ` by ${esc(r.by)}` : ""}${r.at ? ` ${ago(r.at)}` : ""}, kept as sideloaded: Edit changes it, and Remove in there takes it off the catalog.</span>`);
-    lines.push(`<span class="sub">New container opens the Containers page's dialog with ${esc(r.label)} picked: its folders, the user, the time zone and the port are filled in, and Create makes it a container there${r.port ? `, on port ${esc(String(r.port))}` : ""}. Each press makes another, under its own name.</span>`);
-    if (r.secrets?.length) lines.push(`<span class="sub">Made for it when it is created: ${esc(r.secrets.join(", "))}.</span>`);
-    if (r.blanks?.length) lines.push(`<span class="sub">Its blanks, filled from what you type: ${r.blanks.map(b => `<code>${esc(b)}</code>`).join(", ")}.</span>`);
+    if (r.going) lines.push(`<span class="sub warn">${esc(r.going)}</span>`);
+    lines.push(`<span class="sub">New container opens the Containers page's dialog on ${esc(r.label)}'s panel, and Create makes it a container there${
+      r.network === "host" ? `, on the machine's own network, answering on ${esc(String(r.port))}` : r.port ? `, on port ${esc(String(r.port))} unless you pick another` : ""}. Each press makes another, under its own name.</span>`);
+    // What its panel asks for (R238): its own fields, then AerieOS's.
+    const asks = [...(r.fields || []).map(f => f.kind === "secret" ? `${f.label} (made for it)` : f.label),
+      ...(r.own || []).includes("PUID") ? ["who it runs as"] : [], ...(r.own || []).includes("TZ") ? ["the time zone"] : []];
+    if (asks.length) lines.push(`<span class="sub">Asks for ${esc(asks.join(", "))}.</span>`);
     if (r.compose) lines.push(`<pre class="libcompose mono">${esc(r.compose.trim())}</pre>`);
   }
   if (r.kind === "companion"){

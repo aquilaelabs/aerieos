@@ -1,0 +1,9 @@
+services:
+  beacon:
+    image: ghcr.io/example/beacon:2025.5.3
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      TZ: ${TZ}
+    volumes:
+      - ${CONFIG}:/config

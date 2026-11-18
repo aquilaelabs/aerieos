@@ -287,7 +287,7 @@ def build_refusal(name, compose_text, env_text=""):
             "here builds from an absolute path or a git URL.")
 
 
-def create_container(name, compose_text, env_text="", node="", for_project=""):
+def create_container(name, compose_text, env_text="", node="", for_project="", app=None):
     """A container from a compose file written here, with no project behind it.
 
     The shape every other Docker front end uses: a stack is a name, a compose
@@ -358,6 +358,10 @@ def create_container(name, compose_text, env_text="", node="", for_project=""):
     if why:
         devapp.forget_container(slug)
         return {"error": why}
+    # Made from an app (R238 step 3): which one, at which pin and with which
+    # fields, kept beside its compose file, so Configure opens on its panel.
+    if app:
+        keep_app(slug, app)
     with devapp._lock:
         d3 = devapp._load()
         ((d3.get(slug) or {}).get(devapp.MAIN) or {}).pop("pending", None)
@@ -365,6 +369,79 @@ def create_container(name, compose_text, env_text="", node="", for_project=""):
     devapp._bump()
     return {"ok": True, "project": slug, "instance": devapp.MAIN,
             "name": devapp._pname(slug, devapp.MAIN)}
+
+
+# ---- a container made from an app ------------------------------------------
+# What a container made from an app keeps of it (R238 step 3): app.json
+# beside its compose file, nasapps.snapshot's record. Edited by hand, it
+# is taken away and the container is a written one like any other.
+APP_FILE = "app.json"
+
+
+def keep_app(name, snap):
+    """Keep the app a container was made from, or take it away with none."""
+    f = devapp.containers_dir(name) / APP_FILE
+    try:
+        if snap:
+            f.write_text(json.dumps(snap), encoding="utf-8")
+        else:
+            f.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def app_of(name):
+    """The app container `name` was made from, as kept, or None."""
+    try:
+        d = json.loads((devapp.containers_dir(name) / APP_FILE).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return d if isinstance(d, dict) and d.get("id") and isinstance(d.get("fields"), list) else None
+
+
+def app_made(req, a, node="", keep=None):
+    """An app's compose file and environment from what its panel sent:
+    {compose, env, app} or {error}. `a` is the app as the Library holds it
+    or as a container kept it; `keep` the container's values on an edit,
+    so a secret is made once and a port it holds is its own."""
+    import nasapps
+    extra, why = nasapps.extra_env(a, req.get("env"))
+    if why:
+        return {"error": why}
+    r = nasapps.render_with(a, req.get("values"), field(req, "ids") or "1000:1000", field(req, "tz") or "UTC", req.get("port"), keep)
+    if r.get("error"):
+        return r
+    busy = nasapps.ports_taken(a, r["values"], node, keep)
+    if busy:
+        return {"error": f"port {busy[0]} is taken on that node already: pick another for {a.get('name') or 'the app'}"}
+    return {"compose": a.get("compose") or "", "env": r["env"] + extra, "app": nasapps.snapshot(a)}
+
+
+def app_view(name, env_text):
+    """What Configure draws for a container made from an app: its kept app
+    with each value read back from the environment, the other variables
+    apart, and whether the Library holds a newer definition of it. None for
+    a container made any other way."""
+    import nasapps
+    snap = app_of(name)
+    if not snap:
+        return None
+    vals = nasapps.env_values(env_text)
+    mine = {f["var"] for f in snap["fields"]} | set(snap.get("own") or [])
+    extra = [ln for ln in str(env_text or "").splitlines() if ln.strip() and ln.partition("=")[0].strip() not in mine]
+    now = next((a for a in nasapps.catalog() if a["id"] == snap["id"]), None)
+    # Newer: kept from another pin since, and its file or its fields differ.
+    newer = bool(now) and (now.get("commit") or now.get("at")) != (snap.get("commit") or snap.get("at")) \
+        and (now.get("compose") != _compose_of(name) or now.get("fields") != snap.get("fields"))
+    return {**snap, "values": {k: v for k, v in vals.items() if k in mine}, "extra": "\n".join(extra) + ("\n" if extra else ""),
+            "newer": {"commit": now.get("commit") or "", "fields": now["fields"], "own": now["own"], "compose": now["compose"]} if newer and now else None}
+
+
+def _compose_of(name):
+    try:
+        return (devapp.containers_dir(name) / "docker-compose.yml").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
 
 
 def overview_names():
@@ -477,8 +554,11 @@ def read_container(name):
             encoding="utf-8", errors="replace")
     except OSError:
         compose = ""
-    return {"compose": redact_keys(compose), "env": devapp.read_env(name, devapp.MAIN),
-            "managed": devapp.owner_of(name, devapp.MAIN) == devapp.SYSTEM}
+    env = devapp.read_env(name, devapp.MAIN)
+    return {"compose": redact_keys(compose), "env": env,
+            "managed": devapp.owner_of(name, devapp.MAIN) == devapp.SYSTEM,
+            # ...and the app it was made from, read back for its panel (R238).
+            "app": app_view(name, env)}
 
 
 def listed_owner(c):
@@ -691,7 +771,25 @@ def tab_verb(act, name, req, seen):
         # through update_container directly.
         if devapp.owner_of(name, devapp.MAIN) == devapp.SYSTEM:
             return {"error": f"{name} is AerieOS's own, written from the nginx page: change it there"}, 403
-        r = update_container(name, req.get("compose") or "", req.get("env") or "")
+        compose, env = req.get("compose") or "", req.get("env") or ""
+        # Made from an app (R238 step 3): its panel's values make the
+        # environment, the file stays the one it was made with, or the
+        # Library's newer one when Configure takes it; edited by hand, it
+        # leaves the app and is saved as written.
+        snap, made = app_of(name), {}
+        if snap and not req.get("by_hand"):
+            import nasapps
+            kept = nasapps.env_values(devapp.read_env(name, devapp.MAIN))
+            a = next((x for x in nasapps.catalog() if x["id"] == snap["id"]), None) if req.get("newer") else snap
+            if not a:
+                return {"error": f"{snap.get('name') or snap['id']} is not in the Library any more: its newer definition cannot be taken"}, 400
+            made = app_made(req, {**a, "compose": a.get("compose") or _compose_of(name)}, devapp._instance_node(name, devapp.MAIN), kept)
+            if made.get("error"):
+                return made, 400
+            compose, env = made["compose"], made["env"]
+        r = update_container(name, compose, env)
+        if snap and not r.get("error") and (req.get("by_hand") or req.get("newer")):
+            keep_app(name, None if req.get("by_hand") else made.get("app"))
         # ...and a new name with it, while it is down (rename_container):
         # the file is saved first, so what was typed is kept either way.
         new = field(req, "rename")
@@ -717,8 +815,19 @@ def tab_verb(act, name, req, seen):
     under = field(req, "owner")
     if under and under not in mine:
         return {"error": f"not a space: {under}"}, 400
-    r = create_container(name, req.get("compose") or "",
-                         req.get("env") or "", field(req, "node"), under)
+    # From an app the Library holds (R238 step 3): its panel's values make
+    # the environment and its compose file is the catalog's, never the page's.
+    compose, env, app = req.get("compose") or "", req.get("env") or "", None
+    if field(req, "app"):
+        import nasapps
+        a = next((x for x in nasapps.catalog() if x["id"] == field(req, "app")), None)
+        if not a:
+            return {"error": f"no app called {field(req, 'app')} in the Library"}, 400
+        made = app_made(req, a, field(req, "node"))
+        if made.get("error"):
+            return made, 400
+        compose, env, app = made["compose"], made["env"], made["app"]
+    r = create_container(name, compose, env, field(req, "node"), under, app=app)
     # Made for a project: its sessions may reach it (R79).
     if not r.get("error") and under:
         net_nudge()

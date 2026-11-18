@@ -1,0 +1,17 @@
+{
+ "about": "Finds the devices on the network around it, so it runs on the machine's own network; going, with what to install in its place.",
+ "compose": "compose.yml",
+ "fields": [
+  {"var": "CONFIG", "kind": "folder", "label": "Its settings", "default": "apps/beacon"}
+ ],
+ "format": 4,
+ "framework": "4.2",
+ "going": "Beacon is going: install Lighthouse, which does what it did, in its place.",
+ "label": "Beacon",
+ "license": {"label": "Apache-2.0", "url": "https://example.com/beacon/LICENSE"},
+ "maker": "Example Labs",
+ "name": "beacon",
+ "network": "host",
+ "platforms": ["linux/amd64"],
+ "port": 8123
+}

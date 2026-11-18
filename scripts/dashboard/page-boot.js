@@ -457,6 +457,10 @@ function bootContainerDialogs(){
   $("cImport").onclick = () => $("cImportFile").click();
   $("cImportFile").onchange = cImportPicked;
   $("cUnder").onchange = cUnderPicked;
+  // An app's panel (R238): its file left by hand, one way, and its folders
+  // suggested from the node picked.
+  $("cByHand").onclick = cAppByHand;
+  $("cNode").onchange = cAppNodePicked;
   $("dnUnder").onchange = dnNodeSay;
   $("rnNode").onchange = () => {
     // Italic only while the removed node is the one shown (page-projsettings.js).

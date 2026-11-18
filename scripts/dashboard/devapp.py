@@ -1893,6 +1893,16 @@ def containers_dir(name):
     return STATE / "containers" / name
 
 
+def _app_name(name):
+    """The name of the app a written container was made from (its app.json,
+    containers.keep_app), or "" for one made any other way."""
+    try:
+        d = json.loads((containers_dir(name) / "app.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return ""
+    return str(d.get("name") or d.get("id") or "") if isinstance(d, dict) else ""
+
+
 def project_has_compose(project):
     """Whether the project's own checkout carries a compose file.
 
@@ -3076,6 +3086,9 @@ def _overview_here(picked):
                 # ...and the GPU it was given (R207 step 4).
                 "gpu": str(rec.get("gpu") or ""),
                 "source": "file" if filed else "project",
+                # ...and, for one made from an app, the app's name (R238), so
+                # its row's press opens that app's panel as Configure.
+                "app": _app_name(project) if filed else "",
                 # A file read and one git call. risks/problems stay out:
                 # those are judgements to put in front of somebody about to
                 # press a button, and belong on the row that asked.

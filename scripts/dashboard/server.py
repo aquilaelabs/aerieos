@@ -4621,7 +4621,9 @@ import devactions                                                # noqa: E402
 import home                                                      # noqa: E402
 import containers                                                # noqa: E402
 import nasapps                                                   # noqa: E402
-nasapps.configure(state=STATE, write_json=write_json)
+# ...and whether a port an app would publish answers on its node already,
+# asked from here as the node's address (R238 step 3).
+nasapps.configure(state=STATE, write_json=write_json, answers=lambda nid, port: _port_answers(nid, port))
 import nginxproxy                                                # noqa: E402
 import imagecheck                                                # noqa: E402
 import relocate                                                  # noqa: E402
@@ -5538,6 +5540,14 @@ nodes.project_nodes = lambda: {p: (v or {}).get("node") or ""
                                for p, v in prefs.all_projects(WORKSPACE).items()}
 devapp.all_project_nodes = lambda: {p: (v or {}).get("nodes") or []
                                     for p, v in prefs.all_projects(WORKSPACE).items()}
+
+def _port_answers(nid, port):
+    """True when something on node `nid` accepts a connection on `port`,
+    asked at the address it dials in from; None where that is not known."""
+    n = nodes.node(nid) if nid and not NODES_OK else None
+    addr = ((n or {}).get("agent") or {}).get("addr") or ""
+    return ftp._answers(addr, port) if addr else None
+
 
 def _ftp_node(nid):
     """What ftp.py asks of a node: its name, the address it dials in from,
@@ -13082,7 +13092,14 @@ class Handler(BaseHTTPRequestHandler):
         why = users.may(who, "docker-write")
         if why:
             return self._json({"error": why}, 403)
-        return self._json({"apps": nasapps.catalog()})
+        # ...and the folders a folder field suggests on the node picked (R238):
+        # its pools, shares and disks under /mnt or /srv, as the Files page
+        # lists its places.
+        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        nid, why = self._node_asked(q.get("node", [""])[0]) if q.get("node") else ("", "")
+        n = nodes.node(nid) if nid and nid != "local" and not why and not NODES_OK else None
+        roots = [r for r in fileexplorer.roots(n) if nasapps.PATH_RE.fullmatch(r["path"])] if n else []
+        return self._json({"apps": nasapps.catalog(), "roots": roots})
 
     def _nasapps(self, req):
         """POST /api/nasapps (R164 step 2): one app's compose and environment
@@ -13122,9 +13139,9 @@ class Handler(BaseHTTPRequestHandler):
             # catalog again on their next open, and the page that added
             # it reads at once.
             return self._json(r, 400 if r.get("error") else 200)
-        r = nasapps.render(field(req, "app"), field(req, "data"), field(req, "media"), field(req, "ids") or "1000:1000",
-                           field(req, "tz") or "UTC", req.get("port"), req.get("secrets") if isinstance(req.get("secrets"), dict) else None)
-        return self._json(r, 400 if r.get("error") else 200)
+        # An app's environment is made as its container is (R238 step 3:
+        # /api/container's create, from its panel's values), never here.
+        return self._json({"error": f"unknown action: {action or 'none'}"}, 400)
 
     def _get_extmounts(self):
         """GET /api/extmounts (R162 step 4): the other disks and shares the

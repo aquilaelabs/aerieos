@@ -360,6 +360,7 @@ on its Details what that install leaves out.
 | 2.1 | A coding agent's sign-in as data (`signin.flow`), so its page runs it; who a tool is by (`maker`) and each maker's tool where a pack carries several (`credits`). | Takes the entry: the agent signs in in its session's terminal, and the card names nobody as the maker. | the releases after 0.9.0-dev.5284 |
 | 2.2 | A sign-in whose program ends itself once signed in (`signin.flow.ends`), whose link may start in more than one way (`signin.flow.url` as a list), that says where who is signed in is read (`signin.flow.who`), and whose sign-out takes keys out of a settings file (`signin.flow.forget`). | Takes the entry and leaves such a flow out: the agent signs in in its session's terminal. | the releases after 0.9.0-dev.5284 |
 | 3.2 | Declared downloads (`install.fetch`): every file an install takes from somewhere else, with its address and its sha256, fetched and checked by AerieOS before the install steps run, which then run with no network. | Hides the entry: needs the first AerieOS that reads pack format 3. | the releases after 0.9.0-dev.5341 |
+| 4.2 | A Docker app that declares its own fields (`fields`: each the variable it fills, its label, its kind, a default, a line of help and whether it is required), drawn by New container as the app's panel; one on the machine's own network (`network`); one being replaced, with what to install in its place (`going`). | Hides the entry: needs the first AerieOS that reads pack format 4. | the releases after 0.9.0-dev.5341 |
 
 ### What stays AerieOS's own
 
@@ -372,7 +373,9 @@ AerieOS carries. These are the format's primitives:
 | What a command's words may hold | `{dir}`, `{dist}`, `{project}`, `{args}` |
 | A node's package managers (`system`) | `apt`, `dnf`, `pacman`, `zypper`, `apk` |
 | A config field's kind | `secret`, `text`, `choice`, `list`, `switch`, `projects` |
-| A Docker app's blanks | `${PORT}`, `${DATA}`, `${MEDIA}`, `${PUID}`, `${PGID}`, `${TZ}` |
+| A Docker app's blanks before format 4 | `${PORT}`, `${DATA}`, `${MEDIA}`, `${PUID}`, `${PGID}`, `${TZ}` |
+| AerieOS's own fields of a Docker app, and the kinds of its own | `${PUID}`, `${PGID}`, `${TZ}`, `${PORT}`; `folder`, `port`, `text`, `secret`, `choice`, `switch` |
+| The network a Docker app runs on | `host` |
 | How an agent takes the briefing | `flag-text`, `flag-file`, `env-file`, `hook`, `none` |
 | A named hooks file shape and payload | `grouped`, `flat`; `snake`, `camel` |
 | AerieOS's events an agent's own are named for | `pre`, `prompt`, `stop`, `recall`, `asking`, `start` |
@@ -531,17 +534,19 @@ it as it starts (docs/image.md).
 ### Docker apps in the catalog
 
 An entry of `"kind": "app"` is a Docker app: its folder holds `bbapp.json`
-(`name`, `label`, `about`, `port`, `media`, `platforms`, `license`, and an
+(`name`, `label`, `about`, `port`, `maker`, `platforms`, `license`, an
 optional `icon`, a PNG, WebP or SVG file in the folder held to a pack's
-rules) and
-`compose.yml` beside it, the compose held to what an app of your own is held
-to (every image pinned to a tag that is not latest, never built or
-privileged, only the blanks New container fills). The Library lists it as
-an **Apps** card with its tier. **Install** fetches the folder at the commit
-the signed index pins, checks its archive's sha256, keeps the app and opens
-New container with it picked, on the Library's node when that node runs
-Docker (the card says when it does not); from then on New container offers
-it to everyone, and each Create makes another container of it.
+rules, and from pack format 4 its own `fields`, `network` and `going`,
+[A Docker app](submitting.md#a-docker-app)) and `compose.yml` beside it,
+the compose held to what an app of your own is held to (every image pinned
+to a tag that is not latest, never built or privileged, and every blank one
+it declares or one of AerieOS's own). The Library lists it as an **Apps**
+card with its tier and what it asks for. **Install** fetches the folder at
+the commit the signed index pins, checks its archive's sha256, keeps the
+app and opens New container on its panel, on the Library's node when that
+node runs Docker (the card says when it does not); from then on New
+container offers it to everyone, and each Create makes another container
+of it, which keeps beside its compose file which app it was made from.
 
 ### A session asking for one
 

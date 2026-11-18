@@ -189,6 +189,8 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
                     "port": a.get("port"), "media": bool(a.get("media")), "secrets": a.get("secrets") or [],
                     # Its compose file as the catalog holds it, and the blanks New container fills (step 2).
                     "compose": a.get("compose") or "", "blanks": sorted(set(re.findall(r"\$\{([A-Z_]+)\}", a.get("compose") or ""))),
+                    # ...what its panel asks for, its network and whether it is going (R238).
+                    "fields": a.get("fields") or [], "own": a.get("own") or [], "network": a.get("network") or "", "going": a.get("going") or "",
                     "icon": a.get("icon") or "",
                     "installed": False, "version": "", "latest": "", "update": False, "running": False, "verb": "install"})
     # The shipped rows by the names the catalog gives them (a toolchain's

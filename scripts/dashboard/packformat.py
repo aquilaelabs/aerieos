@@ -45,7 +45,7 @@ this beside toolpacks.py from a checkout of any release.
 """
 
 # The number this build reads, and every one before it.
-FORMAT = 3
+FORMAT = 4
 # ...and the framework's second number, which this build reads up to: what
 # was added since that an earlier build leaves out. It never resets.
 MINOR = 2
@@ -66,6 +66,9 @@ FORMATS = {
        "prompt_fires, the start event, and the briefing and the allow list handed over by hook",
     3: "declared downloads (install.fetch): every file an install takes from somewhere else, each with its address and "
        "its sha256, fetched and checked by AerieOS before the install steps run, which then run with no network",
+    4: "a Docker app that declares its own fields (fields: each the variable it fills, its label, its kind, a default, a line "
+       "of help and whether it is required) in place of the six blanks every app shared, one that runs on the machine's own "
+       "network (network: host), and one marked as going (going: what to install in its place)",
 }
 
 

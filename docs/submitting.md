@@ -161,11 +161,29 @@ The full table of keys is under
 
 ## A Docker app
 
-An app is a folder with two files: `bbapp.json`, which says what it is, and
-a `compose.yml` held to a few rules (every image pinned to a tag that is not
-`latest`, nothing built, nothing privileged, and only the blanks New
-container fills: `${PORT}`, `${DATA}`, `${MEDIA}`, `${PUID}`, `${PGID}`,
-`${TZ}`).
+An app is a folder with two files: `bbapp.json`, which says what it is and
+what it asks for, and a `compose.yml` held to a few rules (every image
+pinned to a tag that is not `latest`, nothing built, nothing privileged,
+and every `${VARIABLE}` one the app declares or one of AerieOS's own).
+
+From pack format 4 an app declares its own `fields`, which New container
+draws as the app's panel, in their order: each the variable it fills
+(`var`), what the panel calls it (`label`), its `kind`, a `default`, an
+`example` for a folder or a line of text, a line of `help`, and whether a
+line of text is `required`. The kinds are `folder` (a path on the node, its
+default a folder under the pool or share picked, as `apps/whoami`; always
+asked for), `port` (a number, checked against what the node already
+answers on), `text` (one line), `secret` (made for it when left empty,
+once, and kept on every later edit), `choice` (`choices`, each a `value`
+and a `label`) and `switch` (true or false). `${PUID}`, `${PGID}`, `${TZ}`
+and `${PORT}` are AerieOS's own: never declared, asked for in the same
+words for every app whose compose reads them, `${PORT}` the port it
+answers on. An app that has to be on the machine's own network says
+`"network": "host"`: every service says `network_mode: host` and publishes
+no ports, and `port` is the one it answers on. One being replaced says so
+in `going`, a line naming what to install in its place. A manifest written
+before format 4 has no `fields`, and `${PORT}`, `${DATA}`, `${MEDIA}`,
+`${PUID}`, `${PGID}` and `${TZ}` as its only blanks.
 
 ```json
 {
@@ -173,11 +191,15 @@ container fills: `${PORT}`, `${DATA}`, `${MEDIA}`, `${PUID}`, `${PGID}`,
   "label": "whoami",
   "about": "A tiny web server that answers with the hostname, the address and the headers of the request.",
   "maker": "Traefik Labs",
-  "framework": "2.1",
+  "format": 4,
+  "framework": "4.2",
   "license": {"label": "MIT (traefik/whoami)", "url": "https://github.com/traefik/whoami/blob/master/LICENSE"},
   "compose": "compose.yml",
   "port": 8089,
-  "media": false,
+  "fields": [
+    {"var": "WHOAMI_NAME", "kind": "text", "label": "Its name", "default": "whoami",
+     "help": "the name it answers with, on its first line"}
+  ],
   "platforms": ["linux/amd64", "linux/arm64"]
 }
 ```
@@ -187,6 +209,7 @@ services:
   whoami:
     image: traefik/whoami:v1.10.4
     restart: unless-stopped
+    command: ["--name", "${WHOAMI_NAME}"]
     ports:
       - "${PORT}:80"
 ```
@@ -211,7 +234,9 @@ each step.
 **A Docker app.** **Add your own**, **An app**: give it a name, an id, one
 line of what it is, its port, and paste the compose file. **Look** holds
 the compose to the rules above and **Add** offers it in New container. Make
-a container of it and open it.
+a container of it and open it. An app added this way asks for the folders
+of the six blanks its compose reads; its own `fields` are read from the
+catalog's copy of its folder.
 
 **A coding agent.** Add its pack the same way: **Look** reads the `agent`
 block and names anything in it that is not said right. A pack you added

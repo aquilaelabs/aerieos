@@ -858,9 +858,9 @@ body.firstrun #panes{display:none}
   border:var(--hair) solid var(--line);border-radius:var(--r-surface);min-width:0}
 .librarytab .lcard.open{grid-column:1/-1}
 .librarytab .lchead{display:flex;gap:10px;align-items:flex-start;min-width:0}
-.librarytab .lcicon,:is(.entrytab,.thingtab) .lcicon{flex:none;width:36px;height:36px;border-radius:9px;display:grid;place-items:center;color:var(--accent);
+.librarytab .lcicon,:is(.entrytab,.thingtab,.apppanel) .lcicon{flex:none;width:36px;height:36px;border-radius:9px;display:grid;place-items:center;color:var(--accent);
   background:color-mix(in srgb, var(--accent) 14%, var(--panel))}
-.librarytab .lcicon svg,:is(.entrytab,.thingtab) .lcicon svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round}
+.librarytab .lcicon svg,:is(.entrytab,.thingtab,.apppanel) .lcicon svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round}
 .librarytab .lctitle{min-width:0;display:flex;flex-direction:column;gap:3px}
 .librarytab .lcard .name{font-weight:600;font-size:1.05rem;line-height:1.3;color:var(--ink);overflow-wrap:anywhere}
 .librarytab .lcmeta{display:flex;gap:4px;flex-wrap:wrap}
@@ -886,12 +886,25 @@ body.firstrun #panes{display:none}
 .librarytab .lcard.skcard .lcicon{background:var(--line)}
 /* A pack's or an app's own icon (R182): its picture fills the square, the
    kind's glyph kept under it for one that does not load. */
-.librarytab .lcicon.own,:is(.entrytab,.thingtab) .lcicon.own{overflow:hidden;background:none;--sheen:none}
-.librarytab .lcicon.own img,:is(.entrytab,.thingtab) .lcicon.own img{width:100%;height:100%;object-fit:contain;display:block}
-.librarytab .lcicon.own>svg,:is(.entrytab,.thingtab) .lcicon.own>svg{display:none}
-.librarytab .lcicon.own.broken,:is(.entrytab,.thingtab) .lcicon.own.broken{background:color-mix(in srgb, var(--accent) 14%, var(--panel))}
-.librarytab .lcicon.own.broken img,:is(.entrytab,.thingtab) .lcicon.own.broken img{display:none}
-.librarytab .lcicon.own.broken>svg,.entrytab .lcicon.own.broken>svg{display:block}
+.librarytab .lcicon.own,:is(.entrytab,.thingtab,.apppanel) .lcicon.own{overflow:hidden;background:none;--sheen:none}
+.librarytab .lcicon.own img,:is(.entrytab,.thingtab,.apppanel) .lcicon.own img{width:100%;height:100%;object-fit:contain;display:block}
+.librarytab .lcicon.own>svg,:is(.entrytab,.thingtab,.apppanel) .lcicon.own>svg{display:none}
+.librarytab .lcicon.own.broken,:is(.entrytab,.thingtab,.apppanel) .lcicon.own.broken{background:color-mix(in srgb, var(--accent) 14%, var(--panel))}
+.librarytab .lcicon.own.broken img,:is(.entrytab,.thingtab,.apppanel) .lcicon.own.broken img{display:none}
+.librarytab .lcicon.own.broken>svg,:is(.entrytab,.apppanel) .lcicon.own.broken>svg{display:block}
+/* An app's panel in New container (the design's app-panel rule, R238): the
+   first band, set apart from the name, the node and the definition under it
+   on the page's ground, headed as the app's Library card is (its icon, its
+   name, who it is by beside its tier), its fields a form's grid. */
+.apppanel{display:flex;flex-direction:column;gap:8px;padding:12px;background:var(--bg);border:var(--hair) solid var(--line);border-radius:var(--r-surface);min-width:0}
+.apppanel[hidden]{display:none}
+.apppanel .aphead{display:flex;gap:10px;align-items:center;min-width:0}
+.apppanel .aptitle{min-width:0;display:flex;flex-direction:column;gap:3px}
+.apppanel .aptitle>b{font-weight:600;font-size:1.05rem;line-height:1.3;color:var(--ink);overflow-wrap:anywhere}
+.apppanel .apby{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+.apppanel .apby .lcby{font:var(--f-note);color:var(--dim);margin-right:4px;overflow-wrap:anywhere}
+.apppanel>.fgrid{margin-top:4px}
+.apppanel>.fgrid:empty{display:none}
 /* The Installed page (tab-installed.js, R172): a row a fold (rows-you-open),
    what it is one ellipsized line until Details opens it on the node's
    side of it and its Configure. */
