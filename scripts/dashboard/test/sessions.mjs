@@ -617,13 +617,14 @@ await phone.evaluate(() => document.querySelector('.pgrid .pcard[data-row="alpha
 await phone.waitForSelector('.resumemenu', { timeout: 10000 });
 // Where it rests, not where it is mid-entrance: a dialog's box grows into
 // place, and where it stops is what the operator sees (B77).
-await phone.waitForFunction(() => { const m = document.querySelector('.resumemenu');
-  return !!m && !document.getElementById('rmModal').hidden && m.getAnimations().every(a => a.playState !== 'running'); }, null, { timeout: 10000 });
-const rest = await phone.$eval('.resumemenu', el => {
+// Waited for and measured in one look: in two, a redraw between them
+// swapped the box (rmPut) and the measure read the old one, detached, 0 by
+// 0 and outside #rmModal (B974).
+const rest = await (await phone.waitForFunction(() => { const el = document.querySelector('#rmModal:not([hidden]) .resumemenu');
+  if (!el || !el.isConnected || el.getAnimations().some(a => a.playState === 'running')) return null;
   const m = el.getBoundingClientRect();
   return { top: Math.round(m.top), bottom: Math.round(m.bottom), inner: innerHeight, dialog: !!el.closest('#rmModal'),
-           in: m.top >= 0 && m.bottom <= innerHeight + 1 };
-});
+           in: m.top >= 0 && m.bottom <= innerHeight + 1 }; }, null, { timeout: 10000 })).jsonValue();
 ok(rest.in && rest.dialog, `...a dialog over the page, wholly on the screen however the page under it is scrolled (${JSON.stringify(rest)})`);
 await phone.setViewportSize({ width: 400, height: 800 });
 await phone.click('.resumemenu [data-n]');
