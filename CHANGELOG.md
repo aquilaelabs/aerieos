@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Changed
+
+- What pops up over the page stands out from it in every theme: a tour's card, the bell, the doctor and the gear menu, a row's menu, a help note, the phone's More sheet and a toast are a step brighter than the page, white in a light theme, with a firmer edge (c17c3ae)
+- On a phone a toast shows just above an open dialog's buttons, where it floated over the dialog's words (1ee6913)
+
 ### Fixed
 
 - A node's CI runner that has updated itself shows as listening, where its row said not listening and asked for Reinstall runner while it took jobs (d02e808)
@@ -15,6 +20,8 @@
 - The Git view's history shows a commit's subject however many branches point at it: two branch names and a count of the rest (e38c6ba)
 - A page whose scripts never arrive says it did not finish loading, with Reload, where it said loading forever (5a53495)
 - `aerie bug add --from FILE`, `aerie roadmap add --from FILE` and `aerie design edit` work in a session on a node (4eae63f, 460ba1c)
+- A node whose report has one field in a shape the controller cannot read still checks in, that field left out, where its whole check-in was refused (93de515)
+- Cutting a release keeps the commit each changelog line names, where it could rename a line to the change committed after it (c41fc43)
 
 ## 0.9.0-dev.5641: 2026-11-18
 
