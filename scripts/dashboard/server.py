@@ -13100,8 +13100,11 @@ class Handler(BaseHTTPRequestHandler):
         nid, why = self._node_asked(q.get("node", [""])[0]) if q.get("node") else ("", "")
         n = nodes.node(nid) if nid and nid != "local" and not why and not NODES_OK else None
         roots = [r for r in fileexplorer.roots(n) if nasapps.PATH_RE.fullmatch(r["path"])] if n else []
-        # ...and the model routers a router field can be given a key at (R238 step 7).
-        return self._json({"apps": nasapps.catalog(), "roots": roots, "routers": router.routers()})
+        # ...and the model routers a router field can be given a key at (R238
+        # step 7), and the names and the node's ports the containers already
+        # made hold, so another of the same app is offered its own.
+        return self._json({"apps": nasapps.catalog(), "roots": roots, "routers": router.routers(),
+                           "taken": containers.apps_held(nid if nid and not why else "")})
 
     def _nasapps(self, req):
         """POST /api/nasapps (R164 step 2): one app's compose and environment

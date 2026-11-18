@@ -399,6 +399,29 @@ def app_of(name):
     return d if isinstance(d, dict) and d.get("id") and isinstance(d.get("fields"), list) else None
 
 
+def apps_held(nid, but=""):
+    """What the containers already made hold, so another made from the same
+    app is offered its own: every name the store has, and the ports the ones
+    made from an app on node `nid` publish there, read from their
+    environment, and the apps they were made from. One still pulling its
+    image, or stopped, answers on nothing, so asking the node alone let a
+    second take its port. `but` is a container whose own are not counted
+    (the one being saved)."""
+    import nasapps
+    store = devapp._load()
+    ports, apps = set(), set()
+    for name in store:
+        snap = app_of(name) if nid and name != but else None
+        if not snap or devapp.instance_node(name, devapp.MAIN) != nid:
+            continue
+        apps.add(snap["id"])
+        vals = nasapps.env_values(devapp.read_env(name, devapp.MAIN))
+        for v in [f["var"] for f in snap["fields"] if f.get("kind") == "port"] + (["PORT"] if "PORT" in (snap.get("own") or []) else []):
+            if str(vals.get(v) or "").isdigit():
+                ports.add(int(vals[v]))
+    return {"names": sorted(store), "ports": sorted(ports), "apps": sorted(apps)}
+
+
 def app_made(req, a, node="", keep=None, name=""):
     """An app's compose file and environment from what its panel sent:
     {compose, env, app, routers} or {error}. `a` is the app as the Library
@@ -420,7 +443,12 @@ def app_made(req, a, node="", keep=None, name=""):
     r = nasapps.render_with(a, req.get("values"), field(req, "ids") or "1000:1000", field(req, "tz") or "UTC", req.get("port"), keep, router=at)
     if r.get("error"):
         return r
-    busy = nasapps.ports_taken(a, r["values"], node, keep)
+    held = apps_held(node, but=devapp._slug(name) or "")
+    # One on the machine's own network answers on its own port, which is not
+    # picked: a second of it on the same node has nothing to answer on.
+    if a.get("network") == "host" and a.get("id") in held["apps"]:
+        return {"error": f"{a.get('name') or a['id']} answers on the machine's own network, on port {a.get('port')}, and another on that node already does: make this one on another node"}
+    busy = nasapps.ports_taken(a, r["values"], node, keep, held=held["ports"])
     if busy:
         return {"error": f"port {busy[0]} is taken on that node already: pick another for {a.get('name') or 'the app'}"}
     return {"compose": a.get("compose") or "", "env": r["env"] + extra, "app": nasapps.snapshot(a), "routers": sorted(used)}
@@ -842,11 +870,13 @@ def tab_verb(act, name, req, seen):
         if not a:
             return {"error": f"no app called {field(req, 'app')} in the Library"}, 400
         # A name already taken is refused before a router makes it a key:
-        # its key is the container that has the name.
+        # its key is the container that has the name. Said to the person on
+        # the panel, which offers a free one: another of the same app is a
+        # container of its own under a name of its own.
         with devapp._lock:
             taken = name_free(devapp._slug(name)) if devapp._slug(name) else ""
         if taken:
-            return {"error": taken}, 400
+            return {"error": f"{devapp._slug(name)} is another container's name: give this {a.get('name') or 'one'} a name of its own"}, 400
         made = app_made(req, a, field(req, "node"), name=name)
         if made.get("error"):
             return made, 400

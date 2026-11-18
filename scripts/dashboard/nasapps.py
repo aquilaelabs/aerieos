@@ -312,12 +312,14 @@ def extra_env(a, text):
     return ("\n".join(lines) + "\n") if lines else "", ""
 
 
-def ports_taken(a, values, node, keep=None):
+def ports_taken(a, values, node, keep=None, held=()):
     """Of the ports an app would publish on `node` (its port and each port
-    field), the ones something there already answers on, asked from here;
-    a port the container already had (`keep`) is its own and not asked.
-    Two of its own fields on one port are one taken too."""
+    field), the ones something there already answers on, asked from here,
+    or another container made there holds (`held`); a port the container
+    already had (`keep`) is its own and not asked. Two of its own fields on
+    one port are one taken too."""
     keep = keep if isinstance(keep, dict) else {}
+    held = {int(p) for p in held}
     mine, own = (a.get("fields"), a.get("own")) if "own" in a else app_fields(a)
     want = [v for v in [*(f["var"] for f in mine if f["kind"] == "port"), *(["PORT"] if "PORT" in own else [])] if values.get(v)]
     seen, out = set(), []
@@ -326,7 +328,7 @@ def ports_taken(a, values, node, keep=None):
         if p in seen:
             out.append(int(p))
         seen.add(p)
-        if keep.get(v) != p and answers_fn and answers_fn(node, int(p)):
+        if keep.get(v) != p and (int(p) in held or answers_fn and answers_fn(node, int(p))):
             out.append(int(p))
     return sorted(set(out))
 

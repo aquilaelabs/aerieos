@@ -461,6 +461,7 @@ function bootContainerDialogs(){
   // suggested from the node picked.
   $("cByHand").onclick = cAppByHand;
   $("cNode").onchange = cAppNodePicked;
+  $("cName").addEventListener("input", cAppNameTyped);
   $("dnUnder").onchange = dnNodeSay;
   $("rnNode").onchange = () => {
     // Italic only while the removed node is the one shown (page-projsettings.js).

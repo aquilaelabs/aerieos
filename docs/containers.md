@@ -187,8 +187,12 @@ variables, one the panel sets refused there by name. **Edit the definition
 by hand** under the compose file asks first, then folds the panel to a line
 and leaves the file and the environment as plain text, the values as they
 stood; Start over from the Library puts the fields back. Create makes it
-as any container, keeping beside its compose file which app it came from,
-and its row's **Configure** opens the same panel with each value read back
+as any container, keeping beside its compose file which app it came from.
+Each press makes another: a second from the same app is offered a name of
+its own (immich-2), its folders under that name, followed as it is typed,
+and the ports after the ones the containers already made from apps hold
+on that node, counted even while one is still starting. Its row's
+**Configure** opens the same panel with each value read back
 from its environment, offering a newer definition the Library has kept
 since; the registry update check says when an image's tag moves. Home
 Assistant runs on the machine's own network and answers on its own port.

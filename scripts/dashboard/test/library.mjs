@@ -375,6 +375,28 @@ await section("an app's panel", async () => {
   ok(read.app?.id === 'ledger' && env.BOOKS === '/mnt/tank/ledger' && env.CURRENCY === 'USD' && env.SIGNUPS === 'false' && env.SYNC_PORT === '7070'
      && (env.DB_PASSWORD || '').length >= 20 && env.LEDGER_LOG === 'info' && read.app.extra === 'LEDGER_LOG=info\n' && env.LLM_URL === '' && env.LLM_KEY === '',
      'its environment is the panel\'s values, a secret made for it, and the other variable kept apart; the container keeps which app it came from');
+  // Another of the same app is a container of its own (the Library's rule:
+  // each press makes another): its ports past the ones ledger-one holds,
+  // though nothing answers on them yet, and its folder named for it.
+  await page.evaluate(() => { $('cmodal').hidden = true; openNewContainerApp('ledger'); });
+  await page.waitForFunction(() => cAppCur?.id === 'ledger' && !document.getElementById('cAppField').hidden, null, { timeout: 15000 });
+  const second = await page.evaluate(() => ({ name: $('cName').value, port: $('cAppPort').value,
+    sync: document.querySelector('#cAppFields [data-avar="SYNC_PORT"]').value }));
+  ok(second.name === 'ledger' && second.port === '8021' && second.sync === '7071',
+     `a second from the same app is offered a free name and the ports after the ones the first holds (${JSON.stringify(second)})`);
+  const follows = await page.evaluate(() => { cAppRoots = [{path: '/mnt/tank'}]; cAppFollow();
+    const b = document.querySelector('#cAppFields [data-avar="BOOKS"]'), at = b.value;
+    $('cName').value = 'Ledger Two'; $('cName').dispatchEvent(new Event('input'));
+    return { at, now: b.value, offered: [...b.list.options].map(o => o.value) }; });
+  ok(follows.at === '/mnt/tank/ledger/books' && follows.now === '/mnt/tank/ledger-two/books' && follows.offered[0] === '/mnt/tank/ledger-two/books',
+     `...its folder named for it, following the name as it is typed (${JSON.stringify(follows)})`);
+  await page.fill('#cName', 'ledger-one');
+  await page.fill('#cAppFields [data-avar="BOOKS"]', '/mnt/tank/ledger2');
+  await page.click('#cGo');
+  await page.waitForFunction(() => !document.getElementById('cErrWrap').hidden, null, { timeout: 15000 });
+  ok(/ledger-one is another container's name: give this Ledger a name of its own/.test(await page.$eval('#cErr', e => e.textContent)),
+     "...and a name another container has is refused in the person's words");
+  await page.evaluate(() => { $('cErrWrap').hidden = true; $('cmodal').hidden = true; });
   await page.evaluate(() => openEditContainer('ledger-one'));
   await page.waitForFunction(() => cEditing === 'ledger-one' && cAppCur?.id === 'ledger' && !document.getElementById('cAppField').hidden, null, { timeout: 15000 });
   ok(await page.evaluate(s => $('cTitle').textContent === 'Configure ledger-one' && document.querySelector('#cAppFields [data-avar="DB_PASSWORD"]').value === s

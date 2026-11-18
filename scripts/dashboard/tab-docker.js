@@ -1527,6 +1527,7 @@ let cAppRouters = [];     // the model routers a router field can be given a key
 let cAppWant = "";        // the app the Library asked New container to open on (R170)
 let cAppCur = null;       // the app on the panel: the Library's, or a container's own copy on Configure
 let cAppHand = false;     // its definition was edited by hand, so its panel no longer applies
+let cAppTaken = {names: [], ports: [], apps: []};  // every container's name, and the ports and apps those made from an app hold on the node read
 // The Library's Install on an app (R170): New container with that app on
 // its panel, as if the person had chosen it in a list.
 function openNewContainerApp(id, node = ""){
@@ -1535,18 +1536,46 @@ function openNewContainerApp(id, node = ""){
   if (node) dockerNode = node;
   openNewContainer();
 }
-async function loadNasApps(node = ""){
-  if (!cApps || cAppRootsAt !== node) await reading("nasapps", async () => {
+// `fresh` reads it again on the same node: a container made since holds a
+// name and ports the next one is not offered.
+async function loadNasApps(node = "", fresh = false){
+  if (fresh || !cApps || cAppRootsAt !== node) await reading("nasapps", async () => {
     const j = await getJSON("/api/nasapps" + (node ? "?node=" + encodeURIComponent(node) : ""));
     cApps = j.apps || []; cAppRoots = j.roots || []; cAppRootsAt = node; cAppRouters = j.routers || [];
+    cAppTaken = j.taken || {names: [], ports: [], apps: []};
   });
   return cApps;
+}
+// Another of the same app is a container of its own (the Library's rule:
+// each press makes another): the app's id as its name, or id-2, id-3, the
+// first no container has.
+function cAppFreeName(id){
+  const taken = new Set(cAppTaken.names || []);
+  for (let n = 1; ; n++){ const x = n === 1 ? id : `${id}-${n}`; if (!taken.has(x)) return x; }
+}
+// ...and ports of its own: each the app's, or the first after it that no
+// container made from an app on the node holds and no other field here
+// was given. `given` is the ports handed out on this panel so far.
+function cAppFreePort(p, given){
+  let n = Number(p) || 0;
+  if (!n) return "";
+  const taken = new Set((cAppTaken.ports || []).map(Number));
+  while ((taken.has(n) || given.has(n)) && n < 65535) n++;
+  given.add(n);
+  return String(n);
 }
 
 // Where a folder field suggests putting it: each of the node's places with
 // the app's own folder under it (apps/immich), as the forms rule draws a
 // path, a field with suggestions.
-const cAppFolders = f => [...new Set(cAppRoots.map(r => f.default ? `${r.path}/${f.default}` : r.path))];
+// The app's own folder is named for the container, so another of the same
+// app has its own (apps/immich-2): the segment of the default that is the
+// app's id is the container's name, as the name field holds it.
+const cAppUnder = () => ($("cName").value || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || cAppCur?.id || "";
+const cAppFolders = (f, as = cAppUnder()) => [...new Set(cAppRoots.map(r => {
+  const d = (f.default || "").split("/").map(x => x === cAppCur?.id ? as : x).join("/");
+  return d ? `${r.path}/${d}` : r.path;
+}))];
 
 // One field of the panel, as its kind's answer is drawn (the forms rule): a
 // folder a path with suggestions, a port a number, a choice a pulldown, a
@@ -1586,21 +1615,27 @@ function cAppDraw(a, vals = null){
   drawHTML($("cAppHead"), `${libIcon(row)}<div class="aptitle"><b>${esc(a.name)}</b><span class="apby">${libPills(row)}</span></div>`);
   wireLibrary($("cAppHead"));
   $("cAppWhat").textContent = a.what || "";
-  $("cAppNet").hidden = a.network !== "host";
-  $("cAppNet").textContent = a.network === "host" ? `On the machine's own network: it answers on port ${a.port} there, which is not picked here.` : "";
+  cAppNetSay(a, fresh);
   $("cAppGoing").hidden = !a.going;
   $("cAppGoing").textContent = a.going || "";
   // A folder with a default of its own (apps/immich) starts at the first
   // place the node offers; one with none (a library, a share's files) is
   // the person's to pick from the suggestions.
+  // A port starts at the app's own, or the next free one where another
+  // container holds it.
+  const given = new Set();
   const start = f => !fresh ? (v[f.var] ?? (f.kind === "folder" ? "" : f.default ?? ""))
-    : f.kind === "folder" ? (f.default && cAppFolders(f)[0] || "") : f.kind === "router" ? (cAppRouters[0]?.node || "") : f.default ?? "";
+    : f.kind === "folder" ? (f.default && cAppFolders(f)[0] || "") : f.kind === "router" ? (cAppRouters[0]?.node || "")
+    : f.kind === "port" ? cAppFreePort(f.default, given) : f.default ?? "";
   const ids = v.PUID !== undefined ? `${v.PUID}:${v.PGID ?? v.PUID}` : "1000:1000";
   const tz = v.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
   drawHTML($("cAppFields"), (a.fields || []).map((f, i) => cAppFieldHtml(f, start(f), i)).join("")
     + (own.includes("PUID") || own.includes("PGID") ? `<div class="setrow col ctlrow">${lbl("cAppIds", "Runs as", "uid:gid, the user that owns its folders: a share's files are written as it")}<input id="cAppIds" value="${esc(ids)}" autocomplete="off" spellcheck="false"></div>` : "")
     + (own.includes("TZ") ? `<div class="setrow col ctlrow">${lbl("cAppTz", "Time zone")}<select id="cAppTz">${tzOptions(tz)}</select></div>` : "")
-    + (own.includes("PORT") ? `<div class="setrow col ctlrow fshort">${lbl("cAppPort", "Its port", "what it answers on, on the node; a hostname and a certificate for it are the node's nginx page")}<input id="cAppPort" type="number" min="1" max="65535" value="${esc(v.PORT || a.port)}"></div>` : ""));
+    + (own.includes("PORT") ? `<div class="setrow col ctlrow fshort">${lbl("cAppPort", "Its port", "what it answers on, on the node; a hostname and a certificate for it are the node's nginx page")}<input id="cAppPort" type="number" min="1" max="65535" value="${esc(v.PORT || (fresh ? cAppFreePort(a.port, given) : a.port))}"></div>` : ""));
+  // What a new one was offered, so a node or a name picked after moves
+  // only what the person has not changed.
+  if (fresh) $("cAppFields").querySelectorAll('input[data-avar], #cAppPort').forEach(e => { e.dataset.auto = e.value; });
   $("cAppField").hidden = false;
   $("cAppPanel").hidden = false;
   $("cAppLeft").hidden = true;
@@ -1612,14 +1647,39 @@ function cAppDraw(a, vals = null){
 // to the first this one offers.
 async function cAppNodePicked(){
   if (!cAppCur || cEditing !== null || cAppHand) return;
-  const was = new Map((cAppCur.fields || []).filter(f => f.kind === "folder").map(f => [f.var, cAppFolders(f)[0] || ""]));
   await loadNasApps($("cNode").value);
+  cAppFollow();
+  cAppNetSay(cAppCur, true);
+}
+// An app on the machine's own network answers on its own port, not picked
+// here; a new one where another of it already runs has nothing to answer
+// on, which is said before Create refuses it.
+function cAppNetSay(a, fresh){
+  const host = a.network === "host";
+  $("cAppNet").hidden = !host;
+  $("cAppNet").textContent = !host ? "" : `On the machine's own network: it answers on port ${a.port} there, which is not picked here.${
+    fresh && (cAppTaken.apps || []).includes(a.id) ? ` Another ${a.name} on this node already does, so make this one on another node.` : ""}`;
+}
+// The name typed on a new one: its folders follow it.
+function cAppNameTyped(){
+  if (cAppCur && cEditing === null && !cAppHand) cAppFollow();
+}
+// What a new one was offered and the person has not changed, offered again
+// for the node and the name as they are now: each folder at the first place
+// under the name, each port the first free one there.
+function cAppFollow(){
+  const given = new Set();
   (cAppCur.fields || []).forEach((f, i) => {
     const inp = $(`cAppF${i}`), list = $(`cAppF${i}L`);
-    if (f.kind !== "folder" || !inp || !list) return;
-    drawHTML(list, cAppFolders(f).map(x => `<option value="${esc(x)}"></option>`).join(""));
-    if (inp.value === was.get(f.var)) inp.value = cAppFolders(f)[0] || "";
+    if (!inp) return;
+    const mine = inp.dataset.auto !== undefined && inp.value === inp.dataset.auto;
+    if (f.kind === "folder" && list){
+      drawHTML(list, cAppFolders(f).map(x => `<option value="${esc(x)}"></option>`).join(""));
+      if (mine && f.default) inp.value = inp.dataset.auto = cAppFolders(f)[0] || "";
+    } else if (f.kind === "port" && mine) inp.value = inp.dataset.auto = cAppFreePort(f.default, given);
   });
+  const p = $("cAppPort");
+  if (p && p.dataset.auto !== undefined && p.value === p.dataset.auto) p.value = p.dataset.auto = cAppFreePort(cAppCur.port, given);
 }
 
 // A newer definition of the app in the Library than the one a container
@@ -1704,16 +1764,17 @@ function openNewContainer(){
   // Only the app the Library opened this on: the catalog is browsed there.
   const want = cAppWant;
   cAppWant = "";
-  if (want) loadNasApps(dockerNode).then(apps => {
+  if (want) loadNasApps(dockerNode, true).then(apps => {
     const a = apps.find(x => x.id === want);
     if ($("cmodal").hidden || !a || cEditing !== null) return;
+    // Its name first: its folders are named for it.
+    if (!$("cName").value) $("cName").value = cAppFreeName(a.id);
     cAppDraw(a);
     // Its file is the catalog's and its fields are above: no From an image.
     $("cTabForm").hidden = true;
     $("cYml").value = a.compose || "";
     cYmlTouched = true;
     cAppOwns(true);
-    if (!$("cName").value) $("cName").value = a.id;
     cSeg("yml");
     cHold();
   });

@@ -224,8 +224,40 @@ class Render(unittest.TestCase):
         self.assertEqual(r["env"].split("\n")[:3], ["DATA=/mnt/a", "MEDIA=/mnt/m", "PORT=81"])
         self.assertIn("DB_PASSWORD=", r["env"], "a secret a record from before names is made as a secret field is")
 
+    def test_a_port_another_container_holds_is_taken_though_nothing_answers_on_it(self):
+        a, was = self.app(), nasapps.answers_fn
+        nasapps.answers_fn = lambda node, port: False
+        try:
+            values = nasapps.render_with(a, {"BOOKS": "/mnt/tank/ledger"})["values"]
+            self.assertEqual(nasapps.ports_taken(a, values, "n_x"), [], "nothing answers and nothing holds it")
+            self.assertEqual(nasapps.ports_taken(a, values, "n_x", held=[8020, 9000]), [8020],
+                             "one still pulling its image holds its port all the same")
+            self.assertEqual(nasapps.ports_taken(a, values, "n_x", keep=values, held=[8020]), [],
+                             "its own port, on an edit, is its own")
+        finally:
+            nasapps.answers_fn = was
+
     def test_an_environment_file_reads_back_as_values(self):
         self.assertEqual(nasapps.env_values("A=1\n# no\nB=x=y\nlower=2\nA=3\n\n"), {"A": "3", "B": "x=y"})
+
+
+class Another(unittest.TestCase):
+    """A second container from the same app (each press on the Library
+    makes another): refused only where it could not answer."""
+
+    def test_a_second_on_the_machine_s_own_network_is_refused_on_that_node_alone(self):
+        import containers
+        from unittest import mock
+        compose = "services:\n  beacon:\n    image: ghcr.io/example/beacon:1.0.0\n    network_mode: host\n    volumes:\n      - ${DATA}:/data\n"
+        fields = [{"var": "DATA", "kind": "folder", "label": "Its data", "default": "apps/beacon", "help": "", "required": True}]
+        a = {"id": "beacon", "name": "Beacon", "port": 8123, "network": "host", "compose": compose,
+             "fields": nasapps.check_app({"format": 4, "framework": "4.2", "fields": fields, "network": "host"}, compose)["fields"]}
+        req = {"values": {"DATA": "/mnt/tank/beacon"}}
+        with mock.patch.object(containers, "apps_held", return_value={"names": ["beacon"], "ports": [], "apps": ["beacon"]}):
+            said = containers.app_made(req, a, "n_x", name="beacon-2").get("error", "")
+        self.assertIn("another on that node already does: make this one on another node", said)
+        with mock.patch.object(containers, "apps_held", return_value={"names": ["beacon"], "ports": [], "apps": []}):
+            self.assertNotIn("error", containers.app_made(req, a, "n_y", name="beacon-2"), "on a node without one it is made")
 
 
 class Sideloaded(unittest.TestCase):
