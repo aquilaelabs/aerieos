@@ -1285,8 +1285,11 @@ body.firstrun #panes{display:none}
 .gitgraph{position:relative;display:flex;gap:8px}
 .gitgraph .glines{flex:0 0 auto;overflow:visible}
 .gitgraph .grows{flex:1 1 auto;min-width:0}
-.grow .gsub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:var(--f-row)}
-.grow .gsub .pill{margin-right:4px}
+.grow .gsub{display:flex;align-items:center;min-width:0;white-space:nowrap;font:var(--f-row)}
+.grow .gsub .grefs{display:flex;flex:0 1 auto;max-width:50%;min-width:0;overflow:hidden;margin-right:4px}
+.grow .gsub .pill{margin-right:4px;flex:0 0 auto}
+.grow .gsub .grefs .pill:first-child{flex-shrink:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.grow .gsub .gsubj{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis}
 .grow .gmeta{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:var(--f-note);color:var(--dim)}
 .glines path{fill:none;stroke-width:2;opacity:.8}
 .glines .gn{fill:var(--panel);stroke-width:2}

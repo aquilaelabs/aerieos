@@ -323,8 +323,15 @@ function nbGitView({$, nb, project}){
     // ago() takes seconds, which is what the server sends. Times a thousand
     // put every commit and branch in the future, and the future is "just now".
     const ago_ = t => t ? ago(t) : "";
+    // A commit's branches before its subject, two of them and a count of
+    // the rest (each named in its title), held to half the line: eight
+    // pills at one commit filled it and cut the subject away (B918).
+    const REFS_SHOWN = 2;
+    const refPill = r => `<span class="pill${r.startsWith("HEAD") ? " ok" : ""}">${esc(r.replace(/^HEAD -> /, ""))}</span>`;
+    const refsOf = c => !c.refs.length ? "" : `<span class="grefs">${c.refs.slice(0, REFS_SHOWN).map(refPill).join("")}${
+      c.refs.length > REFS_SHOWN ? `<span class="pill" title="${esc(c.refs.slice(REFS_SHOWN).map(r => r.replace(/^HEAD -> /, "")).join(", "))}">+${c.refs.length - REFS_SHOWN}</span>` : ""}</span>`;
     const row = c => `<div class="grow${c.sha === gitPick ? " on" : ""}" data-sha="${esc(c.sha)}"${gitGraph ? ` data-style="height:${H}px"` : ""}>
-          <span class="gsub">${c.refs.map(r => `<span class="pill${r.startsWith("HEAD") ? " ok" : ""}">${esc(r.replace(/^HEAD -> /, ""))}</span>`).join("")} ${esc(c.subject)}</span>
+          <span class="gsub">${refsOf(c)}<span class="gsubj">${esc(c.subject)}</span></span>
           <span class="gmeta">${esc(c.author)} · ${esc(ago_(c.when))} · <code>${esc(c.short)}</code></span>
         </div>`;
     // By day, newest first as git lists them: a head where the day changes.
