@@ -57,6 +57,15 @@ class Bridge(unittest.TestCase):
         self.assertIn("Address=192.168.1.15/24", files[self.lb.page_path("br0")])
         self.assertIsNone(files[self.lb.page_path("enp3s0")])
 
+    def test_the_sticks_static_address_is_the_bridges(self):
+        # B944: the stick's static address was for the wired cards, and the
+        # card, a port of br0, answers on none: the server took a DHCP lease.
+        stick = "[Match]\nName=en* eth*\n\n[Network]\nAddress=192.168.1.15/24\nGateway=192.168.1.1\nDNS=192.168.1.1\nDNS=1.1.1.1\n"
+        br = self.lb.plan("enp3s0", stick_text=stick)[self.lb.bridge_path()]
+        self.assertIn("Address=192.168.1.15/24\nGateway=192.168.1.1\nDNS=192.168.1.1\nDNS=1.1.1.1\n", br)
+        self.assertNotIn("DHCP=yes", br)
+        self.assertIn("DHCP=yes", self.lb.plan("enp3s0", stick_text="[Match]\nName=en*\n")[self.lb.bridge_path()], "no address set: DHCP")
+
     def test_when(self):
         w = lambda iface, img=True, boot=True: self.lb.wanted(iface, img, boot, self.net)  # noqa: E731
         self.assertEqual(w("enp3s0"), "")

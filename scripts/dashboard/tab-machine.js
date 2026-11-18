@@ -335,6 +335,14 @@ function adoptBackSection(n){
 
 // What the section says, apart from its fold: the first-run walk draws the
 // same body in its own card.
+// The old array degraded (B940): a disk its old system marked disabled or
+// missing, whose files may live only in the parity, so nothing writes to
+// the array until that system has rebuilt it.
+const adoptDegraded = () => (state?.firstboot?.adopt?.degraded || []).length > 0;
+function adoptDegradedSaid(){
+  const d = state?.firstboot?.adopt?.degraded || [];
+  return `The old system's array is degraded: ${d.slice(0, 4).map(x => `${x.slot || x.id} (${x.status})`).join(", ")}. Its files may live only in the parity, so nothing writes to the array until that disk is rebuilt or replaced on the old system and the stick made again.`;
+}
 function adoptParts(n, {take = true} = {}){
   const had = n.reported?.adopted;
   if (had && (had.mounts || []).length){
@@ -346,7 +354,7 @@ function adoptParts(n, {take = true} = {}){
     // agent that has it, where the old parity disk is here.
     // The first-run walk leaves it out (the operator, 8 Nov): the parity
     // is built after the walk, from here, and the bell says so until it is.
-    const canTake = take && "taken" in had && !had.taken && (had.parity || []).length && !(n.reported?.array?.data || []).length;
+    const canTake = take && "taken" in had && !had.taken && (had.parity || []).length && !(n.reported?.array?.data || []).length && !adoptDegraded();
     return {id: "adopted", title: "Adopted disks", status: had.taken ? "taken over" : had.writable ? "writable" : "read-only",
       body: `<div class="field">${factGrid(rows, "adfacts")}<div class="hint">${had.taken
         ? "Taken over: SnapRAID keeps the parity on the old parity disk, and the array, its schedules and each share's places are on the Storage page. Going back to the old system takes its own parity sync."
@@ -360,7 +368,7 @@ function adoptParts(n, {take = true} = {}){
           (state?.firstboot?.shares?.rows || []).length ? `<button type="button" class="primary" data-adoptshares>Serve the shares</button>` : ""}${
           had.taken ? `<span class="sub dim">Release waits until the array is destroyed on the Storage page</span>`
           : `<button type="button" class="danger" data-adopt="release">Release</button>`}</div></div>
-        ${canTake ? adoptTakeField() : ""}
+        ${canTake ? adoptTakeField() : adoptDegraded() && !had.taken ? `<div class="field"><div class="hint warn">${esc(adoptDegradedSaid())} The array is not taken over until it is.</div></div>` : ""}
         ${adoptFoldersField(n)}`};
   }
   const a = state?.firstboot?.adopt;
@@ -375,11 +383,14 @@ function adoptParts(n, {take = true} = {}){
     ...(w.pools || []).map(p => [p.name, `${p.fs} pool, writable`]),
     ...(a.skipped || []).map(x => [x.slot || "disk", `${x.id} · ${x.why}`, {cls: "warn"}])];
   const missing = (w.data || []).filter(x => !found(x.id)).length;
-  return {id: "adopt", title: "The old system's disks", status: missing ? `${missing} not here` : `${(w.data || []).length} disks, ${(w.pools || []).length} pools`,
+  const deg = adoptDegraded();
+  if (deg) adoptWritable = false;
+  return {id: "adopt", title: "The old system's disks", status: deg ? "degraded" : missing ? `${missing} not here` : `${(w.data || []).length} disks, ${(w.pools || []).length} pools`,
     body: `<div class="field">${factGrid(rows, "adfacts")}
+      ${deg ? `<div class="hint warn">${esc(adoptDegradedSaid())} Read only is safe meanwhile.</div>` : ""}
       <div class="adpick">
         <label class="ndcap"><input type="radio" name="adoptMode" value="ro"${adoptWritable ? "" : " checked"}> Read only: the old system's parity stays good, and new files land on a pool</label>
-        <label class="ndcap"><input type="radio" name="adoptMode" value="rw"${adoptWritable ? " checked" : ""}> Writable: going back to the old system then takes a parity sync</label>
+        <label class="ndcap"><input type="radio" name="adoptMode" value="rw"${adoptWritable ? " checked" : ""}${deg ? " disabled" : ""}> Writable: going back to the old system then takes a parity sync${deg ? " (not while the array is degraded)" : ""}</label>
       </div>
       <div class="hint">Each disk is mounted as it is, at the path it had, and never formatted.</div>
       <div class="actbar"><button type="button" data-adopt="dry">Check</button><button type="button" class="primary" data-adopt="adopt">Adopt</button></div></div>`, opts: {open: true}};
@@ -649,8 +660,20 @@ function wireAdopt(root){
         {title: "Release the disks?", verb: "Release", danger: true})) return;
     if (act === "adopt" && adoptWritable && !await askYes("Adopt the data disks writable?\n\nA file written to one is a write the old system's parity did not see: going back to it then takes a parity sync, which leaves its array unprotected until it ends.",
         {title: "Writable?", verb: "Adopt writable"})) return;
+    // A planned data disk not on this machine (replaced, or dead) no longer
+    // holds the rest back (B947): read only, the others adopt and its files
+    // are missing from the merged tree until it is found; writable waits
+    // for every disk, since the parity covers them all.
+    const plan = state?.firstboot?.adopt?.want || {};
+    const gone = act === "release" ? [] : (plan.data || []).filter(x => !adoptFound(n, x.id));
+    if (gone.length && adoptWritable && act !== "dry"){
+      notify(`${gone.map(x => x.slot).join(", ")} ${gone.length === 1 ? "is" : "are"} not on this machine: adopt read only until ${gone.length === 1 ? "it is" : "they are"} found, or rebuild on the old system`, true);
+      return;
+    }
+    if (gone.length && act === "adopt" && !await askYes(`Adopt without ${gone.map(x => x.slot).join(", ")}?\n\n${gone.length === 1 ? "It is" : "They are"} not on this machine. The other disks are adopted read only, and the files on the missing ${gone.length === 1 ? "disk" : "disks"} are not in the merged shares until ${gone.length === 1 ? "it is" : "they are"} found; nothing is written to any disk.`,
+        {title: "Adopt the rest?", verb: "Adopt the rest"})) return;
     busy(b, act === "dry" ? "Checking" : act === "adopt" ? "Adopting" : "Releasing");
-    const want = act === "release" ? undefined : {...(state?.firstboot?.adopt?.want || {}), writable: adoptWritable};
+    const want = act === "release" ? undefined : {...plan, data: (plan.data || []).filter(x => !gone.includes(x)), writable: adoptWritable};
     const j = await postJSON("/api/v1/nodes", {action: "storage-adopt", id: n.id, adopt: act, ...(want ? {want} : {})});
     notify(j.error || (act === "dry" ? "checking: its job says each mount, on the node's Jobs" : act === "adopt" ? "adopting: the Nodes page shows each mount as it lands" : "releasing"), !!j.error);
     await loadNodes();

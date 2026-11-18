@@ -297,6 +297,7 @@ RESTORE_FIELDS = """  <p class="note">A controller with a backup password keeps 
     that controller: its accounts, nodes, spaces and settings. Nothing else is set up first.</p>
   <!--ERR-->
   <!--FOUND-->
+  <!--POOLS-->
   <label for="b">Or a copy you kept (builderbot-backup-VERSION-DATE.bbbackup)</label>
   <input id="b" name="bundle" type="file">
   <label for="t">The backup password</label>
@@ -3104,8 +3105,11 @@ MAINT_BAND = ('<div class="banner maint" id="maintband" role="status" hidden>Mai
 MAINTENANCE_SAID = "AerieOS is down for maintenance: only its owner can sign in until it is over."
 # A held start's band (R56 step 9): sent hidden on every page of a bare-metal
 # install and shown by the poll while the start is held.
-HELD_BAND = ('<div class="banner held" id="heldband" role="status" hidden>The start is held: nothing runs until '
-             '<a href="#/controller/machine" data-heldgo>Start on This controller</a>. <span data-heldwhy></span></div>')
+# What it holds said as it is (B949): the agent sessions; disks, shares,
+# containers and VMs set up before come up as they were set.
+HELD_BAND = ('<div class="banner held" id="heldband" role="status" hidden>The start is held: no session starts until '
+             '<a href="#/controller/machine" data-heldgo>Start on This controller</a>; what this machine already had set up comes up as it was. '
+             '<span data-heldwhy></span></div>')
 # A moved controller's band (R90 step 12): read-only here, the new home named.
 MOVED_BAND = ('<div class="banner moved" id="movedband" role="status" hidden>This controller moved to '
               '<a data-movedto href="#"></a>: what is here is read-only, for a look back. Should the new home be lost, '
@@ -5819,12 +5823,55 @@ backup.configure(state=STATE, bundle_fn=move.write_bundle, restore_fn=move.resto
                  host_fn=lambda: socket.gethostname())
 nodes.move_for_node = move.for_node
 nodes.move_here = move.node_here
+nodes.move_armed = move.armed
+
+
+# The id this machine's system pool is marked with (B939), in the state so a
+# backup or a move carries it: a stick that died is restored onto a new one,
+# whose own id differs, and the old pool is this controller's all the same.
+def _install_id_kept():
+    try:
+        v = (Path(STATE) / "install-id").read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+    return v if re.fullmatch(r"[0-9a-f]{32,64}", v) else ""
+
+
+def _install_id_seen(iid):
+    if iid and iid != _install_id_kept():
+        p = Path(STATE) / "install-id"
+        with contextlib.suppress(OSError):
+            p.with_name("install-id.new").write_text(iid, encoding="utf-8")
+            os.replace(p.with_name("install-id.new"), p)
+
+
+nodes.install_id_seen = _install_id_seen
+
+
+def _place_deploy_keys(folder):
+    """A moved controller's deploy keys kept by the root helper, which alone
+    writes where this home keeps its own (B966): what to say of it."""
+    out, why = projects._key_helper(["--take", folder])
+    if why:
+        return f"the old controller's deploy keys were not kept here ({why}): make each space's key again in its settings"
+    n, loaded = (out.split() + ["0", "0"])[:2]
+    if n == "0":
+        return "the old controller had no deploy keys to bring"
+    return (f"{n} deploy keys came with it" + (", loaded" if n == loaded else
+            f"; {loaded} loaded now, the rest at the controller's next start (Restart under Controller settings)"))
+
+
+move.place_deploy_keys = _place_deploy_keys
+nodes.install_id_kept = _install_id_kept
 # ...a node enrolled at the home tunnel's public hostname kept on it, with no
 # pin (the hostname's certificate is the tunnel's): the tunnel's settings
-# came with the bundle, so the hostname reaches this controller now.
+# came with the bundle, so the hostname reaches this controller now. Any
+# other node keeps the address it knocked at, which reached this controller,
+# and pins the certificate it met there (B936): the page's public name may
+# be the tunnel's, whose edge never serves this controller's certificate.
 move.tunnel_host = lambda nid: nodes.tunnel_host(nodes.node(nid) or {})
 channel.moved_answer = lambda nid: ({"answer": move.answer_for(nid), "url": move.node_url(nid, ""), "pin": ""} if move.tunnel_host(nid)
-                                    else {"answer": move.answer_for(nid), "url": _page_url(), "pin": tls._loaded or ""})
+                                    else {"answer": move.answer_for(nid), "url": "", "pin": ""})
 apps.configure(state=STATE, version=lambda: image_stamp().get("version") or "",
                setting=settings.get, write_json=write_json, audit=db.audit)
 apps.unvetted_ok = channel.unvetted_ok      # the Windows companion and the VS Code extension are dev features
@@ -7278,6 +7325,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._login_page(r["error"], setup=True)
         print(f"dashboard: {name} claimed this container as the owner",
               flush=True)
+        # ...and the people a stick's plan named, where it came with no
+        # owner's password (B946).
+        firstboot.people_after_claim()
         # Then the rest of the setup page, which ends with a node (R199).
         settings.set_many({"setup_done": False})
         # Straight in, rather than back to a sign-in they just proved: they
@@ -9912,6 +9962,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._setup_move_post()
         if self.path.split("?")[0] == "/setup/restore":
             return self._setup_restore_post()
+        if self.path.split("?")[0] == "/setup/restore-pool":
+            return self._setup_restore_pool()
         if self.path.split("?")[0].startswith("/api/v1/move/"):
             return self._move_peer()
         # Moved (R90 step 12): read-only from here on, the move's own verbs aside.
@@ -14129,8 +14181,20 @@ class Handler(BaseHTTPRequestHandler):
                        f'{html_escape(c["name"])} · {html_escape(c["host"] or "this machine")} · {time.strftime("%d %b %Y %H:%M", time.gmtime(c["made_at"]))}'
                        f'{"" if c.get("carries_key") else " · without the install key: its sign-ins and tokens stay locked until the key is given under Controller, Keys"}</label>'
                        for i, c in enumerate(found))
+        # This machine's own pools from before (B938): a stick that died
+        # left them never exported, under another host id, so a new stick
+        # imports them only when asked; the copies they hold are listed then.
+        nid = _own_node_id()
+        back = [p for p in ((nodes.node(nid) or {}).get("reported") or {}).get("pools_importable") or [] if p.get("elsewhere")] if nid else []
+        pools = ("".join(f'<label class="pick"><input type="radio" name="pool" value="{html_escape(p["name"])}"{" checked" if i == 0 else ""}> '
+                         f'{html_escape(p["name"])} · {html_escape(p.get("state") or "")}</label>' for i, p in enumerate(back))
+                 + '<label for="pc">The pool\'s name, typed again</label><input id="pc" name="pool_confirm" autocomplete="off">'
+                   '<button type="submit" formaction="/setup/restore-pool" formnovalidate>Bring the pool back</button>') if back else ""
         fields = RESTORE_FIELDS.replace("<!--FOUND-->", (f'<p class="note">Found on this machine\'s disks, newest first:</p>{rows}' if rows
-                                                         else '<p class="note">No copy found on this machine\'s disks yet (its pools come in once the node reports); upload one below.</p>'))
+                                                         else '<p class="note">No copy found on this machine\'s disks yet; upload one below'
+                                                              + (', or bring back a pool it used before, where copies are kept.' if back else '.') + '</p>'))
+        fields = fields.replace("<!--POOLS-->", (f'<p class="note">On this machine\'s disks, pools last used by its system before (a stick that died leaves them so): '
+                                                 f'bringing one back as it was finds the copies it holds. Never one whose disks another running machine uses.</p>{pools}') if pools else "")
         body = (LOGIN_HTML
                 .replace("<!--TITLE-->", "restore a saved configuration")
                 .replace("<!--SAID-->", "Restoring a saved configuration?")
@@ -14146,6 +14210,40 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
+
+    def _setup_restore_pool(self):
+        """POST /setup/restore-pool: one of this machine's own pools from
+        before brought back, before an owner exists, so the copies it holds
+        are found (B938); its name typed again, as Storage's Import anyway."""
+        if users.unreadable():
+            return self._login_page(ACCOUNTS_UNREADABLE)
+        if users.all_users():
+            return self._login_page("This controller already has an account: its pools are imported on the Storage page.")
+        try:
+            n = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            n = -1
+        if not 0 < n <= 1 << 20:
+            return self._restore_page("pick a pool and type its name; a copy to upload goes with Restore it")
+        spool = Path(STATE) / f".move-restore-pool-{os.getpid()}"
+        try:
+            with open(spool, "wb") as f:
+                f.write(self.rfile.read(n))
+            fields, _f = move.split_form(spool, self.headers.get("Content-Type", ""), "bundle", spool.with_name(spool.name + ".file"))
+        except (OSError, ValueError) as e:
+            return self._restore_page(f"the form could not be read: {e}")
+        finally:
+            for p in (spool, spool.with_name(spool.name + ".file")):
+                with contextlib.suppress(OSError):
+                    p.unlink()
+        name, typed = fields.get("pool", ""), fields.get("pool_confirm", "").strip()
+        nid = _own_node_id()
+        if not nid:
+            return self._restore_page("this machine's node has not reported yet: wait a minute and open this page again")
+        r = nodes.node_storage_pool("setup:restore", nid, {"pool": "import", "name": name, "force": True, "confirm": typed})
+        if r.get("error"):
+            return self._restore_page(r["error"])
+        return self._restore_page(f"bringing {name} back: open this page again in a minute, and the copies it holds are listed")
 
     def _setup_restore_post(self):
         """POST /setup/restore: a found copy or an uploaded one with the

@@ -707,6 +707,32 @@ def open_disk(dev):
     return os.fdopen(fd, "r+b", buffering=0)
 
 
+def image_needs(image):
+    """The bytes a stick needs for `image`, from its partition table's last
+    sector (the GPT header's backup copy, read off its first megabyte); 0
+    when the image says none."""
+    try:
+        with lzma.open(image, "rb") as f:
+            head = f.read(1 << 20)
+    except (OSError, lzma.LZMAError, EOFError):
+        return 0
+    hdr = head[512:512 + 92]
+    if hdr[:8] != b"EFI PART":
+        return 0
+    return (int.from_bytes(hdr[32:40], "little") + 1) * 512
+
+
+def fits_why(image, size):
+    """Why a stick of `size` bytes cannot take `image`, or "" (B958): said
+    before anything is erased, where a write onto a stick too small failed
+    part way and read as a failing stick."""
+    need = image_needs(image)
+    if need and size and size < need:
+        return (f"this stick holds {size / GB:.1f} GB and the image needs {need / GB:.1f} GB: "
+                f"use a stick of {-(-need // (1 << 30)) + 1} GB or more (16 GB is the usual size)")
+    return ""
+
+
 def write_image(image, dev, verify_after=True, sets=(), config=None, mirror=None):
     size_xz = os.path.getsize(image)
     say(f"writing {os.path.basename(image)} ({size_xz / GB:.1f} GB compressed) to {dev}")
@@ -841,6 +867,9 @@ def cmd_write(a):
     again = pick(a.disk)
     if (again["size"], again["model"]) != (d["size"], d["model"]):
         die(f"{a.disk} is not the disk it was before the download ({again['model'] or 'unnamed'}, {again['size'] / GB:.1f} GB now): nothing written")
+    why = fits_why(image, again["size"])
+    if why:
+        die(f"{why}: nothing written")
     say(f"{d['id']}: {named(d)}. Everything on it is lost.")
     if not a.yes:
         if input("Type yes to write it: ").strip().lower() != "yes":

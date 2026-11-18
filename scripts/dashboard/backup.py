@@ -21,7 +21,9 @@ import time
 from pathlib import Path
 
 STATE = Path("/config")
-LEAVE = {"logs", "ci-logs", "snapshots", "apps", "move", "backup", "csp-reports.json", "held.json", "clean-shutdown", "booted", "hold-next", "backup.json"}
+# ...and the copies taken before each update (backups/), each a whole
+# state, which a copy of the configuration held again and again.
+LEAVE = {"logs", "ci-logs", "snapshots", "apps", "move", "backup", "backups", "csp-reports.json", "held.json", "clean-shutdown", "booted", "hold-next", "backup.json"}
 KEEP = 5
 QUIET_S = 15 * 60
 EVERY_S = 10 * 60

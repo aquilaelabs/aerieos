@@ -456,7 +456,14 @@ def stick_status():
             "projects": str(d.get("projects") or "")[:300], "projects_bound": d.get("projects_bound") is True,
             "projects_home": d.get("projects_home") if d.get("projects_home") in ("folder", "pool", "held") else "",
             # The pools holding another install's folder, which a pick there sets aside.
-            "others": [str(x)[:200] for x in (d.get("others") or []) if isinstance(x, str)][:16]}
+            "others": [str(x)[:200] for x in (d.get("others") or []) if isinstance(x, str)][:16],
+            # The id its system pool is marked with, for the controller's
+            # state to carry into a backup (B939).
+            "install_id": str(d.get("install_id") or "") if re.fullmatch(r"[0-9a-f]{32,64}", str(d.get("install_id") or "")) else "",
+            # ...and the id each other install's pool is marked with.
+            "other_marks": {str(k)[:200]: str(v) for k, v in list((d.get("other_marks") or {}).items())[:16]
+                            if isinstance(k, str) and k.startswith("/") and re.fullmatch(r"[0-9a-f]{32,64}", str(v))}
+                           if isinstance(d.get("other_marks"), dict) else {}}
 
 
 class OsImageMixin:
@@ -597,8 +604,11 @@ class OsImageMixin:
             job.say("refused: a pool is named by its mount point\n")
             return "failed", 64
         # Another install's folder there is set aside only when asked (the
-        # operator, 8 Nov); the tool refuses it otherwise.
-        rc = self._sh(job, ["bash", tool, "set", path, *(["--aside"] if cfg.get("aside") is True else [])], timeout=6 * 3600)
+        # operator, 8 Nov); the tool refuses it otherwise, but for the one
+        # this controller's restored configuration names as its own (B939).
+        adopt = str(cfg.get("adopt_id") or "")
+        pre = ["env", f"BB_SP_ADOPT_ID={adopt}"] if re.fullmatch(r"[0-9a-f]{32,64}", adopt) else []
+        rc = self._sh(job, [*pre, "bash", tool, "set", path, *(["--aside"] if cfg.get("aside") is True else [])], timeout=6 * 3600)
         self.hello_again("the system pool was set")
         return ("succeeded", 0) if rc == 0 else ("failed", rc)
 

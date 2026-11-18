@@ -1,8 +1,8 @@
 """A held start (R56 step 9): on a controller installed bare metal, the
-dashboard, its agent and the network come up, and nothing else runs (no
-agent session starts; the pools, shares, apps, VMs and containers the
-installed OS adds are held by their own modules reading this) until a
-person presses Start on This controller. Not by default: held only after an
+dashboard, its agent and the network come up, and no agent session starts
+until a person presses Start on This controller; the pools, shares, apps,
+VMs and containers set up before come up as they were (B949: none of them
+reads this yet, and the page says so). Not by default: held only after an
 unclean shutdown (a clean-shutdown marker written on the way down and
 missing on the way up), or when the next start was asked to hold (This
 hold the next start checkbox beside Restart and Shut down, that one boot). Safe mode at the boot menu

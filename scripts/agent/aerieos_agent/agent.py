@@ -64,8 +64,15 @@ def follow(state, url="", expect=""):
     try:
         ctl = Controller(to, state["token"], "")
         st, r = ctl.call("moved", {"node": state.get("node_id", "")}, timeout=20)
+        # A token handed out after the bundle was packed is one the new
+        # home never saw (B935): this node taken back there by one it held
+        # before, as a hello does at a restored controller, and asked again.
+        if st == 401 and _recover_at(ctl, state):
+            st, r = ctl.call("moved", {"node": state.get("node_id", "")}, timeout=20)
     except Exception as e:                                   # noqa: BLE001 (a knock that fails is tried again)
         return False, f"the move's new address {to} did not answer: {e}"
+    if st == 401:
+        return False, f"the move's new address {to} does not know this node by any token it holds: run the line its Nodes page gives it there"
     if st != 200 or not isinstance(r, dict):
         return False, f"the move's new address {to} answered {st}: not the controller yet"
     # The proof: the challenge the old controller told this node to
@@ -77,9 +84,46 @@ def follow(state, url="", expect=""):
     state["controller"] = str(r.get("url") or to).rstrip("/") or to
     if r.get("pin"):
         state["pin"] = str(r.get("pin"))
+    elif not r.get("url"):
+        # The address knocked at is kept (B936), so its certificate is the
+        # one just met there, which answered the challenge; plain http has
+        # none.
+        seen = getattr(ctl, "seen_pin", "") or ""
+        if seen:
+            state["pin"] = seen
+        else:
+            state.pop("pin", None)
     state.pop("move", None)
     save_state(state)
     return True, ""
+
+
+def _recover_at(ctl, state):
+    """This node taken back at `ctl` by a token it held before (its
+    current one first, then the month's past ones, newest first), the
+    fresh token answered written into `state` as a rotation's is. True
+    when it was."""
+    nid = state.get("node_id") or ""
+    held = [state.get("token") or ""] + [p[0] for p in (state.get("past_tokens") or [])
+                                         if isinstance(p, list) and p and isinstance(p[0], str)]
+    held = [t for i, t in enumerate(held) if t and t not in held[:i]]
+    if not nid or not held:
+        return False
+    for i in range(0, len(held), RECOVER_CHUNK):
+        st, r = ctl.call("recover", {"node": nid, "tokens": held[i:i + RECOVER_CHUNK]}, timeout=30)
+        if st == 200 and isinstance(r.get("token"), str) and r["token"].startswith("bbn_"):
+            now = int(time.time())
+            old = state.get("token") or ""
+            past = [p for p in (state.get("past_tokens") or []) if isinstance(p, list) and len(p) == 2 and p[0] != old]
+            state["past_tokens"] = ([[old, now]] if old else []) + past[:PAST_MOST - 1]
+            state["token"] = r["token"]
+            save_state(state)
+            ctl.token = r["token"]
+            log("the move's new address knew this node by a token from before its newest: taken back there")
+            return True
+        if st != 401:
+            return False
+    return False
 
 
 
@@ -892,6 +936,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             timed("adopted", self.adopt_pass)
             timed("hostid", self.hostid_pass)
             timed("pools-imported", self.pools_pass)
+            timed("backup-dirs", self.backup_dirs_pass)
             timed("ext_mounts", self.ext_mounts_pass)
             timed("spindown", self.spindown_pass)
             timed("tokens", self.token_pass)

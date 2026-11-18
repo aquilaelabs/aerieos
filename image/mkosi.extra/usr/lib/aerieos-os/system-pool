@@ -86,6 +86,19 @@ others() {
     done < <(findmnt -rn -o TARGET 2>/dev/null | sort -u)
     return 0
 }
+# ...and the id each of them is marked with, "PATH": "ID", so a controller
+# restored here knows its own pool from before among them (B939).
+other_marks() {
+    local t m
+    while IFS= read -r t; do
+        case "$t" in /|/proc*|/sys*|/dev*|/run*|/boot*|/usr*|/etc*|/var*|/home*|/srv*|/tmp*) continue ;; esac
+        if [ -d "$t/$SUB" ] && [ "$(pool_owner "$t")" = other ]; then
+            m="$(head -c 64 "$t/$SUB/$OWNER_MARK" 2>/dev/null | tr -cd '0-9a-f')"
+            [ -n "$m" ] && printf '"%s": "%s"\n' "${t//\"/}" "$m"
+        fi
+    done < <(findmnt -rn -o TARGET 2>/dev/null | sort -u)
+    return 0
+}
 CONTROLLER="aerieos-controller"
 
 envget() { sed -n "s/^$1=//p" "$ENVF" 2>/dev/null | tr -d '"' | tail -1; }
@@ -407,6 +420,17 @@ set_pool() {
     if [ -n "$var_src" ] && [ "$var_src" = "$p_src" ]; then
         echo "system-pool: $p is on the stick itself: name a pool on the machine's disks" >&2; return 2
     fi
+    # The pool this controller had before its stick died (B939): a
+    # configuration restored here carries the install id its system pool is
+    # marked with, and names it; the pool is this install's again, and the
+    # stick takes that id for its own.
+    local adopt="${BB_SP_ADOPT_ID:-}"
+    if [ -n "$adopt" ] && [ "$(pool_owner "$p")" = other ] && [ "$(head -c 64 "$p/$SUB/$OWNER_MARK" 2>/dev/null || true)" = "$adopt" ] \
+            && [[ "$adopt" =~ ^[0-9a-f]{32,64}$ ]]; then
+        mkdir -p "$WORK"
+        printf '%s' "$adopt" > "$IDFILE.new" && mv -f "$IDFILE.new" "$IDFILE"
+        echo "system-pool: $p/$SUB is this controller's own from before (its configuration was restored here): taken back as it is"
+    fi
     if [ "$(pool_owner "$p")" = other ]; then
         if [ "${2:-}" != --aside ]; then
             echo "system-pool: $p holds another AerieOS install's data ($p/$SUB): it is never taken by a new install. Move that controller here with its move token, set it aside, or pick a pool without it; nothing on $p was touched" >&2
@@ -509,9 +533,12 @@ status() {
     # held (nowhere yet: never the stick).
     if [ -n "$pf" ]; then home="folder"; elif [ -n "$p" ] && [ "$ready" = true ]; then home="pool"; else home="held"; fi
     local oth; oth="$(others | paste -sd, -)"
-    printf '{"stick": true, "pool": "%s", "ready": %s, "on_stick": [%s], "written_kb": %s, "boot_written_kb": %s, "projects": "%s", "projects_bound": %s, "projects_home": "%s", "others": [%s]}\n' \
+    # The id its system pool is marked with (B939), for a backup to carry.
+    local iid=""; [ -s "$IDFILE" ] && iid="$(head -c 64 "$IDFILE" | tr -cd '0-9a-f')"
+    local marks; marks="$(other_marks | paste -sd, -)"
+    printf '{"stick": true, "pool": "%s", "ready": %s, "on_stick": [%s], "written_kb": %s, "boot_written_kb": %s, "projects": "%s", "projects_bound": %s, "projects_home": "%s", "others": [%s], "install_id": "%s", "other_marks": {%s}}\n' \
         "${p//\"/}" "$ready" "${on_stick[*]}" "${kb:-null}" "${since:-null}" "${pf//\"/}" \
-        "$( { [ -n "$pf" ] && bound "$(projects_place)" && ! held "$(projects_place)"; } && echo true || echo false)" "$home" "$oth"
+        "$( { [ -n "$pf" ] && bound "$(projects_place)" && ! held "$(projects_place)"; } && echo true || echo false)" "$home" "$oth" "$iid" "$marks"
 }
 
 case "${1:-}" in

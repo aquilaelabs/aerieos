@@ -241,7 +241,7 @@ class Move(unittest.TestCase):
         self.configure(new_state, bare=True, url="https://new.example/")
         nh = move.not_yet_here()
         self.assertEqual([x["name"] for x in nh], ["alpha", "beta"])
-        self.assertEqual(nh[0]["line"], f"aerieos-agent follow https://new.example/ {fn['expect']}")
+        self.assertEqual(nh[0]["line"], f"aerieos-agent follow https://new.example {fn['expect']}", "the address the move named (B936)")
         move.tunnel_host = lambda nid: "aerie.example.com" if nid == "n_2" else ""
         try:
             self.assertTrue(move.not_yet_here()[1]["line"].startswith("aerieos-agent follow https://aerie.example.com "),
@@ -510,14 +510,80 @@ class Move(unittest.TestCase):
         self.assertIn("upgrades from 99 on", got.get("error", ""))
 
     def test_what_a_landing_sets_aside_is_never_carried(self):
-        for name in (".moved-1", ".move-upload-2", ".reset-3"):
+        # ...nor the state's own copies (copies of copies: 2.1 GB of the dev
+        # instance's 2.2 GB bundle, 18 Nov).
+        for name in (".moved-1", ".move-upload-2", ".reset-3", "backups", "backup"):
             (self.state / name).mkdir()
             (self.state / name / "big").write_text("x")
         move.prepare("user:ann", "https://new.example")
         import tarfile
         raw, _ = move.pack()
         with tarfile.open(fileobj=__import__("io").BytesIO(raw)) as t:
-            self.assertEqual([n for n in t.getnames() if ".mov" in n or ".reset" in n], [])
+            self.assertEqual([n for n in t.getnames() if ".mov" in n or ".reset" in n or "/backup" in n], [])
+
+    def test_the_running_dashboards_own_files_are_never_carried_nor_swapped(self):
+        # The supervisor watches .server.pid and the lock keeps one server on
+        # the folder: a landing that swapped in the old controller's had a
+        # second dashboard started on the half-swapped state (walked 18 Nov).
+        (self.state / ".server.pid").write_text("4242\n")
+        (self.state / ".server.lock").write_text("")
+        r = move.prepare("user:ann", "https://new.example")
+        import tarfile
+        raw, _ = move.pack()
+        with tarfile.open(fileobj=__import__("io").BytesIO(raw)) as t:
+            self.assertEqual([n for n in t.getnames() if ".server." in n], [])
+        new_state = self.tmp / "new-config"
+        new_state.mkdir()
+        (new_state / ".server.pid").write_text("777\n")
+        (new_state / ".server.lock").write_text("")
+        self.configure(new_state, bare=False)
+        got = move.restore(str(self.tmp / "config" / "move" / r["bundle"]), r["token"], state_dir=new_state,
+                           workspace_dir=self.tmp / "new-ws", secrets_dir=self.tmp / "new-secrets")
+        self.assertTrue(got.get("ok"), got)
+        self.assertEqual((new_state / ".server.pid").read_text(), "777\n", "the running dashboard's pid stays in place")
+        self.assertTrue((new_state / ".server.lock").is_file())
+        self.assertFalse((Path(got["moved_aside"]) / ".server.pid").exists(), "never set aside with the old state")
+
+    def test_deploy_keys_go_to_the_helper_where_this_home_cannot_write_them(self):
+        # B966: the home's deploy-keys folder is the root helper's; a landing
+        # that merged into it stopped there and went back whole.
+        dk = self.state / "deploy-keys"
+        dk.mkdir()
+        (dk / "web-deploy.sealed").write_text("sealed")
+        (dk / "web-deploy.pub").write_text("ssh-ed25519 AAAA web-deploy")
+        r = move.prepare("user:ann", "https://new.example")
+        new_state = self.tmp / "new-config"
+        (new_state / "deploy-keys").mkdir(parents=True)
+        os.chmod(new_state / "deploy-keys", 0o500)
+        self.addCleanup(os.chmod, new_state / "deploy-keys", 0o700)
+        self.configure(new_state, bare=False)
+        handed = []
+
+        def keep(folder):
+            handed.append(sorted(os.listdir(folder)))
+            return "1 deploy keys came with it, loaded"
+        with mock.patch.object(move, "place_deploy_keys", keep):
+            got = move.restore(str(self.tmp / "config" / "move" / r["bundle"]), r["token"], state_dir=new_state,
+                               workspace_dir=self.tmp / "new-ws", secrets_dir=self.tmp / "new-secrets")
+        self.assertTrue(got.get("ok"), got)
+        self.assertEqual(handed, [["web-deploy.pub", "web-deploy.sealed"]])
+        self.assertIn("1 deploy keys came with it, loaded", got["said"])
+        self.assertEqual(os.listdir(new_state / "deploy-keys"), [], "nothing written there by the landing itself")
+
+    def test_a_landing_says_a_key_left_behind_and_spaces_with_no_folder(self):
+        # B953, B956: what stays locked, and the spaces whose repositories
+        # did not come, said in the landing's result.
+        (self.state / "claude-prefs.json").write_text(json.dumps({"projects": {"alpha": {}, "gone": {}}}))
+        r = move.prepare("user:ann", "https://new.example")
+        new_state, new_ws = self.tmp / "new-config", self.tmp / "new-ws"
+        new_state.mkdir()
+        (new_ws / "alpha").mkdir(parents=True)
+        self.configure(new_state, bare=False)
+        got = move.restore(str(self.tmp / "config" / "move" / r["bundle"]), r["token"], state_dir=new_state,
+                           workspace_dir=new_ws, secrets_dir=self.tmp / "new-secrets")
+        said = " | ".join(got.get("said") or [])
+        self.assertIn("the old install's key did not come with it", said)
+        self.assertIn("1 of the moved spaces have no folder here (gone)", said)
 
     def test_a_prepared_move_is_forgotten_and_a_bad_address_refused(self):
         self.assertIn("http://", move.prepare("user:ann", "new.example")["error"])

@@ -57,6 +57,41 @@ class Job:
         return "".join(self.log)
 
 
+class BackupFolder(unittest.TestCase):
+    """B937: each pool's folder for the controller's configuration copies is
+    the controller's account's, so a copy reaches the pools at all."""
+
+    def setUp(self):
+        self.agent = agentpkg.load("aerieos_agent_pools_bk")
+        self.pm = sys.modules[self.agent.Agent.__module__.rsplit(".", 1)[0] + ".pools"]
+
+    def test_the_folder_is_made_the_accounts_and_a_link_is_left_alone(self):
+        import tempfile
+        top = tempfile.mkdtemp()
+        me = (os.getuid(), os.getgid())
+        self.pm.give_backup_dir(top, me)
+        back = os.path.join(top, ".builderbot", "backup")
+        st = os.stat(back)
+        self.assertEqual(((st.st_uid, st.st_gid), oct(st.st_mode & 0o777)), (me, "0o700"))
+        other = tempfile.mkdtemp()
+        top2 = tempfile.mkdtemp()
+        os.symlink(other, os.path.join(top2, ".builderbot"))
+        self.pm.give_backup_dir(top2, me)
+        self.assertFalse(os.path.exists(os.path.join(other, "backup")), "a link where the folder goes is not followed")
+
+    def test_the_account_is_read_from_the_controllers_environment(self):
+        import tempfile
+        import pwd
+        env = os.path.join(tempfile.mkdtemp(), "controller.env")
+        me = pwd.getpwuid(os.getuid()).pw_name
+        with open(env, "w") as f:
+            f.write(f'BB_ACCOUNT="{me}"\n')
+        with mock.patch.dict(os.environ, {"BB_CONTROLLER_ENV": env}):
+            self.assertEqual(self.pm.controller_account(), (os.getuid(), os.getgid()))
+        with mock.patch.dict(os.environ, {"BB_CONTROLLER_ENV": env + ".none"}):
+            self.assertIsNone(self.pm.controller_account(), "no controller here: nothing to give")
+
+
 class TheAgent(unittest.TestCase):
     def setUp(self):
         self.agent = agentpkg.load("aerieos_agent_pools")
@@ -110,7 +145,7 @@ class TheAgent(unittest.TestCase):
                  " config:\n\n\tnas  ONLINE\n\n   pool: Bad Name\n     id: 99\n  state: ONLINE\n")
         with mock.patch.object(self.pm, "_out", return_value=found), mock.patch.object(self.pm.shutil, "which", return_value="/usr/sbin/zpool"):
             got = self.pm.importable_now()
-        self.assertEqual(got, [{"name": "nas", "id": "1234567890", "state": "online", "said": "The pool can be imported using its name or numeric identifier."}])
+        self.assertEqual(got, [{"name": "nas", "id": "1234567890", "state": "online", "said": "The pool can be imported using its name or numeric identifier.", "elsewhere": False}])
         rec = os.path.join(tempfile.mkdtemp(), "imported.json")
         with mock.patch.dict(os.environ, {"BB_POOLS_IMPORTED": rec}):
             state, code, text = self.run_job({"pool": "import", "name": "nas", "id": "1234567890"})
@@ -130,6 +165,30 @@ class TheAgent(unittest.TestCase):
             self.run_job({"pool": "export", "name": "tank"})
             with open(rec) as f:
                 self.assertEqual([x["name"] for x in json.load(f)], ["nas"])
+
+    def test_this_machines_own_pool_from_before_comes_back_as_it_was(self):
+        # B938: a stick that died leaves its pools never exported, under
+        # another host id; imported anyway with the name typed, one AerieOS
+        # made comes back where it was and at every boot.
+        found = ("   pool: tank\n     id: 42\n  state: ONLINE\n status: The pool was last accessed by another system.\n"
+                 " action: The pool can be imported using its name or numeric identifier and\n\tthe '-f' flag.\n")
+        with mock.patch.object(self.pm, "_out", return_value=found), mock.patch.object(self.pm.shutil, "which", return_value="/usr/sbin/zpool"):
+            self.assertTrue(self.pm.importable_now()[0]["elsewhere"])
+        state, code, text = self.run_job({"pool": "import", "name": "old", "id": "42", "force": True, "confirm": "ol"})
+        self.assertEqual(state, "failed")
+        self.assertIn("typed again", text)
+        self.ran.clear()
+        real = self.fake_out
+
+        def out(argv, timeout=60):
+            return "/mnt/old\n" if argv[1:3] == ["get", "-H"] else real(argv, timeout)
+        self.fake_out = out
+        with mock.patch.object(self.pm, "pools_now", return_value=[]):
+            state, code, text = self.run_job({"pool": "import", "name": "old", "id": "42", "force": True, "confirm": "old"})
+        self.assertEqual(state, "succeeded", text)
+        self.assertEqual(self.ran[0], ["/usr/sbin/zpool", "import", "-f", "-N", "-o", "cachefile=none", "42", "old"])
+        self.assertIn(["/usr/sbin/zpool", "set", "cachefile=", "old"], self.ran)
+        self.assertFalse([a for a in self.ran if "upgrade" in a or "altroot=/mnt" in a], "never upgraded, and back where it was")
 
     def test_a_mirror_is_made_of_disks_that_hold_nothing_by_their_links(self):
         state, code, text = self.run_job({"pool": "create", "name": "data", "layout": "mirror", "disks": ["sdb", "sdc"]})
@@ -252,7 +311,8 @@ class TheController(unittest.TestCase):
     def test_a_pool_to_import_is_one_the_census_lists(self):
         import nodes
         got = nodes._census({"pools_importable": [{"name": "nas", "id": "123", "state": "ONLINE", "said": "ok"}, {"name": "Bad"}, {"name": "x", "id": "1;rm"}]})
-        self.assertEqual(got["pools_importable"], [{"name": "nas", "id": "123", "state": "ONLINE", "said": "ok"}, {"name": "x", "id": "", "state": "", "said": ""}])
+        self.assertEqual(got["pools_importable"], [{"name": "nas", "id": "123", "state": "ONLINE", "said": "ok", "elsewhere": False},
+                                                   {"name": "x", "id": "", "state": "", "said": "", "elsewhere": False}])
         n = {"id": "n1", "name": "box", "kind": "agent", "live": True, "config": {"own": True},
              "reported": {"administers": True, "features": {"storage": {"zfs": True}}, "pools": [], "disks": [], "pools_importable": [{"name": "nas", "id": "123"}]}}
         with mock.patch.object(nodes, "node", return_value=n), mock.patch.object(nodes, "own_machine", return_value=True), \
@@ -263,6 +323,10 @@ class TheController(unittest.TestCase):
             r = nodes.node_storage_pool("user:t", "n1", {"pool": "import", "name": "nas"})
             self.assertTrue(r.get("ok"), r)
             self.assertEqual(add.call_args[0][3]["config"], {"pool": "import", "name": "nas", "id": "123"})
+            # B938: one another system used last is forced with its name typed.
+            self.assertIn("name typed again", nodes.node_storage_pool("user:t", "n1", {"pool": "import", "name": "nas", "force": True, "confirm": "na"})["error"])
+            r = nodes.node_storage_pool("user:t", "n1", {"pool": "import", "name": "nas", "force": True, "confirm": "nas"})
+            self.assertEqual(add.call_args[0][3]["config"], {"pool": "import", "name": "nas", "id": "123", "force": True, "confirm": "nas"})
             del n["reported"]["pools_importable"]
             self.assertIn("from before importing", nodes.node_storage_pool("user:t", "n1", {"pool": "import", "name": "nas"})["error"])
 

@@ -349,6 +349,27 @@ await section("a bare-metal install's first run", async () => {
     ok(some.all.pill === 'in the walk' && /Every disk here belongs to the system the stick's plan came from: 4 data disks, the parity disk/.test(some.all.text)
        && !some.all.make && some.all.boxes === 0 && some.all.walk === 'Walk me through it' && some.anyLink === 0,
        `...and with every disk theirs the step leads into the walk, offers nothing to make, and no link on the page leads where nothing can show (B662) (${JSON.stringify(some.all).slice(0, 300)})`);
+    // B945: a pool met by its disk, a disk the plan sets apart, and a disk
+    // with a partition that holds no filesystem (an old parity) are never
+    // offered to erase.
+    const apart = await page.evaluate(() => {
+      const keep = state.firstboot, disks = setupDisks.own?.disks?.disks || setupDisks.own?.disks || [];
+      const sdc = disks.find(x => x.name === 'sdc'), wasParts = sdc.parts;
+      setupWalk = 'fresh';
+      sdc.parts = [{ name: 'sdc1', holds: 'nothing' }];
+      state.firstboot = { ...(keep || {}), adopt: { want: { data: [], parity: [], pools: [{ name: 'cache', fs: 'btrfs', uuid: '', disk_id: 'Samsung_990_S-N' }] },
+                                                     skipped: [{ slot: 'disk2', id: 'WD_Red_WD-D', why: 'encrypted: its key is not asked for yet' }] } };
+      setupSig = ''; drawSetup();
+      const s = [...document.querySelectorAll('#setupPanel .setstep')].find(x => x.querySelector('h3')?.textContent === 'Your disks');
+      const out = { theirs: [...s.querySelectorAll('.setdisk.theirs')].map(x => x.textContent.replace(/\s+/g, ' ')).join(' | '),
+                    ticked: [...s.querySelectorAll('.setdisk:not(.theirs) input:checked')].map(i => i.dataset.setdiskuse),
+                    sdc: s.querySelector('[data-setdiskuse="sdc"]')?.closest('.setdisk')?.textContent.replace(/\s+/g, ' ') || '' };
+      sdc.parts = wasParts; state.firstboot = keep; setupWalk = ''; setupSig = ''; drawSetup();
+      return out;
+    });
+    ok(/old system's pool cache: adopted as it is/.test(apart.theirs) && /old system's disk2: not adopted \(encrypted/.test(apart.theirs)
+       && !apart.ticked.includes('sdc') && /holds a partition: kept unless you tick it/.test(apart.sdc),
+       `the old system's pool disk and a disk it set apart are its own, and a disk with a bare partition is kept unless ticked (${JSON.stringify(apart).slice(0, 400)})`);
   }
   // A new start on a stick (B666, B671; the operator, 4 Nov): the place for the
   // projects is a step, named by itself once a pool is made; a project waits for
@@ -1072,6 +1093,7 @@ await section("a bare-metal install's first run", async () => {
     ok(nodesThere.includes('mover') && nodesThere.includes('late'), `restarted on the state, the destination knows the source's accounts and nodes (${nodesThere.join(',')})`);
     const knock = await (await fetch(dst.base + '/api/v1/agent/moved', { method: 'POST', headers: nH, body: JSON.stringify({ node: en.node_id }) })).json();
     ok(knock.answer === told.move.expect, `the node's knock is answered with the challenge it holds (${(knock.answer || '').slice(0, 12)})`);
+    ok(knock.url === '' && knock.pin === '', `...and names no address or pin, so a node on the network keeps the one it knocked at (${JSON.stringify({url: knock.url, pin: knock.pin})})`);
     const nh = (await (await fetch(dst.base + '/api/v1/nodes', { headers: sH })).json()).move || {};
     ok((nh.not_here || []).map(x => x.name).sort().join(',') === 'late,mover' && (nh.not_here || []).every(x => new RegExp(`^aerieos-agent follow \\S+ [0-9a-f]{64}$`).test(x.line)),
        `the destination's Nodes page lists both as not yet here, each with its follow line (${JSON.stringify((nh.not_here || []).map(x => x.name))})`);
@@ -1088,6 +1110,8 @@ await section("a bare-metal install's first run", async () => {
     const lateKnock = await (await fetch(dst.base + '/api/v1/agent/moved', { method: 'POST', headers: lH, body: JSON.stringify({ node: lateEn.node_id }) })).json();
     ok(lateKnock.answer === goneJ.move.expect, 'and the late node\'s knock is answered with that challenge');
     ok(/no move is prepared|not withdrawn/.test((await sApi('/api/move', { action: 'forget' })).error || ''), 'Forget it is refused once the move landed');
+    const again = await sApi('/api/move', { action: 'pack' });
+    ok(again.ok && /\.aeriemove$/.test(again.bundle || ''), `...and the moved source still packs its bundle, for a new home that is lost (${again.error || again.bundle})`);
     await fetch(dst.base + '/api/v1/agent/hello', { method: 'POST', headers: lH, body: JSON.stringify({ census: { cpu: 2, mem_mb: 4096, arch: 'x86_64', system: 'linux' }, version: '1', digest: 'sha256:' + '1'.repeat(64) }) });
     const nh2 = (await (await fetch(dst.base + '/api/v1/nodes', { headers: sH })).json()).move || {};
     ok((nh2.not_here || []).map(x => x.name).join(',') === 'mover', `a node that said hello to the destination is off the not-yet-here list (${JSON.stringify((nh2.not_here || []).map(x => x.name))})`);

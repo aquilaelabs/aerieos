@@ -36,6 +36,18 @@ class Rotation(unittest.TestCase):
         self.assertNotEqual(nodes.screen_key(self.nid), key, "...and moves once the new one is used")
         self.assertIn("node", nodes.authenticate(self.first), "the old one within its grace")
 
+    def test_no_token_is_handed_out_while_a_move_is_armed(self):
+        # B935: the move's bundle carries the token this node holds now, so a
+        # new one handed out after it was packed would be one the new home
+        # never saw.
+        was = nodes.move_armed
+        nodes.move_armed = lambda: True
+        try:
+            self.assertNotIn("token", self.hello())
+        finally:
+            nodes.move_armed = was
+        self.assertIn("token", self.hello(), "...and handed out again once it is not")
+
     def test_two_calls_with_a_new_token_at_once_leave_it_live(self):
         # B570: the second of two calls that both read the new token as
         # pending retired it (it was live by then) and gave it the grace's

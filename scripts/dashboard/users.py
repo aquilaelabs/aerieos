@@ -1108,27 +1108,53 @@ def adopt(owner, people):
         d["users"][name] = {"uid": mint_uid(), "role": "owner", "projects": [], "password": pw,
                             "created": now, "seen": 0, "prefs": {}, "pins_empty": True}
         made.append(name)
-        for p in people or []:
-            pn = str((p or {}).get("name") or "").strip()
-            role = str((p or {}).get("role") or "user")
-            nt = str((p or {}).get("smb_nt") or "").upper()
-            if not NAME_RE.match(pn) or pn in d["users"]:
-                skipped.append((pn, "not a name, or a name taken"))
-                continue
-            if role not in ("admin", "user"):
-                role = "user"
-            u = {"uid": mint_uid(), "role": role, "roles": [], "projects": [], "password": "",
-                 "created": now, "seen": 0, "prefs": {}, "pins_empty": True}
-            if re.fullmatch(r"[0-9A-F]{32}", nt):
-                u["smb_nt"], u["smb_at"] = nt, now
-            d["users"][pn] = u
-            made.append(pn)
+        _people_into(d, people, now, made, skipped)
         _save(d)
+    _keys_for(made)
+    return {"ok": True, "made": made, "skipped": skipped}
+
+
+def adopt_people(people):
+    """A prepared configuration's people made once the first-run page has
+    made the owner, where the stick came with no owner's password (B946):
+    each by name and role with no password, and their SMB password's NT
+    hash where one came with them. {ok, made, skipped} or {error}."""
+    made, skipped = [], []
+    with _lock:
+        d = load()
+        if not d["users"]:
+            return {"error": "no owner yet"}
+        _people_into(d, people, int(time.time()), made, skipped)
+        _save(d)
+    _keys_for(made)
+    return {"ok": True, "made": made, "skipped": skipped}
+
+
+def _people_into(d, people, now, made, skipped):
+    """Each of `people` made in `d` as adopt makes them, a name taken or not
+    a name set apart with why."""
+    for p in people or []:
+        pn = str((p or {}).get("name") or "").strip()
+        role = str((p or {}).get("role") or "user")
+        nt = str((p or {}).get("smb_nt") or "").upper()
+        if not NAME_RE.match(pn) or pn in d["users"]:
+            skipped.append((pn, "not a name, or a name taken"))
+            continue
+        if role not in ("admin", "user"):
+            role = "user"
+        u = {"uid": mint_uid(), "role": role, "roles": [], "projects": [], "password": "",
+             "created": now, "seen": 0, "prefs": {}, "pins_empty": True}
+        if re.fullmatch(r"[0-9A-F]{32}", nt):
+            u["smb_nt"], u["smb_at"] = nt, now
+        d["users"][pn] = u
+        made.append(pn)
+
+
+def _keys_for(made):
     import accountkeys
     if accountkeys.STATE is not None:
         for n in made:
             accountkeys.key_of((load()["users"].get(n) or {}).get("uid") or "")
-    return {"ok": True, "made": made, "skipped": skipped}
 
 
 def accounts_in_use():

@@ -25,6 +25,7 @@
 #   deploy-key --list        NAME per kept key, one per line
 #   deploy-key --load        seal what is still plain, then load every kept key into the agent (boot)
 #   deploy-key --reseal      seal again, under today's install key, every key sealed under the one before
+#   deploy-key --take DIR    keep the keys a moved controller carried (NAME.sealed and NAME.pub in DIR), then load them
 #
 set -euo pipefail
 
@@ -52,7 +53,10 @@ case "$kind" in
         [[ "$name" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$ ]] \
             || die "usage: deploy-key $kind NAME (letters, digits, dot, dash, underscore)" ;;
     --list|--load|--reseal) ;;
-    *) die "usage: deploy-key [make|store|forget] NAME, or --list, --load or --reseal" ;;
+    --take)
+        [[ "$name" == /* && "$name" != *..* && -d "$name" && ! -L "$name" ]] \
+            || die "usage: deploy-key --take DIR (the folder a landing unpacked the keys into)" ;;
+    *) die "usage: deploy-key [make|store|forget] NAME, or --list, --load, --reseal or --take DIR" ;;
 esac
 install -d -m 0700 "$STORE"
 file="$STORE/$name"
@@ -164,6 +168,31 @@ case "$kind" in
             fi
         done
         echo "$n" ;;
+    --take)
+        # A move's landing (B966): the keys the old controller kept, sealed
+        # under its install key, which came with the move when ticked. Each
+        # file a regular one of a key's name, never a link, never over one
+        # kept here; loaded now where the key opens them, else at the next start.
+        n=0 loaded=0
+        for f in "$name"/*; do
+            b="$(basename "$f")"
+            [[ "$b" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,99}\.(pub|sealed)$ ]] || continue
+            [ -f "$f" ] && [ ! -L "$f" ] || continue
+            [ "$(stat -c %s "$f")" -le 65536 ] || continue
+            [ -e "$STORE/$b" ] && { warn "deploy key $b is kept here already: left as it is" >&2; continue; }
+            mode=0600; [ "${b##*.}" = pub ] && mode=0644
+            if ! { head -c 65536 < "$f" > "$STORE/$b.new" && chmod "$mode" "$STORE/$b.new" && mv -f "$STORE/$b.new" "$STORE/$b"; }; then
+                rm -f "$STORE/$b.new"
+                continue
+            fi
+            if [ "${b##*.}" = sealed ]; then
+                n=$((n + 1))
+                if sealing && [ -S "$SOCK" ] && opened "$STORE/$b" 2>/dev/null | SSH_AUTH_SOCK="$SOCK" ssh-add - >/dev/null 2>&1; then
+                    loaded=$((loaded + 1))
+                fi
+            fi
+        done
+        echo "$n $loaded" ;;
     --reseal)
         sealing || die "this install has no install key to seal under"
         n=0 bad=0

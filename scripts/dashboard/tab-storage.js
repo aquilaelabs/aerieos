@@ -409,8 +409,8 @@ function storagePools(n){
   const importRows = found.map(p => `<div class="row stack2 stpoolfound" data-poolfound="${esc(p.name)}"><div class="grow">
       <div class="name">${esc(p.name)} <span class="pill${p.state === "online" ? "" : " warn"}">${esc(p.state || "unknown")}</span></div>
       ${p.said ? `<div class="sub dim">${esc(p.said)}</div>` : ""}</div>${admin && !why
-        ? `<span class="acts"><button type="button" data-stpool="import" data-name="${esc(p.name)}" title="imported as it is, never upgraded; its datasets under /mnt">Import</button></span>` : ""}</div>`).join("");
-  const importBox = found.length ? `<div class="field"><div class="hint">Found on the disks, made by another machine: importing one keeps it as it is (nothing upgraded, so the other machine can take it back), its datasets under /mnt. One the other machine did not export is refused rather than forced.</div><div class="rows">${importRows}</div></div>` : "";
+        ? `<span class="acts"><button type="button" data-stpool="import" data-name="${esc(p.name)}"${p.elsewhere ? ` data-elsewhere="1"` : ""} title="imported as it is, never upgraded">${p.elsewhere ? "Import anyway" : "Import"}</button></span>` : ""}</div>`).join("");
+  const importBox = found.length ? `<div class="field"><div class="hint">Found on the disks: importing one keeps it as it is, nothing upgraded, so the system that made it can take it back. One last used by another system and never exported (this machine's own pools, after its stick died and a new one was written) is imported anyway with its name typed, back where it was.</div><div class="rows">${importRows}</div></div>` : "";
   const body = `${why ? `<div class="sub dim">${esc(why)}</div>` : ""}${rows ? `<div class="rows">${rows}</div>` : `<div class="empty">No pool yet${n.zfs ? ": the form below makes one" : ""}.</div>`}${importBox}${form}`;
   const sick = pools.filter(p => !["online", ""].includes(p.health)).length;
   return docSection("storage", "pools", "Pools", pools.length ? `${pools.length}${sick ? `, ${sick} not online` : ""}` : "", body, {cls: sick ? "bad" : ""});
@@ -456,6 +456,15 @@ function wireStoragePools(root, n){
       body.confirm = body.name;
     } else if (act === "export"){
       if (!await askYes(`Export the pool ${body.name}? Its datasets are unmounted and the disks let go, to import elsewhere or here again.`, {title: "Export the pool?", verb: "Export"})) return;
+    } else if (act === "import" && b.dataset.elsewhere){
+      // Last used by another system (B938): the machine's own pools after
+      // its stick died, or disks still in use elsewhere, which this would
+      // break; said so, and its name typed.
+      const typed = await askText(`Import ${body.name} anyway?\n\nIt was last used by another system and never exported. That is what this machine's own pools look like after its stick died and a new one was written: then this brings it back as it was. If these disks are in use by another machine that is still running, importing it here damages it.\n\nType the pool's name to import it.`,
+                                  {title: "Import anyway?", verb: "Import anyway", label: "The pool's name"});
+      if (typed === null || typed === undefined) return;
+      if (String(typed).trim() !== body.name){ notify("that is not the pool's name: nothing was imported", true); return; }
+      body.force = true; body.confirm = body.name;
     } else if (act === "import"){
       if (!await askYes(`Import the pool ${body.name}?\n\nIt is taken as it is, never upgraded, so the machine that made it can take it back; its datasets appear under /mnt, and it comes back after every boot until it is exported.`, {title: "Import the pool?", verb: "Import"})) return;
     }

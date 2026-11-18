@@ -1832,7 +1832,9 @@ def _c_pools_importable(c, out):
     if isinstance(c.get("pools_importable"), list):
         out["pools_importable"] = [{"name": str(x["name"]), "id": str(x.get("id") or "")[:24] if str(x.get("id") or "").isdigit() else "",
                                     "state": re.sub(r"[^\w -]", "", str(x.get("state") or ""))[:16],
-                                    "said": re.sub(r"[^\w .,:;/()'@+-]", "", str(x.get("said") or ""))[:200]}
+                                    "said": re.sub(r"[^\w .,:;/()'@+-]", "", str(x.get("said") or ""))[:200],
+                                    # Last used by another system and never exported (B938).
+                                    "elsewhere": x.get("elsewhere") is True}
                                    for x in c["pools_importable"][:16]
                                    if isinstance(x, dict) and re.fullmatch(r"[a-z][a-z0-9_-]{0,30}", str(x.get("name") or ""))]
 
@@ -2012,6 +2014,11 @@ def _c_os_stick(c, out):
                            "projects_home": s.get("projects_home") if s.get("projects_home") in ("folder", "pool", "held") else "",
                            # Pools holding another install's folder, set aside if picked.
                            "others": [str(x)[:200] for x in (s.get("others") or []) if isinstance(x, str) and x.startswith("/")][:16],
+                           # The id its system pool is marked with (B939).
+                           "install_id": str(s.get("install_id") or "") if re.fullmatch(r"[0-9a-f]{32,64}", str(s.get("install_id") or "")) else "",
+                           "other_marks": {str(k)[:200]: str(v) for k, v in list((s.get("other_marks") or {}).items())[:16]
+                                           if isinstance(k, str) and k.startswith("/") and re.fullmatch(r"[0-9a-f]{32,64}", str(v))}
+                                          if isinstance(s.get("other_marks"), dict) else {},
                            # The stick's own partition: its size and its room, from an agent that says them.
                            **{k: kb(s.get(k)) for k in ("var_total_mb", "var_free_mb") if kb(s.get(k)) is not None}}
 
@@ -4081,6 +4088,9 @@ def node_storage_array(principal, node_id, req):
             return {"error": "the adopted array is taken over already"}
         if "taken" not in ad:
             return {"error": f"{n['name']}'s agent is from before the takeover: it updates itself within the hour"}
+        why = _degraded_why("taking the array over formats the old parity, which holds their only copy") or _takeover_gaps_why(ad)
+        if why:
+            return {"error": why}
         cfg["dry"] = req.get("dry") is True
         if not cfg["dry"] and str(req.get("confirm") or "") != "parity":
             return {"error": "taking the array over overwrites the old parity: it takes the word parity typed"}
@@ -4171,6 +4181,34 @@ ADOPT_ACTIONS = ("dry", "adopt", "release", "read-apps", "define-vms", "docker-n
 ADOPT_FS = ("xfs", "btrfs", "zfs")
 
 
+def _degraded_why(what):
+    """Why nothing may write to the old array, or "": the stick's plan names
+    a disk the old system marked disabled or missing (B940), whose files may
+    live only in its parity; the old system rebuilds it first."""
+    import firstboot
+    bad = (firstboot.adopt_want(firstboot.kept_config()) or {}).get("degraded") or []
+    if not bad:
+        return ""
+    names = ", ".join(f"{d['slot'] or d['id']} ({d['status']})" for d in bad[:4])
+    return (f"the old system's array is degraded: {names}. Its files may live only in the parity, so {what}; "
+            "rebuild or replace the disk on the old system first, then make the stick again. Adopting it read-only is safe")
+
+
+def _takeover_gaps_why(adopted):
+    """Why the takeover waits, or "": a data disk the stick's plan names that
+    is not adopted here (not on this machine, or set apart as encrypted),
+    whose only protection is the old parity the takeover formats (B948)."""
+    import firstboot
+    aw = firstboot.adopt_want(firstboot.kept_config()) or {}
+    have = {str(m.get("where") or "").rsplit("/", 1)[-1] for m in (adopted or {}).get("mounts") or [] if isinstance(m, dict)}
+    out = [x["slot"] for x in (aw.get("want") or {}).get("data") or [] if x.get("slot") and x["slot"] not in have]
+    out += [str(x.get("slot") or x.get("id")) for x in aw.get("skipped") or [] if re.fullmatch(r"disk\d+", str(x.get("slot") or ""))]
+    if not out:
+        return ""
+    return (f"{', '.join(out[:6])} {'is' if len(out) == 1 else 'are'} not adopted here (not on this machine, or encrypted): "
+            "taking the array over formats the old parity, their only protection. Adopt every data disk first")
+
+
 def _adopt_want(req):
     """The disks and pools to adopt, as the request names them, each field
     checked for its shape; the agent checks each against the machine again.
@@ -4255,6 +4293,10 @@ def node_storage_adopt(principal, node_id, req):
         want, why = _adopt_want(req)
         if why:
             return {"error": why}
+        if want.get("writable") and action != "dry":
+            why = _degraded_why("a writable adoption makes the old parity stale, and it holds their only copy")
+            if why:
+                return {"error": why}
         cfg["want"] = want
     elif not held_now:
         return {"error": "nothing is adopted on the machine"}
@@ -4526,6 +4568,12 @@ def node_storage_pool(principal, node_id, req):
         if not found:
             return {"error": f"no pool called {name} is waiting to be imported on {n['name']}"}
         cfg["id"] = found.get("id") or ""
+        # One another system used last is forced only with its name typed
+        # again (B938): a machine whose stick died meets its own pools so.
+        if req.get("force") is True:
+            if str(req.get("confirm") or "") != name:
+                return {"error": "importing a pool another system used last takes its name typed again"}
+            cfg.update(force=True, confirm=name)
     r = job_add(principal, {"node": node_id}, "system", {"apply": "storage-pool", "config": cfg, "timeout": 900})
     if r.get("ok"):
         audit(principal, "storage-pool", node_id, {"job": r["job"], **cfg})
@@ -4963,7 +5011,10 @@ def node_system_pool(principal, node_id, path="", aside=False):
         return {"error": why}
     if not n.get("live"):
         return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
-    r = job_add(principal, {"node": node_id}, "system", {"apply": "system-pool", "config": {"path": path, "aside": aside is True}, "timeout": 6 * 3600})
+    # The id this controller's restored configuration names as its own pool's
+    # (B939): that pool is taken back, never refused as another install's.
+    r = job_add(principal, {"node": node_id}, "system", {"apply": "system-pool", "config": {"path": path, "aside": aside is True,
+                                                                                         "adopt_id": install_id_kept()}, "timeout": 6 * 3600})
     if r.get("ok"):
         audit(principal, "system-pool", node_id, {"job": r["job"], "path": path, "aside": aside is True})
     return r
@@ -5555,6 +5606,12 @@ def token_attention():
 move_for_node = lambda nid: {}  # noqa: E731
 # ...and the node's hello on the controller a move landed on (R175 step 3).
 move_here = lambda nid: None  # noqa: E731
+# Whether a move is armed here, which holds every node's token still (B935).
+move_armed = lambda: False  # noqa: E731
+# The install id the state keeps for this machine's system pool (B939): seen
+# from the census once the pool is set, read for the system-pool step.
+install_id_seen = lambda iid: None  # noqa: E731
+install_id_kept = lambda: ""  # noqa: E731
 
 
 def hello(nid, census, addr, version="", digest="", running=None, keep=None, rotates=False, back=None):
@@ -5619,6 +5676,12 @@ def hello(nid, census, addr, version="", digest="", running=None, keep=None, rot
         beat = {k: rep[k] for k in ("sessions", "published", "sync", "sync_drain", "sync_clean") if k in rep}
         rep = _census(census)
         rep["at"] = census_at
+        # A pool marked with the id this controller's restored state keeps
+        # is its own from before, never another install's (B939).
+        st = rep.get("os_stick")
+        if isinstance(st, dict) and st.get("other_marks") and install_id_kept():
+            kept = install_id_kept()
+            st["others"] = [p for p in st.get("others") or [] if st["other_marks"].get(p) != kept]
         if sample:
             rep["sample"] = sample
         rep.update(beat)
@@ -5631,6 +5694,12 @@ def hello(nid, census, addr, version="", digest="", running=None, keep=None, rot
     ours = agent_file()
     # A node here after a move landed (R175 step 3): off the not-yet-here list.
     move_here(nid)
+    # The id this machine's system pool is marked with, kept in the state
+    # once the pool is set so a backup carries it (B939).
+    st = rep.get("os_stick") or {}
+    if own_machine(n) and st.get("ready") and st.get("install_id"):
+        install_id_seen(st["install_id"])
+    moving = move_for_node(nid)
     return {"ok": True, "transports": ["longpoll"],
             "poll": POLL_S, "node": {"id": nid, "name": n["name"],
                                      "state": n["state"],
@@ -5701,9 +5770,11 @@ def hello(nid, census, addr, version="", digest="", running=None, keep=None, rot
             "ftp": [] if host_only(nid) else ftp_for(nid),
             # A move prepared (R90 step 12): the new address and this node's
             # challenge, which it keeps and knocks with when this one goes quiet.
-            "move": move_for_node(nid),
-            # Its next token, for an agent that rotates (R135 step 4).
-            **({"token": rotate_token(nid)} if rotates else {})}
+            "move": moving,
+            # Its next token, for an agent that rotates (R135 step 4); none
+            # while a move is armed, since the bundle carries the token this
+            # node holds now and the new home knows that one alone (B935).
+            **({"token": rotate_token(nid)} if rotates and not move_armed() else {})}
 
 
 def store_merge(census, free, totals):
@@ -6684,10 +6755,11 @@ def sync_node_ids():
 # else. No project may list it, no session runs there, and only container,
 # storage and network, self-update and cache-clearing jobs go to it.
 HOST_VERBS = frozenset(("hello", "beat", "work", "log", "result", "download",
-                        "devimage", "devdata", "devdata-put"))
+                        "devimage", "devdata", "devdata-put", "moved"))
 # ...and of those, what a node locked down (node_lockdown) still asks: its
-# one job, and saying how it went.
-LOCKDOWN_VERBS = frozenset(("hello", "beat", "work", "log", "result"))
+# one job, and saying how it went; and either knocks where its controller
+# moved, or it could never follow (B955).
+LOCKDOWN_VERBS = frozenset(("hello", "beat", "work", "log", "result", "moved"))
 HOST_JOBS = frozenset(("compose", "system", "self-update", "cache-clear", "storage"))
 # ...and one docker verb at a time about the containers it hosts: the Docker
 # tab's listing is a `docker ps` exec on the node (devapp._agent_read), and

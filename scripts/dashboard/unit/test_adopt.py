@@ -220,10 +220,53 @@ class FromTheStick(unittest.TestCase):
                          "cache": [{"slot": "cache", "id": "Samsung_X", "fs": "btrfs"}, {"slot": "cache2", "id": "Crucial_Y", "fs": "LUKS:btrfs"}]}}
         got = self.want(cfg)
         self.assertEqual(got["want"]["pools"], [{"name": "cache", "fs": "btrfs", "uuid": "", "disk_id": "Samsung_X"}])
-        self.assertEqual([(s["slot"], s["why"]) for s in got["skipped"]], [("cache2", "encrypted: its key is not asked for yet")])
+        # cache2 is that pool's second member, never a pool of its own (B941).
+        self.assertEqual(got["skipped"], [])
         # ...and not twice when a pool record names it already.
         cfg["pools"] = [{"name": "cache", "fs": "btrfs", "uuid": "u-1"}]
         self.assertEqual([p["name"] for p in self.want(cfg)["want"]["pools"]], ["cache"])
+
+    def test_with_pool_records_the_cache_slots_are_their_members(self):
+        # B941: a ZFS pool's second member offered as the pool cache2 never
+        # imported, and the merged tree waited on it for good.
+        cfg = {"array": {"disks": [{"slot": "disk1", "id": "WDC_A1", "fs": "xfs"}],
+                         "cache": [{"slot": "cache", "id": "Samsung_X", "fs": "zfs"}, {"slot": "cache2", "id": "Samsung_Y", "fs": "zfs"},
+                                   {"slot": "vms", "id": "Crucial_Z", "fs": "btrfs"}]},
+               "pools": [{"name": "cache", "fs": "zfs", "uuid": "u-1"}, {"name": "vms", "fs": "btrfs", "uuid": "u-2"}]}
+        self.assertEqual([p["name"] for p in self.want(cfg)["want"]["pools"]], ["cache", "vms"])
+
+    def test_a_degraded_array_is_said_and_its_disabled_disk_set_apart(self):
+        # B940: a disk the old system disabled, or one missing and emulated
+        # from the parity, holds files the parity alone has.
+        cfg = {"array": {"disks": [{"slot": "disk1", "id": "WDC_A1", "fs": "xfs", "status": "DISK_OK"},
+                                   {"slot": "disk2", "id": "WDC_B2", "fs": "xfs", "status": "DISK_DSBL"},
+                                   {"slot": "disk3", "id": "", "fs": "xfs", "status": "DISK_NP_DSBL"},
+                                   {"slot": "disk4", "id": "", "status": "DISK_NP"}],
+                         "parity": [{"slot": "parity", "id": "ST_P", "status": "DISK_OK"}]}}
+        got = self.want(cfg)
+        self.assertEqual([d["slot"] for d in got["want"]["data"]], ["disk1"])
+        self.assertEqual([(d["slot"], d["status"]) for d in got["degraded"]], [("disk2", "DISK_DSBL"), ("disk3", "DISK_NP_DSBL")])
+        self.assertIn("DISK_DSBL", got["skipped"][0]["why"])
+        self.assertEqual(self.want({"array": {"disks": [{"slot": "disk1", "id": "WDC_A1", "fs": "xfs"}]}})["degraded"], [],
+                         "a plan from before statuses reads as healthy")
+        # ...and the controller writes nothing to it: no writable adoption,
+        # no takeover, while the kept plan says so.
+        import firstboot
+        import nodes
+        from unittest import mock
+        with mock.patch.object(firstboot, "kept_config", return_value=cfg):
+            why = nodes._degraded_why("taking the array over formats the old parity")
+        self.assertIn("degraded: disk2 (DISK_DSBL), disk3 (DISK_NP_DSBL)", why)
+        with mock.patch.object(firstboot, "kept_config", return_value={}):
+            self.assertEqual(nodes._degraded_why("x"), "")
+        # B948: the takeover waits while a planned data disk is not adopted.
+        plan = {"array": {"disks": [{"slot": "disk1", "id": "A", "fs": "xfs"}, {"slot": "disk2", "id": "B", "fs": "xfs"},
+                                    {"slot": "disk3", "id": "C", "fs": "luks:xfs"}]}}
+        with mock.patch.object(firstboot, "kept_config", return_value=plan):
+            why = nodes._takeover_gaps_why({"mounts": [{"where": "/mnt/disk1"}]})
+            self.assertIn("disk2, disk3 are not adopted here", why)
+            plan["array"]["disks"] = plan["array"]["disks"][:2]
+            self.assertEqual(nodes._takeover_gaps_why({"mounts": [{"where": "/mnt/disk1"}, {"where": "/mnt/disk2"}]}), "")
 
     def test_a_pool_the_adopt_cannot_take_is_set_apart_not_the_whole_request(self):
         # B612: an encrypted pool, one with no filesystem the adopt takes, or

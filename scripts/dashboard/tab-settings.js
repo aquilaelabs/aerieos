@@ -416,7 +416,9 @@ function moveSection(){
   const howWord = {pressed: "marked so here", told: "told by the new controller", asked: "learned by asking the new controller"}[m.how] || "";
   if (m.moved) return `<div class="row stack2" data-group="Move"><div class="grow">
       ${factGrid([["Moved to", m.to], ["When", m.at ? ago(m.at) : ""], ["How", howWord], ["Bundle landed", m.landed_at ? ago(m.landed_at) : ""]])}
-      <div class="sub bad">This controller is read-only now; its nodes have followed, and one that comes back late is told where to knock.</div></div></div>`;
+      <div class="sub bad">This controller is read-only now; its nodes have followed, and one that comes back late is told where to knock.</div>
+      <div class="sub">Should the new home be lost, its bundle still downloads here, packed fresh, and lands on a fresh install with the move token.</div>
+      <div class="actbar"><span class="sp"></span><button type="button" data-movebundle>Download the bundle</button></div></div></div>`;
   // The state arrived by a move: what the old controller was told, as facts.
   const ar = m.arrived || {};
   const arrived = ar.restored_at ? `${factGrid([["Arrived by a move", ago(ar.restored_at)], ["From", ar.from || "no address named"],
@@ -483,13 +485,26 @@ function moveLandBox(ld, inWalk = false, heldSaid = false, bundleOnly = false){
       <div class="fgrid">${tok}${from}${file}</div>
       <div class="actbar"><span class="sp"></span><button type="button" class="primary" data-moveland${off}>Land it here</button></div></div>`;
 }
+// When a bundle was packed, in words ("3 hours ago, 18 Nov 14:02"), from its
+// plain header line; "" for a file that is not one.
+async function moveBundleAge(file){
+  try{
+    const head = (await file.slice(0, 16384).text()).split("\n");
+    const m = JSON.parse(head[1] || "{}");
+    const at = Number(m.packed_at || m.made_at || 0);
+    return at ? `${ago(at)} (${new Date(at * 1000).toLocaleString([], {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"})})` : "";
+  }catch(e){ return ""; }
+}
 function wireMove(root){
   root.querySelectorAll("[data-moveland]").forEach(b => b.onclick = () => pressing(b, async () => {
     const tok = ($("landTok")?.value || "").trim(), from = ($("landFrom")?.value || "").trim(), file = $("landFile")?.files?.[0];
     const kept = !!b.closest("[data-movelandbox]")?.hasAttribute("data-tokkept");
     if (!tok && !kept) return notify("the move token is needed, with the old controller's address or the bundle", true);
     if (!(file || from)) return notify($("landFrom") ? "pick the bundle, or give the old controller's address" : "pick the bundle first", true);
-    if (!await askYes(`Land the move here?\n\nThe moved controller's state takes this one's place: this setup account goes with it (set aside, not deleted), and you sign in with an account it had. ${file ? `The bundle (${moveSize(file.size)}) is sent from this browser.` : `The bundle is pulled from ${from}.`}`,
+    // When it was packed, read off its plain first lines (B957): anything
+    // done on the old controller after that moment does not come.
+    const packed = file ? await moveBundleAge(file) : "";
+    if (!await askYes(`Land the move here?\n\nThe moved controller's state takes this one's place: this setup account goes with it (set aside, not deleted), and you sign in with an account it had. ${file ? `The bundle (${moveSize(file.size)}) is sent from this browser.${packed ? ` It was packed ${packed}: what changed on the old controller since then does not come, so download it again if the old one has been used since.` : ""}` : `The bundle is pulled from ${from}, packed at that moment.`}`,
         {title: "Land the move?", verb: "Land it", danger: true})) return;
     busy(b, file ? "Sending" : "Landing");
     const fd = new FormData();

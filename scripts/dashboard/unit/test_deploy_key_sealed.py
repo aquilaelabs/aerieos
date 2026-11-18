@@ -83,6 +83,33 @@ class Sealed(unittest.TestCase):
         self.assertEqual(self.loaded(), ["app-deploy"])
         self.assertEqual(sorted(os.listdir(self.store)), ["app-deploy.pub", "app-deploy.sealed"])
 
+    def test_the_keys_a_move_carried_are_kept_and_loaded(self):
+        # B966: a landing hands over the old controller's keys (sealed under
+        # the install key that came with it) to be kept where only this
+        # helper writes; one kept here already, a link and a stranger stay out.
+        self.dk("make", "app-deploy")
+        carried = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, carried, True)
+        for n in ("app-deploy.pub", "app-deploy.sealed"):
+            shutil.copy(os.path.join(self.store, n), os.path.join(carried, n))
+        os.remove(os.path.join(self.store, "app-deploy.pub"))
+        os.remove(os.path.join(self.store, "app-deploy.sealed"))
+        self.unload()
+        with open(os.path.join(self.store, "kept.sealed"), "w") as f:
+            f.write("ours")
+        with open(os.path.join(carried, "kept.sealed"), "w") as f:
+            f.write("theirs")
+        os.symlink("/etc/passwd", os.path.join(carried, "link.pub"))
+        with open(os.path.join(carried, "notes.txt"), "w") as f:
+            f.write("x")
+        p = self.dk("--take", carried)
+        self.assertEqual(p.stdout.split(), ["1", "1"], p.stderr)
+        self.assertEqual(self.loaded(), ["app-deploy"])
+        self.assertEqual(sorted(os.listdir(self.store)), ["app-deploy.pub", "app-deploy.sealed", "kept.sealed"])
+        with open(os.path.join(self.store, "kept.sealed")) as f:
+            self.assertEqual(f.read(), "ours", "one kept here already is left as it is")
+        self.assertIn("usage", self.dk("--take", "relative/dir").stderr)
+
     def test_a_plain_key_from_before_is_sealed_when_the_keys_are_next_loaded(self):
         subprocess.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", "old-deploy", "-f", os.path.join(self.store, "old-deploy")], check=True)
         self.assertEqual(self.plain_on_disk(), ["old-deploy"])

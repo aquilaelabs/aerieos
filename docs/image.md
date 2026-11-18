@@ -174,17 +174,27 @@ Controller, Keys. These copies are the controller, not the files on the pools:
 the Storage page's snapshots and Backups keep those.
 
 A stick that dies is replaced by one written from the release's image with
-no configuration: its first page offers *Restoring a saved configuration*,
-lists the copies found on the machine's pools (newest first, with the
-machine and the version each came from) and takes the password, or takes a
-copy you kept; held to the same gate as a move (never onto an older build),
-restored and restarted, the machine is the controller as it was, its nodes
-checking back in. A node whose token rotated since the copy was made is
+no configuration. The new stick has a host id of its own, so the machine's
+pools, never exported by the stick that died, read as last used by another
+system: its first page offers *Restoring a saved configuration*, which lists
+those pools and brings one back as it was when its name is typed again (the
+Storage page's **Import anyway** does the same after setup), then lists the
+copies found on the machine's pools (newest first, with the machine and the
+version each came from) and takes the password, or takes a copy you kept;
+held to the same gate as a move (never onto an older build), restored and
+restarted, the machine is the controller as it was, its nodes checking back
+in. The restored configuration knows its system pool by the mark the old
+stick left on it, so naming that pool again takes it back as it is, with its
+containers, VMs and spaces, rather than setting it aside as another install's. A node whose token rotated since the copy was made is
 taken back by itself: it keeps the tokens it held over the last month and
 offers them, newest first, and the one the restored record knows earns it a
 fresh one. A node that is gone is simply never back.
 
 ## The stick maker
+
+A stick of 16 GB or more takes the image (it needs about 11.3 GB); both
+makers read the size the image needs and refuse a smaller stick before
+anything on it is erased.
 
 On Windows, **AerieOS USB Maker** (`aerieos-usb-maker-VERSION.exe`,
 attached to every release) does it in a window: which release (the newest,
@@ -192,7 +202,9 @@ the newest dev build, one by name, or an image file you have), which stick
 (the removable disks alone), a few settings for the first boot (the dev
 channel, a name, a time zone, a fixed address), and a last page naming the
 stick by model and size, with a box to tick, before it is erased; then the
-progress and the read back. It asks for Administrator once at start, since
+progress and the read back. While no stable release is published, the newest
+release is the newest dev build, said when it is done, with where to pick
+the dev channel for its updates. It asks for Administrator once at start, since
 writing a disk needs it, and every step in it is the stick maker's own.
 
 `tools/aerieos-stick.py` writes a release's stick image onto a USB

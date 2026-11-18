@@ -399,9 +399,16 @@ container to a machine of its own, and back.
    a bundle instead: **Download the bundle** on the old controller (packed
    fresh each time it is pressed, with what was ticked) and give the file
    with the token. Either way the bundle is held to the version gate (a
-   move never lands on a build older than the state it carries: update the
-   new home first), its state put in place of the fresh one (which is moved
-   aside, not deleted), and the dashboard restarts on it. Sign in with an
+   move never lands on a build older than the state it carries: write the
+   stick again from that release or newer, or update the new home first), its
+   state put in place of the fresh one (which is moved aside, not deleted),
+   and the dashboard restarts on it. The landing's confirmation says when the
+   bundle was packed: what changed on the old controller after that does not
+   come, so download it last, right before you shut the old one down. What it
+   could not bring is said when it lands: a space whose folder is not here,
+   and the old install's key when it was not ticked. The state's own copies
+   (those taken before each update, and a stick's configuration copies) never
+   travel. Sign in with an
    account it had. A move lands only while the new home is first being set
    up, before its Finish: it replaces what is there, and is never merged into
    a controller already in use. On a stick, the accounts it made from the old

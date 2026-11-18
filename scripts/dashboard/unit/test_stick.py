@@ -51,6 +51,22 @@ class Stick(unittest.TestCase):
         self.linux = mock.patch.object(self.m.platform, "system", return_value="Linux")
         self.linux.start(); self.addCleanup(self.linux.stop)
 
+    def test_a_stick_too_small_for_the_image_is_refused_before_it_is_erased(self):
+        # B958: an 8 GB stick took the write part way and read as failing.
+        import lzma
+        head = bytearray(1 << 20)
+        hdr = b"EFI PART" + bytes(24) + (22000000 - 1).to_bytes(8, "little")
+        head[512:512 + len(hdr)] = hdr
+        img = os.path.join(self.d, "x.stick.raw.xz")
+        with lzma.open(img, "wb") as f:
+            f.write(bytes(head))
+        self.assertEqual(self.m.image_needs(img), 22000000 * 512)
+        self.assertIn("needs 11.3 GB", self.m.fits_why(img, 8 * 10 ** 9))
+        self.assertEqual(self.m.fits_why(img, 16 * 10 ** 9), "")
+        with lzma.open(img, "wb") as f:
+            f.write(bytes(4096))
+        self.assertEqual(self.m.fits_why(img, 1), "", "an image that names no size is not refused for it")
+
     def test_the_disks_are_listed_and_only_a_removable_one_may_be_written(self):
         rows = self.m.disks()
         self.assertEqual([(r["id"], r["removable"], r["system"]) for r in rows],

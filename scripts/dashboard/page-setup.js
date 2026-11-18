@@ -429,7 +429,7 @@ function setupWalkHtml(s){
     `<p><b>Sign in</b> with an account the old controller had.</p>
      <p><b>Your nodes</b> follow by themselves once they can reach this address. Any that does not is listed on the Nodes page, with the one line to run on it${old ? "; a node that was a VM on the old system is off until its VM runs here" : ""}.</p>
      ${old ? `<p><b>Containers and VMs</b>: this machine's Containers page reads what the old system ran. Its containers come as a zip of compose files, each imported with New container; its VMs are defined there, a VM that was one of your nodes with them. Home keeps this until it is read.</p>` : ""}
-     ${state?.held?.held ? `<p><b>Start</b>: nothing runs until it is pressed: sessions, shares, containers. Press it once the disks are as they should be.</p>` : ""}`,
+     ${state?.held?.held ? `<p><b>Start</b>: no session starts until it is pressed, and nothing of the old system's disks is mounted until you adopt them. Press it once the disks are as they should be.</p>` : ""}`,
     state?.held?.held ? `<button type="button" data-heldstart>Start</button>` : "", "then"));
   cards.push(setupCard(++i, "If you go back", false, false, `${stick?.projects ? `<p><b>Do this first:</b> ${esc(stick.projects)} is the spaces folder, so the system that had it cannot read it. Press Let it go in the step above before you shut down. Already back on that system? Run this there as root:</p>
        <pre class="setcmd">bash ${esc(stick.projects)}/.aerieos-give-back.sh</pre>` : ""}
@@ -466,10 +466,15 @@ const setupDiskFree = d => !d.system && !d.removable;
 // off their NAS saw every disk of it listed under Make it). A plan's id is
 // the old system's name for the disk (MODEL_SERIAL), met by the serial or
 // the by-id name.
+// A pool is met by its disk where the plan names one (B945: pools carry no
+// id, and their disks were offered to erase), and a disk the plan sets
+// apart (encrypted, degraded) is the old system's all the same.
 function setupPlanned(){
-  const w = state?.firstboot?.adopt?.want || {};
+  const a = state?.firstboot?.adopt || {}, w = a.want || {};
   return [...(w.data || []).map(x => ({...x, what: "data"})), ...(w.parity || []).map(x => ({...x, what: "parity"})),
-          ...(w.pools || []).map(x => ({...x, what: "pool"}))].filter(x => x.id);
+          ...(w.pools || []).map(x => ({...x, id: x.id || x.disk_id || "", what: "pool"})),
+          ...(a.skipped || []).map(x => ({...x, what: "apart"})),
+          ...(a.degraded || []).map(x => ({...x, what: "apart", why: x.status}))].filter(x => x.id);
 }
 const setupDiskPlanned = (d, rows) => rows.find(x => x.id === d.serial || (d.serial && x.id.endsWith("_" + d.serial)) || (d.by_id && d.by_id.includes(x.id))) || null;
 // The machine's free disks split: theirs (the plan's, each with its row of
@@ -483,7 +488,10 @@ function setupDiskSplit(n){
 // What a disk or partition holds, in the agent's words: "nothing" is its word
 // for nothing, as the Storage page and the pool and array jobs read it.
 const setupHolds = x => !!x && x !== "nothing";
-const setupDiskHeld = d => setupHolds(d.holds) || (d.parts || []).some(p => setupHolds(p.holds));
+// ...and a disk with any partition at all counts, whatever the partition
+// holds: an old array's parity is a partition with no filesystem, and was
+// ticked to erase with no way to untick it (B945).
+const setupDiskHeld = d => setupHolds(d.holds) || (d.parts || []).length > 0;
 
 // The plan for these disks: {main, fast, notes}. `main` is where the shares
 // live, {kind: "zfs"|"array", layout, disks, parity, usable_mb, may_fail,
@@ -565,7 +573,8 @@ function setupDisksCard(num){
   const facts = d => `<b>${esc(d.model || d.name)}</b> <span class="dim">${esc(setupGB(d.size_mb || 0))} · ${d.ssd ? "SSD" : "hard disk"} · serial ${esc(d.serial || "none")}</span>`;
   // The old system's disks: said whose they are, no box, nothing to press.
   const theirRow = ([d, p]) => `<div class="row setdisk theirs"><span class="grow">${facts(d)}
-      <span class="sub note">the old system's ${esc(p.what === "pool" ? `pool ${p.name || ""}`.trim() : p.slot || p.what)}: adopted as it is, in the walk; nothing here touches it</span></span></div>`;
+      <span class="sub note">${p.what === "apart" ? `the old system's ${esc(p.slot || "disk")}: not adopted (${esc(p.why || "set apart")}); nothing here touches it`
+        : `the old system's ${esc(p.what === "pool" ? `pool ${p.name || ""}`.trim() : p.slot || p.what)}: adopted as it is, in the walk; nothing here touches it`}</span></span></div>`;
   if (theirs.length && !free.length){
     const nd = theirs.filter(([, p]) => p.what === "data").length, np = theirs.filter(([, p]) => p.what === "parity").length, npool = theirs.length - nd - np;
     const what = [nd ? `${nd} data disk${nd === 1 ? "" : "s"}` : "", np ? `${np === 1 ? "the parity disk" : `${np} parity disks`}` : "", npool ? `${npool} pool disk${npool === 1 ? "" : "s"}` : ""].filter(Boolean).join(", ");
@@ -581,7 +590,7 @@ function setupDisksCard(num){
   const row = d => `<div class="row setdisk"><label class="grow"><input type="checkbox" data-setdiskuse="${esc(d.name)}"${use(d) ? " checked" : ""}${setupDiskHeld(d) ? "" : " disabled"}>
       ${facts(d)}
       ${d.smart?.health === "failing" ? `<span class="pill bad">failing</span>` : ""}
-      ${setupDiskHeld(d) ? `<span class="sub warn">holds ${esc(d.holds || "data")}: kept unless you tick it, which erases it</span>` : ""}</label></div>`;
+      ${setupDiskHeld(d) ? `<span class="sub warn">holds ${esc(setupHolds(d.holds) ? d.holds : (d.parts || []).map(p => p.holds).find(setupHolds) || "a partition")}: kept unless you tick it, which erases it</span>` : ""}</label></div>`;
   const says = p => !p ? "" : `<div class="setplan"><p><b>${p.kind === "array" ? "An array" : p.layout === "single" ? "One pool" : `A ZFS ${esc(p.layout)}`}</b> of ${p.disks.length} disk${p.disks.length === 1 ? "" : "s"}${
       p.parity?.length ? `, ${p.parity.length} for parity` : ""}: <b>${esc(setupGB(p.usable_mb))}</b> to use, ${p.may_fail ? `any ${p.may_fail === 1 ? "one disk" : `${p.may_fail} disks`} may fail` : "no disk may fail"}.</p>
       <p class="dim">${esc(p.why)}${p.grows ? ` ${esc(p.grows)}` : ""}</p></div>`;

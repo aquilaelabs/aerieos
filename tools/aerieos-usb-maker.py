@@ -286,7 +286,7 @@ class Maker(tk.Tk):
             if not stick.is_admin():
                 raise Stopped("writing a stick needs Administrator: close this window and start it again, "
                               "answering Yes when Windows asks; nothing was fetched or written")
-            src = self.choice["source"].get()
+            src, fell = self.choice["source"].get(), False
             if src == "file":
                 image = self.choice["file"].get()
                 if os.path.isfile(image + ".sha256"):
@@ -294,18 +294,37 @@ class Maker(tk.Tk):
                 stick.attested(image)
                 stick.signed(stick.tag_of(image), image)
             else:
-                image = stick.release_image(self.choice["tag"].get().strip() if src == "tag" else "latest", "dev" if src == "dev" else "normal")
+                try:
+                    image = stick.release_image(self.choice["tag"].get().strip() if src == "tag" else "latest", "dev" if src == "dev" else "normal")
+                except SystemExit as e:
+                    # No stable release out yet (B959): the newest dev build
+                    # is written, said, rather than a stop with Back dead.
+                    if src != "latest" or "dev channel" not in str(e):
+                        raise
+                    note("no stable release is published yet: the newest dev build is written")
+                    image, fell = stick.release_image("latest", "dev"), True
             d = self.choice["disk"]
             again = stick.pick(d["id"])
             if (again["size"], again["model"]) != (d["size"], d["model"]):
                 raise Stopped("the stick is not the one picked any more (it was unplugged or changed): nothing written")
+            # Big enough for the image, said before anything is erased (B958).
+            why = stick.fits_why(image, again["size"])
+            if why:
+                raise Stopped(f"{why}: nothing written")
+            # A tool this one runs under may refuse a stick it knows must not
+            # be written (one holding what it is moving from): said, nothing written.
+            why = (self.extra.get("refuse") or (lambda row: ""))(again)
+            if why:
+                raise Stopped(f"{why}: nothing written")
             lines = {ln.split("=", 1)[0]: ln.split("=", 1)[1] for ln in settings_lines(self.settings())}
             lines.update((self.extra.get("sets") or (lambda m: {}))(self) or {})
             cfg = (self.extra.get("config") or (lambda m: None))(self)
             self.q.put(("mode", "write"))
             stick.write_image(image, d["id"], verify_after=True, sets=[f"{k}={v}" for k, v in lines.items()], config=cfg)
-            self.q.put(("done", self.extra.get("done") or "Done. Boot the machine from the stick: it comes up as its own controller, "
-                        "and its first page, at http://ITS-ADDRESS:7680 on your network, makes the owner."))
+            self.q.put(("done", (self.extra.get("done") or "Done. Boot the machine from the stick: it comes up as its own controller, "
+                        "and its first page, at http://ITS-ADDRESS:7680 on your network, makes the owner.")
+                        + (" No stable release is out yet, so this is the newest dev build: for its updates, pick Dev builds under "
+                           "Controller settings, Updates, Channel." if fell else "")))
             note("done")
         except Stopped as e:
             note(f"stopped: {e}")

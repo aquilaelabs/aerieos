@@ -84,15 +84,39 @@ def mac_of(iface, sys_net=None):
     return mac if re.fullmatch(r"([0-9a-f]{2}:){5}[0-9a-f]{2}", mac) and mac != "00:00:00:00:00:00" else ""
 
 
-def plan(iface, page_text=None, mac=""):
+def stick_path():
+    """The stick's own static settings (usr/lib/aerieos-os/net, from
+    BB_NET_ADDRESS in its builderbot.env), for every wired card."""
+    return os.path.join(_env("BB_NETWORK_RUN_DIR", "/run/systemd/network"), "10-aerieos-stick.network")
+
+
+def static_of(text):
+    """The [Network] section's Address, Gateway and DNS lines of a networkd
+    file, or "" when it sets no address."""
+    lines, inside = [], False
+    for ln in (text or "").splitlines():
+        s = ln.strip()
+        if s.startswith("["):
+            inside = s == "[Network]"
+        elif inside and re.match(r"(Address|Gateway|DNS)=\S", s):
+            lines.append(s)
+    return "\n".join(lines) + "\n" if any(x.startswith("Address=") for x in lines) else ""
+
+
+def plan(iface, page_text=None, mac="", stick_text=None):
     """{path: text or None} that puts `iface` in br0: the bridge, the card as
     its port, br0 on DHCP, and a Network page file for the card moved to br0
-    (None removes a path). Pure, for the tests."""
+    (None removes a path). An address the stick sets for its wired cards
+    (`stick_text`) is br0's instead of DHCP (B944): the card, a port now,
+    answers on no address, and a server set to one was lost to the network.
+    Pure, for the tests."""
+    fixed = static_of(stick_text)
     out: dict = {
         netdev_path(): "[NetDev]\nName=br0\nKind=bridge\n# The card's own MAC, so its DHCP reservation answers.\n"
                        f"MACAddress={mac or 'none'}\n\n[Bridge]\nSTP=no\n",
         port_path(iface): f"[Match]\nName={iface}\n\n[Network]\nBridge={BRIDGE}\n",
-        bridge_path(): "[Match]\nName=br0\n\n[Network]\nDHCP=yes\n\n[DHCPv4]\n# By the MAC, as a router's reservation is.\nClientIdentifier=mac\n",
+        bridge_path(): ("[Match]\nName=br0\n\n[Network]\n# The address the stick sets, which the card had.\n" + fixed) if fixed else
+                       "[Match]\nName=br0\n\n[Network]\nDHCP=yes\n\n[DHCPv4]\n# By the MAC, as a router's reservation is.\nClientIdentifier=mac\n",
     }
     if page_text:
         out[page_path(BRIDGE)] = re.sub(r"(?m)^Name=.*$", f"Name={BRIDGE}", page_text)
@@ -173,7 +197,7 @@ def ensure(os_image, confirm_s=CONFIRM_S):
     if why:
         return False, why
     pg = _snapshot([page_path(iface)])[page_path(iface)]
-    files = plan(iface, pg, mac_of(iface))
+    files = plan(iface, pg, mac_of(iface), _snapshot([stick_path()])[stick_path()])
     before = _snapshot(list(files))
     _write(files)
     log(f"LAN bridge: {iface} goes into {BRIDGE}, which takes its MAC and its address")

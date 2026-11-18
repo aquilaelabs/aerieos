@@ -1919,9 +1919,13 @@ function ndNotHereHtml(){
       <div class="name">Not yet here since the move <span class="pill warn">${rows.length}</span></div>
       <div class="sub">These nodes have not checked in since this controller's state arrived by a move${ar.from ? ` from ${esc(ar.from)}` : ""}${ar.restored_at ? ` ${esc(ago(ar.restored_at))}` : ""}${
         helpIcon("One that heard the move follows by itself when the old address goes quiet; one that was off the whole time is told on its own console, as root, with its line, and nothing is enrolled again.")}</div>
-      ${rows.map(r => `<div class="sub" data-nothere="${esc(r.id)}"><b>${esc(r.name)}</b> <code>${esc(r.line)}</code> <button type="button" class="link" data-ndcopyline="${esc(r.id)}">Copy</button></div>`).join("")}
+      ${rows.map(r => `<div class="sub" data-nothere="${esc(r.id)}"><b>${esc(r.name)}</b> <code>${esc(ndFollowLine(r.line))}</code> <button type="button" class="link" data-ndcopyline="${esc(r.id)}">Copy</button></div>`).join("")}
     </div></div>`;
 }
+// A follow line with no address in it (a backup names no new home, and an
+// install with no public name has none to give): the address this page is
+// read at, which is where the node is to knock.
+const ndFollowLine = line => String(line || "").replace(/^(aerieos-agent follow)\s+([0-9a-f]{64})$/, (_m, verb, ch) => `${verb} ${location.origin} ${ch}`);
 // The bar: nothing of its own since R177, the node switcher, Create sandbox
 // VM and Enroll node being the Machines group's header (page-shell.js
 // groupHeader); kept as the page's bar builder so its callers stand.

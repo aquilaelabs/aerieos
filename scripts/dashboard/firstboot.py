@@ -2,7 +2,7 @@
 
 The stick's root step (image/mkosi.extra/usr/lib/aerieos-os/firstboot-take)
 takes builderbot/firstboot.json off the ESP before the controller starts and
-hands it over at /run/aerieos-os/firstboot/firstboot.json with what it did
+hands it over at /var/lib/aerieos-os/firstboot/firstboot.json with what it did
 to the machine itself (the hostname, the time zone). At start this applies
 the rest it can: the owner (a name and a password hash; none leaves the
 first-run page to ask), the people (by name and role, their SMB password's
@@ -27,7 +27,9 @@ import re
 import time
 from pathlib import Path
 
-RUN = Path(os.environ.get("BB_FIRSTBOOT_RUN", "/run/aerieos-os/firstboot/firstboot.json"))
+RUN = Path(os.environ.get("BB_FIRSTBOOT_RUN", "/var/lib/aerieos-os/firstboot/firstboot.json"))
+# ...where an image before it handed it over, in memory (B943).
+RUN_BEFORE = Path("/run/aerieos-os/firstboot/firstboot.json")
 STATE = None
 # The name a pool may be mounted under (adopt.POOL_RE, nodes._adopt_want).
 POOL_NAME = re.compile(r"[a-z][a-z0-9_-]{0,31}")
@@ -50,10 +52,50 @@ def _file():
     return STATE / "firstboot.json"
 
 
+def _people_file():
+    return STATE / "firstboot-people.json"
+
+
+def _write_private(path, data):
+    """`data` written to `path` for this account alone (0600), whole or not
+    at all: it holds SMB password hashes."""
+    tmp = path.with_name(path.name + ".tmp")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        json.dump(data, f)
+    os.replace(tmp, path)
+
+
+def people_after_claim():
+    """The plan's people made once the owner is (B946), where the stick came
+    with no owner's password: said on This machine's From the stick, the
+    kept file then gone. Nothing when there were none."""
+    p = _people_file()
+    try:
+        people = (json.loads(p.read_text(encoding="utf-8")) or {}).get("people") or []
+    except (OSError, ValueError):
+        return
+    r = users.adopt_people(people)
+    try:
+        d = json.loads(_file().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        d = None
+    if isinstance(d, dict):
+        d["waiting"] = [w for w in d.get("waiting") or [] if w.get("what") != "accounts"]
+        if r.get("error"):
+            d.setdefault("failed", []).append({"what": "accounts", "said": r["error"]})
+        else:
+            d.setdefault("done", []).append({"what": "accounts", "said": ", ".join(r["made"]) or "none"})
+            d["failed"] = (d.get("failed") or []) + [{"what": f"account {n or '(no name)'}", "said": why} for n, why in r["skipped"]]
+        write_json(_file(), d)
+    if not r.get("error"):
+        p.unlink(missing_ok=True)
+
+
 def apply(path=None):
     """Apply what the stick's first boot handed over, once. The report, or
     None when nothing was handed over."""
-    path = Path(path or RUN)
+    path = Path(path or (RUN if RUN.exists() or not RUN_BEFORE.exists() else RUN_BEFORE))
     try:
         handed = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -80,7 +122,13 @@ def apply(path=None):
                     settings.set_many({"setup_done": True})
                     done.append({"what": "first run", "said": "skipped: the owner signs in"})
         else:
-            waiting.append({"what": "accounts", "said": "no owner's password came with it: the first-run page makes the owner"})
+            # Its people kept until the first-run page makes the owner (B946):
+            # their SMB passwords are what the shares are served to.
+            ppl = [{k: p.get(k) for k in ("name", "role", "smb_nt") if p.get(k)} for p in cfg.get("people") or [] if isinstance(p, dict)]
+            if ppl:
+                _write_private(_people_file(), {"people": ppl})
+            waiting.append({"what": "accounts", "said": "no owner's password came with it: the first-run page makes the owner"
+                            + (f", and the {len(ppl)} people it names are made then" if ppl else "")})
         # Held on the disks (R161 step 11): the start this configuration came
         # with shows them on the Nodes page before anything mounts.
         if cfg.get("hold_first_start"):
@@ -115,11 +163,28 @@ def adopt_want(cfg):
     asked for yet. None when the plan names no disk or pool."""
     ar = (cfg or {}).get("array") if isinstance((cfg or {}).get("array"), dict) else {}
     data, skipped = [], []
+    # A disk the old system marked anything but healthy (disabled, missing
+    # and emulated from the parity, wrong, new): its contents may live only
+    # in the parity until the old system rebuilds it, so it is set apart,
+    # and the array is said degraded, which refuses a writable adoption and
+    # the takeover (B940); a slot with no disk at all is no disk.
+    degraded = []
+    for x in [*(ar.get("disks") or []), *(ar.get("parity") or [])]:
+        if not isinstance(x, dict):
+            continue
+        st = str(x.get("status") or "").upper()
+        if st and st not in ("DISK_OK", "DISK_NP"):
+            degraded.append({"slot": str(x.get("slot") or ""), "id": str(x.get("id") or ""), "status": st})
+    bad = {d["id"] for d in degraded if d["id"]}
     for x in ar.get("disks") or []:
         if not isinstance(x, dict) or not x.get("id"):
             continue
         fs = str(x.get("fs") or "").lower()
-        if fs.startswith("luks"):
+        if x["id"] in bad:
+            st = next(d["status"] for d in degraded if d["id"] == x["id"])
+            skipped.append({"slot": x.get("slot", ""), "id": x["id"],
+                            "why": f"the old system marked it {st}: its files may live only in the parity until it is rebuilt there"})
+        elif fs.startswith("luks"):
             skipped.append({"slot": x.get("slot", ""), "id": x["id"], "why": "encrypted: its key is not asked for yet"})
         elif fs in ("xfs", "btrfs", "zfs"):
             data.append({"slot": str(x.get("slot") or ""), "id": str(x["id"]), "fs": fs})
@@ -144,11 +209,19 @@ def adopt_want(cfg):
             pools.append({"name": name, "fs": fs, "uuid": uuid})
     # A cache disk the old system kept in its array's cache slot (B625: no
     # config/pools, as before its pools), offered as a pool named for its
-    # slot and found by its disk, since no pool record names its UUID.
-    for x in ar.get("cache") or []:
-        if not isinstance(x, dict) or not x.get("id"):
-            continue
+    # slot and found by its disk, since no pool record names its UUID. Only
+    # then: with pool records, the cache slots are their members (cache,
+    # cache2), and a second member taken as a pool of its own never imports
+    # and holds the merged tree back for good (B941).
+    has_records = any(isinstance(p, dict) and p.get("name") for p in (cfg or {}).get("pools") or [])
+    rows = [x for x in ([] if has_records else ar.get("cache") or []) if isinstance(x, dict) and x.get("id")]
+    slots = {str(x.get("slot") or "cache") for x in rows}
+    for x in rows:
         name, fs = str(x.get("slot") or "cache"), str(x.get("fs") or "").lower()
+        # ...and a second member of one (cache2 beside cache) is that pool's.
+        base = re.sub(r"\d+$", "", name)
+        if base != name and base in slots:
+            continue
         if any(p["name"] == name for p in pools) or any(s["slot"] == name for s in skipped):
             continue
         if fs.startswith("luks"):
@@ -159,9 +232,9 @@ def adopt_want(cfg):
             skipped.append({"slot": name, "id": str(x["id"]), "why": "its name is not one a pool can be mounted under here (a lowercase letter, then lowercase letters, digits, - and _)"})
         else:
             pools.append({"name": name, "fs": fs, "uuid": "", "disk_id": str(x["id"])})
-    if not data and not pools:
+    if not data and not pools and not degraded:
         return None
-    return {"want": {"data": data, "parity": parity, "pools": pools}, "skipped": skipped}
+    return {"want": {"data": data, "parity": parity, "pools": pools}, "skipped": skipped, "degraded": degraded}
 
 
 def share_requests(cfg):
@@ -214,7 +287,9 @@ def share_requests(cfg):
 
 def kept_config():
     """The stick's configuration as kept (no password or SMB hash in it),
-    or {}."""
+    or {}; {} where no state folder is configured (a caller's tests)."""
+    if STATE is None:
+        return {}
     try:
         d = json.loads(_file().read_text(encoding="utf-8"))
     except (OSError, ValueError):
