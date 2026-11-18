@@ -1113,7 +1113,7 @@ As built (Perch step 43, the operator 17 Nov): a record's Save writes that one r
 
 Applies to: scripts/dashboard/page-*.css, scripts/dashboard/tab-*.js, scripts/dashboard/nb-*.js, scripts/dashboard/page-*.js; pulldown, select, picker, dropdown
 
-A pulldown in a bar or a row of controls (a page's bar, a band over a list, a picker row, an add row, a grid cell of controls) is as wide as its longest answer and no wider (the operator, 18 Nov): it never grows into the room around it and a grid cell does not stretch it. Where its row runs short it shrinks, to a thumb's width (--tap) at least, its words clipped with an ellipsis; the controls rule's cap holds where a rule sets one. A form's field fills its cell (forms), and a group header's or a notebook's head sizes its own picker. One rule in page-overrides.css holds it, and uniform.mjs measures every such pulldown against its own width on every page.
+A pulldown in a bar or a row of controls (a page's bar, a band over a list, a picker row, an add row, a grid cell of controls) is as wide as its longest answer and no wider (the operator, 18 Nov): it never grows into the room around it and a grid cell does not stretch it. Where its row runs short it shrinks, to a thumb's width (--tap) at least, its words clipped with an ellipsis; the controls rule's cap holds where a rule sets one. A form's field fills its cell (forms), and a group header's or a notebook's head sizes its own picker. A base select is as wide as the answer chosen, so fitPickers (page-docs.js) sets each one's width from itself with its longest answer chosen, as the page draws it; a rule in page-overrides.css keeps it from growing, and uniform.mjs measures every such pulldown against its longest answer on every page.
 
 ## Pages
 
