@@ -52,7 +52,19 @@ function unpack(ver, tag){
 }
 
 // This tree's controller on that world, as run.sh starts the harness's.
+// The port is free when asked for and taken by the server only after its
+// migrations ran, a second or more under a whole run's load, and another
+// worker could take it in that gap: the server then ended on Address
+// already in use (B931). Started again on another port when that is what
+// ended it, three times at most; any other end is the answer.
 async function start(w, dash = DASH, build = BUILD){
+  for (let tries = 1; ; tries++){
+    const from = (() => { try { return readFileSync(`${w}/server.log`, 'utf8').length; } catch { return 0; } })();
+    const c = await startOnce(w, dash, build);
+    if (c.code === null || tries >= 3 || !/Address already in use/.test(c.log().slice(from))) return c;
+  }
+}
+async function startOnce(w, dash, build){
   const port = await freePort();
   const out = openSync(`${w}/server.log`, 'a');
   const proc = spawn('python3', ['-u', `${dash}/server.py`], { stdio: ['ignore', out, out], env: {
