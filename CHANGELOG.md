@@ -83,6 +83,7 @@
 - A space card's back has its Settings gear at the top right and Back last in its foot, where the two were the other way around (797308b)
 - The Spaces page's Full and Compact switch fades the cards through the change, and a compact card opens and folds in motion, as the Containers page's do (797308b)
 - Every notebook view waits in the shape it lands in: the tiles it mostly draws, its status line on its row and its buttons under the tiles, where a view waited with extra tiles and its buttons beside them; Signing waits as its sections, not plain rows (a2e4bf4)
+- A node picker beside its state's pill names the node alone, where a quiet one read "draconis (quiet)" beside a pill saying Not answering, cut short on a phone (2e9ce87)
 
 ### Fixed
 
