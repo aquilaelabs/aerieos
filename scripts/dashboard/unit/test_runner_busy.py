@@ -1,7 +1,8 @@
-"""A self-hosted runner is busy while a job of its own runs, whichever bin
-folder it runs from (B755): the .env sync restarts a runner only while it is
-idle, and a runner that updated itself runs its jobs from bin.VERSION/,
-which the check under bin/ alone read as idle and restarted under the job."""
+"""A self-hosted runner is busy while a job of its own runs, and listening
+while its listener runs, whichever bin folder it runs from: a runner that
+updated itself runs from bin.VERSION/, which the checks under bin/ alone read
+as idle (B755: the .env sync restarted it under the job) and as not listening
+(B971: its row said Reinstall runner while it took jobs)."""
 import os
 import sys
 import tempfile
@@ -41,6 +42,24 @@ class RunnerBusy(unittest.TestCase):
         self.assertFalse(runners.runner_busy(self.d, proc=self.proc), "another runner's job")
         self.ps(13, os.path.join(self.d, "bin", "Runner.Worker"), "spawnclient")
         self.assertTrue(runners.runner_busy(self.d, proc=self.proc))
+
+    def test_a_listener_from_an_updated_runners_bin_is_listening(self):
+        self.assertFalse(runners._runner_runs(self.d, "Listener", proc=self.proc))
+        self.ps(14, os.path.join(self.d, "bin.2.338.2", "Runner.Listener"), "run", "--startuptype", "service")
+        self.assertTrue(runners._runner_runs(self.d, "Listener", proc=self.proc))
+
+    def test_a_listener_from_bin_is_listening(self):
+        self.ps(15, os.path.join(self.d, "bin", "Runner.Listener"), "run")
+        self.assertTrue(runners._runner_runs(self.d, "Listener", proc=self.proc))
+
+    def test_a_slots_runner_is_not_the_folder_above_it(self):
+        # A runner registered in RUNNER_DIR itself, from before a node held
+        # several, is not the one in RUNNER_DIR/<slot> beneath it.
+        self.ps(16, os.path.join(self.d, "slot", "bin", "Runner.Listener"), "run")
+        self.ps(17, os.path.join(self.d, "slot", "bin.2.338.2", "Runner.Worker"), "spawnclient")
+        self.assertFalse(runners._runner_runs(self.d, "Listener", proc=self.proc))
+        self.assertFalse(runners.runner_busy(self.d, proc=self.proc))
+        self.assertTrue(runners._runner_runs(os.path.join(self.d, "slot"), "Listener", proc=self.proc))
 
 
 if __name__ == "__main__":

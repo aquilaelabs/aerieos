@@ -126,12 +126,12 @@ def runner_dirs():
     return out
 
 
-def runner_busy(d, proc="/proc"):
-    """Whether the GitHub runner in `d` is running a job: a Runner.Worker of
-    its own, from bin/ or from the bin.VERSION/ it updated itself into
-    (B755: the check looked under bin/ alone, so a job of an updated
-    runner read as idle and the .env sync restarted the runner under it)."""
-    root = os.path.realpath(d).rstrip("/") + "/"
+def _runner_runs(d, part, proc="/proc"):
+    """Whether a Runner.PART of the GitHub runner in `d` is running: one
+    started from its bin/ or from the bin.VERSION/ it updated itself into,
+    and from this runner's own folder, not a slot's under it."""
+    root = os.path.realpath(d).rstrip("/")
+    mine = re.compile(r"bin(\.[0-9][0-9A-Za-z.\-]*)?/Runner\." + part + r"(\.dll)?")
     for pid in os.listdir(proc) if os.path.isdir(proc) else []:
         if not pid.isdigit():
             continue
@@ -142,9 +142,30 @@ def runner_busy(d, proc="/proc"):
             continue
         for a in argv:
             a = a.decode(errors="replace")
-            if re.search(r"/Runner\.Worker(\.dll)?$", a) and os.path.realpath(a).startswith(root):
+            if "/Runner." + part not in a:
+                continue
+            rel = os.path.relpath(os.path.realpath(a), root)
+            if mine.fullmatch(rel):
                 return True
     return False
+
+
+def runner_busy(d, proc="/proc"):
+    """Whether the GitHub runner in `d` is running a job: a Runner.Worker of
+    its own, from bin/ or from the bin.VERSION/ it updated itself into
+    (B755: the check looked under bin/ alone, so a job of an updated
+    runner read as idle and the .env sync restarted the runner under it)."""
+    return _runner_runs(d, "Worker", proc)
+
+
+def runner_listening(d, proc="/proc"):
+    """Whether the runner in `d` is up to take a job: GitHub's Runner.Listener
+    from any of its bin folders (B971: the check looked under bin/ alone, so
+    a runner that had updated itself read as not listening, its row saying
+    Reinstall runner while it ran jobs), or act_runner's `daemon`, which
+    runs in the foreground under this agent."""
+    return (_runner_runs(d, "Listener", proc)
+            or bool(_run(["pgrep", "-f", os.path.join(d, "act_runner") + " daemon"])))
 
 
 def _runner_state(d, rec):
@@ -153,10 +174,7 @@ def _runner_state(d, rec):
     labels = []
     with contextlib.suppress(OSError):
         labels = [x for x in read_small(os.path.join(d, ".builderbot-labels"), 2048).split(",") if x]
-    # GitHub's runner listens as bin/Runner.Listener; act_runner as
-    # `<dir>/act_runner daemon`, in the foreground under this agent.
-    pg = (_run(["pgrep", "-f", os.path.join(d, "bin/Runner.Listener")])
-          or _run(["pgrep", "-f", os.path.join(d, "act_runner") + " daemon"]))
+    pg = runner_listening(d)
     # WHERE ITS OUTPUT GOES, which only this machine knows. Under systemd
     # svc.sh writes the unit's name into .service and the listener's output
     # is the journal's; in the foreground it is runner.log under the data
@@ -444,8 +462,8 @@ class RunnersMixin:
             # No systemd: a container node (this image in the node role),
             # or a guest machine without it (roadmap #23). The runner is
             # run.sh in the foreground under this agent, which supervises it
-            # and takes it down with itself; the census's pgrep of
-            # Runner.Listener reports it exactly as it would the service.
+            # and takes it down with itself; the census finds its
+            # Runner.Listener exactly as it would the service's.
             if not self.runner_start(who, job, d):
                 return "failed", 1
             job.say("no systemd here: the runner runs in the foreground under this agent\n")
@@ -647,8 +665,7 @@ class RunnersMixin:
                 continue
             if time.time() - self.runner_tried.get(d, 0) < 30:
                 continue
-            if (_run(["pgrep", "-f", os.path.join(d, "bin/Runner.Listener")])
-                    or _run(["pgrep", "-f", os.path.join(d, "act_runner") + " daemon"])):
+            if runner_listening(d):
                 self.runner_tried[d] = time.time()
                 continue                    # an earlier agent's; working
             log(f"runner {os.path.basename(d)}: not running; starting" if p is None
