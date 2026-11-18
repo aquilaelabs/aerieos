@@ -121,6 +121,9 @@ await section('the changelog editor: each line\'s bugs, and what is owed', async
   ok(JSON.stringify(owed) === '["4"]', `the band over the lines names the fixed bug the next release owes (${owed})`);
   const pills = await page.$$eval('.clog .clrow', rs => rs.map(r => [...r.querySelectorAll('.clbug')].map(p => p.textContent.replace(/✕/, '').trim())));
   ok(pills.some(p => p.includes('B3')), `a tied line shows its bug as a pill (${JSON.stringify(pills)})`);
+  ok(await page.$eval('.clog .clrow', r => !!r.querySelector('.clbug.bycommit') && /B1/.test(r.querySelector('.clbug.bycommit').textContent)
+                      && !r.querySelector('.clbug.bycommit .pillx')),
+     'a line naming a bug\'s fix commit shows that bug too, with nothing to untie');
   await page.click('.clog .clowe[data-ow="4"] [data-owline]');
   await page.waitForSelector('.clog .clbug.pend', { timeout: 5000 });
   await page.fill('.clog .clrow:has(.clbug.pend) textarea', 'The export dialog remembers its folder');

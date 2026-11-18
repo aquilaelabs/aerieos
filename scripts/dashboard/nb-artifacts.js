@@ -1116,17 +1116,21 @@ function nbArtDrawChangelog(av, pane, comp, j){
   // words as saved (`orig`); a line written here for a bug carries it as
   // `pend` until Save has put the line in the file, then it is tied.
   const norm = t => String(t || "").split(/\s+/).filter(Boolean).join(" ");
-  let meta = {ties: j.ties || {}, fixed: j.fixed || [], owed: j.owed || []};
+  let meta = {ties: j.ties || {}, found: j.found || {}, fixed: j.fixed || [], owed: j.owed || []};
   const ro = !!projWriteWhy(project);
   const marked = () => gs.forEach(g => g.entries.forEach(e => { if (e.orig === undefined && !e.pend) e.orig = norm(e.text); }));
   marked();
   const tiedTo = e => [...(e.orig !== undefined ? meta.ties[e.orig] || [] : []), ...(e.pend || [])];
   const titleOf = n => meta.fixed.find(b => b.id === n)?.title || "";
   const owedNow = () => meta.owed.filter(o => !gs.some(g => g.entries.some(e => tiedTo(e).includes(o.id))));
+  // ...and a bug tied to no line, found here by the commit that fixed it:
+  // nothing to untie, its commits being the bug's own.
+  const foundBy = e => (e.orig !== undefined ? meta.found[e.orig] || [] : []).filter(n => !tiedTo(e).includes(n));
   const clBugs = e => {
-    const ids = tiedTo(e);
-    if (ro && !ids.length) return "";
-    return `<div class="clbugs">${ids.map(n => `<span class="pill clbug${(e.pend || []).includes(n) ? " pend" : ""}"
+    const ids = tiedTo(e), by = foundBy(e);
+    if (ro && !ids.length && !by.length) return "";
+    return `<div class="clbugs">${by.map(n => `<span class="pill clbug bycommit" title="${esc(`B${n} ${titleOf(n)}: this line names the commit that fixed it`)}">B${n}</span>`).join("")}${
+      ids.map(n => `<span class="pill clbug${(e.pend || []).includes(n) ? " pend" : ""}"
         title="${esc(`B${n} ${titleOf(n)}${(e.pend || []).includes(n) ? ": tied when the line is saved" : ""}`)}">B${n}${
         ro ? "" : `<button type="button" class="pillx" data-clun="${n}" aria-label="this line no longer answers B${n}">✕</button>`}</span>`).join("")}${
       ro ? "" : `<button type="button" class="ghost" data-cltie title="tie a fixed bug to this line: kept in the notebook, the file names its commits">+ Bug</button>`}</div>`;
@@ -1344,7 +1348,7 @@ function nbArtDrawChangelog(av, pane, comp, j){
           }
         try{
           const f = await getJSON(`/api/changelog?project=${encodeURIComponent(project)}&component=${encodeURIComponent(comp)}`);
-          if (!f.error){ meta = {ties: f.ties || {}, fixed: f.fixed || [], owed: f.owed || []}; gs = f.groups || gs; }
+          if (!f.error){ meta = {ties: f.ties || {}, found: f.found || {}, fixed: f.fixed || [], owed: f.owed || []}; gs = f.groups || gs; }
         }catch{ /* drawn from the save's own answer */ }
         marked();
         draw();

@@ -5097,11 +5097,12 @@ def _changelog_relinked(d, olds, new):
 changelog.relinked = _changelog_relinked
 
 
-def _changelog_bugs(project, comp=""):
+def _changelog_bugs(project, comp="", groups=None):
     """What the changelog editor shows of the tracker (R255): the bugs each
-    line answers, by its words; the fixed bugs a line can be tied to, newest
-    first; and the ones the next release owes a line (releasegaps.gaps), each
-    with whether the last release had it."""
+    line answers, by its words, and, for a fixed bug tied to none, the lines
+    naming a commit that fixed it (found); the fixed bugs a line can be tied
+    to, newest first; and the ones the next release owes a line
+    (releasegaps.gaps), each with whether the last release had it."""
     with bugs._lock:
         rows = list(bugs.load()["projects"].get(project) or [])
     ties = {}
@@ -5109,6 +5110,16 @@ def _changelog_bugs(project, comp=""):
         for w in b.get("changelog") or []:
             if isinstance(w, str):
                 ties.setdefault(w, []).append(b["id"])
+    tied = {i for ids in ties.values() for i in ids}
+    found = {}
+    for b in rows:
+        fix = [str(c)[:7] for c in b.get("commits") or [] if isinstance(c, str)]
+        if b.get("status") != "fixed" or not fix or b["id"] in tied:
+            continue
+        for g in groups or []:
+            for e in g.get("entries") or []:
+                if any(str(sh)[:7] in fix for sh in e.get("shas") or []):
+                    found.setdefault(" ".join(str(e.get("text") or "").split()), []).append(b["id"])
     fixed = sorted((b for b in rows if b.get("status") == "fixed"), key=lambda b: -int(b.get("closed_at") or 0))[:300]
     owed = []
     try:
@@ -5118,7 +5129,7 @@ def _changelog_bugs(project, comp=""):
                 for r in (releasegaps.gaps(project, comp).get("owed") or [])]
     except Exception as e:                                       # noqa: BLE001  (the editor opens without it)
         print(f"dashboard: changelog: what the release owes could not be read for {project}: {e}", file=sys.stderr)
-    return {"ties": ties, "owed": owed,
+    return {"ties": ties, "found": found, "owed": owed,
             "fixed": [{"id": b["id"], "title": str(b.get("title") or "")[:200], "commits": b.get("commits") or []}
                       for b in fixed]}
 import claudegrant                                              # noqa: E402
@@ -8848,7 +8859,7 @@ class Handler(BaseHTTPRequestHandler):
         comp = q.get("component", [""])[0]
         out, code = changelog.reading(name, comp)
         if code == 200 and isinstance(out, dict) and out.get("text") is not None:
-            out = out | _changelog_bugs(name, comp)
+            out = out | _changelog_bugs(name, comp, out.get("groups"))
         return self._json(out, code)
 
     def _get_tls(self):

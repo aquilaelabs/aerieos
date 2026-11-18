@@ -1164,6 +1164,7 @@ body.firstrun #panes{display:none}
 .clog .clbugs{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .clog .clbug{display:inline-flex;align-items:center;gap:4px;color:var(--ink)}
 .clog .clbug.pend{border-style:dashed}
+.clog .clbug.bycommit{color:var(--dim)}
 .clog .pillx{border:0;background:none;padding:0 2px;min-height:0;height:auto;
   color:var(--dim);font:inherit;cursor:pointer}
 .clog .pillx:hover{color:var(--bad)}
