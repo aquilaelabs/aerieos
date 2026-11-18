@@ -200,6 +200,14 @@ class Ftp(unittest.TestCase):
             self.skipTest("the port the system gave is out of range")
         ftp.node_info = lambda nid: {"name": "box", "addr": "127.0.0.1", "has_ftp": True}
         self.addCleanup(setattr, ftp, "node_info", None)
+        # Only the ports this test holds are asked for real: in a whole unit
+        # run, another module's server listening in the same ten read as
+        # this one's, and the save named it or was refused where it should
+        # pass (B968).
+        real = ftp._answers
+        mine = {held, held - 3}
+        self.addCleanup(setattr, ftp, "_answers", real)
+        ftp._answers = lambda addr, p: p in mine and real(addr, p)
         j, code = ftp.save("alpha", {"on": True, "port": held - 3}, "boss")
         self.assertEqual(code, 400)
         self.assertIn(f"port {held} is already in use on box", j["error"])
