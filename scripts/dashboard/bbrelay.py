@@ -353,8 +353,14 @@ def run(me, req, project):
                 "code": 75, "out": "", "err": ""}, 503
     limit = relay_limit(argv)
     try:
+        # A records file the session's side read and sent (B962), for the
+        # verb's --from -; nothing for any other.
+        stdin = req.get("stdin") if isinstance(req.get("stdin"), str) and "-" in argv else None
+        if stdin is not None and len(stdin) > 1_000_000:
+            return {"error": "a records file over a megabyte: split it into several", "code": 1, "out": "", "err": ""}, 413
         r = subprocess.run(["bash", str(HERE.parent / "aerie"), *argv], cwd=str(cwd),
-                           env=env, capture_output=True, text=True, timeout=limit)
+                           env=env, capture_output=True, text=True, timeout=limit,
+                           **({"input": stdin} if stdin is not None else {"stdin": subprocess.DEVNULL}))
     except subprocess.TimeoutExpired:
         return {"error": f"aerie {' '.join(argv[:2])} took longer than {limit // 60} minutes and was ended here: "
                          "what it had started on the controller may have gone on without it",

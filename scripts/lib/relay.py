@@ -39,8 +39,26 @@ _repo = os.environ.get("BB_REPO", "")
 if tree and _repo and os.path.isdir(_repo) and os.path.realpath(here) == os.path.realpath(
         os.path.join(os.environ.get("WORKSPACE", "/workspace"), project)):
     here = _repo
+# A records file (aerie bug add --from FILE, aerie roadmap add --from FILE)
+# is read here, where the session wrote it, and sent as the verb's stdin: the
+# controller's copy of the tree holds no file in dist/ or /tmp, and the read
+# there said No such file for one that was here (B962).
+stdin = None
+if argv[:1] in (["bug"], ["roadmap"]) and "add" in argv and "--from" in argv:
+    i = argv.index("--from")
+    if i + 1 < len(argv) and argv[i + 1] != "-":
+        src = argv[i + 1]
+        try:
+            with open(src, encoding="utf-8") as f:
+                stdin = f.read(1_000_001)
+        except OSError as e:
+            sys.exit(f"[builderbot] ERROR: {src}: {e.strerror or e}")
+        if len(stdin) > 1_000_000:
+            sys.exit(f"[builderbot] ERROR: {src} is over a megabyte; split it into several files")
+        argv = argv[:i + 1] + ["-"] + argv[i + 2:]
 r = bbapi.call("/api/v1/bb", {"argv": argv, "project": project,
                               "cwd": here,
+                              **({"stdin": stdin} if stdin is not None else {}),
                               # A session of any coding agent (R95): Claude
                               # Code sets CLAUDECODE, bb-tty's launcher sets
                               # BB_AGENT for every agent, and which one rides
