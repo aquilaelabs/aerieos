@@ -123,13 +123,15 @@ await section("The old address still opens the page, which says its own address"
     foot: [...c.querySelectorAll('.pcback .pcacts > button')].map(b => b.getAttribute('aria-label')),
     lines: new Set([...c.querySelectorAll('.pcback .pcacts > button')].map(b => Math.round(b.getBoundingClientRect().top))).size,
     frontLines: new Set([...c.querySelectorAll('.pcfront .pcacts > button')].map(b => Math.round(b.getBoundingClientRect().top))).size,
-    rename: !!c.querySelector('.pcback .pcname [data-prn]') }));
+    rename: !!c.querySelector('.pcback .pcname [data-prn]'),
+    // Settings at the back's top right, out of its foot (the operator, 18 Nov).
+    gear: c.querySelector('.pcback [data-rn]:not(.pcacts *)')?.getAttribute('aria-label') || '' }));
   ok(Math.abs(back.h - h0) < 1 && back.frontInert, `Edit turns the card over at its size (${h0} then ${back.h})`);
   ok(back.rows.length === 3 && back.rows.every(r => ['rrn', 'rmove', 'del'].every(k => r.includes(k))) && back.rename,
      `each repository on the back has rename, move and delete, and the space's name its pencil (${JSON.stringify(back.rows)})`);
-  ok(['Color', 'Group', 'Report bug', 'Settings'].every(w => back.foot.includes(w)) && back.lines === 1 && back.frontLines === 1
-     && !back.foot.includes('Delete space'),
-     `each face's buttons are one line, the back's the space's controls as icons, Delete space only for an empty one (${JSON.stringify(back)})`);
+  ok(['Color', 'Group', 'Report bug'].every(w => back.foot.includes(w)) && back.foot.at(-1) === 'Back to the front' && back.lines === 1 && back.frontLines === 1
+     && !back.foot.includes('Delete space') && !back.foot.includes('Settings') && back.gear === 'Settings',
+     `each face's buttons are one line, the back's the space's controls as icons with Back last and Settings at its top, Delete space only for an empty one (${JSON.stringify(back)})`);
   // Report bug asks which repository, the first picked.
   await page.click(`${card} .pcback [data-bug]`);
   await page.waitForSelector('#reportModal:not([hidden])', { timeout: 3000 });
