@@ -2888,6 +2888,23 @@ for (const [name, open] of Object.entries(DIALOGS)) {
   await page.evaluate(() => { document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }); resumeFor = null; resumePick = null; });
 }
 await page.evaluate(() => document.getElementById('dlgProbe')?.remove());
+// A page opened the moment a dialog is put away stays open: the dialog's
+// entry is given back after it closes, and a page pushed meanwhile was
+// undone by that give-back (cards.mjs, 18 Nov: Settings cancelled, then a
+// notebook's Signing opened, and the page went back to Spaces).
+{
+  await page.evaluate(() => { location.hash = '#/home'; });
+  await page.waitForFunction(() => location.hash === '#/home', null, { timeout: 5000 }).catch(() => {});
+  await page.evaluate(() => openAbout());
+  await page.waitForFunction(() => !document.getElementById('aboutModal').hidden && history.state?.dlg, null, { timeout: 5000 }).catch(() => {});
+  // The page opened just after the give-back has begun, as a second press
+  // lands: closed, then opened a moment later, in the window it had.
+  await page.evaluate(() => new Promise(r => { closeAbout(); setTimeout(() => { railGo('jobs'); r(); }, 2); }));
+  await new Promise(r => setTimeout(r, 1500));
+  const after = await page.evaluate(() => ({ hash: location.hash, kind: tabOf(panes[0])?.kind || '', dlg: history.state?.dlg || 0 }));
+  ok(/^#\/jobs/.test(after.hash) && after.kind === 'jobs' && !after.dlg,
+     `a page opened as a dialog is put away stays open, its address with it (${JSON.stringify(after)})`);
+}
 // ...and again on a small phone, where the room runs out first: every dialog
 // still scrolls in one place.
 await section("and again on a small phone, where the room runs out first", async () => {
