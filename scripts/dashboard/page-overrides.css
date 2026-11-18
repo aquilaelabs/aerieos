@@ -85,4 +85,16 @@ html[data-motion="reduce"] .pane .stack > .doc.leaving{visibility:hidden}
    sessions before signing out) is a warning, never red, which is for what
    failed (the operator, 22 Oct). */
 .sub.warn{color:var(--warn)}
+/* A pulldown in a bar or a row of controls is as wide as its longest answer
+   and no wider (the operator, 18 Nov: a sort, a page, a key or a mode
+   stretched across its row with its words at one end): it never grows into
+   the room around it, a grid cell no longer stretches it, and where its row
+   runs short it shrinks to a thumb's width at least, its words clipped with
+   an ellipsis. The controls rule's cap still holds where a rule sets it. A
+   form's field fills its cell (forms), so a form's grid and a settings row
+   are left out; so is a group header's or a notebook's head, which size
+   their own. Here, since the rules that stretched them sit in every layer
+   below. uniform.mjs holds every page to it. */
+:is(.docbarrow,.histbar,.actbar,.ctlrow,.ctlline,.lfilter,.rninvitebar,label.wkpick) select:not([multiple],[size]):not(:is(.fgrid,.setgrid,.setrow.col,.prefrow,.phead) select){
+  flex-grow:0;flex-basis:auto;width:auto;justify-self:start;min-width:min(var(--tap),100%);text-overflow:ellipsis}
 }

@@ -739,6 +739,23 @@ function rowsWearTheClass(){
   return page.evaluate(() => [...document.querySelectorAll('.doc.on :is(.setrow, .addbar, .prefrow, .histbar, .logdays, .imgadd, .memadd, .uadd, .ndpaths, .ndname)')]
     .filter(e => !e.classList.contains('ctlrow')).map(e => e.className.split(' ').slice(0, 3).join('.')));
 }
+// A pulldown in a bar or a row is as wide as its longest answer and no wider
+// (the operator, 18 Nov: Sort and the wiki's page stretched across a phone):
+// each one on show measured against its own width with nothing stretching
+// it, which is the width of its longest option; narrower is its row running
+// short, which clips it, and is allowed. The selector is the overrides
+// layer's, so the check and the rule cannot drift apart.
+const PICKERS = ':is(.docbarrow,.histbar,.actbar,.ctlrow,.ctlline,.lfilter,.rninvitebar,label.wkpick) select:not([multiple],[size]):not(:is(.fgrid,.setgrid,.setrow.col,.prefrow,.phead) select)';
+function pickersFit(){
+  return page.evaluate(sel => [...document.querySelectorAll(`.doc.on ${sel}, .pane .bar ${sel}`)].filter(s => s.checkVisibility()).map(s => {
+    const was = s.getAttribute('style');
+    const w = s.getBoundingClientRect().width;
+    s.style.cssText += ';flex:none;width:auto;max-width:none;min-width:0;justify-self:start';
+    const own = s.getBoundingClientRect().width;
+    if (was === null) s.removeAttribute('style'); else s.setAttribute('style', was);
+    return w > own + 2 ? `${s.id || s.getAttribute('aria-label') || '?'} is ${Math.round(w)}px for ${Math.round(own)}px of answers` : '';
+  }).filter(Boolean), PICKERS);
+}
 // The forms rule (the operator, 4 Nov: fields crammed together, each page its
 // own way): a label over its field, never beside it, and fields that do not
 // touch. A picker in a band or an action bar sits beside what it filters and
@@ -1066,6 +1083,8 @@ for (const kind of kinds){
   ok(bare.length === 0, `[${kind}] every row of controls wears .ctlrow${bare.length ? `; not: ${[...new Set(bare)].join(', ')}` : ''}`);
   const forms = await formsHold();
   ok(forms.length === 0, `[${kind}] its forms hold the rule: a label over its field, fields not touching${forms.length ? `; not: ${forms.slice(0, 10).join('; ')}` : ''}`);
+  const wide = await pickersFit();
+  ok(wide.length === 0, `[${kind}] a pulldown in a bar or a row is as wide as its longest answer, never stretched${wide.length ? `; not: ${wide.slice(0, 8).join('; ')}` : ''}`);
   const G = await glance();
   if (!G.err && (G.tiles || G.facts))
     ok(G.bad.length === 0,
