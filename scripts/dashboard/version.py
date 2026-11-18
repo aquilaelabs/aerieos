@@ -1643,33 +1643,32 @@ def _changelog_added(project, rel):
 
 
 def _cite(project, rel, text, have=(), hist=None):
-    """The commits an entry names once it is dated (B284): the commit that
-    introduced its line where its stamp is the one aerie changelog add put on
-    it, HEAD of the moment, the commit before; a stamp the line was given by
-    hand, naming the change it is about, is kept (B702: a cut named the
-    changelog's commits in place of the changes). `hist` is the changelog's
-    history as _changelog_added reads it, read here when not given."""
+    """The commits an entry names once it is dated (B284): the commits its
+    line was stamped with, and the commit that introduced its line where it
+    has none or where its stamp is a commit that changed nothing but the
+    changelog, which is never the change (a line logged while its change was
+    still uncommitted, HEAD then being the last line's commit). A stamp
+    naming a change is kept as written: aerie changelog add stamps the
+    commit the line is about (HEAD after the change was committed, or a tied
+    bug's fix commits), and the line then rides in whatever commit comes
+    next. Taking that next commit for the change whenever the stamp was the
+    one before it (B710's guess) renamed the right commit to the wrong one
+    when the next commit was another change (B735). `hist` is the
+    changelog's history as _changelog_added reads it, read here when not
+    given."""
+    have = [h for h in have if h]
+
+    def changelog_only(c):
+        # A commit this repository holds that touched the changelog alone;
+        # one it does not hold is a stamp given by hand, and kept.
+        out = _git(project, "show", "--format=", "--name-only", c, timeout=30)
+        return out is not None and out.split() == [rel]
+    if have and not all(changelog_only(h) for h in have):
+        return have
     hist = _changelog_added(project, rel) if hist is None else hist
     needle = f"- {text}"
     intro = next((sha for sha, added in hist or () if any(needle in ln for ln in added)), "")
-    if not intro:
-        return list(have)
-    have = [h for h in have if h]
-    if not have:
-        return [intro]
-    before = _git(project, "rev-parse", "--short=7", f"{intro}^") or ""
-    if before and all(before.startswith(h) or h.startswith(before) for h in have):
-        # The stamp is the commit before the line's. That is add's HEAD of
-        # the moment when the line landed with its change; when the line's
-        # commit touched the changelog alone and the one before it changed
-        # something else, that one is the change, and the stamp already
-        # names it (B710).
-        def others(c):
-            out = _git(project, "show", "--format=", "--name-only", c, timeout=30) or ""
-            return [f for f in out.split() if f != rel]
-        if others(intro) or not others(before):
-            return [intro]
-    return have
+    return [intro] if intro else have
 
 
 def _seal(project, where, ver_rel, value, msg, env=None, extra=(), comp=""):

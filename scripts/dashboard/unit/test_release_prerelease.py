@@ -106,6 +106,19 @@ class PreRelease(unittest.TestCase):
         self.assertIn(f"- Said after its change ({change})", text)
         self.assertIn(f"- Said with its change ({together})", text)
 
+    def test_a_line_carried_by_the_next_change_keeps_naming_its_own(self):
+        # B735: the change, its line logged after it, then another change
+        # that carried the changelog with it: the cut renamed the line to
+        # that next change, taking it for the line's own.
+        first = self.commit_file("d.py", "d = 1\n", "the change")
+        changelog.add(self.app, "Said after its change, carried by the next", sha=first, cat="Fixed")
+        (self.app / "e.py").write_text("e = 1\n")
+        nxt = self.commit("another change, with the changelog")
+        self.release(dev=True)
+        text = (self.app / "CHANGELOG.md").read_text()
+        self.assertIn(f"- Said after its change, carried by the next ({first})", text)
+        self.assertNotIn(f"({nxt})", text)
+
     def commit_file(self, name, body, msg):
         (self.app / name).write_text(body)
         return self.commit(msg)
