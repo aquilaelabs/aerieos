@@ -311,7 +311,7 @@ function mountState(m, reported){
 // says is there, and the labels an install would register with: the node's
 // own name among them, which is the label a workflow's runs-on uses to land
 // here. Install and Remove are system jobs like the rest of the plane.
-const RUN_COLS = [{label: "Repository or organization"}, {label: "State", w: "9rem"}, {label: "Registered", w: "minmax(0,1fr)"}, {act: true, w: "5rem"}];
+const RUN_COLS = [{label: "Repository or organization"}, {label: "State", w: "9rem"}, {label: "Registered as", w: "minmax(0,1fr)"}, {act: true, w: "5rem"}];
 function nodeRunnerSection(n, c, between = "", acts = ""){
   // One runner per git host on a node (R53): the record's asks and the
   // census's reports, joined by slot, each a row with its own state and
@@ -351,7 +351,7 @@ function nodeRunnerSection(n, c, between = "", acts = ""){
       : ["not listening", "off", "installed but not listening, so no workflow will reach it: Reinstall runner", "bad"];
     const rowCls = failed && rep.installed && pcls === "ok" ? "warn" : scls === "bad" ? "bad" : scls;
     const facts = rep.installed
-      ? [rep.name ? `registered as ${rep.name}` : "", rep.labels?.length ? "labels " + rep.labels.join(", ") : ""].filter(Boolean).join(" · ") : "";
+      ? [rep.name || "no name yet", rep.labels?.length ? "labels " + rep.labels.join(", ") : ""].filter(Boolean).join(" · ") : "";
     // A token is what a reinstall and a removal mint from, so a runner
     // without one (registered before tokens were per runner) says so once,
     // with the way to add one, rather than as a warning on one that works.
