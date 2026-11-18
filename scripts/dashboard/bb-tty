@@ -506,7 +506,10 @@ in_view() {
     fi
     gradle_local_build
     envf="$(cache_project_dir "$proj")/session.env"
-    ( umask 077; env -0 > "$envf.new" && mv -f "$envf.new" "$envf" ) \
+    # Through a temporary of this launch's own: two terminals of one
+    # account in one space starting at once shared one fixed name, and the
+    # second's mv found the first had moved it already (B901).
+    ( umask 077; t="$(mktemp "$envf.XXXXXX")" && { env -0 > "$t" && mv -f "$t" "$envf" || { rm -f "$t"; false; }; } ) \
         || bad "Could not write this session's environment to $envf, so its view cannot start."
     # Where what Claude Code keeps in /tmp between the turns of a
     # conversation lives, so a session started again on the same
@@ -1374,11 +1377,15 @@ boot_id_by_btime() {
 # machine. Off in the project's settings, both go. Only on a node.
 gradle_local_build() {
     [ -n "${GRADLE_USER_HOME:-}" ] && [ -n "${account:-}" ] && on_node || return 0
+    # A space's build folder: a bare shell, a named scratch session and
+    # sh:N: with no space have none, and set -u ended them on proj (B906).
+    local p="${BB_PROJECT:-${proj:-}}"
+    [ -n "$p" ] || return 0
     local init="$GRADLE_USER_HOME/init.d/builderbot-local-build.gradle"
     local src; src="$(dirname "$(readlink -f "$0")")/../lib/gradle-local-build.gradle"
     if [ "${BB_BUILD_LOCAL:-on}" = on ] && [ -r "$src" ]; then
         mkdir -p "$GRADLE_USER_HOME/init.d" 2>/dev/null && cp -f "$src" "$init" 2>/dev/null || true
-        export BB_LOCAL_BUILD="$HOME/.cache/builderbot/u/$account/project/${BB_PROJECT:-$proj}/build"
+        export BB_LOCAL_BUILD="$HOME/.cache/builderbot/u/$account/project/$p/build"
     else
         rm -f "$init" 2>/dev/null || true
         unset BB_LOCAL_BUILD
@@ -1629,7 +1636,10 @@ agent_named() {
         copilot) agent_name=Copilot; agent_product="Copilot CLI" ;;
         grok)    agent_name=Grok;    agent_product="Grok Build" ;;
         # Any model (R144 step 2): OpenCode, pointed at a node's router.
-        open)    agent_name="Any model"; agent_product="OpenCode" ;;
+        # Its program is opencode, as agents.py names it (B907: the check
+        # looked for a command called open, which Linux has not and a Mac
+        # has for another reason).
+        open)    agent_name="Any model"; agent_product="OpenCode"; agent_cmd=opencode ;;
         # A pack's (R169 step 10), as its adapter names it.
         *)       agent_name="$(jq -r '.name // empty' <<<"$PACK_ADAPTER")"
                  agent_product="$(jq -r '.product // empty' <<<"$PACK_ADAPTER")"
@@ -1945,7 +1955,9 @@ agent_resume_id() {
         # ...and from another of this account's trees when it was had
         # there: another slot's (R143), or the project directory's.
         if [ ! -f "$rtd/${resume}.jsonl" ]; then
-            rf="$(find "$HOME/.claude/projects" -mindepth 2 -maxdepth 2 -name "${resume}.jsonl" 2>/dev/null | head -1)"
+            # With no projects folder find fails, and under pipefail that
+            # ended the terminal before the refusal below could say why (B908).
+            rf="$(find "$HOME/.claude/projects" -mindepth 2 -maxdepth 2 -name "${resume}.jsonl" 2>/dev/null | head -1)" || rf=""
             [ -z "$rf" ] || { ( umask 077; mkdir -p "$rtd" ) && cp -p "$rf" "$rtd/"; } 2>/dev/null || true
         fi
         if [ ! -f "$rtd/${resume}.jsonl" ]; then
@@ -2425,6 +2437,7 @@ case "$target" in
         proj="${target#shell:}"
         dir="$WORKSPACE/$proj"
         git_identity "$proj"
+        need_author "a shell"
         [ "$proj" = "$(basename -- "$proj")" ] && [ "$proj" != "." ] && [ "$proj" != ".." ] && [ -d "$dir" ] \
             || bad "No such space: ${proj}"
         in_view "$proj" "$dir"
