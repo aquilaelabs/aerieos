@@ -12,6 +12,88 @@ from .base import ROOT_BUNDLE_DIR, ROOT_TOOLS, TOOLS_DIR, TOOLS_SIG, fs_holds, l
 from .stores import dir_bytes, load_state, tc_root
 
 
+# How many of root's bundles are kept at most, whatever still runs from
+# them: each is about 4 MB, and a session that outlives this many updates of
+# its controller is one in a month of them.
+BUNDLES_MOST = 40
+# A terminal's hooks are written a moment before its session is entered.
+BUNDLE_SLACK_S = 300
+
+
+def sessions_from(proc="/proc", root=None):
+    """What still runs from root's bundles: (when the oldest running session
+    was entered, in epoch seconds, or None with none running; the bundle
+    folders some process names on its command line). A session's coding
+    agent runs its hooks from the bundle that was current when the session
+    was entered, by its path, for as long as the session lives; a session
+    is the bb-session enter at the head of its view. Read from /proc,
+    which an agent that is root sees whole."""
+    root = (root or ROOT_BUNDLE_DIR).rstrip("/") + "/"
+    try:
+        with open(os.path.join(proc, "stat")) as f:
+            btime = next(int(line.split()[1]) for line in f if line.startswith("btime "))
+        hz = os.sysconf("SC_CLK_TCK")
+    except (OSError, ValueError, StopIteration):
+        return None, set()
+    oldest, named = None, set()
+    for pid in os.listdir(proc):
+        if not pid.isdigit():
+            continue
+        try:
+            with open(os.path.join(proc, pid, "cmdline"), "rb") as f:
+                argv = f.read().decode("utf-8", "replace").split("\0")
+        except OSError:
+            continue
+        for a in argv:
+            if a.startswith(root):
+                named.add(a[len(root):].split("/", 1)[0])
+        if not (any(a.rsplit("/", 1)[-1] == "bb-session" for a in argv[:4]) and "enter" in argv[:6]):
+            continue
+        try:
+            with open(os.path.join(proc, pid, "stat")) as f:
+                began = btime + int(f.read().rsplit(")", 1)[1].split()[19]) / hz
+        except (OSError, ValueError, IndexError):
+            continue
+        oldest = began if oldest is None else min(oldest, began)
+    return oldest, named
+
+
+def stale_bundles(root, current, oldest=None, named=()):
+    """The bundle folders under `root` that nothing can still be running
+    from, oldest first. A bundle was current from its folder's time until
+    the next one's, so it goes only when the next one arrived before the
+    oldest running session was entered and no process names it. The current
+    one and the two before it stay whatever runs, as before, and no more
+    than BUNDLES_MOST are kept. Kept by count alone (the newest three), a
+    session open across three updates of its controller lost the folder its
+    hooks run from: each then failed as a program that could not be run,
+    which a coding agent passes over, so the session went on with no gate,
+    no refused commands and no notices, saying only 'Stop hook failed'."""
+    def at(d):
+        try:
+            return os.path.getmtime(os.path.join(root, d))
+        except OSError:
+            return 0.0
+    try:
+        dirs = [d for d in os.listdir(root) if d not in (current, "current") and not d.startswith(".")
+                and os.path.isdir(os.path.join(root, d)) and not os.path.islink(os.path.join(root, d))]
+    except OSError:
+        return []
+    dirs.sort(key=at)                                  # oldest first; the current one follows them all
+    drop = []
+    for i, d in enumerate(dirs):
+        if i >= len(dirs) - 2 or d in named:
+            continue
+        nxt = at(dirs[i + 1])
+        if oldest is None or nxt <= oldest - BUNDLE_SLACK_S:
+            drop.append(d)
+    kept = [d for d in dirs if d not in drop]
+    over = len(kept) + 1 - BUNDLES_MOST
+    if over > 0:
+        drop += kept[:over]
+    return sorted(drop, key=at)
+
+
 class WorkspaceMixin:
     """Agent's workspace methods: one of the parts class Agent (agent.py) is made of."""
 
@@ -292,8 +374,9 @@ class WorkspaceMixin:
     def _keep_root_bundle(tar_path, name, say):
         """The whole bundle, root-owned and nobody else's to write, unpacked
         from the checked tar into ROOT_BUNDLE_DIR/<name>/ and current pointed
-        at it (R125): what bb-session tty starts a terminal from. The two
-        before it are kept for the terminals still running them."""
+        at it (R125): what bb-session tty starts a terminal from. The ones
+        before it are kept while a session entered under them still runs
+        (stale_bundles)."""
         into = os.path.join(ROOT_BUNDLE_DIR, name)
         try:
             os.makedirs(ROOT_BUNDLE_DIR, mode=0o755, exist_ok=True)
@@ -318,16 +401,23 @@ class WorkspaceMixin:
                     with contextlib.suppress(OSError):
                         os.chmod(os.path.join(tmp, x), 0o755)
                 os.replace(tmp, into)
+            cur = os.path.join(ROOT_BUNDLE_DIR, "current")
+            try:
+                was = os.readlink(cur)
+            except OSError:
+                was = ""
             link = os.path.join(ROOT_BUNDLE_DIR, ".current.new")
             if os.path.lexists(link):
                 os.unlink(link)
             os.symlink(name, link)
-            os.replace(link, os.path.join(ROOT_BUNDLE_DIR, "current"))
-            kept = sorted((d for d in os.listdir(ROOT_BUNDLE_DIR)
-                           if d not in (name, "current") and not d.startswith(".")
-                           and os.path.isdir(os.path.join(ROOT_BUNDLE_DIR, d))),
-                          key=lambda d: os.path.getmtime(os.path.join(ROOT_BUNDLE_DIR, d)), reverse=True)
-            for old in kept[2:]:
+            os.replace(link, cur)
+            if was != name:
+                # Its time is when it became current, which is what the
+                # one before it is kept by: a folder already here (a
+                # controller gone back a build) is current from now.
+                os.utime(into)
+            oldest, named = sessions_from()
+            for old in stale_bundles(ROOT_BUNDLE_DIR, name, oldest, named):
                 shutil.rmtree(os.path.join(ROOT_BUNDLE_DIR, old), ignore_errors=True)
         except (OSError, tarfile.TarError) as e:
             say(f"could not keep root's copy of the bundle: {e}\n")
