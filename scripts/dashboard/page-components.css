@@ -791,7 +791,7 @@ button.danger[disabled]{background:color-mix(in srgb, var(--bad) 8%, var(--groun
 :is(.thingtab,.entrytab) .pghead .actbar .state{margin-right:auto;font:var(--f-note)}
 /* A placeholder's chips wait on the one line the page's own scroll on. */
 .chips>.sk-chips{display:flex;flex-wrap:nowrap;overflow:hidden;gap:6px;padding:0;margin:0;align-items:center}
-.librarytab .libfilter .libsearchrow>input[type=search]{flex:1 1 16rem;min-width:0;max-width:28rem}
+.librarytab .libfilter .libsearchrow>input[type=search]{flex:1 1 14rem;min-width:0;max-width:24rem}
 /* The shared hostname list on the nginx tab: a record table as Routes is,
    and the box to add one under it. */
 .field > .actbar input[data-nghostnew]{flex:1 1 14em;min-width:0}

@@ -133,8 +133,12 @@ function loadLibrary(){
     // A reply is kept while it is still about the node on show.
     const node = libNode, asked = libQuery();
     const got = await getJSON(asked);
-    // An answer about another node, or to words since changed, is not drawn.
-    if (libNode !== node || libQuery() !== asked) return;
+    // An answer about another node, or to words since changed, is not drawn,
+    // and what the page wants now is asked for: a read sent before the
+    // address's narrowing was applied (a reload of a list) answered the
+    // front page, and dropped with nothing asked after it, the list never
+    // came.
+    if (libNode !== node || libQuery() !== asked){ if (libNode) setTimeout(loadLibrary); return; }
     lib = got;
     if (libWantAgent && !lib.error){
       const want = libWantAgent;
@@ -472,8 +476,7 @@ function libFilterBand(acts = ""){
   const view = viewSeg("libview", libViewNow(), "each a card with what it is", "each a row, more to a screen", "", ["Cards", "Rows"]);
   return `<div class="field lfilter libfilter">
     <div class="libsearchrow"><input id="libFind" type="search" maxlength="80" autocomplete="off" spellcheck="false" aria-label="search the library"
-      placeholder="search by name, maker or what it does" value="${esc(libQ)}">${acts ? `<span class="actbar">${acts}</span>` : ""}</div>
-    <div class="libnarrow">${topicSel}${sortSel}${view}</div>
+      placeholder="search by name, maker or what it does" value="${esc(libQ)}"><span class="libnarrow">${topicSel}${sortSel}${view}</span>${acts ? `<span class="actbar">${acts}</span>` : ""}</div>
     <div class="chips" data-chips="libkind">${chipButtons(kinds, libKind, "data-libkind", c.all)}</div>
     <div class="chips" data-chips="libtier">${tierChips}</div>
   </div>`;
@@ -614,6 +617,9 @@ function renderLibraryInto(i){
   // The ellipsis on a card whose job runs is ticked by the one timer every
   // page shares (tcTickDots), so a redraw does not restart it.
   if (!tcDotsTimer && d.list.querySelector(".dots")) tcDotsTimer = setInterval(tcTickDots, 400);
+  // The order's answers change with the search (Best match comes and goes):
+  // each pulldown is held to its longest answer again.
+  fitPickersSoon();
   wireLibrary(d.el);
 }
 

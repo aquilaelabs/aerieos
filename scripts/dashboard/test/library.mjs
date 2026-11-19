@@ -140,6 +140,23 @@ if (await page.$('.doc .librarytab [data-libkind="toolchain"]')){
   ok(await page.$$eval('.doc .librarytab .libgroup', ds => ds.length > 1), '...and All puts the shelves back');
 } else ok(true, 'one kind only here, so no kind chips (chips need two groups)');
 
+// The address is the list (R256): a reload of one with the search in it
+// lands on the same list, the read sent before the address was applied
+// asked again rather than dropped.
+await section("a reload of a list lands on the same list", async () => {
+  const word = (HERE.find(r => r.kind === 'toolchain')?.name || 'jdk').slice(0, 3);
+  await page.fill('.doc .librarytab #libFind', word);
+  await page.waitForFunction(q => libQ === q && /[?&]q=/.test(location.hash) && !!document.querySelector('.doc .librarytab .libone .lcard'), word, { timeout: 15000 });
+  const before = await page.$$eval('.doc .librarytab .libone .lcard', cs => cs.map(c => c.dataset.lrow).join());
+  await page.reload();
+  await ready(page);
+  await page.waitForFunction(() => !!document.querySelector('.doc .librarytab .libone .lcard'), null, { timeout: 20000 }).catch(() => {});
+  const after = await page.evaluate(() => ({ q: libQ, rows: [...document.querySelectorAll('.doc .librarytab .libone .lcard')].map(c => c.dataset.lrow).join(), box: document.querySelector('#libFind')?.value }));
+  ok(after.q === word && after.box === word && after.rows === before, `a reload of a list lands on the same list (${JSON.stringify({ word, before: before.slice(0, 60), after: { ...after, rows: after.rows.slice(0, 60) } })})`);
+  await page.fill('.doc .librarytab #libFind', '');
+  await page.waitForFunction(() => libQ === '' && !document.querySelector('.doc .librarytab .libone'), null, { timeout: 15000 });
+});
+
 // What runs only on other systems is left out of a list and counted, and
 // shown on a press, each card's Install dead with the reason on it.
 const off = ALL.find(r => r.wrong_platform && !r.too_new);

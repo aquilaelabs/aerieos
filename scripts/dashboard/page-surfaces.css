@@ -861,8 +861,14 @@ body.firstrun #panes{display:none}
 /* R256: what narrows the list beside the search (a topic, the order, cards or
    rows), a shelf's All N at the right of its heading, and the line that says
    how many run only on other systems. */
-.librarytab .libnarrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.librarytab .libnarrow .dmviewseg{margin-left:auto}
+.librarytab .libnarrow{display:flex;gap:var(--field-gap);align-items:center;flex:0 1 auto;min-width:0}
+.librarytab .libfilter .libsearchrow{flex-wrap:wrap}
+@media(max-width:600px){
+  /* On a phone the search keeps its line with Check and Add, and the
+     narrowing takes the next, the view at its right. */
+  .librarytab .libfilter .libsearchrow>.libnarrow{order:3;flex:1 1 100%}
+  .librarytab .libnarrow .dmviewseg{margin-left:auto}
+}
 .librarytab .libgname .libshelfall{margin-left:auto;font:var(--f-ui)}
 .librarytab .libgroup>.libhidden{margin:0 0 8px;color:var(--dim)}
 /* Rows: one column, each card one line wide, the icon, the name with its
