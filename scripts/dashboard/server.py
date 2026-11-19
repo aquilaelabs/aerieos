@@ -10275,7 +10275,7 @@ class Handler(BaseHTTPRequestHandler):
         if self._refused("controller"):
             return
         r = checks.run_now(str(req.get("kind") or ""))
-        return self._json(r, 400 if r.get("error") else 200)
+        return self._result(r)
 
     def _catalog_mirror_post(self, req):
         """POST /api/catalog-mirror {action: import, archive} or {action:
@@ -10520,7 +10520,7 @@ class Handler(BaseHTTPRequestHandler):
             r = held.start(self._principal())
             if r.get("ok") and not r.get("note"):
                 db.audit(self._principal(), "start-held", "", {})
-            return self._json(r, 400 if r.get("error") else 200)
+            return self._result(r)
         if act == "hold-next":
             return self._json(held.arm_next(req.get("on") is not False))
         # The containers another system ran, as compose files to import
@@ -10639,7 +10639,7 @@ class Handler(BaseHTTPRequestHandler):
                   f"from a check in {proj or 'no space'}", flush=True)
         r = claudegrant.report(home_for(uid), nid, req.get("email") or "", req.get("plan") or "",
                                signed_in=signed_in, agent=agent)
-        return self._json(r, 400 if r.get("error") else 200)
+        return self._result(r)
 
     def _tty_grant(self, req):
         """Whose terminal a node's bb-tty is about to start, answered here
@@ -11542,7 +11542,7 @@ class Handler(BaseHTTPRequestHandler):
             r = phone.ask_release_remove(field(req, "why"), name, plan, membership.owner_of(name),
                                          membership.owner_name(name) or "the space's owner",
                                          asker_name=str(acct.get("name") or ""), principal=self._principal())
-            return self._json(r, 400 if r.get("error") else 200)
+            return self._result(r)
         if act == "release-withdraw":
             # A release and its tag taken back together (R190 step 3):
             # always a person's answer, whatever the dial, since nothing
@@ -11564,7 +11564,7 @@ class Handler(BaseHTTPRequestHandler):
             r = phone.ask_release_withdraw(field(req, "why"), name, plan, membership.owner_of(name),
                                            membership.owner_name(name) or "the space's owner",
                                            asker_name=str(acct.get("name") or ""), principal=self._principal())
-            return self._json(r, 400 if r.get("error") else 200)
+            return self._result(r)
         if act == "release-edit":
             # aerie version release --edit (R139): the published release's
             # notes and files, under the same dial as the release itself, a
@@ -11595,7 +11595,7 @@ class Handler(BaseHTTPRequestHandler):
             r = phone.ask_release_edit(field(req, "why"), name, plan, membership.owner_of(name),
                                        membership.owner_name(name) or "the space's owner",
                                        asker_name=str(acct.get("name") or ""), principal=self._principal())
-            return self._json(r, 400 if r.get("error") else 200)
+            return self._result(r)
         if act == "release-drafts":
             # The drafts waiting to be read and published (the operator,
             # 1 Nov), each with the files it still lacks.
@@ -11631,7 +11631,7 @@ class Handler(BaseHTTPRequestHandler):
                 r = forgerelease.publish_draft(name, tag, notes, miss)
                 if r.get("ok"):
                     db.audit(self._principal(), "release-publish", name, {"tag": tag})
-            return self._json(r, 400 if r.get("error") else 200)
+            return self._result(r)
         if who.get("session"):
             return self._json({"error": "a session moves its version with aerie version bump, "
                                         "under the space's policy, and releases with aerie version release"}, 403)
@@ -11923,7 +11923,7 @@ class Handler(BaseHTTPRequestHandler):
                 r = phone.ask_release_sign(field(req, "why"), name, owner,
                                            membership.owner_name(name) or "the space's owner",
                                            asker_name=str(acct.get("name") or ""))
-                return self._json(r, 400 if r.get("error") else 200)
+                return self._result(r)
             if act in ("keys", "generate", "map", "rotate"):
                 # Manage signing keys (R106 step 6): which keys there are
                 # (names and fingerprints, never a secret), and a new key or
@@ -11946,7 +11946,7 @@ class Handler(BaseHTTPRequestHandler):
                 r = phone.ask_keys(field(req, "why"), name, act, args, owner,
                                    membership.owner_name(name) or "the space's owner",
                                    asker_name=str(acct.get("name") or ""))
-                return self._json(r, 400 if r.get("error") else 200)
+                return self._result(r)
             mode = (prefs.get(name) or {}).get("sign") or "ask"
             if mode == "deny":
                 return self._json({"error": f"{name}'s settings say Claude does not sign its builds "
@@ -11961,7 +11961,7 @@ class Handler(BaseHTTPRequestHandler):
             r = phone.ask_sign(field(req, "why"), name, file, route, owner,
                                membership.owner_name(name) or "the space's owner",
                                asker_name=str(acct.get("name") or ""), principal=self._principal(), key=key)
-            return self._json(r, 400 if r.get("error") else 200)
+            return self._result(r)
         if self._not_project(name):
             return None
         if field(req, "action") == "sign":
@@ -12886,7 +12886,7 @@ class Handler(BaseHTTPRequestHandler):
             return None
         want = req.get("sections") if isinstance(req.get("sections"), list) else None
         r = diag.report([str(x) for x in want] if want else None)
-        return self._json(r, 400 if r.get("error") else 200)
+        return self._result(r)
 
     def _diag_why(self):
         """Why this caller may not read the controller's diagnostics, or "":
@@ -13078,7 +13078,7 @@ class Handler(BaseHTTPRequestHandler):
             r = schedules.fire(s, by, schedule_queue)
         else:
             return self._json({"error": "action is save, remove or run"}, 400)
-        return self._json(r, 400 if r.get("error") else 200)
+        return self._result(r)
 
     def _get_storebackups(self):
         """GET /api/storebackups (R162 step 5): the backups the controller's
@@ -13104,7 +13104,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": "action is set or remove"}, 400)
         if not r.get("error"):
             db.audit(by, "storebackup-" + act, field(req, "id") or (r.get("backup") or {}).get("id", ""), {"name": (r.get("backup") or {}).get("name", "")})
-        return self._json(r, 400 if r.get("error") else 200)
+        return self._result(r)
 
     def _get_pack_icon(self):
         """GET /api/pack-icon?name=PACK or ?app=ID (R182): a pack's or an
@@ -13301,7 +13301,7 @@ class Handler(BaseHTTPRequestHandler):
             if not self._works_on_node(who, nid):
                 return self._json({"error": "your own settings here are for whoever works on this node's spaces"}, 403)
             r = packconfig.set_mine(nid, pack, fields, req.get("values"), users.uid_of(who))
-            return self._json(r, 400 if r.get("error") else 200)
+            return self._result(r)
         if (why := users.may_node(who, "configure", nid)):
             return self._json({"error": why}, 403)
         if not fields:
@@ -13311,7 +13311,7 @@ class Handler(BaseHTTPRequestHandler):
         r = packconfig.set_values(nid, pack, fields, req.get("values"))
         if not r.get("error"):
             db.audit(f"user:{by}", "pack-configure", nid, {"pack": pack})
-        return self._json(r, 400 if r.get("error") else 200)
+        return self._result(r)
 
     def _get_catalog(self):
         """GET /api/catalog[?fresh=1] (R169 step 2): the vetted catalog's
@@ -13383,7 +13383,7 @@ class Handler(BaseHTTPRequestHandler):
             entry = next((e for e in (catalogindex.index(settings.get("catalog_url") or None).get("index") or {}).get("packs") or []
                           if e.get("kind") == "app" and e["name"] == field(req, "app") and not e.get("withdrawn")), None)
             r = nasapps.add_catalog(entry, by=who.get("name") or "", fetch=toolpacks.fetch_folder)
-            return self._json(r, 400 if r.get("error") else 200)
+            return self._result(r)
         if action in ("preview", "add", "source", "remove"):
             if (why := users.may(who, "curate")):
                 return self._json({"error": why}, 403)
@@ -13399,7 +13399,7 @@ class Handler(BaseHTTPRequestHandler):
             # No revision token: the Library and New container read the
             # catalog again on their next open, and the page that added
             # it reads at once.
-            return self._json(r, 400 if r.get("error") else 200)
+            return self._result(r)
         # An app's environment is made as its container is (R238 step 3:
         # /api/container's create, from its panel's values), never here.
         return self._json({"error": f"unknown action: {action or 'none'}"}, 400)
@@ -13431,7 +13431,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": "action is set, remove, on or off"}, 400)
         if not r.get("error"):
             db.audit(by, "extmount-" + act, field(req, "id") or (r.get("mount") or {}).get("id", ""), {"name": (r.get("mount") or {}).get("name", "")})
-        return self._json(r, 400 if r.get("error") else 200)
+        return self._result(r)
 
     def _get_storage(self):
         """The Storage page (storage.view, R169): every node this account
@@ -14229,7 +14229,7 @@ class Handler(BaseHTTPRequestHandler):
                                                        if n.get("kind") == "agent" and n.get("state") != "retired"])
                 if far:
                     r["said"] = [move.far_said(far, r["to"])]
-            return self._json(r, 400 if r.get("error") else 200)
+            return self._result(r)
         if act == "backup":
             # A copy to keep under a token of its own, no move armed (the
             # operator, 6 Nov); the token is answered once, as a move's is.
@@ -14238,18 +14238,18 @@ class Handler(BaseHTTPRequestHandler):
                                    stores=[str(k) for k in stores if isinstance(k, str)] if isinstance(stores, list) else None)
             if r.get("ok"):
                 db.audit(self._principal(), "move-backup", "", {"repos": req.get("repos") is True, "size": r.get("size", 0)})
-            return self._json(r, 400 if r.get("error") else 200)
+            return self._result(r)
         if act == "pack":
             # The bundle packed now, the page waiting on it with its button
             # saying so (the operator, 8 Nov: a download link said nothing
             # for as long as the packing took); then fetched by name.
             r = move.pack_bundle()
-            return self._json(r, 400 if r.get("error") else 200)
+            return self._result(r)
         if act == "forget":
             r = move.forget(self._principal())
             if r.get("ok"):
                 db.audit(self._principal(), "move-forget", "", {})
-            return self._json(r, 400 if r.get("error") else 200)
+            return self._result(r)
         if act == "moved":
             r = move.mark_moved(field(req, "to") or move.status().get("to", ""))
             db.audit(self._principal(), "moved", "", {"to": r.get("to", "")})
@@ -14361,7 +14361,7 @@ class Handler(BaseHTTPRequestHandler):
         r = backup.make(self._principal(), "asked")
         if r.get("ok"):
             db.audit(self._principal(), "backup", "", {"name": r.get("name", ""), "where": r.get("where", [])})
-        return self._json(r, 400 if r.get("error") else 200)
+        return self._result(r)
 
     def _get_backup_file(self):
         """GET /api/backup-file?name=NAME: a copy under the state as a
