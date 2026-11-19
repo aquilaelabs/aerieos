@@ -77,12 +77,10 @@ function wireDebug(el){
   const devSave = el.querySelector("#dbgDevSave");
   if (devSave) devSave.onclick = async () => {
     busy(devSave, "Saving");
-    try{
-      const j = await postJSON("/api/settings", {set: {offer_unvetted: debugDev}});
-      if (j.error){ notify(j.error, true); unbusy(devSave, "Save"); return; }
-      debugDev = null;
-      notify("saved");
-    }catch(e){ notify("settings: " + failWords(e), true); unbusy(devSave, "Save"); return; }
+    const j = await postJSON("/api/settings", {set: {offer_unvetted: debugDev}});
+    if (j.error){ notify(j.error, true); unbusy(devSave, "Save"); return; }
+    debugDev = null;
+    notify("saved");
     await refresh();
   };
   const revert = el.querySelector("#dbgRevert");
@@ -93,10 +91,8 @@ function wireDebug(el){
     for (const [key, g] of Object.entries(debugGrants)){
       const c = projectList().find(x => x.key === key);
       if (!c?.first) continue;
-      try{
-        const j = await postJSON("/api/prefs", {project: c.first.name, diag: g.diag, log_from: g.log_from});
-        if (j.error){ notify(`${c.name}: ${j.error}`, true); unbusy(save, "Save"); return; }
-      }catch(e){ notify(`${c.name}: ${failWords(e)}`, true); unbusy(save, "Save"); return; }
+      const j = await postJSON("/api/prefs", {project: c.first.name, diag: g.diag, log_from: g.log_from});
+      if (j.error){ notify(`${c.name}: ${j.error}`, true); unbusy(save, "Save"); return; }
       delete debugGrants[key];
     }
     notify("saved");

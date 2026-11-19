@@ -13,9 +13,7 @@ async function openTrash(){
 async function drawTrash(){
   const el = $("tList");
   drawHTML(el, `${skel("rows", 3)}`);
-  let j;
-  try{ j = await getJSON("/api/trash"); }
-  catch(e){ drawHTML(el, `<div class="hint bad">${esc(String(e))}</div>`); return; }
+  const j = await getJSON("/api/trash");
   // A refusal is said, never read as an empty bin (B87).
   if (j?.error){ drawHTML(el, `<div class="hint bad">${esc(j.error)}</div>`); return; }
   const items = j?.items || [];
@@ -336,14 +334,12 @@ async function newProjectByName(){
                          text: "Spaces and punctuation are fine in its name. Its repositories are added on its card."});
   const got = said?.text?.trim();
   if (!got) return;
-  try{
-    const j = await postJSON("/api/repos", {action: "create", name: got});
-    if (j.error){ notify(j.error, true); return; }
-    pjEditing.delete(j.key);
-    notify(`${j.name} made: Add repository on its card makes or clones its first one`);
-    await refresh();
-    showNewCard(j.key);
-  }catch(e){ notify("making the space failed: " + failWords(e), true); await refresh(); }
+  const j = await postJSON("/api/repos", {action: "create", name: got});
+  if (j.error){ notify(j.error, true); return; }
+  pjEditing.delete(j.key);
+  notify(`${j.name} made: Add repository on its card makes or clones its first one`);
+  await refresh();
+  showNewCard(j.key);
 }
 
 // A project just made: the page scrolls to its card wherever the order put
@@ -375,12 +371,10 @@ async function renameProjectCard(btn){
   const key = btn.dataset.prn, was = projectName(key);
   const got = await askInline(btn.closest(".pcname"), {label: `Rename ${was} to`, value: was, ok: "Rename"});
   if (got === null || got === was) return;
-  try{
-    const j = await postJSON("/api/repos", {action: "rename", key, to: got});
-    if (j.error){ notify(j.error, true); return; }
-    slideCards(key, () => applyNow((x, k) => { if (k === key && "members" in x) x.name = j.name || got; }));
-    notify(`${was} is now ${j.name || got}`);
-  }catch(e){ notify("renaming failed: " + failWords(e), true); }
+  const j = await postJSON("/api/repos", {action: "rename", key, to: got});
+  if (j.error){ notify(j.error, true); return; }
+  slideCards(key, () => applyNow((x, k) => { if (k === key && "members" in x) x.name = j.name || got; }));
+  notify(`${was} is now ${j.name || got}`);
   await refresh();
 }
 
@@ -391,11 +385,9 @@ async function renameRepository(btn){
   // card's back opens (the operator, 26 Oct): the label names the repository.
   const got = await askInline(btn.closest(".pcback")?.querySelector(".pcname") || btn.closest(".pcrepo"), {label: `Rename ${was} to`, value: was, ok: "Rename"});
   if (got === null || got === was) return;
-  try{
-    const j = await postJSON("/api/rename", {name, to: got});
-    if (j.error){ notify(j.error, true); return; }
-    notify(`${was} is now ${j.label || got}`);
-  }catch(e){ notify("renaming failed: " + failWords(e), true); }
+  const j = await postJSON("/api/rename", {name, to: got});
+  if (j.error){ notify(j.error, true); return; }
+  notify(`${was} is now ${j.label || got}`);
   await refresh();
 }
 
@@ -410,23 +402,18 @@ async function moveRepository(btn){
   if (!got) return;
   const c = to.find(x => x.name.toLowerCase() === got.toLowerCase());
   if (!c){ notify(`${got} is not a space it can move to`, true); return; }
-  let plan;
-  try{
-    plan = await postJSON("/api/repos", {action: "move-check", name, to: c.key});
-  }catch(e){ notify("checking the move failed: " + failWords(e), true); return; }
+  const plan = await postJSON("/api/repos", {action: "move-check", name, to: c.key});
   if (plan.error){ notify(plan.error, true); return; }
   const picked = await moveConfirm(plan);
   if (picked === null) return;
-  try{
-    const j = await postJSON("/api/repos", {action: "move", name, to: c.key, add_nodes: picked.nodes, give: picked.give});
-    if (j.error){ notify(j.error, true); return; }
-    const nn = id => plan.nodes.find(n => n.id === id)?.name || id;
-    notify(`${projLabel(name)} is in ${j.project}${
-      j.added?.length ? `, which now has ${j.added.map(nn).join(" and ")} too` : ""}${
-      j.readers?.length ? `; ${j.readers.join(", ")} now read${j.readers.length === 1 ? "s" : ""} it too` : ""}${
-      j.kept?.length ? `; ${plan.from} keeps ${j.kept.join(", ")}` : ""}`);
-    if (j.owner_errors?.length) notify(j.owner_errors.join("; "), true);
-  }catch(e){ notify("moving it failed: " + failWords(e), true); }
+  const j = await postJSON("/api/repos", {action: "move", name, to: c.key, add_nodes: picked.nodes, give: picked.give});
+  if (j.error){ notify(j.error, true); return; }
+  const nn = id => plan.nodes.find(n => n.id === id)?.name || id;
+  notify(`${projLabel(name)} is in ${j.project}${
+    j.added?.length ? `, which now has ${j.added.map(nn).join(" and ")} too` : ""}${
+    j.readers?.length ? `; ${j.readers.join(", ")} now read${j.readers.length === 1 ? "s" : ""} it too` : ""}${
+    j.kept?.length ? `; ${plan.from} keeps ${j.kept.join(", ")}` : ""}`);
+  if (j.owner_errors?.length) notify(j.owner_errors.join("; "), true);
   await refresh();
 }
 
@@ -510,12 +497,10 @@ async function deleteProjectCard(key){
   const left = own.containers?.length ? `\n\nThe container${own.containers.length === 1 ? "" : "s"} given to it, ${own.containers.join(", ")}, keep${
     own.containers.length === 1 ? "s" : ""} running, given to no space.` : "";
   if (!await askYes(`Delete the space ${n}?\n\nIt has no repository in it, so nothing on disk goes.${left}`)) return;
-  try{
-    const j = await postJSON("/api/repos", {action: "delete", key});
-    if (j.error){ notify(j.error, true); return; }
-    pjEditing.delete(key);
-    notify(`${n} is gone`);
-  }catch(e){ notify("deleting the space failed: " + failWords(e), true); }
+  const j = await postJSON("/api/repos", {action: "delete", key});
+  if (j.error){ notify(j.error, true); return; }
+  pjEditing.delete(key);
+  notify(`${n} is gone`);
   await refresh();
 }
 
@@ -709,12 +694,10 @@ async function renameProjectGroup(btn){
                                      also: {key: "delete", label: "Delete group"}});
   if (got === null || got === was) return;
   const gone = got?.also === "delete";
-  try{
-    const j = await postJSON("/api/project-group", gone ? {delete: was} : {rename: was, to: got});
-    if (j.error){ notify(j.error, true); return; }
-    applyNow((x, k) => { x.group = (j.groups || {})[k] || ""; });
-    notify(gone ? `${was} is gone: its spaces are in no group` : `${was} is now ${got}`);
-  }catch(e){ notify("group: " + failWords(e), true); }
+  const j = await postJSON("/api/project-group", gone ? {delete: was} : {rename: was, to: got});
+  if (j.error){ notify(j.error, true); return; }
+  applyNow((x, k) => { x.group = (j.groups || {})[k] || ""; });
+  notify(gone ? `${was} is gone: its spaces are in no group` : `${was} is now ${got}`);
   refresh();
 }
 

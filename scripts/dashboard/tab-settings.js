@@ -244,10 +244,8 @@ function renderSettingsInto(i){
   const ac = d.el.querySelector("#setAppsCheck");
   if (ac) ac.onclick = async () => {
     busy(ac, "Looking");
-    try{
-      const j = await postJSON("/api/apps", {action: "check"});
-      if (j.error) notify(j.error, true);
-    }catch(e){ notify("could not reach the controller: " + failWords(e), true); }
+    const j = await postJSON("/api/apps", {action: "check"});
+    if (j.error) notify(j.error, true);
     // The look runs in the background; read again once it has had a moment.
     setTimeout(loadApps, 4000);
     await loadApps();
@@ -675,11 +673,9 @@ function reportsSection(){
 async function deleteReport(btn){
   const id = Number(btn.dataset.repdel);
   busy(btn, "");
-  try{
-    const j = await postJSON("/api/reports", {action: "delete", id});
-    if (j.error){ notify(j.error, true); unbusy(btn, ""); return; }
-    notify(`report #${id} deleted`);
-  }catch{ notify("could not delete the report", true); unbusy(btn, ""); return; }
+  const j = await postJSON("/api/reports", {action: "delete", id});
+  if (j.error){ notify(j.error, true); unbusy(btn, ""); return; }
+  notify(`report #${id} deleted`);
   await loadReports();
 }
 
@@ -691,11 +687,9 @@ async function clearReports(btn){
   const s = n === 1 ? "" : "s";
   if (!await askYes(`Delete all ${n} report${s} about AerieOS?`)) return;
   busy(btn, "Clearing");
-  try{
-    const j = await postJSON("/api/reports", {action: "clear"});
-    if (j.error) notify(j.error, true);
-    else notify(`cleared ${j.cleared} report${j.cleared === 1 ? "" : "s"}`);
-  }catch{ notify("could not clear the reports", true); }
+  const j = await postJSON("/api/reports", {action: "clear"});
+  if (j.error) notify(j.error, true);
+  else notify(`cleared ${j.cleared} report${j.cleared === 1 ? "" : "s"}`);
   unbusy(btn, "Clear reports");
   loadReports();
 }
@@ -1066,11 +1060,8 @@ async function askReset(){
   const send = async (ids) => {
     busy(go, ids.length ? "Un-enrolling" : "Resetting");
     why.hidden = true;
-    let j;
-    try{
-      j = await postJSON("/api/reset", {confirm: word.value.trim(), unenroll: ids,
-        stores: !!$("resetStores")?.checked});
-    }catch(e){ j = {error: "no answer from the dashboard: " + e}; }
+    const j = await postJSON("/api/reset", {confirm: word.value.trim(), unenroll: ids,
+      stores: !!$("resetStores")?.checked});
     if (j.error){ unbusy(go, "Reset"); why.textContent = j.error; why.hidden = false; return; }
     if (j.unenrolling) return resetFollow(body, ids, send);
     resetGone(body, j.moved_to);
@@ -1095,9 +1086,7 @@ function resetFollow(body, ids, send){
     if (j.error){
       $("resetShut").onclick = () => { $("resetmodal").hidden = true; body.innerHTML = ""; };
       $("resetAnyway").onclick = async () => {
-        let r;
-        try{ r = await postJSON("/api/reset", {confirm: "reset"}); }
-        catch(e){ r = {error: "no answer from the dashboard: " + e}; }
+        const r = await postJSON("/api/reset", {confirm: "reset"});
         if (r.error){ $("resetWhy").textContent = r.error; $("resetWhy").hidden = false; return; }
         resetGone(body, r.moved_to);
       };
@@ -1201,11 +1190,9 @@ function wireSettingsSections(el){
   // Ask Let's Encrypt now (R158 step 2): the Connection section's own press.
   el.querySelectorAll("[data-tlsissue]").forEach(b => b.onclick = async () => {
     busy(b, "Asking");
-    try{
-      const j = await postJSON("/api/tls", {action: "issue"});
-      if (j.error) notify(j.error, true);
-      else notify("asking Let's Encrypt: the Connection section says how it goes");
-    }catch(e){ notify("could not ask: " + failWords(e), true); }
+    const j = await postJSON("/api/tls", {action: "issue"});
+    if (j.error) notify(j.error, true);
+    else notify("asking Let's Encrypt: the Connection section says how it goes");
     refresh();
   });
   el.querySelectorAll('[data-group]').forEach(box => {
@@ -1287,8 +1274,7 @@ function wireIdleSection(el){
       notify(j.minutes ? `every agent's session ends after ${j.minutes} idle minute(s), here and on every node`
                        : "no session is ended for being idle");
       refresh();
-    }catch(e){ notify("idle: " + failWords(e), true); }
-    finally{ if (btn && btn.isConnected){ btn.disabled = false; btn.textContent = "Apply"; } }
+    }finally{ if (btn && btn.isConnected){ btn.disabled = false; btn.textContent = "Apply"; } }
   };
   el.querySelector("#idleApply").onclick = apply;
   inp.onkeydown = e => { if (e.key === "Enter"){ e.preventDefault(); apply(); } };
@@ -1350,8 +1336,7 @@ function wirePathsSection(el){
                         : `${i.dataset.path} is kept at ${i.value.trim() || "its default"}`);
       }
       refresh();
-    }catch(e){ notify("storage: " + failWords(e), true); }
-    finally{ if (btn.isConnected) unbusy(btn, "Apply"); }
+    }finally{ if (btn.isConnected) unbusy(btn, "Apply"); }
   };
   btn.onclick = apply;
   el.querySelectorAll("input[data-path]").forEach(i => {

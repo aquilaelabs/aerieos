@@ -26,11 +26,9 @@ function openScannersTab(){
 
 function loadScanners(){
   return reading("scanners", async () => {
-    try{
-      const j = await getJSON("/api/scanners");
-      scannersErr = j.error || "";
-      if (!j.error) scannersData = j;
-    }catch(e){ scannersErr = "scanners: " + failWords(e); }
+    const j = await getJSON("/api/scanners");
+    scannersErr = j.error || "";
+    if (!j.error) scannersData = j;
   });
 }
 

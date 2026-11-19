@@ -20,14 +20,9 @@ function openKeysTab(){
 }
 
 async function postKeys(body){
-  try{
-    const j = await postJSON("/api/keys", body);
-    if (j.error) notify(j.error, true);
-    return j;
-  }catch(e){
-    notify("keys: " + failWords(e), true);
-    return {error: String(e)};
-  }
+  const j = await postJSON("/api/keys", body);
+  if (j.error) notify(j.error, true);
+  return j;
 }
 
 function loadKeys(){

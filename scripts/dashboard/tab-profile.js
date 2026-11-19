@@ -233,8 +233,7 @@ function wireShares(root){
       if (j.error){ notify(j.error, true); return; }
       notify(password ? "your separate share password is set: the machine takes it up within a minute" : "cleared: sign in again and your shares follow your password");
       await loadProfile();
-    }catch(e){ notify("profile: " + failWords(e), true); }
-    finally{ unbusy(btn, word); }
+    }finally{ unbusy(btn, word); }
   };
   set.onclick = () => post(set, a.value, "Setting");
   if (clear) clear.onclick = async () => {
@@ -294,10 +293,8 @@ function termLookPicked(root){
 }
 function wireTerminalLook(root){
   const save = async term => {
-    try{
-      const j = await postJSON("/api/users", {action: "prefs", prefs: {term}});
-      if (j.error) return notify(j.error, true);
-    }catch(e){ return notify("could not reach the controller: " + failWords(e), true); }
+    const j = await postJSON("/api/users", {action: "prefs", prefs: {term}});
+    if (j.error) return notify(j.error, true);
     refresh();
   };
   const preview = () => {
@@ -427,11 +424,9 @@ function wireDeviceOut(root){
   root.querySelectorAll("[data-pfsignout]").forEach(b => b.onclick = async () => {
     // Signing a browser out asks nothing (R265): it signs in again.
     busy(b, "Signing out");
-    try{
-      const j = await postJSON("/api/profile", {action: "signin-out", id: b.dataset.pfsignout});
-      if (j.error) notify(j.error, true);
-      else if (j.this){ location.href = "/login"; return; }
-    }catch(e){ notify("could not reach the controller: " + failWords(e), true); }
+    const j = await postJSON("/api/profile", {action: "signin-out", id: b.dataset.pfsignout});
+    if (j.error) notify(j.error, true);
+    else if (j.this){ location.href = "/login"; return; }
     await loadProfile();
   });
   root.querySelectorAll("[data-pfdevout]").forEach(b => b.onclick = async () => {
@@ -439,11 +434,9 @@ function wireDeviceOut(root){
     const d = [...(profile?.devices || []), ...(usersList || []).flatMap(u => u.devices || [])].find(x => x.id === b.dataset.pfdevout);
     if (!await askYes(`Disconnect ${d ? d.name : "this device"}${of ? ` of ${of}` : ""}? It stops syncing at once and signs in again to come back.`)) return;
     busy(b, "Disconnecting");
-    try{
-      const j = await postJSON(of ? "/api/users" : "/api/profile",
-        of ? {action: "device-signout", name: of, device: b.dataset.pfdevout} : {action: "device-signout", device: b.dataset.pfdevout});
-      if (j.error) notify(j.error, true);
-    }catch(e){ notify("could not reach the controller: " + failWords(e), true); }
+    const j = await postJSON(of ? "/api/users" : "/api/profile",
+      of ? {action: "device-signout", name: of, device: b.dataset.pfdevout} : {action: "device-signout", device: b.dataset.pfdevout});
+    if (j.error) notify(j.error, true);
     await (of ? loadUsers() : loadProfile());
   });
 }
@@ -458,10 +451,7 @@ async function openConversation(project, id){
   m.hidden = false;
   $("cvClose").onclick = () => { m.hidden = true; };
   const tz = userTZ() || Intl.DateTimeFormat().resolvedOptions().timeZone || "";
-  let j;
-  try{
-    j = await getJSON(`/api/transcript?project=${encodeURIComponent(project)}&id=${encodeURIComponent(id)}&as=turns&tz=${encodeURIComponent(tz)}`);
-  }catch(e){ j = {error: "could not reach the controller: " + e}; }
+  const j = await getJSON(`/api/transcript?project=${encodeURIComponent(project)}&id=${encodeURIComponent(id)}&as=turns&tz=${encodeURIComponent(tz)}`);
   if (j.error){ drawHTML(body, `<div class="notice bad">${esc(j.error)}</div>`); return; }
   // The agent the conversation is with (R95): Claude, or the one it names.
   const WHO = {you: "You", claude: j.agent_name || "Claude", system: "System"};
@@ -515,8 +505,7 @@ function wireProfile(root){
         : "saved: your next session and shell carry it");
       await loadProfile();
       refresh();                      // the Claude buttons follow git_ready
-    }catch(e){ notify("profile: " + failWords(e), true); }
-    finally{ if (save.isConnected) unbusy(save, "Save"); }
+    }finally{ if (save.isConnected) unbusy(save, "Save"); }
   };
   // Change password wakes once the current one is typed and the new one is
   // 8 or more, typed the same twice; what is wrong is said under the field
@@ -542,11 +531,12 @@ function wireProfile(root){
     busy(pw, "Changing");
     try{
       const j = await postJSON("/api/profile", {action: "password", current: cur, password: a});
-      if (j.error){ sayAt(/current/.test(j.error) ? "pfCur" : "pfNew", j.error); return; }
+      // One that never landed is said under the current password, where
+      // pwReady, which rewrites the lines under the new ones, leaves it.
+      if (j.error){ sayAt(j.unreached || /current/.test(j.error) ? "pfCur" : "pfNew", j.error); return; }
       notify("password changed: sign in again where you are asked to");
       ["pfCur", "pfNew", "pfNew2"].forEach(id => { const el = fld(id); if (el) el.value = ""; });
-    }catch(e){ sayAt("pfCur", "could not reach the controller: " + e); }
-    finally{ if (pw.isConnected){ unbusy(pw, "Change password"); pwReady(); } }
+    }finally{ if (pw.isConnected){ unbusy(pw, "Change password"); pwReady(); } }
   };
 }
 

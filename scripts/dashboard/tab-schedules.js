@@ -36,14 +36,9 @@ function loadSchedules(){
 }
 
 async function postSchedule(body){
-  try{
-    const j = await postJSON("/api/schedules", body);
-    if (j.error) notify(j.error, true);
-    return j;
-  }catch(e){
-    notify("schedules: " + failWords(e), true);
-    return {error: String(e)};
-  }
+  const j = await postJSON("/api/schedules", body);
+  if (j.error) notify(j.error, true);
+  return j;
 }
 
 // When a run was or will be, as a person reads it: a weekday and a time,

@@ -337,16 +337,14 @@ function emuTickedHere(d){
 async function emuAct(action, image, btn){
   if (btn) busy(btn, action === "add" ? "Adding" : "Removing");
   const many = Array.isArray(image);
-  try{
-    const j = await postJSON("/api/emulator", {action, node: emuNode, ...(many ? {images: image} : {image})});
-    if (j.error) notify(j.error, true);
-    else {
-      if (many) image.forEach(id => emuTicked.delete(id));
-      if (action === "add") emuSelecting = false;
-      notify(`${action === "add" ? "adding" : "removing"} ${many && image.length > 1
-        ? `${image.length} images` : (many ? image[0] : image)} on ${
-        emu?.name || "the node"}; this can take minutes`);
-    }
-  }catch(e){ notify("could not start: " + failWords(e), true); }
+  const j = await postJSON("/api/emulator", {action, node: emuNode, ...(many ? {images: image} : {image})});
+  if (j.error) notify(j.error, true);
+  else {
+    if (many) image.forEach(id => emuTicked.delete(id));
+    if (action === "add") emuSelecting = false;
+    notify(`${action === "add" ? "adding" : "removing"} ${many && image.length > 1
+      ? `${image.length} images` : (many ? image[0] : image)} on ${
+      emu?.name || "the node"}; this can take minutes`);
+  }
   loadEmulator();
 }

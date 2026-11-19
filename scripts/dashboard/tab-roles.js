@@ -44,11 +44,9 @@ function loadRoles(){
 }
 
 async function rolesAct(body, said){
-  try{
-    const j = await postJSON("/api/roles", body);
-    if (j.error){ notify(j.error, true); return false; }
-    notify(said);
-  }catch(e){ notify(String(e), true); return false; }
+  const j = await postJSON("/api/roles", body);
+  if (j.error){ notify(j.error, true); return false; }
+  notify(said);
   await loadRoles();
   return true;
 }

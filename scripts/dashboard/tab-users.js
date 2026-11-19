@@ -51,15 +51,13 @@ function loadUsers(){
 // without it a refusal is a toast. True when it landed.
 async function usersAct(body, say = null){
   const refuse = t => { if (say) say(t); else notify(t, true); return false; };
-  try{
-    const j = await postJSON("/api/users", body);
-    if (j.error) return refuse(j.error);
-    if (body.action === "add"){ usersAddDraft = {name: "", pw: "", role: "user"}; usersPick = body.name; usersPhoneOpen = true; }
-    if (body.action === "remove"){ usersPick = ""; usersPhoneOpen = false; }
-    notify(body.action === "remove" ? `${body.name} removed`
-         : body.action === "add" ? `${body.name} added`
-         : `${body.name} updated`);
-  }catch(e){ return refuse(String(e)); }
+  const j = await postJSON("/api/users", body);
+  if (j.error) return refuse(j.error);
+  if (body.action === "add"){ usersAddDraft = {name: "", pw: "", role: "user"}; usersPick = body.name; usersPhoneOpen = true; }
+  if (body.action === "remove"){ usersPick = ""; usersPhoneOpen = false; }
+  notify(body.action === "remove" ? `${body.name} removed`
+       : body.action === "add" ? `${body.name} added`
+       : `${body.name} updated`);
   // The roles data names the accounts whose roles this one may give, so an
   // account added or removed is read there too (B32).
   if (body.action === "add" || body.action === "remove") await loadRoles();

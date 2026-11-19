@@ -1405,10 +1405,7 @@ async function ndStoreAsk(n, c){
         + `node's own disk is covered until it is unmounted; it is not deleted.`);
   if (roles.length || mounts.length){
     const probe = [...new Set([...roles.map(r => norm(d.stores[r])), ...roles.map(now).filter(Boolean), ...mounts])];
-    let j;
-    try{
-      j = await postJSON("/api/v1/nodes", {action: "path-state", id: n.id, paths: probe});
-    }catch(e){ j = {error: String(e)}; }
+    const j = await postJSON("/api/v1/nodes", {action: "path-state", id: n.id, paths: probe});
     if (j.error){ notify(`could not see what is at those paths on ${n.name}: ${j.error}`, true); return false; }
     const at = p => j.paths?.[p] || {};
     for (const p of mounts){
