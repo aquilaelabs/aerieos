@@ -177,9 +177,10 @@ async function claudeEnd(name, n, several, slot = 1){
 // up again, which is how a session sees what changed since it started (a
 // toolchain on its node's PATH, AerieOS's briefing; the project row says
 // which). The menu turns to the model and effort first, the conversation it
-// was in already chosen; its Restart asks, and only then is the session
-// ended and started again (restartNow). Asked first and ended at once, it
-// left a person picking a model with no session running.
+// was in already chosen; its Restart is the yes, and only then is the
+// session ended and started again (restartNow). Ended at once, it left a
+// person picking a model with no session running; asked again after that
+// step, it was a third screen for one decision (the operator, 19 Nov).
 function claudeRestart(name, n, several, agent = "claude", slot = 1){
   const p = (state?.projects || []).find(x => x.name === name);
   const claude = agent === "claude", last = claude ? p?.last_claude : p?.last_agents?.[agent];
@@ -195,19 +196,35 @@ function claudeRestart(name, n, several, agent = "claude", slot = 1){
   if (state) drawProjects(state.projects);
 }
 
-// The restart itself, once the model and effort are picked and the person
-// said yes: end the session, the server answering once the node says it has
+// The restart itself, once the model and effort are picked and Restart is
+// pressed: end the session, the server answering once the node says it has
 // ended, then start the same conversation. Started while the old one was
 // still going down, the new tab attached to the dying session and showed it
 // end, and a second press was what got a session (the operator, 12 Oct).
-async function restartNow(name, r){
+// A node that has not said so within the server's half minute is waited on
+// here, said as it goes, for RESTART_WAIT_S in all: its agent takes the end
+// at its next poll, which after the agent's own update is over a minute
+// away (its first census), and the page said to press Restart again for a
+// restart that was about to happen by itself (the operator, 19 Nov).
+const RESTART_WAIT_S = 240;
+async function restartNow(name, r, say = () => {}){
   const n = r.restart, id = r.agent || "claude", slot = r.slot || 1;
-  const where = n.name ? ` on ${n.name}` : "";
+  const node = n.name || "the node";
   const j = await endSession(myAgentSession(id, name, slot), n.id, true).catch(e => ({error: failWords(e)}));
   if (j.error) return j.error;
   dropAgentTab(id, name, n.several && n.id ? n.id : "", slot);
-  if (j.gone === false)
-    return `${n.name || "the node"} has not said your session ended within half a minute: its agent may be away; Restart again once its row says it is back`;
+  if (j.gone === false){
+    const began = Date.now() - 25000;
+    let gone = false;
+    while (!gone && j.name && Date.now() - began < RESTART_WAIT_S * 1000){
+      say(`Waiting for ${node} to end it: its agent is busy or starting, ${Math.round((Date.now() - began) / 1000)} seconds so far`);
+      await new Promise(done => setTimeout(done, 2000));
+      gone = (await postJSON("/api/session", {action: "gone", node: j.node, name: j.name}).catch(() => ({}))).gone === true;
+    }
+    if (!gone)
+      return `${node} has not said your session ended in ${RESTART_WAIT_S / 60} minutes: its row on the Nodes page says whether its agent is away; Restart again once it is back`;
+    say("");
+  }
   await refresh();
   return "";
 }
@@ -519,9 +536,9 @@ function resumePicker(p, m, dlg, ns, several){
   m.querySelector("[data-back]").onclick = () => { resumePick = null; drawProjects(state.projects); };
   m.querySelector("[data-start]").onclick = async e => {
     const label = r.restart ? "Restart" : "Start";
-    if (r.restart && !await askYes(`Restart your ${agentSlotName(agentById("claude"), r.slot || 1)} session on ${projLabel(p.name)}${r.restart.name ? ` on ${r.restart.name}` : ""}?\n\n`
-        + (r.when ? "It ends now, and the conversation you picked is resumed in its place."
-                  : "It ends now and resumes the same conversation, starting fresh so it sees what changed since it started."))) return;
+    // No question here: this step is the question (what ends, what resumes,
+    // Back beside Restart), and a second one after two screens was one too
+    // many (the operator, 19 Nov).
     busy(e.target, r.restart ? "Restarting" : "Starting");
     if (r.model !== (p.yours?.model || "") || r.effort !== (p.yours?.effort || "")){
       const j = await postJSON("/api/prefs", {project: p.name, model: r.model, effort: r.effort});
@@ -529,7 +546,7 @@ function resumePicker(p, m, dlg, ns, several){
       if (p.yours) Object.assign(p.yours, {model: r.model, effort: r.effort});
     }
     if (r.restart){
-      const why = await restartNow(p.name, r);
+      const why = await restartNow(p.name, r, t => { const el = document.querySelector("#rmSay"); if (el) el.textContent = t; });
       if (why){ unbusy(e.target, label); m.querySelector("#rmSay").textContent = why; return; }
     }
     resumePick = null;
@@ -606,8 +623,6 @@ function agentPicker(p, m, dlg, n, several){
   m.querySelector("[data-back]").onclick = () => { resumePick = null; drawProjects(state.projects); };
   m.querySelector("[data-start]").onclick = async e => {
     const label = r.restart ? "Restart" : "Start";
-    if (r.restart && !await askYes(`Restart your ${said} session on ${projLabel(p.name)}${r.restart.name ? ` on ${r.restart.name}` : ""}?\n\n`
-        + "It ends now and resumes the same conversation, starting fresh so it sees what changed since it started.")) return;
     // Kept as this person's for the project, per agent (R95 step 9), so the
     // step opens on it next time; the session starts on it either way.
     const mk = `${r.agent}_model`, ek = `${r.agent}_effort`;
@@ -618,7 +633,7 @@ function agentPicker(p, m, dlg, n, several){
       if (p.yours) Object.assign(p.yours, {[mk]: r.model, [ek]: r.effort});
     }
     if (r.restart){
-      const why = await restartNow(p.name, r);
+      const why = await restartNow(p.name, r, t => { const el = document.querySelector("#rmSay"); if (el) el.textContent = t; });
       if (why){ unbusy(e.target, label); m.querySelector("#rmSay").textContent = why; return; }
     }
     launchAgent(r.agent, p.name, r.node, r.model, r.effort, r.sessionId || "", r.slot || 1);

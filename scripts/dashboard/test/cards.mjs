@@ -3175,9 +3175,28 @@ await section("a project on several nodes", async () => {
       window.endSession = realEnd; window.startClaude = realStart;
       return bbRestartLog;
     });
-    ok(/Restart your Claude session on alpha on ubu\?/.test(page.dialogs.at(-1) || '') && page.dialogs.length === d0 + 1
-       && JSON.stringify(done) === JSON.stringify([['end', 'n_ubu'], ['start', '']]),
-       `...then its Restart asks, ends the session and only then starts it again (${JSON.stringify(done)})`);
+    ok(page.dialogs.length === d0 && JSON.stringify(done) === JSON.stringify([['end', 'n_ubu'], ['start', '']]),
+       `...then its Restart ends the session and only then starts it again, with no second question: the step is the question (${JSON.stringify(done)}, ${page.dialogs.length - d0} asked)`);
+    // A node that has not said the session ended within the server's half
+    // minute is waited on, said on the step, and the restart then goes on
+    // by itself: its agent takes the end at its next poll, a minute away
+    // after its own update, and the page said to press Restart again.
+    const waited = await page.evaluate(async () => {
+      const realEnd = endSession, realStart = startClaude, realPost = postJSON;
+      const log = [], said = [];
+      let asks = 0;
+      window.endSession = async () => ({ ok: true, gone: false, node: 'n_ubu', name: 'u_x~claude-alpha' });
+      window.postJSON = async (path, body) => path === '/api/session' && body.action === 'gone'
+        ? (log.push(['gone?', body.node, body.name]), { gone: ++asks >= 2 }) : realPost(path, body);
+      window.startClaude = () => log.push(['start']);
+      const why = await restartNow('alpha', { restart: { id: 'n_ubu', name: 'ubu', several: false } }, t => said.push(t));
+      if (!why) startClaude();
+      window.endSession = realEnd; window.startClaude = realStart; window.postJSON = realPost;
+      return { why, log, said: said.filter(Boolean) };
+    });
+    ok(waited.why === '' && JSON.stringify(waited.log) === JSON.stringify([['gone?', 'n_ubu', 'u_x~claude-alpha'], ['gone?', 'n_ubu', 'u_x~claude-alpha'], ['start']])
+       && /^Waiting for ubu to end it: its agent is busy or starting, \d+ seconds so far$/.test(waited.said[0] || ''),
+       `...and a node slow to say the session ended is waited on, said on the step, the restart going on by itself (${JSON.stringify(waited).slice(0, 300)})`);
   }
   // On a phone the Restart step stays on the screen, its Restart included,
   // with the model's longest choice in the box and nothing in it reaching

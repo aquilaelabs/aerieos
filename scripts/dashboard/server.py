@@ -14092,9 +14092,18 @@ class Handler(BaseHTTPRequestHandler):
                                              start=_legacy_colors(prefs.all_projects(WORKSPACE))))
 
     def _session(self, req):
-        """Kill a session. Closing a tab that owns a Claude conversation should
-        end it, or detached sessions accumulate invisibly behind a tidy UI."""
+        """Kill a session, or say whether one asked to end has. Closing a tab
+        that owns a Claude conversation should end it, or detached sessions
+        accumulate invisibly behind a tidy UI."""
         session = req.get("session", "")
+        # Whether a session asked to end on a node has ended yet (a Restart
+        # going on waiting, nodes.session_kill_wait): by the node's own name
+        # for it, which says whose it is.
+        if req.get("action") == "gone":
+            name = str(req.get("name") or "")[:120]
+            if self._not_theirs(name):
+                return None
+            return self._json({"gone": nodes.session_gone(str(req.get("node") or ""), name)})
         if req.get("action") != "kill":
             return self._json({"error": "unknown action"}, 400)
         if self._not_theirs(session):

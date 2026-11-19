@@ -6985,7 +6985,8 @@ def session_gone(node_id, name):
 def session_kill_wait(node_id, name, timeout=25):
     """session_kill, answered once the node says the session has ended (a
     Restart's new one would otherwise attach to the one going down), or
-    with gone False when it has not said so within `timeout`."""
+    with gone False, the node and its name for the session when it has not
+    said so within `timeout`."""
     r = session_kill(node_id, name)
     if r.get("error"):
         return r
@@ -6994,7 +6995,11 @@ def session_kill_wait(node_id, name, timeout=25):
         if session_gone(node_id, name):
             return {"ok": True, "gone": True}
         time.sleep(0.25)
-    return {"ok": True, "gone": False}
+    # Not yet, which is not never: an agent busy starting (its first census
+    # after its own update is over a minute on a full node) takes the end
+    # when it next polls. Named, so the page can go on asking session_gone
+    # rather than tell the person to press again.
+    return {"ok": True, "gone": False, "node": node_id, "name": name}
 
 
 # tmux commands for a node's sessions (keys, a console's line, a macro),
