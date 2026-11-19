@@ -287,6 +287,14 @@ Two ways to look, by the question you are asking:
   `Xvfb :9 -screen 0 1280x800x24 & DISPLAY=:9 the-app &`); `--video FILE`
   reels a recording you already have, the person's screen recording among
   them.
+- A page, for a shot or a reel, opens in the first browser installed
+  unless one is named: `--browser NAME`, or `--browser all` for a shot in
+  each (`aerie capture browsers` lists those here, `NAME-BROWSER.png` each).
+  Its screen is 1280x800 unless `--size WxH` or `--device "NAME"` says (any
+  device Playwright knows, with its size, density and touch: `aerie capture
+  devices [WORDS]`), and `--scheme dark|light` and `--set NAME=VALUE` tell
+  it the rest (`--set locale=de-DE`, `--set reducedMotion=reduce`). Look at
+  a page change in every browser installed, not one.
 - A frame is kept when any small patch of it changed from the last frame
   kept, so a tap circle, a typed letter and a slow scroll each show; a run of
   motion is thinned to where it starts and settles and a few frames between,

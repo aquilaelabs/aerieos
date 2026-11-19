@@ -288,6 +288,13 @@ def main():
     ap.add_argument("--display")
     ap.add_argument("--seconds", type=int, default=10)
     ap.add_argument("--drive")
+    # A page's own: which browser, which screen, and what else it is told
+    # (pagecap.mjs, as aerie capture shot takes them).
+    ap.add_argument("--browser", default="")
+    ap.add_argument("--device", default="")
+    ap.add_argument("--size", default="")
+    ap.add_argument("--scheme", default="")
+    ap.add_argument("--set", action="append", default=[])
     ap.add_argument("--name")
     ap.add_argument("--threshold", type=float)
     ap.add_argument("--fps", type=int, default=0)
@@ -316,7 +323,11 @@ def main():
         die(f"no such video: {a.video}")
     drive = os.path.abspath(a.drive) if a.drive else ""
     work = scratch(name)
-    video = (a.video if a.video else from_url(a.url, a.seconds, drive, work) if a.url
+    wide, _, high = a.size.partition("x")
+    if a.size and not (wide.isdigit() and high.isdigit()):
+        die("--size takes WxH in whole numbers (393x851)")
+    page = {"browser": a.browser, "device": a.device, "width": wide, "height": high, "scheme": a.scheme, "set": a.set}
+    video = (a.video if a.video else from_url(a.url, a.seconds, drive, work, page) if a.url
              else from_emu(a.emu, a.seconds, drive, work, out) if a.emu is not None
              else from_display(a.display, a.seconds, drive, work))
     # A dry run (the operator, 17 Oct): what a reel at these settings would

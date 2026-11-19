@@ -355,6 +355,52 @@ await section("aerie capture shot at rest", async () => {
   ok(gone.status === 3 && !existsSync(`${S}/gone.png`) && /did not answer/.test(gone.stderr || ''),
      `...and a page that does not answer is no picture and exit 3, saying so (${gone.status}; ${(gone.stderr || '').trim().slice(0, 80)})`);
 });
+// A page in any browser installed here, as any device Playwright knows
+// (R263): neither is a list of aerie's own, so the checks ask what is there
+// and hold the verbs to it. A machine with Chromium alone passes as one
+// with three does.
+await section("a page in every browser installed, as any device", async () => {
+  const web = `${S}/web-any`; mkdirSync(web, { recursive: true });
+  writeFileSync(`${web}/index.html`, '<!doctype html><meta name="viewport" content="width=device-width"><style>body{margin:0;background:#fff}'
+    + '@media (prefers-color-scheme: dark){body{background:#000}}</style><body><h1 style="font:32px sans-serif">any</h1></body>');
+  const port = await freePort();
+  const srv = spawn('python3', ['-m', 'http.server', String(port), '--bind', '127.0.0.1'], { cwd: web, stdio: 'ignore' });
+  for (let i = 0; i < 150; i++){
+    try { if ((await fetch(`http://127.0.0.1:${port}/`)).ok) break; } catch {}
+    await new Promise(r => setTimeout(r, 100));
+  }
+  const aerie = (...args) => spawnSync('bash', [`${REPO}/scripts/aerie`, 'capture', ...args], { encoding: 'utf8', env: { ...process.env, DASHBOARD_PORT: '1' } });
+  const shot = (file, ...flags) => aerie('shot', `http://127.0.0.1:${port}/`, file, '--now', ...flags);
+  const wide = f => existsSync(f) ? readFileSync(f).readUInt32BE(16) : 0;
+  const here = (aerie('browsers').stdout || '').trim().split('\n').filter(Boolean);
+  ok(here.length >= 1 && here.every(n => /^[a-z]+$/.test(n)), `aerie capture browsers names the browsers installed here (${here.join(', ')})`);
+  const all = shot(`${S}/any.png`, '--browser', 'all');
+  const files = here.length > 1 ? here.map(n => `${S}/any-${n}.png`) : [`${S}/any.png`];
+  ok(all.status === 0 && files.every(f => wide(f) === 1280) && (all.stdout || '').trim().split('\n').length === files.length,
+     `--browser all is one picture in each, named for its browser where there are several (${all.status}; ${files.map(f => `${f.split('/').pop()} ${wide(f)}`).join(', ')}; ${(all.stderr || '').trim().slice(0, 80)})`);
+  const none = shot(`${S}/none.png`, '--browser', 'nosuchbrowser');
+  ok(none.status === 2 && !existsSync(`${S}/none.png`) && here.every(n => (none.stderr || '').includes(n)),
+     `a browser that is not here is refused naming those that are (${none.status}; ${(none.stderr || '').trim().slice(0, 90)})`);
+  const devices = (aerie('devices', 'pixel', '7').stdout || '').trim().split('\n').map(l => l.split('\t'));
+  const [name, about] = devices.find(d => d[0] === 'Pixel 7') || devices[0] || [];
+  const m = /^(\d+)x\d+ at ([\d.]+)/.exec(about || '');
+  const dev = m ? shot(`${S}/dev.png`, '--device', name) : null;
+  ok(m && dev.status === 0 && Math.abs(wide(`${S}/dev.png`) - (+m[1]) * (+m[2])) <= 2,
+     `--device takes a device Playwright knows by its name, with its own size and density (${name}: ${about}; the picture ${wide(`${S}/dev.png`)} wide)`);
+  const nodev = shot(`${S}/nodev.png`, '--device', 'No Such Phone');
+  ok(nodev.status === 2 && /aerie capture devices/.test(nodev.stderr || ''), `...and one it does not know is refused, saying where they are listed (${nodev.status})`);
+  const light = shot(`${S}/light.png`, '--scheme', 'light'), dark = shot(`${S}/dark.png`, '--scheme', 'dark');
+  const loc = shot(`${S}/loc.png`, '--set', 'colorScheme=dark');
+  const bytes = f => existsSync(f) ? readFileSync(f) : Buffer.alloc(0);
+  ok(light.status === 0 && dark.status === 0 && loc.status === 0 && !bytes(`${S}/light.png`).equals(bytes(`${S}/dark.png`))
+     && bytes(`${S}/dark.png`).equals(bytes(`${S}/loc.png`)),
+     `--scheme reaches the page, and --set hands the browser's context anything else by its own name (${[light, dark, loc].map(r => r.status).join('/')})`);
+  const reel = aerie('reel', '--url', `http://127.0.0.1:${port}/`, '--seconds', '2', '--name', 'any-reel', '--browser', here[here.length - 1], '--size', '393x851');
+  ok(reel.status === 0 && /frames/.test(reel.stderr + reel.stdout), `a reel takes the same: a page recorded in the browser named, at the size asked (${reel.status}; ${(reel.stderr || '').trim().slice(-90)})`);
+  const many = here.length > 1 ? aerie('reel', '--url', `http://127.0.0.1:${port}/`, '--seconds', '1', '--browser', 'all') : null;
+  ok(!many || (many.status !== 0 && here.every(n => (many.stderr || '').includes(n))), `...one browser a recording, said with their names when all is asked (${many ? many.status : 'one browser here'})`);
+  srv.kill();
+});
 // B143: this session's own token goes to the controller's origin alone. A
 // page on another host (here the same loopback under another port, as a dev
 // instance on bb-sandbox:7680 was beside the controller's :7680) is shot

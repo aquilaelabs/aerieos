@@ -881,6 +881,14 @@ aerie capture reel --video FILE|--url URL|--emu [PKG]|--display :N [--seconds N]
                    Only the sheet and frames.json land in dist/: the recording
                    and the full-size frames are on this machine's disk, where
                    frames.json says
+aerie capture browsers | devices [WORDS]
+                   what a page's shot or reel can be opened in and as: the
+                   browsers installed here, and the devices Playwright knows
+                   (each with its size, density and touch). --browser NAME|all
+                   picks one, or a picture in each; --device NAME or --size WxH
+                   the screen; --scheme dark|light and --set NAME=VALUE the
+                   rest of what a browser's context takes (locale, timezoneId,
+                   reducedMotion)
 aerie capture ls      the captures in this space's dist/ (reels and emulator
                    shots), each with who asked and when: the Artifacts view's
                    Captures fold, in the terminal

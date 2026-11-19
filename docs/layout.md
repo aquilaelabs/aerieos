@@ -77,6 +77,7 @@ scripts/
   lib/devapp-verbs.py            `aerie devapp`: status, rebuild, test, new, env, remove, ls, log, start, stop, restart
   lib/capture.py                 `aerie capture`: the sources anything that draws gives (a page, the emulator, an X display) and a shot at rest
   lib/reel.py                    `aerie capture reel`: the frames of a recording that changed, stamped and tiled
+  lib/pagecap.mjs                a page opened for a shot or a reel: the browsers installed, a device or a size, and the credential to the trusted origins alone
   lib/touch.py                   `aerie emu touch` and a drive script's $BB_TOUCH: a tap, hold or glide with its timing kept, through sendevent
   lib/hand.py                    a finger's path through points for a glide (curved, eased, overshooting, wobbling, by seed), played by `aerie emu touch` and `aerie phone touch`
   lib/sound.py                   `aerie tool sound`: sound effects from sfxr's presets and plain tones, into dist/sound/ as OGG with a waveform and a spectrogram (ffmpeg)

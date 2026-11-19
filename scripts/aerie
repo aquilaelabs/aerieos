@@ -783,6 +783,14 @@ aerie capture reel --video FILE|--url URL|--emu [PKG]|--display :N [--seconds N]
                    Only the sheet and frames.json land in dist/: the recording
                    and the full-size frames are on this machine's disk, where
                    frames.json says
+aerie capture browsers | devices [WORDS]
+                   what a page's shot or reel can be opened in and as: the
+                   browsers installed here, and the devices Playwright knows
+                   (each with its size, density and touch). --browser NAME|all
+                   picks one, or a picture in each; --device NAME or --size WxH
+                   the screen; --scheme dark|light and --set NAME=VALUE the
+                   rest of what a browser's context takes (locale, timezoneId,
+                   reducedMotion)
 aerie capture ls      the captures in this space's dist/ (reels and emulator
                    shots), each with who asked and when: the Artifacts view's
                    Captures fold, in the terminal
@@ -5178,6 +5186,10 @@ cmd_capture() {
     case "${1:-}" in
         shot) shift; capture_shot "$@" ;;
         reel) shift; capture_reel "$@" ;;
+        # What a page can be opened in and as (pagecap.mjs): the browsers
+        # installed here and the devices Playwright knows, asked of it.
+        browsers) capture_env node "$BB_LIB/pagecap.mjs" browsers ;;
+        devices)  shift; capture_env node "$BB_LIB/pagecap.mjs" devices "$*" ;;
         # The captures in dist/ and their removal (R96): capture.py reads
         # and applies the one rule the Artifacts tab's sweep also does.
         ls|prune)
@@ -5191,17 +5203,25 @@ cmd_capture() {
         *) cat <<'EOT'
 aerie capture shot URL... [FILE|DIR] | --emu [PKG] [FILE] | --display :N [FILE]   [--drive F] [--settle|--now]
 aerie capture reel --video FILE | --url URL | --emu [PKG] | --display :N   [--seconds N] [--drive F] [--name N]
+aerie capture browsers
+aerie capture devices [WORDS]
 aerie capture ls
 aerie capture prune [--days N] [NAME...]
   shot:  one picture at rest (shots a quarter second apart until a second of
          them match; --now takes it at once)
+  a page, for shot and reel alike: --browser NAME|all (any installed here:
+         browsers lists them; all is a picture in each), --device NAME (any
+         Playwright knows: devices lists them, with its size, density and
+         touch), --size WxH, --scheme dark|light, and --set NAME=VALUE for
+         anything else a browser's context takes (locale, timezoneId,
+         reducedMotion)
   reel:  the frames that changed, stamped with their times, on one sheet in
          dist/reel/NAME/ with frames.json beside it (aerie capture reel -h)
   ls:    the captures in this project's dist/, with who asked and when
   prune: remove the captures named, or every one older than --days N; the
          controller sweeps them after the project's "captures kept" days
 EOT
-           [ -z "${1:-}" ] || [ "$1" = -h ] || [ "$1" = --help ] || die "aerie capture shot|reel|ls|prune"
+           [ -z "${1:-}" ] || [ "$1" = -h ] || [ "$1" = --help ] || die "aerie capture shot|reel|browsers|devices|ls|prune"
            ;;
     esac
 }
@@ -5244,11 +5264,21 @@ capture_person_only() {
 }
 
 # The store's tools for capture.py, which shot and reel share.
+# Where Playwright's browsers are: the folder named, the store's, the image's.
+pw_browsers_path() {
+    local base
+    for base in "${PLAYWRIGHT_BROWSERS_PATH:-}" "$(sdk_root 2>/dev/null)/playwright" /opt/pw-browsers; do
+        [ -n "$base" ] && [ -d "$base" ] && { printf '%s' "$base"; return 0; }
+    done
+    return 0
+}
+
 capture_env() {
     local root; root="$(sdk_root 2>/dev/null || true)"
     local ff; ff="$(command -v ffmpeg || true)"; [ -n "$ff" ] || { [ -x "$root/ffmpeg/bin/ffmpeg" ] && ff="$root/ffmpeg/bin/ffmpeg"; }
     local adb; adb="$(command -v adb || true)"; [ -n "$adb" ] || { [ -x "$root/platform-tools/adb" ] && adb="$root/platform-tools/adb"; }
     BB_CAPTURE_FFMPEG="$ff" BB_CAPTURE_NODE_PATH="$(pw_node_path)" BB_CAPTURE_CHROME="$(find_chromium 2>/dev/null || true)" \
+    NODE_PATH="$(pw_node_path)" PLAYWRIGHT_BROWSERS_PATH="$(pw_browsers_path)" \
     BB_CAPTURE_ADB="$adb" BB_CAPTURE_AUTH="${BB_TOKEN:-${DASHBOARD_AUTH:-}}" BB_CAPTURE_TRUST="$(capture_trust)" \
     BB_CAPTURE_PERSON_ONLY="$(capture_person_only "the page")" "$@"
 }
@@ -5259,6 +5289,7 @@ capture_reel() {
             cat <<'EOT'
 aerie capture reel --video FILE | --url URL | --emu [PKG] | --display :N  [--seconds N] [--drive FILE] [--name NAME]
         [--patch N] [--max N] [--from S] [--to S] [--dry] [--threshold T] [--fps N]
+        [--browser NAME] [--device NAME] [--size WxH] [--scheme dark|light] [--set NAME=VALUE]...   (a page's, as shot takes them)
   the frames that changed, each stamped with its time, tiled into
   dist/reel/NAME/sheet.png (and sheet-2.png on, twelve frames a page)
   beside frames.json (when, and how much moved): what a screenshot cannot
@@ -5307,6 +5338,10 @@ capture_shot_usage() {
     cat <<'EOT'
 usage: aerie capture shot URL... [FILE|DIR] | --emu [PKG] [FILE] | --display :N [FILE]   [--drive F] [--settle|--now]
         [--auth user:pass] [--size WxH] [--full] [--scale N] [--wait MS] [--resize W]
+        [--browser NAME|all] [--device NAME] [--scheme dark|light] [--set NAME=VALUE]...
+a page is opened in the first browser installed here unless one is named
+(aerie capture browsers; all takes one picture in each, NAME-BROWSER.png), at
+1280x800 unless a size or a device is (aerie capture devices)
 URLs need their scheme (http:// or https://); with no FILE a page's shot goes
 to dist/shot/ and the emulator's to dist/emu/
 EOT
@@ -5315,8 +5350,11 @@ EOT
 capture_shot() {
     # The operator's password, or a session's token, whichever this shell
     # has. --auth overrides both.
-    local auth="${BB_TOKEN:-${DASHBOARD_AUTH:-}}" width=1280 height=800 scale=1 wait=0 settle="" src="" pkg="" disp="" drive=""
-    local full=0 resize="" out="" mode=file urls=() mark=0 trust; trust="$(capture_trust)"
+    # No size, scale, browser or device of its own here: what is not asked for
+    # is pagecap.mjs's to decide (1280x800 in the first browser installed),
+    # and a device brings its own size and density.
+    local auth="${BB_TOKEN:-${DASHBOARD_AUTH:-}}" width="" height="" scale="" wait=0 settle="" src="" pkg="" disp="" drive=""
+    local full=0 resize="" out="" mode=file urls=() mark=0 trust browser="" device="" scheme="" sets=(); trust="$(capture_trust)"
     # A shot nobody named goes to the project's dist/ whatever directory the
     # command is run in (B6), under emu/ or shot/ with a record beside it
     # (--mark): the Artifacts tab lists those as captures and the project's
@@ -5335,6 +5373,14 @@ capture_shot() {
             --wait)   wait="$2"; shift 2 ;;
             --resize) resize="${2%x}"; shift 2 ;;
             --full)   full=1; shift ;;
+            # Which browser (any installed: aerie capture browsers; all for
+            # one picture in each), which screen (any device Playwright
+            # knows: aerie capture devices), and anything else its context
+            # takes by name (--set locale=de-DE --set reducedMotion=reduce).
+            --browser) [ -n "${2:-}" ] || die "--browser needs a name after it: aerie capture browsers lists those here, all is every one"; browser="$2"; shift 2 ;;
+            --device)  [ -n "${2:-}" ] || die "--device needs a name after it: aerie capture devices lists them"; device="$2"; shift 2 ;;
+            --scheme)  [ -n "${2:-}" ] || die "--scheme needs dark or light after it"; scheme="$2"; shift 2 ;;
+            --set)     [ -n "${2:-}" ] || die "--set needs NAME=VALUE after it"; sets+=("$2"); shift 2 ;;
             # Shot at rest: screenshots a quarter second apart until two
             # match, so a modal still arriving or a list still loading is
             # not what the picture shows. The dashboard's own pages settle
@@ -5403,174 +5449,13 @@ capture_shot() {
         mode=dir; mkdir -p "$out"
     fi
 
-    local chrome; chrome="$(find_chromium)"
-    local files st=0
-    files="$(NODE_PATH="$(pw_node_path)" node - \
-        "$chrome" "$auth" "$width" "$height" "$scale" "$wait" "$full" \
-        "$mode" "$out" "$trust" "$resize" "$settle" "${drive:+$(readlink -f "$drive")}" "${urls[@]}" <<'EOF'
-const { chromium } = require("playwright");
-const fs = require("fs");
-const path = require("path");
-const [exe, auth, w, h, scale, wait, full, mode, dest, trust, resize, settle, drive, ...urls]
-  = process.argv.slice(2);
-(async () => {
-  const b = await chromium.launch({ executablePath: exe });
-  // Either shape of credential. A session holds a bearer token rather than a
-  // password now (bug #16), and splitting on ":" produced no credential at
-  // all for one, so a session photographing a dashboard page would have got
-  // the LOGIN page and no error, which is the worst way for this to fail.
-  const bearer = /^bbs_/.test(auth);
-  const [username, password] = !bearer && auth.includes(":")
-    ? auth.split(/:(.*)/) : [null, null];
-  const header = bearer ? "Bearer " + auth
-    : username ? "Basic " + Buffer.from(auth).toString("base64") : "";
-  // Matched on the whole origin, the controller's own (B143): a port alone
-  // let a dev instance, or anybody's page, on :7680 have this session's
-  // token. A credential named with --auth goes to the URLs named with it.
-  const trusted = new Set(trust === "named" ? [] : trust.split(",").filter(Boolean));
-  const mine = new Set(urls.filter(u => {
-    try { return trust === "named" || trusted.has(new URL(u).origin); } catch { return false; }
-  }).map(u => new URL(u).origin));
-  // Credentials go both ways: httpCredentials answers a server that
-  // challenges, the preemptive Authorization header satisfies one that
-  // deliberately never does (the dashboard, whose challenge-free 401s are
-  // what keep browsers from popping their own dialog). The challenge is
-  // answered for one trusted origin alone, Playwright's limit.
-  const ctx = await b.newContext({
-    viewport: { width: +w, height: +h },
-    deviceScaleFactor: +scale,
-    ...(username && mine.size === 1 ? { httpCredentials: { username, password, origin: [...mine][0] } } : {}) });
-  // The header goes to the DASHBOARD and nowhere else. On the context it went
-  // to every URL in the run, so `aerie capture shot <dashboard> https://example.com`
-  // handed the credential to example.com as well (bug #49). Per-route, matched
-  // on origin, so shooting somebody else's page cannot carry it there.
-  if (header && mine.size) {
-    await ctx.route("**/*", async (route) => {
-      let same = false;
-      try { same = mine.has(new URL(route.request().url()).origin); } catch {}
-      await route.continue(same
-        ? { headers: { ...route.request().headers(), authorization: header } }
-        : {});
-    });
-  }
-  // ...and a real sign-in, for the cookie. A header added by routing does not
-  // reach a WEBSOCKET handshake (Playwright does not intercept those) and
-  // the terminal is a websocket on the dashboard's own origin now, so a
-  // shot of a page with a terminal in it came out with the terminal
-  // refused. A cookie goes on the handshake like any other request.
-  // Best-effort: a page that is not an AerieOS dashboard has no /login,
-  // and the header above is still what answers for it.
-  if (username) {
-    for (const origin of mine) {
-      try {
-        await ctx.request.post(origin + "/login", {
-          form: { username, password }, maxRedirects: 0, timeout: 10000 });
-      } catch {}
-    }
-  }
-  // The downscale, in the browser that took the shot. It used to be
-  // imagemagick's `convert`, which is in the controller's image and on no
-  // node (B103), so the one flag a README script needs died on the machine
-  // sessions actually run on. Chromium resamples as well as convert does and
-  // is already here, by definition: nothing that can take a screenshot lacks
-  // it. On a blank page of its own, because a data: image is exactly what a
-  // photographed page's own CSP may refuse.
-  let scaler = null;
-  const shrink = async (file, width) => {
-    scaler = scaler || await b.newPage();
-    const b64 = fs.readFileSync(file).toString("base64");
-    const done = await scaler.evaluate(async ([data, wide]) => {
-      const img = new Image();
-      img.src = "data:image/png;base64," + data;
-      await img.decode();
-      if (img.width <= wide) return null;      // never upscale: that adds nothing
-      const c = document.createElement("canvas");
-      c.width = wide;
-      c.height = Math.max(1, Math.round(img.height * wide / img.width));
-      const g = c.getContext("2d");
-      g.imageSmoothingEnabled = true;
-      g.imageSmoothingQuality = "high";
-      g.drawImage(img, 0, 0, c.width, c.height);
-      return c.toDataURL("image/png").split(",")[1];
-    }, [b64, width]);
-    // In place, and metadata-free by construction: a fresh encode carries
-    // none. The full-size original is scaffolding, the downscale is the
-    // deliverable, and keeping both would double the repo cost the flag
-    // exists to avoid.
-    if (done) fs.writeFileSync(file, Buffer.from(done, "base64"));
-  };
-  const p = await ctx.newPage();
-  const taken = new Set();
-  let unanswered = 0;
-  for (const url of urls) {
-    // A page that never goes quiet is still a page, and is shot as it is;
-    // one that never answered is not (B535): Chromium draws its own error
-    // page, and a picture of that with exit 0 read as the site being up.
-    let failed = "";
-    const res = await p.goto(url, { waitUntil: "networkidle" }).catch(e => {
-      if (!/timeout/i.test(`${e.name} ${e.message}`)) failed = String(e.message).split("\n")[0];
-      return null;
-    });
-    if (failed) {
-      console.error(`${url}: did not answer (${failed}); no picture taken`);
-      unanswered++;
-      continue;
-    }
-    if (res && res.status() >= 400) console.error(`${url}: answered ${res.status()}; shot as it is`);
-    if (+wait) await p.waitForTimeout(+wait);
-    // --drive works the page first, as it does the emulator and a display
-    // (B847: it was taken and never run for a URL, so the shot was of the
-    // page as it loaded): its default export gets the page and the context.
-    if (drive) {
-      const mod = await import(drive);
-      await (mod.default || mod.drive)(p, { ctx, browser: b, url });
-    }
-    let out = dest;
-    if (mode === "dir") {
-      // Named from the path so reruns overwrite their own shots, with a
-      // counter only for two URLs that share a path (e.g. differing query).
-      const u = new URL(url);
-      // No leading dash or dot: "/?view=x" would otherwise slug to
-      // "-view-x.png", which convert then parses as an option. Capped at 80
-      // because a long query string made a filename longer than the 255 a
-      // filesystem takes, and the whole run died on ENAMETOOLONG.
-      const s = ((u.pathname + u.search).replace(/^\/+|\/+$/g, "")
-        .replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^[-.]+/, "") || "index")
-        .slice(0, 80);
-      let name = s, n = 2;
-      while (taken.has(name)) name = `${s}-${n++}`;
-      taken.add(name);
-      out = path.join(dest, name + ".png");
-    }
-    // At rest, when asked or when it is the dashboard's own page: a shot
-    // every quarter second until a whole second of them are the same
-    // bytes, and that one is the picture. Two matching frames were not
-    // enough: they came in the first half second, before a list that
-    // lands a second later. A page that never stops moving (a spinner) is
-    // taken as it is after six seconds, and said.
-    let atRest = settle === "1" || (settle === "" && (() => {
-      try { return mine.has(new URL(url).origin); } catch { return false; } })());
-    if (atRest) {
-      let last = await p.screenshot({ fullPage: full === "1" }), still = 0;
-      const until = Date.now() + 6000;
-      while (Date.now() < until && still < 4) {
-        await p.waitForTimeout(250);
-        const next = await p.screenshot({ fullPage: full === "1" });
-        still = next.equals(last) ? still + 1 : 0;
-        last = next;
-      }
-      if (still < 4) console.error(`${url}: still moving after six seconds; shot as it is`);
-      fs.writeFileSync(out, last);
-    } else {
-      await p.screenshot({ path: out, fullPage: full === "1" });
-    }
-    if (+resize) await shrink(out, +resize);
-    console.log(out);
-  }
-  await b.close();
-  if (unanswered) process.exitCode = 3;
-})().catch(e => { console.error(String(e)); process.exit(1); });
-EOF
+    # The page is opened by pagecap.mjs, which reel shares: the browsers
+    # installed here, a device's screen or a size, and the credential to the
+    # trusted origins alone, all there. Its arguments as one JSON object.
+    local files st=0 spec
+    spec="$(python3 "$BB_LIB/capture.py" spec "$auth" "$width" "$height" "$scale" "$wait" "$full" "$mode" "$out" "$trust" "$resize" "$settle" \
+                    "${drive:+$(readlink -f "$drive")}" "$browser" "$device" "$scheme" "${#sets[@]}" "${sets[@]}" "${urls[@]}")"
+    files="$(capture_env node "$BB_LIB/pagecap.mjs" shot "$spec"
 )" || st=$?
     if [ "$mark" = 1 ] && [ -n "$files" ]; then
         local f

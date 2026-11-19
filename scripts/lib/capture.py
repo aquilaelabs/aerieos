@@ -332,48 +332,28 @@ def mark(path, source):
 
 # ---- the sources: each ends with a video file ---------------------------------------
 
-def from_url(url, seconds, drive, work):
-    """A page recorded by Playwright while a script drives it, the way aerie
-    capture shot opens one. The driver gets the page and the seconds it has.
-    The recording lands under `work`, the capture's scratch directory."""
-    node_path, chrome = os.environ.get("BB_CAPTURE_NODE_PATH", ""), os.environ.get("BB_CAPTURE_CHROME", "")
-    if not chrome:
-        die("no browser here: Playwright's Chromium is a toolchain the Library installs")
+def page_spec(argv):
+    """aerie capture shot's arguments as the one JSON object pagecap.mjs takes:
+    fifteen named values, how many --set there were, those, then the URLs."""
+    keys = ("auth", "width", "height", "scale", "wait", "full", "mode", "dest", "trust", "resize", "settle",
+            "drive", "browser", "device", "scheme")
+    o = {k: argv[i] for i, k in enumerate(keys)}
+    n = int(argv[15] or 0)
+    o["full"] = o["full"] == "1"
+    o["set"], o["urls"] = argv[16:16 + n], argv[16 + n:]
+    return json.dumps(o)
+
+
+def from_url(url, seconds, drive, work, page=None):
+    """A page recorded by Playwright while a script drives it, opened as aerie
+    capture shot opens one (pagecap.mjs, which both share): the browser, the
+    screen and what else the page is told are `page`'s, as asked on the
+    command line. The driver gets the page and the seconds it has. The
+    recording lands under `work`, the capture's scratch directory."""
+    node_path = os.environ.get("BB_CAPTURE_NODE_PATH", "")
     vdir = os.path.join(work, "video")
     shutil.rmtree(vdir, ignore_errors=True)
     os.makedirs(vdir)
-    script = r"""
-const { chromium } = require("playwright");
-const [exe, url, seconds, drive, vdir, auth, trust] = process.argv.slice(2);
-(async () => {
-  const b = await chromium.launch({ executablePath: exe });
-  const bearer = /^bbs_/.test(auth || "");
-  const [username, password] = !bearer && (auth || "").includes(":") ? auth.split(/:(.*)/) : [null, null];
-  // The credential goes to the controller's own origin and nowhere else
-  // (B143): on the context it rode every request of the recording.
-  const mine = new Set((trust || "").split(",").filter(Boolean));
-  const ctx = await b.newContext({ viewport: { width: 1280, height: 800 },
-    recordVideo: { dir: vdir, size: { width: 1280, height: 800 } },
-    ...(username && mine.size ? { httpCredentials: { username, password, origin: [...mine][0] } } : {}) });
-  if (bearer && mine.size)
-    await ctx.route("**/*", async (route) => {
-      let same = false;
-      try { same = mine.has(new URL(route.request().url()).origin); } catch {}
-      await route.continue(same ? { headers: { ...route.request().headers(), authorization: "Bearer " + auth } } : {});
-    });
-  const page = await ctx.newPage();
-  const started = Date.now();
-  await page.goto(url, { waitUntil: "domcontentloaded" }).catch(e => console.error("goto: " + e.message));
-  if (drive) {
-    const mod = await import(drive);
-    await (mod.default || mod.drive)(page, { seconds: +seconds, ctx, browser: b });
-  }
-  const left = +seconds * 1000 - (Date.now() - started);
-  if (left > 0) await page.waitForTimeout(left);
-  await ctx.close();
-  await b.close();
-})();
-"""
     env = dict(os.environ, NODE_PATH=node_path)
     # A session's token opens none of the controller's page (R227 step 4):
     # a reel of the controller's own address with nothing else to sign in
@@ -385,9 +365,9 @@ const [exe, url, seconds, drive, vdir, auth, trust] = process.argv.slice(2);
             die(os.environ.get("BB_CAPTURE_PERSON_ONLY", "").replace("the page", url, 1)
                 or f"{url} is the controller's own dashboard, which is a person's page: a session's token opens none of it")
         auth = ""
-    r = subprocess.run(["node", "-", chrome, url, str(seconds), drive or "", vdir,
-                        auth, trust], input=script, capture_output=True,
-                       text=True, timeout=seconds + 120, check=False, env=env)
+    spec = dict(page or {}, url=url, seconds=seconds, drive=drive or "", vdir=vdir, auth=auth, trust=trust)
+    r = subprocess.run(["node", os.path.join(os.path.dirname(os.path.abspath(__file__)), "pagecap.mjs"), "reel", json.dumps(spec)],
+                       capture_output=True, text=True, timeout=seconds + 120, check=False, env=env)
     if r.returncode:
         die(f"the recording did not finish: {(r.stderr or '').strip()[-400:]}")
     vids = [os.path.join(vdir, x) for x in os.listdir(vdir) if x.endswith(".webm")]
@@ -458,6 +438,9 @@ def ago(t):
 
 
 def main():
+    if sys.argv[1:2] == ["spec"]:
+        print(page_spec(sys.argv[2:]))
+        return
     ap = argparse.ArgumentParser(add_help=False)
     ap.add_argument("what", choices=["shot", "ls", "prune", "mark"])
     ap.add_argument("--emu", nargs="?", const="")
