@@ -531,8 +531,14 @@ await section("a service's card", async () => {
 });
 
 // ---- no node ---------------------------------------------------------------
-await page.evaluate(() => { nodesList = []; libNode = ''; lib = null; loadLibrary(); });
-await page.waitForSelector('.doc .librarytab .libnone', { timeout: 20000 });
+// A read of the nodes in flight (the poll's) lands after the list is
+// emptied and fills it again, so it is emptied again until the page says
+// there is none (B978).
+await page.waitForFunction(() => {
+  if (document.querySelector('.doc .librarytab .libnone')) return true;
+  if (!readBusy('nodes') && !readBusy('library') && (nodesList?.length || libNode || lib)){ nodesList = []; nodesStale = false; libNode = ''; lib = null; loadLibrary(); }
+  return false;
+}, null, { timeout: 20000, polling: 300 });
 ok(await page.evaluate(() => !document.querySelector('.doc .librarytab .lcard') && !document.querySelector('.pane .bar #ndPick')),
    'with no node enrolled it says to enroll one, and offers nothing');
 await page.evaluate(() => { nodesList = null; nodesStale = true; libNode = ''; lib = null; loadLibrary(); });
