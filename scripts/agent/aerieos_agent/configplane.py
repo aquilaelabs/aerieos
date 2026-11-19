@@ -45,7 +45,7 @@ from .sessnet import session_conf, session_sudoers
 from .runners import runner_dirs, runner_slot
 from .census import FEATURES, _os_release, boot_id, export_gaps, mounts_now, network_now, services_now
 from .disks import disks_now
-from .jobs import Job, left_holding, pump
+from .jobs import watched
 
 
 # The journal kept across boots (R185) and kept to a gigabyte: journald's own
@@ -759,18 +759,15 @@ class ConfigPlaneMixin:
         from runner root or install is corrupt" anywhere else, which is
         exactly what a registered-but-serviceless runner came from.
 
-        Streamed, the way Job.exec and _apply_root are: its output pumped
-        as it comes and the log posted on a clock. It used to run the command
-        to the end and post nothing meanwhile, so the NVIDIA rows on the
-        Toolchains page (the Installed page's since R172) never said installing (the step rides a log post) and
-        the job sat at assigned for as long as apt took (30 Sep).
+        Streamed, the way Job.exec and _apply_root are (jobs.watched): its
+        output pumped as it comes and the log posted on a clock, so the
+        NVIDIA rows on the Installed page say installing while apt runs (the
+        step rides a log post). A job that cannot post or be canceled (a
+        check's own stand-in, a test's) still runs the command and hears its
+        output.
         """
-        # A job that cannot post or be canceled (a check's own stand-in, a
-        # test's) still runs the command and hears its output.
-        flush = getattr(job, "flush", None) or (lambda: True)
-        stopped = lambda: bool(getattr(job, "canceled", False))  # noqa: E731
         job.say("$ " + " ".join(argv) + "\n")
-        flush()                          # the step and the command, now
+        (getattr(job, "flush", None) or (lambda: True))()   # the step and the command, now
         began = time.monotonic()
         try:
             p = subprocess.Popen(argv, cwd=cwd, stdout=subprocess.PIPE,
@@ -778,29 +775,8 @@ class ConfigPlaneMixin:
         except OSError as e:
             job.say(f"{argv[0]}: {e}\n")
             return 1
-        with contextlib.suppress(AttributeError):
-            job.proc = p
-        if stopped():
-            Job._kill(p)
-
-        reader = pump(job, p.stdout, keep_blank=False)
-        deadline, killed, emptied = time.monotonic() + timeout, False, [None]
-        while reader.is_alive():
-            reader.join(0.5)
-            if getattr(job, "pending", None):
-                flush()
-            if time.monotonic() > deadline and not killed:
-                job.say(f"timed out after {int(timeout)}s, killing it\n")
-                Job._kill(p)
-                killed = True
-            if left_holding(job, p, emptied):
-                break
-        p.wait()
-        with contextlib.suppress(OSError):
-            p.stdout.close()
-        with contextlib.suppress(AttributeError):
-            job.proc = None
-        if stopped():
+        rc, killed, stopped = watched(job, p, timeout, keep_blank=False)
+        if stopped:
             job.say("stopped\n")
             return 130
         # A slow step says how slow (B243): an apply that took a minute to
@@ -808,7 +784,7 @@ class ConfigPlaneMixin:
         took = time.monotonic() - began
         if took >= 3:
             job.say(f"   (took {took:.0f}s)\n")
-        return 124 if killed else p.returncode
+        return 124 if killed else rc
 
     def _apply_root(self, job, cfg):
         """One command as root, that a person allowed (roadmap R38). The
@@ -835,12 +811,10 @@ class ConfigPlaneMixin:
             timeout = max(1, min(int(cfg.get("timeout") or 600), 3600))
         except (TypeError, ValueError):
             timeout = 600
-        # The same shape as Job.exec (its own process group, output pumped
-        # as it comes, the log posted on a clock so a cancel can arrive and
-        # land), minus the drop to the enrolled account, which is the point.
-        # Not _sh: that blocks until the command ends with nothing posted,
-        # so a cancel had nothing to reach and a timeout killed only the
-        # direct child.
+        # Seen to its end as Job.exec's is (jobs.watched: its own process
+        # group, output pumped as it comes, the log posted on a clock so a
+        # cancel can arrive and land), minus the drop to the enrolled
+        # account, which is the point.
         job.say("$ " + " ".join(argv) + "\n")
         job.flush()
         try:
@@ -849,30 +823,13 @@ class ConfigPlaneMixin:
         except OSError as e:
             job.say(f"could not start {argv[0]}: {e}\n")
             return "failed", 126
-        job.proc = p
-        if job.canceled:
-            job._kill(p)
-
-        reader = pump(job, p.stdout)
-        deadline, killed, emptied = time.monotonic() + timeout, False, [None]
-        while reader.is_alive():
-            reader.join(0.5)
-            if job.pending:
-                job.flush()
-            if time.monotonic() > deadline and not killed:
-                job.say(f"timed out after {timeout}s, killing it\n")
-                job._kill(p)
-                killed = True
-            if left_holding(job, p, emptied):
-                break
-        p.wait()
-        job.proc = None
-        if job.canceled:
+        rc, killed, stopped = watched(job, p, timeout)
+        if stopped:
             job.say("stopped\n")
             return "canceled", 130
         if killed:
             return "failed", 124
-        return ("succeeded" if p.returncode == 0 else "failed"), p.returncode
+        return ("succeeded" if rc == 0 else "failed"), rc
 
     SESSION_PROFILE = "/etc/profile.d/builderbot-session.sh"
 

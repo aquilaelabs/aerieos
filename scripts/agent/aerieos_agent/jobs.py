@@ -74,6 +74,46 @@ def _group_alive(pgid):
         return True                   # there, and not ours to signal
 
 
+def watched(job, p, timeout, keep_blank=True, late="timed out after {n}s, killing it"):
+    """A job's child, started, seen to its end; answers (its exit code,
+    whether it was killed at its deadline, whether the job was stopped).
+
+    The one loop every runner of a child uses (the job's command, a system
+    step, a command as root, an agent's installer), which each wrote out and
+    which were mended four at a time: its output is read on a thread of its
+    own (pump) while this one posts the log on a clock, so a child that
+    prints a line and then works in silence has the line posted and a cancel
+    sent on the log's reply can arrive; at `timeout` seconds it says `late`
+    and its whole group is killed; and a child that has exited while
+    something it started still holds its output is not waited on for good
+    (left_holding). `job` may be a stand-in that cannot post, be canceled or
+    hold a process (a check's, a test's): what it lacks is skipped."""
+    flush = getattr(job, "flush", None) or (lambda: True)
+    stopped = lambda: bool(getattr(job, "canceled", False))  # noqa: E731
+    with contextlib.suppress(AttributeError):
+        job.proc = p
+    if stopped():                         # asked to stop while it was starting
+        Job._kill(p)
+    reader = pump(job, p.stdout, keep_blank=keep_blank)
+    deadline, killed, emptied = time.monotonic() + timeout, False, [None]
+    while reader.is_alive():
+        reader.join(0.5)
+        if getattr(job, "pending", None):
+            flush()
+        if time.monotonic() > deadline and not killed:
+            job.say(late.format(n=int(timeout)) + "\n")
+            Job._kill(p)
+            killed = True
+        if left_holding(job, p, emptied):
+            break
+    code = p.wait()
+    with contextlib.suppress(OSError):
+        p.stdout.close()
+    with contextlib.suppress(AttributeError):
+        job.proc = None
+    return code, killed, stopped()
+
+
 def left_holding(job, p, since):
     """Whether to stop waiting for a job's output (B983). The loops that run
     a job wait for its pipe to close, which a process that left the job's
@@ -771,36 +811,14 @@ class Job(threading.Thread):
         except OSError as e:
             self.say(f"could not start {argv[0]}: {e}\n")
             return "failed", 126
-        self.proc = p
-        if self.canceled:                 # asked to stop while it was starting
-            self._kill(p)
-        # The pipe is read on its own thread, and this one posts on a clock.
-        # Reading and posting on one thread meant a job that printed a line
-        # and then worked in silence never posted the line (readline blocked
-        # until the next one), so the row sat at "assigned" with nothing in
-        # its log, and a cancel sent on the log reply could not arrive.
-        reader = pump(self, p.stdout)
-        deadline = time.monotonic() + timeout
-        killed, emptied = False, [None]
-        while reader.is_alive():
-            reader.join(0.5)
-            if self.pending:
-                self.flush()
-            if time.monotonic() > deadline and not killed:
-                self.say(f"timed out after {int(timeout)}s, killing it\n")
-                self._kill(p)
-                killed = True
-            if left_holding(self, p, emptied):
-                break
-        p.wait()
-        self.proc = None
-        if self.canceled:
+        rc, killed, stopped = watched(self, p, timeout)
+        if stopped:
             self.say("stopped\n")
             state, code = "canceled", 130
         elif killed:
             state, code = "failed", 124
         else:
-            state, code = ("succeeded" if p.returncode == 0 else "failed"), p.returncode
+            state, code = ("succeeded" if rc == 0 else "failed"), rc
         if ws is not None:
             self.agent.finish_workspace(self, ws, spec, state)
         elif state == "succeeded" and spec.get("outputs"):

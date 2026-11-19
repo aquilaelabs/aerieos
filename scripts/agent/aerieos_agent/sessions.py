@@ -11,7 +11,7 @@ import subprocess
 import sys
 import threading
 import time
-from .jobs import left_holding, pump
+from .jobs import watched
 from .base import (
     AGENT_INSTALLS,
     agent_prefixes,
@@ -846,30 +846,22 @@ class SessionsMixin:
         job.say(f"installing {product} for {who_name}" + (f" ({want} is out)" if want else "")
                 + (f", by the catalog's recipe (rev {how.get('rev')})" if how.get("by") == "catalog" else "") + "\n")
         try:
-            job.proc = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                        cwd=home if os.path.isdir(home) else "/tmp", env=env,
-                                        start_new_session=True, close_fds=True, **who)
+            p = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                 cwd=home if os.path.isdir(home) else "/tmp", env=env,
+                                 start_new_session=True, close_fds=True, **who)
         except (OSError, ValueError) as e:
             job.say(f"could not start the installer: {e}\n")
             return "failed", 70
-        deadline = time.monotonic() + int(spec.get("timeout") or 900)
-        # Posted as it goes and timed by the clock, not by the next line: it
-        # read on this thread, so nothing was posted until the end and a
-        # silent hang never reached its deadline.
-        reader = pump(job, job.proc.stdout)
-        emptied = [None]
-        while reader.is_alive():
-            reader.join(0.5)
-            if job.pending:
-                job.flush()
-            if time.monotonic() > deadline:
-                job.say("the installer did not finish in time\n")
-                job.cancel()
-                return "failed", 75
-            if left_holding(job, job.proc, emptied):
-                break
-        code = job.proc.wait()
-        job.proc = None
+        # Seen to its end as every job's child is (jobs.watched): posted as
+        # it goes and timed by the clock. One that runs past its time is
+        # killed and has failed, in its own words: it was canceled instead,
+        # which read as a person having stopped it.
+        code, killed, stopped = watched(job, p, int(spec.get("timeout") or 900), late="the installer did not finish in time")
+        if stopped:
+            job.say("stopped\n")
+            return "canceled", 130
+        if killed:
+            return "failed", 75
         if code != 0:
             job.say(f"the installer exited {code}\n")
             return "failed", code
