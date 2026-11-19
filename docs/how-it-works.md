@@ -21,7 +21,7 @@ edge:
 | Build | Library, Emulator and Phone | [toolchains.md](toolchains.md) |
 | Build, Machines | The coding agents: installed from the Library, signed in to on the Installed page | [agents.md](agents.md) |
 | Build | CI runner, builds, tests, the scanner's findings, signing and releases | [building.md](building.md) |
-| Containers | The Docker manager, its System section with nginx and the scanners | [containers.md](containers.md) |
+| Containers, Machines | The Docker manager and its System section; nginx and the Scanners, services installed from the Library | [containers.md](containers.md) |
 | Containers | VMs | [vms.md](vms.md) |
 | Controller, Machines, Jobs | This controller, Controller settings, Network, Nodes, Storage, Installed, Files and the job queue | [machines.md](machines.md) |
 | Sessions | each agent's sessions: starting one, what it sees, what it is told | [sessions.md](sessions.md) |

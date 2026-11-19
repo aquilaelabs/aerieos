@@ -8,8 +8,11 @@ AerieOS deploys itself (each node's nginx, its scanners and its model
 router) are the **System** section at the top of the Containers page: rows
 like any other container's, with **Configure**, which opens that
 container's own settings page (the nginx page, the Scanners page, the
-router's row on Installed). Their env and compose file are that page's to
-write and never the row's; a container you want otherwise is one you deploy
+router's row on Installed). All three are services: each is installed on a
+node from its card under Services in the Library, and has a row under
+Services on that node's Installed page, where **Open** leads to the same
+page and **Remove** takes it off the node. Their env and compose file are
+that page's to write and never the row's; a container you want otherwise is one you deploy
 yourself. A page opened that way carries a small top header with **Back**,
 naming the page it was opened from and returning there. A space's own
 containers are also its page's Docker view. This doc covers the manager, a
@@ -113,8 +116,9 @@ be off is asked nothing, rather than waiting on a machine that is not there
 until a timeout.
 
 **With more than one docker host, the node is picked in the Containers
-group's header over the page** (the pick holds for nginx too, and the
-Containers sub-tab says *not here* on a node without Docker). Nodes
+group's header over the page** (the Containers sub-tab says *not here* on
+a node without Docker; the nginx page, beside Installed, has the Machines
+group's pick). Nodes
 with the `docker-host` capability are listed online or not; picking one
 switches the whole view to that node's daemon: one page, redrawn, never a
 page per node. Each node's last-known container list is kept, so switching to
@@ -415,6 +419,11 @@ what it is (docs/nodes.md §7).
 
 ## nginx
 
+nginx is a service: **Install** on its card under Services in the Library
+puts it on the node picked there, and its row on that node's Installed page
+opens the nginx page (at `#/machines/nginx`; Configure on its container's
+row opens it too).
+
 Each node's nginx is what stands in front of its containers, unless you
 choose to run your own proxy: a container, a site included, serves plain
 HTTP on a port of its own with the smallest server it needs, and its
@@ -461,7 +470,8 @@ it at another ACME directory (a staging one, or a private CA).
 
 ## Scanners
 
-The Scanners page, opened from the scanners' row in the System section,
+The Scanners page, opened from the Scanners' row on the Installed page or
+from the scanners' row in the System section,
 deploys AerieOS's own static analysis
 scanners (Semgrep, Trivy, mobsfscan) to each node that holds spaces as
 one compose space of one-shot services, their versions pinned at the

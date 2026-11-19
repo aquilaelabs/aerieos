@@ -36,16 +36,19 @@ const RAIL = [
   {key: "home", label: "Home", icon: "home", tools: [["home", "Home"]]},
   {key: "projects", label: "Spaces", icon: "projects", tools: [["projects", "Spaces"], ["findings", "Analysis"]]},
   {key: "build", label: "Build", icon: "toolchains", tools: [["library", "Library"], ["emulator", "Emulator"], ["phone", "Phone"], ["runner", "CI runner"], ["entry", "Library"]]},
-  // nginx and the scanners are reached from their containers' Configure on
-  // the Containers page (R181, the operator, 29 Oct): pages of the group, by
-  // address and grant as before, kept off its sub-nav (PRESSED).
-  {key: "containers", label: "Containers", icon: "docker", tools: [["docker", "Containers"], ["vms", "VMs"], ["nginx", "nginx"], ["scanners", "Scanners"]]},
+  {key: "containers", label: "Containers", icon: "docker", tools: [["docker", "Containers"], ["vms", "VMs"]]},
   // The controller, a group of its own (the operator, 22 Oct): how this
   // AerieOS behaves, with room for the pages a bare-metal install and
   // the USB edition add beside Settings (R90, R56). After Containers, so a
   // phone's bar keeps its four.
   {key: "controller", label: "Controller", icon: "controller", tools: [["machine", "This controller"], ["settings", "Settings"], ["network", "Network"], ["keys", "Keys"], ["audit", "Audit"], ["debug", "Debug"]]},
-  {key: "machines", label: "Machines", icon: "nodes", tools: [["nodes", "Nodes"], ["storage", "Storage"], ["installed", "Installed"], ["thing", "Installed"], ["files", "Files"]]},
+  // nginx and the Scanners are services a node has installed (R264, the
+  // operator, 19 Nov): their pages are opened from their rows on Installed,
+  // and from Configure on their containers, kept off the sub-nav (PRESSED).
+  // Their addresses from when they were the Containers group's still open
+  // (openRoute: a page that moved group keeps its old address).
+  {key: "machines", label: "Machines", icon: "nodes", tools: [["nodes", "Nodes"], ["storage", "Storage"], ["installed", "Installed"], ["thing", "Installed"],
+                                                               ["nginx", "nginx"], ["scanners", "Scanners"], ["files", "Files"]]},
   {key: "sessions", label: "Sessions", icon: "sessions", tools: [["sessions", "Sessions"]]},
   {key: "jobs", label: "Jobs", icon: "jobs", tools: [["jobs", "Jobs"], ["schedules", "Schedules"]]},
   {key: "people", label: "People", icon: "people", tools: [["users", "Users"], ["roles", "Roles"]]},
@@ -56,6 +59,9 @@ const RAIL = [
 // sub-nav, each wearing a small top header with Back to the page it was
 // opened from.
 const PRESSED = new Set(["nginx", "scanners", "thing", "entry"]);
+// Where Back on one goes when it was opened by its address alone: the page
+// its press is on, which need not be its group's first.
+const PRESSED_HOME = {nginx: "installed", scanners: "installed", thing: "installed", entry: "library"};
 
 // The five on a phone's bar: the rail's first four, so a phone and a desk
 // keep one order (the operator, 19 Oct), and More for the rest in it.
@@ -461,7 +467,8 @@ function kindOfRoute(hash){
   if (m[1] === "build" && m[2] === "library" && m[4]) return "entry";
   if (m[1] === "projects" && m[2] && !RAIL[1].tools.some(([k]) => k === m[2])) return "notebook";
   const g = RAIL.find(x => x.key === m[1]);
-  return g ? ((g.tools || []).some(([k]) => k === m[2]) ? m[2] : g.tools[0][0]) : m[1];
+  // A page that moved group is still named by its old address (openRoute).
+  return g ? ((g.tools || []).some(([k]) => k === m[2]) || (m[2] && groupOf(m[2])) ? m[2] : g.tools[0][0]) : m[1];
 }
 // What a person calls the page at an address: its tool's name, or the project's.
 function routeLabel(hash){
@@ -474,7 +481,8 @@ function routeLabel(hash){
 function backHead(t){
   const g = groupOf(t.kind);
   const from = shellFrom?.kind === t.kind ? shellFrom : null;
-  const to = from?.label || (g ? (g.tools.find(([k]) => !PRESSED.has(k)) || [])[1] : "") || "back";
+  const home = g ? g.tools.find(([k]) => k === PRESSED_HOME[t.kind]) || g.tools.find(([k]) => !PRESSED.has(k)) : null;
+  const to = from?.label || (home || [])[1] || "back";
   return `<span class="backhead"><button type="button" class="bare backbtn" data-shellback title="back to ${esc(to)}">${ICON_BACK}<span>${esc(to)}</span></button>`
     + `<span class="backof">${esc(tabLabel(t))}</span></span>`;
 }
@@ -490,7 +498,7 @@ function shellBack(t){
     return;
   }
   const g = groupOf(t?.kind);
-  if (g) railGo(g.key);
+  if (g) railGo(g.key, PRESSED_HOME[t?.kind]);
 }
 
 function wireShellBar(bar){
@@ -574,9 +582,9 @@ function groupPick(g, nid){
     if (GROUP_KEEP[k]){ try{ localStorage.setItem(GROUP_KEEP[k], nid); }catch(e){ /* private */ } }
     if (k === "docker") dockerNodeKeep();
   });
-  if (g.key === "machines"){ readMoved("nodes"); readMoved("storage"); readMoved("installed"); }
+  if (g.key === "machines"){ readMoved("nodes"); readMoved("storage"); readMoved("installed"); readMoved("nginx"); }
   if (g.key === "build"){ readMoved("library"); readMoved("emulator"); readMoved("nodes"); }
-  if (g.key === "containers"){ readMoved("docker"); readMoved("nginx"); }
+  if (g.key === "containers") readMoved("docker");
   drawPanes();
   const on = tabOf(panes[0])?.kind;
   if (on && GROUP_LOAD[on]) GROUP_LOAD[on]();

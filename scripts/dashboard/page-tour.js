@@ -85,8 +85,8 @@ const TOUR_STEPS = {
   ],
   docker: [
     {say: "Containers: every space's containers on a node, grouped by space, with Up, Down, Rebuild and a Shell in the dock."},
-    {at: TOUR_SUB, say: "Containers, VMs and nginx are the three tools of this group."},
-    {at: TOUR_MHEAD, say: "Pick the node here; it holds for nginx too, and a sub-tab says when the node lacks what it needs."},
+    {at: TOUR_SUB, say: "Containers and VMs are the two tools of this group."},
+    {at: TOUR_MHEAD, say: "Pick the node here; a sub-tab says when the node lacks what it needs."},
     {at: TOUR_BAR, say: "Search, and switch between cards and a list. New container and Check for updates sit at the right."},
     // Its rows by name: TOUR_FIRST matched an empty page's own notice, so
     // the example never came (the operator, 21 Oct, on a phone).
@@ -102,7 +102,7 @@ const TOUR_STEPS = {
   ],
   nginx: [
     {say: "nginx: AerieOS's own reverse proxy on a node, putting your containers behind hostnames and certificates."},
-    {at: TOUR_MHEAD, say: "The node picked above is the one nginx runs on. Deploy puts nginx on a node that has none yet."},
+    {at: TOUR_MHEAD, say: "The node picked above is the one nginx runs on. Deploy puts nginx on a node that has none yet, as Install on its card in the Library does."},
     {at: TOUR_FIRST, say: "The image comes first, with an update when one is out; then hostnames, routes and certificates, each a section. A route sends a hostname to a port a container publishes."},
   ],
   settings: [
@@ -146,7 +146,7 @@ const TOUR_STEPS = {
   ],
   schedules: [
     {say: "Schedules: commands run on a node at the times you set, as cron runs them. Each run is a job, with its log on the Jobs page."},
-    {at: `${TOUR_PANE} #bSchedNew`, say: "New schedule is here. The static analysis scan is the Scanners page's, under Containers."},
+    {at: `${TOUR_PANE} #bSchedNew`, say: "New schedule is here. The static analysis scan is the Scanners page's, opened from the Scanners' row on Installed."},
     {at: `${TOUR_PANE} .schedrow, ${TOUR_PANE} .empty`, say: "Each schedule says when it runs, where and as whom, and how its last run went. Run now runs it once."},
   ],
   users: [

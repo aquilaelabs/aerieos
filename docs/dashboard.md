@@ -54,7 +54,7 @@ an account that may read accounts, the Controller group only for one that
 may read the controller. Every page has an address (`#/containers`,
 `#/machines/nodes`, `#/spaces/NAME/roadmap`), so a reload, a shared link
 and the back button land on it. A page a press opens rather than the
-sub-nav (nginx and Scanners from their containers' Configure, a Library
+sub-nav (nginx and Scanners from their rows on Installed, a Library
 entry's page, an installed thing's page) wears a small top header whose
 Back returns to the page it came from. Terminals and the chat are the
 dock's, at the foot of every page. On a phone the rail is a bar of five

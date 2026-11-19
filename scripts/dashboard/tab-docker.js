@@ -2855,8 +2855,10 @@ function dmLanLine(name, on){
 // the scanners' schedule, the router's settings on the Installed page.
 // Its row is any container's row with this one press more.
 const DM_CONFIGURE = {
-  nginx: {page: "nginx", go: nid => { if (nid) NODE_SET.nginx(nid); railGo("containers", "nginx"); }},
-  scanners: {page: "scanners", go: () => railGo("containers", "scanners")},
+  // Each a service's own page, beside Installed (R264), in whichever group
+  // the rail lists it.
+  nginx: {page: "nginx", go: nid => { if (nid) NODE_SET.nginx(nid); railGo(groupOf("nginx").key, "nginx"); }},
+  scanners: {page: "scanners", go: () => railGo(groupOf("scanners").key, "scanners")},
   router: {page: "installed", go: nid => openInstalledOn(nid, "", "service:model-router")},
 };
 function dmConfigureBtn(r){

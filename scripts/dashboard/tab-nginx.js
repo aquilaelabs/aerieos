@@ -416,7 +416,7 @@ function nginxBody(n){
 // the node switcher, and Deploy, an undeployed node's one action, at its
 // right; waiting, which node and whether it is deployed are not known yet.
 function nginxBar(pnodes, n){
-  // The node is the Containers group's header's (R178), and Deploy sits in
+  // The node is its group's header's, the Machines group's (R178, R264), and Deploy sits in
   // an undeployed node's head, so the bar is the same on every node: none.
   return "";
 }

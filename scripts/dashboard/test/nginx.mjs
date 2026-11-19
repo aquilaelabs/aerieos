@@ -22,11 +22,12 @@ await ready(page);
 
 const base = URL.replace(/\/$/, '');
 
-// A tab of its own under Containers on the rail, beside the containers
-// (the operator, 18 Oct), for an account that reads the Nodes tab.
-ok(await page.evaluate(() => railGroups().some(g => g.key === 'containers' && g.tools.map(([k]) => k).join() === 'docker,vms,nginx,scanners')
-                              && !railGroups().some(g => g.key === 'machines' && g.tools.some(([k]) => k === 'nginx')) && railAllows('nginx')),
-   'the rail offers nginx under Containers, beside the containers, and not under Machines');
+// A service's page, beside Installed in the Machines group (R264, the
+// operator, 19 Nov; it was the Containers group's), for an account that
+// reads the Nodes tab.
+ok(await page.evaluate(() => railGroups().some(g => g.key === 'containers' && g.tools.map(([k]) => k).join() === 'docker,vms')
+                              && groupOf('nginx')?.key === 'machines' && groupOf('scanners')?.key === 'machines' && railAllows('nginx')),
+   'nginx and the Scanners are pages of the Machines group, beside Installed, and Containers holds Containers and VMs');
 await page.evaluate(() => openNginxTab());
 await page.waitForSelector('.nginxtab [data-ngnode]', { timeout: 15000 });
 const sandbox = await page.evaluate(() => (nginxList || []).find(n => n.name === 'sandbox'));
@@ -358,13 +359,13 @@ ok(await page.$eval('.dmtab', t => t.querySelector('.dmcard .dmgroup b')?.textCo
 // Configure opens the nginx page, off the group's sub-nav, with a small top
 // header whose Back names the page it came from and returns there.
 await page.click('.dmtab .row[data-inst="nginx-sandbox|main"] [data-dmconf="nginx"]');
-await page.waitForFunction(() => tabOf(panes[0])?.kind === 'nginx' && location.hash.startsWith('#/containers/nginx'), null, { timeout: 10000 });
+await page.waitForFunction(() => tabOf(panes[0])?.kind === 'nginx' && location.hash.startsWith('#/machines/nginx'), null, { timeout: 10000 });
 ok(await page.evaluate(() => {
   const bar = document.querySelector('.pane .bar.page');
   return /Containers/.test(bar.querySelector('.backhead [data-shellback]')?.textContent || '')
     && /nginx/.test(bar.querySelector('.backhead .backof')?.textContent || '')
     && ![...bar.querySelectorAll('[data-subnav]')].some(b => b.dataset.subnav === 'nginx' || b.dataset.subnav === 'scanners');
-}), 'the nginx page wears a top header with Back to Containers, and nginx and Scanners are off the sub-nav');
+}), 'the nginx page, at its address beside Installed, wears a top header with Back to Containers, and nginx and Scanners are off the sub-nav');
 await page.click('.pane .bar.page [data-shellback]');
 await page.waitForFunction(() => tabOf(panes[0])?.kind === 'docker', null, { timeout: 10000 });
 ok(await page.evaluate(() => /^#\/containers(\/|$)/.test(location.hash) && !location.hash.includes('nginx')), '...and Back returns to the Containers page');
@@ -374,6 +375,8 @@ await section("The nginx page opens from a space's page, and Back names the spac
   await page.evaluate(() => openNotebook('alpha'));
   await page.waitForFunction(() => tabOf(panes[0])?.kind === 'notebook' && /^#\/spaces\/alpha(\/|$)/.test(location.hash), null, { timeout: 10000 });
   const errs = page.errors.length;
+  // By its address from when it was the Containers group's page, which
+  // still opens it (R264).
   await page.evaluate(() => { location.hash = '#/containers/nginx'; });
   await page.waitForFunction(() => tabOf(panes[0])?.kind === 'nginx'
     && /alpha/.test(document.querySelector('.pane .bar.page .backhead [data-shellback]')?.textContent || ''), null, { timeout: 10000 });
