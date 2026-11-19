@@ -674,6 +674,13 @@ def may_see(u, name):
     return sees_all(u) or key_of(name) in _keys(u)
 
 
+def is_owner(u):
+    """Whether the account behind this caller is AerieOS's owner: for a
+    session, the account its token stands for (account_of), never what the
+    session's own record says of itself."""
+    return (account_of(u) or {}).get("role") == "owner"
+
+
 def is_admin(u):
     """Whether this account owns the machinery: nodes, toolchains, settings,
     other accounts. Everything that is not a project.

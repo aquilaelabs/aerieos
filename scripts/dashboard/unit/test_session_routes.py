@@ -96,6 +96,10 @@ class Gate(unittest.TestCase):
             @staticmethod
             def account_of(me):
                 return me
+
+            @staticmethod
+            def is_owner(me):
+                return (me or {}).get("role") == "owner"
         ns = {"users": _Users}
         exec(SERVER[a:c], ns)      # noqa: S102 (the repository's own source, read from beside this test)
         cls.ns = ns

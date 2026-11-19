@@ -3123,7 +3123,7 @@ def kept_out(u):
     token counts as the account it was minted for, so the owner's own
     sessions go on working."""
     return bool(u) and bool(settings.get("maintenance_mode")) \
-        and (users.account_of(u) or {}).get("role") != "owner"
+        and not users.is_owner(u)
 
 
 def owner_session_open(project):
@@ -6244,12 +6244,6 @@ def _findings_counts(who, ps):
     return {k: v for k, v in c.items() if k == mine} if mine else c
 
 
-def _timed(name, fn):
-    """One part of a read, timed by its name (timing.py)."""
-    with timing.timed(name):
-        return fn()
-
-
 def snapshot(who):
     """The status read: every node row it asks for read once (nodes.held)."""
     with nodes.held():
@@ -6293,7 +6287,7 @@ def _snapshot(who):
         p = by_name.get(top)
         s["git"] = bool(p and p["git_ok"])
         s["github"] = bool(p and p.get("github"))
-    attention, bell_hidden = _timed("status:attention", lambda: _attention(who))
+    attention, bell_hidden = _tpart("status:attention", lambda: _attention(who))
     return {
         "host": os.uname().nodename,
         "uptime": uptime(),
@@ -6301,17 +6295,17 @@ def _snapshot(who):
         # the requests themselves: this rides on every poll, and it exists so
         # the Phone tab knows when to go and fetch the real thing. Reading it
         # is a length() on a list in memory: no adb, nothing to pay for.
-        "phone_asks": _timed("status:phone_asks", lambda: len(phone.requests_open(users.uid_of(who), users.is_admin(who)))),
+        "phone_asks": _tpart("status:phone_asks", lambda: len(phone.requests_open(users.uid_of(who), users.is_admin(who)))),
         # The invitations to a project waiting on this account, for its bell
         # (membership.py): Accept and Decline are answered there.
-        "invites": _timed("status:invites", lambda: membership.mine(who)),
+        "invites": _tpart("status:invites", lambda: membership.mine(who)),
         # A project this account sees whose main branch's newest CI run
         # failed (ciwatch.red, R117): a bell row while it is true.
-        "ci_red": _timed("status:ci_red", lambda: bellseen.filter_rows(
+        "ci_red": _tpart("status:ci_red", lambda: bellseen.filter_rows(
             users.uid_of(who), ciwatch.red([p["name"] for p in ps]))[0]),
         # A file changed on two synced copies at once (R162, wssync.py): the
         # copy kept beside it, listed until it is deleted.
-        "sync_conflicts": _timed("status:sync_conflicts", lambda: wssync.conflicts(lambda p: users.may_see(who, p))),
+        "sync_conflicts": _tpart("status:sync_conflicts", lambda: wssync.conflicts(lambda p: users.may_see(who, p))),
         # What is pinned in the bell about nodes (an agent behind, or from
         # another window), computed here on every poll so an alert clears
         # the moment it stops being true; nothing is stored to dismiss.
@@ -6319,33 +6313,33 @@ def _snapshot(who):
         # ...and this account's own standing notice to add a second factor
         # (R127), kept out of `attention`, whose rows are the nodes' and
         # carry what the companion app reads off them.
-        "two_factor_due": _timed("status:two_factor", lambda: _two_factor_due(who)),
+        "two_factor_due": _tpart("status:two_factor", lambda: _two_factor_due(who)),
         # How many of them this account has put away, for the drawer's
         # "show them again".
         "bell_hidden": bell_hidden,
         # Claude Code per node against the latest known, for the Nodes
         # tab's section.
-        "claude_code": _timed("status:claude_code", lambda: {} if NODES_OK else _claude_code_for(who, ps)),
+        "claude_code": _tpart("status:claude_code", lambda: {} if NODES_OK else _claude_code_for(who, ps)),
 
         # Whether there is a daemon behind any of the Docker controls, and if
         # not, the sentence saying why. Memoised in devapp, because answering
         # it properly is a subprocess: this rides the poll, and the poll is the
         # page's heartbeat. Every Docker button on the page reads this one
         # answer rather than each finding out by failing.
-        "docker": _timed("status:docker", lambda: devapp.available_default()),
+        "docker": _tpart("status:docker", lambda: devapp.available_default()),
         # An administrator's, as the Logs section that reads it is: it
         # walks the log directory and the CI tree, which a session's poll
         # has no use for and every poll would pay.
-        "logs": _timed("status:logs", lambda: logs.payload() if users.is_admin(who) else None),
-        "idle": _timed("status:idle", lambda: idle.payload()),
+        "logs": _tpart("status:logs", lambda: logs.payload() if users.is_admin(who) else None),
+        "idle": _tpart("status:idle", lambda: idle.payload()),
         # Which run of the container this is. The page stamps it into the URL
         # of every Claude terminal it opens, so bb-tty can tell a request made
         # now from one a browser carried across a restart.
         "boot": layout.boot_id(),
-        "image": _timed("status:image", lambda: image_stamp()),
+        "image": _tpart("status:image", lambda: image_stamp()),
         # A bare-metal install's release against the newest (R90 step 5),
         # with its own node for the Update press; {} on a container install.
-        "release": _timed("status:release", lambda: (dict(releasecheck.status(), node=_own_node_id(), os=_own_os(), host=_own_host())
+        "release": _tpart("status:release", lambda: (dict(releasecheck.status(), node=_own_node_id(), os=_own_os(), host=_own_host())
                                                       if BARE_METAL else {})),
         # ...and whether its start is held (R56 step 9), with why.
         "held": held.status(),
@@ -6354,7 +6348,7 @@ def _snapshot(who):
         "firstboot": firstboot.view((nodes.node(_own_node_id() or "") or {}).get("reported")) if BARE_METAL and users.is_admin(who) else None,
         # ...and each update check's cadence and last run (R176), for
         # Controller settings' Update checks.
-        "checks": _timed("status:checks", checks.view) if users.is_admin(who) else None,
+        "checks": _tpart("status:checks", checks.view) if users.is_admin(who) else None,
         "catalog_mirror": catalogmirror.held() if users.is_admin(who) else None,
         # The coding agents installed packs bring (R169 step 9), which the
         # page adds to its own table of the shipped five.
@@ -6365,58 +6359,58 @@ def _snapshot(who):
         "projects": ps,
         # Every project this account sees (R138), one with no repository in
         # it too: the Projects page draws each as one card, from this.
-        "repos": _timed("status:repos", lambda: _project_cards(who, ps)),
+        "repos": _tpart("status:repos", lambda: _project_cards(who, ps)),
         "sessions": sessions,
         # Every node with a runner on it: the Runner card is a view of these
         # and nothing else, since CI left this container (phase 7). Read from
         # the census, which already carries it.
-        "node_runners": _timed("status:node_runners", lambda: _runners_for(who)),
-        "reports": _timed("status:reports", lambda: findings.mounted()),
-        "reports_mtime": _timed("status:reports_mtime", lambda: findings.reports_mtime()),
-        "findings_counts": _timed("status:findings_counts", lambda: _findings_counts(who, ps)),
+        "node_runners": _tpart("status:node_runners", lambda: _runners_for(who)),
+        "reports": _tpart("status:reports", lambda: findings.mounted()),
+        "reports_mtime": _tpart("status:reports_mtime", lambda: findings.reports_mtime()),
+        "findings_counts": _tpart("status:findings_counts", lambda: _findings_counts(who, ps)),
         # ...and, for the row they land on, what those paths actually look
         # like. Order matters: this reads what the call above computed. Empty
         # for a session: a head is a fragment of a path from outside its
         # project, which is the one thing it must not be shown.
-        "findings_heads": _timed("status:findings_heads", lambda: [] if (who or {}).get("session") else findings.heads()),
+        "findings_heads": _tpart("status:findings_heads", lambda: [] if (who or {}).get("session") else findings.heads()),
         # ...and whether there is a readable report at all, which is what the
         # Static analysis button and the Analysis tab ghost on.
-        "reports_ok": _timed("status:reports_ok", lambda: findings.reports_ok()),
+        "reports_ok": _tpart("status:reports_ok", lambda: findings.reports_ok()),
         # ...and when each report was written, so one left behind by a failed
         # scanner is visible rather than silently counted as current.
-        "reports_ages": _timed("status:reports_ages", lambda: findings.reports_ages()),
-        "doctor": _timed("status:doctor", lambda: doctor.payload()),
+        "reports_ages": _tpart("status:reports_ages", lambda: findings.reports_ages()),
+        "doctor": _tpart("status:doctor", lambda: doctor.payload()),
         # Which nodes report this account signed in to Claude, and the
         # sign-in of theirs that is running, if one is.
-        "claude_auth": _timed("status:claude_auth", lambda: claude_auth(home_for(users.uid_of(who)))),
+        "claude_auth": _tpart("status:claude_auth", lambda: claude_auth(home_for(users.uid_of(who)))),
         # The asker's key store (R158 step 5, R157): whether it is under a
         # key of their own and shut, so the page asks for it before a
         # terminal opens and the Git view says why a push would wait.
         "store": unlocks.status(users.uid_of(who)) if users.uid_of(who) else {},
         # ...and the other coding agents' the same way (R95 step 3).
-        "agent_auth": _timed("status:agent_auth", lambda: agent_auth(home_for(users.uid_of(who)))),
+        "agent_auth": _tpart("status:agent_auth", lambda: agent_auth(home_for(users.uid_of(who)))),
         "signin": login,
         # A clone or a first push runs in the background now, so the card can
         # say what it is doing without the dialog being open.
         # The clone or link in flight, for whoever may start one (B171): it
         # names a project the account may not have been given, and its
         # buttons are that account's.
-        "project_job": _timed("status:project_job", lambda: {} if users.may(who, "create") else projects.job()),
+        "project_job": _tpart("status:project_job", lambda: {} if users.may(who, "create") else projects.job()),
         # The code maps being built for new projects, and the ones that just
         # finished: the row says "mapping the code" and then how many files.
-        "mapping": _timed("status:mapping", lambda: mapping.payload()),
+        "mapping": _tpart("status:mapping", lambda: mapping.payload()),
         "max_tabs": layout.max_tabs(),
         # Everything the Settings tab edits, with where each value came from.
-        "settings": _timed("status:settings", lambda: settings.payload() | {"tunnel": tunnel.status(), "tls": tls.status(settings.get)}),
+        "settings": _tpart("status:settings", lambda: settings.payload() | {"tunnel": tunnel.status(), "tls": tls.status(settings.get)}),
         # The features this install switched off (R81), {feature: why}: each
         # draws its controls dead with the sentence under them.
         "off": featuresoff.sentences(),
         # ...and where the controller keeps what grows, an administrator's.
-        "paths": _timed("status:paths", lambda: {} if users.may(who, "admin") else paths.view()),
+        "paths": _tpart("status:paths", lambda: {} if users.may(who, "admin") else paths.view()),
         # ...and what would stop it if it ran out, for Controller settings'
         # card: the free space under /config and the spaces, the database's
         # size, and the nodes online of enrolled.
-        "controller": _timed("status:controller", lambda: {} if users.may(who, "controller-read")
+        "controller": _tpart("status:controller", lambda: {} if users.may(who, "controller-read")
                              else paths.room() | {"nodes": home.node_counts()}),
         # The command list is built from the table above rather than spelled out
         # again in the page, so a command added here appears as a button and one
@@ -6429,7 +6423,7 @@ def _snapshot(who):
         # and every client is already asking for that every 15s. THIS
         # account's: the strip follows the person to any browser they sign in
         # on, and stops following them to somebody else's (roadmap #25).
-        "layout": _timed("status:layout", lambda: layout.load_layout(users.uid_of(who))),
+        "layout": _tpart("status:layout", lambda: layout.load_layout(users.uid_of(who))),
         # Who this is, so the page can name a shell session the way bb-tty
         # will (index.html's myTmux). Not a secret: it is this account's own
         # id, and it is already the key to everything the page saves.
@@ -6468,7 +6462,7 @@ def _snapshot(who):
                | {"reads": (who or {}).get("role") == "owner",
                   # ...and maintenance mode, the owner's alone, a session of
                   # theirs counting as them.
-                  "maintenance": (users.account_of(who) or {}).get("role") == "owner"},
+                  "maintenance": users.is_owner(who)},
         # ...and, for the page-wide ones a bar offers, the server's own
         # refusal, which is said under the dead control (B87).
         "can_why": {name: users.may(who, name) for name in ("create", "trash")},
@@ -7043,7 +7037,7 @@ def route_gate(name, me, action=None):
     kind, words = g
     if me.get("session"):
         return words
-    if kind == "owner" and (users.account_of(me) or {}).get("role") != "owner":
+    if kind == "owner" and not users.is_owner(me):
         return words
     return ""
 
@@ -10309,7 +10303,7 @@ class Handler(BaseHTTPRequestHandler):
         # Maintenance mode is the owner's alone: an administrator who switched
         # it on would be kept out by it.
         if ("maintenance_mode" in want and want["maintenance_mode"] != settings.get("maintenance_mode")
-                and (users.account_of(self._who()) or {}).get("role") != "owner"):
+                and not users.is_owner(self._who())):
             return self._json({"error": "only the owner switches maintenance mode"}, 403)
         # Turning it on ends everybody else's sessions and terminals (the
         # operator, 27 Oct): asked first, with each listed and what it is
@@ -14201,7 +14195,7 @@ class Handler(BaseHTTPRequestHandler):
         fresh = cut or (users.accounts_in_use() <= 1 and nodes.only_this_machine() and not settings.get("setup_done") and not setup_finished())
         # ...and whether this account may land it (_move_land's own test):
         # the page's poll carries the name alone, never the role.
-        owner = (users.account_of(me) or {}).get("role") == "owner"
+        owner = users.is_owner(me)
         out["land"] = {"fresh": fresh, "cut": cut, "owner": owner, "stick": nodes.on_stick(), "held": nodes.workspace_held() if fresh else "",
                        # The token given on the first page: the landing asks for the bundle alone.
                        "token_kept": bool(fresh and owner and move.setup_token())}
@@ -14216,7 +14210,7 @@ class Handler(BaseHTTPRequestHandler):
         ask (the new address asked now whether the bundle landed, R175).
         The owner's."""
         me = self._who() or {}
-        if (users.account_of(me) or {}).get("role") != "owner":
+        if not users.is_owner(me):
             return self._json({"error": "moving the controller is its owner's"}, 403)
         act = field(req, "action")
         if act == "prepare":
@@ -14296,7 +14290,7 @@ class Handler(BaseHTTPRequestHandler):
         fresh under the armed move's key at this moment (R175 step 1), or the
         one just packed by name; the owner's."""
         me = self._who() or {}
-        if (users.account_of(me) or {}).get("role") != "owner":
+        if not users.is_owner(me):
             return self._json({"error": "the move bundle is its owner's"}, 403)
         # ?name= is the bundle the page just packed (action pack), served as
         # it is; with no name, packed fresh here as before.
@@ -14323,7 +14317,7 @@ class Handler(BaseHTTPRequestHandler):
         """GET /api/move-backup?name=: the controller's backup packed under a
         token of its own, as a download; the owner's."""
         me = self._who() or {}
-        if (users.account_of(me) or {}).get("role") != "owner":
+        if not users.is_owner(me):
             return self._json({"error": "the controller's backup is its owner's"}, 403)
         q = urllib.parse.parse_qs(self.path.partition("?")[2])
         p = move.backup_path(q.get("name", [""])[0])
@@ -14349,12 +14343,12 @@ class Handler(BaseHTTPRequestHandler):
         also = set(str(settings.get("backup_also") or "").split())
         other = [{"id": r.get("id"), "name": r.get("name"), "kind": r.get("kind"), "ro": bool(r.get("ro")), "on": r.get("id") in also}
                  for r in extmounts.rows() if r.get("id") and r.get("name")]
-        return self._json(backup.status() | {"owner": (users.account_of(me) or {}).get("role") == "owner", "other": other})
+        return self._json(backup.status() | {"owner": users.is_owner(me), "other": other})
 
     def _backup(self, req):
         """POST /api/backup {action: now}: a copy written now, the owner's."""
         me = self._who() or {}
-        if (users.account_of(me) or {}).get("role") != "owner":
+        if not users.is_owner(me):
             return self._json({"error": "a backup now is the owner's"}, 403)
         if field(req, "action") != "now":
             return self._json({"error": "action is now"}, 400)
@@ -14368,7 +14362,7 @@ class Handler(BaseHTTPRequestHandler):
         download, the owner's; sealed, so a download is only ever a sealed
         file."""
         me = self._who() or {}
-        if (users.account_of(me) or {}).get("role") != "owner":
+        if not users.is_owner(me):
             return self._json({"error": "a backup's download is the owner's"}, 403)
         name = (urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get("name") or [""])[0]
         if not re.fullmatch(r"builderbot-backup-[A-Za-z0-9.+-]+-\d{8}-\d{6}(-\d+)?\.bbbackup", name):
@@ -14604,7 +14598,7 @@ class Handler(BaseHTTPRequestHandler):
         projects have a place on the machine's disks, and spooled and
         unpacked there, never on the stick."""
         me = self._who() or {}
-        if (users.account_of(me) or {}).get("role") != "owner" or me.get("session"):
+        if not users.is_owner(me) or me.get("session"):
             return self._json({"error": "moving a controller here is its owner's"}, 403)
         cut = bool(move.cut_landing())
         if (settings.get("setup_done") or setup_finished()) and not cut:
