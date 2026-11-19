@@ -14,7 +14,7 @@ function nbAnalysisView({$, nb, project}){
       if (!findings || findings.error) await loadFindings(!!findings?.error);
       nb.anaStamp = state?.reports_mtime ?? null;
       if (!findings || findings.loading){ glanceWaiting(hint); drawHTML(list, skel("rows")); return; }
-      if (findings.error){ viewGlance(hint, [], esc("analysis: " + findings.error), "", "bad"); return; }
+      if (findings.error){ glanceBad(hint, "analysis", findings.error); return; }
       if (!findings.available){
         viewGlance(hint, [], "no scan results: the report folder is not mounted here", "", "warn");
         // What the view is for, and the way to it (docs/scanners.md).

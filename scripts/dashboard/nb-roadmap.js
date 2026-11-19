@@ -202,14 +202,13 @@ function nbRmCanSend(nb, r, idx, live){
 // when-sent. Drawn in the row's fold, with its details and its actions.
 function nbRmRowFacts(nb, r, idx){
   const st = idx < 0 ? r : (r.steps || [])[idx] || {};
-  const who = b => b === "claude" ? "Claude" : "you";
   // A step from another item says which, by the number it answers to
   // there (R168): the one a session knows it by.
   const from = idx >= 0 && Array.isArray(st.sid) && st.sid.length === 2 && String(st.sid[0]) !== String(r.id)
     ? (st.sid[1] ? `R${st.sid[0]} step ${st.sid[1]}` : `R${st.sid[0]}, folded in`) : "";
   if (idx >= 0) return factGrid([["Done", st.done ? rmDay(st.done) : ""], ["Sent", st.sent ? rmDay(st.sent) : ""], ["Was", from]]);
   const steps = r.steps || [];
-  return factGrid([["Added", r.added ? `${rmDay(r.added)}, by ${who(r.by)}` : ""],
+  return factGrid([["Added", r.added ? `${rmDay(r.added)}, by ${byWho(r.by || "you", r)}` : ""],
                    ["Target", r.target || ""],
                    ["Plan", steps.length ? `${steps.filter(x => x.done).length} of ${steps.length} steps done` : ""],
                    ["Sent", r.sent ? rmDay(r.sent) : ""],
@@ -1272,9 +1271,11 @@ function nbRmDrawFinished($, nb){
       <summary><div class="roadmap"><span class="n id">R${r.id}</span> <span class="body"><span class="txt">${esc(r.text || "")}</span>
         <span class="sub data dim">done ${r.done_at ? esc(when(r.done_at)) : ""}${(() => { const v = shippedIn(r.done_at, nb.roadmapReleases);
         return v ? ` · in ${esc(v)}` : ""; })()}</span></span></div></summary>
-      ${factGrid([["Added", r.added ? `${rmDay(r.added)}, by ${r.by === "claude" ? agentAsker(r) : "you"}` : ""],
+      ${factGrid([["Added", r.added ? `${rmDay(r.added)}, by ${byWho(r.by || "you", r)}` : ""],
                 ["Target", r.target || ""],
-                ["Finished", r.done_at ? `${rmDay(r.done_at)}${r.done_by ? `, by ${r.done_by === "claude" ? "Claude" : r.done_by === "you" ? "you" : r.done_by}` : ""}` : ""],
+                // The agent an item names is the one that added it; which agent's
+                // session finished it is not on the row, so that one reads as Claude.
+                ["Finished", r.done_at ? `${rmDay(r.done_at)}${r.done_by ? `, by ${byWho(r.done_by)}` : ""}` : ""],
                 ["Shipped in", (() => { const v = shippedIn(r.done_at, nb.roadmapReleases);
                   return v === null ? "not yet: planned for the next release" : v || ""; })()],
                 ["Changelog", clRefs((nb.roadmapChangelog || {})["R" + r.id]), {html: true}]], "dfacts")}

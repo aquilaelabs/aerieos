@@ -50,7 +50,7 @@ function nbSigningView({$, nb, project}){
       let j;
       try{
         j = await postJSON("/api/signing", {action: "list", project});
-      }catch(e){ viewGlance($("sgHint"), [], esc("signing: " + e), "", "bad"); return; }
+      }catch(e){ glanceBad($("sgHint"), "signing", e); return; }
       if (mine !== gen) return;
       if (j.error){
         // The server's own words, where the keys would be (R255 step 4).

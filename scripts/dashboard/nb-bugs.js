@@ -19,16 +19,17 @@ function bugMatch(b, q){
 // it was closed, the build that closed it and the release that shipped
 // the fix (shippedIn, from the CHANGELOG's dated headings).
 function bugFacts(b, rel, words, refs, untie = false){
-  const who = x => x === "claude" ? "Claude" : x === "you" ? "you" : x || "";
   const closed = b.status !== "open";
   const shipped = closed && b.status === "fixed" ? shippedIn(b.closed_at, rel) : "";
   return factGrid([
-    ["Reported", `${b.at ? rmDay(b.at) : ""}${b.by ? `, by ${who(b.by)}` : ""}`],
+    ["Reported", `${b.at ? rmDay(b.at) : ""}${b.by ? `, by ${byWho(b.by, b)}` : ""}`],
     ["Seen in", b.seen_in || ""], ["Seen on", b.seen_on || ""],
     // Whether its steps show it (R124), from "not tried" up.
     ["Happens", REPRO_WORDS[b.reproduces || "untried"] || ""],
+    // The agent a report names is the one that reported it; which agent's
+    // session closed it is not stored, so that one reads as Claude.
     ["Closed", closed ? `${words[b.status] || b.status}${b.closed_at ? ", " + rmDay(b.closed_at) : ""}${
-      b.status_by ? `, by ${who(b.status_by)}` : ""}${b.status_note ? `: ${b.status_note}` : ""}` : ""],
+      b.status_by ? `, by ${byWho(b.status_by)}` : ""}${b.status_note ? `: ${b.status_note}` : ""}` : ""],
     // The commits that fixed it (R255), or the build it was closed in
     // where none is named.
     ["Fixed in", closed ? (b.commits || []).join(", ") || b.fixed_in || "" : ""],
@@ -244,7 +245,7 @@ function nbBugsView({$, nb, project}){
       drawBugAdd();
       return;
     }
-    if (nb.bugs.error){ viewGlance(hint, [], esc("bugs: " + nb.bugs.error), "", "bad"); return; }
+    if (nb.bugs.error){ glanceBad(hint, "bugs", nb.bugs.error); return; }
     if (!force && list.querySelector(".dropbox, .bugform")) return;
     if (nb.bugs.releases !== undefined) nb.bugReleases = nb.bugs.releases;
     const rows = sortedBugs();

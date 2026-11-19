@@ -70,9 +70,9 @@ function nbArtLoad(av, kept){
     const hint = $("artHint"), list = $("artList");
     if (!(kept === true && av.art)) try{
       av.art = await getJSON("/api/artifacts?project=" + encodeURIComponent(project));
-    }catch(e){ viewGlance(hint, [], esc("artifacts: " + e), "", "bad"); return; }
+    }catch(e){ glanceBad(hint, "artifacts", e); return; }
     const art = av.art;
-    if (art.error){ viewGlance(hint, [], esc("artifacts: " + art.error), "", "bad"); return; }
+    if (art.error){ glanceBad(hint, "artifacts", art.error); return; }
     const rows = art.artifacts || [], job = art.push || {}, dev = art.phone;
     const groups = art.branches || [];
     // The code base itself, as a zip through the browser: a navigation, so

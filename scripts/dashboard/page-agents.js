@@ -108,6 +108,10 @@ function agentsWord(names){
 // for any session's): the agent it names (R95), or Claude, whose sessions
 // were the only ones before a record named its agent.
 function agentAsker(rec){ return agentById(rec?.agent)?.name || "Claude"; }
+// Who did it, from the word a record stores: a session by its agent's name
+// (agentAsker, with the record that names it), a person as "you", and
+// anything else as it is stored. Without a record a session reads Claude.
+function byWho(by, rec){ return by === "claude" ? agentAsker(rec) : by || ""; }
 // The argument that opens an agent's session on a project: `claude:alpha`.
 function agentArg(id, project){ return `${(agentById(id) || AGENTS[0]).id}:${project}`; }
 // ...and its slot's (R143), which bb-tty reads by suffix before the boot, so

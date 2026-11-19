@@ -68,9 +68,9 @@ function nbDsLoadDesign(ds){
   return reading(`${project}:design`, async () => {
     try{
       const j = await getJSON(`/api/design?project=${encodeURIComponent(project)}`);
-      if (j.error){ viewGlance($("dsHint"), [], esc("design: " + j.error), "", "bad"); return; }
+      if (j.error){ glanceBad($("dsHint"), "design", j.error); return; }
       nb.dsData = j;
-    }catch(e){ viewGlance($("dsHint"), [], esc("design: " + e), "", "bad"); return; }
+    }catch(e){ glanceBad($("dsHint"), "design", e); return; }
     // A re-read never takes what is being edited: the working copies stay
     // until Save or Revert, and only the file's state and the vocabulary
     // come in fresh.

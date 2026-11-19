@@ -10,7 +10,7 @@ function nbMemoryView({$, nb}){
     return reading(`${nb.memProj}:memory`, async () => {
       const j = await getJSON("/api/memory?project=" + encodeURIComponent(nb.memProj));
       if (gen !== nb.memGen) return;              // closed, or reopened elsewhere
-      if (j.error){ viewGlance($("memWhere"), [], esc("memory: " + j.error), "", "bad"); return; }
+      if (j.error){ glanceBad($("memWhere"), "memory", j.error); return; }
       drawMemory(j);
     });
   }

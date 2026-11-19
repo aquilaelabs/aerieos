@@ -1154,6 +1154,9 @@ function viewGlance(el, tiles = [], said = "", actions = "", tone = ""){
   glanceSeen[el.id] = {tiles: el.querySelectorAll(".tile").length, said: !!(said || actions)};
   return wrote;
 }
+// A view's glance when its read failed: no tiles, and what was being read
+// with the error's words, in red.
+function glanceBad(el, what, err){ return viewGlance(el, [], esc(what + ": " + err), "", "bad"); }
 
 // What a card's settings are, read (the operator's concept, 17 Oct): one
 // wrapping line of pills, each its label in the quiet voice and its value,

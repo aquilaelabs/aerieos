@@ -1222,7 +1222,7 @@ function nbCoreLoadVms(nb){
   return reading(`${project}:vms`, async () => {
     try{
       vmsData = await getJSON("/api/vms");
-    }catch(e){ viewGlance($("nvHint"), [], esc("VMs: " + e), "", "bad"); return; }
+    }catch(e){ glanceBad($("nvHint"), "VMs", e); return; }
     nbCoreDrawVms(nb);
   });
 }
@@ -1300,7 +1300,7 @@ function nbCoreLoadDocker(nb){
       : n ? "?node=" + encodeURIComponent(n) : "");
     try{
       nb.dkGot = await getJSON(url(node));
-    }catch(e){ viewGlance($("dkHint"), [], esc("docker: " + e), "", "bad"); return; }
+    }catch(e){ glanceBad($("dkHint"), "docker", e); return; }
     dockerSeen[nb.dkGot.node || node || ""] = nb.dkGot;
     const rest = (nb.dkGot.nodes || []).map(n => n.id).filter(id => id !== (nb.dkGot.node || node));
     // Its own node's rows are drawn as they land, the others' kept as last

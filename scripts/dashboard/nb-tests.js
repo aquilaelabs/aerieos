@@ -77,7 +77,7 @@ function nbTestsView({$, nb, project}){
     const ob = $("tstOut");
     if (ob){ ob.onclick = openRunOutput; ob.hidden = !mayShell(); }
     if (j.error){
-      viewGlance($("tstHint"), [], esc("tests: " + j.error), "", "bad");
+      glanceBad($("tstHint"), "tests", j.error);
       $("tstList").innerHTML = ""; $("tstStats").hidden = true;
       $("tstBar").hidden = true; $("tstFolds").innerHTML = "";
       return;

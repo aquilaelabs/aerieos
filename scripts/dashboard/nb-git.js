@@ -119,7 +119,7 @@ function nbGitView({$, nb, project}){
       const hint = $("gitHint"), body = $("gitBody");
       try{
         git = await getJSON("/api/git?project=" + encodeURIComponent(project) + "&what=all&n=" + gitWant());
-      }catch(e){ rowGone(); viewGlance(hint, [], esc("git: " + e), "", "bad"); return; }
+      }catch(e){ rowGone(); glanceBad(hint, "git", e); return; }
       if (git.error){
         rowGone();
         const none = git.error === "not a git repository";
