@@ -201,7 +201,8 @@ def set_aside(folder, name):
 # changes reaches another; what is saved is the trip to the disk. A request
 # (begin_request) looks at each file once: the first ask stats it, and the
 # same answer serves the rest of that request, as a request is one moment.
-# A write through write_json or write_text forgets the file at once.
+# A write through write_json, write_text or write_bytes forgets the file at
+# once.
 _texts = {}
 _texts_lock = threading.Lock()
 _here = threading.local()
@@ -372,6 +373,31 @@ def write_text(path, text, mode=0o644, encoding="utf-8"):
     try:
         with os.fdopen(fd, "w", encoding=encoding) as f:
             f.write(text)
+            _sync(f)
+        os.chmod(tmp, mode)
+        with _gate:
+            _not_landing(path)
+            os.replace(tmp, path)
+        _forget(path)
+        _sync_dir(path)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp)
+        raise
+
+
+def write_bytes(path, data, mode=0o644):
+    """Atomically replace `path` with `data`, as write_text does with text:
+    for a file that is not text (a sealed blob), whose writer would
+    otherwise carry a temporary and a rename of its own."""
+    path = _p(path)
+    _not_landing(path)
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path) or ".",
+                               prefix="." + os.path.basename(path) + ".", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
             _sync(f)
         os.chmod(tmp, mode)
         with _gate:

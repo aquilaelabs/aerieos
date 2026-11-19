@@ -55,6 +55,7 @@ import urllib.parse
 import urllib.request
 import zlib
 
+import statefile
 import stateversion
 from pathlib import Path
 
@@ -170,13 +171,7 @@ def keep_setup_token(token):
     if seal is None:
         return
     with contextlib.suppress(Exception):     # noqa: BLE001 (no install key yet: memory alone)
-        blob = seal(token.encode())
-        f = STATE / SETUP_TOKEN_FILE
-        tmp = f.with_name(f.name + ".new")
-        with open(tmp, "wb") as g:
-            g.write(blob)
-        os.chmod(tmp, 0o600)
-        os.replace(tmp, f)
+        statefile.write_bytes(STATE / SETUP_TOKEN_FILE, seal(token.encode()), mode=0o600)
 
 
 def setup_token():
@@ -798,7 +793,6 @@ def _pack_into(tar, repos=False, carry_key=False, stores=None):
     # while the database is copied and the state is walked (statefile.frozen),
     # so the bundle is not an account from before a change and its secrets
     # from after it.
-    import statefile                                        # noqa: PLC0415
     with statefile.frozen():
         snap = _db_snapshot()
         try:
@@ -1628,7 +1622,6 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
             # swap would be the old controller's record in the new one's
             # state. Refused, never held, until the process restarts on the
             # new state, or until the old one is back below.
-            import statefile                                # noqa: PLC0415
             statefile.landing_begins(state_dir)
             with contextlib.suppress(OSError):
                 marker.write_text(json.dumps({"at": int(time.time()), "stamp": stamp, "aside": str(aside),

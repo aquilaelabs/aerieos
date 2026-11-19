@@ -36,6 +36,7 @@ if _here not in sys.path:
     sys.path.insert(0, _here)
 import devapp  # noqa: E402
 import relocate  # noqa: E402
+import statefile  # noqa: E402
 
 
 def configure(*, runner=None):
@@ -182,10 +183,7 @@ def set_compose(project, instance, text):
         return {"ok": True, "unchanged": True}
 
     def put(body):
-        tmp = cf.with_name(f".{cf.name}.bbedit")
-        tmp.write_text(body, encoding="utf-8")
-        os.chmod(tmp, cf.stat().st_mode & 0o7777)
-        os.replace(tmp, cf)
+        statefile.write_text(cf, body, mode=cf.stat().st_mode & 0o7777)
     try:
         put(text)
     except OSError as e:

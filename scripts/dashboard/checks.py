@@ -20,6 +20,7 @@ import time
 from pathlib import Path
 
 import services
+import statefile
 
 CADENCE = {"daily": 86400, "weekly": 7 * 86400, "monthly": 30 * 86400, "off": None}
 # Every check, in the order Controller settings lists them: the services'
@@ -58,6 +59,20 @@ def _file():
     return STATE / "checks.json"
 
 
+def _own_mode():
+    """The mode a file this process makes is given, 0666 less its umask: 0644
+    in the container, and 0600 on a machine of its own, where what the
+    controller writes is its account's alone (host-boot.sh)."""
+    try:
+        with open("/proc/self/status") as f:
+            for line in f:
+                if line.startswith("Umask:"):
+                    return 0o666 & ~int(line.split()[1], 8)
+    except (OSError, ValueError, IndexError):
+        pass
+    return 0o644
+
+
 def stamped(kind):
     try:
         return int(json.loads(_file().read_text()).get(kind) or 0)
@@ -72,9 +87,7 @@ def stamp(kind, at=None):
         except (OSError, ValueError):
             d = {}
         d[kind] = int(at or time.time())
-        tmp = _file().with_suffix(".tmp")
-        tmp.write_text(json.dumps(d))
-        tmp.replace(_file())
+        statefile.write_text(_file(), json.dumps(d), mode=_own_mode())
 
 
 def view():
