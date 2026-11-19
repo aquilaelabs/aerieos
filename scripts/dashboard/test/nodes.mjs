@@ -3763,15 +3763,13 @@ await section("Uninstall from the row", async () => {
     // ...and in Rows the pick is a line under the card's own, the name
     // keeping its width beside the verbs, at a desk and on a phone (the
     // operator, 19 Nov: the pulldown took the name's column, a letter wide).
-    // Asked for until it is drawn: under a gate's load one draw was not
-    // enough once (19 Nov), and what the page held then is said if it
-    // happens again.
-    const inRows = await page.waitForFunction(() => {
-      if (document.querySelector('.doc .librarytab .lgrid.lrows > .lcard[data-lrow="toolchain:nvidia-driver"] #libDrvSel')) return true;
-      libView = 'list';
-      if (!readBusy('library')) drawPanes();
-      return false;
-    }, null, { timeout: 20000, polling: 300 }).then(() => true, () => false);
+    // As the Rows button does it: the view, then the read marked moved, or
+    // the draw is skipped as nothing new. Without the mark this waited on
+    // whatever read came next to repaint, which under a gate's load was not
+    // within its time (19 Nov). What the page held is said if it is not drawn.
+    await page.evaluate(() => { libView = 'list'; readMoved('library'); drawPanes(); });
+    const inRows = await page.waitForSelector('.doc .librarytab .lgrid.lrows > .lcard[data-lrow="toolchain:nvidia-driver"] #libDrvSel',
+                                              { timeout: 20000 }).then(() => true, () => false);
     let rowsDesk = [], rowsPhone = [];
     if (inRows){
       rowsDesk = await libraryRowsWrong(page);
@@ -3785,7 +3783,7 @@ await section("Uninstall from the row", async () => {
         cards: document.querySelectorAll('.doc .librarytab .lcard').length,
         driver: !!document.querySelector('.doc .librarytab [data-lrow="toolchain:nvidia-driver"]'), pick: !!document.querySelector('#libDrvSel') })))];
     }
-    await page.evaluate(() => { libView = ''; drawPanes(); });
+    await page.evaluate(() => { libView = ''; readMoved('library'); drawPanes(); });
     ok(!rowsDesk.length && !rowsPhone.length, `in Rows the driver's version is a line under its card's, the name beside the verbs (${[...rowsDesk, ...rowsPhone].slice(0, 3).join('; ') || 'all well'})`);
     await page.evaluate(id => openThing(id, 'toolchain:nvidia-driver'), shed.id);
     await page.waitForSelector(`${IDRV} .idetail`, { timeout: 20000 });
