@@ -9,6 +9,7 @@ import json
 import os
 import re
 import shlex
+import subprocess
 import shutil
 import tempfile
 import unittest
@@ -224,8 +225,29 @@ class OneList(unittest.TestCase):
             m = group.get("matcher")
             if m is not None and m != matcher and not (tool and re.fullmatch(m, tool)):
                 continue
-            out += [x["command"] for x in group["hooks"]]
+            # The gate's command carries what refuses when it cannot be run
+            # (closed); what it runs is the part before that.
+            out += [x["command"].split("; r=$?;")[0] for x in group["hooks"]]
         return out
+
+    def test_the_gate_refuses_when_it_cannot_be_run_and_is_itself_otherwise(self):
+        gate = self.settings["PreToolUse"][0]["hooks"][0]["command"]
+        self.assertIn("bb-gate alpha u_x; r=$?;", gate)
+
+        def run(command):
+            return subprocess.run(["sh", "-c", command], input="{}", capture_output=True, text=True)
+        gone = run(self.h.closed("/nonexistent/bb-gate alpha u_x"))
+        self.assertEqual(gone.returncode, 2, "a gate that is not there is a refusal, not a hook passed over")
+        self.assertIn("guard could not be run in this session", gone.stderr)
+        barred = os.path.join(tempfile.mkdtemp(), "bb-gate")
+        open(barred, "w").close()
+        self.assertEqual(run(self.h.closed(barred)).returncode, 2, "nor one that may not be run")
+        self.assertEqual(run(self.h.closed("true")).returncode, 0)
+        held = run(self.h.closed("sh -c 'echo the controller is away >&2; exit 2'"))
+        self.assertEqual((held.returncode, held.stderr.strip()), (2, "the controller is away"), "its own refusal goes through as it is")
+        self.assertEqual(run(self.h.closed("sh -c 'exit 1'")).returncode, 1)
+        others = [x["command"] for ev, groups in self.settings.items() for g in groups for x in g["hooks"] if "r=$?" not in x["command"]]
+        self.assertTrue(others and all("exit 2" not in c for c in others), "only the gate before a tool refuses this way")
 
     def test_claude_runs_what_the_other_agents_run_for_every_event_and_tool(self):
         tools = [None, "Bash", "Edit", "Write", "Grep", "Read"]

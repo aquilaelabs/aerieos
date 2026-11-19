@@ -453,6 +453,25 @@ def plan(event, call, proj, who):
     return steps
 
 
+# What a session is told when its gate cannot be run at all.
+GUARD_GONE = ("AerieOS's guard could not be run in this session, so nothing runs here: its tools are gone "
+              "from this node or damaged. Start the session again from its space; if that does not bring "
+              "it back, the node's row says what is wrong.")
+
+
+def closed(command):
+    """A gate's command that refuses when the gate itself cannot be run
+    (B1009). A shell answers 127 for a program that is not there and 126 for
+    one it may not run, which Claude Code reads as a hook that failed and
+    passes over: a session whose hooks' folder had gone ran on for hours
+    with no gate, no refused commands and no notices, saying only that a
+    hook failed. Either code becomes the refusal a gate gives, exit 2 with
+    the reason, so no tool runs and the session says why. Every other code
+    is the gate's own and goes through as it is."""
+    return (f"{command}; r=$?; if [ $r -eq 126 ] || [ $r -eq 127 ]; then "
+            f"echo {shlex.quote(GUARD_GONE)} >&2; exit 2; fi; exit $r")
+
+
 def claude_settings(proj, who, where):
     """Claude Code's `hooks` settings from the same list, each command under
     `where` (bb-tty's directory by the name that outlives a bundle): one
@@ -464,7 +483,10 @@ def claude_settings(proj, who, where):
         groups = out.setdefault(name, [])
         every = {"hooks": []} if matcher is None else {"matcher": matcher, "hooks": []}
         for script, args, timeout, tools, status in spec["steps"]:
-            hook = {"type": "command", "command": shlex.join(_argv(script, args, proj, who, where)), "timeout": timeout}
+            command = shlex.join(_argv(script, args, proj, who, where))
+            if script == "bb-gate" and args == [P, W]:
+                command = closed(command)
+            hook = {"type": "command", "command": command, "timeout": timeout}
             if status:
                 hook["statusMessage"] = status
             if tools:
