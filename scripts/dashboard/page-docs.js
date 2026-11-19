@@ -1231,8 +1231,10 @@ function fitHeadPickers(){
     if (s.dataset.fitFor === key) continue;
     pickInk.font = font;
     const px = v => parseFloat(v) || 0;
+    // ...and what its own negative margin takes back: its label is as wide
+    // as it is less that margin, and the header's max-width holds it to that.
     s.style.width = `${Math.ceil(pickInk.measureText(word).width + px(cs.paddingLeft) + Math.max(px(cs.paddingRight), HEAD_ARROW)
-      + px(cs.borderLeftWidth) + px(cs.borderRightWidth))}px`;
+      + px(cs.borderLeftWidth) + px(cs.borderRightWidth) + Math.max(0, -px(cs.marginLeft)))}px`;
     s.dataset.fitFor = key;
   }
 }
