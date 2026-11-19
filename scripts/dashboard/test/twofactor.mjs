@@ -4,11 +4,10 @@
 // its password alone opens nothing, Basic auth included; the bell asks an
 // account with none to add one; a role can require it, and an account in
 // that role meets the setup page before anything else; wrong codes are held.
-import { launch, ok, done, URL, DIR, OWNER as owner } from './lib.mjs';
+import { launch, ok, done, URL, DIR, OWNER as owner, REPO } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { createHmac } from 'node:crypto';
 
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const BASE = URL.replace(/\/$/, '');
 const bbUsers = (args, input) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', ...args],
   { input, encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });

@@ -3,11 +3,10 @@
 // detail and diff, and the branches with whose worktree sits on which.
 // Real git on the fixture repos, read by the checkout's server; nothing
 // here writes through the dashboard, because this step has no actions.
-import { launch, newPage, ok, done, ready, refreshUntil, until, quiet as quietFor, tmuxNew, tmuxKill, tmuxCapture, URL, DIR, openFold, member, OWNER, asUser, asSession, mint, section } from './lib.mjs';
+import { launch, newPage, ok, done, ready, refreshUntil, until, quiet as quietFor, tmuxNew, tmuxKill, tmuxCapture, URL, DIR, openFold, member, OWNER, asUser, asSession, mint, section, REPO } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync, mkdirSync, existsSync, rmSync, readFileSync } from 'node:fs';
 
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const B = `${DIR}/ws/beta`;
 const git = (...a) => execFileSync('git', ['-C', B, ...a], { encoding: 'utf8' }).trim();
 // A history worth a graph: two commits on the main line, a branch off the

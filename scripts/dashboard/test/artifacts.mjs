@@ -1,7 +1,7 @@
 // The notebook's Artifacts view: what a project has built, from its dist/.
 // The convention IS the feature: the tab lists dist/ and nothing else, so a
 // build worth keeping has to be copied there, and an empty tab says that.
-import { launch, newPage, ok, done, ready, URL, DIR, refreshUntil, openFold, nbGo, settled, OWNER, section } from './lib.mjs';
+import { launch, newPage, ok, done, ready, URL, DIR, refreshUntil, openFold, nbGo, settled, OWNER, section, REPO } from './lib.mjs';
 import { mkdirSync, writeFileSync, symlinkSync, rmSync, renameSync, existsSync, utimesSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
@@ -284,7 +284,6 @@ await section("the captures", async () => {
                              null, { timeout: 15000 });
   ok(true, '...and the fold says they are kept until removed');
   // A session lets a capture go from the tree (aerie capture prune), never here.
-  const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
   const tok = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', 'test'],
     { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
   const r = await fetch(URL.replace(/\/$/, '') + '/api/artifacts', { method: 'POST',

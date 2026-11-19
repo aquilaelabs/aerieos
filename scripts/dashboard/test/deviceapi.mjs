@@ -7,12 +7,11 @@
 // way to update, and the controller says the version it speaks for an app
 // newer than it to say so. The Android app's surface is
 // apps/android/api-surface.json, held by test/appapi.mjs. No browser.
-import { ok, done, DIR, URL, pinBreaks as breaks, OWNER as ADMIN, asSession, section } from './lib.mjs';
+import { ok, done, DIR, URL, pinBreaks as breaks, OWNER as ADMIN, asSession, section, REPO } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const require = createRequire(import.meta.url);
 const client = require(`${REPO}/apps/vscode/lib/client.js`);
 const base = URL.replace(/\/$/, '');

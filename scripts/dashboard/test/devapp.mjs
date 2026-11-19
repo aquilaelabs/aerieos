@@ -4,7 +4,7 @@
 // Everything here drives the stub docker the harness provides; the argv it
 // records IS the assertion, because the module's whole safety story is that
 // the buttons run table-lookup compose commands and nothing else.
-import { launch, newPage, ok, done, ready, sleep, patience, holdPoll, freePoll, refreshUntil, saveDialog, URL, DIR, nbShown, nbTab, openFold, nbGo, faded, projectKey, until, quiet, settled, OWNER, asSession, section } from './lib.mjs';
+import { launch, newPage, ok, done, ready, sleep, patience, holdPoll, freePoll, refreshUntil, saveDialog, URL, DIR, nbShown, nbTab, openFold, nbGo, faded, projectKey, until, quiet, settled, OWNER, asSession, section, REPO } from './lib.mjs';
 import { writeFileSync, readFileSync, rmSync, existsSync, mkdirSync, chmodSync, readdirSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -2365,8 +2365,6 @@ await section("a shell inside a container, in the dock", async () => {
   // for the container's project, and execs into what the answer names, not
   // what the URL says: the same questions, asked of the token's account.
   {
-    const { fileURLToPath } = await import('node:url');
-    const REPO = fileURLToPath(new globalThis.URL('../../../', import.meta.url));
     const tok = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'ep.silon', 'test'],
       { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
     const grant = async arg => {
@@ -4018,8 +4016,6 @@ await section("building an instance from another branch", async () => {
 // dial rather than a bare 403), ask (a person reads the reason and allows
 // one), auto.
 await section("who may rebuild it", async () => {
-  const { fileURLToPath } = await import('node:url');
-  const REPO = fileURLToPath(new globalThis.URL('../../../', import.meta.url));
   const tok = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'ep.silon', 'test'],
     { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`,
                                WORKSPACE: `${DIR}/ws` } }).trim();
@@ -4577,7 +4573,6 @@ await section("who may rebuild it", async () => {
 // Open to a session with the rebuild dial on deny: a test run is not a
 // rebuild. A container that is down is said so, never started.
 await section("the tests inside the dev instance", async () => {
-  const REPO = fileURLToPath(new globalThis.URL('../../../', import.meta.url));
   const tok = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'ep.silon', 'test'],
     { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`,
                                WORKSPACE: `${DIR}/ws` } }).trim();

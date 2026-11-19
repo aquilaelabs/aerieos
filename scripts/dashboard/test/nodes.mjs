@@ -4,7 +4,7 @@
 // the DOCKER_HOST mirror are seeded, work stamps the node it belongs to,
 // every mutation grows an audit row, and the page the operator sees is
 // exactly the page it was.
-import { URL, launch, newPage, ok, done, ready, sleep, DIR, tmuxNew, animatedDuring, openFold, openArchived, closeFold, patience, saveDialog, sectSave, openSection, splitPick, refreshUntil, prefsOf, until, OWNER, api, usersPy, section, libraryShow, libraryFront, libraryRowsWrong } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, sleep, DIR, tmuxNew, animatedDuring, openFold, openArchived, closeFold, patience, saveDialog, sectSave, openSection, splitPick, refreshUntil, prefsOf, until, OWNER, api, usersPy, section, libraryShow, libraryFront, libraryRowsWrong, REPO } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync, readFileSync } from 'node:fs';
 
@@ -16,8 +16,6 @@ writeFileSync(`${DIR}/ws/ep.silon/docker-compose.yml`,
 // leaves an .env.example wanting PORT, which would turn this file's `up` into
 // a refusal about somebody else's fixture.
 writeFileSync(`${DIR}/ws/ep.silon/.env.example`, '');
-
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 
 // The store the harness server booted with, read through the module itself,
 // the way aerie nodes reads it, so the test exercises the same path.

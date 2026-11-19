@@ -4,12 +4,11 @@
 // project on several nodes, and dialogs that scroll.
 import { launch, newPage, ok, done, ready, openArchived, doctorFixture, animatedDuring, refreshUntil,
          holdPoll, freePoll, tmuxNew, tmuxKill, tmuxFmt, nbShown, URL, DIR, unfold, registerProject,
-         saveDialog, sectSave, splitPick, until, quiet, settled, sleep, OWNER, section } from './lib.mjs';
+         saveDialog, sectSave, splitPick, until, quiet, settled, sleep, OWNER, section, REPO } from './lib.mjs';
 import { writeFileSync, readFileSync, existsSync, rmSync, utimesSync,
          mkdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 800 } });
 

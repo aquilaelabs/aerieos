@@ -7,13 +7,12 @@
 // own code, driven under a stand-in for VS Code's API against this server,
 // and its terminal, AerieOS's own on /termws.
 // No browser.
-import { ok, done, sleep, until, DIR, URL, OWNER, OWNER as ADMIN, asSession, section } from './lib.mjs';
+import { ok, done, sleep, until, DIR, URL, OWNER, OWNER as ADMIN, asSession, section, REPO } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, symlinkSync, existsSync, statSync, utimesSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import Module from 'node:module';
 
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const require = createRequire(import.meta.url);
 const { Client, Refused, signIn, API } = require(`${REPO}/apps/vscode/lib/client.js`);
 const { Term } = require(`${REPO}/apps/vscode/lib/term.js`);

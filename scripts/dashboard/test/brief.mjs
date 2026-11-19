@@ -9,11 +9,10 @@
 // Through startClaude, the entry the Claude button reaches once a node is
 // settled: a project made here has no node, and pressing Claude on one of
 // those says so before anything else, which is cards.mjs's to hold.
-import { launch, newPage, ok, done, ready, URL, DIR, refreshUntil } from './lib.mjs';
+import { launch, newPage, ok, done, ready, URL, DIR, refreshUntil, REPO } from './lib.mjs';
 import { existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const base = URL.replace(/\/$/, '');
 const BRIEF = 'Build a planner for armor stats.\n\n- one page\n- "quotes" and $HOME stay as typed';
 

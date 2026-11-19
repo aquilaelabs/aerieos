@@ -7,12 +7,11 @@
 // exists to prove.
 import { URL, launch, newPage, ok, done, ready, sleep, refreshUntil, DIR,
          tmuxNew, tmuxKill, tmuxFmt, tmuxCapture, openSection, quiet as quietFor,
-         api, OWNER, asSession, mint, section } from './lib.mjs';
+         api, OWNER, asSession, mint, section, REPO } from './lib.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { readFileSync, existsSync, statSync, lstatSync, readlinkSync, writeFileSync, mkdirSync, readdirSync, openSync, rmSync, appendFileSync, realpathSync, copyFileSync, cpSync, chmodSync, symlinkSync } from 'node:fs';
 
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const AGENT = `${REPO}/scripts/agent/builderbot-agent.py`;
 // The agent this world's controller ships (run.sh's BB_AGENT_DIR, a copy of
 // its own): the zip a node starts on is built from it, and the newer agent
@@ -2588,7 +2587,7 @@ print(json.dumps(sorted(os.listdir(d))))
         '1 of 2 did not install', ''].join('\n');
       const parsed = JSON.parse(execFileSync('python3', ['-c', `
 import json, sys, types
-sys.path.insert(0, ${JSON.stringify(REPO + 'scripts/dashboard')})
+sys.path.insert(0, ${JSON.stringify(REPO + '/scripts/dashboard')})
 import toolchains as tc
 tc.nodes = types.SimpleNamespace(job_tail=lambda jid, n=4000: sys.stdin.read())
 print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: log, encoding: 'utf8' }));

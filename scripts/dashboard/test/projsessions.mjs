@@ -3,11 +3,10 @@
 // A session is its account's (B172): nobody presses a key or types into
 // another person's, administrators included, and that still holds. Ending
 // one is the single exception, and an administrator's alone.
-import { launch, newPage, ok, done, ready, settled, tmuxNew, tmuxKill, URL, DIR, OWNER as H, asUser, section } from './lib.mjs';
+import { launch, newPage, ok, done, ready, settled, tmuxNew, tmuxKill, URL, DIR, OWNER as H, asUser, section, REPO } from './lib.mjs';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const base = URL.replace(/\/$/, '');
 const call = async (path, body, h = H) => {
   const r = await fetch(base + path, body ? { method: 'POST', headers: h, body: JSON.stringify(body) }

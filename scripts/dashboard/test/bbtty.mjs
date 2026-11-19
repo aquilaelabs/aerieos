@@ -9,7 +9,7 @@
 // project became unstartable, its terminal reconnecting into the same error
 // every five seconds. The command goes through a launcher file now, and this is the test
 // that says so.
-import { ok, done, sleep, until, URL, DIR, tmuxKill, tmuxNew, tmuxFmt, takeOn, member, section } from './lib.mjs';
+import { ok, done, sleep, until, URL, DIR, tmuxKill, tmuxNew, tmuxFmt, takeOn, member, section, REPO } from './lib.mjs';
 import { execFileSync, spawn } from 'child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, chmodSync, readFileSync, existsSync, lstatSync, readlinkSync, rmSync, statSync, symlinkSync, realpathSync, readdirSync } from 'fs';
 import { tmpdir } from 'os';
@@ -462,7 +462,6 @@ tmuxKill('claude-alpha');
 // most installs never reach.
 await section("a home and a shell of one's own", async () => {
   const HOMEDIR = join(DIR, 'home');
-  const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
   const shell = (arg, extra = {}, more = []) => {
     try {
       return execFileSync('bash', [BBTTY, arg, ...more], {

@@ -2,7 +2,7 @@
 // newest first with the first thing typed, and each downloadable as a text
 // that carries the words, every command Claude ran and what came back, and
 // never Claude's private reasoning nor another account's file.
-import { URL, launch, newPage, ok, done, ready, DIR, splitPick, section } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, DIR, splitPick, section, REPO } from './lib.mjs';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -194,7 +194,6 @@ ok(none === 400, `a space that is not one is refused as not a space (${none})`);
 // a project alpha does not read is not a project to it, and nothing of
 // another account's is ever found.
 const { execFileSync } = await import('node:child_process');
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const betaTree = join(DIR, 'home', '.claude', 'projects', slug(join(DIR, 'ws', 'beta')));
 mkdirSync(betaTree, { recursive: true });
 writeFileSync(join(betaTree, 'beta-chat-1.jsonl'), line(msg('user', 'Make the beta page blue')) + line(msg('assistant', [{ type: 'text', text: 'Blue it is.' }])));

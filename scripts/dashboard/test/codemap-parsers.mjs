@@ -8,13 +8,12 @@
 // projects, this found some twenty ways the map read code wrong).
 // No browser. Babel is the one inside Playwright's bundle; without it the
 // babel half says it was skipped, never that it passed.
-import { ok, done, DIR } from './lib.mjs';
+import { ok, done, DIR, REPO } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { createRequire } from 'node:module';
 
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const CODEMAP = `${REPO}/scripts/lib/codemap.py`;
 // The index as two files since format 5 (R228 step 16): what each file
 // calls and passes by name beside the rest, joined back here per file.

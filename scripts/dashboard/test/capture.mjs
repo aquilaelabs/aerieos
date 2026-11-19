@@ -5,7 +5,7 @@
 // says so and this skips rather than failing for a tool it never had.
 import { execFileSync, spawnSync, spawn } from 'node:child_process';
 import { existsSync, readFileSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
-import { ok, done, until, DIR, section } from './lib.mjs';
+import { ok, done, until, DIR, section, REPO } from './lib.mjs';
 import { createServer } from 'node:net';
 
 // A port the machine says is free, for a small server of a check's own, not
@@ -17,7 +17,6 @@ const freePort = () => new Promise(res => {
   s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => res(p)); });
 });
 
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const S = `${DIR}/reel`;
 mkdirSync(S, { recursive: true });
 // dist/ and the scratch apart (R96): the sheet and frames.json land under

@@ -3,10 +3,9 @@
 // words, Run now runs it once as a job whose log is on the Jobs page, and
 // Turn off and Remove do what they say. A session's token and an account
 // without the Schedules area are refused, whatever they ask.
-import { launch, newPage, ok, done, ready, sleep, URL, DIR, member, OWNER as H, asUser, asSession, section } from './lib.mjs';
+import { launch, newPage, ok, done, ready, sleep, URL, DIR, member, OWNER as H, asUser, asSession, section, REPO } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const base = URL.replace(/\/$/, '');
 const api = async (path, body, h = H) => {
   const r = await fetch(base + path, body === undefined ? { headers: h } : { method: 'POST', headers: h, body: JSON.stringify(body) });

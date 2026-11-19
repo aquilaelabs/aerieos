@@ -5,14 +5,12 @@
 // that is renamed, or a number moved on one side and not the others fails
 // here, before the app finds out by drawing blanks. Moving the surface is
 // fine; moving it without the app is what this catches.
-import { ok, done, URL, DIR, pinBreaks, OWNER as H, section } from './lib.mjs';
+import { ok, done, URL, DIR, pinBreaks, OWNER as H, section, REPO } from './lib.mjs';
 import { readFileSync, writeFileSync, mkdirSync, rmSync, readdirSync, utimesSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 
-const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const base = URL.replace(/\/$/, '');
 const get = async p => { const r = await fetch(base + p, { headers: H }); return { status: r.status, body: await r.json() }; };
 

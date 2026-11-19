@@ -10,7 +10,7 @@
 // So what is measured here is the assembly itself (order, joins, the cap) and
 // then the thing that makes it worth having: the tab renders the SAME string
 // the endpoint returns, byte for byte, rather than its own idea of it.
-import { URL, DIR, launch, newPage, ok, done, ready, sleep, patience, OWNER, section } from './lib.mjs';
+import { URL, DIR, launch, newPage, ok, done, ready, sleep, patience, OWNER, section, REPO } from './lib.mjs';
 import { writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -134,7 +134,6 @@ ok((p.parts || []).map(x => x.name).join(',') === 'core,rules,briefing,live,road
 
 // What a prompt names arrives on that prompt, by its words or its number,
 // once a conversation, through the hook every prompt runs.
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const hook = input => execFileSync('python3', [`${REPO}/scripts/dashboard/bb-prompt-relay`, 'alpha', 'u_pre'],
   { input: JSON.stringify(input), encoding: 'utf8',
     env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws`,

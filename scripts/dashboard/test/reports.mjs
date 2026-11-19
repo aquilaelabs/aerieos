@@ -5,11 +5,10 @@
 // their gate, a log a person clears. Nothing goes back to the session that
 // made it: that loop worked only where AerieOS's own tracker sat beside
 // the sessions reporting to it (the operator, 8 Oct).
-import { launch, newPage, ready, ok, done, saveDialog, URL, DIR, unfold, splitPick, prefsOf, OWNER as ADMIN, asUser, asSession, section } from './lib.mjs';
+import { launch, newPage, ready, ok, done, saveDialog, URL, DIR, unfold, splitPick, prefsOf, OWNER as ADMIN, asUser, asSession, section, REPO } from './lib.mjs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const base = URL.replace(/\/$/, '');
 const call = async (path, body, headers = ADMIN) => {
   const r = await fetch(base + path, body === undefined ? { headers }

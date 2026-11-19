@@ -3,11 +3,10 @@
 // no notebook foot; Export as a zip; and aerie wiki for a session, under
 // Agents may: Write the wiki. Pushing to a forge is wiki.py's unit tier,
 // against a repository on disk: the harness has no forge.
-import { launch, newPage, ok, done, ready, URL, DIR, section } from './lib.mjs';
+import { launch, newPage, ok, done, ready, URL, DIR, section, REPO } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const P = 'alpha';
 const NB = `.nb:has(#memTitle:text-is("Notebook: ${P}"))`;
 const browser = await launch();

@@ -8,13 +8,11 @@
 // The harness's stub docker answers `compose config` and the build job, the
 // way devapp.mjs's New container tests use it, so this file proves the
 // asking, the routing, the reading and the answering.
-import { launch, newPage, ok, done, ready, URL, DIR, call as api, asUser, OWNER as owner, asSession, section } from './lib.mjs';
+import { launch, newPage, ok, done, ready, URL, DIR, call as api, asUser, OWNER as owner, asSession, section, REPO } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync, rmSync, existsSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 
-const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const COMPOSE = 'services:\n  app:\n    image: alpine\n    command: sleep 1\n';
 const ask = (extra, headers = owner) => api('/api/phone', {
   action: 'ask', kind: 'container', why: 'a sonarr to test the media space against',

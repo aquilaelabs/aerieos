@@ -8,13 +8,10 @@
 // and whose system job runs the allowed command as the suite's own user:
 // this file proves the asking, the routing and the answering; the real
 // agent's own file proves the running and the guest-node refusal.
-import { launch, newPage, ok, done, ready, until, URL, DIR, asUser, OWNER as owner, asSession, call as api, mint, section } from './lib.mjs';
+import { launch, newPage, ok, done, ready, until, URL, DIR, asUser, OWNER as owner, asSession, call as api, mint, section, REPO } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync, rmSync, mkdirSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-
-const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+import { join } from 'node:path';
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 1000 } });

@@ -4,12 +4,11 @@
 // this repository's own code makes, a definition's file and line, the ids a
 // suite names. Run over this copy of the tree, so the index it writes lands
 // beside the copy and never in the checkout.
-import { ok, done, DIR, section } from './lib.mjs';
+import { ok, done, DIR, section, REPO } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, chmodSync, statSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const map = (...args) => execFileSync('python3', [`${REPO}/scripts/lib/codemap.py`, '--root', REPO, ...args],
                                       { encoding: 'utf8' }).trim();
 

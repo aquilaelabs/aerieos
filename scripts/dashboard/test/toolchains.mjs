@@ -8,7 +8,7 @@
 // answers a toolchain job at once, failing it), the Installed page's rows,
 // and the tool pack dialog the Library's Add your own and a card's Edit
 // open. Then the shell libraries a session on a node reads its store with.
-import { launch, newPage, ok, done, ready, sectSave, URL, DIR, until as untilTrue, section, libraryShow } from './lib.mjs';
+import { launch, newPage, ok, done, ready, sectSave, URL, DIR, until as untilTrue, section, libraryShow, REPO } from './lib.mjs';
 import { existsSync, readFileSync } from 'node:fs';
 
 const browser = await launch();
@@ -339,7 +339,6 @@ await section("The module's own view of it, which is where the decision is made"
   // answer stored against a different catalog is not an answer any more, and
   // zeroing the date is what sends the weekly loop looking again.
   const { execFileSync } = await import('node:child_process');
-  const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
   const ask = extra => execFileSync('python3', ['-c', `
 import importlib.util, json, sys
 spec = importlib.util.spec_from_file_location("pk", "${REPO}/scripts/dashboard/toolchains.py")

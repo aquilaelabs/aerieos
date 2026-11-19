@@ -4,11 +4,10 @@
 // as a field), the session token widened to the reads on every
 // request, every write refused by name, the relayed words kept to reads,
 // the grant carrying the reads for the view, and the briefing naming them.
-import { launch, newPage, ok, done, ready, settled, refreshUntil, saveDialog, sectSave, URL, DIR, prefsOf, projectKey, OWNER as H, asSession, section } from './lib.mjs';
+import { launch, newPage, ok, done, ready, settled, refreshUntil, saveDialog, sectSave, URL, DIR, prefsOf, projectKey, OWNER as H, asSession, section, REPO } from './lib.mjs';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const base = URL.replace(/\/$/, '');
 const api = async (path, body, headers = H) => {
   const r = await fetch(base + path, body === undefined ? { headers } : { method: 'POST', headers, body: JSON.stringify(body) });

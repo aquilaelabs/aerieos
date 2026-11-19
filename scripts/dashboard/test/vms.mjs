@@ -5,12 +5,10 @@
 // a snapshot and Remove each a vm job; a session's aerie vm is held to its
 // project's Make VMs dial (deny refuses, ask goes to the bell, auto does it),
 // and a session never makes Windows.
-import { URL, launch, newPage, ok, done, ready, DIR, until, OWNER as H, asSession } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, DIR, until, OWNER as H, asSession, REPO } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 
-const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const KEY = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGJ0ZXN0a2V5Zm9ydGhldm1tYW5hZ2VydGVzdHMx test';
 
 const browser = await launch();

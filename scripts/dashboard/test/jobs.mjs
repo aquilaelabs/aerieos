@@ -6,10 +6,9 @@
 // operator's window on all of it. Every assertion here goes through the queue
 // end to end (a job queued, placed, run, logged, ended), because the queue is
 // what this phase exists to prove.
-import { URL, launch, newPage, ok, done, ready, sleep, DIR, quiet, OWNER, api, section } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, sleep, DIR, quiet, OWNER, api, section, REPO } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const auth = OWNER;
 const base = URL.replace(/\/$/, '');
 const OVER = ['succeeded', 'failed', 'canceled'];

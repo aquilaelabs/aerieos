@@ -7,12 +7,9 @@
 // offers Take back, the controllers are listed with what hangs off each and
 // what shares their IOMMU group, the Features section offers the IOMMU with
 // Install, and a session's aerie vm usb is held for a person whatever the dial.
-import { URL, launch, newPage, ok, done, ready, until, openSection, DIR, saveDialog, refreshUntil, OWNER as H, asSession } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, until, openSection, DIR, saveDialog, refreshUntil, OWNER as H, asSession, REPO } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-
-const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+import { join } from 'node:path';
 
 // A name of this run's own: on a kept fixture an earlier run's VM record may still be there.
 const VMN = 'lab' + Date.now().toString(36).slice(-3);

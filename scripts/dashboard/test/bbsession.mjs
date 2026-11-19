@@ -4,14 +4,13 @@
 // `enter` binds, covers or hides is a step of `plan`, which reads the layout
 // and changes nothing, and a scratch layout stands in for a node with two
 // projects, two accounts and the agent's stores.
-import { ok, done, DIR, section } from './lib.mjs';
+import { ok, done, DIR, section, REPO } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, symlinkSync, existsSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
 import { userInfo } from 'node:os';
 
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const HELPER = join(REPO, 'nodes', 'bb-session');
 const STAGE = '/run/bb-session';
 const L = join(DIR, 'viewlayout');

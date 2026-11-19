@@ -5,6 +5,7 @@
 import os from 'node:os';
 import { mkdirSync } from 'node:fs';
 import { basename } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createRequire } from 'module';
 import { writeFileSync, readFileSync } from 'fs';
 import { execFileSync } from 'child_process';
@@ -945,10 +946,13 @@ export const call = async (path, body, headers = OWNER) => {
   return { status: r.status, body: j };
 };
 export const api = async (path, body, headers = OWNER) => (await call(path, body, headers)).body;
+// REPO: the checkout the suite runs from, with no trailing slash, for a
+// suite that reads a file of the tree or runs one of its scripts.
+export const REPO = fileURLToPath(new globalThis.URL('../../..', import.meta.url)).replace(/\/$/, '');
 // usersPy(expr): users.py asked for `expr` over the fixture's own state, and
 // what it printed. mint(project, who, ttl): a session's token for a space,
 // made as the server makes one, for the account `who` (by name) when said.
-const TREE = new globalThis.URL('../../..', import.meta.url).pathname;
+const TREE = REPO;
 export const usersPy = expr => execFileSync('python3', ['-c', `
 import importlib.util, json, os
 spec = importlib.util.spec_from_file_location("users", "${TREE}/scripts/dashboard/users.py")

@@ -8,13 +8,11 @@
 // a phone that is always present. That is not a shortcut: a real adb answers
 // from whatever is actually paired to the box the suite runs on, which makes
 // the result a fact about the room rather than the code.
-import { launch, newPage, ok, done, ready, sleep, until, URL, DIR, asUser, OWNER as owner, asSession, mint, call as api, section } from './lib.mjs';
+import { launch, newPage, ok, done, ready, sleep, until, URL, DIR, asUser, OWNER as owner, asSession, mint, call as api, section, REPO } from './lib.mjs';
 import { execSync, execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 
-const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const base = URL.replace(/\/$/, '');
 
 const browser = await launch();

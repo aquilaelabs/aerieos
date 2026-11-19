@@ -5,7 +5,7 @@
 // would be (a refusal and why, or that a websocket is asked for), which is
 // how most checks here ask; the socket itself is covered by term.mjs.
 import { launch, newPage, ok, done, until, quiet, URL, DIR, takeOn, openSection, member, splitPick, projectKey,
-         asUser, OWNER, asSession, usersPy, mint, section } from './lib.mjs';
+         asUser, OWNER, asSession, usersPy, mint, section, REPO } from './lib.mjs';
 import http from 'node:http';
 import { mkdirSync, writeFileSync, rmSync, readFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -186,7 +186,6 @@ await ctx2.close();
 await section("accounts, not one env var", async () => {
   const { readFileSync, existsSync } = await import('node:fs');
   const { execFileSync } = await import('node:child_process');
-  const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
   const bb = (args, input) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', ...args],
     { input, encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
   const store = `${DIR}/state/users.json`;
@@ -251,7 +250,6 @@ await section("the first run", async () => {
   const { execFileSync } = await import('node:child_process');
   const { mkdtempSync, readFileSync, existsSync } = await import('node:fs');
   const { tmpdir } = await import('node:os');
-  const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
   const fresh = mkdtempSync(`${tmpdir()}/bbsetup-`);
   const run = code => execFileSync('python3', ['-c', `
 import importlib.util, json, sys
@@ -304,7 +302,6 @@ ${code}`], { encoding: 'utf8' });
 await section("a strip each", async () => {
   const { readFileSync } = await import('node:fs');
   const { execFileSync } = await import('node:child_process');
-  const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
   const bb = (args, input) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', ...args],
     { input, encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
   const store = `${DIR}/state/users.json`;
@@ -853,7 +850,6 @@ print(u.remove("renamed"))`], { encoding: 'utf8' });
 await section("what a `user` sees, and does not", async () => {
   const { readFileSync } = await import('node:fs');
   const { execFileSync } = await import('node:child_process');
-  const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
   const bb = (args, input) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', ...args],
     { input, encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
   const py = (code) => execFileSync('python3', ['-c', `
@@ -1881,7 +1877,6 @@ print(json.dumps(out))`], { encoding: 'utf8' }));
 // the page (its cookie kept for after), the API, a sign-in, a session's
 // token and the phone app's. The switch is the owner's and not an admin's.
 await section("maintenance mode", async () => {
-  const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
   const env = { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` };
   const users = (args, input) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', ...args], { input, encoding: 'utf8', env });
   users(['add', 'maintuser', '--role', 'user'], 'maintpass11\nmaintpass11\n');

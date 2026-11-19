@@ -7,11 +7,10 @@
 // device, a read-only person's change is refused, and a device waiting on
 // the project wakes when another changes it. The Profile page lists the
 // devices and Disconnect signs one out. No browser.
-import { ok, done, sleep, until, DIR, URL, OWNER as ADMIN, asUser, asSession, section } from './lib.mjs';
+import { ok, done, sleep, until, DIR, URL, OWNER as ADMIN, asUser, asSession, section, REPO } from './lib.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 
-const REPO = new globalThis.URL('../../..', import.meta.url).pathname;
 const base = URL.replace(/\/$/, '');
 const admin = async (path, body) => {
   const r = await fetch(base + path, { method: 'POST', headers: ADMIN, body: JSON.stringify(body) });
