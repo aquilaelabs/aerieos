@@ -53,7 +53,6 @@ job_get = None              # jid -> the job row with its log
 node_gpu = None             # nid -> whether the node reports a graphics card, which Ollama is then given
 container_gone = None       # name -> True once no written container has that name (R238)
 _lock = threading.Lock()
-_rev = 0
 SEALED = "bbseal:"
 PORT = 4000
 IMAGE = "ghcr.io/berriai/litellm:main-stable"
@@ -109,19 +108,21 @@ def _file():
     return STATE / "router.json"
 
 
+# Read once while the same file (R228 step 1); 0600, since the providers'
+# keys are in it.
+_store = statefile.Store(_file, write=lambda: write_json, mode=0o600, cached=True)
+
+
 def _load():
-    d = statefile.read_json(_file())         # read once while the same file (R228 step 1)
-    return d if isinstance(d, dict) else {}
+    return _store.load()
 
 
 def _save(d):
-    global _rev
-    write_json(_file(), d, mode=0o600)
-    _rev += 1
+    _store.save(d)
 
 
 def rev():
-    return _rev
+    return _store.rev()
 
 
 def _keep(v):

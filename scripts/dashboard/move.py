@@ -133,17 +133,15 @@ def _file():
     return STATE / "move.json"
 
 
+_store = statefile.Store(_file, write=lambda: write_json)
+
+
 def _load():
-    try:
-        with open(_file()) as f:
-            d = json.load(f)
-    except (OSError, ValueError):
-        d = {}
-    return d if isinstance(d, dict) else {}
+    return _store.load()
 
 
 def _save(d):
-    write_json(_file(), d)
+    _store.save(d)
 
 
 def new_token():

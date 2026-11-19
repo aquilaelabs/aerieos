@@ -51,6 +51,7 @@ from pathlib import Path
 import changelog
 import cilogs
 import forges
+import statefile
 
 STATE = Path("/config")
 WORKSPACE = Path("/workspace")
@@ -80,26 +81,20 @@ def _file():
     return STATE / "forge-releases.json"
 
 
+_store = statefile.Store(_file, write=lambda: write_json)
+
+
 def kept(project):
     """{tag: {url, error}} of the releases made, or refused, for this project."""
-    try:
-        d = json.loads(_file().read_text())
-    except (OSError, ValueError):
-        return {}
-    got = d.get(project) if isinstance(d, dict) else None
+    got = _store.load().get(project)
     return got if isinstance(got, dict) else {}
 
 
 def _keep(project, tag, url, error="", forge="GitHub"):
-    try:
-        d = json.loads(_file().read_text())
-    except (OSError, ValueError):
-        d = {}
-    if not isinstance(d, dict):
-        d = {}
+    d = _store.load()
     d.setdefault(project, {})[tag] = {"url": url, "error": error, "forge": forge}
     if write_json:
-        write_json(_file(), d)
+        _store.save(d)
 
 
 # ---- what goes in it ----------------------------------------------------------

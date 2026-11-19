@@ -39,6 +39,7 @@ import threading
 import time
 from pathlib import Path
 
+import statefile
 from fields import field
 
 write_json = None
@@ -132,6 +133,9 @@ def configure(*, write_json, state, workspace):
 
 
 _lock = threading.Lock()
+# A record whose `nodes` is not a table of them is read as none at all.
+_store = statefile.Store(lambda: FILE, write=lambda: write_json,
+                         validate=lambda d: d if isinstance(d.get("nodes"), dict) else {"nodes": {}})
 
 
 def load():
@@ -142,17 +146,11 @@ def load():
     `known` is the phones this node has paired or connected, newest first:
     the pairing key is in the node account's ~/.android, so a remembered
     phone needs Connect and nothing else, and the tab offers exactly that."""
-    try:
-        d = __import__("json").loads(FILE.read_text())
-    except (OSError, ValueError):
-        d = {}
-    if not isinstance(d, dict) or not isinstance(d.get("nodes"), dict):
-        d = {"nodes": {}}
-    return d
+    return _store.load()
 
 
 def save(d):
-    write_json(FILE, d)
+    _store.save(d)
 
 
 def _rec(nid):

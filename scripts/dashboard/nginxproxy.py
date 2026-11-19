@@ -84,9 +84,12 @@ def _file():
     return STATE / "nginx.json"
 
 
+# Read once while the same file (R228 step 1).
+_store = statefile.Store(_file, write=lambda: write_json, cached=True)
+
+
 def _load():
-    d = statefile.read_json(_file())         # read once while the same file (R228 step 1)
-    return d if isinstance(d, dict) else {}
+    return _store.load()
 
 
 # The token the nginx tab watches (/api/revs `nginx`, B714): moved by every
@@ -94,21 +97,16 @@ def _load():
 # row, from bb or from another browser reaches an open tab within a poll
 # rather than at its next Refresh. A counter, not an mtime: the tab stages
 # a draft per node and redraws around it.
-_rev = 0
-
-
 def _bump():
-    global _rev
-    _rev += 1
+    _store.bump()
 
 
 def rev():
-    return _rev
+    return _store.rev()
 
 
 def _save(d):
-    write_json(_file(), d)
-    _bump()
+    _store.save(d)
 
 
 def _cert_dir(nid, host=""):
@@ -623,7 +621,7 @@ _memo_lock = threading.Lock()
 
 
 def _daemon_half(devapp, instance_state, nid, name, is_up):
-    key = (_rev, getattr(devapp, "job_rev", lambda: "")())
+    key = (rev(), getattr(devapp, "job_rev", lambda: "")())
     now = time.monotonic()
     with _memo_lock:
         got = _daemon_memo.get(nid)

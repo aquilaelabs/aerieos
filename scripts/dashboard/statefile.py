@@ -411,6 +411,75 @@ def write_bytes(path, data, mode=0o644):
         raise
 
 
+# ---- a module's own JSON file: one load, one save, one revision ----
+class Store:
+    """One module's JSON object in a file of its own: the load, the save and
+    the revision counter each such module would otherwise write for itself.
+
+    `path` is a function asked on every call, since a module is told where
+    its file is after it is imported and a unit test points it somewhere
+    else; `write` is one too, answering the module's own `write_json` of the
+    moment, and with none given the write is statefile's own.
+
+    load() answers the object the file holds, and {} for a file that is
+    missing, is not JSON, or holds anything but an object. `validate` is
+    then handed that dict and answers the one to use (the shape a module
+    insists on), and each key of `defaults()` the answer lacks is set from
+    it, in its order: a function, so no two loads share a value.
+
+    The read is the file's own every time. `cached` reads through read_json
+    instead, which answers what this thread's request already read of the
+    file (begin_request) until this thread writes it: another thread's save
+    in between is not seen, so it is a module's own choice, never the
+    default.
+
+    save(d) writes the object, with `mode` where the file has one of its
+    own, and moves rev(), the counter a page's poll watches. write(d) is
+    the same write without the move, and bump() the move without a write,
+    for a change kept somewhere else."""
+
+    def __init__(self, path, write=None, defaults=None, mode=None, validate=None, cached=False):
+        self._path, self._write = path, write
+        self._defaults, self._mode, self._validate, self._cached = defaults, mode, validate, cached
+        self._rev = 0
+
+    def load(self):
+        path = self._path()
+        if self._cached:
+            d = read_json(path)
+        else:
+            try:
+                with open(path) as f:
+                    d = json.load(f)
+            except (OSError, ValueError):
+                d = None
+        if not isinstance(d, dict):
+            d = {}
+        if self._validate:
+            d = self._validate(d)
+        if self._defaults:
+            for k, v in self._defaults().items():
+                d.setdefault(k, v)
+        return d
+
+    def write(self, d):
+        write = self._write() if self._write else write_json
+        if self._mode is None:
+            write(self._path(), d)
+        else:
+            write(self._path(), d, mode=self._mode)
+
+    def save(self, d):
+        self.write(d)
+        self._rev += 1
+
+    def bump(self):
+        self._rev += 1
+
+    def rev(self):
+        return self._rev
+
+
 @contextlib.contextmanager
 def locked(path):
     """Hold `path` exclusively, against this process's threads and every other

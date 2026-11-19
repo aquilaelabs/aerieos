@@ -96,13 +96,17 @@ def configure(*, state, write_json, unpack=None):
                      HOSTED=Path(state) / "toolpacks", unpack=unpack)
 
 
-def _load():
-    try:
-        d = json.loads(FILE.read_text())
-    except (OSError, ValueError, AttributeError):
-        d = {}
-    packs = d.get("packs") if isinstance(d, dict) and isinstance(d.get("packs"), dict) else {}
+def _packs_only(d):
+    packs = d.get("packs") if isinstance(d.get("packs"), dict) else {}
     return {"packs": {k: v for k, v in packs.items() if isinstance(v, dict)}}
+
+
+_store = statefile.Store(lambda: FILE, validate=_packs_only)
+
+
+def _load():
+    # No pack is installed before the module is told where its file is.
+    return _store.load() if FILE is not None else _packs_only({})
 
 
 def _words(v, what, errors, placeholders=PLACEHOLDERS):

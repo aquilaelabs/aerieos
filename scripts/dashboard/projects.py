@@ -427,13 +427,16 @@ def rename(req):
 PUSH_FILE = None            # set in configure(), beside the rest
 
 
+# Read once while the same file (R228 step 1).
+_push = statefile.Store(lambda: STATE / "push-rights.json", write=lambda: write_json, cached=True)
+
+
 def load_push():
-    d = statefile.read_json(STATE / "push-rights.json")   # read once while the same file (R228 step 1)
-    return d if isinstance(d, dict) else {}
+    return _push.load()
 
 
 def save_push(d):
-    write_json(STATE / "push-rights.json", d)
+    _push.save(d)
 
 
 def repo_path_of(url):

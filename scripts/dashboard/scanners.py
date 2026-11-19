@@ -34,6 +34,7 @@ import time
 import urllib.request
 from pathlib import Path
 
+import statefile
 import syscontainer
 
 STATE = None
@@ -47,7 +48,6 @@ job_state = None         # jid -> "queued" | "running" | ... | ""
 next_after = None        # schedules.next_after(cron, after)
 cron_words = None        # schedules.words(cron)
 _lock = threading.Lock()
-_rev = 0
 
 SCANNERS = ("semgrep", "trivy", "mobsfscan")
 # The pins a fresh deploy takes, moved on purpose a release at a time, and
@@ -91,26 +91,20 @@ def _file():
     return STATE / "scanners.json"
 
 
+_store = statefile.Store(_file, write=lambda: write_json,
+                         defaults=lambda: {"schedule": {"on": False, "cron": DEFAULT_CRON}, "nodes": {}, "latest": {}})
+
+
 def _load():
-    try:
-        d = json.loads(_file().read_text())
-        d = d if isinstance(d, dict) else {}
-    except (OSError, ValueError, AttributeError):
-        d = {}
-    d.setdefault("schedule", {"on": False, "cron": DEFAULT_CRON})
-    d.setdefault("nodes", {})
-    d.setdefault("latest", {})
-    return d
+    return _store.load()
 
 
 def _save(d):
-    global _rev
-    write_json(_file(), d)
-    _rev += 1
+    _store.save(d)
 
 
 def rev():
-    return _rev
+    return _store.rev()
 
 
 def record(nid):
@@ -549,7 +543,7 @@ def view():
                      "reports": rec.get("reports") or {}, "deploy_job": rec.get("deploy_job", ""),
                      "deploy_state": job_state(rec.get("deploy_job")) if job_state and rec.get("deploy_job") else ""})
     return {"nodes": rows, "schedule": schedule(), "latest": {**d["latest"], "versions": lt}, "defaults": VERSIONS,
-            "uncovered": uncovered(), "rev": _rev}
+            "uncovered": uncovered(), "rev": rev()}
 
 
 def attention():
