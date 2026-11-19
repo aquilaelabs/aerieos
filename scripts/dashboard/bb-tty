@@ -558,7 +558,7 @@ in_view() {
 # the wrong tree by mistake, not a sandbox: Bash still reaches the filesystem,
 # and the only hard boundary is not mounting the other projects at all.
 claude_scope() {
-    local proj="$1" here="${2:-}" dir out tmp hooks bundle
+    local proj="$1" here="${2:-}" dir out tmp hooks
     # One file per project, rewritten each time rather than a fresh temp file:
     # Every terminal runs this script, a reattach included,
     # so mktemp here would drop a file per page load. Under the cache dir
@@ -643,13 +643,7 @@ claude_scope() {
     # Through .bb/current each hook call runs whatever was delivered last, the
     # way B66 put bb on PATH. A checkout has no current link and keeps the
     # path it always had.
-    hooks="$(dirname "$(readlink -f "$0")")"
-    case "$hooks" in
-        */.bb/*/scripts/dashboard)
-            bundle="${hooks%/scripts/dashboard}"
-            [ "$(readlink -f "${bundle%/*}/current" 2>/dev/null)" = "$bundle" ] \
-                && hooks="${bundle%/*}/current/scripts/dashboard" ;;
-    esac
+    hooks="$(lasting_dir)"
     # A project this one reads is a wall to Edit and not to Read: its tree
     # is in the view read-only, and the deny list says the same.
     local readsq worksq
@@ -1038,10 +1032,17 @@ claude_first_run() {
 lasting_dir() {
     local here bundle
     here="$(dirname "$(readlink -f "$0")")"
+    # Wherever the bundle is kept by its digest with a current link beside
+    # it: the store's .bb, and root's own copy, which a terminal on a node
+    # starts from since each account became its own user. Only .bb was
+    # known here, so a session's hooks named root's copy by its digest
+    # again, and when that copy was pruned every hook of the session failed
+    # as a program that could not be run (19 Nov; B120 was the same thing
+    # for .bb).
     case "$here" in
-        */.bb/*/scripts/dashboard)
+        */scripts/dashboard)
             bundle="${here%/scripts/dashboard}"
-            [ "$(readlink -f "${bundle%/*}/current" 2>/dev/null)" = "$bundle" ] \
+            [ -L "${bundle%/*}/current" ] && [ "$(readlink -f "${bundle%/*}/current" 2>/dev/null)" = "$bundle" ] \
                 && here="${bundle%/*}/current/scripts/dashboard" ;;
     esac
     printf '%s' "$here"

@@ -1435,9 +1435,12 @@ print(uid)`);
     // the digest it started from (B120). The settings file is read once, when
     // claude starts, so a resolved path kept an open session on the hooks it
     // began with however many deliveries followed. Run from a real
-    // .bb/<digest> directory, the way a node runs it, with current pointing at it.
+    // <digest> directory with current pointing at it, the way a node runs
+    // it: root's own copy of the bundle (a folder named bundle), which a
+    // terminal starts from now and which was not known as one, so hooks
+    // named its digest again (19 Nov); the store's .bb is the same shape.
     {
-      const bundles = join(DIR, 'store', '.bb');
+      const bundles = join(DIR, 'store', 'bundle');
       const digest = join(bundles, '0123456789abcdef');
       mkdirSync(digest, { recursive: true });
       execFileSync('cp', ['-r', join(import.meta.dirname, '..', '..'), join(digest, 'scripts')]);
@@ -1474,7 +1477,7 @@ print(uid)`);
       const hooks = scopeOf();
       ok(hooks.includes(`${cur}/bb-gate ${proj} `) && hooks.includes(`${cur}/bb-work-note ${proj} `)
          && hooks.includes(`${cur}/bb-check-relay ${proj} `) && !hooks.includes('0123456789abcdef'),
-         `run from a node's bundle, every hook names .bb/current, so a delivery reaches a session already open (${hooks.slice(0, 100)}; it said: ${said.trim().slice(-300)}; list ${
+         `run from a node's bundle, every hook names its current link, so a delivery reaches a session already open (${hooks.slice(0, 100)}; it said: ${said.trim().slice(-300)}; list ${
            JSON.stringify(Object.values(JSON.parse(readFileSync(join(DIR, 'state', 'users.json'), 'utf8')).users || {}).find(u => u.uid === ownerUid)?.projects)}; repos ${
            (() => { try { return readFileSync(join(DIR, 'state', 'project-repos.json'), 'utf8').slice(0, 300); } catch { return 'none'; } })()}; proj ${proj})`);
       tmuxKill(`${ownerUid}~claude-${proj}`);
