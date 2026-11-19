@@ -22,7 +22,10 @@ PUB_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 DEFAULT_URL = "https://raw.githubusercontent.com/aquilaelabs/aerieos-catalog/main/"
 KEEP_S = 3600
 MISS_S = 300
-MAX_BYTES = 4 << 20
+# An index as big as a catalog of tens of thousands of entries gets (R256):
+# past either, what it lists beyond is said, never dropped unsaid (B975).
+MAX_BYTES = 16 << 20
+ENTRIES_MOST = 20000
 _lock = threading.RLock()
 _cache = {"at": 0.0, "index": None, "error": ""}
 
@@ -89,7 +92,7 @@ def parse(index_bytes):
         return None, "index.json is not a version 1 catalog index"
     import re
     out = []
-    for p in d["packs"][:2000]:
+    for p in d["packs"][:ENTRIES_MOST]:
         if not isinstance(p, dict):
             continue
         name = str(p.get("name") or "")
@@ -126,6 +129,15 @@ def parse(index_bytes):
         # it before the pack is fetched, as it does once it is kept.
         if isinstance(p.get("label"), str) and p["label"].strip():
             out[-1]["label"] = p["label"].strip()[:60]
+        # What it is about (R256): the catalog's topics this build knows,
+        # and the day it was added, for the Library's Topic and Recently
+        # added. A build from before either leaves them out.
+        topics = packformat.topics_of(p)
+        if topics:
+            out[-1]["topics"] = topics
+        added = str(p.get("added") or "")
+        if re.fullmatch(r"20\d\d-[01]\d-[0-3]\d", added):
+            out[-1]["added"] = added
         # A shipped toolchain's entry says its recipe's rev (R234 step 4), so
         # an install fetches the pack only when that is past its own row's.
         rev = p.get("shipped_rev")
@@ -157,7 +169,10 @@ def parse(index_bytes):
     # card to name ({"3": "0.10.0"}).
     since = {str(k): str(v)[:40] for k, v in (d.get("formats") or {}).items()
              if re.fullmatch(r"[0-9]{1,4}(?:\.[0-9]{1,4})?", str(k)) and re.fullmatch(r"[0-9A-Za-z.+-]{1,40}", str(v))} if isinstance(d.get("formats"), dict) else {}
-    return {"generated": str(d.get("generated") or "")[:40], "packs": out, **({"formats": since} if since else {})}, ""
+    # ...and how many it lists past what this build reads, for the Library to say.
+    past = max(0, len(d["packs"]) - ENTRIES_MOST)
+    return {"generated": str(d.get("generated") or "")[:40], "packs": out, **({"formats": since} if since else {}),
+            **({"past": past} if past else {})}, ""
 
 
 def too_new(entry, index=None):
@@ -208,7 +223,7 @@ def fetch(url=None, opener=None):
     except Exception as e:                                             # noqa: BLE001 (the network's reasons are many)
         return {"error": f"the catalog did not answer: {str(e)[:200]}", "index": _fallback(base)}
     if len(data) > MAX_BYTES:
-        return {"error": "the index is over 4 MB, which no catalog's is: refused", "index": _fallback(base)}
+        return {"error": "the index is over 16 MB, which no catalog's is: refused", "index": _fallback(base)}
     why = verify(data, sig)
     if why:
         return {"error": why, "index": _fallback(base)}

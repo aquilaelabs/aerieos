@@ -170,11 +170,13 @@ class Rows(unittest.TestCase):
                            {"name": "anylinux", "url": "https://example.com/b", "commit": "c" * 40, "sha256": "d" * 64, "tier": "vetted", "about": "any",
                             "platforms": ["linux/*"]}]}
         by = {r["name"]: r for r in library.rows(tc, [], [], index, None)}
-        self.assertEqual(by["xcode"]["wrong_platform"], "needs darwin/arm64", "the toolchain's own verdict stands")
+        # The toolchain's own verdict stands, said as every other card's is
+        # now a card for another system can be shown (R256).
+        self.assertEqual(by["xcode"]["wrong_platform"], "not for this node (linux/amd64): needs darwin/arm64", "the toolchain's own verdict stands")
         self.assertIn("not for this node (linux/amd64)", by["armonly"]["wrong_platform"])
         self.assertEqual((by["anylinux"]["wrong_platform"], by["jdk"]["wrong_platform"]), ("", ""))
         by = {r["name"]: r for r in library.rows({**tc, "platform": ""}, [], [], index, None)}
-        self.assertEqual((by["armonly"]["wrong_platform"], by["xcode"]["wrong_platform"]), ("", "needs darwin/arm64"),
+        self.assertEqual((by["armonly"]["wrong_platform"], by["xcode"]["wrong_platform"]), ("", "not for this node: needs darwin/arm64"),
                          "a node that has not said its platform is not judged")
 
 if __name__ == "__main__":

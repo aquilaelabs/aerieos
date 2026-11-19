@@ -10,7 +10,10 @@ node (installed, version, latest, update due, a job in flight), and the
 one verb the row takes. The page draws the rows; each verb goes to the
 read's own endpoint, so nothing is installed two ways.
 """
+import calendar
+import contextlib
 import re
+import time
 
 import agents
 import packformat
@@ -233,10 +236,25 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
     # A card not for this node (R170 step 9, the operator, 28 Oct: Xcode on
     # a Linux node): judged here for every row with a platforms list, the
     # toolchains' own verdict kept; the page leaves it out and counts it.
+    # What each is about and when the catalog added it (R256), where its
+    # index entry says: a shipped toolchain's and a kept pack's as well as
+    # an offer's, by name.
+    told = {e["name"]: e for e in (catalog_index or {}).get("packs") or []}
+    for r in out:
+        e = told.get(r["name"]) if r["kind"] != "agent" and r["kind"] != "companion" else None
+        if e and e.get("topics"):
+            r["topics"] = list(e["topics"])
+        if e and e.get("added"):
+            with contextlib.suppress(ValueError):
+                r["added_at"] = int(calendar.timegm(time.strptime(e["added"], "%Y-%m-%d")))
     for r in out:
         r.setdefault("wrong_platform", "")
         if not r["wrong_platform"] and plat and r.get("platforms") and not _supports(r["platforms"], plat):
             r["wrong_platform"] = f"not for this node ({plat}): {', '.join(r['platforms'])}"
+        # The toolchains' own verdict names the platforms alone: said as
+        # the rest are, now a card for another system can be shown (R256).
+        elif r["wrong_platform"] and not r["wrong_platform"].startswith("not for"):
+            r["wrong_platform"] = f"not for this node{f' ({plat})' if plat else ''}: {r['wrong_platform']}"
     return out
 
 
@@ -283,3 +301,132 @@ def _supports(platforms, plat):
     itself, or its system with any machine (linux/*)."""
     o, _, _a = plat.partition("/")
     return any(x == plat or x == f"{o}/*" for x in platforms)
+
+
+# ---- browsing it (R256) ----
+
+# How many cards a shelf on the front page shows, and the most a list asks
+# for at once.
+SHELF = 8
+PAGE_MOST = 60
+SORTS = ("match", "name", "added")
+STANDS = {"installed": lambda r: bool(r.get("installed")),
+          "update": lambda r: bool(r.get("update") or r.get("repin"))}
+TIER_ORDER = {"official": 0, "verified": 1, "vetted": 2, "sideloaded": 3}
+
+
+def _group(r):
+    return r.get("group") or r.get("kind")
+
+
+def _words(q):
+    return [w for w in str(q or "").lower().split() if w][:8]
+
+
+def _score(r, words):
+    """How well a row answers the words, 0 when one of them is nowhere in it:
+    its name first, then its label and maker, then its topics, then what it
+    is, so typing a tool's name puts that tool first."""
+    if not words:
+        return 1
+    name, label = str(r.get("name") or "").lower(), str(r.get("label") or "").lower()
+    maker = str(r.get("maker") or "").lower()
+    topics = " ".join(r.get("topics") or []).lower()
+    about = f"{r.get('about') or ''} {r.get('kind') or ''} {r.get('tier') or ''} {' '.join(r.get('platforms') or [])}".lower()
+    total = 0
+    for w in words:
+        if w == name or w == label:
+            total += 100
+        elif name.startswith(w) or label.startswith(w):
+            total += 60
+        elif w in name or w in label:
+            total += 40
+        elif w in maker:
+            total += 30
+        elif w in topics:
+            total += 20
+        elif w in about:
+            total += 10
+        else:
+            return 0
+    return total
+
+
+def _front_order(r):
+    # A shelf's order: Packaged by Aerie first, then the newest in the
+    # catalog, then by name.
+    return (TIER_ORDER.get(r.get("tier"), 9), -int(r.get("added_at") or 0), str(r.get("label") or r.get("name") or "").lower())
+
+
+def browse(rows, q="", kind="", topic="", tier="", here=True, sort="", offset=0, limit=30, kinds=()):
+    """One look at the Library for the page (R256): the rows narrowed by the
+    words, the kind (or Installed or Updates), the topic and the source,
+    and, while `here`, to what runs on the node; the count for every chip
+    and topic under the other narrowings; how many the node's platform hid;
+    and either the front page's shelves (nothing narrowed) or one page of
+    the one sorted list."""
+    # An entry this AerieOS does not take is never shown (the operator, 12
+    # Nov), counted for the page's head with the rest of what it says of
+    # the node, which is about every row whatever is narrowed.
+    later = [r for r in rows if r.get("too_new")]
+    rows = [r for r in rows if not r.get("too_new")]
+    facts = {"installed": sum(1 for r in rows if r.get("installed") and not r.get("wrong_platform")),
+             "offered": sum(1 for r in rows if r["kind"] not in ("app", "companion") and not r.get("wrong_platform")),
+             "updates": sum(1 for r in rows if STANDS["update"](r) and not r.get("wrong_platform")),
+             "other_platform": sum(1 for r in rows if r.get("wrong_platform")), "not_this_build": len(later)}
+    words = _words(q)
+    offset = max(0, int(offset or 0))
+    limit = max(1, min(PAGE_MOST, int(limit or 30)))
+    sort = sort if sort in SORTS else ("match" if words else "name")
+    scored = [(r, _score(r, words)) for r in rows]
+    scored = [(r, s) for r, s in scored if s]
+
+    def k_ok(r, k=None):
+        k = kind if k is None else k
+        return not k or (STANDS[k](r) if k in STANDS else _group(r) == k)
+
+    def t_ok(r, t=None):
+        t = topic if t is None else t
+        return not t or t in (r.get("topics") or [])
+
+    def s_ok(r, s=None):
+        s = tier if s is None else s
+        return not s or r.get("tier") == s
+
+    def p_ok(r):
+        return not here or not r.get("wrong_platform")
+
+    def counted(f):
+        return [r for r, _ in scored if f(r) and p_ok(r)]
+    counts = {
+        "kind": {k: len([r for r in counted(lambda r: t_ok(r) and s_ok(r)) if k_ok(r, k)]) for k in (*STANDS, *kinds)},
+        "all": len(counted(lambda r: t_ok(r) and s_ok(r))),
+        "tier": {}, "topic": {}}
+    for r in counted(lambda r: k_ok(r) and t_ok(r)):
+        counts["tier"][r.get("tier")] = counts["tier"].get(r.get("tier"), 0) + 1
+    for r in counted(lambda r: k_ok(r) and s_ok(r)):
+        for t in r.get("topics") or []:
+            counts["topic"][t] = counts["topic"].get(t, 0) + 1
+    matched = [(r, s) for r, s in scored if k_ok(r) and t_ok(r) and s_ok(r)]
+    hidden = len([r for r, _ in matched if not p_ok(r)])
+    matched = [(r, s) for r, s in matched if p_ok(r)]
+    out = {"counts": counts, "hidden": hidden, "total": len(matched), "sort": sort, "facts": facts}
+    if not (words or kind or topic or tier):
+        mine = [r for r, _ in matched if STANDS["installed"](r) or STANDS["update"](r)]
+        mine.sort(key=lambda r: (not STANDS["update"](r), str(r.get("label") or r.get("name")).lower()))
+        out["here"] = mine
+        out["shelves"] = []
+        for k in kinds:
+            of = sorted((r for r, _ in matched if _group(r) == k), key=_front_order)
+            if of:
+                out["shelves"].append({"kind": k, "total": len(of), "rows": of[:SHELF]})
+        return out
+    if sort == "match":
+        matched.sort(key=lambda rs: (-rs[1], str(rs[0].get("label") or rs[0].get("name")).lower()))
+    elif sort == "added":
+        matched.sort(key=lambda rs: (-int(rs[0].get("added_at") or 0), str(rs[0].get("label") or rs[0].get("name")).lower()))
+    else:
+        matched.sort(key=lambda rs: str(rs[0].get("label") or rs[0].get("name")).lower())
+    out["rows"] = [r for r, _ in matched[offset:offset + limit]]
+    out["offset"] = offset
+    return out

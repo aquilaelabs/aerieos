@@ -13078,8 +13078,30 @@ class Handler(BaseHTTPRequestHandler):
         yours_ok = bool(n) and self._works_on_node(who, nid) and bool(users.uid_of(who))
         pack_mine = {name: packconfig.get_mine(nid, name, fields, users.uid_of(who)) for name, fields in toolpacks.configs().items()
                      if packconfig.person_fields(fields)} if yours_ok else {}
+        rows = library.rows(tc, agentcode.rows(n) if n else [], napps, cat.get("index"), apps.view(), services, pack_values, pack_mine)
+        # The page asks for one look at it (R256): the rows narrowed, counted
+        # and paged here, so it never holds the whole catalog; an entry's
+        # page asks for its one row by kind:name. Asked with neither, the
+        # whole list, as before.
+        one = (q.get("key") or [""])[0]
+        look = {}
+        if one:
+            rows = [r for r in rows if f"{r['kind']}:{r['name']}" == one]
+        elif (q.get("view") or [""])[0] == "browse":
+            arg = lambda k, d="": (q.get(k) or [d])[0][:80]  # noqa: E731
+            try:
+                offset, limit = int(arg("offset", "0")), int(arg("limit", "30"))
+            except ValueError:
+                offset, limit = 0, 30
+            look = library.browse(rows, q=arg("q"), kind=arg("kind"), topic=arg("topic"), tier=arg("tier"),
+                                  here=arg("all") != "1", sort=arg("sort"), offset=offset, limit=limit,
+                                  kinds=("agent", "toolchain", "pack", "service", "app", "companion"))
+            rows = look.pop("rows", [])
+            look["topics"] = [[k, v] for k, v in packformat.TOPICS.items()]
+            if (cat.get("index") or {}).get("past"):
+                look["catalog_past"] = cat["index"]["past"]
         return self._json({"node": nid, "name": tc.get("name") or (n or {}).get("name") or "", "live": bool(tc.get("live", (n or {}).get("live"))),
-                           "rows": library.rows(tc, agentcode.rows(n) if n else [], napps, cat.get("index"), apps.view(), services, pack_values, pack_mine),
+                           "rows": rows, **look,
                            "job": tc.get("job") or {"running": False}, "catalog_error": cat.get("error", ""),
                            # Whether this node runs Docker, for an app's card (R170 step 7).
                            "docker": bool(((n or {}).get("reported") or {}).get("docker")),

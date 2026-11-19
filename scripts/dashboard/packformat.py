@@ -126,6 +126,49 @@ def credits_of(doc):
     return out[:CREDITS_MAX]
 
 
+# What a catalog entry is about, beyond its kind (R256, the operator, 18 Nov:
+# a fixed list the catalog keeps, not tags anybody writes): each index entry
+# names one to three of these keys in `topics`, the catalog's check refuses
+# any other word, and the Library's Topic pulldown offers them in this order.
+# A key is never renamed or taken back, only added to: an install reads the
+# ones it knows and leaves out the rest, as a build from before topics does.
+TOPICS = {
+    "languages": "Languages and SDKs", "mobile": "Mobile", "web": "Web", "databases": "Databases",
+    "ai": "AI and models", "media": "Media", "home": "Home and IoT", "files": "Files and backup",
+    "network": "Networking", "security": "Security", "devtools": "Dev tools", "monitoring": "Monitoring",
+    "productivity": "Productivity", "documents": "Documents",
+}
+TOPICS_MOST = 3
+
+
+def topics_of(doc):
+    """The topics an index entry names that this build knows, in its own
+    order, three at most; [] where it names none."""
+    got = doc.get("topics") if isinstance(doc, dict) else None
+    out = []
+    for t in got if isinstance(got, list) else []:
+        if isinstance(t, str) and t in TOPICS and t not in out:
+            out.append(t)
+    return out[:TOPICS_MOST]
+
+
+def topics_refused(doc):
+    """Why an index entry's topics are not the catalog's, or "": a list of
+    one to three keys of TOPICS, none twice. An entry with none is let
+    through, so the catalog's older entries pass until they are tagged."""
+    got = doc.get("topics") if isinstance(doc, dict) else None
+    if got is None:
+        return ""
+    if not isinstance(got, list) or not 1 <= len(got) <= TOPICS_MOST:
+        return f"topics names one to {TOPICS_MOST} of: {', '.join(TOPICS)}"
+    bad = [str(t) for t in got if t not in TOPICS]
+    if bad:
+        return f"topics has {', '.join(bad[:3])}, not one of the catalog's: {', '.join(TOPICS)}"
+    if len(set(got)) != len(got):
+        return "topics names one twice"
+    return ""
+
+
 def of(doc):
     """The format a manifest or an index entry says it needs: a whole
     number from 1, 1 when it says none, None when what it says is no number."""
