@@ -4,7 +4,7 @@
 // the DOCKER_HOST mirror are seeded, work stamps the node it belongs to,
 // every mutation grows an audit row, and the page the operator sees is
 // exactly the page it was.
-import { URL, launch, newPage, ok, done, ready, sleep, DIR, tmuxNew, animatedDuring, openFold, openArchived, closeFold, patience, saveDialog, sectSave, openSection, splitPick, refreshUntil, prefsOf, until, OWNER, api, usersPy, section, libraryShow, libraryFront } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, sleep, DIR, tmuxNew, animatedDuring, openFold, openArchived, closeFold, patience, saveDialog, sectSave, openSection, splitPick, refreshUntil, prefsOf, until, OWNER, api, usersPy, section, libraryShow, libraryFront, libraryRowsWrong } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync, readFileSync } from 'node:fs';
 
@@ -3760,6 +3760,18 @@ await section("Uninstall from the row", async () => {
     ok(!drawn.dead && drawn.opts.length === 3 && /^595\.91\.07 · recommended for this card$/.test(drawn.opts[0])
        && /^610\.57\.04 · newer than recommended$/.test(drawn.opts[1]) && /^595\.91\.07 · open kernel modules$/.test(drawn.opts[2]),
        `its version pick lists the branches apt offers, the recommended one first (${drawn.opts.join(' | ')})`);
+    // ...and in Rows the pick is a line under the card's own, the name
+    // keeping its width beside the verbs, at a desk and on a phone (the
+    // operator, 19 Nov: the pulldown took the name's column, a letter wide).
+    await page.evaluate(() => { libView = 'list'; drawPanes(); });
+    await page.waitForSelector(`.doc .librarytab .lgrid.lrows > .lcard[data-lrow="toolchain:nvidia-driver"] #libDrvSel`, { timeout: 20000 });
+    const rowsDesk = await libraryRowsWrong(page);
+    await page.setViewportSize({ width: 393, height: 851 });
+    await page.waitForTimeout(300);
+    const rowsPhone = await libraryRowsWrong(page);
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.evaluate(() => { libView = ''; drawPanes(); });
+    ok(!rowsDesk.length && !rowsPhone.length, `in Rows the driver's version is a line under its card's, the name beside the verbs (${[...rowsDesk, ...rowsPhone].slice(0, 3).join('; ') || 'all well'})`);
     await page.evaluate(id => openThing(id, 'toolchain:nvidia-driver'), shed.id);
     await page.waitForSelector(`${IDRV} .idetail`, { timeout: 20000 });
     const idrv = await page.$eval(IDRV, e => ({ state: e.querySelector('.pghead .state')?.textContent.trim() || '', detail: e.querySelector('.idetail').textContent }));

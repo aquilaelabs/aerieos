@@ -4,7 +4,7 @@
 // /api/library; the search and the chips narrow the list and save nothing;
 // a row opens on its description; the verbs are the pages' own (an install
 // is the toolchain job, which the bb stub runs in a second).
-import { launch, newPage, ok, done, ready, URL, DIR, section } from './lib.mjs';
+import { launch, newPage, ok, done, ready, URL, DIR, section, libraryRowsWrong } from './lib.mjs';
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const browser = await launch();
@@ -155,6 +155,27 @@ await section("a reload of a list lands on the same list", async () => {
   ok(after.q === word && after.box === word && after.rows === before, `a reload of a list lands on the same list (${JSON.stringify({ word, before: before.slice(0, 60), after: { ...after, rows: after.rows.slice(0, 60) } })})`);
   await page.fill('.doc .librarytab #libFind', '');
   await page.waitForFunction(() => libQ === '' && !document.querySelector('.doc .librarytab .libone'), null, { timeout: 15000 });
+});
+
+// Rows (R256): at a desk a card a line, its head, what it is and its verbs
+// side by side; on a phone two lines, the name across the card and the
+// verbs beside its pills; anything else under those.
+await section("Rows: a card a line at a desk and on a phone", async () => {
+  const wrong = [];
+  for (const kind of ['toolchain', 'agent', 'update']){
+    if (!(await page.$(`.doc .librarytab [data-libkind="${kind}"]`))) continue;
+    await page.evaluate(k => { libView = 'list'; libKind = k; libPagesFrom(); shellSync(); loadLibrary(); }, kind);
+    await page.waitForFunction(k => libKind === k && !readBusy('library') && !!document.querySelector('.doc .librarytab .libone .lgrid.lrows > .lcard'), kind, { timeout: 15000 });
+    for (const width of [1280, 393, 344]){
+      await page.setViewportSize({ width, height: width > 600 ? 900 : 851 });
+      await page.waitForTimeout(250);
+      wrong.push(...(await libraryRowsWrong(page)).map(w => `${kind} at ${width}: ${w}`));
+    }
+    await page.setViewportSize({ width: 1280, height: 900 });
+  }
+  ok(!wrong.length, `Rows keep each card's name and its verbs on its own lines, two lines on a phone, at a desk and at 393 and 344 (${wrong.slice(0, 3).join('; ') || 'all well'})`);
+  await page.evaluate(() => { libView = ''; libKind = ''; libPagesFrom(); shellSync(); loadLibrary(); });
+  await page.waitForFunction(() => libKind === '' && !readBusy('library') && !document.querySelector('.doc .librarytab .libone'), null, { timeout: 15000 });
 });
 
 // What runs only on other systems is left out of a list and counted, and

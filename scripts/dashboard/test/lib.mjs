@@ -999,3 +999,35 @@ export async function libraryShow(page, { q = '', kind = '', all = false } = {})
 }
 // ...and back to the front page's shelves.
 export async function libraryFront(page){ await libraryShow(page, { all: false }); }
+// What is wrong with the Library's Rows as drawn, card by card (R256): the
+// verbs on the card's own lines (its name, who made it and its pills) at
+// the card's right edge, the name never squeezed under a few words' width,
+// anything else the card carries (the driver's version, a failed job's
+// words) on a line of its own under those, the card's width, and on a
+// phone a card two lines tall. An empty list is all well.
+export async function libraryRowsWrong(page, sel = '.doc .librarytab .lgrid.lrows > .lcard'){
+  return page.$$eval(sel, cs => cs.flatMap(c => {
+    const r = e => e.getBoundingClientRect(), card = r(c);
+    const icon = c.querySelector('.lcicon'), name = c.querySelector('.lchead .name'), meta = c.querySelector('.lchead .lcmeta');
+    const acts = c.querySelector(':scope > .pcacts');
+    if (!icon || !name || !acts) return [`${c.dataset.lrow}: no name or verbs`];
+    const own = [icon, name, meta].filter(e => e && r(e).height).map(r);
+    const top = Math.min(...own.map(b => b.top)), bottom = Math.max(...own.map(b => b.bottom));
+    const a = r(acts), n = r(name), wrong = [];
+    const mid = a.top + a.height / 2;
+    if (acts.childElementCount && (mid < top - 2 || mid > bottom + 2)) wrong.push(`${c.dataset.lrow}: the verbs are not on the card's own lines (${Math.round(mid)} vs ${Math.round(top)}..${Math.round(bottom)})`);
+    if (acts.childElementCount && card.right - a.right > 40) wrong.push(`${c.dataset.lrow}: the verbs stop ${Math.round(card.right - a.right)}px short of the card's right edge`);
+    if (n.width < 96) wrong.push(`${c.dataset.lrow}: the name is ${Math.round(n.width)}px wide`);
+    let extra = 0;
+    for (const x of c.querySelectorAll(':scope > :not(.lchead,.lcabout,.pcacts)')){
+      const b = r(x);
+      if (!b.height) continue;
+      extra += b.height;
+      if (b.top < bottom - 1) wrong.push(`${c.dataset.lrow}: its ${x.className || x.tagName} is on the card's own lines, not under them`);
+      if (b.width < (card.width - 2 * 24) * 0.9) wrong.push(`${c.dataset.lrow}: its ${x.className || x.tagName} is ${Math.round(b.width)}px of the card's ${Math.round(card.width)}`);
+    }
+    if (innerWidth < 600 && card.height - extra > 96) wrong.push(`${c.dataset.lrow}: ${Math.round(card.height)}px tall on a phone`);
+    if (c.scrollWidth > c.clientWidth + 1) wrong.push(`${c.dataset.lrow}: runs past its card`);
+    return wrong;
+  }));
+}

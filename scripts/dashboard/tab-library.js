@@ -437,7 +437,7 @@ function libRow(r, may){
   const err = !r.running && (r.kind === "toolchain" || r.kind === "pack") && lib?.job?.errors?.[r.name] ? `<div class="sub bad">${esc(lib.job.errors[r.name])}</div>` : "";
   return `<div class="lcard${r.running ? " busy" : ""}" data-lrow="${esc(key)}">
     <div class="lchead">${libIcon(r)}
-      <div class="lctitle"><div class="name">${esc(r.label)} <button type="button" class="link lmore" data-libmore="${esc(key)}">Details</button></div><div class="lcmeta">${libPills(r)}</div></div></div>
+      <div class="lctitle"><div class="name"><span class="lcname">${esc(r.label)}</span> <button type="button" class="link lmore" data-libmore="${esc(key)}">Details</button></div><div class="lcmeta">${libPills(r)}</div></div></div>
     <div class="lcabout">${esc(r.about)}</div>
     ${r.machine && r.name === TC_DRIVER ? libDriverPick(r.machine) : ""}${err}
     <div class="pcacts actbar">${libState(r)}${libActs(r, may)}</div>
