@@ -92,7 +92,10 @@ function openNotebook(name, view){
 //   unwatch             the way to stop each watch taken, for destroy; nbCoreWatchState, nbCoreWatch
 //   halves              the six halves: the token, whether its move is news, what to re-read; makeNotebook
 //   staleHalves         the halves that moved while another page was on show; nbCoreWatchHalves, nbCoreShown
-//   dkGot               the Docker view's last /api/docker answer; nbCoreWireDocker, nbCoreLoadDocker
+//   dkGot               the Docker view's last /api/docker answer, its own node's; nbCoreWireDocker, nbCoreLoadDocker
+//   dkMore              the answers of the other nodes its containers may be on; nbCoreLoadDocker
+//   dkNode              the node the Docker view's chips narrow it to, "" for all; nbCoreDrawDocker
+//   nvNode              the node the VMs view's chips narrow it to, "" for all; nbCoreDrawVms
 //
 // This file's functions, for the views to call
 //   openSheet           opens the reading room on some elements; nbCorePublish
@@ -1149,30 +1152,56 @@ function nbCoreLoadVms(nb){
     try{
       vmsData = await getJSON("/api/vms");
     }catch(e){ viewGlance($("nvHint"), [], esc("VMs: " + e), "", "bad"); return; }
-    const rows = (vmsData.vms || []).filter(v => v.project === project);
-    const up = rows.filter(v => v.state === "running").length;
-    // The glance (R109): what runs of how many, as the VMs page counts,
-    // and on the row with VMs page and New VM what a session here may do
-    // about VMs, so those two are never on a line of their own (the sweep,
-    // 7 Nov, on a phone).
-    const dial = (state?.projects || []).find(x => x.name === project)?.prefs?.makevms || "deny";
-    viewGlance($("nvHint"), rows.length ? [{label: "running", value: up, sub: `of ${rows.length} VM${rows.length === 1 ? "" : "s"}`}] : [],
-               dial === "auto" ? "a session here makes VMs on its own" : dial === "ask" ? "a session here asks before it makes a VM"
-                 : "a session here may not make VMs");
-    const may = (vmsData.can || {})[project] === "write";
-    const nb = $("nvNew");
-    nb.hidden = !may;
-    nb.disabled = !(vmsData.hosts || []).length;
-    nb.onclick = () => openNewVm(project);
-    $("nvOpen").onclick = () => openVmsTab();
-    // What the view is for, as its empty state (R119 step 4).
-    drawHTML($("nvList"), rows.length ? vmGroupsHtml(rows)
-      : `<div class="field"><div class="hint nbempty">${!(vmsData.hosts || []).length
-          ? `No node has VM host yet: a node's Features section on the ${pageLink("nodes", "Nodes page")} installs it.`
-          : dial === "deny" ? "A session here may not make VMs (Make VMs is deny in this space's settings); a person makes one with New VM."
-          : "A session makes one with aerie vm new NAME --os debian, or a person with New VM."}</div></div>`);
-    wireVms($("nvList"));
+    nbCoreDrawVms(nb);
   });
+}
+// A band of chips narrowing a notebook's list to one node (the operator,
+// 19 Nov): drawn only where what the space has is on more than one, All and
+// a chip a node with its count, the pick kept for the page's life as the
+// Roadmap's is. `counts` is [[node id, name, how many]...]; answers the pick
+// that stands.
+function nbCoreNodeChips(nb, box, counts, picked, attr, items, pick){
+  const groups = counts.length > 1 ? counts.map(([key, label, count]) => ({key, label, count}))
+    .sort((a, b) => a.label.localeCompare(b.label, undefined, {sensitivity: "base"})) : [];
+  const on = groups.some(g => g.key === picked) ? picked : "";
+  const chips = chipButtons(groups, on, attr);
+  if (patch(box, chips, true))
+    box.querySelectorAll(`[${attr}]`).forEach(b => b.onclick = () =>
+      chipMove(() => box.closest(".nbview"), items, () => pick(b.getAttribute(attr))));
+  setHidden(box.parentElement, !chips);
+  return on;
+}
+function nbCoreDrawVms(nb){
+  const {$, project} = nb;
+  const all = (vmsData?.vms || []).filter(v => v.project === project);
+  const nodes = [...new Set(all.map(v => v.node || ""))];
+  nb.nvNode = nbCoreNodeChips(nb, $("nvChips"), nodes.map(id => [id, all.find(v => (v.node || "") === id)?.node_name || id || "no node",
+                                                               all.filter(v => (v.node || "") === id).length]),
+                              nb.nvNode || "", "data-nvnode", ".dmcard .row, .tbl > .row, .tbl .rows > .row",
+                              id => { nb.nvNode = id; nbCoreDrawVms(nb); });
+  const rows = nb.nvNode ? all.filter(v => (v.node || "") === nb.nvNode) : all;
+  const up = rows.filter(v => v.state === "running").length;
+  // The glance (R109): what runs of how many, as the VMs page counts,
+  // and on the row with VMs page and New VM what a session here may do
+  // about VMs, so those two are never on a line of their own (the sweep,
+  // 7 Nov, on a phone).
+  const dial = (state?.projects || []).find(x => x.name === project)?.prefs?.makevms || "deny";
+  viewGlance($("nvHint"), rows.length ? [{label: "running", value: up, sub: `of ${rows.length} VM${rows.length === 1 ? "" : "s"}`}] : [],
+             dial === "auto" ? "a session here makes VMs on its own" : dial === "ask" ? "a session here asks before it makes a VM"
+               : "a session here may not make VMs");
+  const may = (vmsData.can || {})[project] === "write";
+  const add = $("nvNew");
+  add.hidden = !may;
+  add.disabled = !(vmsData.hosts || []).length;
+  add.onclick = () => openNewVm(project);
+  $("nvOpen").onclick = () => openVmsTab();
+  // What the view is for, as its empty state (R119 step 4).
+  drawHTML($("nvList"), rows.length ? vmGroupsHtml(rows)
+    : `<div class="field"><div class="hint nbempty">${!(vmsData.hosts || []).length
+        ? `No node has VM host yet: a node's Features section on the ${pageLink("nodes", "Nodes page")} installs it.`
+        : dial === "deny" ? "A session here may not make VMs (Make VMs is deny in this space's settings); a person makes one with New VM."
+        : "A session makes one with aerie vm new NAME --os debian, or a person with New VM."}</div></div>`);
+  wireVms($("nvList"));
 }
 
 // This project's containers as the Containers page draws them, scoped to
@@ -1180,7 +1209,7 @@ function nbCoreLoadVms(nb){
 // its card in the page's cards or list, whichever this browser keeps.
 function nbCoreWireDocker(nb){
   const {$} = nb;
-  nb.dkGot = null;
+  nb.dkGot = null; nb.dkMore = []; nb.dkNode = "";
   $("dkOpen").onclick = () => openDocker();
   // Cards and List wait on the control row where they land: a press before
   // the read keeps the choice for when it is drawn. A space with nothing
@@ -1192,23 +1221,53 @@ function nbCoreLoadDocker(nb){
   const {$, project} = nb;
   return reading(`${project}:docker`, async () => {
     const p = (state?.projects || []).find(x => x.name === project);
-    const node = p?.prefs?.node || dockerNode || "";
+    const own = p?.prefs?.node || "";
+    const node = own || dockerNode || "";
+    // A space with a node reads it as the space's, and is told every node
+    // its containers may be on (a hosting node, one it also works on): each
+    // of the others is read the same way, on its own, since a row's presses
+    // go to the node its read names.
+    const url = n => "/api/docker" + (own ? `?project=${encodeURIComponent(project)}&node=${encodeURIComponent(n)}`
+      : n ? "?node=" + encodeURIComponent(n) : "");
     try{
-      nb.dkGot = await getJSON("/api/docker" + (node ? "?node=" + encodeURIComponent(node) : ""));
+      nb.dkGot = await getJSON(url(node));
     }catch(e){ viewGlance($("dkHint"), [], esc("docker: " + e), "", "bad"); return; }
     dockerSeen[nb.dkGot.node || node || ""] = nb.dkGot;
+    const rest = (nb.dkGot.nodes || []).map(n => n.id).filter(id => id !== (nb.dkGot.node || node));
+    // Its own node's rows are drawn as they land, the others' kept as last
+    // read until theirs do: a hosting node slow to answer holds nothing.
+    nb.dkMore = (nb.dkMore || []).filter(g => rest.includes(g.node));
+    nbCoreDrawDocker(nb);
+    if (!rest.length) return;
+    const was = nb.dkMore;
+    nb.dkMore = (await Promise.all(rest.map(id => getJSON(url(id)).catch(() => was.find(g => g.node === id) || null))))
+      .filter(Boolean);
     nbCoreDrawDocker(nb);
   });
 }
 function nbCoreDrawDocker(nb){
   const {$, project} = nb;
-  const got = nb.dkGot, node = got.node || "";
-  // What belongs to the project, which is the Containers page's group for it.
-  const mine = (got.instances || []).filter(d => d.owner === project);
-  const others = (got.containers || []).filter(c => c.owner === project);
-  const job = got.job && (got.job.running || got.job.error) ? got.job : null;
-  const blind = !!(got.blind || got.error || got.on === false);
-  const where = (nodesList || []).find(n => n.id === node)?.name || "its node";
+  const called = id => (nodesList || []).find(n => n.id === id)?.name || (nb.dkGot.nodes || []).find(n => n.id === id)?.name || "its node";
+  // What belongs to the project on each node read, which is the Containers
+  // page's group for it there.
+  const parts = [nb.dkGot, ...(nb.dkMore || [])].map(got => ({
+    got, node: got.node || "",
+    mine: (got.instances || []).filter(d => d.owner === project),
+    others: (got.containers || []).filter(c => c.owner === project),
+    job: got.job && (got.job.running || got.job.error) ? got.job : null,
+    blind: !!(got.blind || got.error || got.on === false)}));
+  const held = parts.filter(x => x.mine.length + x.others.length);
+  // The band that narrows it to one node, where it is on more than one.
+  nb.dkNode = nbCoreNodeChips(nb, $("dkChips"), held.map(x => [x.node, called(x.node), x.mine.length + x.others.length]),
+                              nb.dkNode || "", "data-dknode", ".dmcard, .tbl > .row, .tbl .rows > .row",
+                              id => { nb.dkNode = id; nbCoreDrawDocker(nb); });
+  const shown = nb.dkNode ? held.filter(x => x.node === nb.dkNode) : held.length ? held : parts.slice(0, 1);
+  const one = shown.length === 1 ? shown[0] : null;
+  const got = (one || parts[0]).got, node = (one || parts[0]).node;
+  const mine = shown.flatMap(x => x.mine), others = shown.flatMap(x => x.others);
+  const dark = shown.filter(x => x.blind && x.mine.length + x.others.length);
+  const blind = !!one && one.blind;
+  const where = one ? called(node) : `${shown.length} nodes`;
   const n = mine.length + others.length;
   // The glance (R109): the Containers page's tiles for the project's own,
   // then its node and when the images were checked, or why the rows
@@ -1218,7 +1277,8 @@ function nbCoreDrawDocker(nb){
   viewGlance($("dkHint"), blind || !n ? "" : dmTiles({running: mine.filter(d => d.running).length, all: mine.length,
     behind: mine.filter(d => (d.images_behind || []).length || d.nginx_to).length, checked: !!got.images_at}),
     blind && n ? `on ${esc(where)}: the daemon did not answer, so the rows cannot say what is running`
-      : n ? `on ${esc(where)}${imgs}` : "no node runs this space's containers yet", "", blind && n ? "warn" : "");
+      : !one && dark.length ? `on ${esc(where)}: ${esc(dark.map(x => called(x.node)).join(", "))} did not answer, so ${dark.length === 1 ? "its" : "their"} rows cannot say what is running`
+      : n ? `on ${esc(where)}${one ? imgs : ""}` : "no node runs this space's containers yet", "", (blind || (!one && dark.length)) && n ? "warn" : "");
   // Patched as the Containers page's rows are (R244): a row's settings
   // dialog open, a field typed in it and a fold stay as they are, and a
   // draw that brings nothing new writes nothing, which a key of its own
@@ -1226,13 +1286,23 @@ function nbCoreDrawDocker(nb){
   patch($("dkSeg"), n ? dmViewSeg() : "");
   dmViewWire($("dkSeg"), () => nbCoreDrawDocker(nb));
   const ck = $("dkCheck");
-  ck.hidden = blind || !mayDocker() || !mine.length;
-  ck.onclick = () => dmCheck(ck, node, () => { unbusy(ck, "Check"); ck.insertAdjacentHTML("beforeend", `<span class="lng"> for updates</span>`); nbCoreLoadDocker(nb); });
+  // Check asks each node on show that answers and has one of its instances.
+  const checks = shown.filter(x => !x.blind && x.mine.length).map(x => x.node);
+  ck.hidden = !checks.length || !mayDocker();
+  ck.onclick = async () => {
+    for (const id of checks.slice(0, -1)) await dmCheck(ck, id, () => {});
+    dmCheck(ck, checks.at(-1), () => { unbusy(ck, "Check"); ck.insertAdjacentHTML("beforeend", `<span class="lng"> for updates</span>`); nbCoreLoadDocker(nb); });
+  };
   // What the view is for, as its empty state (R119 step 4).
   dmNoteOpen($("dkList"));
-  patch($("dkList"), dmGroupsHtml(mine, others, job, blind, project)
+  patch($("dkList"), shown.map(x => dmGroupsHtml(x.mine, x.others, x.job, x.blind, project,
+                                                 {id: x.node, name: one ? "" : called(x.node)})).join("")
     || `<div class="field"><div class="hint nbempty">Send ${esc(projLabel(project))} from ${pageLink("", "Artifacts", `#/spaces/${encodeURIComponent(project)}/artifacts`)}, or pick it on a container's row on the ${pageLink("docker", "Containers page")}.</div></div>`);
-  dmWireRows($("dkList"), got);
+  // Each node's card is wired with its own read: a press on a row goes to
+  // the node that row is on.
+  const cards = [...$("dkList").querySelectorAll(":scope > .dmcard[data-node]")];
+  if (cards.length > 1) for (const c of cards) dmWireRows(c, shown.find(x => x.node === c.dataset.node)?.got || got);
+  else dmWireRows($("dkList"), got);
 }
 
 // ---- the handle the rest of the page holds ------------------------------

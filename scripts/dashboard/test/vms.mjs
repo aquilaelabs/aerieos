@@ -139,6 +139,28 @@ const nv = await page.evaluate(() => {
 });
 ok(nv.ship === 'artifacts,docker,vms,signing' && nv.row && nv.newVm,
    `a space's notebook has VMs beside Docker in Ship, its own VM's row and New VM in its head (${JSON.stringify(nv)})`);
+// Its VMs may be on more than one node: one band of chips narrows the view
+// to a node, as the Docker view's does (the operator, 19 Nov), and on one
+// node there is no band.
+const nvChips = await page.evaluate(() => {
+  const nb = getNotebook('alpha').nb, v = document.querySelector('.nbview[data-view="vms"]');
+  const read = () => ({ chips: [...v.querySelectorAll('#nvChips .chip')].map(c => c.textContent.replace(/\s+/g, ' ').trim() + (c.classList.contains('on') ? '*' : '')),
+                        band: !v.querySelector('#nvChips').parentElement.hidden, rows: v.querySelectorAll('#nvList [data-vm-key]').length,
+                        hint: v.querySelector('#nvHint').textContent.replace(/\s+/g, ' ') });
+  const one = read(), was = vmsData.vms;
+  const mine = was.find(x => x.project === 'alpha');
+  vmsData.vms = [...was, { ...mine, key: 'alpha/far', name: 'far', node: 'n_far', node_name: 'farbox', state: 'shut off' }];
+  nbCoreDrawVms(nb);
+  const two = read();
+  v.querySelector('#nvChips [data-nvnode="n_far"]').click();
+  const far = read();
+  vmsData.vms = was; nb.nvNode = '';
+  nbCoreDrawVms(nb);
+  return { one, two, far, back: read() };
+});
+ok(!nvChips.one.band && nvChips.two.band && nvChips.two.chips.length === 3 && /^All\s*2\*$/.test(nvChips.two.chips[0]) && nvChips.two.chips.some(c => /^farbox\s*1$/.test(c))
+   && nvChips.two.rows === 2 && nvChips.far.rows === 1 && /0 running of 1 VM/.test(nvChips.far.hint) && nvChips.far.chips.some(c => /^farbox\s*1\*$/.test(c)) && !nvChips.back.band,
+   `the notebook's VMs view draws no chips on one node, and on two a band of All and a chip a node that narrows the rows and the count (${JSON.stringify(nvChips.two.chips)}; ${nvChips.far.rows} row, ${nvChips.far.hint.slice(0, 40)})`);
 await page.evaluate(() => openVmsTab());
 await page.waitForSelector('.vmtab [data-vm-key="alpha/db"]', { timeout: 10000 });
 

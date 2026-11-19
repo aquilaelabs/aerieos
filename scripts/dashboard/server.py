@@ -9466,7 +9466,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def _get_docker(self):
         """GET /api/docker: the manager's whole page, containers.manager_view,
-        for the node this account may read."""
+        for the node this account may read; with a space and one of the
+        nodes its containers may be on, that node as the space's, naming
+        every such node."""
         # No node named means the default, which is the arrangement that
         # predates the picker.
         q = urllib.parse.parse_qs(self.path.partition("?")[2])
@@ -9477,7 +9479,19 @@ class Handler(BaseHTTPRequestHandler):
         # reads that project's (aerie devapp ls outside a session).
         asked = q.get("node", [""])[0]
         proj = q.get("project", [""])[0]
-        if sess or (not asked and proj):
+        # A person naming a space and one of the nodes its containers may be
+        # on reads that node as the space's (the notebook's Docker view, a
+        # node at a time, since a row's presses go to the node its read
+        # names): allowed by the space being theirs to see, as the read of
+        # all of them below is, and answered with every such node so the
+        # view knows which else to ask.
+        places = None
+        if proj and asked and not sess and proj in set(project_names(me)) and asked in devapp.container_nodes(proj):
+            places = devapp.container_nodes(proj)
+        if places is not None:
+            where = None
+            nid, why = asked, None
+        elif sess or (not asked and proj):
             # A named project reads its own node's daemon, allowed by the
             # project being the account's to see rather than by the node
             # scope (B258); the filter below still keeps the answer to the
@@ -9541,6 +9555,8 @@ class Handler(BaseHTTPRequestHandler):
                             row.setdefault("node_name", devapp.node_name(other))
                         got[k] = (got.get(k) or []) + (more.get(k) or [])
                     got["blind"] = bool(got.get("blind")) or bool(more.get("blind"))
+            if places is not None:
+                got = dict(got, nodes=[{"id": n, "name": devapp.node_name(n)} for n in places])
         return self._json(got)
 
     def _get_containers(self):

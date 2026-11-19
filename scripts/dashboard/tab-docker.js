@@ -2762,7 +2762,10 @@ function dmMatch(r){
 // ("" is All, "none" the containers of no project): a view, never saved.
 let dmChip = "";
 
-function dmGroupsHtml(ins, cs, job, blind, only = ""){
+// `on` is the node these are on, {id, name}, where a space's containers are
+// drawn a node at a time (the notebook's Docker view): its card is marked
+// with the node, and its heading says which when a name is given.
+function dmGroupsHtml(ins, cs, job, blind, only = "", on = null){
   // A project's heading wears its own color when it has one; `null` is
   // the No project heading, which wears none.
   const head = (t, sub, tone) => `<div class="field dmgroup${tone === null ? " none" : ""}"${
@@ -2794,7 +2797,7 @@ function dmGroupsHtml(ins, cs, job, blind, only = ""){
   // System is AerieOS's own (R180): what it deploys itself, the nginx
   // container today, set by that deployment and by no picker.
   // Each group a card at a desk (R262): its heading and its rows together.
-  const card = (html, cls = "") => `<section class="dmcard${cls}">${html}</section>`;
+  const card = (html, cls = "") => `<section class="dmcard${cls}"${on ? ` data-node="${esc(on.id)}"` : ""}>${html}</section>`;
   return owners.map(o => gone(o)
       ? card(head(`${gonesName(o)} (deleted)`, "restore it from the trash, or Move these to another space", null) + group(o))
       : o === "System"
@@ -2803,7 +2806,7 @@ function dmGroupsHtml(ins, cs, job, blind, only = ""){
           ? card(head(projLabel(o), "", colorTone(projectColor(o)))
               + `<div class="sub bad dmwhy">${esc(projLabel(o))} is not on your list of spaces: add it to your own list on ${
                   pageLink("users", "the Users page")} to work on these</div>` + group(o), " notmine")
-          : card(head(projLabel(o), "", colorTone(projectColor(o))) + group(o))).join("")
+          : card(head(projLabel(o), on?.name ? `on ${on.name}` : "", colorTone(projectColor(o))) + group(o))).join("")
     + (loose ? card(head("No space", "no session sees these", null) + group("")) : "");
 }
 

@@ -40,7 +40,7 @@
     try{ dmNode = localStorage.getItem("bb.dmnode") || ""; }catch(e){ /* private */ }
     const BOOT_READS = {"home/home": ["/api/home?light=1"], "people/users": ["/api/users", "/api/roles"], "people/roles": ["/api/roles"],
                         "settings/profile": ["/api/profile"], "machines/nodes": ["/api/v1/nodes"],
-                        "machines/storage": ["/api/storage"], "containers/nginx": ["/api/nginx"], "jobs/jobs": ["/api/v1/jobs?n=100"],
+                        "machines/storage": ["/api/storage"], "machines/nginx": ["/api/nginx"], "containers/nginx": ["/api/nginx"], "jobs/jobs": ["/api/v1/jobs?n=100"],
                         "containers/docker": ["/api/docker" + (dmNode ? "?node=" + encodeURIComponent(dmNode) : "")]};
     // A space's page (#/spaces/NAME, or #/projects/NAME from before): what its notebook reads as it opens.
     // Its Overview, the view it opens on, reads its rules, code base,
@@ -426,6 +426,8 @@
         <span class="actbar"><button type="button" id="nvOpen">VMs<span class="lng"> page</span></button><button type="button" id="nvNew" class="primary" hidden>New VM</button></span></div>
       <!-- The glance (R109): what runs of the project's VMs. -->
       <div class="nbglance" id="nvHint" data-tiles="1" data-said></div>
+      <!-- Narrowing it to one node, where its VMs are on more than one. -->
+      <div class="field lfilter" hidden><div class="chips" id="nvChips"></div></div>
       <div id="nvList" data-skel="rows"></div>
     </div>
     <!-- This project's Android signing keys (R106), a view of their own in
@@ -446,6 +448,8 @@
            node and when the images were checked are said in the control
            row's slot above (viewGlance). -->
       <div class="nbglance" id="dkHint" data-tiles="2" data-said></div>
+      <!-- Narrowing it to one node, where its containers are on more than one. -->
+      <div class="field lfilter" hidden><div class="chips" id="dkChips"></div></div>
       <div id="dkList" data-skel="rows"></div>
     </div>
     <div class="nbview" data-view="git" hidden>

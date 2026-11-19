@@ -67,7 +67,7 @@ The companion app's own contract is `apps/android/api-surface.json`.
 | GET | `/api/apps` | prefix | `_get_apps` | GET /api/apps: the apps this controller offers and holds (apps.view), for the Library's companion cards and the Settings section. |  |
 | GET | `/api/notices` | prefix | `_get_notices` | GET /api/notices: notices.listing, this account's own (R218 step 6). |  |
 | GET | `/api/help` | prefix | `_get_help` | GET /api/help: the docs on the Help page (helpdocs.py, R258): the listing, ?doc=NAME one of them, ?q=WORDS a search across them. |  |
-| GET | `/api/docker` | prefix | `_get_docker` | GET /api/docker: the manager's whole page, containers.manager_view, for the node this account may read. |  |
+| GET | `/api/docker` | prefix | `_get_docker` | GET /api/docker: the manager's whole page, containers.manager_view, for the node this account may read; with a space and one of the nodes its containers may be on, that node as the space's, naming every such node. |  |
 | GET | `/api/containers` | prefix | `_get_containers` | GET /api/containers. | refused: containers-read |
 | GET | `/api/vms` | exact | `_get_vms` | GET /api/vms (R91): the VMs of the projects this account may read them on (a session: its own), the OS catalog and the VM hosts. |  |
 | GET | `/api/node-files` | exact | `_get_node_files` | GET /api/node-files?node=&root=&path= (R224): the node's roots, and with a root the folder's listing; an administrator's. |  |

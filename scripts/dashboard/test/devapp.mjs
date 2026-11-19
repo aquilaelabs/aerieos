@@ -4930,6 +4930,48 @@ await section("the project a container belongs to", async () => {
   // 19 Oct): its own card under its tiles, no row loose on the page.
   ok(view.cards.length === 1 && view.loose === 0 && view.tiles.some(t => /running/.test(t)) && !view.tiles.some(t => /projects/.test(t)),
      `...in the space's own card under its tiles, as the Containers page draws a group (${JSON.stringify({cards: view.cards, loose: view.loose, tiles: view.tiles})})`);
+  // Its containers may be on more than one node (a hosting node, one it also
+  // works on): the view reads each as the space's, a node at a time, and one
+  // band of chips narrows it to a node (the operator, 19 Nov). On one node
+  // there is no band.
+  const ownNode = await page.evaluate(() => getNotebook('ep.silon').nb.dkGot.node);
+  const asSpace = await (await fetch(`${URL.replace(/\/$/, '')}/api/docker?project=ep.silon&node=${ownNode}`, { headers: OWNER })).json();
+  ok(Array.isArray(asSpace.nodes) && asSpace.nodes.some(n => n.id === ownNode && n.name) && asSpace.node === ownNode
+     && (asSpace.instances || []).some(d => d.owner === 'ep.silon'),
+     `a space's node is read as the space's, and the answer names every node its containers may be on (${JSON.stringify(asSpace.nodes)})`);
+  ok(await page.$eval('.pane .nb [data-view="docker"] #dkChips', c => !c.children.length && c.parentElement.hidden),
+     '...and with everything on one node the view draws no band of chips');
+  const two = await page.evaluate(() => {
+    const nb = getNotebook('ep.silon').nb;
+    const far = JSON.parse(JSON.stringify(nb.dkGot));
+    far.node = 'n_far';
+    far.instances = far.instances.filter(d => d.owner === 'ep.silon').slice(0, 1).map(d => ({ ...d, name: 'far-one', key: 'far-one|main' }));
+    far.containers = [];
+    nb.dkGot.nodes = [...(nb.dkGot.nodes || []), { id: 'n_far', name: 'farbox' }];
+    nb.dkMore = [far];
+    nbCoreDrawDocker(nb);
+    const v = document.querySelector('.pane .nb [data-view="docker"]');
+    const read = () => ({
+      chips: [...v.querySelectorAll('#dkChips .chip')].map(c => c.textContent.replace(/\s+/g, ' ').trim() + (c.classList.contains('on') ? '*' : '')),
+      band: !v.querySelector('#dkChips').parentElement.hidden,
+      cards: [...v.querySelectorAll('#dkList > .dmcard')].map(c => `${c.dataset.node}: ${c.querySelector('.dmgroup').textContent.replace(/\s+/g, ' ').trim()}`),
+      rows: v.querySelectorAll('#dkList .row[data-inst], #dkList .row[data-ctr]').length,
+      hint: (v.querySelector(':scope > .nbhead > .nbsaidslot')?.textContent || '') + ' ' + v.querySelector('#dkHint').textContent });
+    const all = read();
+    nb.dkNode = 'n_far';
+    nbCoreDrawDocker(nb);
+    const one = read();
+    nb.dkNode = ''; nb.dkMore = []; nb.dkGot.nodes = nb.dkGot.nodes.filter(n => n.id !== 'n_far');
+    nbCoreDrawDocker(nb);
+    return { all, one, back: read() };
+  });
+  ok(two.all.band && two.all.chips.length === 3 && /^All\s*\d+\*$/.test(two.all.chips[0]) && two.all.chips.some(c => /^farbox\s*1$/.test(c))
+     && two.all.cards.length === 2 && two.all.cards.some(c => /^n_far: .*on farbox/.test(c)) && /on 2 nodes/.test(two.all.hint),
+     `on two nodes the band offers All and a chip a node with its count, each node's card saying which it is (${JSON.stringify(two.all.chips)}; ${JSON.stringify(two.all.cards)}; ${two.all.hint.replace(/\s+/g, ' ').slice(0, 60)})`);
+  ok(two.one.chips.some(c => /^farbox\s*1\*$/.test(c)) && two.one.cards.length === 1 && /^n_far: /.test(two.one.cards[0])
+     && !/on farbox/.test(two.one.cards[0]) && two.one.rows === 1 && /on farbox/.test(two.one.hint),
+     `...a node's chip leaves that node's rows alone, the glance counting them (${JSON.stringify(two.one.cards)}, ${two.one.rows} row; ${two.one.hint.replace(/\s+/g, ' ').slice(0, 60)})`);
+  ok(!two.back.band && two.back.cards.length === 1, '...and the band goes when one node is left');
   // Idle, the view re-reads nothing (B727): it followed the status poll, and
   // on an agent node each docker read moved the nodes token, which ran the
   // status poll, which read docker again, 134 requests in 30 s.
