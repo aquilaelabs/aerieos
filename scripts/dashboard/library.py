@@ -353,9 +353,10 @@ def _score(r, words):
 
 
 def _front_order(r):
-    # A shelf's order: Packaged by Aerie first, then the newest in the
-    # catalog, then by name.
-    return (TIER_ORDER.get(r.get("tier"), 9), -int(r.get("added_at") or 0), str(r.get("label") or r.get("name") or "").lower())
+    # A shelf's order: the machine's own first (the NVIDIA driver, then its
+    # container toolkit, as rows() lists them), then Packaged by Aerie, then
+    # the newest in the catalog, then by name.
+    return (not r.get("machine"), TIER_ORDER.get(r.get("tier"), 9), -int(r.get("added_at") or 0), str(r.get("label") or r.get("name") or "").lower())
 
 
 def browse(rows, q="", kind="", topic="", tier="", here=True, sort="", offset=0, limit=30, kinds=()):
@@ -426,7 +427,9 @@ def browse(rows, q="", kind="", topic="", tier="", here=True, sort="", offset=0,
     elif sort == "added":
         matched.sort(key=lambda rs: (-int(rs[0].get("added_at") or 0), str(rs[0].get("label") or rs[0].get("name")).lower()))
     else:
-        matched.sort(key=lambda rs: str(rs[0].get("label") or rs[0].get("name")).lower())
+        # By name, the machine's own first in the order rows() gives them
+        # (the driver before the toolkit that needs it).
+        matched.sort(key=lambda rs: (not rs[0].get("machine"), "" if rs[0].get("machine") else str(rs[0].get("label") or rs[0].get("name")).lower()))
     out["rows"] = [r for r, _ in matched[offset:offset + limit]]
     out["offset"] = offset
     return out

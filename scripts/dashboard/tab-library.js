@@ -544,8 +544,8 @@ function renderLibraryInto(i){
     d.setBar("");
     const skcard = () => `<div class="lcard skcard"><div class="lchead"><span class="lcicon"></span><div class="lctitle">${skv(7, "name")}${skv(4)}</div></div>${skRows(1)}</div>`;
     drawHTML(d.list, skTpl(pageHead({facts: [["Installed", GHOST], ["Store", GHOST]]})
-      + `<div class="field lfilter libfilter"><div class="libsearchrow"><input type="search" disabled placeholder="search by name or what it does"><span class="actbar"><button type="button" disabled>${barSaid("Check for updates", "Check")}</button><button type="button" class="primary" disabled>${barSaid("Add your own", "Add")}</button></span></div><div class="chips">${skel("chips", 5)}</div>${libHadTiers ? `<div class="chips">${skel("chips", 3)}</div>` : ""}</div>`
-      + `<div class="field libgroups">${LIB_KINDS.map(([k, title]) => `<div class="libgroup"><h3 class="libgname">${esc(title)}</h3><div class="lgrid">${skcard()}${skcard()}${skcard()}</div></div>`).join("")}</div>`));
+      + `<div class="field lfilter libfilter"><div class="libsearchrow"><input type="search" disabled placeholder="search by name, maker or what it does"><span class="libnarrow"><label class="pick libsort"><select disabled aria-label="order"><option>By name</option></select></label>${viewSeg("libviewsk", libViewNow(), "", "", " disabled", ["Cards", "Rows"])}</span><span class="actbar"><button type="button" disabled>${barSaid("Check for updates", "Check")}</button><button type="button" class="primary" disabled>${barSaid("Add your own", "Add")}</button></span></div><div class="chips">${skel("chips", 5)}</div>${libHadTiers ? `<div class="chips">${skel("chips", 3)}</div>` : ""}</div>`
+      + `<div class="field libgroups">${[["installed", "On this node"], ...LIB_KINDS].map(([k, title]) => `<div class="libgroup"><h3 class="libgname">${esc(title)}<button type="button" class="link libshelfall" disabled>All ›</button></h3><div class="lgrid">${skcard()}${skcard()}${skcard()}</div></div>`).join("")}</div>`));
     if (!readRev("library") && !readBusy("library")) loadLibrary();
     return;
   }

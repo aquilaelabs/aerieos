@@ -981,3 +981,21 @@ export async function member(...names) {
       body: JSON.stringify({ action: 'edit', name, projects: was }) });
   }
 }
+
+// The Library narrowed as a person would (R256): it opens on shelves of
+// eight, so a suite after a card past them, or every card of a kind, asks
+// for it: `q` its search, `kind` a chip (its every page brought in), `all`
+// the cards for other systems too (left out, as the page leaves them). Resolves once the list is drawn whole.
+export async function libraryShow(page, { q = '', kind = '', all = false } = {}){
+  await page.evaluate(([q, kind, all]) => { libQ = q; libKind = kind; libTopic = ''; libTier = ''; libAll = all;
+    if (lib) lib.moreAsked = false; libPagesFrom(); shellSync(); loadLibrary(); }, [q, kind, all]);
+  await page.waitForFunction(([q, kind]) => libQ === q && libKind === kind && lib && !readBusy('library') && Array.isArray(lib.rows)
+    && (!(q || kind) || !!document.querySelector('.doc .librarytab .libone')), [q, kind], { timeout: 20000 });
+  for (let i = 0; i < 20 && await page.evaluate(() => (lib.rows || []).length < (lib.total || 0)); i++){
+    await page.evaluate(() => libMore());
+    await page.waitForFunction(() => !lib.moreAsked, null, { timeout: 20000 });
+  }
+  await page.waitForFunction(() => document.querySelectorAll('.doc .librarytab .libone .lcard').length >= (lib.rows || []).length, null, { timeout: 20000 }).catch(() => {});
+}
+// ...and back to the front page's shelves.
+export async function libraryFront(page){ await libraryShow(page, { all: false }); }

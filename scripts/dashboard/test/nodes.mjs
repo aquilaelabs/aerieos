@@ -4,7 +4,7 @@
 // the DOCKER_HOST mirror are seeded, work stamps the node it belongs to,
 // every mutation grows an audit row, and the page the operator sees is
 // exactly the page it was.
-import { URL, launch, newPage, ok, done, ready, sleep, DIR, tmuxNew, animatedDuring, openFold, openArchived, closeFold, patience, saveDialog, sectSave, openSection, splitPick, refreshUntil, prefsOf, until, OWNER, api, usersPy, section } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, sleep, DIR, tmuxNew, animatedDuring, openFold, openArchived, closeFold, patience, saveDialog, sectSave, openSection, splitPick, refreshUntil, prefsOf, until, OWNER, api, usersPy, section, libraryShow, libraryFront } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync, readFileSync } from 'node:fs';
 
@@ -2018,6 +2018,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     await page.goForward();
     await libOn(minted.id);
   }
+  await libraryShow(page, { kind: 'toolchain' });
   const tools = await page.$$eval('.doc .librarytab .lcard[data-lrow^="toolchain:"]', rs => rs.map(r => r.textContent.replace(/\s+/g, ' ')));
   ok(tools.some(t => /6655482e/.test(t)) && tools.some(t => /29\.0\.14206865/.test(t))
      && !tools.some(t => /3\.24\.0/.test(t)),
@@ -2061,6 +2062,7 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     // What each tool pulls onto this machine is on its record, named in the
     // node's package manager, before Install rather than in a job log after.
     // The Library's card does not draw it; the read it is drawn from carries it.
+    await libraryShow(page, { q: 'dotnet' });
     const dotnetSys = await page.evaluate(() => { const r = lib.rows.find(x => x.kind === 'toolchain' && x.name === 'dotnet');
       return r ? { ...(r.system || {}), installed: !!r.installed } : null; });
     ok(dotnetSys?.manager === 'dnf' && (dotnetSys.names || []).includes('libicu') && !dotnetSys.installed,
@@ -3746,6 +3748,7 @@ await section("Uninstall from the row", async () => {
     const DRV = '.doc .librarytab .lcard[data-lrow="toolchain:nvidia-driver"]';
     const IDRV = `.doc .thingtab [data-instnode="${shed.id}"][data-thing="toolchain:nvidia-driver"]`;
     await page.evaluate(id => { nodesList = null; openLibraryOn(id); }, shed.id);
+    await libraryShow(page, { kind: 'toolchain' });
     await page.waitForSelector(`${DRV} #libDrvSel`, { timeout: 20000 });
     const drawn = await page.$eval(DRV, e => ({ text: e.textContent.replace(/\s+/g, ' ').trim(),
       install: !!e.querySelector('[data-libact="install"][data-libname="nvidia-driver"]'),
@@ -3834,7 +3837,7 @@ await section("Uninstall from the row", async () => {
       await cancel(both);
       await hello(shed, { sandbox: true, gpu_card: card, gpu_driver: on, gpu_container: none });
       await page.evaluate(id => openLibraryOn(id), shed.id);
-      await page.evaluate(() => loadLibrary());
+      await libraryShow(page, { kind: 'toolchain' });
       await page.waitForFunction(sel => !!document.querySelector(sel + ' [data-libact="install"]:not([disabled])'), CTK, { timeout: 20000 });
       const kd = await page.$eval(CTK, c => ({ text: c.textContent.replace(/\s+/g, ' ').trim(),
         under: c.previousElementSibling?.dataset.lrow === 'toolchain:nvidia-driver' }));
@@ -3845,6 +3848,7 @@ await section("Uninstall from the row", async () => {
       ok(await page.$eval(ICTK, r => r.querySelector('.pghead .state')?.textContent.trim() === 'not installed' && !r.querySelector('[data-instact="remove"]')),
          '...and the Installed page\'s row says it is not installed, so a container here cannot reserve the card, with nothing to remove');
       await page.evaluate(id => openLibraryOn(id), shed.id);
+      await libraryShow(page, { kind: 'toolchain' });
       await page.waitForSelector(`${CTK} [data-libact="install"]`, { timeout: 20000 });
       const ni = page.dialogs.length;
       await page.click(`${CTK} [data-libact="install"]`);
@@ -4024,6 +4028,9 @@ await section("Claude Code on a node", async () => {
   // and the click goes to the drawer, which runs no link's handler (B748).
   // Pressed again while the drawer is still open on the link.
   const agLink = `#bellPanel [data-bag="${en.id}"]`;
+  // The Library back on its front page: the toolchain list the checks above
+  // narrowed it to is theirs (R256).
+  await libraryFront(page);
   let went = '';
   for (let i = 0; i < 3; i++){
     if (await page.isVisible(agLink)) await page.click(agLink, { timeout: 5000 }).catch(() => {});

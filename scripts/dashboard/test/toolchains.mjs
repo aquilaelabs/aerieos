@@ -8,7 +8,7 @@
 // answers a toolchain job at once, failing it), the Installed page's rows,
 // and the tool pack dialog the Library's Add your own and a card's Edit
 // open. Then the shell libraries a session on a node reads its store with.
-import { launch, newPage, ok, done, ready, sectSave, URL, DIR, until as untilTrue, section } from './lib.mjs';
+import { launch, newPage, ok, done, ready, sectSave, URL, DIR, until as untilTrue, section, libraryShow } from './lib.mjs';
 import { existsSync, readFileSync } from 'node:fs';
 
 const browser = await launch();
@@ -48,10 +48,13 @@ const tcInstall = async (names, node) => {
 };
 
 const sb = (await api('/api/v1/nodes')).nodes.find(n => n.name === 'sandbox');
-const toLibrary = async () => {
+// The Library on the sandbox node, narrowed to one kind's every card (R256:
+// it opens on shelves of eight), the toolchains unless a section says.
+const toLibrary = async (kind = 'toolchain') => {
   await page.evaluate(id => openLibraryOn(id), sb.id);
   await page.waitForFunction(id => libNode === id && lib && Array.isArray(lib.rows)
     && !!document.querySelector(`.pane .doc.on .librarytab [data-libnode="${id}"]`), sb.id, { timeout: 20000 });
+  await libraryShow(page, { kind });
 };
 await toLibrary();
 
@@ -656,7 +659,7 @@ await section("tool packs (R77)", async () => {
     await page.waitForSelector('#tpmodal:not([hidden]) [data-tpwhat="pack"]', { timeout: 15000 });
     await page.click('#tpmodal [data-tpwhat="pack"]');
   };
-  await toLibrary();
+  await toLibrary('pack');
   await addYourOwn();
   await page.fill('#tpmodal #tpUrl', `file://${repo}`);
   await page.click('#tpmodal [data-tplook]');
@@ -703,7 +706,7 @@ await section("tool packs (R77)", async () => {
              strings: { about: 'Its strings.', usage: 'FILE', run: ['{dir}/bin/hexkit', 'strings', '{args}'] } } }));
   g('commit', '-qam', 'later');
   const newer = g('rev-parse', 'HEAD');
-  await toLibrary();
+  await toLibrary('pack');
   await packCard('hexkit');
   await page.click(EDIT('hexkit'));
   await page.waitForSelector('#tpmodal:not([hidden]) .tpseen', { timeout: 20000 });
@@ -791,7 +794,7 @@ await section("tool packs (R77)", async () => {
       ok(/newer pin, or remove it/.test(words), `...its Details page's source line opens its dialog, Remove in it (${words})`);
       await page.waitForFunction(() => !tpForm.busy, null, { timeout: 20000 });
       await page.click('#tpmodal [data-tpcancel]');
-      await toLibrary();
+      await toLibrary('pack');
     }
     // Its own icon (R182): named in its manifest, read at the commit it is
     // kept at, drawn on its card as an image, and served as one alone: an SVG
@@ -831,9 +834,13 @@ await section("tool packs (R77)", async () => {
     await page.waitForSelector(`.doc.on .librarytab .lcard[data-lrow="pack:forall"]`, { timeout: 20000 });
     const later = await page.evaluate(() => ({
       cards: ['later', 'otherline', 'forall'].map(n => !!document.querySelector(`.doc.on .librarytab .lcard[data-lrow="pack:${n}"]`)),
-      rows: (lib.rows || []).filter(r => r.too_new).map(r => r.name).sort().join(),
+      rows: null,
       head: [...document.querySelectorAll('.doc.on .librarytab .pghead dt, .doc.on .librarytab .facts dt')].map(d => `${d.textContent.trim()}=${d.nextElementSibling?.textContent.trim()}`)
         .find(x => /^Not for this AerieOS/.test(x)) || '' }));
+    // An entry this build does not take never reaches a look at the Library
+    // (R256): the whole list says which.
+    later.rows = (await page.evaluate(async () => (await getJSON('/api/library?node=' + encodeURIComponent(libNode))).rows || []))
+      .filter(r => r.too_new).map(r => r.name).sort().join();
     // (A build with no version, as the suite's is, judges no entry by its release lines: only the format counts here.)
     const want = later.rows === 'later,otherline' ? [false, false, true] : [false, true, true];
     ok(JSON.stringify(later.cards) === JSON.stringify(want) && /^Not for this AerieOS=\d+ in the catalog$/.test(later.head),
@@ -895,7 +902,7 @@ await section("tool packs (R77)", async () => {
   const pasted = { name: 'wordy', label: 'Wordy', about: 'Counts words.', platforms: ['linux/amd64', 'linux/arm64'],
     install: { steps: [['sh', '-c', 'mkdir -p "$1/bin"', 'x', '{dir}']] },
     verbs: { count: { about: 'Words in a file.', usage: 'FILE', run: ['{dir}/bin/wordy', '{args}'] } } };
-  await toLibrary();
+  await toLibrary('pack');
   await addYourOwn();
   const tpH = () => page.$eval('#tpmodal .box', b => Math.round(b.getBoundingClientRect().height));
   // The dialog's own opening scale is over: the box is measured at rest.

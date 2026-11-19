@@ -71,7 +71,9 @@ const DRIVERS = {
   entry: {
     open: () => page.evaluate(async () => {
       if (!lib || !lib.rows) await loadLibrary();
-      const r = (lib?.rows || []).find(x => x.kind === 'toolchain' && !x.wrong_platform);
+      // From the whole list: the page holds shelves or a page of one (R256).
+      const all = (await getJSON('/api/library?node=' + encodeURIComponent(libNode))).rows || [];
+      const r = all.find(x => x.kind === 'toolchain' && !x.wrong_platform);
       openEntry(libNode, r ? `toolchain:${r.name}` : 'agent:claude-code');
     }),
     readyWhen: '.entrytab details.sect, .entrytab .notice',
