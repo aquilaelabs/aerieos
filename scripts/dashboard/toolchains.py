@@ -43,8 +43,7 @@ run = None
 write_json = None
 STATE = None
 nodes = None          # the node store, once the server has opened it (phase 6)
-claudecode = None     # claudecode.py, set by the server: Claude Code as a node's toolchain (R145)
-agentcode = None      # agentcode.py, set by the server: the other coding agents' rows (R95 step 2)
+agentcode = None      # agentcode.py, set by the server: the coding agents' rows, Claude Code's first (R145, R95 step 2)
 
 
 def configure(*, run, write_json, state, project_nodes=None, workspace=None):
@@ -993,8 +992,8 @@ def last_check(nid):
 
 def attention(project_nodes):
     """Bell rows, one per live agent node with a toolchain behind what is
-    out: every toolchain its last check found an update for, and Claude
-    Code beside them (claudecode.behind), each as {name, label, from, to}.
+    out: every toolchain its last check found an update for, each as
+    {name, label, from, to} (the coding agents' are agent_attention's).
     One shape for all of them, with Open on the Library for that node,
     which is where each is updated (the operator, 9 Oct). Computed on every
     poll, so a row leaves the moment its update lands. `project_nodes` is
@@ -1028,9 +1027,6 @@ def agent_attention(project_nodes):
         if n.get("kind") != "agent" or not n.get("live"):
             continue
         tools = []
-        if claudecode and claudecode.behind(n) and not claudecode.updating(n["id"]):
-            tools.append({"name": "claude-code", "label": "Claude Code",
-                          "from": claudecode.installed(n), "to": claudecode.latest()["version"]})
         for a in agentcode.tracked() if agentcode else ():
             if agentcode.behind(n, a.id) and not agentcode.updating(n["id"], a.id):
                 tools.append({"name": a.tool, "label": a.product,
@@ -2454,14 +2450,11 @@ def node_checks_due(now=None):
         if r.get("ok") or r.get("job"):
             queued.append(n["id"])
             getattr(nodes, "checks_wanted", set()).discard(n["id"])
-    # Claude Code on the same clock (R145): asked once for every node, since
-    # what is out is one answer, when any node was due or a week has passed.
+    # The coding agents on the same clock, Claude Code first (R145, R95 step
+    # 2): each asked once for every node, since what is out is one answer,
+    # when any node was due or a week has passed.
     import checks
     agents_every = checks.every("catalog") or TC_CHECK_EVERY
-    if claudecode and (queued or now - int(claudecode.latest().get("at") or 0) >= agents_every):
-        with contextlib.suppress(Exception):
-            claudecode.check()
-    # The other coding agents on the same clock (R95 step 2).
     for a in agentcode.tracked() if agentcode else ():
         if queued or now - int(agentcode.latest(a.id).get("at") or 0) >= agents_every:
             with contextlib.suppress(Exception):

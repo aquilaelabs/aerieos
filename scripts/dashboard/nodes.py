@@ -5513,7 +5513,7 @@ session_tokens_for = lambda nid, sessions: []   # noqa: E731
 
 def reported_set(nid, key, sub, value):
     """One field of a node's census, set by this side between hellos: what a
-    finished job measured (claudecode.update_done, B249). The next hello
+    finished job measured (agentcode.update_done, B249). The next hello
     replaces the whole record, which is right: the node's word is the
     census, and this is only how the minutes before it are not wrong."""
     # Read and written under the store's lock, the row read afresh (R228
@@ -6192,7 +6192,7 @@ JOB_TYPES = ("exec", "self-update", "compose", "system", "toolchain", "cache-cle
              # claude-logout (`claude auth logout` there, in one account's
              # home, since the login is that machine's to let go) and
              # claude-update (the installer run there, then the binary pinned
-             # where the account cannot write it, claudecode.py). An install
+             # where the account cannot write it, agentcode.py). An install
              # is queued by an administrator's press and nothing else; the
              # agent's sessions on the node are ended first.
              *(j for a in agents.TABLE for j in (a.login_job, a.logout_job) if j),

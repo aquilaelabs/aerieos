@@ -6,6 +6,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+import agents  # noqa: E402
 import toolchains  # noqa: E402
 
 NODE = {"id": "n1", "name": "box", "kind": "agent", "state": "online", "live": True, "reported": {}}
@@ -26,22 +27,26 @@ class Sessions(unittest.TestCase):
                 return lambda *a, **k: []
 
         class Claude:
-            behind = staticmethod(lambda n: True)
-            updating = staticmethod(lambda nid: False)
-            installed = staticmethod(lambda n: "2.0.1")
-            latest = staticmethod(lambda: {"version": "2.0.2"})
+            tracked = staticmethod(lambda: (agents.get("claude"),))
+            behind = staticmethod(lambda n, aid: True)
+            updating = staticmethod(lambda nid, aid: False)
+            installed = staticmethod(lambda n, aid: "2.0.1")
+            latest = staticmethod(lambda aid: {"version": "2.0.2"})
 
-        was = toolchains.nodes, toolchains.claudecode, toolchains.last_check, toolchains.agentcode
-        toolchains.nodes, toolchains.claudecode, toolchains.agentcode = Nodes(), Claude(), None
+        was = toolchains.nodes, toolchains.last_check, toolchains.agentcode
+        toolchains.nodes, toolchains.agentcode = Nodes(), Claude()
         toolchains.last_check = lambda nid: ({}, None)
         try:
             bound = {"alpha": "n1", "beta": "n1", "ep.silon": "n1", "gamma": "n1", "far": "n2"}
             # The coding agents' own row (R95: the coding agents'), not the
             # toolchains'.
             self.assertFalse([r for r in toolchains.attention(bound) if r["kind"] == "toolchain"])
-            return [r for r in toolchains.agent_attention(bound) if r["kind"] == "agents"]
+            got = [r for r in toolchains.agent_attention(bound) if r["kind"] == "agents"]
+            self.assertEqual([r["tools"] for r in got],
+                             [[{"name": "claude-code", "label": "Claude Code", "from": "2.0.1", "to": "2.0.2"}]])
+            return got
         finally:
-            toolchains.nodes, toolchains.claudecode, toolchains.last_check, toolchains.agentcode = was
+            toolchains.nodes, toolchains.last_check, toolchains.agentcode = was
 
     def test_no_session_running_counts_none(self):
         (row,) = self.bell([{"name": "shell-alpha"}])

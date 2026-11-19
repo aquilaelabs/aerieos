@@ -4857,14 +4857,12 @@ import jobs                                                      # noqa: E402
 if not NODES_OK:
     jobs.configure(nodes_module=nodes)
     toolchains.nodes = nodes
-    toolchains.claudecode = claudecode
     toolchains.agentcode = agentcode
     emulator.nodes = nodes
     phone.nodes = nodes            # every adb command is a job on a node
     # A compose action the AGENT ran still has records to write here; this is
     # where the module that queued it finishes it (roadmap #18).
     nodes.on_done("compose", devactions.compose_done)
-    nodes.on_done(claudecode.JOB, claudecode.update_done)
     for _a in agentcode.tracked():
         nodes.on_done(_a.update_job, agentcode.update_done)
 # What Allow on a rebuild request actually starts (the Docker row's `ask`).
@@ -5401,13 +5399,12 @@ version.configure_verbs(PANEL=version_payload, GIT_ENV=users.git_env, CREDS_ENV=
 
 
 
-# Claude Code on the nodes (claudecode.py): what each runs against what is
-# out, and the one way it is updated, which is an administrator's press.
+# The coding agents on the nodes, Claude Code among them (agentcode.py):
+# what each runs against what is out, and the one way it is updated, which
+# is an administrator's press.
 if not NODES_OK:
-    claudecode.configure(nodes_module=nodes, node_sessions=node_tmux_sessions,
-                         tmux_base=tmux_base, audit=nodes.audit, recipe_spec=agentcode.recipe_spec)
     agentcode.configure(nodes_module=nodes, node_sessions=node_tmux_sessions,
-                        tmux_base=tmux_base, audit=nodes.audit, claude=claudecode,
+                        tmux_base=tmux_base, audit=nodes.audit,
                         catalog_entry=_catalog_official, fetch_pack=toolpacks.fetch)
 
 # Every account's sessions on a project, for its settings dialog, and an
@@ -8053,12 +8050,10 @@ class Handler(BaseHTTPRequestHandler):
         t = session_target(project, claude=True, node=_arg_node(arg), uid=uid)
         if t["where"] != "node":
             return ""
-        # The agent on that node first (claudecode.py, agentcode.py): an
-        # update running there holds the start.
-        ag = agents.of_arg(arg)[0]
-        if ag and ag.id != "claude":
-            return agentcode.start_hold(project, t["id"], ag.id) or ""
-        return claudecode.start_hold(project, t["id"]) or ""
+        # The agent on that node first (agentcode.py): an update running
+        # there holds the start. An argument that names no agent is Claude's.
+        ag = agents.of_arg(arg)[0] or agents.default()
+        return agentcode.start_hold(project, t["id"], ag.id) or ""
 
     def _scoped_arg(self, rest, node=False):
         """Stamp the terminal's argument with the account that asked for it.
@@ -14994,8 +14989,7 @@ def main():
     doctor.start()
     idle.start()
     if not NODES_OK:
-        claudecode.start()        # the first check soon after the start, then every six hours
-        agentcode.start()         # ...and the other coding agents' (R95 step 2)
+        agentcode.start()         # each coding agent's first check soon after the start (R95 step 2), then on the toolchains' clock
     # The seed file once, before the first look at the release (R272 step 4).
     try:
         if seeded := apps.seed(settings.set_many):

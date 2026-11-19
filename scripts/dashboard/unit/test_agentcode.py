@@ -1,7 +1,7 @@
-"""Codex CLI and Copilot CLI as a node's rows in the Library and on the
+"""The coding agents as a node's rows in the Library and on the
 Installed page (R95 step 2): the census's version against the registry's latest, each install its
-own job, and the node agent's half run against a stub installer, never a
-vendor's."""
+own job, Claude Code one of them in its own words, and the node agent's
+half run against a stub installer, never a vendor's."""
 import json
 import os
 import sys
@@ -88,8 +88,8 @@ class Controller(unittest.TestCase):
         agentcode.tmux_base = lambda s: s
         return agentcode.nodes
 
-    def test_codex_copilot_grok_and_open_are_tracked_and_claude_is_not(self):
-        self.assertEqual([a.id for a in agentcode.tracked()], ["codex", "copilot", "grok", "open"])
+    def test_every_agent_the_library_installs_is_tracked_claude_first(self):
+        self.assertEqual([a.id for a in agentcode.tracked()], ["claude", "codex", "copilot", "grok", "open"])
 
     def test_the_version_is_read_out_of_what_each_prints(self):
         n = node(codex="codex-cli 0.163.0", copilot="GitHub Copilot CLI 1.0.102.")
@@ -264,10 +264,37 @@ class Controller(unittest.TestCase):
         self.use(node(codex=""))
         self.assertIn("not installed", agentcode.remove("user:admin", "n1", "codex")["error"])
 
-    def test_claude_is_not_this_module_s(self):
-        self.use(node())
-        with self.assertRaises(KeyError):
-            agentcode.update("user:admin", "n1", "claude")
+    def test_claude_code_is_one_of_them_in_its_own_wording(self):
+        ns = self.use(node())
+        agentcode._latest["claude"] = {"version": "2.1.306", "at": 1, "error": "", "checking": False}
+        self.assertTrue(agentcode.update("user:admin", "n1", "claude")["ok"])
+        self.assertEqual(ns.added, [("claude-update", {"timeout": 900, "to": "2.1.306", "ended": [],
+                                                       "recipe": agents.get("claude").install, "recipe_from": "release"})])
+        # Its own wording of a hold and of a refusal, beside the common one.
+        ns.jobs_for = lambda *a, **k: [{"type": k.get("type")}]
+        self.assertEqual(agentcode.start_hold("alpha", "n1", "claude"),
+                         "Claude Code is updating on box: press Claude on alpha again when its row comes back")
+        self.assertEqual(agentcode.start_hold("alpha", "n1", "codex"),
+                         "Codex CLI is updating on box: start ChatGPT on alpha again when its row on the Installed page comes back")
+        self.use(node(up=False))
+        self.assertEqual(agentcode.update("user:admin", "n1", "claude")["error"],
+                         "box runs no session account, so there is no Claude Code there to update")
+        self.assertEqual(agentcode.update("user:admin", "n1", "codex")["error"],
+                         "box runs no session account, so there is nowhere for Codex CLI to go")
+
+    def test_the_latest_of_claude_code_is_its_installer_s_plain_file(self):
+        with mock.patch.dict(os.environ):
+            os.environ.pop("BB_CLAUDE_LATEST_URL", None)
+            self.assertEqual(agentcode.latest_url(agents.get("claude")), "https://downloads.claude.ai/claude-code-releases/latest")
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
+            f.write("2.1.306\n")
+        self.addCleanup(os.unlink, f.name)
+        with mock.patch.dict(os.environ, {"BB_CLAUDE_LATEST_URL": "file://" + f.name}):
+            self.assertEqual(agentcode.check("claude")["version"], "2.1.306")
+        # What could not be asked is named by where each agent's answer comes from.
+        with mock.patch.dict(os.environ, {"BB_CLAUDE_LATEST_URL": "file:///nonexistent", "BB_CODEX_LATEST_URL": "file:///nonexistent"}):
+            self.assertTrue(agentcode.check("claude")["error"].startswith("could not reach the download service: "))
+            self.assertTrue(agentcode.check("codex")["error"].startswith("could not reach the registry: "))
 
     def test_the_census_catches_up_when_the_job_ends(self):
         ns = self.use(node())
@@ -275,11 +302,12 @@ class Controller(unittest.TestCase):
         agentcode.update_done({"id": "j_1", "type": "codex-update", "node": "n1", "spec": {}}, "succeeded")
         self.assertEqual(ns.reported, [("n1", "session", "codex", "0.163.0")])
 
-    def test_the_toolchains_page_draws_both_beside_claude(self):
+    def test_the_toolchains_page_draws_each_with_claude_s_first(self):
         self.use(node())
         toolchains.agentcode = agentcode
-        names = [agentcode.row(node(), a.id)["name"] for a in agentcode.tracked()]
-        self.assertEqual(names, [a.tool for a in agents.installable() if a.id != "claude"])
+        names = [r["name"] for r in agentcode.rows(node())]
+        self.assertEqual(names, [a.tool for a in agents.installable()])
+        self.assertEqual(names[0], "claude-code")
 
 
 class NodeAgent(unittest.TestCase):

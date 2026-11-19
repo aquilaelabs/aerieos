@@ -3970,7 +3970,7 @@ await section("Uninstall from the row", async () => {
   await napi('/api/v1/nodes', { action: 'retire', id: plain.id });
 });
 
-// ---- Claude Code on a node: version, check, update (claudecode.py) ------
+// ---- Claude Code on a node: version, check, update (agentcode.py) -------
 // The node reports what its session account runs; the controller asks the
 // installer's `latest` (a file here) after it starts and on Check. Behind
 // is a bell row and a sentence on the section; Update ends the Claude
@@ -4140,18 +4140,18 @@ await section("Claude Code on a node", async () => {
     const said = execFileSync('python3', ['-c', `
 import sys, json
 sys.path.insert(0, ${JSON.stringify(REPO + '/scripts/dashboard')})
-import claudecode as m
+import agentcode as m
 seen = []
 class N:
     def node(self, i): return {"id": i, "name": "clbox", "kind": "agent", "live": True, "reported": {"session": {"up": True}}}
     def jobs_for(self, *a, **k): return []
     def session_kill(self, nid, name):
-        seen.append(m.updating(nid)); return {"ok": True}
+        seen.append(m.updating(nid, "claude")); return {"ok": True}
     def job_add(self, who, sel, typ, spec): return {"ok": True, "job": "j_1"}
 m.configure(nodes_module=N(), node_sessions=lambda: [{"node_id": "n1", "name": "u_1~claude-beta"}], tmux_base=lambda s: s.split("~")[-1])
-m._latest["version"] = "1.2.0"
-r = m.update("test", "n1")
-print(json.dumps({"held_while_ending": seen, "after": m.updating("n1"), "ok": r.get("ok")}))
+m._latest["claude"] = {"version": "1.2.0", "at": 0, "error": "", "checking": False}
+r = m.update("test", "n1", "claude")
+print(json.dumps({"held_while_ending": seen, "after": m.updating("n1", "claude"), "ok": r.get("ok")}))
 `], { encoding: 'utf8' }).trim();
     const r = JSON.parse(said);
     ok(r.ok && r.held_while_ending.length === 1 && r.held_while_ending[0] === true && r.after === false,

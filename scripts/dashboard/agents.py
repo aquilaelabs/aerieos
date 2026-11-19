@@ -8,7 +8,8 @@ used to say claude asks here which agent a name or an argument is, and
 what that agent's command, job, sign-in or transcript folder is called.
 
 Each row is an adapter: how the agent installs and reports its version
-(`command`, `reported`, `version`, `update_job`), signs in and out
+(`command`, `reported`, `version`, `update_job`, and where its newest is
+asked, `latest_url` or `latest_file`), signs in and out
 (`provider`, `login_job`, `logout_job`), is launched (`arg`, `session`),
 takes the briefing (`briefing`), is guarded (`guards`), reports its state
 (`state`) and keeps its transcripts (`transcripts`). A row with `live`
@@ -44,6 +45,9 @@ class Agent:
     live: bool = False      # wired end to end: parsed, offered, started
     tool: str = ""          # its row's name in the Library and on the Installed page, "" when it has none yet
     latest_url: str = ""    # where the newest release is asked (an npm registry `latest`, or a plain version)
+    latest_file: str = ""   # ...or, for a row with no registry, the installer's own `latest` file on its maker's download service; no pack's field
+    census_suffix: str = ""  # what its --version prints after the number, kept on the census value a finished job writes
+    says: dict = field(default=None, compare=False, hash=False)  # its own wording of a sentence agentcode.py says of every agent (agentcode.SAYS, by key), None for none
     pack: dict = field(default=None, compare=False, hash=False)  # a pack agent's adapter (R169 step 9), None for the shipped
     allow: dict = field(default=None, compare=False, hash=False)  # how it is told a command needs no asking (ALLOW_HOW), None for no way
     install: dict = field(default=None, compare=False, hash=False)  # its install recipe (install_checked), None for one a pack installs
@@ -84,6 +88,10 @@ TABLE = (
           login_job="claude-login", logout_job="claude-logout",
           briefing="system-prompt-file", guards="hooks", state="hooks",
           transcripts=".claude/projects", live=True, tool="claude-code",
+          latest_file="https://downloads.claude.ai/claude-code-releases/latest",
+          census_suffix=" (Claude Code)",
+          says={"no_account": "{node} runs no session account, so there is no {product} there to update",
+                "hold": "{product} is updating on {node}: press {name} on {project} again when its row comes back"},
           allow={"how": "settings", "rule": "Bash({cmd} *)"},
           # Its sign-in as a pack's agent says its own (R234 step 6): a link
           # at one of three hosts, a code pasted back, the program ending

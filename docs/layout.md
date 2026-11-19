@@ -282,8 +282,8 @@ scripts/
     db.py                        the controller's store: the SQLite connection, the migrations, ids and the audit trail
     nodes.py                     the node registry, the job queue and the agent's channel (docs/nodes.md); the Nodes page's verbs; a build job from the controller
     channel.py                   the node agent's verbs behind /api/v1/agent/: enroll, hello, work, a job's files, log and result
-    claudecode.py                Claude Code on each node: which version, checking for and installing an update
-    agentcode.py                 the other coding agents on each node (Codex CLI, Copilot CLI): which version, the registry's latest, installing, updating and removing each (R95)
+    claudecode.py                what is Claude Code's alone on a node: the hold on a node without it or updating it, and the status payload's versions
+    agentcode.py                 the coding agents on each node (Claude Code, Codex CLI, Copilot CLI and the others): which version, the latest out, installing, updating and removing each (R95, R145)
     claudegrant.py               which nodes each account is signed in to each agent on, as each node reported it
     mapping.py                   a new project's code map built in the background as it is created
     plugins.py                   the Claude Code plugins a project carries, listed and installed
