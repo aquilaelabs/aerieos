@@ -10,6 +10,7 @@ import subprocess
 import sys
 import threading
 import time
+import traceback
 from . import AGENT_VERSION
 from .coverage import _COV_OUT, _cov_write
 from .base import BEAT_S, RUNNER_DIAG_KEEP, SESSION_WALL, TRIAL_S, cap_file, fs_holds, log, log_once, own_digest, own_path, prune_dir
@@ -136,6 +137,39 @@ RECOVER_CHUNK = 200
 # What a call says when nobody is listening at the controller's port yet: a
 # restart under way (B760).
 RESTARTING = re.compile(r"ConnectionRefused|RemoteDisconnected|ConnectionReset|Connection refused")
+
+
+def turn_part(turn, name, fn, *a):
+    """One part of the agent's turn, run and timed into `turn` (B841). One
+    that raises is that part's alone (B979): logged once an hour with where,
+    and None, as a part with nothing to say, so the other passes and the
+    work poll still run."""
+    t0 = time.monotonic()
+    try:
+        return fn(*a)
+    except Exception as e:                                   # noqa: BLE001 (logged; the rest of the turn goes on)
+        log_once(f"turn-{name}", f"{name}: {type(e).__name__}: {e}\n"
+                                 + traceback.format_exc(limit=8).rstrip())
+        return None
+    finally:
+        ms = int((time.monotonic() - t0) * 1000)
+        if ms >= 20:
+            turn[name] = turn.get(name, 0) + ms
+
+
+def keep_turning(turns, pause=5):
+    """turns() taken up again whenever it raises, after `pause` seconds, and
+    the fault logged (B979): one exception in the loop's own code ended the
+    agent with no bye, its running jobs orphaned and read lost, and a fault
+    that came back restarted it every five seconds with a census each start.
+    SystemExit and KeyboardInterrupt still end it, as a stop should."""
+    while True:
+        try:
+            turns()
+        except Exception as e:                               # noqa: BLE001 (logged, the next turn taken)
+            log_once("turn", f"a turn failed: {type(e).__name__}: {e}\n"
+                             + traceback.format_exc(limit=8).rstrip())
+            time.sleep(pause)
 
 
 class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersMixin, VmsMixin, OsImageMixin, SharesMixin, PoolsMixin, ArrayMixin, AdoptMixin, ConsoleMixin, PowerMixin, ExtMountsMixin, BackupsMixin, PackConfigMixin, AccountsMixin,
@@ -795,13 +829,11 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         return moved
 
     def loop(self):
-        delay = wdelay = 1
         # An update on trial gets TRIAL_S to reach its controller (R241).
         if trial_note() is not None:
             t = threading.Timer(TRIAL_S, self.trial_over)
             t.daemon = True
             t.start()
-        refused_since = 0.0     # when the controller began refusing connections (B760)
         # The hourly walk of the disks, on its own thread (storage.py).
         storage.start(lambda: self.state)
         # What is THIS process's to end, ended by it: a stop of the unit is
@@ -863,19 +895,25 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         self.wssync.start()
         self.claudesync.start()
         self.screen.start()
+        # A turn that raises is logged and the next one taken, never the end
+        # of the agent (B979): one exception left the process with no bye,
+        # its running jobs orphaned and read lost, and a fault that came back
+        # restarted it every five seconds with a census at each start.
+        keep_turning(self.turns)
+
+    def turns(self):
+        """The agent's turns, one after another: a hello when one is due,
+        the passes, the sample and the work poll, and what the poll hands
+        back. loop() takes the next one up again when one raises."""
+        delay = wdelay = 1
+        refused_since = 0.0     # when the controller began refusing connections (B760)
         while True:
             # How long each part of a turn took before its poll (B841): a job
             # queued while the agent is between polls waits for all of it,
             # and what the turn spends is said in the next heartbeat.
             turn = {}
             def timed(name, fn, *a, _turn=turn):
-                t0 = time.monotonic()
-                try:
-                    return fn(*a)
-                finally:
-                    ms = int((time.monotonic() - t0) * 1000)
-                    if ms >= 20:
-                        _turn[name] = _turn.get(name, 0) + ms
+                return turn_part(_turn, name, fn, *a)
             turn_t0 = time.monotonic()
             if self.console_moved():
                 self.hello_at = 0
@@ -952,7 +990,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             # seconds of the census landing and not a whole poll after it,
             # which is what the retry a refusal asked for is waiting on.
             wait = min(self.poll, 3) if getattr(self, "census_asked", False) else self.poll
-            sample = timed("sample", self.sampler.sample, self.state, n)
+            sample = timed("sample", self.sampler.sample, self.state, n) or {}
             # The sessions this node runs ride the heartbeat (roadmap #24),
             # so the dashboard's Sessions card lists them beside its own.
             if self.session_up:
