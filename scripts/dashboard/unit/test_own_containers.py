@@ -197,11 +197,16 @@ class BehindTheWall(unittest.TestCase):
 
 
 class ASessionsBuild(unittest.TestCase):
-    def run_it(self, dial, own, reach=()):
+    def run_it(self, dial, own, reach=(), beside=()):
         act, ask = mock.Mock(return_value=({"ok": True}, 200)), mock.Mock(return_value={"ok": True, "asked": True})
+        # What the build would run new beside the app is read off the
+        # instance's record and its compose file, neither of which is here.
         with mock.patch.object(devactions, "act", act), mock.patch.object(devactions, "ask_rebuild", ask, create=True), \
                 mock.patch.object(devactions.devapp, "on_own_machine", lambda *a: own), \
                 mock.patch.object(devactions.devapp, "unacked_risks", lambda *a: list(reach)), \
+                mock.patch.object(devactions.devapp, "is_file_source", lambda *a: False), \
+                mock.patch.object(devactions.devapp, "_config", lambda *a, **k: {}), \
+                mock.patch.object(devactions.devapp, "beside_new", lambda *a, **k: list(beside)), \
                 mock.patch.object(devactions.devapp, "pname", lambda p, i: p), \
                 mock.patch.object(devactions.devapp, "field", lambda req, k: "", create=True), \
                 mock.patch.object(devactions, "say", lambda *a: None, create=True), \
@@ -209,6 +214,9 @@ class ASessionsBuild(unittest.TestCase):
                 mock.patch.object(devactions, "acting_as", mock.MagicMock(), create=True):
             devactions.request("web", "main", "rebuild", {}, me={"session": "web"}, principal="session:web", dial=dial)
         return act.called, ask.called
+
+    def test_auto_waits_for_a_person_when_the_build_would_run_something_new_beside_the_app(self):
+        self.assertEqual(self.run_it("auto", False, beside=["sockproxy"]), (False, True))
 
     def test_auto_on_the_controllers_machine_waits_for_a_person(self):
         self.assertEqual(self.run_it("auto", True), (False, True))
