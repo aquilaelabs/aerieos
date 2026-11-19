@@ -1,6 +1,6 @@
 """AerieOS's own scanners on each node (R145, the operator, 26 Oct).
 
-The Scanners page, in the Containers group beside nginx, deploys one
+The Scanners page, a service's page opened from Installed (R264), deploys one
 compose project of the three static analysis scanners (Semgrep, Trivy,
 mobsfscan) to each node that holds projects and runs them there on a
 schedule. A run scans the projects whose node it is, never a project's

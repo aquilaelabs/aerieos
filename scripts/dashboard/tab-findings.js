@@ -187,8 +187,8 @@ function renderFindingsInto(i){
   const off = findingsOff();
   if (off){
     d.setBar("");
-    drawHTML(d.list, `<div class="empty">${esc(off)}. The Scanners page under Containers deploys AerieOS's
-      scanners to each node, and <a href="#/help/scanners">The scanners</a> says how.</div>`);
+    drawHTML(d.list, `<div class="empty">${esc(off)}. The Scanners, a service in the ${pageLink("library", "Library")}, are AerieOS's
+      scanners on each node, set from their row on Installed, and <a href="#/help/scanners">The scanners</a> says how.</div>`);
     return;
   }
   if (!findings){
@@ -211,8 +211,8 @@ function renderFindingsInto(i){
   }
   if (findings.available === false){
     // How to set the scanners up, one press away in Help (docs/scanners.md).
-    drawHTML(d.list, `<div class="empty">no scanner reports yet: the Scanners page under Containers
-      deploys AerieOS's scanners to each node and runs them on a schedule, and what they send up lands here.
+    drawHTML(d.list, `<div class="empty">no scanner reports yet: the Scanners, a service in the ${pageLink("library", "Library")}, are AerieOS's
+      scanners on each node, run on a schedule from their page off Installed, and what they send up lands here.
       <a href="#/help/scanners">The scanners</a> says how.</div>`);
     return;
   }

@@ -1277,7 +1277,8 @@ function nbCoreDrawDocker(nb){
   viewGlance($("dkHint"), blind || !n ? "" : dmTiles({running: mine.filter(d => d.running).length, all: mine.length,
     behind: mine.filter(d => (d.images_behind || []).length || d.nginx_to).length, checked: !!got.images_at}),
     blind && n ? `on ${esc(where)}: the daemon did not answer, so the rows cannot say what is running`
-      : !one && dark.length ? `on ${esc(where)}: ${esc(dark.map(x => called(x.node)).join(", "))} did not answer, so ${dark.length === 1 ? "its" : "their"} rows cannot say what is running`
+      // ...named while they are one or two; more are counted, each one's card saying so.
+      : !one && dark.length ? `on ${esc(where)}: ${dark.length > 2 ? dark.length : esc(dark.map(x => called(x.node)).join(" and "))} did not answer, so ${dark.length === 1 ? "its" : "their"} rows cannot say what is running`
       : n ? `on ${esc(where)}${one ? imgs : ""}` : "no node runs this space's containers yet", "", (blind || (!one && dark.length)) && n ? "warn" : "");
   // Patched as the Containers page's rows are (R244): a row's settings
   // dialog open, a field typed in it and a fold stay as they are, and a
@@ -1296,7 +1297,7 @@ function nbCoreDrawDocker(nb){
   // What the view is for, as its empty state (R119 step 4).
   dmNoteOpen($("dkList"));
   patch($("dkList"), shown.map(x => dmGroupsHtml(x.mine, x.others, x.job, x.blind, project,
-                                                 {id: x.node, name: one ? "" : called(x.node)})).join("")
+                                                 {id: x.node, name: one ? "" : called(x.node) + (x.blind ? ", which did not answer" : "")})).join("")
     || `<div class="field"><div class="hint nbempty">Send ${esc(projLabel(project))} from ${pageLink("", "Artifacts", `#/spaces/${encodeURIComponent(project)}/artifacts`)}, or pick it on a container's row on the ${pageLink("docker", "Containers page")}.</div></div>`);
   // Each node's card is wired with its own read: a press on a row goes to
   // the node that row is on.

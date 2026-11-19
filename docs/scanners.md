@@ -1,8 +1,10 @@
 # The scanners
 
 AerieOS runs its own static analysis stack on each node that holds
-spaces, from the **Scanners** page: Configure on a node's scanners row in
-the Containers page's System section opens it.
+spaces, from the **Scanners** page. The Scanners are a service: Install on
+their card under Services in the Library puts them on a node, and Open on
+their row under Services on the Installed page opens the page, as Configure
+on a node's scanners row in the Containers page's System section does.
 Nothing is scanned on the controller and nothing of the controller's is
 mounted on a node: each node runs the scanners over the spaces whose node
 it is and sends what they found up to the controller over the agent's own
