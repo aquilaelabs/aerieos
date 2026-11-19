@@ -5,7 +5,8 @@ it in the diagnostics. Nothing comes back: there is no answer to follow up.
 
 Arguments: the words of the report and its --area, --repro and --reproduces, or for
 `conversation` the report's number. BB_R_SUB is the subcommand bb chose (add,
-conversation), BB_R_AUTH the auth header, BB_R_PROJECT the project.
+conversation) and BB_PROJECT the project. The auth header is bbapi's own
+(BB_AUTH_HEADER, from api_py in aerie).
 """
 import os
 import sys
@@ -14,8 +15,8 @@ import bbapi
 from say import need
 
 
-auth, proj, sub, args = os.environ["BB_R_AUTH"], os.environ.get("BB_R_PROJECT", ""), os.environ["BB_R_SUB"], sys.argv[1:]
-post = lambda b: bbapi.call("/api/reports", b, auth=auth, timeout=60)  # noqa: E731
+proj, sub, args = os.environ.get("BB_PROJECT", ""), os.environ["BB_R_SUB"], sys.argv[1:]
+post = lambda b: bbapi.call("/api/reports", b, timeout=60)  # noqa: E731
 
 
 def flags(names):

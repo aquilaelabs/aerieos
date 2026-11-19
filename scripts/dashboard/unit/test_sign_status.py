@@ -64,7 +64,7 @@ class Clients(unittest.TestCase):
 
     def env(self):
         return {**os.environ, "BB_CONTROLLER": f"http://127.0.0.1:{self.srv.server_address[1]}",
-                "BB_SIGN_AUTH": "Bearer t", "BB_SIGN_PROJECT": "app", "BB_VERSION_AUTH": "Bearer t",
+                "BB_AUTH_HEADER": "Bearer t", "BB_PROJECT": "app",
                 "PYTHONPATH": LIB}
 
     def sign(self, *argv):

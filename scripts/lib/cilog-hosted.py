@@ -7,7 +7,8 @@ holds none and GitHub hands out a log only to a token.
     aerie ci-log [RUN]       a run's jobs, and the end of each failed job's log
                           (the newest finished run when none is named)
 
-BB_CI_AUTH is the auth header and BB_CI_PROJECT the project.
+BB_PROJECT is the project. The auth header is bbapi's own (BB_AUTH_HEADER,
+from api_py in aerie).
 """
 import os
 import sys
@@ -16,13 +17,12 @@ import urllib.parse
 import bbapi
 from say import die
 
-auth = os.environ["BB_CI_AUTH"]
-proj = os.environ["BB_CI_PROJECT"]
+proj = os.environ["BB_PROJECT"]
 args = sys.argv[1:]
 
 
 def get(query):
-    r = bbapi.call("/api/ci-runs?project=" + urllib.parse.quote(proj) + query, auth=auth, timeout=120)
+    r = bbapi.call("/api/ci-runs?project=" + urllib.parse.quote(proj) + query, timeout=120)
     if not isinstance(r, dict):
         die("the controller answered something that is not a run")
     if r.get("error"):

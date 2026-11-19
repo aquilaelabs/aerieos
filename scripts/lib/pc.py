@@ -8,17 +8,16 @@ lent PC; never a command string.
     aerie pc editor-call METHOD PATH [--body JSON] [--why "..."]
                                   one request to the editor's local interface
 
-BB_PC_AUTH is the auth header bb chose.
+The auth header is bbapi's own (BB_AUTH_HEADER, from aerie).
 """
-import os
 import sys
 import time
 
 import bbapi
 from say import need
 
-auth, args = os.environ["BB_PC_AUTH"], sys.argv[1:]
-post = lambda b, t=60: bbapi.call("/api/pc", b, auth=auth, timeout=t)  # noqa: E731
+args = sys.argv[1:]
+post = lambda b, t=60: bbapi.call("/api/pc", b, timeout=t)  # noqa: E731
 
 
 def take(name):

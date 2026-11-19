@@ -14,8 +14,8 @@ audit`: the same conversations counted against the rules that refuse
 commands (R200). `label ID WORDS`, `note ID WORDS`, `keep ID` and `unkeep
 ID` say something of one of the account's own (R236): the name and the note
 its person reads it by, and whether a copy of it is kept past its agent's
-own cleanup. BB_TRANSCRIPTS_AUTH is the
-auth header and BB_TRANSCRIPTS_PROJECT the project.
+own cleanup. BB_PROJECT is the project. The auth header is bbapi's own
+(BB_AUTH_HEADER, from aerie).
 """
 import os
 import sys
@@ -27,8 +27,7 @@ from say import die
 
 argv = sys.argv[1:]
 verb = argv[0] if argv else "list"
-auth = os.environ["BB_TRANSCRIPTS_AUTH"]
-proj = os.environ["BB_TRANSCRIPTS_PROJECT"]
+proj = os.environ["BB_PROJECT"]
 
 
 # How much of a long conversation `show` prints, from its end, without --all.
@@ -40,7 +39,7 @@ def size(n):
 
 
 if verb == "list":
-    r = bbapi.call(f"/api/transcripts?project={urllib.parse.quote(proj)}", auth=auth)
+    r = bbapi.call(f"/api/transcripts?project={urllib.parse.quote(proj)}")
     if not isinstance(r, dict) or r.get("error"):
         die(r.get("error") if isinstance(r, dict) else "the controller answered something that is not a list")
     rows, seen = r.get("rows") or [], r.get("visible") or []
@@ -80,7 +79,7 @@ if verb in ("label", "note", "keep", "unkeep"):
     body = {"project": proj, "id": argv[1], "action": verb}
     if words:
         body["text"] = " ".join(argv[2:])
-    r = bbapi.call("/api/transcripts", body, auth=auth)
+    r = bbapi.call("/api/transcripts", body)
     if not isinstance(r, dict) or r.get("error"):
         die(r.get("error") if isinstance(r, dict) else "the controller did not answer")
     if verb == "label":
@@ -97,7 +96,7 @@ if verb == "audit":
     # the last DAYS, counted against the rules that refuse commands.
     days = argv[1] if len(argv) > 1 and argv[1].isdigit() else "7"
     q = urllib.parse.urlencode({"project": proj, "audit": days})
-    r = bbapi.call(f"/api/transcripts?{q}", auth=auth, timeout=300)
+    r = bbapi.call(f"/api/transcripts?{q}", timeout=300)
     if not isinstance(r, dict) or r.get("error"):
         die(r.get("error") if isinstance(r, dict) else "the controller answered something that is not an audit")
     a = r.get("audit") or {}
@@ -129,7 +128,7 @@ if verb == "show":
     # where it stopped, and a whole day's conversation outran the wait.
     q = urllib.parse.urlencode({"project": proj, "id": sid, "tz": tz, "as": "json",
                                 "tail": 0 if "--all" in argv else SHOW_TAIL_MB})
-    r = bbapi.call(f"/api/transcript?{q}", auth=auth, timeout=600 if "--all" in argv else 120)
+    r = bbapi.call(f"/api/transcript?{q}", timeout=600 if "--all" in argv else 120)
     if not isinstance(r, dict) or r.get("error"):
         die(r.get("error") if isinstance(r, dict) else "the controller answered something that is not a transcript")
     sys.stdout.write(r.get("text") or "")
@@ -155,7 +154,8 @@ if verb == "fetch":
     q = urllib.parse.urlencode({"project": proj, "id": sid, "as": "raw", "have": have})
     try:
         c, base = bbapi._conn(600)
-        c.request("GET", f"{base}/api/transcript?{q}", None, {"Authorization": auth})
+        c.request("GET", f"{base}/api/transcript?{q}", None,
+                  {"Authorization": os.environ.get("BB_AUTH_HEADER", "")})
         r = c.getresponse()
         if r.status != 200 or r.getheader("Content-Type", "").startswith("application/json"):
             import json

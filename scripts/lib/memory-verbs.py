@@ -6,8 +6,8 @@ repository moved to another project keeps what was learned about it and a
 session of any agent sees them (R152). `list` prints the index; `show NAME`
 one memory whole; `add NAME --type T --about "..." BODY` writes one and its
 index line; `forget NAME` removes it. `bb -p REPO memory ...` answers for
-another repository of the project. BB_MEMORY_AUTH is the auth header and
-BB_MEMORY_PROJECT the repository.
+another repository of the project. BB_PROJECT is the repository. The auth
+header is bbapi's own (BB_AUTH_HEADER, from api_py in aerie).
 """
 import os
 import sys
@@ -18,20 +18,19 @@ from say import die
 
 argv = sys.argv[1:]
 verb = argv[0] if argv else "list"
-auth = os.environ["BB_MEMORY_AUTH"]
-proj = os.environ["BB_MEMORY_PROJECT"]
+proj = os.environ["BB_PROJECT"]
 TYPES = ("user", "feedback", "project", "reference")
 
 
 def read():
-    r = bbapi.call(f"/api/memory?project={urllib.parse.quote(proj)}", auth=auth)
+    r = bbapi.call(f"/api/memory?project={urllib.parse.quote(proj)}")
     if not isinstance(r, dict) or r.get("error"):
         die(r.get("error") if isinstance(r, dict) else "the controller answered something that is not a list")
     return r
 
 
 def post(body):
-    r = bbapi.call("/api/memory", body={"project": proj, **body}, auth=auth)
+    r = bbapi.call("/api/memory", body={"project": proj, **body})
     if not isinstance(r, dict):
         die("the controller answered something that is not a result")
     if r.get("error"):

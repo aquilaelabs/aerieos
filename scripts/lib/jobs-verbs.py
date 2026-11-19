@@ -6,8 +6,8 @@ to all. It read the node store directly before, which on a machine that
 holds the controller's state showed a session every project's jobs by
 name (B317).
 
-Arguments: how many jobs to list, and a job's id for its log. BB_JOBS_AUTH
-is the auth header.
+Arguments: how many jobs to list, and a job's id for its log. The auth
+header is bbapi's own (BB_AUTH_HEADER, from api_py in aerie).
 """
 import os
 import re
@@ -19,7 +19,6 @@ from say import need
 
 import urllib.parse
 
-auth = os.environ["BB_JOBS_AUTH"]
 jid = sys.argv[2] if len(sys.argv) > 2 else ""
 try:
     n = int(sys.argv[1])
@@ -28,7 +27,7 @@ except ValueError:
 q = {"n": n} | {k: v for k, v in (("node", os.environ.get("BB_JOBS_NODE", "")),
                                   ("type", os.environ.get("BB_JOBS_TYPE", ""))) if v}
 d = bbapi.call(f"/api/v1/jobs?id={urllib.parse.quote(jid)}" if jid
-               else "/api/v1/jobs?" + urllib.parse.urlencode(q), auth=auth)
+               else "/api/v1/jobs?" + urllib.parse.urlencode(q))
 if jid:
     # One job answers as itself; the API's "no such job" is the same answer
     # for one that is another project's, on purpose.

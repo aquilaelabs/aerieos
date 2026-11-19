@@ -181,7 +181,7 @@ def sign_in(agent, a):
     env.update({str(k): str(v) for k, v in (a.get("env") or {}).items()})
     # What this flow tells the controller with afterwards is aerie's own to
     # hold: the program signing in has no use for it.
-    for k in ("BB_TOKEN", "BB_LOGIN_AUTH"):
+    for k in ("BB_TOKEN", "BB_AUTH_HEADER"):
         env.pop(k, None)
     # The code is typed into the program, never said back up the log.
     with contextlib.suppress(termios.error, OSError):

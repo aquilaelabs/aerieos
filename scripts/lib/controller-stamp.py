@@ -5,8 +5,9 @@ BB_VERSION are empty, and the which-build rule sends it to aerie status to
 learn the build, so this has to work there. A controller that is down, or a
 session with no token, is a state the line reports rather than dies on.
 
-BB_META_AUTH is the auth header, BB_NODE_ID the node. Two lines, the second
-the agent's or empty, the last with no newline.
+BB_NODE_ID is the node. The auth header is bbapi's own (BB_AUTH_HEADER, from
+api_py in aerie). Two lines, the second the agent's or empty, the last with
+no newline.
 """
 import os
 import urllib.parse
@@ -28,7 +29,7 @@ import bbapi
 NODE = os.environ.get("BB_NODE_ID", "")
 try:
     st, m = bbapi.request("/api/meta" + (f"?node={urllib.parse.quote(NODE)}" if NODE else ""),
-                          auth=os.environ["BB_META_AUTH"], timeout=5)
+                          timeout=5)
 except Exception:
     st, m = None, {}
 

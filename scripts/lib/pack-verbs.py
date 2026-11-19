@@ -5,15 +5,14 @@ waits for a person on the bell, auto adds it now at the commit the signed
 index pins). A session never installs a pack on a node itself: once added,
 a person installs it from the Library, or it is there already.
 
-BB_PACK_AUTH is the auth header; the rest is argv: the verb, then its words.
+The words are argv: the verb, then its own. The auth header is bbapi's own
+(BB_AUTH_HEADER, from aerie).
 """
-import os
 import sys
 
 import bbapi
 from say import need
 
-AUTH = os.environ.get("BB_PACK_AUTH", "")
 USAGE = """usage: aerie tool search [WORDS...]
        aerie tool install NAME --why "what it is for\""""
 
@@ -23,7 +22,7 @@ def main(argv):
         sys.exit(USAGE)
     if argv[0] == "search":
         import urllib.parse
-        d = bbapi.call("/api/catalog/search?q=" + urllib.parse.quote(" ".join(argv[1:])), auth=AUTH)
+        d = bbapi.call("/api/catalog/search?q=" + urllib.parse.quote(" ".join(argv[1:])))
         if d.get("error") and not d.get("packs"):
             sys.exit(f"[builderbot] ERROR: {d['error']}")
         rows = d.get("packs") or []
@@ -45,7 +44,7 @@ def main(argv):
         rest = rest[:i] + rest[i + 2:]
     if len(rest) != 1:
         sys.exit(USAGE)
-    d = bbapi.call("/api/toolpacks", {"action": "install", "name": rest[0], "why": why}, auth=AUTH)
+    d = bbapi.call("/api/toolpacks", {"action": "install", "name": rest[0], "why": why})
     need(d)
     if d.get("request") or d.get("asked") or d.get("id"):
         print(f"asked: {rest[0]} waits for a person on the bell; aerie tool search shows it as added once they allow it")

@@ -3,10 +3,11 @@ compose file and a reason (roadmap R71), which an administrator reads on the
 bell and allows or denies; Allow hands the file to the Containers page's own New
 container path and starts the build.
 
-The first argument is the verb (status or new). For new, BB_PHONE_AUTH is the
-auth header, BB_PHONE_WHY the reason, BB_PHONE_PROJECT the project asking,
-BB_C_NAME the container's name, BB_C_COMPOSE and BB_C_ENV the files to send,
-BB_C_NODE the node and BB_C_FOR the project it is for.
+The first argument is the verb (status or new). For new, BB_PHONE_WHY is the
+reason, BB_PHONE_PROJECT the project asking, BB_C_NAME the container's name,
+BB_C_COMPOSE and BB_C_ENV the files to send, BB_C_NODE the node and BB_C_FOR
+the project it is for. The auth header is bbapi's own (BB_AUTH_HEADER, from
+api_py in aerie).
 """
 import os
 import sys
@@ -17,7 +18,7 @@ from say import need
 
 
 def status():
-    d = bbapi.call("/api/phone", auth=os.environ["BB_PHONE_AUTH"])
+    d = bbapi.call("/api/phone")
     asks = [a for a in d.get("asks") or [] if a.get("kind") == "container"]
     if not asks:
         print("container: nothing is waiting")
@@ -27,7 +28,7 @@ def status():
 
 
 def new():
-    post = lambda body: bbapi.call("/api/phone", body, auth=os.environ["BB_PHONE_AUTH"])  # noqa: E731
+    post = lambda body: bbapi.call("/api/phone", body)  # noqa: E731
     compose = open(os.environ["BB_C_COMPOSE"], encoding="utf-8", errors="replace").read()
     env = open(os.environ["BB_C_ENV"], encoding="utf-8", errors="replace").read() if os.environ.get("BB_C_ENV") else ""
     r = post({"action": "ask", "kind": "container", "why": os.environ["BB_PHONE_WHY"],
@@ -42,7 +43,7 @@ def new():
     rid = r["id"]
     print(f"[builderbot] asked {r.get('to') or 'the administrators'} (#{rid}): the compose file is on their "
           "bell, waiting up to 15 minutes for Approve", file=sys.stderr)
-    o = waits.outcome(os.environ["BB_PHONE_AUTH"], rid, "denied on the dashboard; nothing ran")
+    o = waits.outcome("", rid, "denied on the dashboard; nothing ran")
     if o.get("code"):
         print(f"[builderbot] ERROR: {o.get('out') or 'refused'}", file=sys.stderr); sys.exit(1)
     print(f"[builderbot] allowed: {o.get('out')} (the build is a job on the Jobs page)")

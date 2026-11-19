@@ -67,7 +67,7 @@ class RemoveFollowsItsJob(unittest.TestCase):
 
     def run_remove(self):
         env = dict(os.environ, BB_CONTROLLER=f"http://127.0.0.1:{self.srv.server_address[1]}",
-                   BB_DEV_PROJECT="web", BB_DEV_AUTH="Bearer x", BB_DEV_VERB="remove",
+                   BB_PROJECT="web", BB_AUTH_HEADER="Bearer x", BB_DEV_VERB="remove",
                    BB_DEV_CONTAINER="site", PYTHONPATH=os.path.join(HERE, "..", "..", "lib"))
         return subprocess.run([sys.executable, VERBS, "edit"], env=env, capture_output=True,
                               text=True, timeout=60, check=False)

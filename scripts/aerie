@@ -1001,7 +1001,7 @@ cmd_projects() {
 claude_login_check() {
     on_node || return 0
     [ -n "${BB_TOKEN:-}" ] || return 0
-    BB_LOGIN_AUTH="$(bb_auth_header)" python3 "$BB_LIB/login-check.py" "${1:-}" "${2:-claude}" || true
+    api_py --auth "$(bb_auth_header)" login-check.py "${1:-}" "${2:-claude}" || true
 }
 
 cmd_login() {
@@ -1870,9 +1870,8 @@ cmd_ci_log() {
         if ci_hosted_only "$proj"; then
             # GitHub keeps these, and hands a log only to a token: the
             # controller asks with its own, for this project (R115).
-            local auth; auth="$(bb_auth_or_die)"
             local a=(); [ "$list" = 1 ] && a+=(--list); [ -n "$want" ] && a+=("$want")
-            BB_CI_AUTH="$auth" BB_CI_PROJECT="$proj" python3 "$BB_LIB/cilog-hosted.py" "${a[@]}"
+            api_py --project "$proj" cilog-hosted.py "${a[@]}"
             return
         fi
         if [ -n "$(project_node 2>/dev/null)" ]; then
@@ -2347,9 +2346,7 @@ cmd_diag() {
         esac
         shift
     done
-    local auth
-    auth="$(bb_auth_or_die)"
-    BB_DIAG_AUTH="$auth" BB_DIAG_JSON="$json" python3 "$BB_LIB/diag.py" "${sections[@]}"
+    BB_DIAG_JSON="$json" api_py diag.py "${sections[@]}"
 }
 
 # aerie report: a problem with AerieOS itself, from a session on any project
@@ -2368,7 +2365,7 @@ cmd_pc() {
                 '       aerie pc editor-call METHOD PATH [--body JSON] [--why "..."]'
             return 0 ;;
     esac
-    BB_PC_AUTH="$(bb_auth_or_die)" python3 "$BB_LIB/pc.py" "$@"
+    BB_AUTH_HEADER="$(bb_auth_or_die)" python3 "$BB_LIB/pc.py" "$@"
 }
 
 cmd_report() {
@@ -2385,7 +2382,7 @@ cmd_report() {
         *) sub=add ;;
     esac
     [ "$sub" = add ] || shift || true
-    BB_R_AUTH="$auth" BB_R_PROJECT="$proj" BB_R_SUB="$sub" python3 "$BB_LIB/report.py" "$@"
+    BB_R_SUB="$sub" api_py --auth "$auth" --project "$proj" report.py "$@"
 }
 
 cmd_logs() {
@@ -2438,10 +2435,7 @@ cmd_logs() {
         # A node's log is read once through a job, so there is nothing to
         # follow: said, rather than -f quietly printing once.
         [ "$follow" = 0 ] || die "aerie logs --node reads the last lines once; -f follows only the controller's own log"
-        local auth
-        auth="$(bb_auth_or_die)"
-        BB_LOG_AUTH="$auth" BB_LOG_NODE="$want_node" \
-        BB_LOG_STREAM="${stream:-agent}" BB_LOG_LINES="$lines" python3 "$BB_LIB/node-log.py"
+        BB_LOG_NODE="$want_node" BB_LOG_STREAM="${stream:-agent}" BB_LOG_LINES="$lines" api_py node-log.py
         return
     fi
     if [ -n "$gen" ]; then
@@ -2581,13 +2575,12 @@ cmd_history() {
 # and the words it is handed are the controller's (design.py), so what it
 # prints is what the tab shows.
 cmd_design() {
-    local verb="${1:-list}" auth proj
+    local verb="${1:-list}" proj
     case "$verb" in list|show|file|json|schema|save|edit) ;; -h|--help)
         echo "aerie design [list | show [ID|NAME] | file [--from FILE] | json | schema | save FILE [--file] | edit NAME --text FILE|--append FILE [--file]]: what this space looks like, from the notebook's Design view; aerie design save -h prints the record's shape"; return 0 ;;
         *) die "aerie design [list | show [ID|NAME] | file [--from FILE] | json | schema | save FILE [--file] | edit NAME --text FILE|--append FILE [--file]]" ;; esac
     proj="$(need_project)" || exit
-    auth="$(bb_auth_or_die)"
-    BB_DESIGN_AUTH="$auth" BB_DESIGN_PROJECT="$proj" python3 "$BB_LIB/design-verbs.py" "$@"
+    api_py --project "$proj" design-verbs.py "$@"
 }
 
 # `aerie transcripts`: this account's own conversations with Claude on the
@@ -2595,32 +2588,29 @@ cmd_design() {
 # project this one reads (the operator, 29 Sep). Only the account's own:
 # the controller looks under its transcripts and nowhere else.
 cmd_wiki() {
-    local auth proj
+    local proj
     case "${1:-}" in -h|--help) usage | sed -n '/^aerie wiki /,/^bb [^w]/p' | sed '$d'; return 0 ;; esac
     proj="$(need_project)" || exit
-    auth="$(bb_auth_or_die)"
-    BB_WIKI_AUTH="$auth" BB_WIKI_PROJECT="$proj" python3 "$BB_LIB/wiki-verbs.py" "$@"
+    api_py --project "$proj" wiki-verbs.py "$@"
 }
 
 cmd_transcripts() {
-    local verb="${1:-list}" auth proj
+    local verb="${1:-list}" proj
     case "$verb" in list|show|fetch|label|note|keep|unkeep) ;; -h|--help)
         echo "aerie transcripts [list | show ID [--tz ZONE] [--all] | fetch ID [--into DIR] | label ID WORDS | note ID WORDS | keep ID | unkeep ID]: your own conversations on this space, every agent's, from the controller"; return 0 ;;
         *) die "aerie transcripts [list | show ID [--tz ZONE] [--all] | fetch ID [--into DIR] | label ID WORDS | note ID WORDS | keep ID | unkeep ID]" ;; esac
     proj="$(need_project)" || exit
-    auth="$(bb_auth_or_die)"
-    BB_TRANSCRIPTS_AUTH="$auth" BB_TRANSCRIPTS_PROJECT="$proj" python3 "$BB_LIB/transcripts-verbs.py" "$@"
+    api_py --project "$proj" transcripts-verbs.py "$@"
 }
 
 cmd_memory() {
-    local verb="${1:-list}" auth proj
+    local verb="${1:-list}" proj
     local use='aerie memory [list | show NAME | add NAME --type user|feedback|space|reference --about "one line" "what to remember" | forget NAME]'
     case "$verb" in list|show|add|forget) ;; -h|--help)
         echo "$use: your memories on this repository, kept for every coding agent; aerie -p REPO memory for another repository of the space"; return 0 ;;
         *) die "$use" ;; esac
     proj="$(need_project)" || exit
-    auth="$(bb_auth_or_die)"
-    BB_MEMORY_AUTH="$auth" BB_MEMORY_PROJECT="$proj" python3 "$BB_LIB/memory-verbs.py" "$@"
+    api_py --project "$proj" memory-verbs.py "$@"
 }
 
 cmd_brief() {
@@ -2635,7 +2625,7 @@ cmd_brief() {
     else
         auth="$(bb_auth_or_die)"
     fi
-    BB_BRIEF_AUTH="$auth" BB_BRIEF_PROJECT="$proj" python3 "$BB_LIB/brief-verbs.py" "$verb" \
+    api_py --auth "$auth" --project "$proj" brief-verbs.py "$verb" \
         || [ "$verb" = take ]
 }
 
@@ -2712,7 +2702,7 @@ cmd_rules() {
     # controller's API like aerie transcripts, which is where they are kept.
     if [ "${1:-}" = audit ]; then
         shift
-        BB_TRANSCRIPTS_AUTH="$(bb_auth_or_die)" BB_TRANSCRIPTS_PROJECT="$proj" \
+        BB_AUTH_HEADER="$(bb_auth_or_die)" BB_PROJECT="$proj" \
             python3 "$BB_LIB/transcripts-verbs.py" audit "$@"
         return $?
     fi
@@ -3239,7 +3229,7 @@ cmd_phone() {
             # is a minefield and this shipped broken once, with a SyntaxError
             # where the phone's model should have been. What the program needs
             # arrives by environment, never by pipe.
-            BB_PHONE_AUTH="$auth" python3 "$BB_LIB/phone-verbs.py" status
+            api_py --auth "$auth" phone-verbs.py status
             ;;
         run)
             # `--why` is required, not polite. The operator is being asked
@@ -3254,9 +3244,8 @@ cmd_phone() {
             done
             [ -n "$why" ] || die "aerie phone run needs --why \"what this is for\""
             [ $# -gt 0 ] || die "nothing to run; put the adb arguments after --"
-            BB_PHONE_WHY="$why" BB_PHONE_AUTH="$auth" \
-            BB_PHONE_PROJECT="$(need_project --or-dir)" \
-                python3 "$BB_LIB/phone-verbs.py" run "$@"
+            BB_PHONE_WHY="$why" BB_PHONE_PROJECT="$(need_project --or-dir)" \
+                api_py --auth "$auth" phone-verbs.py run "$@"
             ;;
         lease|shot|record|install|start|stop|ime|log|ui|touch)
             # The phone lent to this project (R113). Each command but lease
@@ -3270,9 +3259,8 @@ cmd_phone() {
                 esac
             done
             set -- "${a[@]}"
-            BB_PHONE_WHY="$why" BB_PHONE_AUTH="$auth" \
-            BB_PHONE_PROJECT="$(need_project --or-dir)" \
-                python3 "$BB_LIB/phone-verbs.py" "$sub" "$@"
+            BB_PHONE_WHY="$why" BB_PHONE_PROJECT="$(need_project --or-dir)" \
+                api_py --auth "$auth" phone-verbs.py "$sub" "$@"
             ;;
         *) die "usage: aerie phone [status | run --why \"...\" -- adb args... | lease | shot | record [S] | install FILE | start|stop|ime|log PKG | ui | touch ...]" ;;
     esac
@@ -3288,7 +3276,7 @@ cmd_root() {
     shift || true
     case "$sub" in
         status)
-            BB_PHONE_AUTH="$auth" python3 "$BB_LIB/root-verbs.py" status
+            api_py --auth "$auth" root-verbs.py status
             ;;
         run)
             # --node NAME: one of the nodes the project hosts its containers
@@ -3304,9 +3292,8 @@ cmd_root() {
             done
             [ -n "$why" ] || die "aerie root run needs --why \"what this is for\""
             [ $# -gt 0 ] || die "nothing to run; put the command after --"
-            BB_PHONE_WHY="$why" BB_PHONE_NODE="$node" BB_PHONE_AUTH="$auth" \
-            BB_PHONE_PROJECT="$(need_project --or-dir)" \
-                python3 "$BB_LIB/root-verbs.py" run "$@"
+            BB_PHONE_WHY="$why" BB_PHONE_NODE="$node" BB_PHONE_PROJECT="$(need_project --or-dir)" \
+                api_py --auth "$auth" root-verbs.py run "$@"
             ;;
         *) die "usage: aerie root [status|run --why \"...\" -- command...]" ;;
     esac
@@ -3317,8 +3304,7 @@ cmd_root() {
 cmd_vm() {
     local auth
     auth="$(bb_auth_or_die)"
-    BB_VM_AUTH="$auth" \
-    BB_VM_PROJECT="$(need_project --or-dir)" \
+    BB_AUTH_HEADER="$auth" BB_PROJECT="$(need_project --or-dir)" \
         exec python3 "$BB_LIB/vm-verbs.py" "$@"
 }
 
@@ -3332,7 +3318,7 @@ cmd_container() {
     auth="$(bb_auth_or_die)"
     case "$sub" in
         status)
-            BB_PHONE_AUTH="$auth" python3 "$BB_LIB/container-verbs.py" status
+            api_py --auth "$auth" container-verbs.py status
             ;;
         new)
             # One verb, and the project's setting decides (the operator, 24
@@ -3356,10 +3342,10 @@ cmd_container() {
             [ -n "$compose" ] || die "aerie container new needs --compose FILE"
             [ -f "$compose" ] || die "no such file: $compose"
             [ -z "$envf" ] || [ -f "$envf" ] || die "no such file: $envf"
-            BB_PHONE_WHY="$why" BB_PHONE_AUTH="$auth" BB_C_NAME="$name" BB_C_COMPOSE="$compose" \
+            BB_PHONE_WHY="$why" BB_C_NAME="$name" BB_C_COMPOSE="$compose" \
             BB_C_ENV="$envf" BB_C_NODE="$node" BB_C_FOR="$forp" \
             BB_PHONE_PROJECT="$(need_project --or-dir)" \
-                python3 "$BB_LIB/container-verbs.py" new
+                api_py --auth "$auth" container-verbs.py new
             ;;
         *) die "usage: aerie container [status|new --why \"...\" --name NAME --compose FILE [--env FILE] [--node NODE] [--for PROJECT]]" ;;
     esac
@@ -3370,7 +3356,7 @@ cmd_container() {
 # ask to its answer and the job to its verdict.
 cmd_sign() {
     local file="" route="" why="" key="" a
-    local auth proj
+    local proj
     proj="$(need_project --soft 2>/dev/null)"
     case "${1:-}" in
         keys|key|map|rotate|status|release)
@@ -3383,9 +3369,7 @@ cmd_sign() {
                     *) rest+=("$1"); shift ;;
                 esac
             done
-            auth="$(bb_auth_or_die)"
-            BB_SIGN_AUTH="$auth" BB_SIGN_PROJECT="$proj" \
-                python3 "$BB_LIB/sign-verbs.py" --"$sub" "$route" "$why" "${rest[@]}"
+            api_py --project "$proj" sign-verbs.py --"$sub" "$route" "$why" "${rest[@]}"
             return $? ;;
     esac
     while [ $# -gt 0 ]; do
@@ -3405,9 +3389,7 @@ cmd_sign() {
         case "$file" in *.aab) route=play ;; *) route=sideload ;; esac
     fi
     case "$route" in play|sideload) ;; *) die "--for is play or sideload, not $route" ;; esac
-    auth="$(bb_auth_or_die)"
-    BB_SIGN_AUTH="$auth" BB_SIGN_PROJECT="$proj" BB_SIGN_KEY="$key" \
-        python3 "$BB_LIB/sign-verbs.py" "${file#dist/}" "$route" "$why"
+    BB_SIGN_KEY="$key" api_py --project "$proj" sign-verbs.py "${file#dist/}" "$route" "$why"
 }
 
 # aerie devapp: this project's dev instance, and what a session may be given
@@ -3449,13 +3431,13 @@ cmd_devapp() {
     proj="$(need_project)" || exit
     case "$sub" in
         status|state)
-            BB_DEV_AUTH="$auth" BB_DEV_PROJECT="$proj" python3 "$BB_LIB/devapp-verbs.py" status
+            api_py --auth "$auth" --project "$proj" devapp-verbs.py status
             ;;
         probe)
             # Whether it answers on its node's loopback (R248): a read, with
             # no root ask, from its own published ports only.
             shift || true
-            BB_DEV_AUTH="$auth" BB_DEV_PROJECT="$proj" python3 "$BB_LIB/devapp-verbs.py" probe "$@"
+            api_py --auth "$auth" --project "$proj" devapp-verbs.py probe "$@"
             ;;
         rebuild)
             shift || true
@@ -3479,14 +3461,14 @@ EOT
                     *) die "usage: aerie devapp rebuild [--why \"what it is for\"]" ;;
                 esac
             done
-            BB_DEV_AUTH="$auth" BB_DEV_PROJECT="$proj" BB_DEV_WHY="$why" python3 "$BB_LIB/devapp-verbs.py" rebuild
+            BB_DEV_WHY="$why" api_py --auth "$auth" --project "$proj" devapp-verbs.py rebuild
             ;;
         test)
             # The project's test command inside its running dev instance
             # (roadmap R48): the whole log to stdout, so `aerie tests run` can
             # read it, and the job's exit code as this one's.
             shift || true
-            BB_DEV_AUTH="$auth" BB_DEV_PROJECT="$proj" python3 "$BB_LIB/devapp-verbs.py" test "$@"
+            api_py --auth "$auth" --project "$proj" devapp-verbs.py test "$@"
             ;;
         new)
             # This project sent to Docker, as the Artifacts tab's Send does: a
@@ -3516,8 +3498,8 @@ EOT
             done
             if [ "$file" = - ]; then tmp="$(mktemp)"; cat > "$tmp"; file="$tmp"; fi
             [ -z "$file" ] || [ -f "$file" ] || die "no such file: $file"
-            BB_DEV_AUTH="$auth" BB_DEV_PROJECT="$proj" BB_DEV_WHY="$why" BB_DEV_REF="$ref" \
-            BB_DEV_COMPOSE="$compose" BB_DEV_OVERRIDE="$override" BB_DEV_HOST="$host" BB_DEV_FILE="$file" python3 "$BB_LIB/devapp-verbs.py" new || rc=$?
+            BB_DEV_WHY="$why" BB_DEV_REF="$ref" BB_DEV_COMPOSE="$compose" BB_DEV_OVERRIDE="$override" \
+            BB_DEV_HOST="$host" BB_DEV_FILE="$file" api_py --auth "$auth" --project "$proj" devapp-verbs.py new || rc=$?
             [ -z "$tmp" ] || rm -f "$tmp"
             return "$rc"
             ;;
@@ -3542,8 +3524,8 @@ EOT
             if [ "$file" = - ]; then tmp="$(mktemp)"; cat > "$tmp"; file="$tmp"; fi
             [ -z "$file" ] || [ -f "$file" ] || die "no such file: $file"
             local rc=0
-            BB_DEV_AUTH="$auth" BB_DEV_PROJECT="$proj" BB_DEV_WHY="$why" BB_DEV_VERB="$verb" \
-            BB_DEV_SET="$setting" BB_DEV_FILE="$file" python3 "$BB_LIB/devapp-verbs.py" edit || rc=$?
+            BB_DEV_WHY="$why" BB_DEV_VERB="$verb" BB_DEV_SET="$setting" BB_DEV_FILE="$file" \
+                api_py --auth "$auth" --project "$proj" devapp-verbs.py edit || rc=$?
             [ -z "$tmp" ] || rm -f "$tmp"
             return "$rc"
             ;;
@@ -3554,13 +3536,13 @@ EOT
             # person in the container's settings.
             shift || true
             [ $# -eq 1 ] || die "usage: aerie devapp override FILE|none [--instance NAME]"
-            BB_DEV_AUTH="$auth" BB_DEV_PROJECT="$proj" BB_DEV_OVERRIDE="$([ "$1" = none ] || printf %s "$1")" \
-                python3 "$BB_LIB/devapp-verbs.py" override
+            BB_DEV_OVERRIDE="$([ "$1" = none ] || printf %s "$1")" \
+                api_py --auth "$auth" --project "$proj" devapp-verbs.py override
             ;;
         ls|list)
             # What belongs to this project on its node, as its group on the
             # Docker tab lists it (the operator, 24 Sep).
-            BB_DEV_AUTH="$auth" BB_DEV_PROJECT="$proj" python3 "$BB_LIB/devapp-verbs.py" ls
+            api_py --auth "$auth" --project "$proj" devapp-verbs.py ls
             ;;
         log|logs|start|stop|restart)
             # One container that belongs to this project, by the name bb
@@ -3580,8 +3562,8 @@ EOT
             # The project too (B675): a read project's container is
             # answered only when its project is named, so `aerie -p X devapp
             # log NAME` fell to this session's own and was refused.
-            BB_DEV_AUTH="$auth" BB_DEV_PROJECT="$proj" BB_DEV_VERB="$verb" BB_DEV_NAME="$name" BB_DEV_WHY="$why" \
-                python3 "$BB_LIB/devapp-verbs.py" ctl
+            BB_DEV_VERB="$verb" BB_DEV_NAME="$name" BB_DEV_WHY="$why" \
+                api_py --auth "$auth" --project "$proj" devapp-verbs.py ctl
             ;;
         *) die "usage: aerie devapp [--instance NAME|--container NAME] [status|rebuild [--why \"...\"]|new [NAME] [--branch REF] [--compose FILE] [--env FILE] [--why \"...\"]|env [set FILE|-]|test [ARGS]|ls|log NAME|start|stop|restart NAME]" ;;
     esac
@@ -3811,6 +3793,39 @@ terminal, or pass one for the command with DASHBOARD_AUTH=name:password."
     printf '%s' "$h"
 }
 
+# api_py [--auth HEADER] [--project NAME] SCRIPT [ARGS...]: one of the
+# library's programs, run as the caller. bbapi sends BB_AUTH_HEADER with
+# every request, and a program that is about one project reads which from
+# BB_PROJECT; whatever else a verb hands its program rides in front of the
+# call (BB_DEV_WHY="$why" api_py ...).
+# The header is bb_auth_or_die's, asked for here. --auth hands over one the
+# verb already holds: it refused a missing credential before it read its
+# arguments, or it asks softly (bb_auth_header) and goes on without one.
+# With no --project the program is about no project and runs with the
+# environment's own BB_PROJECT.
+# Both are set on the program's command line and never exported: run_here
+# and cmd_run execute the person's own build command from this shell, and
+# an exported header would be in that command's environment. A verb whose
+# program replaces this shell (exec) sets the same two names on its own
+# command line.
+api_py() {
+    local auth="" held=0 proj="" named=0
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --auth) auth="$2"; held=1; shift 2 ;;
+            --project) proj="$2"; named=1; shift 2 ;;
+            *) break ;;
+        esac
+    done
+    if [ "$held" = 0 ]; then auth="$(bb_auth_or_die)"; fi
+    local script="$1"; shift
+    if [ "$named" = 1 ]; then
+        BB_AUTH_HEADER="$auth" BB_PROJECT="$proj" python3 "$BB_LIB/$script" "$@"
+    else
+        BB_AUTH_HEADER="$auth" python3 "$BB_LIB/$script" "$@"
+    fi
+}
+
 # The controller's own build, for `aerie status` on a node (R62). A node runs no
 # controller image, so BB_IMAGE_REV and BB_VERSION are empty here and the old
 # status lines read "unstamped". The which-build rule sends a session to bb
@@ -3825,7 +3840,7 @@ terminal, or pass one for the command with DASHBOARD_AUTH=name:password."
 bb_stamps() {
     local auth; auth="$(bb_auth_header)"
     [ -n "$auth" ] || { printf 'unknown: no session token to ask the controller with\n'; return; }
-    BB_META_AUTH="$auth" python3 "$BB_LIB/controller-stamp.py" 2>/dev/null \
+    api_py --auth "$auth" controller-stamp.py 2>/dev/null \
         || printf 'unreachable: the controller did not answer\n'
 }
 
@@ -4242,9 +4257,7 @@ cmd_jobs() {
     # diagnostics grant the nodes' own (system, toolchain) jobs as well. Run
     # here rather than relayed, so the call carries the session's account,
     # which that grant is checked against (the relayed token has none).
-    local auth; auth="$(bb_auth_or_die)"
-    BB_JOBS_AUTH="$auth" BB_JOBS_NODE="$node" BB_JOBS_TYPE="$type" BB_JOBS_ALL="$whole" \
-        python3 "$BB_LIB/jobs-verbs.py" "$n" "$jid"
+    BB_JOBS_NODE="$node" BB_JOBS_TYPE="$type" BB_JOBS_ALL="$whole" api_py jobs-verbs.py "$n" "$jid"
 }
 
 # aerie run / build / test: a job on the project's node, watched from here.
@@ -5090,8 +5103,7 @@ is not running; see aerie logs."
             # and by who asked, with how long each took (B245): the one
             # command that shows a poll that should not be there, a tab that
             # asks twice, or the request a slow tab is waiting on.
-            local auth; auth="$(bb_auth_or_die)"
-            BB_TRACE_AUTH="$auth" python3 "$BB_LIB/trace-verbs.py" "${1:-60}"
+            api_py trace-verbs.py "${1:-60}"
             ;;
         *) die "usage: aerie dashboard test|dev|status|trace [SECONDS]" ;;
     esac
@@ -5521,7 +5533,7 @@ cmd_tool() {
         # asked for, as the project's Install a tool pack setting says.
         search|install)
             local auth; auth="$(bb_auth_or_die)"
-            BB_PACK_AUTH="$auth" exec python3 "$BB_LIB/pack-verbs.py" "$tool" "$@" ;;
+            BB_AUTH_HEADER="$auth" exec python3 "$BB_LIB/pack-verbs.py" "$tool" "$@" ;;
         "")
             local t d
             for t in graphics diagrams documents office; do
@@ -6263,8 +6275,7 @@ PY
 cmd_version_edit() {
     local proj
     proj="$(need_project BB_VERSION_PROJECT)" || exit
-    export BB_VERSION_AUTH; BB_VERSION_AUTH="$(bb_auth_or_die)"
-    BB_WORKSPACE="$WORKSPACE" python3 "$BB_LIB/release-edit.py" "$proj" "$@"
+    BB_WORKSPACE="$WORKSPACE" api_py release-edit.py "$proj" "$@"
 }
 
 # aerie forge (R188): the project's git host worked through the controller,
@@ -6272,8 +6283,7 @@ cmd_version_edit() {
 cmd_forge() {
     local proj
     proj="$(need_project --here)" || exit
-    export BB_FORGE_AUTH; BB_FORGE_AUTH="$(bb_auth_or_die)"
-    python3 "$BB_LIB/forge-verbs.py" "$proj" "$@"
+    api_py forge-verbs.py "$proj" "$@"
 }
 
 cmd_version() {
@@ -6306,10 +6316,12 @@ cmd_version() {
     fi
     case "$top" in "$BB_WORKTREES/$proj"/*) export BB_VERSION_TREE="$top" ;; esac
     # A release is the controller's to make (R138): the verb asks it, with
-    # this session's credential.
-    case " $* " in *" release "*|*" rehearse "*) export BB_VERSION_AUTH; BB_VERSION_AUTH="$(bb_auth_or_die)" ;; esac
+    # this session's credential. Every other form reads and writes here and
+    # is handed none.
+    local -a run=(python3 "$BB_LIB/version-verbs.py")
+    case " $* " in *" release "*|*" rehearse "*) run=(api_py version-verbs.py) ;; esac
     DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" \
-    BB_WORKSPACE="$WORKSPACE" python3 "$BB_LIB/version-verbs.py" "$py" "$proj" "$@"
+    BB_WORKSPACE="$WORKSPACE" "${run[@]}" "$py" "$proj" "$@"
 }
 
 # aerie changelog: the user-facing record beside VERSION, per project or
@@ -6475,7 +6487,7 @@ fi
 case "${1:-help}" in
     status)   cmd_status ;;
     settings) shift; cmd_settings "$@" ;;
-    router-key) shift; BB_RK_AUTH="$(bb_auth_or_die)" BB_RK_PROJECT="$(need_project --soft 2>/dev/null)" python3 "$BB_LIB/router-key.py" "$@" ;;
+    router-key) shift; BB_AUTH_HEADER="$(bb_auth_or_die)" BB_PROJECT="$(need_project --soft 2>/dev/null)" python3 "$BB_LIB/router-key.py" "$@" ;;
     version)  shift; cmd_version "$@" ;;
     forge)    shift; cmd_forge "$@" ;;
     changelog) shift; cmd_changelog "$@" ;;
@@ -6495,7 +6507,7 @@ case "${1:-help}" in
                   log) shift; nd="${1:-${BB_NODE:-}}"; [ $# -gt 0 ] && shift
                        cmd_logs --node "$nd" "$@"; exit $? ;;
               esac
-              BB_BUSY_AUTH="$(bb_auth_or_die)" BB_BUSY_PROJECT="$(bb_project 2>/dev/null || true)" \
+              BB_AUTH_HEADER="$(bb_auth_or_die)" BB_PROJECT="$(bb_project 2>/dev/null || true)" \
                   BB_BUSY_NODE="${BB_NODE:-}" exec python3 "$BB_LIB/busy-verbs.py" "$@" ;;
     lint)     shift; cmd_lint "$@" ;;
     findings) shift; cmd_findings "$@" ;;

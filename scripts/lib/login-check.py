@@ -13,9 +13,9 @@ but a sign-in made in a job or a terminal is said at once, as Claude's is.
 
 Arguments: `--loud` for the interactive verb, or nothing; then the agent
 whose flow just ran (claude, the default, codex or copilot), which is the
-one the loud lines are about. BB_LOGIN_AUTH is
-the session's auth header; HOME and BB_NODE are the machine's, and BB_NODE_ID its id as bb-tty
-was told it.
+one the loud lines are about. The session's auth header is bbapi's own
+(BB_AUTH_HEADER, from api_py in aerie); HOME and BB_NODE are the machine's,
+and BB_NODE_ID its id as bb-tty was told it.
 """
 import importlib.util
 import json
@@ -29,7 +29,6 @@ import bbapi
 
 loud = len(sys.argv) > 1 and sys.argv[1] == "--loud"
 FOR = sys.argv[2] if len(sys.argv) > 2 else "claude"
-auth = os.environ["BB_LOGIN_AUTH"]
 NODE = os.environ.get("BB_NODE", "this node")
 # Which machine this is, by id: a project may work on several nodes, and the
 # controller believes the one named only when it is one of the project's.
@@ -133,9 +132,9 @@ def others():
             continue
         if got:
             w = bbapi.call("/api/v1/claude-login", {"agent": agent, "email": got["email"], "plan": got["plan"],
-                                                    "signed_in": True, "node": NODE_ID}, auth=auth)
+                                                    "signed_in": True, "node": NODE_ID})
         else:
-            w = bbapi.call("/api/v1/claude-login", {"agent": agent, "signed_in": False, "node": NODE_ID}, auth=auth)
+            w = bbapi.call("/api/v1/claude-login", {"agent": agent, "signed_in": False, "node": NODE_ID})
         if loud and agent == FOR:
             if w.get("error"):
                 warn(f"could not tell the controller about this machine's {agent} login: {w['error']}")
@@ -154,11 +153,11 @@ if not here:
         say(f"not signed in on {NODE}: Sign in on Claude Code's row of the Installed page, with this node picked, runs the flow here")
     # Tell the controller this machine is not one of the signed-in ones, so
     # its row stops naming it.
-    bbapi.call("/api/v1/claude-login", {"signed_in": False, "node": NODE_ID}, auth=auth)
+    bbapi.call("/api/v1/claude-login", {"signed_in": False, "node": NODE_ID})
     sys.exit(1)
 
 w = bbapi.call("/api/v1/claude-login",
-               {"email": mine, "plan": "", "signed_in": True, "node": NODE_ID}, auth=auth)
+               {"email": mine, "plan": "", "signed_in": True, "node": NODE_ID})
 if w.get("error"):
     e = str(w["error"])
     if loud:
@@ -171,7 +170,7 @@ if not plan:
     plan = plan_now()
     if plan:
         bbapi.call("/api/v1/claude-login",
-                   {"email": mine, "plan": plan, "signed_in": True, "node": NODE_ID}, auth=auth)
+                   {"email": mine, "plan": plan, "signed_in": True, "node": NODE_ID})
 if loud:
     say(f"signed in on {NODE} as {mine}" + (f" · {plan}" if plan else ""))
 sys.exit(0)

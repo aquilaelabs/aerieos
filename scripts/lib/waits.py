@@ -11,6 +11,9 @@ rebuild was not allowed" are different verbs' words.
 
 Polled rather than pushed: a shell command waiting on a person, and a person
 is slow in a way no callback improves.
+
+`auth` is the header to ask with, or "" for the one the verb itself was
+handed, which bbapi sends when it is given none (BB_AUTH_HEADER).
 """
 import sys
 import time

@@ -11,8 +11,8 @@ Shebang-DevBoard, 5 Oct). Only the API call goes to the controller.
 
 Arguments: the project, then the words after `aerie version`: [--for DIR]
 release --edit --why "..." [--tag TAG] [--notes FILE|-] [--attach FILE]...
-BB_VERSION_AUTH is the session's credential, BB_WORKSPACE where the
-projects are.
+BB_WORKSPACE is where the projects are. The session's credential is bbapi's
+own header (BB_AUTH_HEADER, from api_py in aerie).
 """
 import os
 import sys
@@ -72,7 +72,6 @@ while rest:
         if not p.startswith(root + os.sep):
             fail(f"--attach {val}: a file in {proj}, a build in dist/ or a committed one")
         attach.append(os.path.relpath(p, root))
-auth = os.environ.get("BB_VERSION_AUTH", "")
 # Taking files off is its own ask and never part of an edit (the operator,
 # 5 Oct): the person reading it sees a removal and nothing else.
 if remove and (notes is not None or attach):
@@ -92,14 +91,14 @@ if attach:
     import syncwait  # noqa: E402
     if not syncwait.up(proj, "the controller attaches the files from its copy"):
         fail("[builderbot] ERROR: not asked: the files here have not reached the controller yet; try again in a moment")
-r = bbapi.call("/api/version", body, auth=auth, timeout=600)
+r = bbapi.call("/api/version", body, timeout=600)
 if r.get("error"):
     fail(f"[builderbot] ERROR: {r['error']}")
 what = f"withdraw {withdraw} and its tag" if withdraw else "take files off the release" if remove else "edit the release"
 if r.get("id") and not (r.get("edited") or r.get("removed") or r.get("withdrawn")):
     print(f"[builderbot] asked {r.get('to') or 'the space owner'} (#{r['id']}) to {what}, "
           "waiting up to 15 minutes for Approve in their bell", file=sys.stderr)
-    o = waits.outcome(auth, r["id"], f"it was not allowed to {what}")
+    o = waits.outcome("", r["id"], f"it was not allowed to {what}")
     if o.get("code"):
         fail(f"[builderbot] ERROR: {o.get('out') or 'nothing changed'}")
     print(o.get("out") or "done")

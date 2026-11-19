@@ -2,8 +2,9 @@
 command put in front of the operator with its reason, run when they allow it.
 
 The first argument is the verb (status or run); for run the rest are the adb
-arguments. BB_PHONE_AUTH is the auth header, BB_PHONE_WHY the sentence the
-operator reads, BB_PHONE_PROJECT the project asking.
+arguments. BB_PHONE_WHY is the sentence the operator reads, BB_PHONE_PROJECT
+the project asking. The auth header is bbapi's own (BB_AUTH_HEADER, from
+api_py in aerie).
 """
 import json
 import os
@@ -16,7 +17,7 @@ from say import need
 
 
 def status():
-    d = bbapi.call("/api/phone", auth=os.environ["BB_PHONE_AUTH"])
+    d = bbapi.call("/api/phone")
     if d.get("error"):
         sys.exit(f"[builderbot] ERROR: could not reach the dashboard at {bbapi.url()}: {d['error']}")
     rows = d.get("nodes") or []
@@ -47,7 +48,7 @@ def status():
 
 
 def run():
-    post = lambda body: bbapi.call("/api/phone", body, auth=os.environ["BB_PHONE_AUTH"])  # noqa: E731
+    post = lambda body: bbapi.call("/api/phone", body)  # noqa: E731
 
 
     # The project names the node, and the node's phone names who is asked: a
@@ -64,7 +65,7 @@ def run():
               "for Approve in the bell, or the Phone page", file=sys.stderr)
     # Polled rather than pushed: this is a shell command waiting on a person, and
     # a person is slow in a way no callback improves.
-    o = waits.outcome(os.environ["BB_PHONE_AUTH"], rid, "the operator said no")
+    o = waits.outcome("", rid, "the operator said no")
     sys.stdout.write(o.get("out") or "")
     sys.exit(o.get("code") or 0)
 
@@ -80,7 +81,7 @@ def use(op, args=None, quiet=False):
     r = bbapi.call("/api/phone", {"action": "use", "op": op, "args": args or {},
                                   "why": os.environ.get("BB_PHONE_WHY", ""),
                                   "project": os.environ.get("BB_PHONE_PROJECT", "")},
-                   auth=os.environ["BB_PHONE_AUTH"], timeout=900)
+                   timeout=900)
     if r.get("asked"):
         if r.get("allowed"):
             print(f"[builderbot] #{r['asked']}: {r.get('to') or 'its owner'} allowed this session's commands "
@@ -88,7 +89,7 @@ def use(op, args=None, quiet=False):
         else:
             print(f"[builderbot] asked {r.get('to') or 'its owner'} (#{r['asked']}), waiting up to 15 minutes "
                   "for Approve in their bell", file=sys.stderr)
-        o = waits.outcome(os.environ["BB_PHONE_AUTH"], r["asked"], f"{r.get('to') or 'its owner'} said no")
+        o = waits.outcome("", r["asked"], f"{r.get('to') or 'its owner'} said no")
         try:
             r = json.loads(o.get("out") or "{}")
         except ValueError:

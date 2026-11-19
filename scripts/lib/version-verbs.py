@@ -202,9 +202,8 @@ if argv and argv[0] == "release":
     rest = [x for x in rest if x not in ("--without-apk", "--dev", "--stable")]
     if rest:
         fail(f"aerie version release takes --why \"...\" [--without-apk] [--dev|--pre NAME|--stable] and nothing else, not {rest[0]}")
-    auth = os.environ.get("BB_VERSION_AUTH", "")
     r = bbapi.call("/api/version", {"action": "release", "project": proj, "component": comp, "why": why, "dev": dev,
-                                    "pre": pre, "stable": stable, "unsigned": unsigned}, auth=auth, timeout=240)
+                                    "pre": pre, "stable": stable, "unsigned": unsigned}, timeout=240)
     if r.get("error"):
         fail(f"[builderbot] ERROR: {r['error']}")
     if r.get("channel"):
@@ -212,7 +211,7 @@ if argv and argv[0] == "release":
     if r.get("id") and not r.get("released"):
         print(f"[builderbot] asked {r.get('to') or 'the space owner'} (#{r['id']}) to release, waiting up "
               "to 15 minutes for Approve in their bell", file=sys.stderr)
-        o = waits.outcome(auth, r["id"], "the release was not allowed")
+        o = waits.outcome("", r["id"], "the release was not allowed")
         if o.get("code"):
             fail(f"[builderbot] ERROR: {o.get('out') or 'it was not released'}")
         print(o.get("out") or "released")
@@ -255,7 +254,7 @@ if argv and argv[0] == "rehearse":
              "the remote's branch")
     r = bbapi.call("/api/forge", {"project": proj, "verb": "run dispatch",
                                   "args": {"pos": [wf], "flags": {"ref": branch}}},
-                   auth=os.environ.get("BB_VERSION_AUTH", ""), timeout=120)
+                   timeout=120)
     if isinstance(r, dict) and r.get("error"):
         # GitHub starts a dispatch only for a workflow its default branch
         # also carries: until the rehearsal is merged there, it is said so.

@@ -5,10 +5,10 @@ controller, which holds the project's token and runs each verb with it
 Arguments: the project, then the words after `aerie forge`: a verb (whoami,
 measure, or a group and an action: pr list, run log ...), its positional
 arguments, and its flags (--title "...", --draft, -f NAME=VALUE ...).
-BB_FORGE_AUTH is the session's credential.
+The session's credential is bbapi's own header (BB_AUTH_HEADER, from api_py
+in aerie).
 """
 import json
-import os
 import sys
 
 import bbapi
@@ -49,7 +49,7 @@ while words:
         pos.append(w)
 as_json = bool(flags.pop("json", False))
 r = bbapi.call("/api/forge", {"project": proj, "verb": verb, "args": {"pos": pos, "flags": flags}},
-               auth=os.environ.get("BB_FORGE_AUTH", ""), timeout=120)
+               timeout=120)
 if isinstance(r, dict) and r.get("error"):
     die(r["error"])
 if as_json:

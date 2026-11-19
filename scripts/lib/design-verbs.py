@@ -19,8 +19,8 @@ changes one rule's text (a design rule by its name, a theme's or a page's
 as `aerie design show` names it, `a-dialog/layout`) or one page's notes,
 and saves the record whole as `save` does, printing what changed. `--file`
 on `edit` and `save` writes docs/design-language.md into the repository's
-tree from what was saved. BB_DESIGN_AUTH is the auth header and
-BB_DESIGN_PROJECT the project.
+tree from what was saved. BB_PROJECT is the project. The auth header is
+bbapi's own (BB_AUTH_HEADER, from api_py in aerie).
 """
 import difflib
 import json
@@ -40,8 +40,7 @@ import records  # noqa: E402
 # prints, in that form; a design is one record of its pages and themes.
 fmt, argv = dash.format_flag(sys.argv[1:])
 verb = argv[0] if argv else "list"
-auth = os.environ["BB_DESIGN_AUTH"]
-proj = os.environ["BB_DESIGN_PROJECT"]
+proj = os.environ["BB_PROJECT"]
 USAGE = ("usage: aerie design [list | show [ID|NAME] | file [--from FILE] | json | schema | save FILE [--file] | "
          "edit NAME --text FILE|--append FILE [--file]]")
 # --file on save and edit: docs/design-language.md written into the tree.
@@ -51,7 +50,7 @@ argv = [a for a in argv if a != "--file"]
 
 if verb == "save" and (len(argv) < 2 or argv[1] in ("-h", "--help")):
     # Help, not a file called -h (B342): the shape and every limit.
-    r = bbapi.call("/api/design?project=" + urllib.parse.quote(proj) + "&show=schema", auth=auth)
+    r = bbapi.call("/api/design?project=" + urllib.parse.quote(proj) + "&show=schema")
     print("aerie design save FILE (or - for stdin): a JSON file of this shape, saved whole")
     print()
     print(r.get("text", "") if isinstance(r, dict) else "")
@@ -75,7 +74,7 @@ if verb == "file" and len(argv) > 1:
     rec = read_record(argv[2])
     r = bbapi.call("/api/design", {"action": "render", "project": proj,
                                    "language": rec.get("language") or {},
-                                   "pages": rec.get("pages") or []}, auth=auth)
+                                   "pages": rec.get("pages") or []})
     if not isinstance(r, dict):
         die("the controller answered something that is not a design")
     if r.get("error"):
@@ -96,7 +95,7 @@ def tree_file():
 
 def saved_file_text():
     """docs/design-language.md as the saved design writes it."""
-    r = bbapi.call("/api/design?project=" + urllib.parse.quote(proj) + "&show=file", auth=auth)
+    r = bbapi.call("/api/design?project=" + urllib.parse.quote(proj) + "&show=file")
     if not isinstance(r, dict) or r.get("error"):
         die((r or {}).get("error") if isinstance(r, dict) else "the controller answered something that is not a design")
     text = str(r.get("text") or "")
@@ -128,7 +127,7 @@ def save(rec, said):
     """Save a whole record, saying `said` once it lands."""
     r = bbapi.call("/api/design", {"action": "save", "project": proj,
                                    "language": rec.get("language") or {},
-                                   "pages": rec.get("pages") or []}, auth=auth)
+                                   "pages": rec.get("pages") or []})
     if not isinstance(r, dict):
         die("the controller answered something that is not a design")
     if r.get("error"):
@@ -160,7 +159,7 @@ if verb == "edit":
     new = new.strip("\n")
     if not new.strip():
         die(f"{src} is empty; aerie design save writes a record with the rule left out")
-    r = bbapi.call("/api/design?project=" + urllib.parse.quote(proj) + "&show=json", auth=auth)
+    r = bbapi.call("/api/design?project=" + urllib.parse.quote(proj) + "&show=json")
     if not isinstance(r, dict) or r.get("error"):
         die((r or {}).get("error") if isinstance(r, dict) else "the controller answered something that is not a design")
     rec = json.loads(str(r.get("text") or "{}"))
@@ -195,7 +194,7 @@ elif verb in ("-h", "--help"):
 else:
     die(USAGE)
 
-r = bbapi.call("/api/design?project=" + urllib.parse.quote(proj) + "&show=" + urllib.parse.quote(which), auth=auth)
+r = bbapi.call("/api/design?project=" + urllib.parse.quote(proj) + "&show=" + urllib.parse.quote(which))
 if not isinstance(r, dict):
     die("the controller answered something that is not a design")
 if r.get("error"):

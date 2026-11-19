@@ -5,8 +5,8 @@ The first argument is the verb: show prints the brief waiting in the tree,
 or the one kept after it left; take is bb-tty's, starting a new session,
 and prints the brief this account staged with Build it, which leaves the
 tree as it is taken, or nothing. A take never fails a session's start: any
-error prints nothing. BB_BRIEF_AUTH is the auth header and BB_BRIEF_PROJECT
-the project.
+error prints nothing. BB_PROJECT is the project. The auth header is bbapi's
+own (BB_AUTH_HEADER, from api_py in aerie).
 """
 import os
 import sys
@@ -17,17 +17,16 @@ import bbapi
 from say import need
 
 verb = sys.argv[1] if len(sys.argv) > 1 else "show"
-auth = os.environ["BB_BRIEF_AUTH"]
-proj = os.environ["BB_BRIEF_PROJECT"]
+proj = os.environ["BB_PROJECT"]
 
 if verb == "take":
-    r = bbapi.call("/api/brief", {"action": "take", "project": proj}, auth=auth)
+    r = bbapi.call("/api/brief", {"action": "take", "project": proj})
     text = r.get("text") if isinstance(r, dict) else ""
     if text:
         sys.stdout.write(str(text) + "\n")
     raise SystemExit(0)
 
-d = bbapi.call("/api/brief?project=" + urllib.parse.quote(proj), auth=auth)
+d = bbapi.call("/api/brief?project=" + urllib.parse.quote(proj))
 if not isinstance(d, dict):
     sys.exit("[builderbot] ERROR: the controller answered something that is not a brief")
 need(d)

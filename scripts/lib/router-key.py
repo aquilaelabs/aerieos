@@ -3,7 +3,8 @@ own key and the models it offers, for an Any model session at its start
 (bb-tty's launcher writes OpenCode's config from it). Prints the JSON the
 controller answers, {} where no router allows the project.
 
-BB_RK_AUTH is the auth header, BB_RK_PROJECT the project.
+BB_PROJECT is the project. The auth header is bbapi's own (BB_AUTH_HEADER,
+from aerie).
 """
 import json
 import os
@@ -12,8 +13,8 @@ import urllib.parse
 
 import bbapi
 
-proj = os.environ.get("BB_RK_PROJECT", "")
+proj = os.environ.get("BB_PROJECT", "")
 if not proj:
     sys.exit("[builderbot] ERROR: no space: run it inside one, or set BB_PROJECT")
-d = bbapi.call("/api/router-key?project=" + urllib.parse.quote(proj), auth=os.environ["BB_RK_AUTH"], timeout=20)
+d = bbapi.call("/api/router-key?project=" + urllib.parse.quote(proj), timeout=20)
 print(json.dumps(d))
