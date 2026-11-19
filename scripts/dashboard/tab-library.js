@@ -20,6 +20,14 @@
 
 let lib = null, libNode = "", libFollow = null;
 let libQ = "", libKind = "", libTier = "";
+// The rest of what narrows it (R256): a topic, the order, and whether what
+// runs on other systems is shown too; all in the address, none saved.
+let libTopic = "", libSort = "", libAll = false;
+// Cards or rows, this browser's (the Spaces page's Full and Compact): a list
+// on a phone opens in rows until somebody picks.
+let libView = (() => { try{ return localStorage.getItem("bb.libview") || ""; }catch(e){ return ""; } })();
+// How many a list asks for at a time.
+const LIB_PAGE = 30;
 // Whether the source chips drew the last time the page did: a library whose
 // cards all come from one source draws none, and its waiting template then
 // holds no row for them (it stood a row lower than the page it waited for
@@ -49,6 +57,34 @@ function libGroup(r){ return r.group || r.kind; }
 // maintainers reviewed, and what a person added themselves.
 const LIB_TIERS = [["official", "Packaged by Aerie"], ["verified", "Verified"], ["vetted", "Vetted"], ["sideloaded", "Sideloaded"]];
 function libTierWord(t){ return (LIB_TIERS.find(([k]) => k === t) || [t, t])[1]; }
+// Every row the page holds now: a list's page so far, or the front page's
+// shelves and what is on the node, and the entry page's own.
+function libKnown(){
+  return [...(lib?.rows || []), ...(lib?.here || []), ...(lib?.shelves || []).flatMap(s => s.rows || []), ...(entryLib?.rows || [])];
+}
+function libFind(f){ return libKnown().find(f) || null; }
+// What the page asks for (R256): the server narrows, counts and pages, so
+// the page never holds the whole catalog.
+function libQuery(offset = 0){
+  const p = new URLSearchParams({node: libNode, view: "browse", limit: String(LIB_PAGE), offset: String(offset)});
+  for (const [k, v] of [["q", libQ.trim()], ["kind", libKind], ["topic", libTopic], ["tier", libTier], ["sort", libSort]]) if (v) p.set(k, v);
+  if (libAll) p.set("all", "1");
+  return "/api/library?" + p;
+}
+// The narrowing as the address carries it (?kind=app&topic=media&q=...).
+function libAddr(){
+  const p = new URLSearchParams();
+  for (const [k, v] of [["q", libQ.trim()], ["kind", libKind], ["topic", libTopic], ["tier", libTier], ["sort", libSort]]) if (v) p.set(k, v);
+  if (libAll) p.set("all", "1");
+  const s = p.toString();
+  return s ? "?" + s : "";
+}
+// ...and read back from one, as the page opens on it.
+function libFromAddr(query){
+  const p = new URLSearchParams(query || "");
+  libQ = p.get("q") || ""; libKind = p.get("kind") || ""; libTopic = p.get("topic") || "";
+  libTier = p.get("tier") || ""; libSort = p.get("sort") || ""; libAll = p.get("all") === "1";
+}
 
 function openLibrary(){
   openTab({kind: "library", arg: "__library", label: "Library"});
@@ -95,15 +131,19 @@ function loadLibrary(){
     if (nodesList === null || nodesStale) await nodesKnown();
     if (!libPick()){ lib = {nonode: true}; return; }
     // A reply is kept while it is still about the node on show.
-    const node = libNode;
-    const got = await getJSON("/api/library?node=" + encodeURIComponent(node));
-    if (libNode !== node) return;
+    const node = libNode, asked = libQuery();
+    const got = await getJSON(asked);
+    // An answer about another node, or to words since changed, is not drawn.
+    if (libNode !== node || libQuery() !== asked) return;
     lib = got;
     if (libWantAgent && !lib.error){
-      const r = (lib.rows || []).find(x => x.kind === "agent" && x.agent === libWantAgent);
+      const want = libWantAgent;
       libWantAgent = "";
+      // An agent's card may be past the shelf's eight: asked for by kind.
+      const found = libFind(x => x.kind === "agent" && x.agent === want)
+        || ((await getJSON(`/api/library?node=${encodeURIComponent(node)}&view=browse&kind=agent&limit=60`)).rows || []).find(x => x.kind === "agent" && x.agent === want);
       // The agent's own entry page (R183), once the card is drawn.
-      if (r) setTimeout(() => openEntry(libNode, `agent:${r.name}`));
+      if (found) setTimeout(() => openEntry(libNode, `agent:${found.name}`));
     }
     // The lines the Toolchains and Agents pages draw read their own page's
     // state: the node's sandbox flag (Install them now on a system line) and
@@ -120,15 +160,32 @@ function loadLibrary(){
     // One follow-up while a job writes a row, not a poll: the toolchains
     // revision moves when the job ends, and the row's "installing" until then.
     clearTimeout(libFollow); libFollow = null;
-    if ((lib.rows || []).some(r => r.running || r.queued)) libFollow = setTimeout(loadLibrary, 3000);
-  }, {join: 500, about: libNode});
+    if (libKnown().some(r => r.running || r.queued)) libFollow = setTimeout(loadLibrary, 3000);
+  }, {join: 500, about: libQuery()});
 }
 
-// What the search box matches: the name, what it is, its kind and its tier.
-function libMatch(r, q){
-  if (!q) return true;
-  const hay = `${r.label} ${r.name} ${r.about} ${r.kind} ${r.tier} ${libTierWord(r.tier)} ${(r.platforms || []).join(" ")}`.toLowerCase();
-  return q.toLowerCase().split(/\s+/).filter(Boolean).every(w => hay.includes(w));
+// After a press: the list, and the entry's page where it is on show.
+function libReload(){ return Promise.all([loadLibrary(), entryKey && typeof shown === "function" && shown("entry") ? loadEntry() : null]); }
+
+// A list narrowed anew starts from its first page.
+function libPagesFrom(){ if (typeof pageState === "object") delete pageState.liblist; }
+
+// A list's next page, put under the rows it has: one already there (the
+// list moved under it) is not drawn twice.
+async function libMore(){
+  if (!lib?.rows || lib.moreAsked) return;
+  lib.moreAsked = true;
+  const node = libNode, asked = libQuery(lib.rows.length), was = lib;
+  try{
+    const got = await getJSON(asked);
+    if (lib !== was || libNode !== node || got.error) return;
+    const have = new Set(lib.rows.map(r => `${r.kind}:${r.name}`));
+    lib.rows = [...lib.rows, ...(got.rows || []).filter(r => !have.has(`${r.kind}:${r.name}`))];
+    lib.total = got.total;
+  } finally {
+    if (lib === was) lib.moreAsked = false;
+  }
+  readMoved("library"); drawPanes();
 }
 
 // The pills a row wears: its tier (the three read on every row), what is
@@ -219,6 +276,9 @@ function libActs(r, may){
   // something is behind it, set on the Installed page.
   if (r.kind === "service") return !may.configure || r.installed ? "" : `<button type="button" class="primary" data-libact="install" data-libkind="service" data-libname="${esc(r.name)}"${r.ready ? " disabled" : ""}${r.ready ? ` title="${esc(r.ready)}: set on the Installed page"` : ""}>Install</button>`;
   if (!may.install || !n) return "";
+  // One for other systems, shown when somebody asked to see them (R256):
+  // its Install dead, the card's state saying why.
+  if (r.wrong_platform && !r.installed) return a(r.kind === "pack" && r.catalog ? "add" : "install", "Install", "primary", r.wrong_platform);
   if (r.kind === "pack" && !r.installed && r.catalog) return a("add", "Install", "primary", libHold);
   if (r.machine && (!r.machine.managed || r.machine.imaged)) return "";
   // The container toolkit installed but unknown to Docker is put right by
@@ -341,7 +401,7 @@ const LIB_ICONS = {
 // to (an added pack at its own, a catalog offer at the catalog's, its archive
 // checked against the catalog's sha256), drawn as the dialog draws it.
 async function libLook(key){
-  const r = (lib?.rows || []).find(x => `${x.kind}:${x.name}` === key);
+  const r = libFind(x => `${x.kind}:${x.name}` === key);
   if (!r || libSeen[key] === "looking") return;
   libSeen[key] = "looking"; readMoved("library"); drawPanes();
   const body = r.catalog ? {action: "preview", url: r.catalog.url, commit: r.catalog.commit, sha256: r.catalog.sha256, path: r.catalog.path || ""}
@@ -389,49 +449,89 @@ function libRow(r, may){
 // The sources count within the kind picked (the operator, 31 Oct: a kind
 // picked says how many of it each source has); the kinds, the first row,
 // count the whole library, so a source picked never empties that row.
-function libFilterBand(kindRows, tierRows, acts = ""){
-  const count = (key, f) => kindRows.filter(f).length;
-  // Installed, then Updates, first after All (the operator, 29 Oct): every
-  // card installed, or with an update due, each in its own kind's section;
-  // drawn only while one is.
-  const kinds = [{key: "installed", label: "Installed", count: count("installed", LIB_STANDS.installed)},
-                 {key: "update", label: "Updates", count: count("update", LIB_STANDS.update)},
-                 ...LIB_KINDS.map(([k, l]) => ({key: k, label: l, count: count(k, r => libGroup(r) === k)}))];
-  const tiers = LIB_TIERS.map(([k, l]) => ({key: k, label: l, count: tierRows.filter(r => r.tier === k).length}));
-  const tierChips = chipButtons(tiers, libTier, "data-libtier", undefined, "Any source");
+function libFilterBand(acts = ""){
+  const c = lib.counts || {kind: {}, tier: {}, topic: {}, all: 0};
+  // Installed, then Updates, first after All (the operator, 29 Oct), each
+  // drawn while it has cards; the counts are the server's, under the other
+  // narrowings (R256).
+  const kinds = [{key: "installed", label: "Installed", count: c.kind.installed || 0},
+                 {key: "update", label: "Updates", count: c.kind.update || 0},
+                 ...LIB_KINDS.map(([k, l]) => ({key: k, label: l, count: c.kind[k] || 0}))];
+  // A source picked keeps its chip while it narrows to nothing, so it can
+  // be let go; the chips draw only where two sources are present.
+  const tiers = LIB_TIERS.map(([k, l]) => ({key: k, label: l, count: c.tier[k] || (k === libTier ? 0.5 : 0)}));
+  const tierChips = tiers.filter(t => t.count).length > 1 || libTier ? chipButtons(tiers.map(t => ({...t, count: Math.floor(t.count)})).filter(t => t.count || t.key === libTier), libTier, "data-libtier", undefined, "Any source") : "";
   libHadTiers = !!tierChips;
+  // A topic (the catalog's fixed list, R256) and the order, each a pulldown
+  // beside the search; a topic with nothing under the rest is left out.
+  const topics = (lib.topics || []).filter(([k]) => c.topic[k] || k === libTopic);
+  const topicSel = topics.length ? `<label class="pick libtopic"><select id="libTopic" aria-label="topic">
+      <option value="">Any topic</option>${topics.map(([k, l]) => `<option value="${esc(k)}"${k === libTopic ? " selected" : ""}>${esc(l)}${c.topic[k] ? ` (${c.topic[k]})` : ""}</option>`).join("")}</select></label>` : "";
+  const sortSel = `<label class="pick libsort"><select id="libSort" aria-label="order">${[["", libQ.trim() ? "Best match" : "By name"], ...(libQ.trim() ? [["name", "By name"]] : []), ["added", "Recently added"]]
+      .map(([k, l]) => `<option value="${k}"${k === libSort ? " selected" : ""}>${l}</option>`).join("")}</select></label>`;
+  const view = viewSeg("libview", libViewNow(), "each a card with what it is", "each a row, more to a screen", "", ["Cards", "Rows"]);
   return `<div class="field lfilter libfilter">
     <div class="libsearchrow"><input id="libFind" type="search" maxlength="80" autocomplete="off" spellcheck="false" aria-label="search the library"
-      placeholder="search by name or what it does" value="${esc(libQ)}">${acts ? `<span class="actbar">${acts}</span>` : ""}</div>
-    <div class="chips" data-chips="libkind">${chipButtons(kinds, libKind, "data-libkind", kindRows.length)}</div>
+      placeholder="search by name, maker or what it does" value="${esc(libQ)}">${acts ? `<span class="actbar">${acts}</span>` : ""}</div>
+    <div class="libnarrow">${topicSel}${sortSel}${view}</div>
+    <div class="chips" data-chips="libkind">${chipButtons(kinds, libKind, "data-libkind", c.all)}</div>
     <div class="chips" data-chips="libtier">${tierChips}</div>
   </div>`;
 }
 
-function libSections(rows, may){
-  return LIB_KINDS.map(([k, title]) => {
-    const all = (lib.rows || []).filter(r => libGroup(r) === k);
-    const here = rows.filter(r => libGroup(r) === k);
-    if (libKind && !LIB_STANDS[libKind] && libKind !== k) return "";
-    if (LIB_STANDS[libKind] && !here.length) return "";
-    // No packs at all is no group (the operator, 29 Oct): nothing to list, and
-    // Add your own is on the bar; the Tool packs chip still opens it empty.
-    if (k === "pack" && !all.length && libKind !== k) return "";
-    const inst = all.filter(r => r.installed).length;
-    const count = !all.length ? "" : k === "app" || k === "companion" ? `${all.length}` : `${inst} of ${all.length} installed`;
-    // The catalog's trouble is the packs' alone, said over them, never in the node's head.
-    // Over the packs: the catalog's trouble, and the way to offer one of
-    // yours to everybody (R169 step 3's vetting: a pull request there).
-    const submit = k === "pack" && lib.catalog_repo && may.packs
-      ? `<div class="hint">Made a pack worth sharing? <a href="${esc(lib.catalog_repo)}" target="_blank" rel="noopener">Submit it to the vetted catalog ↗</a>: a pull request there, reviewed and signed by the maintainers.</div>` : "";
-    const note = (k === "pack" && lib.catalog_error ? `<div class="hint warn">${esc(lib.catalog_error)}</div>` : "") + submit
-      || (k === "companion" && featureOff("apps") ? deadWhy(featureOff("apps")) : "");
-    const body = k === "companion" && featureOff("apps") ? ""
-      : here.length ? `<div class="lgrid">${here.map(r => libRow(r, may)).join("")}</div>`
-      : `<div class="empty">${all.length ? "Nothing here matches." : k === "companion" ? "This controller offers no apps for your own machines: an administrator picks them on the Controller page, under Apps."
-        : k === "pack" ? "Nothing added yet: Add your own brings in a tool pack of yours, and the vetted catalog's offers land here." : "Nothing here yet."}</div>`;
-    return `<div class="libgroup" data-libgroup="${esc(k)}"><h3 class="libgname">${esc(title)}${count ? ` <span class="dim">${esc(count)}</span>` : ""}</h3>${note}${body}</div>`;
+// Cards or rows: the browser's pick, else rows for a list on a phone and
+// cards everywhere else (R256).
+function libViewNow(){
+  if (libView === "cards" || libView === "list") return libView;
+  return innerWidth < 600 && libNarrowed() ? "list" : "cards";
+}
+function libNarrowed(){ return !!(libQ.trim() || libKind || libTopic || libTier); }
+
+// What a group says over its cards: the catalog's trouble and the way to
+// submit a pack, over the Tool packs (never in the node's head).
+function libPackNote(may){
+  const submit = lib.catalog_repo && may.packs
+    ? `<div class="hint">Made a pack worth sharing? <a href="${esc(lib.catalog_repo)}" target="_blank" rel="noopener">Submit it to the vetted catalog ↗</a>: a pull request there, reviewed and signed by the maintainers.</div>` : "";
+  const past = lib.catalog_past ? `<div class="hint warn">The catalog lists ${lib.catalog_past.toLocaleString()} more than this AerieOS reads; a newer AerieOS reads them all.</div>` : "";
+  return (lib.catalog_error ? `<div class="hint warn">${esc(lib.catalog_error)}</div>` : "") + past + submit;
+}
+
+function libCards(rows, may){
+  return `<div class="lgrid${libViewNow() === "list" ? " lrows" : ""}">${rows.map(r => libRow(r, may)).join("")}</div>`;
+}
+
+// The front page (R256, the operator, 18 Nov: shelves, never the whole
+// catalog): what is on this node, then a shelf per kind of at most eight
+// cards, Packaged by Aerie first, each with All N opening that kind's list.
+function libShelves(may){
+  const shelf = (key, title, total, rows, note = "") => `<div class="libgroup" data-libgroup="${esc(key)}">
+    <h3 class="libgname">${esc(title)} <span class="dim">${esc(String(total))}</span>${
+      total > rows.length ? `<button type="button" class="link libshelfall" data-libshelf="${esc(key)}">All ${esc(String(total))} ›</button>` : ""}</h3>${note}${libCards(rows, may)}</div>`;
+  const here = lib.here || [];
+  const mine = here.length ? shelf("installed", "On this node", here.length, here.slice(0, 8)) : "";
+  const kinds = (lib.shelves || []).map(sh => {
+    const title = (LIB_KINDS.find(([k]) => k === sh.kind) || [sh.kind, sh.kind])[1];
+    if (sh.kind === "companion" && featureOff("apps")) return "";
+    return shelf(sh.kind, title, sh.total, sh.rows, sh.kind === "pack" ? libPackNote(may) : "");
   }).join("");
+  // No packs at all is no shelf (the operator, 29 Oct), but what the
+  // catalog has to say over them is still said.
+  const packsSaid = !(lib.shelves || []).some(sh => sh.kind === "pack") && libPackNote(may)
+    ? `<div class="libgroup" data-libgroup="pack"><h3 class="libgname">Tool packs</h3>${libPackNote(may)}</div>` : "";
+  return mine + kinds + packsSaid || `<div class="empty">Nothing here yet.</div>`;
+}
+
+// A list (a chip, a topic or the search): one sorted list, a page at a time.
+function libList(may){
+  const rows = lib.rows || [];
+  const kindWord = LIB_STANDS[libKind] ? (libKind === "update" ? "with an update" : "installed") : "";
+  const noun = libKind && !LIB_STANDS[libKind] ? (LIB_KINDS.find(([k]) => k === libKind) || ["", "entries"])[1].toLowerCase() : "entries";
+  const hidden = lib.hidden ? `<div class="hint libhidden">${lib.hidden} more ${lib.hidden === 1 ? "runs" : "run"} only on other systems than ${esc(lib.name || "this node")}'s. <button type="button" class="link" data-liball="1">Show ${lib.hidden === 1 ? "it" : "them"}</button></div>`
+    : libAll ? `<div class="hint libhidden">Showing what runs on other systems too, each marked. <button type="button" class="link" data-liball="0">Hide them</button></div>` : "";
+  const note = libKind === "pack" ? libPackNote(may) : "";
+  const body = rows.length ? libCards(rows, may)
+    : `<div class="empty">${libQ.trim() ? `Nothing ${kindWord ? kindWord + " " : ""}matches ${esc(libQ.trim())}.` : "Nothing here matches."}</div>`;
+  return `<div class="libgroup libone" data-libgroup="list">${note}${hidden}${body}</div>`;
 }
 
 function renderLibraryInto(i){
@@ -472,29 +572,18 @@ function renderLibraryInto(i){
     patch(d.list, `<div class="field"><div class="notice bad">${esc("could not read the library: " + lib.error)}</div></div>`);
     return;
   }
-  // A card not for this node is not drawn (R170 step 9): counted in the head.
-  // Nor is a catalog entry this AerieOS does not take (the operator, 12 Nov:
-  // not shown at all, where its card said what it needed): written in a
-  // format past this build's, or for other release lines than this one.
-  const notBuild = (lib.rows || []).filter(r => r.too_new).length;
-  const all = (lib.rows || []).filter(r => !r.wrong_platform && !r.too_new);
-  const notHere = (lib.rows || []).length - all.length - notBuild;
+  // What the head says is about the whole Library on the node, whatever is
+  // narrowed: the server counts it (R256). A card not for this node is left
+  // out of a list and counted (R170 step 9), and an entry this AerieOS does
+  // not take is never shown (the operator, 12 Nov).
+  const f = lib.facts || {};
   // The last update installed takes the Updates chip with it, the last
   // thing removed the Installed chip: back to All.
-  if (LIB_STANDS[libKind] && !all.some(LIB_STANDS[libKind])) libKind = "";
-  const inKind = r => !libKind || (LIB_STANDS[libKind] ? LIB_STANDS[libKind](r) : libGroup(r) === libKind);
-  const tierRows = all.filter(inKind);
-  // A kind whose cards come from one source alone draws no source chips,
-  // and a source the kind has none from draws none: a source picked before
-  // is let go then rather than narrowing out of sight.
-  if (libTier && (LIB_TIERS.filter(([k]) => tierRows.some(r => r.tier === k)).length < 2
-                  || !tierRows.some(r => r.tier === libTier))) libTier = "";
-  const kindRows = all;
-  const rows = all.filter(r => libMatch(r, libQ) && inKind(r) && (!libTier || r.tier === libTier));
-  const inst = all.filter(r => r.installed).length, due = all.filter(LIB_STANDS.update).length;
+  if (LIB_STANDS[libKind] && !(lib.counts?.kind?.[libKind]) && !(lib.rows || []).length && !libQ.trim()){ libKind = ""; setTimeout(loadLibrary); }
+  const inst = f.installed || 0, due = f.updates || 0, notHere = f.other_platform || 0, notBuild = f.not_this_build || 0;
   const free = lib.store?.free_mb ? `${humanBytes(lib.store.free_mb * 1048576)} free` : "";
   const head = pageHead({facts: [
-    ["Installed", `${inst} of ${all.filter(r => r.kind !== "app" && r.kind !== "companion").length}`],
+    ["Installed", `${inst} of ${f.offered || 0}`],
     ["Updates due", due ? String(due) : ""],
     ["Store", lib.store?.root ? `${lib.store.root}${free ? ", " + free : ""}` : ""],
     ["Versions checked", lib.store?.checked ? ago(lib.store.checked) : ""],
@@ -515,7 +604,13 @@ function renderLibraryInto(i){
   libHold = stale ? "this node is not reporting" : pro ? "this node's store is read-only to it" : "";
   // Patched into what is there (R244): the search being typed in keeps its
   // focus and its caret through the redraw its own key brings.
-  patch(d.list, `<div data-libnode="${esc(libNode)}">${notes}${head}${libFilterBand(kindRows, tierRows, acts)}<div class="field libgroups">${libSections(rows, may)}</div></div>`);
+  patch(d.list, `<div data-libnode="${esc(libNode)}">${notes}${head}${libFilterBand(acts)}<div class="field libgroups">${
+    libNarrowed() || !lib.shelves ? libList(may) : libShelves(may)}</div></div>`);
+  // A list a page at a time (the long-lists rule): its foot says how much
+  // of how many, and the next page comes as the foot scrolls into view.
+  const one = d.list.querySelector(".libone .lgrid");
+  if (one) paginate(one, ":scope > .lcard", {key: "liblist", total: lib.total || 0, more: libMore,
+    noun: libKind && !LIB_STANDS[libKind] ? (LIB_KINDS.find(([k]) => k === libKind) || ["", "entries"])[1].toLowerCase() : "entries"});
   // The ellipsis on a card whose job runs is ticked by the one timer every
   // page shares (tcTickDots), so a redraw does not restart it.
   if (!tcDotsTimer && d.list.querySelector(".dots")) tcDotsTimer = setInterval(tcTickDots, 400);
@@ -538,16 +633,26 @@ function wireLibrary(root){
   });
   wireSections(root);
   wireSignin(root);
+  // Each narrowing asks the server again (R256), the address following it,
+  // and a list starts from its first page.
+  const ask = set => { set(); if (lib) lib.moreAsked = false; libPagesFrom(); shellSync(); loadLibrary(); };
   const q = root.querySelector("#libFind");
   if (q){
-    onTyping(q, () => { libQ = q.value; readMoved("library"); drawPanes(); });
+    onTyping(q, () => { if (q.value === libQ) return; ask(() => { libQ = q.value; if (!libQ.trim() && libSort === "") libSort = ""; }); });
   }
-  // A chip rearranges the shelf (R192): the cards that stay slide to their
-  // places, the ones it leaves out fade away, the ones it brings fade up.
-  const shelf = () => document.querySelector(".pane .doc.on .librarytab");
-  const move = set => chipMove(shelf, ".lcard, .libgname", () => { set(); readMoved("library"); drawPanes(); });
-  root.querySelectorAll("[data-libkind]").forEach(b => b.onclick = () => move(() => { libKind = b.dataset.libkind; }));
-  root.querySelectorAll("[data-libtier]").forEach(b => b.onclick = () => move(() => { libTier = b.dataset.libtier; }));
+  root.querySelectorAll("[data-libkind]").forEach(b => b.onclick = () => ask(() => { libKind = b.dataset.libkind; }));
+  root.querySelectorAll("[data-libtier]").forEach(b => b.onclick = () => ask(() => { libTier = b.dataset.libtier; }));
+  root.querySelectorAll("[data-libshelf]").forEach(b => b.onclick = () => ask(() => { libKind = b.dataset.libshelf; }));
+  root.querySelectorAll("[data-liball]").forEach(b => b.onclick = () => ask(() => { libAll = b.dataset.liball === "1"; }));
+  const tsel = root.querySelector("#libTopic");
+  if (tsel) tsel.onchange = () => ask(() => { libTopic = tsel.value; });
+  const ssel = root.querySelector("#libSort");
+  if (ssel) ssel.onchange = () => ask(() => { libSort = ssel.value; });
+  root.querySelectorAll("[data-libview]").forEach(b => b.onclick = () => {
+    libView = b.dataset.libview;
+    try{ localStorage.setItem("bb.libview", libView); }catch(e){ /* private */ }
+    readMoved("library"); drawPanes();
+  });
   root.querySelectorAll("[data-libmore]").forEach(b => b.onclick = () => openEntry(libNode, b.dataset.libmore));
   const chk = root.querySelector("[data-libcheck]");
   // ...and the vetted catalog read again with it: its index is kept for an
@@ -587,7 +692,7 @@ async function libWithToolchains(f){
 }
 
 async function libAct(b, act, kind, name){
-  const r = (lib?.rows || []).find(x => x.kind === kind && x.name === name);
+  const r = libFind(x => x.kind === kind && x.name === name);
   if (!r) return;
   const n = (nodesList || []).find(x => x.id === libNode), where = n?.name || "this node";
   if (kind === "app"){
@@ -598,9 +703,9 @@ async function libAct(b, act, kind, name){
     if (r.catalog){
       busy(b, "Taking");
       const j = await postJSON("/api/nasapps", {action: "add-catalog", app: name});
-      if (j.error){ notify(j.error, true); await loadLibrary(); return; }
+      if (j.error){ notify(j.error, true); await libReload(); return; }
       if (typeof cApps !== "undefined") cApps = null;
-      await loadLibrary();
+      await libReload();
     }
     openNewContainerApp(name, lib?.docker ? libNode : "");
     return;
@@ -610,7 +715,7 @@ async function libAct(b, act, kind, name){
     const j = await postJSON("/api/library", {action: "install", node: libNode, pack: r.name});
     if (j.error) notify(j.error, true);
     else if (j.job) notify(`deploying ${r.label}: its row on the Containers page has the build`);
-    await loadLibrary();
+    await libReload();
     return;
   }
   if (kind === "agent"){
@@ -618,7 +723,7 @@ async function libAct(b, act, kind, name){
     busy(b, "Asking");
     const j = await postJSON("/api/agents", {action: act, node: libNode, agent: r.agent || ""});
     if (j.error) notify(j.error, true);
-    await loadLibrary();
+    await libReload();
     return;
   }
   if (act === "add"){ libWithToolchains(() => tpOpenCatalog({...r.catalog, name: r.name, tier: r.tier, about: r.about, platforms: r.platforms})); return; }
@@ -628,5 +733,5 @@ async function libAct(b, act, kind, name){
   // with its agreements asked the way that page asks them.
   busy(b, r.installed ? "Updating" : "Installing");
   await tcAct("install", [r.name]);
-  await loadLibrary();
+  await libReload();
 }

@@ -243,12 +243,12 @@ const TABKINDS = {
               icon: TOOL_ICONS.nodes,
               render: (i) => renderFilesInto(i), live: () => `${readRev("files")}/${readRev("nodes")}`,
               open: () => loadFiles() },
-  // A Library entry's own page (R183): the Library's read, one card of it,
-  // opened by its Details and named for the entry.
+  // A Library entry's own page (R183): its one row of the Library, read on
+  // its own (R256), opened by its Details and named for the entry.
   entry:     { multi: false, label: () => entryLabel(),
               icon: TOOL_ICONS.toolchains,
-              render: (i) => renderEntryInto(i), live: () => `${readRev("library")}/${readRev("nodes")}/${entryKey}`,
-              open: () => { if (!lib) loadLibrary(); } },
+              render: (i) => renderEntryInto(i), live: () => `${readRev("entry")}/${readRev("nodes")}/${entryKey}`,
+              open: () => { if (!entryLib) loadEntry(); } },
   // An installed thing's own page (R181 step 2): Installed's read, one row
   // of it, opened by a press and named for the thing.
   thing:     { multi: false, label: () => thingLabel(),

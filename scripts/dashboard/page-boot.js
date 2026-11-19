@@ -661,6 +661,7 @@ function bootAway(){
   // page (R172) read on it.
   onRev("toolchains", () => {
     if (shown("library")) loadLibrary();
+    if (shown("entry")) loadEntry();
     if (shown("installed")) loadInstalled();
   });
   // Google's image index landing, for the Emulator tab's picker.
@@ -696,7 +697,8 @@ function bootAway(){
     if (shown("storage")) loadStorage();
     // ...and the Library and the Installed page, whose agents' versions ride
     // a node's census (R95); a page that said no node yet looks again.
-    if (shown("library") || shown("entry")) loadLibrary();
+    if (shown("library")) loadLibrary();
+    if (shown("entry")) loadEntry();
     if (shown("installed") || shown("thing")) loadInstalled();
     if (shown("emulator") && emu?.nonode) loadEmulator();
     // ...and Home's Getting started, which says whether a node is online.

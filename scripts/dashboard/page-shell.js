@@ -247,12 +247,19 @@ function routeOf(t){
   // the group's own address, #/jobs/failed as Home links it, never
   // #/jobs/jobs; the reader takes a segment that is no page's for its node.
   const at = ADDR_OF[g.key] || g.key;
-  return ((g.tools || []).length > 1 && t.kind !== g.key ? `#/${at}/${t.kind}` : `#/${at}`) + (node ? "/" + encodeURIComponent(node) : "");
+  // ...and the Library's narrowing (R256), so Back, a reload and a link land
+  // on the same list.
+  return ((g.tools || []).length > 1 && t.kind !== g.key ? `#/${at}/${t.kind}` : `#/${at}`) + (node ? "/" + encodeURIComponent(node) : "")
+    + (t.kind === "library" ? libAddr() : "");
 }
 
 // Open what an address names; nothing happens for one that names nothing.
 function openRoute(hash){
   hash = routeIn(hash);
+  // What follows a ? is a page's own narrowing (the Library's, R256).
+  const qat = String(hash || "").indexOf("?");
+  const query = qat >= 0 ? hash.slice(qat + 1) : "";
+  if (qat >= 0) hash = hash.slice(0, qat);
   const m = /^#\/([a-z]+)(?:\/([^/]+))?(?:\/([^/]+))?(?:\/([^/]+))?(?:\/([^/]+))?/.exec(hash || "");
   if (!m) return false;
   const [, key, a, b, c, d] = m;
@@ -309,6 +316,11 @@ function openRoute(hash){
   // The node the address names, set before the page draws (R256 step 3).
   const node = multi && named ? b : a;
   if (node && NODE_SET[kind]) NODE_SET[kind](decodeURIComponent(node));
+  if (kind === "library"){
+    const was = libAddr();
+    libFromAddr(query);
+    if (libAddr() !== was && lib){ lib.moreAsked = false; libPagesFrom(); loadLibrary(); }
+  }
   OPENERS[kind]?.();
   return true;
 }

@@ -25,40 +25,53 @@ await page.waitForFunction(() => lib && !lib.nonode && Array.isArray(lib.rows), 
 // ...pushed by the draw that follows the read, so waited for.
 ok(await page.waitForFunction(() => location.hash === '#/build/library/' + encodeURIComponent(libNode), null, { timeout: 10000 }).then(() => true, () => false),
    `the address names the page and its node (${await page.evaluate(() => location.hash)})`);
-const sects = await page.$$eval('.doc .librarytab .libgroup', ds => ds.map(d => d.dataset.libgroup));
-const hasPacks = await page.evaluate(() => lib.rows.some(r => libGroup(r) === 'pack'));
-ok(['agent', 'toolchain', 'app', 'companion'].every(k => sects.includes(k)) && sects.includes('pack') === hasPacks,
-   `a group of cards per kind, in the page's order, Tool packs only when there are any (${sects.join(', ')})`);
-// No pack at all is no Tool packs group, its hint and empty line with it
-// (the operator, 29 Oct); the Tool packs chip still opens it, empty.
+// Every row the Library has for the node, asked for whole (no view): what
+// the checks count against, since the page holds a page of it at most.
+const whole = () => page.evaluate(async () => (await getJSON('/api/library?node=' + encodeURIComponent(libNode))).rows || []);
+let ALL = await whole();
+const HERE = ALL.filter(r => !r.wrong_platform && !r.too_new);
+const groupOf = r => r.group || r.kind;
+const KINDS = ['agent', 'toolchain', 'pack', 'service', 'app', 'companion'];
+// Waits for the page to have drawn what a narrowing asked the server for.
+const settled = () => page.waitForFunction(() => !readBusy('library') && !!document.querySelector('.doc .librarytab .libgroups'), null, { timeout: 20000 });
+
+// ---- the front page: shelves, never the whole catalog (R256) ----------------
+await page.waitForSelector('.doc .librarytab .libgroup', { timeout: 15000 });
+const shelves = await page.$$eval('.doc .librarytab .libgroup', ds => ds.map(d => ({ key: d.dataset.libgroup, cards: d.querySelectorAll('.lcard').length,
+  all: d.querySelector('[data-libshelf]')?.textContent.trim() || '' })));
+const kindsHere = KINDS.filter(k => HERE.some(r => groupOf(r) === k));
+const MINE = HERE.filter(r => r.installed || r.update || r.repin);
+ok(kindsHere.every(k => shelves.some(sh => sh.key === k)) && shelves.every(sh => sh.cards <= 8)
+   && shelves.filter(sh => sh.key !== 'installed' && sh.cards).map(sh => sh.key).join() === kindsHere.join(),
+   `the front page is a shelf per kind, in the page's order, eight cards at most on each (${shelves.map(sh => `${sh.key}:${sh.cards}`).join(', ')})`);
+ok(shelves.every(sh => { const n = sh.key === 'installed' ? MINE.length : HERE.filter(r => groupOf(r) === sh.key).length;
+  return !sh.cards || (n > sh.cards ? sh.all === `All ${n} ›` : !sh.all); }),
+   '...each with All N to its list where it holds more than it shows');
+ok(MINE.length ? shelves[0]?.key === 'installed' : !shelves.some(sh => sh.key === 'installed'),
+   `...and what is on this node comes first (${MINE.length} installed or with an update)`);
+ok(await page.evaluate(() => !(lib.rows || []).length && Array.isArray(lib.shelves)),
+   'the page holds the shelves the server picked, never the whole catalog');
+// No pack at all is no Tool packs shelf (the operator, 29 Oct), unless the
+// catalog has something to say over them.
 ok(await page.evaluate(async () => {
-  const keep = lib.rows;
-  // Until the page is drawn as `f` reads it, looked at every 50 ms, ten
-  // seconds at most.
+  const keep = lib;
   const drawn = async f => { for (const end = Date.now() + 10000; !f() && Date.now() < end;) await new Promise(r => setTimeout(r, 50)); };
   const pack = '.doc .librarytab .libgroup[data-libgroup="pack"]';
-  lib = {...lib, rows: keep.filter(r => libGroup(r) !== 'pack'), catalog_error: 'no index'};
+  lib = {...lib, shelves: (lib.shelves || []).filter(sh => sh.kind !== 'pack'), catalog_error: '', catalog_repo: ''};
   readMoved('library'); drawPanes(); await drawn(() => !document.querySelector(pack));
-  const gone = !document.querySelector('.doc .librarytab .libgroup[data-libgroup="pack"]');
-  libKind = 'pack'; readMoved('library'); drawPanes(); await drawn(() => document.querySelector(pack + ' .empty'));
-  const chip = !!document.querySelector('.doc .librarytab .libgroup[data-libgroup="pack"] .empty');
-  // Every card back, which is what the checks after this count.
-  libKind = ''; lib = {...lib, rows: keep, catalog_error: ''}; readMoved('library'); drawPanes();
-  await drawn(() => document.querySelectorAll('.doc .librarytab .lcard').length === lib.rows.filter(r => !r.wrong_platform && !r.too_new).length);
-  return gone && chip;
-}), 'with no tool pack the Tool packs group is not drawn, and its chip still opens it empty');
-const shape = await page.evaluate(() => lib.rows.map(r => [r.kind, r.tier, typeof r.label, typeof r.about, typeof r.installed, typeof r.verb]));
-ok(shape.length > 0 && shape.every(([k, t, l, a, i, v]) => ['agent', 'toolchain', 'pack', 'service', 'app', 'companion'].includes(k)
+  const gone = !document.querySelector(pack);
+  lib = {...lib, catalog_error: 'no index'}; readMoved('library'); drawPanes(); await drawn(() => document.querySelector(pack + ' .hint'));
+  const said = /no index/.test(document.querySelector(pack)?.textContent || '');
+  lib = keep; readMoved('library'); drawPanes();
+  return gone && said;
+}), 'with no tool pack the Tool packs shelf is not drawn, and the catalog\'s trouble is still said where it would be');
+const shape = ALL.map(r => [r.kind, r.tier, typeof r.label, typeof r.about, typeof r.installed, typeof r.verb]);
+ok(shape.length > 0 && shape.every(([k, t, l, a, i, v]) => KINDS.includes(k)
    && ['official', 'verified', 'vetted', 'sideloaded'].includes(t) && l === 'string' && a === 'string' && i === 'boolean' && v === 'string'),
    `every row is one shape: kind, tier, label, about, installed, verb (${shape.length} rows)`);
-ok(await page.evaluate(() => lib.rows.some(r => r.kind === 'toolchain') && document.querySelectorAll('.doc .librarytab .lcard').length === lib.rows.filter(r => !r.wrong_platform && !r.too_new).length),
-   'the toolchain catalog is among the rows, and every row for this node and this AerieOS is drawn');
-ok(await page.evaluate(() => {
-  const off = lib.rows.filter(r => r.wrong_platform);
-  const head = document.querySelector('.doc .librarytab .pghead')?.textContent || '';
-  return off.length > 0 && off.every(r => !document.querySelector(`.doc .librarytab .lcard[data-lrow="${r.kind}:${r.name}"]`))
-    && new RegExp(`Not for this node\\s*${off.length}\\b`).test(head);
-}), 'a card not for this node is not drawn, and the head counts them (R170 step 9)');
+ok(await page.evaluate(() => /Not for this node/.test(document.querySelector('.doc .librarytab .pghead')?.textContent || '') || !lib.facts?.other_platform)
+   && await page.evaluate(n => (lib.facts?.other_platform || 0) === n, ALL.filter(r => r.wrong_platform && !r.too_new).length),
+   'the head counts the cards not for this node (R170 step 9)');
 // Who stands behind a card, in the words a person reads (the operator, 12
 // Nov): Packaged by Aerie for what AerieOS ships or wrote, never the stored
 // word official.
@@ -71,6 +84,9 @@ ok(await page.evaluate(() => libTierWord('official') === 'Packaged by Aerie' && 
 // ...and to the left of that pill a card names who the tool itself is by
 // (the operator, 12 Nov): the tier is the pack's, the maker the tool's.
 await section("and to the left of that pill a card names who the tool itself is by", async () => {
+  // Found by the search, as a person would find one past a shelf's eight.
+  await page.fill('.doc .librarytab #libFind', 'jdk');
+  await page.waitForSelector('.librarytab .lcard[data-lrow="toolchain:jdk"]', { timeout: 15000 });
   const by = await page.evaluate(() => { const c = document.querySelector('.librarytab .lcard[data-lrow="toolchain:jdk"] .lcmeta');
     return c && { first: c.firstElementChild?.className, text: c.firstElementChild?.textContent, pill: c.querySelector('.pill')?.textContent,
                   left: c.firstElementChild.getBoundingClientRect().right <= c.querySelector('.pill').getBoundingClientRect().left + 1 }; });
@@ -78,10 +94,12 @@ await section("and to the left of that pill a card names who the tool itself is 
      `a card names its tool's maker to the left of the pill that says who packaged it (${JSON.stringify(by)})`);
   // What this build ships, not what the live catalog offers: an entry it
   // lists is the catalog's to name (its own check holds it to that).
-  const made = await page.evaluate(() => ({ none: (lib.rows || []).filter(r => r.tier !== 'sideloaded' && !r.maker && r.kind !== 'pack' && !r.catalog).map(r => `${r.kind}:${r.name}`),
-    lint: makerLine((lib.rows || []).find(r => r.name === 'lint-tools') || {}).replace(/<[^>]+>/g, '') }));
+  const made = await page.evaluate(all => ({ none: all.filter(r => r.tier !== 'sideloaded' && !r.maker && r.kind !== 'pack' && !r.catalog).map(r => `${r.kind}:${r.name}`),
+    lint: makerLine(all.find(r => r.name === 'lint-tools') || {}).replace(/<[^>]+>/g, '') }), ALL);
   ok(!made.none.length && /^Put together by AerieOS from other people's work: shellcheck \(Vidar Holen\), .*ruff \(Astral\)/.test(made.lint),
      `every card AerieOS ships names a maker, and one of several makers' tools is AerieOS's with each credited in its Details (${made.none.join(', ') || 'all named'}; ${made.lint.slice(0, 90)})`);
+  await page.fill('.doc .librarytab #libFind', '');
+  await page.waitForFunction(() => libQ === '' && !document.querySelector('.doc .librarytab .libone'), null, { timeout: 15000 });
 });
 ok(await page.evaluate(() => {
   const head = document.querySelector('.doc .librarytab .pghead');
@@ -89,36 +107,58 @@ ok(await page.evaluate(() => {
 }), 'the head says how many are installed, the way a node\'s head does');
 
 // ---- search and chips ----------------------------------------------------
-const firstTc = await page.evaluate(() => lib.rows.find(r => r.kind === 'toolchain')?.label || '');
+// The server narrows (R256): the search, a chip or a topic is one sorted
+// list, a page of it at a time, and the shelves come back with nothing
+// narrowed.
+const firstTc = HERE.find(r => r.kind === 'toolchain')?.label || '';
 await page.fill('.doc .librarytab #libFind', firstTc.slice(0, 4).toLowerCase());
-await page.waitForFunction(q => libQ === q, firstTc.slice(0, 4).toLowerCase());
-ok(await page.evaluate(() => document.querySelectorAll('.doc .librarytab .lcard').length < lib.rows.length
+await page.waitForFunction(q => libQ === q && !!document.querySelector('.doc .librarytab .libone .lcard'), firstTc.slice(0, 4).toLowerCase(), { timeout: 15000 });
+ok(await page.evaluate(n => document.querySelectorAll('.doc .librarytab .lcard').length < n
    && document.querySelectorAll('.doc .librarytab .lcard').length > 0
-   && document.activeElement?.id === 'libFind'),
-   'the search narrows the rows as it is typed and keeps the caret');
+   && document.activeElement?.id === 'libFind' && /[?&]q=/.test(location.hash), HERE.length),
+   `the search narrows to one list as it is typed, keeps the caret, and the address carries it (${await page.evaluate(() => location.hash)})`);
 await page.fill('.doc .librarytab #libFind', '');
-await page.waitForFunction(() => libQ === '');
-ok(await page.evaluate(() => document.querySelectorAll('.doc .librarytab .lcard').length === lib.rows.filter(r => !r.wrong_platform && !r.too_new).length), '...and emptied puts every row back');
+await page.waitForFunction(() => libQ === '' && !document.querySelector('.doc .librarytab .libone'), null, { timeout: 15000 });
+ok(await page.evaluate(() => !!document.querySelector('.doc .librarytab .libgroup[data-libshelf], .doc .librarytab .libgroup [data-libshelf]') || document.querySelectorAll('.doc .librarytab .libgroup').length > 1),
+   '...and emptied puts the shelves back');
 if (await page.$('.doc .librarytab [data-libkind="toolchain"]')){
   await page.click('.doc .librarytab [data-libkind="toolchain"]');
-  await page.waitForFunction(() => libKind === 'toolchain');
-  ok(await page.evaluate(() => [...document.querySelectorAll('.doc .librarytab .libgroup')].every(d => d.dataset.libgroup === 'toolchain')
-     && document.querySelector('.doc .librarytab [data-libkind="toolchain"]').classList.contains('on')),
-     'a kind chip shows that kind\'s group alone, the chip wearing .on');
+  await page.waitForFunction(() => libKind === 'toolchain' && !readBusy('library') && !!document.querySelector('.doc .librarytab .libone'), null, { timeout: 15000 });
+  const tcs = HERE.filter(r => groupOf(r) === 'toolchain');
+  ok(await page.evaluate(n => [...document.querySelectorAll('.doc .librarytab .lcard')].every(c => c.dataset.lrow.startsWith('toolchain:'))
+     && document.querySelectorAll('.doc .librarytab .lcard').length === Math.min(n, 30) && lib.total === n
+     && document.querySelector('.doc .librarytab [data-libkind="toolchain"]').classList.contains('on'), tcs.length),
+     `a kind chip is that kind's list alone, a page of it, the chip wearing .on (${tcs.length})`);
   // ...and the source chips count within it (the operator, 31 Oct).
-  const facet = await page.evaluate(() => {
-    const n = lib.rows.filter(r => !r.wrong_platform && libGroup(r) === 'toolchain');
-    const chips = Object.fromEntries([...document.querySelectorAll('.doc .librarytab [data-libtier]')]
-      .map(b => [b.dataset.libtier, +(b.querySelector('.pill')?.textContent || 0)]));
-    return { want: Object.fromEntries(LIB_TIERS.map(([k]) => [k, n.filter(r => r.tier === k).length]).filter(([, c]) => c)),
-             total: n.length, chips };
-  });
-  ok(!Object.keys(facet.chips).length || (facet.chips[''] === facet.total && Object.entries(facet.want).every(([k, c]) => facet.chips[k] === c)),
-     `...and the source chips count that kind's cards alone (${JSON.stringify(facet)})`);
+  const facet = await page.evaluate(() => Object.fromEntries([...document.querySelectorAll('.doc .librarytab [data-libtier]')]
+    .map(b => [b.dataset.libtier, +(b.querySelector('.pill')?.textContent || 0)])));
+  const want = Object.fromEntries(['official', 'verified', 'vetted', 'sideloaded'].map(k => [k, tcs.filter(r => r.tier === k).length]).filter(([, c]) => c));
+  ok(!Object.keys(facet).length || Object.entries(want).every(([k, c]) => facet[k] === c),
+     `...and the source chips count that kind's cards alone (${JSON.stringify({ want, facet })})`);
   await page.click('.doc .librarytab [data-libkind=""]');
-  await page.waitForFunction(() => libKind === '');
-  ok(await page.$$eval('.doc .librarytab .libgroup', (ds, n) => ds.length === n, sects.length), '...and All puts every group back');
+  await page.waitForFunction(() => libKind === '' && !document.querySelector('.doc .librarytab .libone'), null, { timeout: 15000 });
+  ok(await page.$$eval('.doc .librarytab .libgroup', ds => ds.length > 1), '...and All puts the shelves back');
 } else ok(true, 'one kind only here, so no kind chips (chips need two groups)');
+
+// What runs only on other systems is left out of a list and counted, and
+// shown on a press, each card's Install dead with the reason on it.
+const off = ALL.find(r => r.wrong_platform && !r.too_new);
+if (off){
+  await page.click(`.doc .librarytab [data-libkind="${groupOf(off)}"]`);
+  await page.waitForSelector('.doc .librarytab .libhidden [data-liball="1"]', { timeout: 15000 });
+  const n = ALL.filter(r => r.wrong_platform && !r.too_new && groupOf(r) === groupOf(off)).length;
+  ok(await page.$eval('.doc .librarytab .libhidden', (d, n) => new RegExp(`^${n} more`).test(d.textContent.trim()), n)
+     && !(await page.$(`.doc .librarytab .lcard[data-lrow="${off.kind}:${off.name}"]`)),
+     `a list leaves out what runs only on other systems and says how many (${n})`);
+  await page.click('.doc .librarytab .libhidden [data-liball="1"]');
+  await page.waitForSelector(`.doc .librarytab .lcard[data-lrow="${off.kind}:${off.name}"]`, { timeout: 15000 });
+  ok(await page.$eval(`.doc .librarytab .lcard[data-lrow="${off.kind}:${off.name}"]`, c => /not for this node/.test(c.querySelector('.state')?.textContent || '')
+       && [...c.querySelectorAll('[data-libact]')].every(b => b.disabled)) && /[?&]all=1/.test(await page.evaluate(() => location.hash)),
+     '...and shown on a press, marked not for this node with its Install dead');
+  await page.click('.doc .librarytab .libhidden [data-liball="0"]');
+  await page.click('.doc .librarytab [data-libkind=""]');
+  await page.waitForFunction(() => libKind === '' && !libAll && !document.querySelector('.doc .librarytab .libone'), null, { timeout: 15000 });
+} else ok(true, 'nothing here is for another system');
 
 // The page's buttons on the search's line under the head, the bar empty
 // (the operator, 29 Oct: they stood over a gap).
@@ -130,39 +170,37 @@ ok(await page.evaluate(() => !!document.querySelector('.doc .librarytab .libsear
 // Installed, the chip after All (the operator, 29 Oct): the cards
 // installed on this node, each in its own kind's section; no chip while
 // nothing is.
-if (await page.evaluate(() => lib.rows.some(r => r.installed && !r.wrong_platform))){
+if (HERE.some(r => r.installed)){
 ok(await page.evaluate(() => {
   const cs = [...document.querySelectorAll('.doc .librarytab [data-chips="libkind"] .chip')];
   return cs[1]?.dataset.libkind === 'installed' && /^Installed/.test(cs[1].textContent.trim());
 }), 'Installed is the chip after All');
 await page.click('.doc .librarytab [data-libkind="installed"]');
-await page.waitForFunction(() => libKind === 'installed');
-ok(await page.evaluate(() => {
+await page.waitForFunction(() => libKind === 'installed' && !readBusy('library') && !!document.querySelector('.doc .librarytab .libone'), null, { timeout: 15000 });
+ok(await page.evaluate(want => {
   const cards = [...document.querySelectorAll('.doc .librarytab .lcard')];
-  return cards.length > 0 && cards.length === lib.rows.filter(r => r.installed && !r.wrong_platform).length
-    && cards.every(c => lib.rows.find(r => `${r.kind}:${r.name}` === c.dataset.lrow)?.installed);
-}), '...and pressed it shows what is installed here and nothing else');
+  return cards.length > 0 && cards.length === Math.min(want.length, 30) && cards.every(c => want.includes(c.dataset.lrow));
+}, HERE.filter(r => r.installed).map(r => `${r.kind}:${r.name}`)), '...and pressed it lists what is installed here and nothing else');
 await page.click('.doc .librarytab [data-libkind=""]');
-await page.waitForFunction(() => libKind === '');
+await page.waitForFunction(() => libKind === '' && !document.querySelector('.doc .librarytab .libone'), null, { timeout: 15000 });
 } else ok(!(await page.$('.doc .librarytab [data-libkind="installed"]')), 'nothing installed here, so no Installed chip');
 
 // Updates, the chip after Installed (the operator, 29 Oct): the cards with an
 // update due, each in its own section, and no chip while none is.
-if (await page.evaluate(() => lib.rows.some(r => r.update && !r.wrong_platform))){
+if (HERE.some(r => r.update || r.repin)){
   ok(await page.evaluate(() => {
     const cs = [...document.querySelectorAll('.doc .librarytab [data-chips="libkind"] .chip')];
     const at = cs.findIndex(c => c.dataset.libkind === 'update');
     return at > 0 && at <= 2 && cs.slice(1, at).every(c => c.dataset.libkind === 'installed') && /^Updates/.test(cs[at].textContent.trim());
   }), 'Updates is the chip after Installed while an update is due');
   await page.click('.doc .librarytab [data-libkind="update"]');
-  await page.waitForFunction(() => libKind === 'update');
-  ok(await page.evaluate(() => {
+  await page.waitForFunction(() => libKind === 'update' && !readBusy('library') && !!document.querySelector('.doc .librarytab .libone'), null, { timeout: 15000 });
+  ok(await page.evaluate(want => {
     const cards = [...document.querySelectorAll('.doc .librarytab .lcard')];
-    return cards.length === lib.rows.filter(r => r.update && !r.wrong_platform).length
-      && cards.every(c => lib.rows.find(r => `${r.kind}:${r.name}` === c.dataset.lrow)?.update);
-  }), '...and pressed it shows the cards with an update due and no others');
+    return cards.length === Math.min(want.length, 30) && cards.every(c => want.includes(c.dataset.lrow));
+  }, HERE.filter(r => r.update || r.repin).map(r => `${r.kind}:${r.name}`)), '...and pressed it lists the cards with an update due and no others');
   await page.click('.doc .librarytab [data-libkind=""]');
-  await page.waitForFunction(() => libKind === '');
+  await page.waitForFunction(() => libKind === '' && !document.querySelector('.doc .librarytab .libone'), null, { timeout: 15000 });
 } else ok(!(await page.$('.doc .librarytab [data-libkind="update"]')), 'no update due here, so no Updates chip');
 
 // ---- Details opens the entry's own page (R183) ------------------------------
@@ -189,7 +227,7 @@ await section("a toolchain card to open", async () => {
   const pg = await page.evaluate(k => ({ hash: location.hash, want: '#/build/library/' + encodeURIComponent(libNode) + '/' + encodeURIComponent(k),
     back: document.querySelector('.pane .bar .backhead [data-shellback]')?.textContent.trim() || '',
     name: document.querySelector('.pane .bar .backhead .backof')?.textContent.trim() || '',
-    label: lib.rows.find(r => `${r.kind}:${r.name}` === k)?.label || '' }), key);
+    label: (entryLib?.rows || []).find(r => `${r.kind}:${r.name}` === k)?.label || '' }), key);
   ok(pg.hash === pg.want && /Library/.test(pg.back) && pg.name === pg.label,
      `...Details opens the entry's own page at its own address, its top header's Back to the Library and its name (${JSON.stringify(pg)})`);
   await page.click('.pane .bar [data-shellback]');
@@ -201,23 +239,21 @@ await section("a toolchain card to open", async () => {
 // An app's page holds its compose file and what its panel asks for;
 // a toolchain's what it adds to a session and its terms.
 await section("the whole description", async () => {
-  const app = await page.evaluate(() => lib.rows.find(r => r.kind === 'app' && !r.wrong_platform) ? `app:${lib.rows.find(r => r.kind === 'app' && !r.wrong_platform).name}` : '');
+  const app = HERE.find(r => r.kind === 'app') ? `app:${HERE.find(r => r.kind === 'app').name}` : '';
   if (app){
     await toEntry(app);
     ok(await page.$eval(ENTRY(app), r => /image:/.test(r.querySelector('.libcompose')?.textContent || '')
        && /Asks for /.test(r.querySelector('.ldetail').textContent) && /New container opens the Containers page/.test(r.querySelector('.ldetail').textContent)),
        `an app's page holds its compose file, what its panel asks for and how New container makes it one (${app})`);
   } else ok(true, 'no app rows here (the account may not make containers)');
-  const tc = await page.evaluate(() => {
-    const r = lib.rows.find(x => x.kind === 'toolchain' && (x.tool || x.terms?.length));
-    return r ? `toolchain:${r.name}` : '';
-  });
+  const tcRow = ALL.find(x => x.kind === 'toolchain' && (x.tool || x.terms?.length));
+  const tc = tcRow ? `toolchain:${tcRow.name}` : '';
   if (tc){
     await toEntry(tc);
     ok(await page.$eval(`${ENTRY(tc)} .ldetail`, d => /aerie tool|Licensed|accept/.test(d.textContent)),
        `a toolchain's page says what it adds to a session and its terms (${tc})`);
   }
-  if (await page.evaluate(() => lib.rows.some(r => r.kind === 'agent' && r.name === 'claude-code'))){
+  if (ALL.some(r => r.kind === 'agent' && r.name === 'claude-code')){
     await toEntry('agent:claude-code');
     ok(await page.$eval(`${ENTRY('agent:claude-code')} .ldetail`, d => /session account/.test(d.textContent) && /Installed page/.test(d.textContent) && !d.querySelector('[data-signin]')),
        "Claude Code's page holds its facts, pointing at the Installed page for this person's sign-in (R172: the Library is the catalog)");
@@ -231,16 +267,21 @@ await section("the whole description", async () => {
 // toolchains.mjs's node tests find), and the row then says what the
 // job said: installed, or what failed under the row, as that page does.
 await section("the verbs are the pages' own", async () => {
-  const name = await page.evaluate(() => lib.rows.find(r => r.kind === 'toolchain' && !r.installed && r.verb === 'install' && !r.wrong_platform)?.name || '');
+  const name = HERE.find(r => r.kind === 'toolchain' && !r.installed && r.verb === 'install')?.name || '';
   if (name){
+    // Found by its name, as a card past a shelf's eight is.
+    await page.fill('.doc .librarytab #libFind', name);
+    await page.waitForSelector(`.doc .librarytab [data-libact="install"][data-libname="${name}"]`, { timeout: 15000 });
     await page.click(`.doc .librarytab [data-libact="install"][data-libname="${name}"]`);
     await page.waitForFunction(n => lib.job && !lib.job.running && lib.job.action === 'install'
-      && (lib.rows.find(r => r.kind === 'toolchain' && r.name === n)?.installed || lib.job.errors?.[n]), name, { timeout: 60000 });
-    const said = await page.evaluate(n => ({installed: !!lib.rows.find(r => r.kind === 'toolchain' && r.name === n)?.installed, err: lib.job.errors?.[n] || ''}), name);
+      && (libFind(r => r.kind === 'toolchain' && r.name === n)?.installed || lib.job.errors?.[n]), name, { timeout: 60000 });
+    const said = await page.evaluate(n => ({installed: !!libFind(r => r.kind === 'toolchain' && r.name === n)?.installed, err: lib.job.errors?.[n] || ''}), name);
     ok(true, `Install on ${name} ran the toolchain job on the node (${said.installed ? 'installed' : said.err})`);
     ok(await page.$eval(`.doc .librarytab .lcard[data-lrow="toolchain:${name}"]`, (r, s) => s.installed ? !!r.querySelector('[data-libact="remove"]')
        : r.querySelector('.sub.bad')?.textContent === s.err, said),
        said.installed ? '...and an installed row offers Remove' : '...and what failed is said under the row');
+    await page.fill('.doc .librarytab #libFind', '');
+    await page.waitForFunction(() => libQ === '' && !document.querySelector('.doc .librarytab .libone'), null, { timeout: 15000 });
   } else ok(true, 'nothing uninstalled to install on the stub');
 });
 // Install on an app row opens New container on that app's panel (R238).
@@ -301,7 +342,10 @@ await section("Add your own", async () => {
   ok(await page.$eval('#tpmodal .tpseen', d => /notes/.test(d.textContent) && /ghcr.io\/example\/notes:2.4.1/.test(d.textContent) && /DATA/.test(d.textContent)),
      '...and a good one is shown as what it runs and the blanks it takes before Add');
   await page.click('#tpmodal [data-tpadd]');
-  await page.waitForFunction(() => document.getElementById('tpmodal').hidden && lib?.rows.some(r => r.kind === 'app' && r.name === 'notes'), null, { timeout: 15000 });
+  await page.waitForFunction(() => document.getElementById('tpmodal').hidden, null, { timeout: 15000 });
+  // Found by its name, past the Apps shelf's eight.
+  await page.fill('.doc .librarytab #libFind', 'notes');
+  await page.waitForSelector('.doc .librarytab .lcard[data-lrow="app:notes"]', { timeout: 15000 });
   ok(await page.$eval('.doc .librarytab .lcard[data-lrow="app:notes"]', c => /sideloaded/.test(c.querySelector('.lcmeta').textContent)
      && !!c.querySelector('[data-libact="edit"]') && !!c.querySelector('[data-libact="install"]')),
      'Add keeps it: an Apps card wearing sideloaded, with Install and Edit');
@@ -316,7 +360,8 @@ await section("Add your own", async () => {
   // whole run's load it was gone again between a wait and the press (B933).
   await page.waitForFunction(() => { const b = document.querySelector('.modal.askdlg:not([hidden]) [data-ai="0"]');
     if (!b) return false; b.click(); return true; }, null, { timeout: 10000 });
-  await page.waitForFunction(() => document.getElementById('tpmodal').hidden && !lib?.rows.some(r => r.kind === 'app' && r.name === 'notes'), null, { timeout: 15000 });
+  await page.waitForFunction(() => document.getElementById('tpmodal').hidden && !document.querySelector('.doc .librarytab .lcard[data-lrow="app:notes"]'), null, { timeout: 15000 });
+  await page.fill('.doc .librarytab #libFind', '');
   ok(true, 'Remove in there takes it off the catalog, and the card goes');
 });
 

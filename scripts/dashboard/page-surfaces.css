@@ -858,6 +858,25 @@ body.firstrun #panes{display:none}
 .librarytab .libgroup>.hint{margin:0 0 8px}
 .librarytab .lgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px}
 .librarytab .lgrid>.empty{grid-column:1/-1}
+/* R256: what narrows the list beside the search (a topic, the order, cards or
+   rows), a shelf's All N at the right of its heading, and the line that says
+   how many run only on other systems. */
+.librarytab .libnarrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.librarytab .libnarrow .dmviewseg{margin-left:auto}
+.librarytab .libgname .libshelfall{margin-left:auto;font:var(--f-ui)}
+.librarytab .libgroup>.libhidden{margin:0 0 8px;color:var(--dim)}
+/* Rows: one column, each card one line wide, the icon, the name with its
+   pills, what it is on one line, then where it stands and its verb. */
+.librarytab .lgrid.lrows{grid-template-columns:1fr;gap:6px}
+.librarytab .lgrid.lrows>.lcard{display:grid;grid-template-columns:minmax(0,18rem) minmax(0,1fr) auto;align-items:center;column-gap:14px;row-gap:2px}
+.librarytab .lgrid.lrows>.lcard .lcabout{-webkit-line-clamp:1}
+.librarytab .lgrid.lrows>.lcard .pcacts{margin:0;padding:0;flex-wrap:nowrap;justify-content:flex-end}
+.librarytab .lgrid.lrows>.lcard .pcacts>.state{flex:0 1 auto;text-align:right}
+@media(max-width:600px){
+  .librarytab .lgrid.lrows>.lcard{grid-template-columns:minmax(0,1fr) auto}
+  .librarytab .lgrid.lrows>.lcard .lcabout{display:none}
+  .librarytab .lgrid.lrows>.lcard .pcacts>.state{display:none}
+}
 .librarytab .lcard{display:flex;flex-direction:column;gap:6px;padding:var(--row-y) var(--row-x);background:var(--panel);
   border:var(--hair) solid var(--line);border-radius:var(--r-surface);min-width:0}
 .librarytab .lcard.open{grid-column:1/-1}
