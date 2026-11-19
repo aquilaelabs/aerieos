@@ -7,6 +7,7 @@
 - What pops up over the page stands out from it in every theme: a tour's card, the bell, the doctor and the gear menu, a row's menu, a help note, the phone's More sheet and a toast are a step brighter than the page, white in a light theme, with a firmer edge (c17c3ae)
 - On a phone a toast shows just above an open dialog's buttons, where it floated over the dialog's words (1ee6913)
 - The Library stays easy to get around however big the catalog grows: it opens on shelves (what is on this node, then up to eight of each kind with All N to see the rest), and a kind, a topic or a search is one sorted list that loads more as you scroll, kept in the page's address so Back and a shared link land on it. A Topic pulldown, Recently added and a Rows view are new beside the search, and what runs only on other systems is counted and shown on a press (fcf70a4, 208b302)
+- Restart on a session asks once: the step where the model and effort are picked is the question, with no confirm after it (31f6b8b)
 
 ### Fixed
 
@@ -32,6 +33,8 @@
 - A session left open across several controller updates keeps its guards and notices, where after the third update every hook failed and the session ran on unguarded, showing only that its stop hooks failed (64e3189)
 - Updating a toolchain while a running program still has one of its files open goes through, where the update stopped with the toolchain removed and nothing installed (1a39710)
 - A Claude session whose guards cannot be run refuses every tool and says to start it again, and a session that works a turn with nothing heard from its hooks is a row on the bell for its account and for administrators, where such a session ran on unguarded and nothing said so (2b8534a, 07fe564)
+- Restart on a session waits for its node to end it, saying so with the seconds so far, and then starts it again by itself, where it gave up after half a minute and said to press Restart again (31f6b8b)
+- The page no longer shows bare for a moment while its stylesheets load, its mark across the whole screen, in a browser that paints before they arrive (5c47982)
 
 ## 0.9.0-dev.5641: 2026-11-18
 
