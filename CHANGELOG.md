@@ -12,6 +12,10 @@
 - On a phone a toast shows just above an open dialog's buttons, where it floated over the dialog's words (1ee6913)
 - The Library stays easy to get around however big the catalog grows: it opens on shelves (what is on this node, then up to eight of each kind with All N to see the rest), and a kind, a topic or a search is one sorted list that loads more as you scroll, kept in the page's address so Back and a shared link land on it. A Topic pulldown, Recently added and a Rows view are new beside the search, and what runs only on other systems is counted and shown on a press (fcf70a4, 208b302)
 - Restart on a session asks once: the step where the model and effort are picked is the question, with no confirm after it (31f6b8b)
+- A session's rebuild of a container whose compose file gained a service beside the app is a request on the bell that names the service, where it stopped as a failed job nobody was told about; Allow builds it and the same service is not asked about again (f2e1640)
+- A space's notebook lists its containers on every node they are on, where its Docker view showed its own node's alone, and its Docker and VMs views narrow to one node with a band of chips when they are on more than one (c56e7a8)
+- The page asks far less, and never twice for one press: Rebuild, Up, Down, Stop and an image update on a container just run, and when a rebuild's compose file reaches past its own folder or runs something new beside the app, both are listed in one question. Saving or applying a node's storage, installing a toolchain with its driver, and uploading over existing files each ask once. On a phone a question is a short sheet at the bottom of the screen, where it filled the screen (0dd3c86)
+- nginx and the Scanners are services in the Library, as the model router is: Install on their cards under Services, and a row under Services on the Installed page, where Open leads to each one's page and Remove takes it off the node. Their pages moved from the Containers group to Machines (#/machines/nginx, #/machines/scanners); the old addresses still open them (4a1d05c, 2fc5855)
 
 ### Fixed
 
