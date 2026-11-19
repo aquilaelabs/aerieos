@@ -33,7 +33,7 @@ import time
 
 from . import tokenseal
 from .accounts import UID_RE, user_of
-from .base import SIGNINS, log, pack_signins, wipe
+from .base import SIGNINS, log, pack_signins, wipe, write_atomic
 from .names import VAR
 
 SEAL_DIR = VAR + "/tokens"
@@ -157,15 +157,6 @@ def link_left(home_file, opened, seal):
         and not os.path.lexists(opened) and not os.path.exists(seal)
 
 
-def _write(path, data, mode, uid=0, gid=0):
-    tmp = path + ".new"
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
-    with os.fdopen(fd, "wb") as f:
-        f.write(data)
-    os.chown(tmp, uid, gid)
-    os.replace(tmp, path)
-
-
 class TokensMixin:
     tokens_at = 0.0
     _tok_e = None
@@ -235,7 +226,8 @@ class TokensMixin:
         os.makedirs(d, mode=0o700, exist_ok=True)
         # K names the public key it was sealed under, so the controller can
         # tell a seal still under the install key before a rotation.
-        _write(os.path.join(d, agent + ".seal"), tokenseal.seal(pub, data, dict(about(agent, data, home), K=tokenseal.rid(pub))), 0o600)
+        write_atomic(os.path.join(d, agent + ".seal"), tokenseal.seal(pub, data, dict(about(agent, data, home), K=tokenseal.rid(pub))),
+                     mode=0o600, uid=0, gid=0)
         # The controller hears the new seal's R at once: the next terminal
         # opened for this account must bring the key that opens this one.
         again = getattr(self, "hello_again", None)
@@ -298,7 +290,7 @@ class TokensMixin:
                         if self._seal(acct, agent, data, home):
                             if os.path.isdir(odir) or self._live(acct):
                                 self._acct_open_dir(acct, pw)
-                                _write(of, data, 0o600, pw.pw_uid, pw.pw_gid)
+                                write_atomic(of, data, mode=0o600, uid=pw.pw_uid, gid=pw.pw_gid)
                                 st = os.stat(of)
                                 seen[(acct, agent)] = (st.st_ino, st.st_size, st.st_mtime_ns)
                             _shred(hf)
@@ -356,7 +348,7 @@ class TokensMixin:
                     hf = os.path.join(home, rel)
                     with contextlib.suppress(FileNotFoundError):
                         os.unlink(hf)
-                    _write(hf, data, 0o600, pw.pw_uid, pw.pw_gid)
+                    write_atomic(hf, data, mode=0o600, uid=pw.pw_uid, gid=pw.pw_gid)
                     self.token_forget(acct, agent)
                     log(f"tokens: {acct}'s {agent} sign-in is a plain file again")
                 with contextlib.suppress(OSError):
@@ -400,7 +392,7 @@ class TokensMixin:
                     continue
                 odir = odir or self._acct_open_dir(acct, pw)
                 of = os.path.join(odir, agent + ".json")
-                _write(of, data, 0o600, pw.pw_uid, pw.pw_gid)
+                write_atomic(of, data, mode=0o600, uid=pw.pw_uid, gid=pw.pw_gid)
                 wipe(data)
                 st = os.stat(of)
                 seen[(acct, agent)] = (st.st_ino, st.st_size, st.st_mtime_ns)

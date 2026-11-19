@@ -1,4 +1,4 @@
-"""What every part of the agent shares: the constants naming the node's paths and tools, the log, and the small runners of a command."""
+"""What every part of the agent shares: the constants naming the node's paths and tools, the log, a small file written or read whole, and the small runners of a command."""
 import contextlib
 import json
 import hashlib
@@ -1028,6 +1028,56 @@ def fs_holds(who):
     return acting_as(ids if _FS_HOLDS["ok"] else None)
 
 
+# -- a small file, written whole and read whole ---------------------------------
+
+
+def write_atomic(path, data, *, mode=None, uid=None, gid=None, makedirs=False, tmp_suffix=".new"):
+    """A file replaced in one step: written beside itself, at its own name
+    with `tmp_suffix` after it, then renamed over the file, so a reader
+    finds the old file or the new one and never half of either. `data` is
+    text, written as UTF-8, or bytes. With `mode` the temporary file is
+    created with it, so a secret is at no moment readable by more than its
+    file will be, and the file has exactly that mode whatever the umask and
+    whatever was left at the temporary name; without it the mode is what
+    the umask gives a new file. `uid` and `gid` are given to the temporary
+    file before the rename. `makedirs` makes the file's folder first. A
+    failure raises with the file as it was; the temporary file may be left."""
+    if makedirs:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + tmp_suffix
+    how = {"mode": "w", "encoding": "utf-8"} if isinstance(data, str) else {"mode": "wb"}
+    if mode is None:
+        f = open(tmp, **how)
+    else:
+        f = os.fdopen(os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode), **how)
+    with f:
+        # Asked for only where the file is not as it was created: under a
+        # umask that took bits away, or over a file already at this name.
+        if mode is not None and os.fstat(f.fileno()).st_mode & 0o7777 != mode:
+            os.fchmod(f.fileno(), mode)
+        f.write(data)
+    if uid is not None or gid is not None:
+        os.chown(tmp, -1 if uid is None else uid, -1 if gid is None else gid)
+    os.replace(tmp, path)
+
+
+def write_json(path, obj, *, indent=None, sort_keys=False, **kw):
+    """An object as JSON, replaced in one step: write_atomic, which takes
+    everything else given here."""
+    write_atomic(path, json.dumps(obj, indent=indent, sort_keys=sort_keys), **kw)
+
+
+def read_json(path, default, kind=dict):
+    """What a JSON file holds, or `default` when it is not there, is not
+    JSON, or is not a `kind` at its top (a table, unless told a list)."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            d = json.load(f)
+    except (OSError, ValueError):
+        return default
+    return d if isinstance(d, kind) else default
+
+
 # -- an update on trial ---------------------------------------------------------
 #
 # A self-update keeps the file it replaces (FILE.prev) and leaves a note that
@@ -1042,30 +1092,15 @@ TRIAL_S = int(os.environ.get("BUILDERBOT_AGENT_TRIAL_S", "600") or 600)
 SELFCHECK_S = 120
 
 
-def _note(path):
-    try:
-        with open(path, encoding="utf-8") as f:
-            d = json.load(f)
-        return d if isinstance(d, dict) else None
-    except (OSError, ValueError):
-        return None
-
-
-def _note_write(path, d):
-    tmp = path + ".w"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(d, f)
-    os.replace(tmp, path)
-
-
 def trial_note():
     """The note of an update on trial, or None."""
-    return _note(own_path() + ".trial")
+    return read_json(own_path() + ".trial", None)
 
 
 def trial_begin(digest, was):
     """The file about to replace this one is on trial from its first start."""
-    _note_write(own_path() + ".trial", {"digest": digest, "from": was, "starts": 0, "at": int(time.time())})
+    write_json(own_path() + ".trial", {"digest": digest, "from": was, "starts": 0, "at": int(time.time())},
+               tmp_suffix=".w")
 
 
 def trial_passed():
@@ -1084,12 +1119,12 @@ def trial_give_way(why):
     which the caller makes now. False where there is no trial or nothing to
     go back to."""
     me = own_path()
-    t = _note(me + ".trial")
+    t = read_json(me + ".trial", None)
     if t is None or not os.path.isfile(me + ".prev"):
         return False
     t["why"] = str(why)[:300]
     try:
-        _note_write(me + ".trial", t)
+        write_json(me + ".trial", t, tmp_suffix=".w")
     except OSError:
         return False
     return True
@@ -1098,7 +1133,7 @@ def trial_give_way(why):
 def back_note():
     """A way back this node took, for its controller: the digest it would
     not run, when, and why; None where it took none."""
-    b = _note(own_path() + ".back")
+    b = read_json(own_path() + ".back", None)
     if not b or not b.get("digest"):
         return None
     try:

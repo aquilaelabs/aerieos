@@ -27,6 +27,7 @@ from .base import (
     SESSNET_TABLE,
     _run,
     log,
+    write_atomic,
 )
 from .stores import tc_root
 from .vms import vmnet_keep
@@ -905,8 +906,4 @@ def _write_root(path, text):
                 return
     except OSError:
         pass
-    tmp = path + ".new"
-    with open(tmp, "w", encoding="utf-8") as f:
-        f.write(text)
-    os.chmod(tmp, 0o644)
-    os.replace(tmp, path)
+    write_atomic(path, text, mode=0o644)

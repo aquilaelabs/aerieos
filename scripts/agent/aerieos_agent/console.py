@@ -16,7 +16,7 @@ import re
 import subprocess
 from typing import Callable
 
-from .base import log
+from .base import log, write_atomic
 from .names import VAR
 
 HASH_FILE = VAR + "/console-hash"
@@ -124,11 +124,7 @@ class ConsoleMixin:
         if not HASH_RE.fullmatch(h):
             job.say("refused: not a password hash this takes\n")
             return "failed", 64
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        fd = os.open(path + ".new", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w") as f:
-            f.write(h + "\n")
-        os.replace(path + ".new", path)
+        write_atomic(path, h + "\n", mode=0o600, makedirs=True)
         rc = apply()
         if rc != 0:
             job.say("the password is kept, but the admin account did not take it (it is tried again at the next start)\n")

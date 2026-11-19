@@ -11,14 +11,13 @@ kind for the census, and the storage-snapshot job: one taken of the pool's
 every dataset (the oldest of its kind pruned past what is kept), a dataset
 rolled back to one, or one destroyed.
 """
-import json
 import os
 import re
 import shutil
 import subprocess
 import time
 
-from .base import log
+from .base import log, read_json, write_json
 from .disks import disks_now, moved
 from .names import ETC
 
@@ -157,20 +156,12 @@ def importable_now():
 
 
 def _imported():
-    try:
-        with open(os.environ.get("BB_POOLS_IMPORTED", IMPORTED), encoding="utf-8") as f:
-            d = json.load(f)
-        return [x for x in d if isinstance(x, dict) and POOL_RE.fullmatch(str(x.get("name") or ""))] if isinstance(d, list) else []
-    except (OSError, ValueError):
-        return []
+    rows = read_json(os.environ.get("BB_POOLS_IMPORTED", IMPORTED), [], kind=list)
+    return [x for x in rows if isinstance(x, dict) and POOL_RE.fullmatch(str(x.get("name") or ""))]
 
 
 def _imported_set(rows):
-    path = os.environ.get("BB_POOLS_IMPORTED", IMPORTED)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path + ".new", "w", encoding="utf-8") as f:
-        json.dump(rows, f)
-    os.replace(path + ".new", path)
+    write_json(os.environ.get("BB_POOLS_IMPORTED", IMPORTED), rows, makedirs=True)
 
 
 def controller_account():

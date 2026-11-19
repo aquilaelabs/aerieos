@@ -14,7 +14,6 @@ disk; destroying the array unmounts it and forgets it, every data disk's
 files left as they are, readable on any Linux.
 """
 import contextlib
-import json
 import os
 import re
 import shutil
@@ -23,7 +22,7 @@ import tempfile
 import threading
 import time
 
-from .base import log
+from .base import log, read_json, write_atomic, write_json
 from .disks import disks_now, moved
 from .pools import by_id, _out
 from .names import ETC, VAR
@@ -58,41 +57,22 @@ def _env(k, d):
 
 
 def read_record():
-    try:
-        with open(_env("BB_ARRAY_RECORD", RECORD), encoding="utf-8") as f:
-            r = json.load(f)
-        return r if isinstance(r, dict) and isinstance(r.get("data"), list) else {}
-    except (OSError, ValueError):
-        return {}
+    r = read_json(_env("BB_ARRAY_RECORD", RECORD), {})
+    return r if isinstance(r.get("data"), list) else {}
 
 
 def write_record(rec):
-    path = _env("BB_ARRAY_RECORD", RECORD)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    tmp = path + ".new"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(rec, f, indent=1, sort_keys=True)
-    os.chmod(tmp, 0o644)
-    os.replace(tmp, path)
+    write_json(_env("BB_ARRAY_RECORD", RECORD), rec, indent=1, sort_keys=True, mode=0o644, makedirs=True)
 
 
 def _state():
-    try:
-        with open(_env("BB_ARRAY_STATE", STATE), encoding="utf-8") as f:
-            s = json.load(f)
-        return s if isinstance(s, dict) else {}
-    except (OSError, ValueError):
-        return {}
+    return read_json(_env("BB_ARRAY_STATE", STATE), {})
 
 
 def _state_set(**kw):
     s = _state()
     s.update(kw)
-    path = _env("BB_ARRAY_STATE", STATE)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path + ".new", "w", encoding="utf-8") as f:
-        json.dump(s, f)
-    os.replace(path + ".new", path)
+    write_json(_env("BB_ARRAY_STATE", STATE), s, makedirs=True)
 
 
 def mount_of(kind, slot):
@@ -264,10 +244,7 @@ def write_fstab(rec):
     text = "".join(kept)
     if text and not text.endswith("\n"):
         text += "\n"
-    with open(path + ".new", "w", encoding="utf-8") as f:
-        f.write(text + render_fstab(rec))
-    os.chmod(path + ".new", 0o644)
-    os.replace(path + ".new", path)
+    write_atomic(path, text + render_fstab(rec), mode=0o644)
 
 
 def _df(path):
@@ -806,9 +783,7 @@ class ArrayMixin:
 
         def settle():
             write_fstab(rec)
-            with open(_env("BB_SNAPRAID_CONF", SNAPRAID_CONF) + ".new", "w", encoding="utf-8") as f:
-                f.write(render_snapraid(rec))
-            os.replace(_env("BB_SNAPRAID_CONF", SNAPRAID_CONF) + ".new", _env("BB_SNAPRAID_CONF", SNAPRAID_CONF))
+            write_atomic(_env("BB_SNAPRAID_CONF", SNAPRAID_CONF), render_snapraid(rec))
             os.makedirs(os.path.dirname(CONTENT), exist_ok=True)
             write_record(rec)
 

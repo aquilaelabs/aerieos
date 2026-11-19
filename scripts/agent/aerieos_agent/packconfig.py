@@ -17,7 +17,7 @@ import pwd
 import re
 
 from .accounts import user_of
-from .base import log
+from .base import log, write_atomic
 
 ENV_NAME = re.compile(r"^[A-Z][A-Z0-9_]{0,40}$")
 PACK_NAME = re.compile(r"^[a-z][a-z0-9-]{1,39}$")
@@ -67,12 +67,9 @@ class PackConfigMixin:
                     if name.endswith(".env") and name[:-4] not in packs:
                         os.unlink(os.path.join(d, name))
                 for pack, env in packs.items():
-                    path = os.path.join(d, pack + ".env")
-                    fd = os.open(path + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-                    with os.fdopen(fd, "w", encoding="utf-8") as f:
-                        f.write("".join(f"{k}={v}\n" for k, v in sorted(env.items()) if "\n" not in v))
-                    os.chown(path + ".tmp", pw.pw_uid, pw.pw_gid)
-                    os.replace(path + ".tmp", path)
+                    write_atomic(os.path.join(d, pack + ".env"),
+                                 "".join(f"{k}={v}\n" for k, v in sorted(env.items()) if "\n" not in v),
+                                 mode=0o600, uid=pw.pw_uid, gid=pw.pw_gid, tmp_suffix=".tmp")
             except OSError as e:
                 log(f"pack config: could not write {uid}'s own: {e}")
                 return
@@ -106,14 +103,11 @@ class PackConfigMixin:
                     if name.endswith(".env") and name[:-4] not in packs:
                         os.unlink(os.path.join(d, name))
                 for pack, env in packs.items():
-                    path = os.path.join(d, pack + ".env")
-                    tmp = path + ".tmp"
-                    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-                    with os.fdopen(fd, "w", encoding="utf-8") as f:
-                        f.write("".join(f"{k}={v}\n" for k, v in sorted(env.items()) if "\n" not in v))
-                    if uid is not None:
-                        os.chown(tmp, uid, gid)
-                    os.replace(tmp, path)
+                    # The session account's where this agent is root, and
+                    # left as the agent's own where it is not.
+                    write_atomic(os.path.join(d, pack + ".env"),
+                                 "".join(f"{k}={v}\n" for k, v in sorted(env.items()) if "\n" not in v),
+                                 mode=0o600, uid=uid, gid=gid, tmp_suffix=".tmp")
             except OSError as e:
                 log(f"pack config: could not write {d}: {e}")
                 return

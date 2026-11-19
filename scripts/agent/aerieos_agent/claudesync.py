@@ -33,7 +33,7 @@ import time
 import urllib.parse
 
 from .accounts import user_of
-from .base import as_root, fs_holds, log_once
+from .base import as_root, fs_holds, log_once, write_json
 
 TICK = 5.0
 LIST_EVERY = 30.0
@@ -169,10 +169,7 @@ class ClaudeMirror:
         return self.rec
 
     def save(self):
-        tmp = self.rec_path() + ".new"
-        with open(tmp, "w") as f:
-            json.dump(self.rec, f)
-        os.replace(tmp, self.rec_path())
+        write_json(self.rec_path(), self.rec)
 
     def owner(self, uid=""):
         """Who an account's copies belong to: its own user where accounts

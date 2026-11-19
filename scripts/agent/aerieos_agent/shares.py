@@ -19,7 +19,7 @@ import shutil
 import subprocess
 import time
 
-from .base import log
+from .base import log, write_atomic, write_json
 from .accounts import accounts_moved
 from .stores import save_state
 from .names import ETC
@@ -199,10 +199,7 @@ def _samba_hooks(main=None):
     if want[1] in missing:
         lines.append(want[1])
     try:
-        with open(main + ".new", "w", encoding="utf-8") as f:
-            f.write("\n".join(lines) + "\n")
-        os.chmod(main + ".new", 0o644)
-        os.replace(main + ".new", main)
+        write_atomic(main, "\n".join(lines) + "\n", mode=0o644)
     except OSError:
         return False
     return True
@@ -314,11 +311,9 @@ class SharesMixin:
         # The name a person signs in with, onto the Unix user Samba knows them
         # as (B672).
         try:
-            mp = _env("BB_SMB_MAP", SMB_MAP)
-            with open(mp + ".new", "w", encoding="utf-8") as f:
-                f.write("".join(f'{r["user"]} = "{r["name"]}"\n' for r in want if re.fullmatch(r"[A-Za-z0-9._@+-]{1,64}", r["name"])))
-            os.chmod(mp + ".new", 0o644)
-            os.replace(mp + ".new", mp)
+            write_atomic(_env("BB_SMB_MAP", SMB_MAP),
+                         "".join(f'{r["user"]} = "{r["name"]}"\n' for r in want if re.fullmatch(r"[A-Za-z0-9._@+-]{1,64}", r["name"])),
+                         mode=0o644)
         except OSError as e:
             log(f"shares: the names' map did not write: {e}")
         _samba_hooks()
@@ -456,11 +451,9 @@ class SharesMixin:
             say("smb.conf could not be told about the shares file: Samba will not serve them until it can\n")
         # What nothing serves is kept apart, and is still a share.
         try:
-            ip = _env("BB_SHARES_INTERNAL", INTERNAL_FILE)
-            os.makedirs(os.path.dirname(ip), exist_ok=True)
-            with open(ip + ".new", "w", encoding="utf-8") as fh:
-                json.dump([{"name": x["name"], "path": x["path"]} for x in rest if not x["smb"]["on"] and not x["nfs"]["on"]], fh)
-            os.replace(ip + ".new", ip)
+            write_json(_env("BB_SHARES_INTERNAL", INTERNAL_FILE),
+                       [{"name": x["name"], "path": x["path"]} for x in rest if not x["smb"]["on"] and not x["nfs"]["on"]],
+                       makedirs=True)
         except OSError as e:
             say(f"the list of internal shares did not write: {e}\n")
             return "failed", 67

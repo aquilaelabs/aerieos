@@ -26,6 +26,8 @@ from .base import (
     UNIT_DROPIN,
     _run,
     log,
+    write_atomic,
+    write_json,
 )
 from .stores import (
     _can_chown,
@@ -166,10 +168,7 @@ class ConfigPlaneMixin:
         if new is None:
             return
         try:
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path + ".new", "w", encoding="utf-8") as f:
-                f.write(new)
-            os.replace(path + ".new", path)
+            write_atomic(path, new, makedirs=True)
         except OSError as e:
             log(f"published ports: {path} could not be written ({e})")
             return
@@ -200,9 +199,7 @@ class ConfigPlaneMixin:
                 return
             os.makedirs(os.path.dirname(f), exist_ok=True)
             os.makedirs("/var/log/journal", exist_ok=True)
-            with open(f + ".new", "w", encoding="utf-8") as out:
-                out.write(JOURNAL_DROPIN)
-            os.replace(f + ".new", f)
+            write_atomic(f, JOURNAL_DROPIN)
         except OSError as e:
             log(f"journal: could not keep it across boots ({e})")
             return
@@ -469,12 +466,8 @@ class ConfigPlaneMixin:
             return
         if not want or want == have:
             return
-        tmp = SANDBOX_BIN + ".new"
         try:
-            with open(tmp, "w", encoding="utf-8") as f:
-                f.write(want)
-            os.chmod(tmp, 0o750)
-            os.replace(tmp, SANDBOX_BIN)
+            write_atomic(SANDBOX_BIN, want, mode=0o750)
         except OSError as e:
             job.say(f"could not refresh {SANDBOX_BIN} from the bundle: {e}\n")
             return
@@ -956,12 +949,9 @@ class ConfigPlaneMixin:
             with contextlib.suppress(OSError, ValueError):
                 with open(f) as fh:
                     was = json.load(fh)
-            tmp = f + ".new"
-            with open(tmp, "w") as fh:
-                json.dump({"what": "storage", "node": self.state.get("name") or "",
-                           "said": said, "since": int(was.get("since") or now), "updated": now}, fh)
-            os.chmod(tmp, 0o644)
-            os.replace(tmp, f)
+            write_json(f, {"what": "storage", "node": self.state.get("name") or "",
+                           "said": said, "since": int(was.get("since") or now), "updated": now},
+                       mode=0o644)
         except OSError:
             pass
 

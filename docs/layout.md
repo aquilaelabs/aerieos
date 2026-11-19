@@ -332,7 +332,7 @@ scripts/
   agent/builderbot-agent.py      the node agent's entry: runs the package beside it, and is the __main__.py of the zip a node runs
   agent/aerieos_agent/        the node agent, stdlib only, shipped to nodes by the dashboard as one zip
     __init__.py                  what the agent is and how it runs, and AGENT_VERSION
-    base.py                      the constants naming the node's paths and tools, the log, own_path and own_digest
+    base.py                      the constants naming the node's paths and tools, the log, own_path and own_digest, and a small file written or read whole (write_atomic, write_json, read_json)
     bundle.py                    the zip a node runs, built the same on the controller and the node, so the digests agree
     controller.py                the connection to the controller, verified by pin
     stores.py                    the node's stores, a store's path rules, and node.json

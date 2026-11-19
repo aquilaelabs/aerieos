@@ -8,14 +8,13 @@ folder behind. The record comes with the hello (the controller's
 backups.py), the storage-backup job names one of its rows, and the state
 file beside it says each row's last run for the census.
 """
-import json
 import os
 import re
 import shutil
 import subprocess
 import time
 
-from .base import log
+from .base import log, read_json, write_json
 from .stores import save_state
 from .names import VAR
 
@@ -29,22 +28,13 @@ def _env(k, d):
 
 
 def _state():
-    try:
-        with open(_env("BB_BACKUPS_STATE", STATE_FILE), encoding="utf-8") as f:
-            s = json.load(f)
-        return s if isinstance(s, dict) else {}
-    except (OSError, ValueError):
-        return {}
+    return read_json(_env("BB_BACKUPS_STATE", STATE_FILE), {})
 
 
 def _state_set(name, **kw):
     s = _state()
     s[name] = {**(s.get(name) or {}), **kw}
-    path = _env("BB_BACKUPS_STATE", STATE_FILE)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path + ".new", "w", encoding="utf-8") as f:
-        json.dump(s, f)
-    os.replace(path + ".new", path)
+    write_json(_env("BB_BACKUPS_STATE", STATE_FILE), s, makedirs=True)
 
 
 def backups_now(state):

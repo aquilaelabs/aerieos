@@ -34,7 +34,7 @@ import tarfile
 import threading
 import time
 import urllib.parse
-from .base import as_root, fs_holds, hello_again, SHARE, log, log_once
+from .base import as_root, fs_holds, hello_again, SHARE, log, log_once, write_json
 from .names import VAR
 
 # What is not synced, the same set as the controller's (wssync.SKIP_DIRS
@@ -286,10 +286,7 @@ class Project:
         # The agent's own record, kept where only root writes: root's file
         # identity for it, in the middle of work done as the tree's owner.
         with as_root():
-            tmp = self.path + ".new"
-            with open(tmp, "w") as f:
-                json.dump({"rev": self.rev, "ready": self.ready, "files": self.files}, f)
-            os.replace(tmp, self.path)
+            write_json(self.path, {"rev": self.rev, "ready": self.ready, "files": self.files})
 
 
 class WorkspaceSync:
@@ -513,9 +510,7 @@ class WorkspaceSync:
                         os.remove(rec)
         self.cleaned = {"token": token, "freed": freed, "error": err}
         with contextlib.suppress(OSError):
-            with open(self.cleaned_path() + ".new", "w") as f:
-                json.dump(self.cleaned, f)
-            os.replace(self.cleaned_path() + ".new", self.cleaned_path())
+            write_json(self.cleaned_path(), self.cleaned)
         log(f"sync: /workspace cleaned up, {freed // (1024 * 1024)} MB freed" if not err
             else f"sync: /workspace not cleaned up whole ({freed // (1024 * 1024)} MB freed): {err}")
         hello_again(self.agent, "/workspace was cleaned up")

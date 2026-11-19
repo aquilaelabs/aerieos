@@ -34,7 +34,7 @@ import time
 import xml.etree.ElementTree as ET  # nosemgrep: python.lang.security.use-defused-xml.use-defused-xml (libvirt's own XML for this host's domains)
 
 from .backends import _have
-from .base import IPTABLES_BIN, NETWORKCTL_BIN, NETWORKD_DIR, _run, log
+from .base import IPTABLES_BIN, NETWORKCTL_BIN, NETWORKD_DIR, _run, log, write_atomic
 
 BRIDGE = "br0"
 CONFIRM_S = 60
@@ -141,11 +141,7 @@ def _write(files):
             with contextlib.suppress(OSError):
                 os.remove(p)
             continue
-        os.makedirs(os.path.dirname(p), exist_ok=True)
-        with open(p + ".new", "w", encoding="utf-8") as f:
-            os.fchmod(f.fileno(), 0o644)
-            f.write(text)
-        os.replace(p + ".new", p)
+        write_atomic(p, text, mode=0o644, makedirs=True)
 
 
 def _reload(iface):

@@ -15,6 +15,7 @@ import shutil
 import subprocess
 import time
 import xml.etree.ElementTree as ET  # nosemgrep: python.lang.security.use-defused-xml.use-defused-xml (libvirt's own XML from virsh on this node; and ElementTree resolves no external entity)
+from .base import write_atomic
 
 PCI_RE = re.compile(r"[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]")
 USB_ID_RE = re.compile(r"0x[0-9a-f]{4}")
@@ -143,10 +144,7 @@ def hold_for_vms(addrs, sys_root="/sys", path=None):
             held.append(a)
     text = vfio_rules(held)
     if text:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path + ".new", "w", encoding="utf-8") as f:
-            f.write(text)
-        os.replace(path + ".new", path)
+        write_atomic(path, text, makedirs=True)
     return held, said
 
 

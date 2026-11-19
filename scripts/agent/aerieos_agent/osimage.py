@@ -19,6 +19,7 @@ import shutil
 import subprocess
 import tempfile
 import urllib.request
+from .base import write_atomic
 
 RELEASE_FILE = "/usr/lib/aerieos-os/release"
 SLOT_TOOL = "/usr/lib/aerieos-os/slot"
@@ -363,9 +364,7 @@ def pin_hostid():
         with open(hostid, "rb") as f:
             raw = f.read()
         if len(raw) == 4:
-            with open(hostid + ".new", "wb") as f:
-                f.write(raw)
-            os.replace(hostid + ".new", hostid)
+            write_atomic(hostid, raw)
 
 
 def _sha256(path):

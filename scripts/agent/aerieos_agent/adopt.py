@@ -32,6 +32,7 @@ import tempfile
 import time
 import xml.etree.ElementTree as ET
 from typing import Callable
+from .base import read_json, write_atomic, write_json
 from .names import ETC, VAR
 
 RECORD = ETC + "/adopted.json"
@@ -303,19 +304,11 @@ def write_fstab(p):
     text = "".join(kept)
     if text and not text.endswith("\n"):
         text += "\n"
-    with open(path + ".new", "w", encoding="utf-8") as f:
-        f.write(text + (render_fstab(p) if p else ""))
-    os.chmod(path + ".new", 0o644)
-    os.replace(path + ".new", path)
+    write_atomic(path, text + (render_fstab(p) if p else ""), mode=0o644)
 
 
 def read_record():
-    try:
-        with open(_env("BB_ADOPT_RECORD", RECORD), encoding="utf-8") as f:
-            rec = json.load(f)
-        return rec if isinstance(rec, dict) else {}
-    except (OSError, ValueError):
-        return {}
+    return read_json(_env("BB_ADOPT_RECORD", RECORD), {})
 
 
 def write_record(rec):
@@ -326,10 +319,7 @@ def write_record(rec):
         except OSError:
             pass
         return
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path + ".new", "w", encoding="utf-8") as f:
-        json.dump(rec, f, indent=1)
-    os.replace(path + ".new", path)
+    write_json(path, rec, indent=1, makedirs=True)
 
 
 def adopted_now():
@@ -931,12 +921,7 @@ def carry_tpm(x, here, swtpm_dir=None):
 
 
 def read_apps():
-    try:
-        with open(_env("BB_ADOPT_APPS", APPS), encoding="utf-8") as f:
-            d = json.load(f)
-        return d if isinstance(d, dict) else {}
-    except (OSError, ValueError):
-        return {}
+    return read_json(_env("BB_ADOPT_APPS", APPS), {})
 
 
 def apps_now():
@@ -1089,11 +1074,7 @@ class AdoptMixin:
                     self._unmount_image(job, d)
             got["said"] = said
             got["at"] = int(time.time())
-            path = _env("BB_ADOPT_APPS", APPS)
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path + ".new", "w", encoding="utf-8") as f:
-                json.dump(got, f)
-            os.replace(path + ".new", path)
+            write_json(_env("BB_ADOPT_APPS", APPS), got, makedirs=True)
             for line in said:
                 say(line + "\n")
             self.hello_again("the old system's containers and VMs were read")
