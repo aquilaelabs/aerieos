@@ -913,7 +913,7 @@ function dmSetGrid(cells, key, {cancel = false, bare = false} = {}){
   if (!body) return "";
   // ...or the grid alone, for a dialog whose foot carries the buttons.
   if (bare) return `<div class="setgrid dmsettings">${body.replace("<!--APPLY-->", "")}</div>`;
-  const settable = /data-(dmown|dmmove|dmref|dmov|dmgpu|dmboot|dmlan|route)=/.test(body);
+  const settable = DM_STAGED.some(s => body.includes(`data-${s.attr}=`));
   // ...with Cancel before it where Edit settings opened them: it drops what
   // was staged and puts the fields away (rows-you-open).
   const apply = `${cancel ? `<button type="button" class="stop" data-dmcancel="${esc(key)}">Cancel</button>` : ""}<button type="button" class="primary" data-dmapply="${esc(key)}"${
@@ -944,24 +944,29 @@ function dmSetDialog(name, key, cells){
     </div></dialog>`;
 }
 
-// What a row has staged, dropped (Cancel): every draft its key names.
-function dmDropDrafts(key){
+// The three keys a row's drafts are kept under, from the key its Apply
+// carries: that key itself (`inst:project|instance` or `ctr:name`), the
+// instance's `project|instance`, empty for a container AerieOS did not
+// start, and the container's name, which for an instance is read from
+// `list` and is none while the listing does not hold it.
+function dmRowKeys(key, list = dockerList){
   const inst = key.startsWith("inst:") ? key.slice(5) : "";
-  const name = inst ? (dockerList?.instances || []).find(x => `${x.project}|${x.instance}` === inst)?.name : key.slice(4);
-  delete dmOwnDraft[key];
-  if (inst){ delete dmMoveDraft[inst]; delete dmRefDraft[inst]; delete dmOvDraft[inst]; delete dmGpuDraft[inst]; delete dmRouteDraft[inst]; delete dmNginxDraft[inst]; }
-  if (name){ delete dmBootDraft[name]; delete dmLanDraft[name]; }
+  const name = inst ? (list?.instances || []).find(x => `${x.project}|${x.instance}` === inst)?.name : key.slice(4);
+  return {row: key, inst, name};
+}
+// What a row has staged, dropped (Cancel): every draft its key names, and
+// with them what was typed on its nginx line, which is no setting of the
+// Apply's (Add route writes it) and so is not in DM_STAGED.
+function dmDropDrafts(key){
+  const keys = dmRowKeys(key);
+  for (const s of DM_STAGED) if (keys[s.key]) delete s.draft[keys[s.key]];
+  if (keys.inst) delete dmNginxDraft[keys.inst];
 }
 // Whether a row has a setting staged and not yet applied: the drafts each
 // setting keeps, read by the row's key.
 function dmRowDirty(key){
-  const inst = key.startsWith("inst:") ? key.slice(5) : "";
-  const name = key.startsWith("ctr:") ? key.slice(4) : "";
-  const rowName = inst ? (dockerList?.instances || []).find(x => `${x.project}|${x.instance}` === inst)?.name : name;
-  return dmOwnDraft[key] !== undefined
-    || (inst && (dmMoveDraft[inst] !== undefined || dmRefDraft[inst] !== undefined || dmOvDraft[inst] !== undefined || dmGpuDraft[inst] !== undefined
-                 || dmRouteDraft[inst] !== undefined))
-    || (rowName && (dmBootDraft[rowName] !== undefined || dmLanDraft[rowName] !== undefined));
+  const keys = dmRowKeys(key);
+  return DM_STAGED.some(s => keys[s.key] && s.draft[keys[s.key]] !== undefined);
 }
 // Which project a row belongs to: its group on this tab, the notebook that
 // lists it, and whose Claude sessions may see it and work on it (the
@@ -2514,64 +2519,8 @@ function dmWireRows(el, list = dockerList){
     dockerList = null; readMoved("docker"); loadDocker();
   });
   // Every setting on a row is staged by its control and written by the
-  // grid's one Apply (R210): a pick wakes the button when something differs
-  // from what is saved, and the Apply runs each staged setting in turn.
-  const wake = row => {
-    const b = row?.querySelector("[data-dmapply]");
-    if (b && !b.getAttribute("aria-busy")) b.disabled = !dmRowDirty(b.dataset.dmapply);
-  };
-  el.querySelectorAll("[data-dmref]").forEach(sel => sel.onchange = () => {
-    const key = sel.dataset.dmref;
-    const saved = (list?.instances || []).find(
-      x => `${x.project}|${x.instance}` === key)?.ref || "";
-    if (sel.value === saved) delete dmRefDraft[key];
-    else dmRefDraft[key] = sel.value;
-    wake(sel.closest(".row"));
-  });
-  el.querySelectorAll("[data-dmov]").forEach(sel => sel.onchange = () => {
-    const key = sel.dataset.dmov;
-    const saved = (list?.instances || []).find(x => `${x.project}|${x.instance}` === key)?.override || "";
-    if (sel.value === saved) delete dmOvDraft[key];
-    else dmOvDraft[key] = sel.value;
-    wake(sel.closest(".row"));
-  });
-  el.querySelectorAll("[data-dmgpu]").forEach(sel => sel.onchange = () => {
-    const key = sel.dataset.dmgpu;
-    const saved = (list?.instances || []).find(x => `${x.project}|${x.instance}` === key)?.gpu || "";
-    if (sel.value === saved) delete dmGpuDraft[key];
-    else dmGpuDraft[key] = sel.value;
-    wake(sel.closest(".row"));
-  });
-  const applyGpu = async key => {
-    const [project, instance] = key.split("|");
-    const kind = dmGpuDraft[key];
-    if (kind === undefined) return;
-    const j = await postJSON("/api/devapp", {project, instance, action: "gpu", kind});
-    if (j.error){ notify(j.error, true); return; }
-    delete dmGpuDraft[key];
-    notify(kind ? `${dmCalled(project, instance)} gets the ${kind === "nvidia" ? "NVIDIA card" : "AMD card"} from the next build`
-                : `${dmCalled(project, instance)} gets no GPU from the next build`);
-  };
-  const applyOverride = async key => {
-    const [project, instance] = key.split("|");
-    const file = dmOvDraft[key];
-    if (file === undefined) return;
-    const j = await postJSON("/api/devapp", {project, instance, action: "override", file});
-    if (j.error){ notify(j.error, true); return; }
-    delete dmOvDraft[key];
-    notify(file ? `${dmCalled(project, instance)} lays ${file} over its compose file from the next build`
-                : `${dmCalled(project, instance)} has no override from the next build`);
-  };
-  const applyRef = async key => {
-    const [project, instance] = key.split("|");
-    const ref = dmRefDraft[key];
-    if (ref === undefined) return;
-    const j = await postJSON("/api/devapp", {project, instance, action: "ref", ref});
-    if (j.error){ notify(j.error, true); return; }
-    delete dmRefDraft[key];
-    notify(ref ? `${dmCalled(project, instance)} builds from ${ref} now`
-               : `${dmCalled(project, instance)} builds from the space's own checkout again`);
-  };
+  // grid's one Apply (R210): DM_STAGED says which, and how each is written.
+  dmWireStaged(el, list);
   // Start, stop, restart and the log, on any container the daemon reported,
   // including the ones AerieOS did not create (R68 steps 1 and 2). The
   // name goes back to the server, which looks it up in a fresh listing
@@ -2598,79 +2547,6 @@ function dmWireRows(el, list = dockerList){
     openLogTab(row && b.dataset.running === "1" ? `log:ctr:${project}:${instance}:${name}`
                  : `log:dm:${list?.node || dockerNode || ""}:${name}`, `Log: ${name}`);
   });
-  // Start on boot: the tick is a draft, Apply writes it (R122).
-  el.querySelectorAll("[data-dmboot]").forEach(cb => cb.onchange = () => {
-    const name = cb.dataset.dmboot, was = cb.dataset.was === "1";
-    if (cb.checked === was) delete dmBootDraft[name]; else dmBootDraft[name] = cb.checked;
-    wake(cb.closest(".row"));
-  });
-  const applyBoot = async name => {
-    const on = dmBootDraft[name];
-    if (on === undefined) return;
-    const j = await postJSON("/api/dockerctl", {action: on ? "boot-on" : "boot-off", container: name, node});
-    if (j.error){ notify(j.error, true); return; }
-    delete dmBootDraft[name];
-    notify(j.out || (on ? `${name} starts on boot` : `${name} no longer starts on boot`));
-  };
-  // Reaches the LAN (R178): the same draft and Apply, an administrator's.
-  el.querySelectorAll("[data-dmlan]").forEach(cb => cb.onchange = () => {
-    const name = cb.dataset.dmlan, was = cb.dataset.was === "1";
-    if (cb.checked === was) delete dmLanDraft[name]; else dmLanDraft[name] = cb.checked;
-    wake(cb.closest(".row"));
-  });
-  const applyLan = async name => {
-    const on = dmLanDraft[name];
-    if (on === undefined) return;
-    const j = await postJSON("/api/dockerctl", {action: on ? "lan-on" : "lan-off", container: name, node});
-    if (j.error){ notify(j.error, true); return; }
-    delete dmLanDraft[name];
-    notify(j.out || (on ? `${name} reaches the network around its node` : `${name} no longer reaches the network around its node`));
-  };
-  // Which project a row belongs to: staged on the pick, written by Apply.
-  const ownSaved = key => (key.startsWith("ctr:")
-    ? (list?.containers || []).find(c => (c.name || c.id) === key.slice(4))
-    : (list?.instances || []).find(x => `inst:${x.project}|${x.instance}` === key))?.owner || "";
-  el.querySelectorAll("[data-dmown]").forEach(sel => sel.onchange = () => {
-    const key = sel.dataset.dmown;
-    if (sel.value === ownSaved(key)) delete dmOwnDraft[key];
-    else dmOwnDraft[key] = sel.value;
-    wake(sel.closest(".row"));
-  });
-  const applyOwner = async key => {
-    const owner = dmOwnDraft[key];
-    if (owner === undefined) return;
-    const other = key.startsWith("ctr:");
-    const [project, instance] = other ? [] : key.slice(5).split("|");
-    const what = other ? key.slice(4) : (list?.instances || []).find(
-      x => x.project === project && x.instance === instance)?.name || project;
-    const j = await postJSON(other ? "/api/dockerctl" : "/api/devapp", other
-      ? {action: "owner", container: key.slice(4), owner, node}
-      : {action: "owner", project, instance, owner});
-    if (j.error){ notify(j.error, true); return; }
-    delete dmOwnDraft[key];
-    notify(owner ? `${what} belongs to ${projLabel(owner)} now` : `${what} belongs to no space now`);
-  };
-
-  // Built from: staged on the pick, moved by Apply, asked first since what it
-  // builds from changes.
-  el.querySelectorAll("[data-dmmove]").forEach(sel => sel.onchange = () => {
-    const key = sel.dataset.dmmove, from = key.split("|")[0];
-    if (sel.value === from) delete dmMoveDraft[key]; else dmMoveDraft[key] = sel.value;
-    wake(sel.closest(".row"));
-  });
-  const applyMove = async key => {
-    const to = dmMoveDraft[key];
-    if (!to) return;
-    const [project, instance] = key.split("|");
-    const what = (list?.instances || []).find(
-      x => x.project === project && x.instance === instance)?.name || project;
-    const j = await postJSON("/api/devapp", {action: "move", project, instance, to});
-    if (j.error){ notify(j.error, true); return; }
-    delete dmMoveDraft[key];
-    notify(`${what} is ${projLabel(to)}'s now` + (j.dropped_ref
-      ? `; it built from ${j.dropped_ref}, which was ${projLabel(project)}'s branch, and now builds from ${projLabel(to)}'s checkout` : ""));
-  };
-
   // The words on the row are a way in to where the setting lives now.
   el.querySelectorAll("[data-dmtestgo]").forEach(a => a.onclick = e => {
     e.preventDefault();
@@ -2678,30 +2554,6 @@ function dmWireRows(el, list = dockerList){
     // this clicked the row's settings button, which went with it.
     openProjectSettings(a.dataset.dmtestgo);
   });
-  // The route is saved on Apply, not on the pick (docs/design-language.md,
-  // Settings): a pick wakes the button when it differs from what is saved.
-  el.querySelectorAll("[data-route]").forEach(sel => sel.onchange = () => {
-    const row = sel.closest("[data-inst]");
-    const d = dmRouteDraft[row.dataset.inst] || (dmRouteDraft[row.dataset.inst] = {});
-    d[sel.dataset.route] = sel.value;
-    const dirty = [...row.querySelectorAll("[data-route]")].some(x => x.value !== x.dataset.was);
-    if (!dirty) delete dmRouteDraft[row.dataset.inst];
-    wake(row);
-  });
-  const applyRoute = async row => {
-    const [project, instance] = row.dataset.inst.split("|");
-    if (!dmRouteDraft[row.dataset.inst]) return;
-    const sel = row.querySelector('[data-route="mode"]');
-    const mode = sel?.value || "lan";
-    const port = row.querySelector('[data-route="port"]')?.value || "";
-    if (mode === "funnel" && sel.dataset.was !== "funnel" && !await askYes(
-        `Open ${dmCalled(project, instance)} to the internet?\n\nAnyone with the link can reach the port until the route goes back to lan.`)){
-          row.querySelectorAll("[data-route]").forEach(x => { x.value = x.dataset.was; });
-          delete dmRouteDraft[row.dataset.inst]; return; }
-    delete dmRouteDraft[row.dataset.inst];
-    const j = await postJSON("/api/devapp", {project, instance, action:"route", mode, port});
-    if (j.error) notify(j.error, true);
-  };
   // The grid's one Apply: every staged setting on the row, in turn, then
   // one redraw. A setting that fails says so and the rest still go.
   // A row's settings dialog, drawn open: shown in the top layer, again after
@@ -2720,14 +2572,9 @@ function dmWireRows(el, list = dockerList){
   el.querySelectorAll("[data-dmapply]").forEach(btn => btn.onclick = async () => {
     const key = btn.dataset.dmapply, row = btn.closest(".row");
     dmBackLet(key); dmEditing.delete(key);
-    const inst = key.startsWith("inst:") ? key.slice(5) : "";
-    const name = inst ? (list?.instances || []).find(x => `${x.project}|${x.instance}` === inst)?.name : key.slice(4);
     busy(btn, "Applying");
-    try{
-      await applyOwner(key);
-      if (inst){ await applyMove(inst); await applyRef(inst); await applyOverride(inst); await applyGpu(inst); if (row?.dataset.inst) await applyRoute(row); }
-      if (name){ await applyBoot(name); await applyLan(name); }
-    }catch(e){ notify("apply: " + failWords(e), true); }
+    try{ await dmApplyStaged(key, row, {list, node}); }
+    catch(e){ notify("apply: " + failWords(e), true); }
     finally{ if (btn.isConnected) unbusy(btn, "Apply"); }
     dockerList = null; readMoved("docker"); loadDocker();
   });
@@ -2825,7 +2672,7 @@ function dmChipGroups(ins, cs){
 // Start on boot (R122): a switch on a row, a draft until its Apply, as every
 // setting here is. `name` is what the server acts on (a container, or an
 // instance meaning all its containers), `on` what the daemon says now.
-let dmBootDraft = {};
+const dmBootDraft = {};
 function dmBootLine(name, on){
   if (!mayDocker()) return "";
   const want = name in dmBootDraft ? dmBootDraft[name] : on;
@@ -2839,12 +2686,158 @@ function dmBootLine(name, on){
 // private ranges, which a container that talks to a machine on the network
 // (a controller to its nodes, an app to a device) cannot work behind. An
 // administrator lets one through; what no role gives is not drawn.
-let dmLanDraft = {};
+const dmLanDraft = {};
 function dmLanLine(name, on){
   if (!state?.can?.admin) return "";
   const want = name in dmLanDraft ? dmLanDraft[name] : on;
   return `<div class="setcell dmlan">${lbl("", "Network", "")}<div class="ctl"><label class="ndcap"><input type="checkbox" data-dmlan="${esc(name)}"
       data-was="${on ? "1" : ""}"${want ? " checked" : ""}> Reaches the LAN</label></div></div>`;
+}
+
+// What an instance has saved under one field of its listing, as the saved
+// half of a setting kept under `project|instance`.
+const dmInstSaved = field => (key, list) =>
+  (list?.instances || []).find(x => `${x.project}|${x.instance}` === key)?.[field] || "";
+// What a notice calls an instance: its row's name in the listing the row
+// was drawn from, else its project.
+const dmInstNamed = ({list, project, instance}) =>
+  (list?.instances || []).find(x => x.project === project && x.instance === instance)?.name || project;
+
+// The settings a row stages and its one Apply writes (R210), in the order
+// the Apply writes them. Whether the grid has an Apply (dmSetGrid), what
+// Cancel drops (dmDropDrafts), whether a row is dirty (dmRowDirty), the
+// controls' wiring (dmWireStaged) and the Apply itself (dmApplyStaged) are
+// all read from here, so a new setting is its draft, the line that draws
+// its control and one entry. Declared after the last draft it names.
+//   attr   the control's data attribute, whose value is the draft's key
+//   key    which of the row's keys that is (dmRowKeys): row, inst or name
+//   draft  what is staged, by that key; the setting's line reads the same
+//          object by its own name to draw what was picked
+//   tick   a checkbox, staged as true or false; the rest are selects
+//   saved  what is saved now: a control put back to it stages nothing
+//   skip   a staged value the Apply passes over, where that is not just
+//          `undefined`
+//   post   the path and the body that write it
+//   said   the words once it is written, `j` being the server's answer
+// `ctx` is the listing the rows were drawn from, its node, and the row's
+// project and instance. An entry with `stage` and `apply` does both itself.
+const DM_STAGED = [
+  // Which space the row belongs to, on an instance's row and on a
+  // container's alike: the one draft kept under the row's own key.
+  {name: "owner", attr: "dmown", key: "row", draft: dmOwnDraft,
+   saved: (key, list) => (key.startsWith("ctr:")
+     ? (list?.containers || []).find(c => (c.name || c.id) === key.slice(4))
+     : (list?.instances || []).find(x => `inst:${x.project}|${x.instance}` === key))?.owner || "",
+   post: (key, owner, {node, project, instance}) => key.startsWith("ctr:")
+     ? ["/api/dockerctl", {action: "owner", container: key.slice(4), owner, node}]
+     : ["/api/devapp", {action: "owner", project, instance, owner}],
+   said: (key, owner, j, ctx) => {
+     const what = key.startsWith("ctr:") ? key.slice(4) : dmInstNamed(ctx);
+     return owner ? `${what} belongs to ${projLabel(owner)} now` : `${what} belongs to no space now`;
+   }},
+  // Built from: the project in the key is what is saved, and an empty pick
+  // moves nothing. The row's Apply is the only yes it takes.
+  {name: "move", attr: "dmmove", key: "inst", draft: dmMoveDraft,
+   saved: key => key.split("|")[0],
+   skip: to => !to,
+   post: (key, to, {project, instance}) => ["/api/devapp", {action: "move", project, instance, to}],
+   said: (key, to, j, ctx) => `${dmInstNamed(ctx)} is ${projLabel(to)}'s now` + (j.dropped_ref
+     ? `; it built from ${j.dropped_ref}, which was ${projLabel(ctx.project)}'s branch, and now builds from ${projLabel(to)}'s checkout` : "")},
+  {name: "ref", attr: "dmref", key: "inst", draft: dmRefDraft,
+   saved: dmInstSaved("ref"),
+   post: (key, ref, {project, instance}) => ["/api/devapp", {project, instance, action: "ref", ref}],
+   said: (key, ref, j, {project, instance}) => ref ? `${dmCalled(project, instance)} builds from ${ref} now`
+     : `${dmCalled(project, instance)} builds from the space's own checkout again`},
+  {name: "override", attr: "dmov", key: "inst", draft: dmOvDraft,
+   saved: dmInstSaved("override"),
+   post: (key, file, {project, instance}) => ["/api/devapp", {project, instance, action: "override", file}],
+   said: (key, file, j, {project, instance}) => file ? `${dmCalled(project, instance)} lays ${file} over its compose file from the next build`
+     : `${dmCalled(project, instance)} has no override from the next build`},
+  {name: "gpu", attr: "dmgpu", key: "inst", draft: dmGpuDraft,
+   saved: dmInstSaved("gpu"),
+   post: (key, kind, {project, instance}) => ["/api/devapp", {project, instance, action: "gpu", kind}],
+   said: (key, kind, j, {project, instance}) => kind
+     ? `${dmCalled(project, instance)} gets the ${kind === "nvidia" ? "NVIDIA card" : "AMD card"} from the next build`
+     : `${dmCalled(project, instance)} gets no GPU from the next build`},
+  // The route does both itself: its draft is two controls' picks (how it is
+  // reached, and through which port), dropped when both are back at what is
+  // saved; the Apply reads the two from the row, and a public link is asked
+  // about first, a no putting the controls back. Its redrawn line is what
+  // says it was written.
+  {name: "route", attr: "route", key: "inst", draft: dmRouteDraft,
+   stage(sel){
+     const row = sel.closest("[data-inst]");
+     const d = dmRouteDraft[row.dataset.inst] || (dmRouteDraft[row.dataset.inst] = {});
+     d[sel.dataset.route] = sel.value;
+     const dirty = [...row.querySelectorAll("[data-route]")].some(x => x.value !== x.dataset.was);
+     if (!dirty) delete dmRouteDraft[row.dataset.inst];
+     return row;
+   },
+   async apply(row){
+     if (!row?.dataset.inst) return;
+     const [project, instance] = row.dataset.inst.split("|");
+     if (!dmRouteDraft[row.dataset.inst]) return;
+     const sel = row.querySelector('[data-route="mode"]');
+     const mode = sel?.value || "lan";
+     const port = row.querySelector('[data-route="port"]')?.value || "";
+     if (mode === "funnel" && sel.dataset.was !== "funnel" && !await askYes(
+         `Open ${dmCalled(project, instance)} to the internet?\n\nAnyone with the link can reach the port until the route goes back to lan.`)){
+           row.querySelectorAll("[data-route]").forEach(x => { x.value = x.dataset.was; });
+           delete dmRouteDraft[row.dataset.inst]; return; }
+     delete dmRouteDraft[row.dataset.inst];
+     const j = await postJSON("/api/devapp", {project, instance, action:"route", mode, port});
+     if (j.error) notify(j.error, true);
+   }},
+  // Start on boot (R122) and Reaches the LAN (R178), an administrator's: a
+  // tick each, kept under the container's name, saved as the tick was drawn.
+  {name: "boot", attr: "dmboot", key: "name", draft: dmBootDraft, tick: true,
+   saved: (name, list, box) => box.dataset.was === "1",
+   post: (name, on, {node}) => ["/api/dockerctl", {action: on ? "boot-on" : "boot-off", container: name, node}],
+   said: (name, on, j) => j.out || (on ? `${name} starts on boot` : `${name} no longer starts on boot`)},
+  {name: "lan", attr: "dmlan", key: "name", draft: dmLanDraft, tick: true,
+   saved: (name, list, box) => box.dataset.was === "1",
+   post: (name, on, {node}) => ["/api/dockerctl", {action: on ? "lan-on" : "lan-off", container: name, node}],
+   said: (name, on, j) => j.out || (on ? `${name} reaches the network around its node` : `${name} no longer reaches the network around its node`)},
+];
+
+// Each staged control wired: a pick or a tick that differs from what is
+// saved is its draft, one put back is none, and either wakes the row's Apply
+// while something is staged. `list` is the listing the rows were drawn from.
+function dmWireStaged(el, list){
+  const wake = row => {
+    const b = row?.querySelector("[data-dmapply]");
+    if (b && !b.getAttribute("aria-busy")) b.disabled = !dmRowDirty(b.dataset.dmapply);
+  };
+  for (const s of DM_STAGED)
+    el.querySelectorAll(`[data-${s.attr}]`).forEach(c => c.onchange = () => {
+      if (s.stage){ wake(s.stage(c)); return; }
+      const key = c.dataset[s.attr], v = s.tick ? c.checked : c.value;
+      if (v === s.saved(key, list, c)) delete s.draft[key];
+      else s.draft[key] = v;
+      wake(c.closest(".row"));
+    });
+}
+
+// A row's Apply: every setting it has staged, written in the table's order.
+// One the server refuses says why and keeps its draft, and the rest still
+// go. `key` is the key the Apply carries, `row` its row, `list` the listing
+// the row was drawn from and `node` that listing's node.
+async function dmApplyStaged(key, row, {list, node}){
+  const keys = dmRowKeys(key, list);
+  const [project, instance] = keys.inst.split("|");
+  const ctx = {list, node, project, instance};
+  for (const s of DM_STAGED){
+    const k = keys[s.key];
+    if (!k) continue;
+    if (s.apply){ await s.apply(row); continue; }
+    const v = s.draft[k];
+    if (s.skip ? s.skip(v) : v === undefined) continue;
+    const [path, body] = s.post(k, v, ctx);
+    const j = await postJSON(path, body);
+    if (j.error){ notify(j.error, true); continue; }
+    delete s.draft[k];
+    notify(s.said(k, v, j, ctx));
+  }
 }
 
 // A system container's own page (R181): nginx's routes and certificates,
