@@ -4426,6 +4426,12 @@ await section("who may rebuild it", async () => {
   await page.selectOption('#rnReply', 'minimal');
   await page.selectOption('#rnAsks', 'fewer');
   await page.selectOption('#rnGateDocker', 'deny');
+  // Install a tool pack is a dial of the same section, saved with the rest:
+  // it was read, drawn and put back, and neither counted as a change nor
+  // sent, so the page could not save it (B1019).
+  const packsWas = await page.$eval('#rnGatePacks', e => e.value);
+  await page.selectOption('#rnGatePacks', 'deny');
+  const packsSaid = await page.evaluate(() => rnSectChanges('claude').said.join(', '));
   await saveDialog(page);
   // Read as the setting, not as the record's absence: a project on a node
   // keeps its record even with every gate at its default (R82).
@@ -4435,6 +4441,10 @@ await section("who may rebuild it", async () => {
      '...and turning it back to deny there takes the grant back');
   ok(await page.evaluate(() => ((state?.projects || []).find(p => p.name === 'ep.silon') || {}).prefs?.test_change) === 'restart',
      'the test-run setting is saved with it');
+  ok(/Agents may/.test(packsSaid) && await page.evaluate(() => ((state?.projects || []).find(p => p.name === 'ep.silon') || {}).prefs?.installpacks) === 'deny',
+     `...and Install a tool pack, changed from ${packsWas} to deny, counted as a change of its section and was saved (${packsSaid})`);
+  await page.evaluate(async () => { await fetch('/api/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ project: 'ep.silon', installpacks: 'ask' }) }); });
   // ...the person's own, saved by its own request: read once the poll has it.
   await refreshUntil(page, () => { const p = (state?.projects || []).find(p => p.name === 'ep.silon') || {};
     return p.yours?.reply === 'minimal' && p.yours?.asks === 'fewer'; }, { timeout: 20000 }).catch(() => {});
