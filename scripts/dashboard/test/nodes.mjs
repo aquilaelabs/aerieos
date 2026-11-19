@@ -502,6 +502,27 @@ await section("a group header's picker leaves the quiet word to its pill", async
   });
   ok(opts.stated === 'draconis|vega (quiet)' && opts.plain === 'draconis (quiet)|vega (quiet)' && !/quiet/.test(opts.picked) && /not answering/.test(opts.pill),
      `a group header's picker names its node alone beside the pill, the others quiet as they are (${JSON.stringify(opts)})`);
+  // ...and is as wide as the name it shows, measured rather than left to
+  // the browser, which cut it short with room beside it (bb-sand… on a
+  // phone in Firefox, the operator, 19 Nov; WebKit too): its ink, its
+  // padding and room for the arrow, and again when the name changes.
+  const fit = await page.evaluate(async () => {
+    const s = document.querySelector('.pane .bar #ndPick'), cs = getComputedStyle(s);
+    const c = document.createElement('canvas').getContext('2d');
+    c.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    const ink = w => Math.ceil(c.measureText(w).width);
+    const read = () => ({ set: parseFloat(s.style.width) || 0, box: Math.round(s.getBoundingClientRect().width), ink: ink(s.selectedOptions[0].textContent) });
+    fitPickers();
+    const now = read(), word = s.selectedOptions[0].textContent;
+    s.selectedOptions[0].textContent = 'a-much-longer-name-for-this-node';
+    fitPickers();
+    const long = read();
+    s.selectedOptions[0].textContent = word;
+    fitPickers();
+    return { now, long, room: Math.round(s.closest('.phead').getBoundingClientRect().width) };
+  });
+  ok(fit.now.set >= fit.now.ink + 52 && fit.now.box >= fit.now.ink + 52 && fit.long.set >= fit.long.ink + 52 && fit.long.set > fit.now.set && fit.long.box <= fit.room,
+     `...and is as wide as its name with room for the arrow, measured again when the name changes, never wider than its header (${JSON.stringify(fit)})`);
 });
 await section("phase 2: the docker manager's picker", async () => {
   // Opened with the node list DELIBERATELY not loaded, because that is the

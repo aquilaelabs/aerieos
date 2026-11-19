@@ -3164,11 +3164,11 @@ await section("a project on several nodes", async () => {
       document.querySelector('#resumemenu [data-restart]').click();
       await new Promise(r => setTimeout(r, 300));
       const go = document.querySelector('#resumemenu [data-start]');
-      return { label: go?.textContent.trim(), danger: !!go?.classList.contains('danger'),
+      return { label: go?.textContent.trim(), amber: !!go?.classList.contains('caution') && !go.classList.contains('danger'),
                model: !!document.querySelector('#rmModel'), log: [...bbRestartLog] };
     });
-    ok(page.dialogs.length === d0 && first.label === 'Restart' && first.danger && first.model && first.log.length === 0,
-       `Restart turns the menu to the model and effort first, asking nothing and ending nothing yet (${JSON.stringify(first)})`);
+    ok(page.dialogs.length === d0 && first.label === 'Restart' && first.amber && first.model && first.log.length === 0,
+       `Restart turns the menu to the model and effort first, its Restart in amber since it loses nothing, asking nothing and ending nothing yet (${JSON.stringify(first)})`);
     const done = await page.evaluate(async () => {
       document.querySelector('#resumemenu [data-start]').click();
       for (let i = 0; i < 50 && !bbRestartLog.some(x => x[0] === 'start'); i++) await new Promise(r => setTimeout(r, 100));

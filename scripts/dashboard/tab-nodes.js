@@ -1311,7 +1311,7 @@ function nodeAdvancedSection(n, stale, inflight){
         : installing ? `<span class="warn">${esc(installing[0].toUpperCase() + installing.slice(1))} is running here: one pressed now waits for it to end.</span>`
         : "Reboot ends every session there and the machine comes back on its own; Shut down does not come back until somebody switches it on.",
         (n.id === state?.own_node ? holdNextBox() : "") + ["reboot", "poweroff"].map(w =>
-          `<button type="button" class="danger" data-nd="${w}" ${!n.live || inflight(w) ? "disabled" : ""}>${
+          `<button type="button" class="caution" data-nd="${w}" ${!n.live || inflight(w) ? "disabled" : ""}>${
             inflight(w) ? (w === "reboot" ? "Rebooting…" : "Shutting down…")
                         : (w === "reboot" ? "Reboot" : "Shut down")}</button>`).join(""))}
     </div>`;

@@ -37,7 +37,7 @@ function rnSessionsDraw(name, rows){
       <div class="grow"><div class="name">${esc(rnSessWho(r))}</div>
         <div class="sub">${[r.kind === "claude" ? "Claude" : "shell",
           r.node ? "on " + esc(r.node) : "", esc(r.state || "")].filter(Boolean).join(" · ")}</div></div>
-      <button type="button" class="danger" data-rnsessend="${i}">End</button>
+      <button type="button" class="caution" data-rnsessend="${i}">End</button>
     </div>`).join("") : `<div class="hint">No sessions on this space.</div>`);
   list.querySelectorAll("[data-rnsessend]").forEach(b =>
     // Its own attribute: data-rnend is a section bar's End and save, which

@@ -526,7 +526,7 @@ function resumePicker(p, m, dlg, ns, several){
       <div class="setrow col ctlrow"><label class="lbl" for="rmEffort">Effort</label><select id="rmEffort" aria-label="effort this session starts on">${opts(EFFORTS, r.effort)}</select></div>
     </div></div>
     ${dlgFoot(`<button type="button" data-back>Back</button>`,
-      `<button type="button" class="${r.restart ? "danger" : "primary"}" data-start>${r.restart ? "Restart" : "Start"}</button>`, `<span class="state" id="rmSay"></span>`)}`);
+      `<button type="button" class="${r.restart ? "caution" : "primary"}" data-start>${r.restart ? "Restart" : "Start"}</button>`, `<span class="state" id="rmSay"></span>`)}`);
   m.dataset.pick = p.name;
   rmPut(dlg, m, dlg.querySelector(":scope > .resumemenu"));
   const say = () => { if (r.agent === "open"){ const w = routerSays(p, r.model); const el = m.querySelector("#rmSay"); el.textContent = w; el.classList.toggle("warn", !!w); } };
@@ -613,7 +613,7 @@ function agentPicker(p, m, dlg, n, several){
       <div class="setrow col ctlrow"><label class="lbl" for="rmEffort">Effort</label><select id="rmEffort" aria-label="effort this session starts on">${opts(t.efforts, r.effort)}</select></div>
     </div></div>
     ${dlgFoot(`<button type="button" data-back>Back</button>`,
-      `<button type="button" class="${r.restart ? "danger" : "primary"}" data-start>${r.restart ? "Restart" : "Start"}</button>`, `<span class="state" id="rmSay"></span>`)}`);
+      `<button type="button" class="${r.restart ? "caution" : "primary"}" data-start>${r.restart ? "Restart" : "Start"}</button>`, `<span class="state" id="rmSay"></span>`)}`);
   m.dataset.pick = p.name;
   rmPut(dlg, m, dlg.querySelector(":scope > .resumemenu"));
   const say = () => { if (r.agent === "open"){ const w = routerSays(p, r.model); const el = m.querySelector("#rmSay"); el.textContent = w; el.classList.toggle("warn", !!w); } };
@@ -683,10 +683,10 @@ function placeResumeMenu(){
     return line(agentSlotName(x.agent, x.slot), words, claude
       ? `<button data-open="1" data-node="${esc(at(nd))}"${sl} class="primary" title="open your session's tab">Open</button>`
         + `<button data-restart="${esc(nd.id)}"${sl} title="end it and resume the same conversation">Restart</button>`
-        + `<button data-end="${esc(nd.id)}"${sl} class="danger" title="end your session here">End</button>`
+        + `<button data-end="${esc(nd.id)}"${sl} class="caution" title="end your session here">End</button>`
       : `<button data-aopen="${esc(id)}" data-node="${esc(at(nd))}"${sl} class="primary" title="open your session's tab">Open</button>`
         + `<button data-arestart="${esc(id)}" data-nid="${esc(nd.id)}"${sl} title="end it and resume the same conversation">Restart</button>`
-        + `<button data-aend="${esc(id)}" data-nid="${esc(nd.id)}"${sl} class="danger" title="end your session here">End</button>`, " live");
+        + `<button data-aend="${esc(id)}" data-nid="${esc(nd.id)}"${sl} class="caution" title="end your session here">End</button>`, " live");
   };
   // Start: a new conversation of each agent on the node picked, in the
   // lowest slot free, or why there is none.

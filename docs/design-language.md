@@ -655,6 +655,8 @@ A `title` written anyway is never drawn: `untitle()` keeps its words for a
 screen reader (`aria-label` on a control with no text, `aria-description`
 otherwise), and `saidOf(el)` reads them back for a suite. A destructive button (`.danger`) is filled, never an outline alone (the operator, 27 Oct): its scheme's own red as its words, a 22% tint of that red over the panel as its ground and a 50% mix as its edge, a little more of the tint under the pointer; the same on every surface.
 
+**Red is for what is dangerous; what interrupts and loses nothing is amber** (the operator, 19 Nov, on Restart's red button). A verb that destroys or cannot be taken back wears `.danger`, in red: Delete, Remove, Uninstall, Discard, Reset, Forget, Purge, Wipe, Revoke, Overwrite, Replace, Rotate, Destroy, Erase, a forced stop, leaving over unsaved changes. A verb that stops something which starts again wears `.caution`, in the scheme's amber (`--warn`), filled as the red one is: Restart, End a session, Stop, Reboot, Shut down, a job's Cancel, Sign out, Disconnect, Take back. A question's yes follows its verb the same way (`ASK_DANGER`, `ASK_CAUTION` in page-ask.js): a red yes comes after Cancel, which takes the focus; an amber one is the first button as any yes is.
+
 ### forms
 
 Applies to: scripts/dashboard/index.html, scripts/dashboard/tab-*.js, scripts/dashboard/nb-*.js, scripts/dashboard/page-*.js; form, field, label, pulldown, select, input
@@ -1118,6 +1120,8 @@ As built (Perch step 43, the operator 17 Nov): a record's Save writes that one r
 Applies to: scripts/dashboard/page-*.css, scripts/dashboard/tab-*.js, scripts/dashboard/nb-*.js, scripts/dashboard/page-*.js; pulldown, select, picker, dropdown
 
 A pulldown in a bar or a row of controls (a page's bar, a band over a list, a picker row, an add row, a grid cell of controls) is as wide as its longest answer and no wider (the operator, 18 Nov): it never grows into the room around it and a grid cell does not stretch it. Where its row runs short it shrinks, to a thumb's width (--tap) at least, its words clipped with an ellipsis; the controls rule's cap holds where a rule sets one. A form's field fills its cell (forms), and a group header's or a notebook's head sizes its own picker. A base select is as wide as the answer chosen, so fitPickers (page-docs.js) sets each one's width from itself with its longest answer chosen, as the page draws it; a rule in page-overrides.css keeps it from growing, and uniform.mjs measures every such pulldown against its longest answer on every page.
+
+**A group header's node picker is as wide as the name it shows, in every browser** (the operator, 19 Nov: bb-sand… on a phone with room beside it). It is measured (`fitHeadPickers`): the name's ink at the header's face, its padding, and 52px for the closed picker's arrow, which each engine draws at a different width; left to the browser, Firefox on a phone and WebKit cut the name short. The header's own max-width still lets it give way to the pill beside it on a screen too narrow for both.
 
 ## Pages
 

@@ -51,7 +51,7 @@ function ask({title = "", text = "", choices = [{label: "Yes", value: true}], ca
     m.setAttribute("aria-labelledby", `${id}T`);
     m.hidden = true;
     const btn = (c, i) => `<button type="button" data-ai="${i}" class="${
-      [i === 0 && !c.danger ? "primary" : "", c.danger ? "danger" : ""].filter(Boolean).join(" ")}">${esc(c.label)}</button>`;
+      [i === 0 && !c.danger && !c.caution ? "primary" : "", c.danger ? "danger" : c.caution ? "caution" : ""].filter(Boolean).join(" ")}">${esc(c.label)}</button>`;
     const cancelBtn = cancel === null ? "" : `<button type="button" data-acancel>${esc(cancel)}</button>`;
     // The primary first and anything destructive last: a question whose
     // answer destroys something puts Cancel before it.
@@ -135,19 +135,25 @@ function askYesWord(text){
 
 // The verbs that cannot be taken back, which wear .danger and come after
 // Cancel (a-dialog: anything destructive last).
-const ASK_DANGER = new Set(["Delete", "Remove", "End", "Uninstall", "Discard", "Retire", "Reset", "Forget",
-                            "Purge", "Wipe", "Unenroll", "Kill", "Drop", "Clear", "Stop", "Revoke",
+const ASK_DANGER = new Set(["Delete", "Remove", "Uninstall", "Discard", "Retire", "Reset", "Forget",
+                            "Purge", "Wipe", "Unenroll", "Kill", "Drop", "Clear", "Revoke",
                             "Overwrite", "Replace", "Rotate", "Destroy", "Erase", "Unlink", "Abandon",
-                            // ...and what loses work in flight or typed: a reboot, a forced
-                            // stop, leaving or closing over unsaved changes.
-                            "Reboot", "Force", "Leave"]);
+                            // ...and what loses work typed: a forced stop, leaving or
+                            // closing over unsaved changes.
+                            "Force", "Leave"]);
+// ...and the ones that interrupt and lose nothing, which wear .caution, in
+// amber (the operator, 19 Nov: red is for what is dangerous; a restart is
+// not): what they stop starts again.
+const ASK_CAUTION = new Set(["Restart", "Reboot", "End", "Stop", "Shut", "Disconnect", "Lock", "Take", "Sign"]);
 
 // confirm()'s replacement: true for its yes, false for Cancel. `verb` names
 // the yes (askYesWord by default), `danger` marks it destructive, as a verb in
 // ASK_DANGER is by itself.
-async function askYes(text, {verb = "", danger = false, title = "", parts = []} = {}){
-  const v = verb || askYesWord(title || text);
-  return (await ask({title, text, parts, choices: [{label: v, value: true, danger: danger || ASK_DANGER.has(v)}]})) === true;
+async function askYes(text, {verb = "", danger = false, caution = false, title = "", parts = []} = {}){
+  const v = verb || askYesWord(title || text), first = v.split(" ")[0];
+  const red = danger || ASK_DANGER.has(v);
+  return (await ask({title, text, parts, choices: [{label: v, value: true, danger: red,
+                                                    caution: !red && (caution || ASK_CAUTION.has(first))}]})) === true;
 }
 
 // prompt()'s replacement: the text typed, or null for Cancel.

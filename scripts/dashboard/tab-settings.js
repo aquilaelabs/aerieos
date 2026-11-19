@@ -614,7 +614,7 @@ function wireUpdates(root){
     notify(j.error || "updating: the job runs on this machine; its log is on the Jobs page", !!j.error);
   }));
   root.querySelectorAll("[data-hostreboot]").forEach(b => b.onclick = () => pressing(b, async () => {
-    if (!await askYes("Restart this machine now? Every session and container on it stops until it is back.", {title: "Restart?", verb: "Restart", danger: true})) return;
+    if (!await askYes("Restart this machine now? Every session and container on it stops until it is back.", {title: "Restart?", verb: "Restart"})) return;
     busy(b, "Restarting");
     const j = await postJSON("/api/v1/nodes", {action: "reboot", id: b.dataset.hostreboot});
     notify(j.error || "restarting: the page comes back when the machine does", !!j.error);
@@ -868,7 +868,7 @@ async function maintAsk(rows){
     ? `Everybody else is kept out until it is off, and these ${rows.length} session${rows.length === 1 ? "" : "s"} and terminal${
         rows.length === 1 ? "" : "s"} of theirs end now${busyN ? `, ${busyN} of them in the middle of work` : ""}:\n\n${rows.map(line).join("\n")}`
     : "Everybody else is kept out until it is off. Nobody else has a session or a terminal open.";
-  return askYes(text, {title: "Turn maintenance mode on?", verb: rows.length ? "End them and turn it on" : "Turn it on", danger: rows.length > 0});
+  return askYes(text, {title: "Turn maintenance mode on?", verb: rows.length ? "End them and turn it on" : "Turn it on", caution: rows.length > 0});
 }
 
 // The Connection section's lines (R158 step 2): what is in force, the

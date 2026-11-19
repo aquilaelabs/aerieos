@@ -6963,8 +6963,26 @@ def session_kill(node_id, name):
 
 # (node id, session name) -> when the operator ended it, so the row goes
 # at once rather than at the next heartbeat; forgotten after a minute, by
-# which time the node has either dropped it or it is genuinely back.
+# which time the node has either dropped it or it is genuinely back. One
+# the node says was made after that is another session under the name,
+# which is what Restart starts, and is listed at once (still_ending).
 _ended = {}
+
+
+def still_ending(node_id, row, now=None):
+    """Whether a node's session row is one a person just ended, to keep off
+    the lists until the node drops it: ended within the minute, and not made
+    since. A Restart's new session has the old one's name, and for that
+    minute the space's card said Start agent with the session running (the
+    operator, 19 Nov)."""
+    at = _ended.get((node_id, str((row or {}).get("name") or "")), 0)
+    if (time.time() if now is None else now) - at > 60:
+        return False
+    try:
+        made = float((row or {}).get("created") or 0)
+    except (TypeError, ValueError):
+        made = 0
+    return made <= at
 # ...when the agent's poll took that kill, and when each node's heartbeat
 # last listed its sessions: a heartbeat after the kill was taken that no
 # longer lists it says it has ended (session_gone).
@@ -7030,9 +7048,7 @@ def node_sessions():
         rows = (n.get("reported") or {}).get("sessions")
         if isinstance(rows, list):
             now = time.time()
-            out[n["id"]] = (n["name"], [
-                r for r in rows
-                if now - _ended.get((n["id"], str((r or {}).get("name") or "")), 0) > 60])
+            out[n["id"]] = (n["name"], [r for r in rows if not still_ending(n["id"], r, now)])
     return out
 
 

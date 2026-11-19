@@ -186,7 +186,7 @@ async function setupGenerateConsole(b){
 }
 async function setupShutDown(b){
   const n = ownMachine();
-  if (!await askYes(`Shut ${n?.name || "this machine"} down?\n\nIt stays off until somebody switches it on. Setup picks up where it was when it starts again.`, {title: "Shut down?", verb: "Shut down", danger: true})) return;
+  if (!await askYes(`Shut ${n?.name || "this machine"} down?\n\nIt stays off until somebody switches it on. Setup picks up where it was when it starts again.`, {title: "Shut down?", verb: "Shut down"})) return;
   busy(b, "Shutting down");
   const j = await postJSON("/api/v1/nodes", {action: "poweroff", id: n?.id || ""});
   if (j.error){ notify(j.error, true); unbusy(b, "Shut down"); return; }

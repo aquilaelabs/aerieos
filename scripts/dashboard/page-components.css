@@ -733,6 +733,16 @@ button.danger[disabled]{background:color-mix(in srgb, var(--bad) 8%, var(--groun
    for "wants a decision from you". Red is kept for the controls that destroy
    something already on disk, which is the other two on this panel. */
 .nb .caution{color:var(--warn);border-color:var(--gold-edge)}
+/* A verb that interrupts and loses nothing is amber, never red (the
+   operator, 19 Nov: red is kept for what is dangerous): Restart, End, Stop,
+   Reboot, Shut down, a job's Cancel, Sign out. What it stops starts again;
+   what a red one takes is gone. Filled as the red one is, in the scheme's
+   own amber. */
+button.caution,a.btn.caution{color:var(--warn);background:color-mix(in srgb, var(--warn) 18%, var(--ground));
+  border-color:color-mix(in srgb, var(--warn) 50%, var(--ground))}
+@media(hover:hover){ button.caution:not([disabled]):hover,a.btn.caution:hover{background:color-mix(in srgb, var(--warn) 28%, var(--ground))}
+}
+button.caution[disabled]{background:color-mix(in srgb, var(--warn) 7%, var(--ground))}
 /* Two-way choice as two buttons, not radios: one tap on a phone, and the
    green .on state is the same vocabulary as everything else on the page. */
 /* Underlined and in the warm color, the way the CLAUDE.md fix link on a

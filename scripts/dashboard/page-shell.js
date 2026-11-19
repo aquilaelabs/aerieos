@@ -821,7 +821,11 @@ function wireJump(){
 // first, then whose else is here, then none. The dot is the one every
 // session surface wears.
 function projectState(p){
-  const name = p.name, sess = myLiveSession(name), mine = !!sess;
+  // A space's one session runs on its first repository (R136), so every
+  // repository's header says that one's state, as its agent button does:
+  // the second repository of a space read "no session" beside a lit Manage
+  // agent (the operator's screen, 19 Nov).
+  const name = state?.repos?.[p.project]?.members?.[0] || p.name, sess = myLiveSession(name), mine = !!sess;
   // One entry per person per agent per slot (B344: a person's Claude and
   // Codex folded into one, one session's state masking the other's; R143:
   // and two of one agent's), from where each session is: its account, its

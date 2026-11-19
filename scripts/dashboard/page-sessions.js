@@ -95,7 +95,7 @@ function renderSessionsInto(i){
       `<div class="actbar">${t ? (claude ? "" : `<button type="button" data-min="${esc(s.name)}"
           title="take its tab off the strip; it keeps running">Minimize</button>`)
         : `<button type="button" data-a="${esc(s.name)}" title="reopen its tab">Open</button>`}
-        <button type="button" class="danger" data-k="${esc(s.name)}" data-kn="${esc(s.node_id || "")}"
+        <button type="button" class="caution" data-k="${esc(s.name)}" data-kn="${esc(s.node_id || "")}"
           title="${claude ? "end this session: the transcript is kept" : "end this session and what runs in it"}">End</button></div>`])}</div>`;
   }).join("");
   const html = ss.length ? glance + tblWrap(SESS_COLS, rows, "sesstbl")

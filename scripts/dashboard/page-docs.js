@@ -1212,8 +1212,36 @@ const VIEW_ICON_LIST = `<svg viewBox="0 0 16 16" width="16" height="16" aria-hid
 const PICKERS = ":is(.docbarrow,.histbar,.actbar,.ctlrow,.ctlline,.lfilter,.rninvitebar,label.wkpick) select:not([multiple],[size]):not(:is(.fgrid,.setgrid,.setrow.col,.prefrow,.phead) select)";
 let pickFitDue = 0;
 let pickInk = null;
+// A group header's node picker is as wide as the name it shows, measured
+// here in every browser: left to size itself it was cut short with room
+// beside it (bb-sand… on a phone in Firefox, the operator, 19 Nov; in
+// WebKit too, B1018), each engine keeping a different room for the closed
+// picker's arrow at the header's larger face. The name's ink, its own
+// padding, and room for the arrow whatever draws it; the header's own
+// max-width still lets it give way to the pill beside it.
+const HEAD_PICKERS = ".pane .bar.page.grouped .phead > label.pick > select";
+const HEAD_ARROW = 52;
+function fitHeadPickers(){
+  pickInk = pickInk || document.createElement("canvas").getContext("2d");
+  for (const s of document.querySelectorAll(HEAD_PICKERS)){
+    const word = s.selectedOptions[0]?.label || s.selectedOptions[0]?.textContent || "";
+    if (!word || !s.checkVisibility()) continue;
+    const cs = getComputedStyle(s), font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    const key = `${font}\n${word}`;
+    if (s.dataset.fitFor === key) continue;
+    pickInk.font = font;
+    const px = v => parseFloat(v) || 0;
+    s.style.width = `${Math.ceil(pickInk.measureText(word).width + px(cs.paddingLeft) + Math.max(px(cs.paddingRight), HEAD_ARROW)
+      + px(cs.borderLeftWidth) + px(cs.borderRightWidth))}px`;
+    s.dataset.fitFor = key;
+  }
+}
 function fitPickers(){
   pickFitDue = 0;
+  fitHeadPickers();
+  // The rest is a base select's alone: a browser that draws its own select
+  // sizes one in a bar by its longest answer itself.
+  if (!CSS.supports("appearance", "base-select")) return;
   pickInk = pickInk || document.createElement("canvas").getContext("2d");
   for (const s of document.querySelectorAll(PICKERS)){
     const words = [...s.options].map(o => o.label || o.textContent || "");

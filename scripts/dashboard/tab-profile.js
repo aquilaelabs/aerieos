@@ -77,7 +77,7 @@ function profileSignins(rows){
   if (!rows.length) return "";
   return tblWrap(PF_SIGNIN_COLS, rows.map(r => `<div class="row" data-signin="${esc(r.id)}">${tblLine(PF_SIGNIN_COLS, [
     esc(r.agent) + (r.mine ? ` <span class="dim">(this one)</span>` : ""), esc(r.ip || ""), esc(r.last ? ago(r.last) : "never"),
-    `<button type="button"${r.mine ? "" : ' class="danger"'} data-pfsignout="${esc(r.id)}">Sign out</button>`])}</div>`).join(""), "pfsignins");
+    `<button type="button"${r.mine ? "" : ' class="caution"'} data-pfsignout="${esc(r.id)}">Sign out</button>`])}</div>`).join(""), "pfsignins");
 }
 const PF_DEVICE_KIND = {pc: "PC", phone: "Phone", editor: "Editor"};
 // `of` names the account when an administrator reads it on the Users page
@@ -87,7 +87,7 @@ function profileDevices(rows, of = ""){
     : `<div class="empty">No device yet. The Windows companion signs in here with your name and password, and is listed for you to disconnect.</div>`;
   return tblWrap(PF_DEVICE_COLS, rows.map(d => `<div class="row" data-device="${esc(d.id)}">${tblLine(PF_DEVICE_COLS, [
     esc(d.name), esc(PF_DEVICE_KIND[d.kind] || d.kind), esc(d.seen ? ago(d.seen) : "never"),
-    `<button type="button" class="danger" data-pfdevout="${esc(d.id)}"${of ? ` data-devof="${esc(of)}"` : ""}>Disconnect</button>`])}</div>`).join(""), "pfdevices");
+    `<button type="button" class="caution" data-pfdevout="${esc(d.id)}"${of ? ` data-devof="${esc(of)}"` : ""}>Disconnect</button>`])}</div>`).join(""), "pfdevices");
 }
 
 function renderProfileInto(i){

@@ -282,7 +282,7 @@ function renderJobsInto(i){
     <div class="row stack2 jbrow${j.id === jobsMarked ? " focus" : ""}" data-job="${esc(j.id)}" data-state="${esc(j.state)}">
       ${tblLine(JOB_COLS, [jobTitle(j), jobStatePill(j), esc(j.type), jobNode(j), jobBy(j), jobWhen(j), jobTook(j),
         over || j.cancel ? "" : `<div class="actbar">
-          <button type="button" class="danger" data-jb="cancel"
+          <button type="button" class="caution" data-jb="cancel"
             title="${j.state === "queued" ? "take it off the queue before it starts"
                      : "stop it where it is: the row moves when the runner reports that it did"}">Cancel</button>
         </div>`], "div", "jbopen",

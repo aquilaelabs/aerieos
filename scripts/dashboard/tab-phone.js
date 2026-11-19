@@ -261,7 +261,7 @@ function phonePanel(n){
          L.recording ? `<div class="sub"><span class="pill warn">recording</span> a session is recording the screen</div>` : ""}
          ${n.mine ? `<div class="actbar"><span class="state">the screen updates as a session takes shots and recordings</span>
            <button type="button" id="phLook">Check now</button>
-           <button type="button" class="danger" id="phTakeBack">Take back</button></div>` : ""}</div>
+           <button type="button" class="caution" id="phTakeBack">Take back</button></div>` : ""}</div>
      </div>`);
   } else if (dev && n.mine && mayPhone()){
     const ps = n.lendable || [];
