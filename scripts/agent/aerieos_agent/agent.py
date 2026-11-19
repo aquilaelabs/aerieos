@@ -14,7 +14,7 @@ import traceback
 from . import AGENT_VERSION
 from .coverage import _COV_OUT, _cov_write
 from .base import BEAT_S, RUNNER_DIAG_KEEP, SESSION_WALL, TRIAL_S, cap_file, fs_holds, log, log_once, own_digest, own_path, prune_dir
-from .base import back_note, selfcheck, trial_begin, trial_give_way, trial_note, trial_passed
+from .base import back_note, selfcheck, test_lock_ready, trial_begin, trial_give_way, trial_note, trial_passed
 from .controller import Controller
 from .stores import console_said, load_state, save_state, use_scope
 from .toolchains import share_images
@@ -895,6 +895,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         self.wssync.start()
         self.claudesync.start()
         self.screen.start()
+        test_lock_ready()
         # The other mounts on a thread of their own (B980): a share that
         # stopped answering held the turn, and the work poll behind it, for
         # minutes at a time.

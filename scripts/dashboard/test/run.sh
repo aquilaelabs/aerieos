@@ -376,6 +376,36 @@ done
 rm -f "$LOCK" 2>/dev/null || true
 ( umask 000; printf '%s' "$$" > "$LOCK" ) 2>/dev/null \
     || die "cannot take $LOCK: $(stat -c %U "$LOCK" 2>/dev/null || echo somebody)'s, and $LOCKDIR is not world-writable; fix the directory's mode (chmod 0777) and re-run"
+# ...and one run on the machine, whoever starts it (B986). A session's /tmp
+# and its pids are its own, so the lock above kept two runs of one session
+# apart and nothing else: two sessions' gates, or a session's and the CI
+# runner's, ran at once with all their workers each. The node's agent makes
+# this file for everyone (0666, in /run, which every session's view shares);
+# a lock on it is the kernel's, so it goes with its holder however that
+# ends. It is held by a process of its own beside this one, so the suites'
+# servers do not inherit it: one left behind would hold it for good.
+NODE_LOCK="${BB_TEST_NODE_LOCK:-/run/builderbot-test.lock}"
+if [ -z "${BB_TEST_CONCURRENT:-}" ] && [ -w "$NODE_LOCK" ] && command -v flock >/dev/null 2>&1; then
+    node_held="$(mktemp "${TMPDIR:-/tmp}/dashboard-test-node.XXXXXX")"
+    node_who="$(id -un)"; [ -z "${GITHUB_ACTIONS:-}" ] || node_who="the CI runner ($node_who)"
+    _run_pid=$$
+    (
+        exec 9<>"$NODE_LOCK"
+        if ! flock -n 9; then
+            echo "[dashboard-test] waiting for the run already going on this machine: $(tr -cd '[:print:]' < "$NODE_LOCK" | head -c 160)" >&2
+            flock -w "${BB_TEST_WAIT_LOCK:-900}" 9 || { echo busy > "$node_held"; exit 1; }
+        fi
+        printf '%s, since %s' "$node_who" "$(date '+%H:%M')" > "$NODE_LOCK" 2>/dev/null || true
+        echo held > "$node_held"
+        while kill -0 "$_run_pid" 2>/dev/null; do sleep 2; done
+    ) &
+    while [ ! -s "$node_held" ] && kill -0 $! 2>/dev/null; do sleep 0.2; done
+    if [ "$(cat "$node_held" 2>/dev/null)" != held ]; then
+        rm -f "$node_held"
+        die "another dashboard test run is going on this machine ($(tr -cd '[:print:]' < "$NODE_LOCK" | head -c 160)). One at a time on a machine, other sessions' and the CI runner's included; wait for it, or set BB_TEST_CONCURRENT=1"
+    fi
+    rm -f "$node_held"
+fi
 fi
 S="$(mktemp -d "${TMPDIR:-/tmp}/dashboard-test.XXXXXX")"
 # Where each suite's seconds are kept for the run's queue (run_file, the

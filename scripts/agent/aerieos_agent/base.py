@@ -570,6 +570,32 @@ def log_once(key, msg, every=3600):
     _said[key] = (now, 0, msg)
 
 
+# One test run at a time on this machine, whoever starts it (B986): the
+# harness takes a lock on this file. Every session's view has its own /tmp
+# and its own pids, so a lock there kept apart only one session's runs; /run
+# is the host's in every view, and only root can make a file in it, so the
+# agent makes this one for every account, the CI runner's included.
+TEST_LOCK = os.environ.get("BUILDERBOT_TEST_LOCK", "/run/builderbot-test.lock")
+
+
+def test_lock_ready():
+    """The test-run lock file, there and 0666 (past the umask). Its content
+    is only who holds it, for the next run's waiting line."""
+    if os.geteuid() != 0:
+        return
+    try:
+        fd = os.open(TEST_LOCK, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o666)
+    except OSError as e:
+        log_once("test-lock", f"could not make {TEST_LOCK}: {e}")
+        return
+    try:
+        os.fchmod(fd, 0o666)
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
+
+
 # A statvfs still out, by path: a store or a mount on a share that stopped
 # answering blocks the call in the kernel, where no timeout reaches it (B980).
 _stat_out = {}
