@@ -1594,3 +1594,23 @@ function chipButtons(groups, on, attr, all, allWord = "All"){
       count === null || count === undefined ? "" : `<span class="pill">${count}</span>`}</button>`;
   return chip("", allWord, total) + gs.map(g => chip(g.key, g.label, g.count)).join("");
 }
+// A band of chips in a box of its own: the chips patched in and, when that
+// wrote anything, each wired so its press is a move (chipMove) of the
+// `items` in `scope` to what `pick` draws for the chip's key, which is its
+// `attr`. The band is there, it does not arrive, so the patch is a quiet
+// one. Answers whether it drew, as patch does.
+function chipBand(box, html, attr, scope, items, pick){
+  const drew = patch(box, html, true);
+  if (drew) box.querySelectorAll(`[${attr}]`).forEach(b => b.onclick = () =>
+    chipMove(scope, items, () => pick(b.getAttribute(attr))));
+  return drew;
+}
+// Whether a row answers a list's search: its number, with its letter or
+// bare (B12, R12 or 12), or any of its words, case aside. An empty search
+// is all. `q` comes trimmed and in lower case, `prefix` is the letter in
+// lower case, and `words` gives the row's words only when a search asks.
+function idOrWords(prefix, id, words, q){
+  if (!q) return true;
+  if (q === prefix + id || q === String(id)) return true;
+  return words().some(t => String(t || "").toLowerCase().includes(q));
+}

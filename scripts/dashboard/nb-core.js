@@ -1236,9 +1236,7 @@ function nbCoreNodeChips(nb, box, counts, picked, attr, items, pick){
     .sort((a, b) => a.label.localeCompare(b.label, undefined, {sensitivity: "base"})) : [];
   const on = groups.some(g => g.key === picked) ? picked : "";
   const chips = chipButtons(groups, on, attr);
-  if (patch(box, chips, true))
-    box.querySelectorAll(`[${attr}]`).forEach(b => b.onclick = () =>
-      chipMove(() => box.closest(".nbview"), items, () => pick(b.getAttribute(attr))));
+  chipBand(box, chips, attr, () => box.closest(".nbview"), items, pick);
   setHidden(box.parentElement, !chips);
   return on;
 }

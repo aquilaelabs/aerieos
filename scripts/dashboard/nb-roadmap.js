@@ -429,10 +429,9 @@ function nbRmDraw($, nb, j, force){
   nb.roadmapChip = ["", "open", "shelved"].includes(nb.roadmapChip) ? nb.roadmapChip : "";
   const chips = chipButtons([{key: "open", label: "Open", count: rows.length - parked},
                              {key: "shelved", label: "Shelved", count: parked}], nb.roadmapChip, "data-rmchip");
-  if (patch($("roadmapChips"), chips, true))
-    $("roadmapChips").querySelectorAll("[data-rmchip]").forEach(b => b.onclick = () => {
-      chipMove(() => $("roadmapList")?.closest(".nbview"), "#roadmapList > details.grp",
-               () => { nb.roadmapChip = b.dataset.rmchip; nbRmRedraw($, nb); }); });
+  const view = () => $("roadmapList")?.closest(".nbview");
+  chipBand($("roadmapChips"), chips, "data-rmchip", view, "#roadmapList > details.grp",
+           k => { nb.roadmapChip = k; nbRmRedraw($, nb); });
   setHidden($("roadmapFind"), rows.length + finishedN < 2 && !nb.roadmapFind);
   // ...and by the release an item is meant for (the operator, 21 Oct): a
   // chip per target, oldest first, and No target; the Finished section
@@ -442,10 +441,8 @@ function nbRmDraw($, nb, j, force){
   const verChips = chipButtons(vers, nb.roadmapVer, "data-rmver", undefined, "Any version");
   // One band for every group (R109), drawn while any group has two.
   setHidden($("roadmapFilter"), !chips && !verChips);
-  if (patch($("roadmapVers"), verChips, true))
-    $("roadmapVers").querySelectorAll("[data-rmver]").forEach(b => b.onclick = () => {
-      chipMove(() => $("roadmapList")?.closest(".nbview"), "#roadmapList > details.grp, #roadmapDoneList > details.grp", () => {
-        nb.roadmapVer = b.dataset.rmver; nbRmRedraw($, nb); if (nb.roadmapDone) nb.drawFinished(); }); });
+  chipBand($("roadmapVers"), verChips, "data-rmver", view, "#roadmapList > details.grp, #roadmapDoneList > details.grp",
+           k => { nb.roadmapVer = k; nbRmRedraw($, nb); if (nb.roadmapDone) nb.drawFinished(); });
   const q = (nb.roadmapFind || "").trim().toLowerCase();
   const shown = r => (!nb.roadmapChip || (nb.roadmapChip === "shelved") === !!r.shelved) && rmVer(r, nb.roadmapVer) && rmMatch(r, q);
   setHidden($("roadmapDoneSect"), !finishedN);
@@ -1345,10 +1342,7 @@ const rmVers = r => [r.target || "", ...(r.steps || []).filter(st => st.target).
 const rmVer = (r, v) => rmVers(r).some(t => inRelease(t, v));
 
 function rmMatch(r, q){
-  if (!q) return true;
-  if (q === "r" + r.id || q === String(r.id)) return true;
-  return [r.text, r.info, r.target, ...(r.steps || []).flatMap(st => [st.text, st.info])]
-    .some(t => String(t || "").toLowerCase().includes(q));
+  return idOrWords("r", r.id, () => [r.text, r.info, r.target, ...(r.steps || []).flatMap(st => [st.text, st.info])], q);
 }
 
 function nextStep(r){

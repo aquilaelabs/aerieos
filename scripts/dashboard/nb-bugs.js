@@ -11,10 +11,7 @@ function onPress(root, sel, fn){ const b = root.querySelector(sel); if (b) b.onc
 // Whether a report answers a search (R254 step 1): its number (B12 or 12)
 // or any of its words, case aside. An empty search is all.
 function bugMatch(b, q){
-  if (!q) return true;
-  if (q === "b" + b.id || q === String(b.id)) return true;
-  return ["title", "area", "repro", "expected", "actual", "notes", "status_note"]
-    .some(k => String(b[k] || "").toLowerCase().includes(q));
+  return idOrWords("b", b.id, () => ["title", "area", "repro", "expected", "actual", "notes", "status_note"].map(k => b[k]), q);
 }
 
 // What a report knows (R254 step 3), as facts in place of a dotted line:
@@ -269,21 +266,23 @@ function nbBugsView({$, nb, project}){
     setHidden($("bugFind"), rows.length < 2 && !nb.bugFind);
     // Narrowed by a chip (All, Open, Closed) and the search (R254 step 1).
     nb.bugChip = ["", "open", "closed"].includes(nb.bugChip) ? nb.bugChip : "";
-    if (patch($("bugChips"), chipButtons([{key: "open", label: "Open", count: open},
-                                          {key: "closed", label: "Closed", count: rows.length - open}], nb.bugChip, "data-bgchip"), true))
-      $("bugChips").querySelectorAll("[data-bgchip]").forEach(b => b.onclick = () => chipMove(() => $("bugList")?.closest(".nbview"), "#bugList details.bug", () => { nb.bugChip = b.dataset.bgchip; drawBugs(true); }));
+    // A press on any of the three bands moves the reports in this view.
+    const view = () => $("bugList")?.closest(".nbview"), reports = "#bugList details.bug";
+    chipBand($("bugChips"), chipButtons([{key: "open", label: "Open", count: open},
+                                         {key: "closed", label: "Closed", count: rows.length - open}], nb.bugChip, "data-bgchip"),
+             "data-bgchip", view, reports, k => { nb.bugChip = k; drawBugs(true); });
     const q = (nb.bugFind || "").trim().toLowerCase();
     // ...and by the release a report was seen in (the operator, 21 Oct).
     const vers = versionChips(rows, b => b.seen_in, "Unknown");
     if (nb.bugVer && !vers.some(v => v.key === nb.bugVer)) nb.bugVer = "";
-    if (patch($("bugVers"), chipButtons(vers, nb.bugVer, "data-bgver", undefined, "Any version"), true))
-      $("bugVers").querySelectorAll("[data-bgver]").forEach(b => b.onclick = () => chipMove(() => $("bugList")?.closest(".nbview"), "#bugList details.bug", () => { nb.bugVer = b.dataset.bgver; drawBugs(true); }));
+    chipBand($("bugVers"), chipButtons(vers, nb.bugVer, "data-bgver", undefined, "Any version"),
+             "data-bgver", view, reports, k => { nb.bugVer = k; drawBugs(true); });
     // ...and by whether it reproduces (R124).
     const reprN = k => rows.filter(b => (b.reproduces || "untried") === k).length;
     if (!REPRO_ORDER.includes(nb.bugRepr)) nb.bugRepr = "";
-    if (patch($("bugRepro"), chipButtons(REPRO_ORDER.map(k => ({key: k, label: REPRO_LABELS[k], count: reprN(k)})),
-                                         nb.bugRepr, "data-bgrepr", undefined, "However often"), true))
-      $("bugRepro").querySelectorAll("[data-bgrepr]").forEach(b => b.onclick = () => chipMove(() => $("bugList")?.closest(".nbview"), "#bugList details.bug", () => { nb.bugRepr = b.dataset.bgrepr; drawBugs(true); }));
+    chipBand($("bugRepro"), chipButtons(REPRO_ORDER.map(k => ({key: k, label: REPRO_LABELS[k], count: reprN(k)})),
+                                        nb.bugRepr, "data-bgrepr", undefined, "However often"),
+             "data-bgrepr", view, reports, k => { nb.bugRepr = k; drawBugs(true); });
     const shown = b => (!nb.bugChip || (nb.bugChip === "open") === (b.status === "open"))
       && inRelease(b.seen_in, nb.bugVer) && (!nb.bugRepr || (b.reproduces || "untried") === nb.bugRepr) && bugMatch(b, q);
     // Which were open before this redraw, so acting on one does not fold it.
