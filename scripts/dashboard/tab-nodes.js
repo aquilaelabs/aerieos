@@ -89,12 +89,8 @@ function nodesKnown(){
   return loadNodes(nodesStale ? undefined : {join: 120000});
 }
 
-async function nodeAct(body){
-  const j = await postJSON("/api/v1/nodes", body);
-  if (j.error) notify(j.error, true);
-  await loadNodes();
-  return j;
-}
+// A node's action: a refusal said, the nodes read again, the answer back.
+function nodeAct(body){ return poster("/api/v1/nodes", {reload: () => loadNodes()})(body); }
 
 // What a node can do, offered as toggles. The list is the server's
 // (nodes.CAPABILITIES); repeated here only as labels, and an unknown one

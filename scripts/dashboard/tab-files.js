@@ -214,10 +214,9 @@ function renderFilesInto(i){
 
 function flFull(name){ return (flPath ? flPath + "/" : "") + name; }
 
+// A change to the place the page is on, a refusal said: true when it landed.
 async function flPost(body){
-  const j = await postJSON("/api/node-files", {node: flNode, root: flRoot, ...body});
-  if (j.error) notify(j.error, true);
-  return !j.error;
+  return !(await poster("/api/node-files", {base: () => ({node: flNode, root: flRoot})})(body)).error;
 }
 
 function wireFiles(root){

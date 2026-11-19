@@ -35,11 +35,8 @@ function loadSchedules(){
   });
 }
 
-async function postSchedule(body){
-  const j = await postJSON("/api/schedules", body);
-  if (j.error) notify(j.error, true);
-  return j;
-}
+// A schedule's action: a refusal said, the answer back.
+function postSchedule(body){ return poster("/api/schedules")(body); }
 
 // When a run was or will be, as a person reads it: a weekday and a time,
 // the date where it is not this week.

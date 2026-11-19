@@ -74,12 +74,8 @@ function loadJobs(){
   });
 }
 
-async function jobAct(body){
-  const j = await postJSON("/api/v1/jobs", body);
-  if (j.error) notify(j.error, true);
-  await loadJobs();
-  return j;
-}
+// A job's action: a refusal said, the jobs read again, the answer back.
+function jobAct(body){ return poster("/api/v1/jobs", {reload: () => loadJobs()})(body); }
 
 // What the job is, in the words the operator used to start it: a compose
 // job says its action and instance, an exec says its command.

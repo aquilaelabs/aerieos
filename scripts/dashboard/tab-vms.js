@@ -358,10 +358,8 @@ function wireVms(el){
       if (b.dataset.force) body.force = true;
       busy(b, {start: "Starting", stop: "Stopping", restart: "Restarting", remove: "Removing", snapshot: "Saving",
                revert: "Reverting", "snapshot-rm": "Deleting", eject: "Ejecting", "disk-grow": "Growing", "disk-add": "Adding"}[action] || "Working");
-      const j = await postJSON("/api/vms", body);
+      const j = await sayPost(null, "", "/api/vms", body, `${v.name}: ${action === "snapshot-rm" ? "snapshot delete" : action} queued`);
       if (!j.error && action === "stop" && !body.force) vmStopAsked[`${v.project}/${v.name}`] = Date.now();
-      if (j.error) notify(j.error, true);
-      else notify(`${v.name}: ${action === "snapshot-rm" ? "snapshot delete" : action} queued`);
       await loadVms();
     }));
   });

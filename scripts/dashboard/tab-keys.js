@@ -19,11 +19,8 @@ function openKeysTab(){
   openTab({kind: "keys", arg: "__keys", label: "Keys"});
 }
 
-async function postKeys(body){
-  const j = await postJSON("/api/keys", body);
-  if (j.error) notify(j.error, true);
-  return j;
-}
+// Everything this page asks: a refusal said, the answer back.
+function postKeys(body){ return poster("/api/keys")(body); }
 
 function loadKeys(){
   return reading("keys", async () => {

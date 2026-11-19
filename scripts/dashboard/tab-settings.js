@@ -607,50 +607,40 @@ function wireUpdates(root){
   root.querySelectorAll("[data-hostupdate]").forEach(b => b.onclick = () => pressing(b, async () => {
     const reboot = !!$("hostReboot")?.checked;
     if (!await askYes(`Update the system's own packages?\n\napt brings every package to its newest with the configuration files kept as they are${reboot ? ", and the machine restarts after if the update asks for it" : "; a restart, if one is needed, is yours to press after"}. The log is on the Jobs page.`, {title: "Apply updates?", verb: "Update"})) return;
-    busy(b, "Updating");
-    const j = await postJSON("/api/v1/nodes", {action: "host-update", id: b.dataset.hostupdate, reboot});
-    notify(j.error || "updating: the job runs on this machine; its log is on the Jobs page", !!j.error);
+    await sayPost(b, "Updating", "/api/v1/nodes", {action: "host-update", id: b.dataset.hostupdate, reboot},
+      "updating: the job runs on this machine; its log is on the Jobs page");
   }));
   root.querySelectorAll("[data-hostreboot]").forEach(b => b.onclick = () => pressing(b, async () => {
     if (!await askYes("Restart this machine now? Every session and container on it stops until it is back.", {title: "Restart?", verb: "Restart"})) return;
-    busy(b, "Restarting");
-    const j = await postJSON("/api/v1/nodes", {action: "reboot", id: b.dataset.hostreboot});
-    notify(j.error || "restarting: the page comes back when the machine does", !!j.error);
+    await sayPost(b, "Restarting", "/api/v1/nodes", {action: "reboot", id: b.dataset.hostreboot}, "restarting: the page comes back when the machine does");
   }));
   root.querySelectorAll("[data-relcheck]").forEach(b => b.onclick = () => pressing(b, async () => {
-    busy(b, "Checking");
-    const j = await postJSON("/api/v1/nodes", {action: "release-check"});
-    if (j.error) notify(j.error, true);
-    await refresh();
+    await sayPost(b, "Checking", "/api/v1/nodes", {action: "release-check"}, "", () => refresh());
   }));
   root.querySelectorAll("[data-osfrom]").forEach(b => b.onclick = () => pressing(b, async () => {
     const from = ($("osFrom")?.value || "").trim();
     if (!from){ notify("name the folder on this machine that holds the release's ISO with its .sha256 and .attestation.jsonl", true); return; }
     if (!await askYes(`Write the ISO in ${from} into the other slot?\n\nThe ISO is checked against the sha256 beside it; the slot not in use takes it and boots next; nothing running changes until you restart.`, {title: "Update from a folder?", verb: "Write the slot"})) return;
-    busy(b, "Updating");
-    const j = await postJSON("/api/v1/nodes", {action: "os-update", id: b.dataset.osfrom, from});
-    notify(j.error || "updating: the job writes the other slot; restart from the Nodes page when it is done", !!j.error);
+    await sayPost(b, "Updating", "/api/v1/nodes", {action: "os-update", id: b.dataset.osfrom, from},
+      "updating: the job writes the other slot; restart from the Nodes page when it is done");
   }));
   root.querySelectorAll("[data-relpick]").forEach(b => b.onclick = () => pressing(b, async () => {
     const tag = $("relPick")?.value;
     if (!tag || !await askYes(`Install ${tag} on this machine?\n\nIt is fetched and checked as any update is. An older build may refuse this machine's state, and a dev build may not come up.`, {title: "Install this version?", verb: "Install"})) return;
-    busy(b, "Installing");
-    const j = await postJSON("/api/v1/nodes", {action: b.dataset.os ? "os-update" : "controller-update", id: b.dataset.relpick, release: tag});
-    notify(j.error || j.said || `installing ${tag}: its job is on the Jobs page`, !!j.error);
+    await sayPost(b, "Installing", "/api/v1/nodes", {action: b.dataset.os ? "os-update" : "controller-update", id: b.dataset.relpick, release: tag},
+      j => j.said || `installing ${tag}: its job is on the Jobs page`);
     unbusy(b, "Install this version");
   }));
   root.querySelectorAll("[data-relupdate]").forEach(b => b.onclick = () => pressing(b, async () => {
     if (b.dataset.os){
       if (!await askYes(`Update this machine to AerieOS ${state?.release?.newer}?\n\nThe release's image is fetched and checked (sha256, build attestation), written into the slot not in use and named for the next boot; nothing running changes until you restart from the Nodes page, and the slot running now stays to fall back to.`, {title: "Update the image?", verb: "Write the slot"})) return;
-      busy(b, "Updating");
-      const j = await postJSON("/api/v1/nodes", {action: "os-update", id: b.dataset.relupdate, release: "v" + state.release.newer});
-      notify(j.error || j.said || "updating: the job writes the other slot; restart from the Nodes page when it is done", !!j.error);
+      await sayPost(b, "Updating", "/api/v1/nodes", {action: "os-update", id: b.dataset.relupdate, release: "v" + state.release.newer},
+        j => j.said || "updating: the job writes the other slot; restart from the Nodes page when it is done");
       return;
     }
     if (!await askYes(`Update this install to ${state?.release?.newer}?\n\nThe installer runs on this machine's node: the bundle is fetched and checked, the state copied aside, the service switched to the new release and started. The page comes back on it; if it does not answer, the install goes back by itself.`)) return;
-    busy(b, "Updating");
-    const j = await postJSON("/api/v1/nodes", {action: "controller-update", id: b.dataset.relupdate});
-    notify(j.error || "updating: the job runs on this machine's node; the page comes back on the new release", !!j.error);
+    await sayPost(b, "Updating", "/api/v1/nodes", {action: "controller-update", id: b.dataset.relupdate},
+      "updating: the job runs on this machine's node; the page comes back on the new release");
   }));
 }
 function reportsSection(){
@@ -1189,11 +1179,7 @@ function wireSettingsSections(el){
   wireMove(el);
   // Ask Let's Encrypt now (R158 step 2): the Connection section's own press.
   el.querySelectorAll("[data-tlsissue]").forEach(b => b.onclick = async () => {
-    busy(b, "Asking");
-    const j = await postJSON("/api/tls", {action: "issue"});
-    if (j.error) notify(j.error, true);
-    else notify("asking Let's Encrypt: the Connection section says how it goes");
-    refresh();
+    await sayPost(b, "Asking", "/api/tls", {action: "issue"}, "asking Let's Encrypt: the Connection section says how it goes", () => { refresh(); });
   });
   el.querySelectorAll('[data-group]').forEach(box => {
     const btn = box.querySelector(".setApply");

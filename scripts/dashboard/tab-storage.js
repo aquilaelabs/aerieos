@@ -428,10 +428,9 @@ function wireStoragePools(root, n){
       if (typed === null || typed === undefined) return;
       body.passphrase = String(typed);
     } else if (!await askYes(`Stop keeping ${b.dataset.name}'s key here? It is asked for on this page after every boot from now on, and the pool and its shares wait until then.`, {title: "Forget the key here?", verb: "Forget", danger: true})) return;
-    busy(b, act === "unlock" ? "Unlocking" : "Saving");
-    const j = await postJSON("/api/v1/nodes", body);
-    notify(j.error || {unlock: "the passphrase goes to the machine at its next check-in; the pool opens within a minute", keep: "kept: the pool unlocks at boot from now on", forget: "forgotten here: asked after every boot from now on"}[act], !!j.error);
-    await refresh();
+    await sayPost(b, act === "unlock" ? "Unlocking" : "Saving", "/api/v1/nodes", body,
+      {unlock: "the passphrase goes to the machine at its next check-in; the pool opens within a minute", keep: "kept: the pool unlocks at boot from now on", forget: "forgotten here: asked after every boot from now on"}[act],
+      () => refresh());
   }));
   root.querySelectorAll("[data-stpool]").forEach(b => b.onclick = () => pressing(b, async () => {
     const act = b.dataset.stpool, body = {action: "storage-pool", id: n.node, pool: act, name: b.dataset.name || ""};
@@ -469,9 +468,7 @@ function wireStoragePools(root, n){
     // A pool exported cleanly is imported with no question (R265: a press asks only where its yes costs something): it
     // is taken as it is, never upgraded, and Export lets it go again.
     busy(b, act === "scrub" ? "Scrubbing" : "Working");
-    const j = await postJSON("/api/v1/nodes", body);
-    notify(j.error || `${act}: the job runs on the machine; the page follows its next check-in`, !!j.error);
-    await refresh();
+    await sayPost(null, "", "/api/v1/nodes", body, `${act}: the job runs on the machine; the page follows its next check-in`, () => refresh());
   }));
 }
 
@@ -524,10 +521,8 @@ function wireStorageSnapshots(root, n){
       const was = (n.snapshot_schedules || []).find(x => x.pool === pool && x.kind === kind);
       const body = {action: "save", ...(was ? {id: was.id} : {}), name: `Snapshots of ${pool}, ${kind}`, cron: SNAP_KINDS.find(k => k[0] === kind)[2],
                     node: n.node, on: true, system: {apply: "storage-snapshot", config: {pool, kind, keep}}};
-      busy(b, "Saving");
-      const j = await postJSON("/api/schedules", body);
-      notify(j.error || `${pool}: ${kind} snapshots, ${keep} kept (${j.schedule?.words || ""}); the row is on the Schedules page too`, !!j.error);
-      await refresh();
+      await sayPost(b, "Saving", "/api/schedules", body,
+        j => `${pool}: ${kind} snapshots, ${keep} kept (${j.schedule?.words || ""}); the row is on the Schedules page too`, () => refresh());
       return;
     }
     const body = {action: "storage-snapshot", id: n.node, snapshot: act, pool: b.dataset.pool || "", name: b.dataset.name || "", dataset: b.dataset.pool || ""};
@@ -542,16 +537,12 @@ function wireStorageSnapshots(root, n){
       body.kind = "manual"; body.keep = 50;
     }
     busy(b, act === "take" ? "Taking" : "Working");
-    const j = await postJSON("/api/v1/nodes", body);
-    notify(j.error || `${act}: the job runs on the machine; the page follows its next check-in`, !!j.error);
-    await refresh();
+    await sayPost(null, "", "/api/v1/nodes", body, `${act}: the job runs on the machine; the page follows its next check-in`, () => refresh());
   }));
   root.querySelectorAll("[data-stsnapsched]").forEach(b => b.onclick = () => pressing(b, async () => {
     const x = (n.snapshot_schedules || []).find(y => y.id === b.dataset.stsnapsched);
     if (!await askYes(`Remove the ${x?.kind || ""} schedule of ${x?.pool || "the pool"}? The snapshots it took stay.`, {title: "Remove the schedule?", verb: "Remove"})) return;
-    const j = await postJSON("/api/schedules", {action: "remove", id: b.dataset.stsnapsched});
-    notify(j.error || "the schedule is gone", !!j.error);
-    await refresh();
+    await sayPost(null, "", "/api/schedules", {action: "remove", id: b.dataset.stsnapsched}, "the schedule is gone", () => refresh());
   }));
 }
 
@@ -652,10 +643,8 @@ function wireStorageArray(root, n){
       const kind = $("stArraySched")?.value || "sync", k = ARRAY_KINDS.find(x => x[0] === kind);
       const was = (n.snapshot_schedules || []).find(x => x.array === kind);
       const body = {action: "save", ...(was ? {id: was.id} : {}), name: `Array ${kind}`, cron: k[2], node: n.node, on: true, system: {apply: "storage-array", config: {array: kind}}};
-      busy(b, "Saving");
-      const j = await postJSON("/api/schedules", body);
-      notify(j.error || `the array's ${kind}: ${j.schedule?.words || ""}; the row is on the Schedules page too`, !!j.error);
-      await refresh();
+      await sayPost(b, "Saving", "/api/schedules", body,
+        j => `the array's ${kind}: ${j.schedule?.words || ""}; the row is on the Schedules page too`, () => refresh());
       return;
     }
     const body = {action: "storage-array", id: n.node, array: act};
@@ -691,9 +680,7 @@ function wireStorageArray(root, n){
       body.confirm = "array";
     }
     busy(b, {sync: "Syncing", scrub: "Scrubbing", check: "Checking", verify: "Checking", mover: "Moving"}[act] || "Working");
-    const j = await postJSON("/api/v1/nodes", body);
-    notify(j.error || `${act}: the job runs on the machine; its log is on the Jobs page and the page follows the next check-in`, !!j.error);
-    await refresh();
+    await sayPost(null, "", "/api/v1/nodes", body, `${act}: the job runs on the machine; its log is on the Jobs page and the page follows the next check-in`, () => refresh());
   }));
 }
 
@@ -763,9 +750,9 @@ function wireStorageOther(root, n){
       body = {action: "remove", id: b.dataset.id};
     } else body = {action: act, id: b.dataset.id};
     busy(b, {set: "Saving", remove: "Removing", off: "Unmounting", on: "Mounting"}[act] || "Working");
-    const j = await postJSON("/api/extmounts", body);
-    notify(j.error || {set: "recorded: the machine mounts it within a minute", remove: "forgotten", off: "unmounted within a minute: the row says when it is safe to pull", on: "mounted within a minute"}[act], !!j.error);
-    await refresh();
+    await sayPost(null, "", "/api/extmounts", body,
+      {set: "recorded: the machine mounts it within a minute", remove: "forgotten", off: "unmounted within a minute: the row says when it is safe to pull", on: "mounted within a minute"}[act],
+      () => refresh());
   }));
 }
 
@@ -822,15 +809,13 @@ function wireStorageBackups(root, n){
     if (act === "set"){
       const body = {action: "set", name: ($("stBackupName")?.value || "").trim(), source: ($("stBackupSrc")?.value || "").trim(), dest: ($("stBackupDest")?.value || "").trim(), keep: parseInt($("stBackupKeep")?.value || "7", 10)};
       if (!body.name || !body.source || !body.dest){ notify("a backup takes a name, a folder to copy and where its runs go", true); return; }
-      busy(b, "Adding");
-      const j = await postJSON("/api/storebackups", body);
-      notify(j.error || "added: Run now copies it, or give it a schedule", !!j.error);
-      await refresh(); return;
+      await sayPost(b, "Adding", "/api/storebackups", body, "added: Run now copies it, or give it a schedule", () => refresh());
+      return;
     }
     if (act === "remove"){
       if (!await askYes("Forget this backup? The runs already copied stay where they are.", {title: "Remove the backup?", verb: "Remove", danger: true})) return;
-      const j = await postJSON("/api/storebackups", {action: "remove", id: b.dataset.id});
-      notify(j.error || "forgotten", !!j.error); await refresh(); return;
+      await sayPost(null, "", "/api/storebackups", {action: "remove", id: b.dataset.id}, "forgotten", () => refresh());
+      return;
     }
     if (act === "nightly"){
       // The record and its schedule in one press: the pool to the array's
@@ -848,15 +833,12 @@ function wireStorageBackups(root, n){
       const was = (n.snapshot_schedules || []).find(x => x.backup === b.dataset.name);
       const body = {action: "save", ...(was ? {id: was.id} : {}), name: `Backup ${b.dataset.name}`, cron: act === "daily" ? "0 4 * * *" : "0 4 * * 0", node: n.node, on: true,
                     system: {apply: "storage-backup", config: {name: b.dataset.name}}};
-      busy(b, "Saving");
-      const j = await postJSON("/api/schedules", body);
-      notify(j.error || `${b.dataset.name}: ${j.schedule?.words || act}; the row is on the Schedules page too`, !!j.error);
-      await refresh(); return;
+      await sayPost(b, "Saving", "/api/schedules", body,
+        j => `${b.dataset.name}: ${j.schedule?.words || act}; the row is on the Schedules page too`, () => refresh());
+      return;
     }
-    busy(b, "Copying");
-    const j = await postJSON("/api/v1/nodes", {action: "storage-backup", id: n.node, name: b.dataset.name});
-    notify(j.error || "copying: the job runs on the machine; its log is on the Jobs page and the row follows the next check-in", !!j.error);
-    await refresh();
+    await sayPost(b, "Copying", "/api/v1/nodes", {action: "storage-backup", id: n.node, name: b.dataset.name},
+      "copying: the job runs on the machine; its log is on the Jobs page and the row follows the next check-in", () => refresh());
   }));
 }
 
@@ -1013,10 +995,7 @@ function wireStorageTab(root){
     openDockerOn(a.dataset.stprune);
   });
   root.querySelectorAll("[data-stmeasure]").forEach(b => b.onclick = async () => {
-    busy(b, "Asking");
-    const j = await postJSON("/api/storage", {action: "measure", node: b.dataset.stmeasure});
-    if (j.error) notify(j.error, true);
-    else notify("measuring: the numbers arrive with the node's next report, in a minute or so");
-    await loadStorage();
+    await sayPost(b, "Asking", "/api/storage", {action: "measure", node: b.dataset.stmeasure},
+      "measuring: the numbers arrive with the node's next report, in a minute or so", () => loadStorage());
   });
 }

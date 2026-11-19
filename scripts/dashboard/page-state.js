@@ -94,6 +94,31 @@ async function answerOf(req, opts){
   if (!r.ok && j && typeof j === "object" && !Array.isArray(j) && !j.error) j.error = said;
   return j;
 }
+// A press that posts, says how it went and reads again, in one call. The
+// button wears `word` while the request is out (busy, when both are given);
+// the answer's error is said, or `said` for a good one: its words, or a
+// function of the answer where the words come from it, and nothing when it
+// is empty. `after`, the page's read, is awaited with the answer whether it
+// was refused or not, and the answer comes back for a caller with a step of
+// its own. The request is sent before anything is awaited, so it asks for
+// the ring of the press that called this (pressTie).
+async function sayPost(btn, word, path, body, said, after){
+  if (btn && word) busy(btn, word);
+  const j = await postJSON(path, body);
+  const words = j.error || (typeof said === "function" ? said(j) : said);
+  if (words) notify(words, !!j.error);
+  await after?.(j);
+  return j;
+}
+// One endpoint's post as a function of its body, for a page whose every
+// action goes to one path: a refusal is said, `said` after a good one where
+// the page has words for it, and `reload` is awaited either way. `base`
+// returns what every body carries (the node and place a Files page is on),
+// asked at each call. A page script makes one inside the function that uses
+// it: it is read before this file, and nothing runs at load.
+function poster(path, {reload, base, said} = {}){
+  return body => sayPost(null, "", path, base ? {...base(), ...body} : body, said, reload);
+}
 
 const esc = s => String(s ?? "").replace(/[&<>"']/g,
   c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
