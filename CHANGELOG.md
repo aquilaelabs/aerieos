@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- `aerie capture shot` and `reel` open a page in any browser installed (`--browser NAME`, or `all` for a shot in each) and as any device Playwright knows (`--device NAME`), with `--scheme` and `--set NAME=VALUE` for the rest; `aerie capture browsers` and `devices` list them (d8814eb)
+
 ### Changed
 
 - What pops up over the page stands out from it in every theme: a tour's card, the bell, the doctor and the gear menu, a row's menu, a help note, the phone's More sheet and a toast are a step brighter than the page, white in a light theme, with a firmer edge (c17c3ae)
