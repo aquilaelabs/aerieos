@@ -9,7 +9,7 @@ import tempfile
 import threading
 import time
 from . import names
-from .base import NODE_JSON, STORE_DENY_EXACT, STORE_DENY_UNDER, _run, log
+from .base import NODE_JSON, STORE_DENY_EXACT, STORE_DENY_UNDER, StatTimeout, _run, log, statvfs_within
 
 
 def _can_chown(path):
@@ -248,12 +248,19 @@ def _stores(stores, used=False):
     out = {}
     for role, path in (stores or {}).items():
         try:
-            st = os.statvfs(path)
+            # Within seconds or not at all: a store on a share that stopped
+            # answering blocked statvfs, and with it every turn of the
+            # agent's loop, which samples the stores (B980).
+            st = statvfs_within(path)
             out[role] = {"path": path, "id": store_id(path),
                          "free_mb": st.f_bavail * st.f_frsize // (1024 * 1024),
                          "total_mb": st.f_blocks * st.f_frsize // (1024 * 1024)}
             if role == "toolchains":
                 out[role]["scope"] = tc_scope()      # where THIS machine's toolchains are, under path
+        except StatTimeout:
+            # Not answering: null as missing is, and said so on the row.
+            out[role] = {"path": path, "free_mb": None, "total_mb": None, "stuck": True}
+            continue
         except OSError:
             # Not there is a different fact from full: reported as null so
             # the row says "missing" rather than "0MB free".

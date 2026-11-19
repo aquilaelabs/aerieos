@@ -570,6 +570,47 @@ def log_once(key, msg, every=3600):
     _said[key] = (now, 0, msg)
 
 
+# A statvfs still out, by path: a store or a mount on a share that stopped
+# answering blocks the call in the kernel, where no timeout reaches it (B980).
+_stat_out = {}
+_stat_lock = threading.Lock()
+
+
+class StatTimeout(OSError):
+    """statvfs did not answer within its time: the filesystem is not
+    answering (a share gone away), which is not the same fact as missing."""
+
+
+def statvfs_within(path, limit=3.0):
+    """os.statvfs(path) on a thread of its own, waited on for `limit`
+    seconds. StatTimeout when it has not answered by then, and at once while
+    an earlier call for the same path is still out, so a dead share costs
+    one stuck thread, not one a turn and not the turn itself (B980)."""
+    with _stat_lock:
+        t = _stat_out.get(path)
+        if t is not None:
+            if t.is_alive():
+                raise StatTimeout(f"{path} is not answering")
+            _stat_out.pop(path, None)
+    box = {}
+
+    def ask():
+        try:
+            box["st"] = os.statvfs(path)
+        except OSError as e:
+            box["err"] = e
+    t = threading.Thread(target=ask, name="statvfs", daemon=True)
+    t.start()
+    t.join(limit)
+    if t.is_alive():
+        with _stat_lock:
+            _stat_out[path] = t
+        raise StatTimeout(f"{path} did not answer in {limit:g}s")
+    if "err" in box:
+        raise box["err"]
+    return box["st"]
+
+
 def hello_again(agent, why):
     """Ask the agent for a fresh hello with its reason in the journal
     (Agent.hello_again); a stand-in driven in a test has only the clock."""

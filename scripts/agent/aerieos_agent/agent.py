@@ -895,6 +895,10 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         self.wssync.start()
         self.claudesync.start()
         self.screen.start()
+        # The other mounts on a thread of their own (B980): a share that
+        # stopped answering held the turn, and the work poll behind it, for
+        # minutes at a time.
+        self.ext_mounts_start()
         # A turn that raises is logged and the next one taken, never the end
         # of the agent (B979): one exception left the process with no bye,
         # its running jobs orphaned and read lost, and a fault that came back
@@ -975,7 +979,6 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             timed("hostid", self.hostid_pass)
             timed("pools-imported", self.pools_pass)
             timed("backup-dirs", self.backup_dirs_pass)
-            timed("ext_mounts", self.ext_mounts_pass)
             timed("spindown", self.spindown_pass)
             timed("tokens", self.token_pass)
             timed("idle_reap", self.session_idle_reap)

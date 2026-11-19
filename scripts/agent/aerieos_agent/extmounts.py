@@ -13,8 +13,10 @@ import os
 import re
 import shutil
 import subprocess
+import threading
+import time
 
-from .base import log
+from .base import log, log_once, statvfs_within
 from .stores import save_state
 from .names import ETC
 
@@ -33,7 +35,7 @@ def _mounted(path):
 
 def _df(path):
     try:
-        st = os.statvfs(path)
+        st = statvfs_within(path)     # a share gone away does not hold the census (B980)
         return st.f_frsize * st.f_blocks // 1048576, st.f_frsize * (st.f_blocks - st.f_bavail) // 1048576
     except OSError:
         return 0, 0
@@ -67,6 +69,13 @@ def extmounts_now(state):
         out.append({"id": str(m.get("id") or "")[:16], "name": m["name"], "kind": str(m.get("kind") or "")[:4], "mounted": mounted, "present": present,
                     "size_mb": size, "used_mb": used, "error": str((state.get("ext_errors") or {}).get(m.get("id"), ""))[:200]})
     return out
+
+
+# How often the pass looks, on its own thread (B980): once a minute, as it
+# always said, rather than at every turn of the agent's loop.
+EVERY_S = 60
+# One pass at a time: the thread's and a change of the record's (forced).
+_PASS = threading.Lock()
 
 
 class ExtMountsMixin:
@@ -121,9 +130,31 @@ class ExtMountsMixin:
                 except OSError:
                     pass
 
+    def ext_mounts_start(self):
+        """The pass once a minute on a thread of its own (B980). On the
+        agent's loop, a share that stopped answering held every turn for
+        minutes (mount.nfs retrying, a stat of the dead mount), and the work
+        poll, the jobs, the cancels and the keys waited behind it."""
+        if getattr(self, "_ext_thread", None) is not None:
+            return
+
+        def run():
+            while True:
+                try:
+                    self.ext_mounts_pass()
+                except Exception as e:                       # noqa: BLE001 (logged, tried again in a minute)
+                    log_once("ext-mounts", f"other mounts: {type(e).__name__}: {e}")
+                time.sleep(EVERY_S)
+        self._ext_thread = threading.Thread(target=run, name="extmounts", daemon=True)
+        self._ext_thread.start()
+
     def ext_mounts_pass(self, force=False):
         """Once a minute: a disk that arrived mounted, one that left said
         gone; with `force`, every mount brought to the record."""
+        with _PASS:
+            return self._ext_mounts_pass(force)
+
+    def _ext_mounts_pass(self, force=False):
         if os.geteuid() != 0:
             return
         rows = self.state.get("ext_mounts") or []
@@ -143,12 +174,16 @@ class ExtMountsMixin:
             if not argv:
                 continue
             os.makedirs(path, exist_ok=True)
-            p = subprocess.run(argv, capture_output=True, text=True, timeout=120, check=False)
-            if p.returncode == 0:
+            try:
+                p = subprocess.run(argv, capture_output=True, text=True, timeout=120, check=False)
+            except subprocess.TimeoutExpired:
+                p = None
+            if p is not None and p.returncode == 0:
                 errors.pop(m.get("id"), None)
                 log(f"other mounts: {name} mounted ({m.get('kind')})")
             else:
-                why = (p.stderr or p.stdout or f"exit {p.returncode}").strip()[:200]
+                why = ("did not answer in two minutes" if p is None
+                       else (p.stderr or p.stdout or f"exit {p.returncode}").strip()[:200])
                 if errors.get(m.get("id")) != why:
                     log(f"other mounts: {name} did not mount: {why}")
                 errors[m.get("id")] = why
@@ -180,14 +215,23 @@ class ExtMountsMixin:
             opts = f"credentials={creds},uid=0,gid=0,file_mode=0664,dir_mode=0775,vers=3.0,soft,nosuid,nodev" + (",ro" if m.get("ro") else "")
             return [shutil.which("mount") or "mount", "-t", "cifs", f"//{m.get('host')}/{m.get('path')}", path, "-o", opts]
         if kind == "nfs":
-            opts = "nfsvers=4,soft,timeo=100,nosuid,nodev" + (",ro" if m.get("ro") else "")
+            # retry=0: one try a pass, not mount.nfs's two minutes of its own
+            # in the foreground (B980); the pass is the retry.
+            opts = "nfsvers=4,soft,timeo=100,retry=0,nosuid,nodev" + (",ro" if m.get("ro") else "")
             return [shutil.which("mount") or "mount", "-t", "nfs", f"{m.get('host')}:{m.get('path')}", path, "-o", opts]
         return None
 
     def _ext_umount(self, path, m, errors):
-        p = subprocess.run([shutil.which("umount") or "umount", path], capture_output=True, text=True, timeout=120, check=False)
-        if p.returncode != 0:
-            # Busy: lazily, so the record's word holds and the files close by themselves.
-            subprocess.run([shutil.which("umount") or "umount", "-l", path], capture_output=True, timeout=60, check=False)
+        try:
+            p = subprocess.run([shutil.which("umount") or "umount", path], capture_output=True, text=True, timeout=120, check=False)
+        except subprocess.TimeoutExpired:
+            p = None
+        if p is None or p.returncode != 0:
+            # Busy, or a share that stopped answering: lazily, so the
+            # record's word holds and the files close by themselves.
+            try:
+                subprocess.run([shutil.which("umount") or "umount", "-l", path], capture_output=True, timeout=60, check=False)
+            except subprocess.TimeoutExpired:
+                log_once(f"ext-umount-{m.get('name')}", f"other mounts: {m.get('name')} would not let go in a minute")
         errors.pop(m.get("id"), None)
         log(f"other mounts: {m.get('name')} unmounted")
