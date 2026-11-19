@@ -4682,6 +4682,21 @@ def _beside_gate(project, instance=MAIN, yes=""):
             "not a service in the space's compose file")
 
 
+def ack_beside(project, instance=MAIN):
+    """A person's Allow on a session's question about a build is their yes
+    to what its compose runs beside the app as it stands, as it is to what
+    the compose reaches (ack_risks): kept, so the same service is asked
+    about once. "" always: no gate."""
+    if is_file_source(project, instance):
+        return ""
+    cfg = _config(project, instance)
+    if cfg is not None:
+        now = beside_services(cfg)
+        if _read_rec(project, instance).get("beside") != now:
+            _set_beside(project, instance, now)
+    return ""
+
+
 # The variables that would make compose read another file, another stack or
 # another set of the file's services than the build was pressed for: what a
 # dev container runs is its compose file and its branch, nothing an env says.

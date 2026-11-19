@@ -1409,11 +1409,14 @@ def rebuild(project, instance=devapp.MAIN, ack="", gate=True, beside="", approve
     # The GPU's gate is for a session's build too: it is about what the node
     # can do, not about who confirmed what.
     # What it ships beside the app is a person's to say yes to whoever
-    # pressed it (devapp._beside_gate): a session's build carries no yes.
+    # pressed it (devapp._beside_gate): a session's build carries no yes,
+    # and a person's Allow on its question is one (ack_beside), the
+    # question having named the service (request).
     return _submit(project, instance, "rebuild",
                    check=lambda: devapp.room_gate(project, instance) or devapp.gpu_gate(project, instance)
                    or _env_gate(project, instance)
-                   or devapp._beside_gate(project, instance, beside if gate else "")
+                   or (devapp.ack_beside(project, instance) if approved and not gate
+                       else devapp._beside_gate(project, instance, beside if gate else ""))
                    or (devapp._risk_gate(project, instance, ack) if gate or not approved or devapp.on_own_machine(project, instance)
                        else devapp.ack_risks(project, instance)))
 
@@ -1802,6 +1805,19 @@ def request(project, instance, action, req, *, me, principal, dial="", test_cmd=
             dial = "ask"
             req = dict(req, why=("Its compose file asks for more than its own folder: " + "; ".join(reach[:4])
                                  + (" …" if len(reach) > 4 else "") + ". "
+                                 + str(devapp.field(req, "why") or "")).strip()[:600])
+    # ...and the same for a service its compose now runs beside the app,
+    # which its last build did not ship (the operator, 19 Nov): the build
+    # stopped with the reason in a failed job's words, where nobody was told,
+    # and waited on a press of Rebuild on the Containers page. It is put to
+    # a person on the bell with the service named, and their Allow says it
+    # is part of the app (rebuild's ack_beside).
+    if sess and dial in ("auto", "ask") and action == "rebuild" and not devapp.is_file_source(project, instance):
+        beside = devapp.beside_new(project, instance, devapp._config(project, instance))
+        if beside:
+            dial = "ask"
+            req = dict(req, why=(f"Its compose file now runs {', '.join(beside[:4])}" + (" and more" if len(beside) > 4 else "")
+                                 + " beside the app, which its last build did not ship: Allow says that is part of the app. "
                                  + str(devapp.field(req, "why") or "")).strip()[:600])
     # An override on a container that exists is a person's under ask: a
     # session names one for a new container (new's override), which the

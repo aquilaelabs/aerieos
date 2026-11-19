@@ -4301,6 +4301,26 @@ await section("who may rebuild it", async () => {
     ok(ao.state === 'done' && aoj.state === 'succeeded' && again.job && !again.id && againJ.state === 'succeeded',
        `...their Allow builds it and acknowledges the list, so the same file builds at once on auto after that (${
           ao.state}; ${aoj.state}; ${again.job ? againJ.state : 'asked again'}: ${String(againJ.error || '').slice(0, 60)})`);
+    // ...and the same for a service its compose now runs beside the app,
+    // which its last build did not ship (the operator, 19 Nov): the build
+    // stopped with the reason in a failed job's words, where nobody was
+    // told. It is put to a person on the bell with the service named, their
+    // Allow says it is part of the app, and it is asked about once.
+    writeFileSync(`${DIR}/dockerstate/riskynew.config`, JSON.stringify(
+      { services: { app: { build: { context: '.' }, privileged: true }, sockproxy: { image: 'proxy:1' } } }));
+    const br = await asSession({ project: 'ep.silon', action: 'rebuild', instance: 'riskynew', why: 'with its proxy' });
+    const basked = br.id ? (await (await fetch(URL.replace(/\/$/, '') + '/api/phone', { headers: H })).json()) : {};
+    const brow = JSON.stringify(basked).match(/Its compose file now runs sockproxy beside the app[^"]{0,160}/)?.[0] || '';
+    ok(br.status === 200 && br.id && !br.job && /Allow says that is part of the app/.test(brow) && /with its proxy/.test(brow),
+       `a session's build that would ship a service its last one did not is put to a person on the bell, the service named (${
+          br.error || br.job || br.id}: ${brow.slice(0, 110)})`);
+    const bo = await allowIt(br.id);
+    const boj = await jobEnd(bo.out);
+    const bagain = await asSession({ project: 'ep.silon', action: 'rebuild', instance: 'riskynew' });
+    const bagainJ = await jobEnd(bagain.job);
+    ok(bo.state === 'done' && boj.state === 'succeeded' && bagain.job && !bagain.id && bagainJ.state === 'succeeded',
+       `...their Allow builds it with that service as part of the app, and the next build on auto asks nothing (${
+          bo.state}; ${boj.state}: ${String(boj.error || '').slice(0, 60)}; ${bagain.job ? bagainJ.state : 'asked again'})`);
     await dial('ask');
     const ra = await asSession({ project: 'ep.silon', action: 'rebuild', instance: 'riskynew',
                                  why: 'the privileged one again' });
