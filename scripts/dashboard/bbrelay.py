@@ -48,6 +48,13 @@ HERE = Path(__file__).resolve().parent
 # verb cannot be added to one and not the other.
 VERBS = frozenset((HERE.parent / "lib" / "relay-verbs").read_text().split())
 
+# The variables a verb's own override of its project rides in, beside
+# BB_PROJECT: the relayed aerie is handed the project in every one. The
+# list is BB_PROJECT_VARS in scripts/aerie, which `aerie -p` sets and
+# bb_relay reads on the node's side: a name added there is added here.
+PROJECT_VARS = ("BB_ROADMAP_PROJECT", "BB_BUG_PROJECT", "BB_VERSION_PROJECT",
+                "BB_TESTS_PROJECT", "BB_CILOG_PROJECT", "BB_FINDINGS_PROJECT")
+
 # How many relayed bb verbs run at once, across every session.
 _SLOTS = threading.BoundedSemaphore(8)
 
@@ -285,8 +292,8 @@ def run(me, req, project):
                                  f"not this session's to write. Push {head} and say what "
                                  "you want done with it"}, 403
     env = {k: v for k, v in os.environ.items() if k != "DASHBOARD_AUTH"}
-    env.update({"BB_PROJECT": project, "BB_ROADMAP_PROJECT": project,
-                "BB_BUG_PROJECT": project, "BB_VERSION_PROJECT": project,
+    env.update(dict.fromkeys(PROJECT_VARS, project))
+    env.update({"BB_PROJECT": project,
                 "DASHBOARD_STATE": str(STATE), "WORKSPACE": str(WORKSPACE),
                 "BB_TOKEN": users.mint_session(project), "BB_RELAYED": "1",
                 "BUILDERBOT_ROLE": "controller"})

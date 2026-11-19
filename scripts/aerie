@@ -1306,7 +1306,7 @@ project_node() {
     # every caller then does the thing locally, which is what being on the
     # project's node means (roadmap #24).
     on_node && return 0
-    local proj="${BB_PROJECT:-$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")}"
+    local proj; proj="$(need_project --or-dir)"
     DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" python3 "$BB_LIB/doctor-probes.py" prefs "$proj" 2>/dev/null
 }
 
@@ -1327,7 +1327,7 @@ emu_via_node() {
     fi
     local auth
     auth="$(bb_auth_or_die)"
-    local proj="${BB_PROJECT:-$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")}"
+    local proj; proj="$(need_project --or-dir)"
     # The credential rides the environment, never argv: ps shows argv to
     # every account on the box, and this is the person's own header.
     BB_EMU_FILES="$(printf '%s\n' "${files[@]}")" \
@@ -1850,8 +1850,8 @@ cmd_ci_log() {
     fi
     # The project this is run from, the same way `aerie roadmap` decides.
     if [ -z "$proj" ]; then
-        proj="$(project_here)" \
-            || die "not inside a space under ${WORKSPACE}; cd into one, or pass --project NAME"
+        proj="$(need_project --here --soft)"
+        [ -n "$proj" ] || die "not inside a space under ${WORKSPACE}; cd into one, or pass --project NAME"
     fi
     local d="$dir/$proj"
     # The workflows file a run under the REPOSITORY's name (GITHUB_REPOSITORY),
@@ -2374,7 +2374,7 @@ cmd_pc() {
 cmd_report() {
     local auth proj sub="${1:-}"
     auth="$(bb_auth_or_die)"
-    proj="${BB_PROJECT:-$(project_here 2>/dev/null || true)}"
+    proj="$(need_project --soft 2>/dev/null)"
     case "$sub" in
         -h|--help)
             printf '%s\n' 'usage: aerie report "what happened" [--area A] [--repro "..."]' \
@@ -2556,11 +2556,7 @@ cmd_roadmap() {
     # path. The command is what the operator reads, and that is `aerie roadmap`.
     py="$BB_SCRIPTS/dashboard/roadmap.py"
     [ -f "$py" ] || die "roadmap.py is missing from this image"
-    local proj="${BB_ROADMAP_PROJECT:-}"
-    if [ -z "$proj" ]; then
-        proj="$(project_here)" \
-            || die "not inside a space under ${WORKSPACE}; cd into one first"
-    fi
+    local proj; proj="$(need_project BB_ROADMAP_PROJECT)" || exit
     DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" python3 "$BB_LIB/roadmap-verbs.py" "$py" "$proj" "$@"
 }
 
@@ -2572,11 +2568,7 @@ cmd_history() {
     # the notebook and not about a tab of it.
     local dir
     dir="$BB_SCRIPTS/dashboard"
-    local proj="${BB_ROADMAP_PROJECT:-}"
-    if [ -z "$proj" ]; then
-        proj="$(project_here)" \
-            || die "not inside a space under ${WORKSPACE}; cd into one first"
-    fi
+    local proj; proj="$(need_project BB_ROADMAP_PROJECT)" || exit
     DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" python3 "$BB_LIB/nb-history.py" "$dir" "$proj" "$@"
 }
 
@@ -2593,7 +2585,7 @@ cmd_design() {
     case "$verb" in list|show|file|json|schema|save|edit) ;; -h|--help)
         echo "aerie design [list | show [ID|NAME] | file [--from FILE] | json | schema | save FILE [--file] | edit NAME --text FILE|--append FILE [--file]]: what this space looks like, from the notebook's Design view; aerie design save -h prints the record's shape"; return 0 ;;
         *) die "aerie design [list | show [ID|NAME] | file [--from FILE] | json | schema | save FILE [--file] | edit NAME --text FILE|--append FILE [--file]]" ;; esac
-    proj="$(bb_project)" || die "not inside a space under ${WORKSPACE}; cd into one first"
+    proj="$(need_project)" || exit
     auth="$(bb_auth_or_die)"
     BB_DESIGN_AUTH="$auth" BB_DESIGN_PROJECT="$proj" python3 "$BB_LIB/design-verbs.py" "$@"
 }
@@ -2605,7 +2597,7 @@ cmd_design() {
 cmd_wiki() {
     local auth proj
     case "${1:-}" in -h|--help) usage | sed -n '/^aerie wiki /,/^bb [^w]/p' | sed '$d'; return 0 ;; esac
-    proj="$(bb_project)" || die "not inside a space under ${WORKSPACE}; cd into one first"
+    proj="$(need_project)" || exit
     auth="$(bb_auth_or_die)"
     BB_WIKI_AUTH="$auth" BB_WIKI_PROJECT="$proj" python3 "$BB_LIB/wiki-verbs.py" "$@"
 }
@@ -2615,7 +2607,7 @@ cmd_transcripts() {
     case "$verb" in list|show|fetch|label|note|keep|unkeep) ;; -h|--help)
         echo "aerie transcripts [list | show ID [--tz ZONE] [--all] | fetch ID [--into DIR] | label ID WORDS | note ID WORDS | keep ID | unkeep ID]: your own conversations on this space, every agent's, from the controller"; return 0 ;;
         *) die "aerie transcripts [list | show ID [--tz ZONE] [--all] | fetch ID [--into DIR] | label ID WORDS | note ID WORDS | keep ID | unkeep ID]" ;; esac
-    proj="$(bb_project)" || die "not inside a space under ${WORKSPACE}; cd into one first"
+    proj="$(need_project)" || exit
     auth="$(bb_auth_or_die)"
     BB_TRANSCRIPTS_AUTH="$auth" BB_TRANSCRIPTS_PROJECT="$proj" python3 "$BB_LIB/transcripts-verbs.py" "$@"
 }
@@ -2626,7 +2618,7 @@ cmd_memory() {
     case "$verb" in list|show|add|forget) ;; -h|--help)
         echo "$use: your memories on this repository, kept for every coding agent; aerie -p REPO memory for another repository of the space"; return 0 ;;
         *) die "$use" ;; esac
-    proj="$(bb_project)" || die "not inside a space under ${WORKSPACE}; cd into one first"
+    proj="$(need_project)" || exit
     auth="$(bb_auth_or_die)"
     BB_MEMORY_AUTH="$auth" BB_MEMORY_PROJECT="$proj" python3 "$BB_LIB/memory-verbs.py" "$@"
 }
@@ -2635,8 +2627,8 @@ cmd_brief() {
     local verb="${1:-show}" auth proj
     case "$verb" in show|take) ;; -h|--help) echo "aerie brief: the brief this space was started from"; return 0 ;;
         *) die "aerie brief: the brief this space was started from (take is bb-tty's)" ;; esac
-    proj="$(bb_project 2>/dev/null)" \
-        || { [ "$verb" = take ] && return 0; die "not inside a space under ${WORKSPACE}; cd into one first"; }
+    proj="$(need_project --soft 2>/dev/null)"
+    [ -n "$proj" ] || { [ "$verb" = take ] && return 0; not_in_a_space; }
     if [ "$verb" = take ]; then
         auth="$(bb_auth_header 2>/dev/null)" || return 0
         [ -n "$auth" ] || return 0
@@ -2657,11 +2649,7 @@ cmd_preamble() {
     dir="$BB_SCRIPTS/dashboard"
     py="$dir/preamble.py"
     [ -f "$py" ] || die "preamble.py is missing from this image"
-    local proj="${BB_PROJECT:-}"
-    if [ -z "$proj" ]; then
-        proj="$(project_here)" \
-            || die "not inside a space under ${WORKSPACE}; cd into one first"
-    fi
+    local proj; proj="$(need_project)" || exit
     python3 "$BB_LIB/preamble-verbs.py" "$dir" "$proj" "${1:-}" "${2:-}"
 }
 
@@ -2684,11 +2672,7 @@ cmd_rules() {
     case "${1:-}" in
         -h|--help) usage | sed -n '/^aerie rules /,/^aerie [^r]/p' | sed '$d'; return 0 ;;
     esac
-    local proj="${BB_PROJECT:-}"
-    if [ -z "$proj" ]; then
-        proj="$(project_here)" \
-            || die "not inside a space under ${WORKSPACE}; cd into one first"
-    fi
+    local proj; proj="$(need_project)" || exit
     # `aerie rules check` runs a rule's check command HERE, in this tree, on
     # whichever machine the session is on (roadmap R31): the rules themselves
     # come through `aerie rules --json`, which is relayed on a node, so this
@@ -3056,11 +3040,7 @@ cmd_tests() {
         rm -f "$said"
         return "$rc"
     fi
-    local proj="${BB_TESTS_PROJECT:-}"
-    if [ -z "$proj" ]; then
-        proj="$(project_here)" \
-            || die "not inside a space under ${WORKSPACE}; cd into one first"
-    fi
+    local proj; proj="$(need_project BB_TESTS_PROJECT)" || exit
     # `ingest` with no file reads stdin, so the whole thing is one pipe. The
     # log reaches python as a PATH, never as a value: a run log is a couple
     # of hundred kilobytes; passed in the environment it is "Argument list
@@ -3222,11 +3202,7 @@ cmd_bug() {
     local py
     py="$BB_SCRIPTS/dashboard/bugs.py"
     [ -f "$py" ] || die "bugs.py is missing from this image"
-    local proj="${BB_BUG_PROJECT:-}"
-    if [ -z "$proj" ]; then
-        proj="$(project_here)" \
-            || die "not inside a space under ${WORKSPACE}; cd into one first"
-    fi
+    local proj; proj="$(need_project BB_BUG_PROJECT)" || exit
     # --report N files a diagnostics report: read through aerie diag, whose
     # gate is the diagnostics' own (R124).
     local reports="" a
@@ -3279,7 +3255,7 @@ cmd_phone() {
             [ -n "$why" ] || die "aerie phone run needs --why \"what this is for\""
             [ $# -gt 0 ] || die "nothing to run; put the adb arguments after --"
             BB_PHONE_WHY="$why" BB_PHONE_AUTH="$auth" \
-            BB_PHONE_PROJECT="${BB_PROJECT:-$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")}" \
+            BB_PHONE_PROJECT="$(need_project --or-dir)" \
                 python3 "$BB_LIB/phone-verbs.py" run "$@"
             ;;
         lease|shot|record|install|start|stop|ime|log|ui|touch)
@@ -3295,7 +3271,7 @@ cmd_phone() {
             done
             set -- "${a[@]}"
             BB_PHONE_WHY="$why" BB_PHONE_AUTH="$auth" \
-            BB_PHONE_PROJECT="${BB_PROJECT:-$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")}" \
+            BB_PHONE_PROJECT="$(need_project --or-dir)" \
                 python3 "$BB_LIB/phone-verbs.py" "$sub" "$@"
             ;;
         *) die "usage: aerie phone [status | run --why \"...\" -- adb args... | lease | shot | record [S] | install FILE | start|stop|ime|log PKG | ui | touch ...]" ;;
@@ -3329,7 +3305,7 @@ cmd_root() {
             [ -n "$why" ] || die "aerie root run needs --why \"what this is for\""
             [ $# -gt 0 ] || die "nothing to run; put the command after --"
             BB_PHONE_WHY="$why" BB_PHONE_NODE="$node" BB_PHONE_AUTH="$auth" \
-            BB_PHONE_PROJECT="${BB_PROJECT:-$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")}" \
+            BB_PHONE_PROJECT="$(need_project --or-dir)" \
                 python3 "$BB_LIB/root-verbs.py" run "$@"
             ;;
         *) die "usage: aerie root [status|run --why \"...\" -- command...]" ;;
@@ -3342,7 +3318,7 @@ cmd_vm() {
     local auth
     auth="$(bb_auth_or_die)"
     BB_VM_AUTH="$auth" \
-    BB_VM_PROJECT="${BB_PROJECT:-$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")}" \
+    BB_VM_PROJECT="$(need_project --or-dir)" \
         exec python3 "$BB_LIB/vm-verbs.py" "$@"
 }
 
@@ -3382,7 +3358,7 @@ cmd_container() {
             [ -z "$envf" ] || [ -f "$envf" ] || die "no such file: $envf"
             BB_PHONE_WHY="$why" BB_PHONE_AUTH="$auth" BB_C_NAME="$name" BB_C_COMPOSE="$compose" \
             BB_C_ENV="$envf" BB_C_NODE="$node" BB_C_FOR="$forp" \
-            BB_PHONE_PROJECT="${BB_PROJECT:-$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")}" \
+            BB_PHONE_PROJECT="$(need_project --or-dir)" \
                 python3 "$BB_LIB/container-verbs.py" new
             ;;
         *) die "usage: aerie container [status|new --why \"...\" --name NAME --compose FILE [--env FILE] [--node NODE] [--for PROJECT]]" ;;
@@ -3395,7 +3371,7 @@ cmd_container() {
 cmd_sign() {
     local file="" route="" why="" key="" a
     local auth proj
-    proj="${BB_PROJECT:-$(project_here 2>/dev/null || true)}"
+    proj="$(need_project --soft 2>/dev/null)"
     case "${1:-}" in
         keys|key|map|rotate|status|release)
             local sub="$1"; shift
@@ -3470,11 +3446,7 @@ cmd_devapp() {
     export BB_DEV_INSTANCE="$inst" BB_DEV_CONTAINER="$ctr"
     local sub="${1:-status}" auth proj
     auth="$(bb_auth_or_die)"
-    proj="${BB_PROJECT:-}"
-    if [ -z "$proj" ]; then
-        proj="$(project_here)" \
-            || die "not inside a space under ${WORKSPACE}; cd into one first"
-    fi
+    proj="$(need_project)" || exit
     case "$sub" in
         status|state)
             BB_DEV_AUTH="$auth" BB_DEV_PROJECT="$proj" python3 "$BB_LIB/devapp-verbs.py" status
@@ -3619,11 +3591,7 @@ cmd_findings_history() {
     local py proj
     py="$BB_SCRIPTS/dashboard/findings.py"
     [ -f "$py" ] || die "findings.py is missing from this image"
-    proj="${BB_FINDINGS_PROJECT:-}"
-    if [ -z "$proj" ]; then
-        proj="$(project_here)" \
-            || die "not inside a space under ${WORKSPACE}; cd into one first"
-    fi
+    proj="$(need_project BB_FINDINGS_PROJECT)" || exit
     DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" python3 "$BB_LIB/findings-verbs.py" history "$py" "$proj" "$@"
 }
 
@@ -3889,11 +3857,63 @@ bb_project() {
     project_here
 }
 
+# The variables a verb's own override of its project rides in. A verb that
+# reads one ignores BB_PROJECT on purpose: a caller that is in no project
+# (bb-tty, the test suites) names the project for that verb alone. `aerie
+# -p NAME` sets every one beside BB_PROJECT, the logs' two among them
+# (B675: `aerie -p X tests log` and `aerie -p X ci-log` answered for the
+# session's own project), and bb_relay falls back on them. The controller's
+# side of the relay sets the same names (dashboard/bbrelay.py
+# PROJECT_VARS): a name added here is added there.
+BB_PROJECT_VARS=(BB_ROADMAP_PROJECT BB_BUG_PROJECT BB_VERSION_PROJECT
+                 BB_TESTS_PROJECT BB_CILOG_PROJECT BB_FINDINGS_PROJECT)
+
+# not_in_a_space [TAIL]: the sentence a verb dies with when it was handed no
+# project and is run outside every one, with what the verb adds to it.
+not_in_a_space() {
+    die "not inside a space under ${WORKSPACE}; cd into one first${1:-}"
+}
+
+# need_project [VAR|--here] [--soft|--or-dir]: the project a verb acts on,
+# printed. The value of VAR when it has one: BB_PROJECT, as bb_project
+# reads it, unless the verb names its own override (one of
+# BB_PROJECT_VARS), and no variable at all with --here. Else the project
+# the working directory is in (project_here, which takes a worktree for its
+# project). Outside every project it dies with the one sentence; called as
+# $(need_project) that ends its subshell, and the caller ends itself with
+# || exit.
+# --soft prints nothing there instead, for a verb that goes on without a
+# project or says a sentence of its own. --or-dir prints the name of the
+# tree's top directory, or of the directory itself, for a verb that also
+# runs in a checkout outside the workspace.
+need_project() {
+    local var=BB_PROJECT lack=die p=""
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --here) var="" ;;
+            --soft) lack=soft ;;
+            --or-dir) lack=dir ;;
+            *) var="$1" ;;
+        esac
+        shift
+    done
+    [ -z "$var" ] || p="${!var:-}"
+    if [ -z "$p" ]; then
+        case "$lack" in
+            die) p="$(project_here)" || not_in_a_space ;;
+            soft) p="$(project_here || true)" ;;
+            dir) p="$(project_here 2>/dev/null)" \
+                     || p="$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")" ;;
+        esac
+    fi
+    printf '%s' "$p"
+}
+
 bb_relay() {
-    local auth proj rc
+    local auth proj rc v
     auth="$(bb_auth_or_die)"
     proj="$(bb_project 2>/dev/null || true)"
-    [ -n "$proj" ] || proj="${BB_ROADMAP_PROJECT:-${BB_BUG_PROJECT:-${BB_VERSION_PROJECT:-}}}"
+    for v in "${BB_PROJECT_VARS[@]}"; do [ -n "$proj" ] || proj="${!v:-}"; done
     BB_RELAY_PROJECT="$proj" BB_AUTH_HEADER="$auth" python3 "$BB_LIB/relay.py" "" "$@"
     rc=$?
     return $rc
@@ -3958,7 +3978,7 @@ run_here() {
         # every APK by hand to get that name, and never used aerie build (R104).
         local pre="" proj ver
         if [ "$role" = build ]; then
-            proj="${BB_PROJECT:-$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")}"
+            proj="$(need_project --or-dir)"
             ver="$(BB_PROJECT="$proj" "$0" version --file 2>/dev/null | tail -1 | tr -cd 'A-Za-z0-9._+-')" || ver=""
             [ -z "$ver" ] || pre="${proj}-${ver}-"
         fi
@@ -4059,7 +4079,7 @@ cmd_settings() {
         # --json from a shell with no project still answers: the commit
         # identity in it is the account's, and bb-tty asks for a shell too.
         proj="$(project_here 2>/dev/null)" || {
-            [ "$json" = 1 ] || die "not inside a space under ${WORKSPACE}; cd into one first"
+            [ "$json" = 1 ] || not_in_a_space
             proj=""
         }
     fi
@@ -4068,14 +4088,14 @@ cmd_settings() {
         # scripted setup: an administrator's, as on the Settings page.
         [ -z "${BB_TOKEN:-}${BB_ACCOUNT_UID:-}" ] && ! on_node \
             || die "aerie settings node is run in a shell on the controller, not from a session: a space's node is its Settings page's"
-        [ -n "$proj" ] || die "not inside a space under ${WORKSPACE}; cd into one first, or aerie -p NAME settings node NODE"
+        [ -n "$proj" ] || not_in_a_space ", or aerie -p NAME settings node NODE"
         [ -n "${2:-}" ] || die "aerie settings node NODE: which node? aerie nodes lists them"
         BB_SET_VALUE="$2" DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" \
             python3 "$BB_LIB/settings-verbs.py" node "$BB_SCRIPTS/dashboard" "$proj"
         return
     fi
     if [ "${1:-}" = set ]; then
-        [ -n "$proj" ] || die "not inside a space under ${WORKSPACE}; cd into one first"
+        [ -n "$proj" ] || not_in_a_space
         local field="${2:-}"; shift 2 2>/dev/null || true
         case "$field" in build|test|outputs) ;; *) die "aerie settings set build|test|outputs VALUE" ;; esac
         [ $# -ge 1 ] || die "aerie settings set $field VALUE: the command to run, or for outputs the globs, comma-separated"
@@ -4108,7 +4128,7 @@ cmd_work() {
     local py proj
     py="$BB_SCRIPTS/dashboard/overlap.py"
     [ -f "$py" ] || die "overlap.py is missing from this image"
-    proj="${BB_PROJECT:-$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")}"
+    proj="$(need_project --or-dir)"
     python3 "$BB_LIB/work-verbs.py" "$py" "$proj" "${DASHBOARD_STATE:-/config}" "${WORKSPACE:-/workspace}"
 }
 
@@ -4255,7 +4275,7 @@ cmd_run() {
         esac
     done
     [ $# -gt 0 ] || die "aerie run needs a command after -- (aerie run -h)"
-    proj="${BB_PROJECT:-$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")}"
+    proj="$(need_project --or-dir)"
     # ON A NODE THE SESSION IS WHERE THE TOOLCHAIN IS (roadmap #24), so there
     # is nothing to snapshot and nowhere to send it: the command runs here,
     # in this tree, and what --out names is copied into dist/ the way a job's
@@ -4282,7 +4302,7 @@ cmd_run() {
 cmd_build_or_test() {
     local role="$1" proj
     shift
-    proj="${BB_PROJECT:-$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")}"
+    proj="$(need_project --or-dir)"
     # One value per line: the command first, then each output glob. Read as
     # lines rather than words, because a build command has spaces in it.
     local -a rec
@@ -6242,11 +6262,7 @@ PY
 # the edit asked of the controller over its API (lib/release-edit.py).
 cmd_version_edit() {
     local proj
-    proj="${BB_VERSION_PROJECT:-}"
-    if [ -z "$proj" ]; then
-        proj="$(project_here)" \
-            || die "not inside a space under ${WORKSPACE}; cd into one first"
-    fi
+    proj="$(need_project BB_VERSION_PROJECT)" || exit
     export BB_VERSION_AUTH; BB_VERSION_AUTH="$(bb_auth_or_die)"
     BB_WORKSPACE="$WORKSPACE" python3 "$BB_LIB/release-edit.py" "$proj" "$@"
 }
@@ -6255,8 +6271,7 @@ cmd_version_edit() {
 # which holds the token (lib/forge-verbs.py, dashboard/forgeaccess.py).
 cmd_forge() {
     local proj
-    proj="$(project_here)" \
-        || die "not inside a space under ${WORKSPACE}; cd into one first"
+    proj="$(need_project --here)" || exit
     export BB_FORGE_AUTH; BB_FORGE_AUTH="$(bb_auth_or_die)"
     python3 "$BB_LIB/forge-verbs.py" "$proj" "$@"
 }
@@ -6268,19 +6283,16 @@ cmd_version() {
     local py proj
     py="$BB_SCRIPTS/dashboard/version.py"
     [ -f "$py" ] || die "version.py is missing from this image"
-    proj="${BB_VERSION_PROJECT:-}"
+    proj="$(need_project BB_VERSION_PROJECT --soft)"
     if [ -z "$proj" ]; then
-        proj="$(project_here)" || {
-            # A checkout that is not under the workspace (a CI runner's, for a
-            # rehearsal's file names) still has a version to read: its own,
-            # from where it stands. Reading only; anything that moves a
-            # version is a space's.
-            local out; out="$(git rev-parse --show-toplevel 2>/dev/null || true)"
-            case "${1:-}" in ""|--file|--semver|--code|--json) ;; *) out="" ;; esac
-            [ -n "$out" ] && [ -f "$out/VERSION" ] \
-                || die "not inside a space under ${WORKSPACE}; cd into one first"
-            WORKSPACE="$(dirname "$out")"; proj="$(basename "$out")"
-        }
+        # A checkout that is not under the workspace (a CI runner's, for a
+        # rehearsal's file names) still has a version to read: its own,
+        # from where it stands. Reading only; anything that moves a
+        # version is a space's.
+        local out; out="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+        case "${1:-}" in ""|--file|--semver|--code|--json) ;; *) out="" ;; esac
+        [ -n "$out" ] && [ -f "$out/VERSION" ] || not_in_a_space
+        WORKSPACE="$(dirname "$out")"; proj="$(basename "$out")"
     fi
     # Asked from one of the project's worktrees, the answer is that tree's:
     # its HEAD, its VERSION file, its ordinal (version.py root()). The relay
@@ -6308,11 +6320,7 @@ cmd_changelog() {
     local py proj
     py="$BB_SCRIPTS/dashboard/version.py"
     [ -f "$py" ] || die "version.py is missing from this image"
-    proj="${BB_VERSION_PROJECT:-}"
-    if [ -z "$proj" ]; then
-        proj="$(project_here)" \
-            || die "not inside a space under ${WORKSPACE}; cd into one first"
-    fi
+    proj="$(need_project BB_VERSION_PROJECT)" || exit
     # Asked from one of the project's worktrees, the answer is that tree's:
     # its HEAD, its VERSION file, its ordinal (version.py root()). The relay
     # runs this in the caller's cwd, so a node's session gets the same.
@@ -6353,10 +6361,10 @@ if [ "${1:-}" = -p ] || [ "${1:-}" = --project ]; then
         p_res="$(BB_PROJECT="$p_dir" "$0" settings 2>/dev/null | sed -n '1s/:$//p')" || p_res=""
         [ -n "$p_res" ] && [ -d "$WORKSPACE/$p_res" ] && p_dir="$p_res"
     fi
-    export BB_PROJECT="$p_dir" BB_ROADMAP_PROJECT="$p_dir" BB_BUG_PROJECT="$p_dir" BB_VERSION_PROJECT="$p_dir"
-    # ...and the verbs that read logs (B675): `aerie -p X tests log` and
-    # `aerie -p X ci-log` answered for this session's own project.
-    export BB_TESTS_PROJECT="$p_dir" BB_CILOG_PROJECT="$p_dir"
+    export BB_PROJECT="$p_dir"
+    # ...and each verb's own override (BB_PROJECT_VARS), so none answers for
+    # this session's own project.
+    for p_var in "${BB_PROJECT_VARS[@]}"; do export "$p_var=$p_dir"; done
     export BB_TREE="$WORKSPACE/$p_dir"
     shift 2
     # Said rather than answered for this project or for nothing
@@ -6467,7 +6475,7 @@ fi
 case "${1:-help}" in
     status)   cmd_status ;;
     settings) shift; cmd_settings "$@" ;;
-    router-key) shift; BB_RK_AUTH="$(bb_auth_or_die)" BB_RK_PROJECT="${BB_PROJECT:-$(project_here 2>/dev/null || true)}" python3 "$BB_LIB/router-key.py" "$@" ;;
+    router-key) shift; BB_RK_AUTH="$(bb_auth_or_die)" BB_RK_PROJECT="$(need_project --soft 2>/dev/null)" python3 "$BB_LIB/router-key.py" "$@" ;;
     version)  shift; cmd_version "$@" ;;
     forge)    shift; cmd_forge "$@" ;;
     changelog) shift; cmd_changelog "$@" ;;
