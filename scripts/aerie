@@ -3229,7 +3229,10 @@ cmd_phone() {
             # is a minefield and this shipped broken once, with a SyntaxError
             # where the phone's model should have been. What the program needs
             # arrives by environment, never by pipe.
-            api_py --auth "$auth" phone-verbs.py status
+            # Told which space this is, so it can say whether the phone is
+            # lent to it: it never was, and those lines never printed.
+            BB_PHONE_PROJECT="$(need_project --soft 2>/dev/null)" \
+                api_py --auth "$auth" phone-verbs.py status
             ;;
         run)
             # `--why` is required, not polite. The operator is being asked
