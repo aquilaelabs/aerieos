@@ -1,9 +1,13 @@
 """The node's stores: where data, cache, artifacts and the toolchains live, the rules for a store's path, and node.json."""
 import contextlib
+import fcntl
 import json
 import os
 import re
 import subprocess
+import tempfile
+import threading
+import time
 from . import names
 from .base import NODE_JSON, STORE_DENY_EXACT, STORE_DENY_UNDER, _run, log
 
@@ -451,10 +455,39 @@ def console_said():
     return {k: cur[k] for k in CONSOLE_KEYS if isinstance(cur, dict) and k in cur}
 
 
+# One save at a time (B982): node.json is saved by the agent's loop, its job
+# threads and the configuration plane (a new token at every hello among
+# them), and by the console's own commands in another process. Two saves
+# through one fixed .tmp could interleave into a file that is not JSON,
+# after which no start reads it and the node has to be enrolled again at its
+# console. The thread lock orders this process's saves; the file lock, on a
+# file beside node.json, orders them against the console's.
+_save_lock = threading.Lock()
+
+
+def _dumps(state):
+    """The state as JSON, taken while other threads may be changing it: a
+    walk that meets a change is taken again."""
+    for _ in range(20):
+        try:
+            return json.dumps(state, indent=2)
+        except RuntimeError:          # changed size during the walk
+            time.sleep(0.01)
+    return json.dumps(state, indent=2)
+
+
 def save_state(state, console=False):
     """node.json written whole. `console` is a person at the machine saying
     what it trusts (enroll, release-key, unsigned): only then are the
     console's keys taken from `state`; otherwise the file's own are kept."""
+    d = os.path.dirname(NODE_JSON)
+    os.makedirs(d, mode=0o700, exist_ok=True)
+    with _save_lock, open(os.path.join(d, ".node.json.lock"), "a") as held:
+        fcntl.flock(held.fileno(), fcntl.LOCK_EX)
+        _save(state, console, d)
+
+
+def _save(state, console, d):
     if not console:
         try:
             with open(NODE_JSON) as f:
@@ -467,21 +500,25 @@ def save_state(state, console=False):
                     state[k] = cur[k]
                 else:
                     state.pop(k, None)
-    d = os.path.dirname(NODE_JSON)
-    os.makedirs(d, mode=0o700, exist_ok=True)
-    tmp = NODE_JSON + ".tmp"
-    with open(tmp, "w") as f:
-        os.fchmod(f.fileno(), 0o600)
-        json.dump(state, f, indent=2)
-        # On the disk before its name points at it: a power cut after a new
-        # token was used could bring back the one before, which the
-        # controller had retired and reads as a stolen copy.
-        try:
-            f.flush()
-            os.fsync(f.fileno())
-        except OSError:
-            pass
-    os.replace(tmp, NODE_JSON)
+    text = _dumps(state)
+    fd, tmp = tempfile.mkstemp(prefix=".node.json.", dir=d)
+    try:
+        with os.fdopen(fd, "w") as f:
+            os.fchmod(f.fileno(), 0o600)
+            f.write(text)
+            # On the disk before its name points at it: a power cut after a
+            # new token was used could bring back the one before, which the
+            # controller had retired and reads as a stolen copy.
+            try:
+                f.flush()
+                os.fsync(f.fileno())
+            except OSError:
+                pass
+        os.replace(tmp, NODE_JSON)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp)
+        raise
     try:
         fd = os.open(d, os.O_RDONLY)
         try:
