@@ -16,6 +16,7 @@
 - A space's notebook lists its containers on every node they are on, where its Docker view showed its own node's alone, and its Docker and VMs views narrow to one node with a band of chips when they are on more than one (c56e7a8)
 - The page asks far less, and never twice for one press: Rebuild, Up, Down, Stop and an image update on a container just run, and when a rebuild's compose file reaches past its own folder or runs something new beside the app, both are listed in one question. Saving or applying a node's storage, installing a toolchain with its driver, and uploading over existing files each ask once. On a phone a question is a short sheet at the bottom of the screen, where it filled the screen (0dd3c86)
 - nginx and the Scanners are services in the Library, as the model router is: Install on their cards under Services, and a row under Services on the Installed page, where Open leads to each one's page and Remove takes it off the node. Their pages moved from the Containers group to Machines (#/machines/nginx, #/machines/scanners); the old addresses still open them (4a1d05c, 2fc5855)
+- Restart, End, Reboot, Shut down, a job's Cancel, Sign out and Disconnect are amber buttons; red is kept for what deletes or cannot be undone (7f00b50)
 
 ### Fixed
 
@@ -43,6 +44,8 @@
 - A Claude session whose guards cannot be run refuses every tool and says to start it again, and a session that works a turn with nothing heard from its hooks is a row on the bell for its account and for administrators, where such a session ran on unguarded and nothing said so (2b8534a, 07fe564)
 - Restart on a session waits for its node to end it, saying so with the seconds so far, and then starts it again by itself, where it gave up after half a minute and said to press Restart again (31f6b8b)
 - The page no longer shows bare for a moment while its stylesheets load, its mark across the whole screen, in a browser that paints before they arrive (5c47982)
+- A restarted session shows on its space's card at once, where the card said Start agent for a minute with the session running; and every repository of a space shows the space's session in its header (7f00b50)
+- The node's name in a group header shows whole on a phone in Firefox and Safari, where it was cut short with room beside it (7f00b50)
 
 ## 0.9.0-dev.5641: 2026-11-18
 
