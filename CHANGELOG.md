@@ -6,6 +6,7 @@
 
 - What pops up over the page stands out from it in every theme: a tour's card, the bell, the doctor and the gear menu, a row's menu, a help note, the phone's More sheet and a toast are a step brighter than the page, white in a light theme, with a firmer edge (c17c3ae)
 - On a phone a toast shows just above an open dialog's buttons, where it floated over the dialog's words (1ee6913)
+- The Library stays easy to get around however big the catalog grows: it opens on shelves (what is on this node, then up to eight of each kind with All N to see the rest), and a kind, a topic or a search is one sorted list that loads more as you scroll, kept in the page's address so Back and a shared link land on it. A Topic pulldown, Recently added and a Rows view are new beside the search, and what runs only on other systems is counted and shown on a press (fcf70a4, 208b302)
 
 ### Fixed
 
@@ -22,6 +23,7 @@
 - `aerie bug add --from FILE`, `aerie roadmap add --from FILE` and `aerie design edit` work in a session on a node (4eae63f, 460ba1c)
 - A node whose report has one field in a shape the controller cannot read still checks in, that field left out, where its whole check-in was refused (93de515)
 - Cutting a release keeps the commit each changelog line names, where it could rename a line to the change committed after it (c41fc43)
+- The vetted catalog is read up to 20,000 entries and says when it lists more, where entries past 2,000 were dropped without a word (fcf70a4)
 
 ## 0.9.0-dev.5641: 2026-11-18
 
