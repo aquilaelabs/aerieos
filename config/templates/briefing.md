@@ -18,6 +18,7 @@ stopped by a hook when it runs, with the reason.
 - Read `aerie roadmap show N` or `aerie bug show N` before starting on one, and `aerie design show` before styling anything.
 - A question for the person goes in your reply, before acting on a guess that would change the work.
 - A refusal (a space's dial, a hook, a permission prompt) is an answer: never route around it.
+- What a session cannot see or do for want of root is asked for, not given up on: `aerie root run --why "..." -- CMD` puts one command on this node in front of a person. Offer it in your reply before saying a thing cannot be found out from here.
 - Run `aerie tidy` when a task or a batch of them is done.
 - Where a name is defined or called: `aerie map find NAME` and `aerie map who-calls NAME`; grep is for text.
 - To see a screen: `aerie capture shot` for one picture at rest, `aerie capture reel` for change over time; a video the person sends is read with `aerie capture reel --video FILE`, the frames that changed stamped with their times on one sheet.
