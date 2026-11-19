@@ -122,8 +122,7 @@ function rnDialChoices(p, f, modes, dflt){
 // A project's settings as the form holds them, from its row: what the form
 // opens on, and what a section's Save compares with what is saved now.
 function rnPrefsOf(p){
-  return {git_name: p?.yours?.git_name || "", git_email: p?.yours?.git_email || "",
-               node: p?.prefs?.node || "",
+  return {node: p?.prefs?.node || "",
                nodes: (p?.prefs?.nodes || []).join(","),
                hosts: (p?.prefs?.hosts || []).join(","),
                hosts_off: (p?.prefs?.hosts_off || []).join(","),
@@ -131,31 +130,15 @@ function rnPrefsOf(p){
                tc_off: (p?.prefs?.tc_off || []).join(","), packs_on: (p?.prefs?.packs_on || []).join(","),
                agents_off: (p?.prefs?.agents_off || []).join(","),
                agent_default: p?.prefs?.agent_default || "claude",
-               agent_slots: String(p?.prefs?.agent_slots ?? 3),
                sees: (p?.prefs?.sees || []).join(", "),
                reaches: JSON.stringify(p?.prefs?.reaches || []),
-               build: p?.prefs?.build || "", test: p?.prefs?.test || "",
-               outputs: (p?.prefs?.outputs || []).join(", "),
-               capture_days: String(p?.prefs?.capture_days ?? 7),
-               snapshot_days: String(p?.prefs?.snapshot_days ?? 14),
-               dev_keep: String(p?.prefs?.dev_keep ?? 3),
-               release_gate: p?.prefs?.release_gate === "warn" ? "warn" : "refuse",
-               files_table: p?.prefs?.files_table === false ? "off" : "on",
                gate: Object.keys(GATE_IDS).map(k => rnDialVal(p, "gate." + k, "auto")).join(","),
                tests_in: p?.prefs?.tests_in || "node", test_node: rnDialVal(p, "test_node", ""),
                test_change: rnDialVal(p, "test_change", "wait"),
-               gpu: p?.prefs?.gpu || "on",
-               reply: p?.yours?.reply || "", asks: p?.yours?.asks || "",
-               devbuild: rnDialVal(p, "devbuild", "deny"),
-               makevms: rnDialVal(p, "makevms", "deny"),
-               installpacks: rnDialVal(p, "installpacks", "ask"),
                vm_caps: rnVmCapsOf(p),
-               report: rnDialVal(p, "report", "auto"),
-               sign: rnDialVal(p, "sign", "ask"),
-               release: rnDialVal(p, "release", "ask"),
-               keys: rnDialVal(p, "keys", "ask"),
-               pc: rnDialVal(p, "pc", "deny"),
-               version: p?.version_policy || "locked"};
+               version: p?.version_policy || "locked",
+               // The simple fields, each by its row of RN_FIELDS.
+               ...Object.fromEntries(RN_SIMPLE.map(f => [f.k, rnFieldOf(f, p)]))};
 }
 
 function rnFillPrefs(p){
@@ -165,13 +148,12 @@ function rnFillPrefs(p){
   if (nm) delete nm.dataset.drawn;
   rnMore = null;
   rnPrefWas = rnPrefsOf(p);
-  // A select with no value of its own reads as its first option, and the
-  // form collects every field whichever section is saved: set here, with the
-  // rest that are always on the form, so saving another section never takes
-  // the cap down to 1 (R143).
-  $("rnAgentSlots").value = rnPrefWas.agent_slots;
-  $("rnGitName").value = rnPrefWas.git_name;
-  $("rnGitEmail").value = rnPrefWas.git_email;
+  // The simple fields (RN_FIELDS), each element set to its value; a dial is
+  // drawn with its choices in rnFillPrefsRest. A select with no value of
+  // its own reads as its first option, and the form collects every field
+  // whichever section is saved: set on every open, so saving another
+  // section never takes the sessions cap down to 1 (R143).
+  for (const f of RN_SIMPLE) if (!f.dial) $(f.id).value = rnPrefWas[f.k];
   // Said where it is typed: the Profile is the default, this is the exception,
   // and a commit needs both halves from somewhere.
   $("rnGitHint").textContent = rnPrefWas.git_name || rnPrefWas.git_email
@@ -671,8 +653,6 @@ function rnFillTests(canDev){
   };
 }
 function rnFillPrefsRest(p){
-  $("rnBuildCmd").value = p?.prefs?.build || "";
-  $("rnTestCmd").value = p?.prefs?.test || "";
   // Offered only where there is a container to run in: the Docker tab knows
   // which projects have one, and `has_compose` on the project row is the
   // same answer without asking it.
@@ -692,18 +672,9 @@ function rnFillPrefsRest(p){
     el.dataset.inherit = inh ? pv : "";
     el.value = rnDialVal(p, "test_change", "wait");
   }
-  $("rnGpu").value = p?.prefs?.gpu || "on";
-  $("rnReply").value = p?.yours?.reply || "";
-  $("rnAsks").value = p?.yours?.asks || "";
-  $("rnOutputs").value = (p?.prefs?.outputs || []).join(", ");
-  $("rnCaptureDays").value = String(p?.prefs?.capture_days ?? 7);
-  $("rnSnapDays").value = String(p?.prefs?.snapshot_days ?? 14);
-  $("rnRelGate").value = p?.prefs?.release_gate === "warn" ? "warn" : "refuse";
-  $("rnRelTable").value = p?.prefs?.files_table === false ? "off" : "on";
   rnRelFiles = (p?.prefs?.files || []).map(r => ({name: r.name, what: r.what}));
   rnRelEdit = null;
   rnDrawRelFiles();
-  $("rnDevKeep").value = String(p?.prefs?.dev_keep ?? 3);
   // Every dial here is a select filled once with its words and set to the
   // project's value: one helper for all of them (consistency pass), where
   // each was a copy of the same eight lines.
@@ -727,20 +698,26 @@ function rnFillPrefsRest(p){
     rnDialApart(el, p, f, modes);
     return el;
   };
+  // ...and a dial that is a row of RN_FIELDS, by its field: the row names
+  // its element and its default.
+  const fieldDial = (k, modes) => {
+    const f = RN_SIMPLE.find(x => x.k === k);
+    return dial(f.id, k, modes, f.dial);
+  };
   for (const [k, id] of Object.entries(GATE_IDS)) dial(id, "gate." + k, gateChoices(k), "auto");
   // Auto and deny only: a report has nothing to hold for approval.
-  dial("rnGateReport", "report", GATE_MODES.filter(([v]) => v !== "ask"), "auto");
-  dial("rnGateSign", "sign", GATE_MODES, "ask");
-  dial("rnGateRelease", "release", GATE_MODES, "ask");
-  dial("rnGateKeys", "keys", GATE_MODES, "ask");
+  fieldDial("report", GATE_MODES.filter(([v]) => v !== "ask"));
+  fieldDial("sign", GATE_MODES);
+  fieldDial("release", GATE_MODES);
+  fieldDial("keys", GATE_MODES);
   // A lent PC (R270 step 6): deny by default, it is somebody's own machine.
-  dial("rnGatePc", "pc", GATE_MODES, "deny");
+  fieldDial("pc", GATE_MODES);
   pick("rnGateVersion", Object.entries(POLICY_LABEL), p?.version_policy || "locked");
   // docker-write's to change (the grant, R137 step 4), so not offered otherwise.
-  dial("rnGateDocker", "devbuild", GATE_MODES, "deny").closest("label").hidden = state?.can?.["docker-write"] === false;
+  fieldDial("devbuild", GATE_MODES).closest("label").hidden = state?.can?.["docker-write"] === false;
   // ...and its VMs' (R91), the VMs area's to change, deny unless set.
-  dial("rnGateVms", "makevms", GATE_MODES, "deny").closest("label").hidden = state?.can?.["vms-write"] === false;
-  dial("rnGatePacks", "installpacks", GATE_MODES, "ask").closest("label").hidden = state?.can?.curate === false;
+  fieldDial("makevms", GATE_MODES).closest("label").hidden = state?.can?.["vms-write"] === false;
+  fieldDial("installpacks", GATE_MODES).closest("label").hidden = state?.can?.curate === false;
   rnVmCapsSet(rnVmCapsOf(p));
   // What its VMs may hold, only where it may make VMs at all (R223).
   const vmsCaps = () => {
@@ -1700,25 +1677,93 @@ function closeRename(){
 // section holds something a running session takes only when it starts, its
 // bar offers both answers at once: Save, keep it running and Save and end it.
 const RN_SECTS = ["project", "people", "repo", "runs", "files", "sees", "tools", "build", "releases", "claude", "yours"];
+// The settings' fields, a row each: `k` its name in rnPrefWas and in what
+// /api/prefs takes, `sect` the section whose Save writes it, `label` what a
+// change to it is called, `atStart` on one a running session takes only when
+// it starts. A section's bar names its changes in the rows' order.
+//
+// A row with an `id` is a simple field, one element holding one plain
+// value: `of` its value from a project's row, `read` its value off its
+// element (as it stands where the row has none), `out` the value /api/prefs
+// is sent where that is not the form's own, with undefined for one not sent
+// at all. A `dial` is one of the Agents may dials, by its default: it reads
+// through rnDialVal, and rnFillPrefsRest draws its choices. Opening the
+// form, comparing it, putting a section back and saving one each take every
+// simple field from here, so a new one is a row, and for a dial its line in
+// rnFillPrefsRest.
+//
+// A row with no `id` is a field with code of its own in each of those
+// places (rnPrefsOf, the fills, rnEnc, rnRevertSect, rnDec, rnSubmit): a
+// list, a set of ticks, several dials in one string.
+const RN_FIELDS = [
+  {k: "node", sect: "runs", label: "Node", atStart: true},
+  {k: "nodes", sect: "runs", label: "Node", atStart: true},
+  {k: "hosts", sect: "runs", label: "Hosts its containers on"},
+  {k: "hosts_off", sect: "runs", label: "Its containers may go to"},
+  {k: "gpu", id: "rnGpu", sect: "runs", label: "The node's GPU", atStart: true,
+   of: p => p?.prefs?.gpu || "on", read: el => el.value || "on"},
+  {k: "tests_in", sect: "build", label: "Tests run"},
+  {k: "test_node", sect: "build", label: "Tests run"},
+  {k: "reads", sect: "sees", label: "Reads", atStart: true},
+  {k: "sees", sect: "sees", label: "Also sees", atStart: true},
+  {k: "reaches", sect: "sees", label: "Also reaches"},
+  {k: "tc_off", sect: "tools", label: "Toolchains", atStart: true},
+  {k: "packs_on", sect: "tools", label: "Tool packs", atStart: true},
+  {k: "build", id: "rnBuildCmd", sect: "build", label: "Build",
+   of: p => p?.prefs?.build || "", read: el => el.value.trim()},
+  {k: "test", id: "rnTestCmd", sect: "build", label: "Test",
+   of: p => p?.prefs?.test || "", read: el => el.value.trim()},
+  // Typed as one line, stored as a list.
+  {k: "outputs", id: "rnOutputs", sect: "build", label: "Outputs",
+   of: p => (p?.prefs?.outputs || []).join(", "), read: el => el.value.trim(),
+   out: v => v.split(",").map(x => x.trim()).filter(Boolean)},
+  // A count left blank is not sent, and the server keeps the one it has.
+  {k: "capture_days", id: "rnCaptureDays", sect: "build", label: "Captures kept", atStart: true,
+   of: p => String(p?.prefs?.capture_days ?? 7), read: el => el.value.trim(), out: v => v !== "" ? +v : undefined},
+  {k: "snapshot_days", id: "rnSnapDays", sect: "build", label: "Snapshots kept", atStart: true,
+   of: p => String(p?.prefs?.snapshot_days ?? 14), read: el => el.value.trim(), out: v => v !== "" ? +v : undefined},
+  {k: "dev_keep", id: "rnDevKeep", sect: "build", label: "Dev builds kept", atStart: true,
+   of: p => String(p?.prefs?.dev_keep ?? 3), read: el => el.value.trim(), out: v => v !== "" ? +v : undefined},
+  {k: "release_gate", id: "rnRelGate", sect: "releases", label: "A fixed bug with no changelog line",
+   of: p => p?.prefs?.release_gate === "warn" ? "warn" : "refuse", read: el => el.value || "refuse"},
+  // Stored as a yes or no, picked as "on" or "off".
+  {k: "files_table", id: "rnRelTable", sect: "releases", label: "What each file is for",
+   of: p => p?.prefs?.files_table === false ? "off" : "on", read: el => el.value || "on", out: v => v !== "off"},
+  {k: "gate", sect: "claude", label: "Agents may"},
+  {k: "test_change", sect: "claude", label: "During a test run, a change asked for", atStart: true},
+  {k: "agents_off", sect: "claude", label: "Coding agents"},
+  {k: "agent_default", sect: "claude", label: "Start opens"},
+  {k: "agent_slots", id: "rnAgentSlots", sect: "claude", label: "Sessions of one agent",
+   of: p => String(p?.prefs?.agent_slots ?? 3), read: el => el?.value || "3"},
+  {k: "devbuild", id: "rnGateDocker", sect: "claude", label: "Agents may", dial: "deny"},
+  {k: "makevms", id: "rnGateVms", sect: "claude", label: "Agents may", dial: "deny"},
+  {k: "vm_caps", sect: "claude", label: "Its VMs may hold"},
+  {k: "installpacks", id: "rnGatePacks", sect: "claude", label: "Agents may", dial: "ask"},
+  {k: "report", id: "rnGateReport", sect: "claude", label: "Agents may", dial: "auto"},
+  {k: "sign", id: "rnGateSign", sect: "claude", label: "Agents may", dial: "ask"},
+  {k: "keys", id: "rnGateKeys", sect: "claude", label: "Agents may", dial: "ask"},
+  {k: "release", id: "rnGateRelease", sect: "claude", label: "Agents may", dial: "ask"},
+  {k: "pc", id: "rnGatePc", sect: "claude", label: "Agents may", dial: "deny"},
+  {k: "version", sect: "claude", label: "Move the version"},
+  {k: "reply", id: "rnReply", sect: "yours", label: "Replies", atStart: true, of: p => p?.yours?.reply || ""},
+  {k: "asks", id: "rnAsks", sect: "yours", label: "Questions", atStart: true, of: p => p?.yours?.asks || ""},
+  {k: "git_name", id: "rnGitName", sect: "yours", label: "Commit name and email", atStart: true,
+   of: p => p?.yours?.git_name || "", read: el => el.value.trim()},
+  {k: "git_email", id: "rnGitEmail", sect: "yours", label: "Commit name and email", atStart: true,
+   of: p => p?.yours?.git_email || "", read: el => el.value.trim()},
+];
+const RN_SIMPLE = RN_FIELDS.filter(f => f.id);
+// A simple field's value from a project's row; its value on the form now;
+// and every simple field as /api/prefs takes it, from what rnDec answers.
+const rnFieldOf = (f, p) => f.dial ? rnDialVal(p, f.k, f.dial) : f.of(p);
+const rnFieldNow = f => f.read ? f.read($(f.id)) : $(f.id).value || f.dial || "";
+const rnFieldsOut = v => Object.fromEntries(
+  RN_SIMPLE.map(f => [f.k, f.out ? f.out(v[f.k]) : v[f.k]]).filter(([, x]) => x !== undefined));
 // Which section each of rnPrefWas's fields is in, and what it is called.
-const RN_WAS = {
-  node: ["runs", "Node"], nodes: ["runs", "Node"], hosts: ["runs", "Hosts its containers on"], hosts_off: ["runs", "Its containers may go to"], gpu: ["runs", "The node's GPU"], tests_in: ["build", "Tests run"], test_node: ["build", "Tests run"],
-  reads: ["sees", "Reads"], sees: ["sees", "Also sees"], reaches: ["sees", "Also reaches"],
-  tc_off: ["tools", "Toolchains"], packs_on: ["tools", "Tool packs"],
-  build: ["build", "Build"], test: ["build", "Test"], outputs: ["build", "Outputs"],
-  capture_days: ["build", "Captures kept"], snapshot_days: ["build", "Snapshots kept"], dev_keep: ["build", "Dev builds kept"],
-  release_gate: ["releases", "A fixed bug with no changelog line"], files_table: ["releases", "What each file is for"],
-  gate: ["claude", "Agents may"], test_change: ["claude", "During a test run, a change asked for"], agents_off: ["claude", "Coding agents"], agent_default: ["claude", "Start opens"], agent_slots: ["claude", "Sessions of one agent"],
-  devbuild: ["claude", "Agents may"], makevms: ["claude", "Agents may"], vm_caps: ["claude", "Its VMs may hold"], installpacks: ["claude", "Agents may"], report: ["claude", "Agents may"], sign: ["claude", "Agents may"],
-  keys: ["claude", "Agents may"], release: ["claude", "Agents may"], pc: ["claude", "Agents may"], version: ["claude", "Move the version"],
-  reply: ["yours", "Replies"], asks: ["yours", "Questions"],
-  git_name: ["yours", "Commit name and email"], git_email: ["yours", "Commit name and email"],
-};
+const RN_WAS = Object.fromEntries(RN_FIELDS.map(f => [f.k, [f.sect, f.label]]));
 // What a running session takes only when it starts (the briefing, the launch
 // flags, the view it runs in); everything else is read when it is used.
-const RN_AT_START = new Set(["reply", "asks", "git_name", "git_email", "node", "nodes",
-                             "reads", "sees", "test_change", "gpu", "capture_days", "snapshot_days", "dev_keep",
-                             "tc_off", "packs_on"]);
+const RN_AT_START = new Set(RN_FIELDS.filter(f => f.atStart).map(f => f.k));
 
 // The fields as they stand, in rnPrefWas's own shape, so each compares with
 // its saved value directly.
@@ -1728,8 +1773,7 @@ function rnEnc(){
   // bar on every open under load (the gate, 10 Oct).
   const drawn = nodesList !== null;
   const node = drawn ? $("rnNode").value : rnPrefWas.node;
-  return {git_name: $("rnGitName").value.trim(), git_email: $("rnGitEmail").value.trim(),
-          node, nodes: !drawn ? rnPrefWas.nodes
+  return {node, nodes: !drawn ? rnPrefWas.nodes
             : (node ? [node, ...rnMoreIds().filter(id => !rnHostIds().has(id))] : []).join(","),
           // The ticked rows marked Hosting only are prefs.hosts, the rest
           // prefs.nodes: one list on screen, two settings underneath.
@@ -1747,20 +1791,13 @@ function rnEnc(){
             : rnRowsList(rnPrefWas.packs_on, $("rnTools").querySelectorAll("input[data-pack]"), i => i.checked),
           agents_off: [...$("rnAgents").querySelectorAll("input:not(:checked)")].map(i => i.value).join(","),
           agent_default: $("rnAgentDefault")?.value || "claude",
-          agent_slots: $("rnAgentSlots")?.value || "3",
           sees: $("rnSees").value.split(",").map(x => x.trim()).filter(Boolean).join(", "),
           reaches: JSON.stringify(rnReachNow()),
-          build: $("rnBuildCmd").value.trim(), test: $("rnTestCmd").value.trim(),
-          outputs: $("rnOutputs").value.trim(),
-          capture_days: $("rnCaptureDays").value.trim(), snapshot_days: $("rnSnapDays").value.trim(),
-          dev_keep: $("rnDevKeep").value.trim(), gate: gateKey(rnGateNow()),
-          release_gate: $("rnRelGate").value || "refuse", files_table: $("rnRelTable").value || "on",
+          gate: gateKey(rnGateNow()),
           tests_in: $("rnDevTest").value || "node", test_node: $("rnTestNode")?.value || "", test_change: $("rnTestChange").value || "wait",
-          gpu: $("rnGpu").value || "on", reply: $("rnReply").value || "", asks: $("rnAsks").value || "",
-          devbuild: $("rnGateDocker").value || "deny", makevms: $("rnGateVms").value || "deny", vm_caps: rnVmCapsNow(),
-          installpacks: $("rnGatePacks").value || "ask", report: $("rnGateReport").value || "auto",
-          sign: $("rnGateSign").value || "ask", release: $("rnGateRelease").value || "ask",
-          keys: $("rnGateKeys").value || "ask", pc: $("rnGatePc").value || "deny", version: $("rnGateVersion").value || "locked"};
+          vm_caps: rnVmCapsNow(), version: $("rnGateVersion").value || "locked",
+          // The simple fields, each read as its row of RN_FIELDS says.
+          ...Object.fromEntries(RN_SIMPLE.map(f => [f.k, rnFieldNow(f)]))};
 }
 
 // What one section holds unsaved, as the names its fields go by, and which
@@ -1842,6 +1879,8 @@ function rnBars(){
 // saved; the other sections keep what is typed in them.
 function rnRevertSect(sect){
   const w = rnPrefWas;
+  // The section's simple fields (RN_FIELDS), then what has code of its own.
+  for (const f of RN_SIMPLE) if (f.sect === sect) $(f.id).value = w[f.k];
   if (sect === "project"){
     $("rnName").value = projLabel(rnFor); rnShow();
     $("rnPreview").hidden = true; $("rnName").classList.remove("bad");
@@ -1854,7 +1893,7 @@ function rnRevertSect(sect){
   } else if (sect === "runs"){
     delete $("rnNodesMore").dataset.drawn;
     rnFillNode();
-    $("rnGpu").value = w.gpu; $("rnDevTest").value = w.tests_in; if ($("rnTestNode")) $("rnTestNode").value = w.test_node || "";
+    $("rnDevTest").value = w.tests_in; if ($("rnTestNode")) $("rnTestNode").value = w.test_node || "";
   if ($("rnTests")) $("rnTests").value = `${w.tests_in || "node"}|${w.tests_in === "only" ? "" : (w.test_node || "")}`;
   } else if (sect === "files"){
     rnFtpDraft = {}; rnDrawFtp();
@@ -1867,25 +1906,13 @@ function rnRevertSect(sect){
     rnReachDraft = JSON.parse(w.reaches || "[]");
     rnReachEdit = null;
     rnDrawReach();
-  } else if (sect === "build"){
-    $("rnBuildCmd").value = w.build; $("rnTestCmd").value = w.test; $("rnOutputs").value = w.outputs;
-    $("rnCaptureDays").value = w.capture_days; $("rnSnapDays").value = w.snapshot_days;
-    $("rnDevKeep").value = w.dev_keep;
-  } else if (sect === "releases"){
-    $("rnRelGate").value = w.release_gate; $("rnRelTable").value = w.files_table;
   } else if (sect === "claude"){
     const g = String(w.gate).split(",");
     Object.values(GATE_IDS).forEach((id, i) => { $(id).value = g[i] || "auto"; });
-    $("rnTestChange").value = w.test_change; $("rnGateDocker").value = w.devbuild; $("rnGateVms").value = w.makevms; rnVmCapsSet(w.vm_caps);
-    $("rnGatePacks").value = w.installpacks;
+    $("rnTestChange").value = w.test_change; rnVmCapsSet(w.vm_caps);
     rnFillAgents(w.agents_off, w.agent_default);
-    $("rnAgentSlots").value = w.agent_slots;
-    $("rnGateReport").value = w.report; $("rnGateSign").value = w.sign;
-    $("rnGateRelease").value = w.release; $("rnGateKeys").value = w.keys;
-    $("rnGatePc").value = w.pc; $("rnGateVersion").value = w.version;
+    $("rnGateVersion").value = w.version;
   } else if (sect === "yours"){
-    $("rnReply").value = w.reply; $("rnAsks").value = w.asks;
-    $("rnGitName").value = w.git_name; $("rnGitEmail").value = w.git_email;
     rnDrawPrefs();
   }
   rnBarSay(sect, "");
@@ -1986,17 +2013,11 @@ async function rnSubmit(sect, end = false){
                               // The project's own door writes the project's defaults (R208 step 6);
                               // a notebook writes this repository's overrides.
                               scope: rnMode === "project" ? "project" : "repository",
-                              ...pick({git_name: v.git_name, git_email: v.git_email,
-                              node: v.node, nodes: v.nodes, hosts: v.hosts, hosts_off: v.hosts_off, reads: v.reads, sees: v.sees, reaches: v.reaches,
-                              tc_off: v.tc_off, packs_on: v.packs_on, agents_off: v.agents_off, agent_default: v.agent_default, agent_slots: v.agent_slots,
-                              build: v.build, test: v.test, gate: v.gate,
-                              tests_in: v.tests_in, test_node: v.test_node, test_change: v.test_change, gpu: v.gpu, reply: v.reply, asks: v.asks,
-                              devbuild: v.devbuild, makevms: v.makevms, vm_caps: JSON.parse(v.vm_caps || "{}"), installpacks: v.installpacks, report: v.report, sign: v.sign, keys: v.keys, release: v.release, pc: v.pc,
-                              release_gate: v.release_gate, files_table: v.files_table !== "off",
-                              outputs: v.outputs.split(",").map(x => x.trim()).filter(Boolean),
-                              ...(v.capture_days !== "" ? {capture_days: +v.capture_days} : {}),
-                              ...(v.snapshot_days !== "" ? {snapshot_days: +v.snapshot_days} : {}),
-                              ...(v.dev_keep !== "" ? {dev_keep: +v.dev_keep} : {})})});
+                              ...pick({node: v.node, nodes: v.nodes, hosts: v.hosts, hosts_off: v.hosts_off, reads: v.reads, sees: v.sees, reaches: v.reaches,
+                              tc_off: v.tc_off, packs_on: v.packs_on, agents_off: v.agents_off, agent_default: v.agent_default,
+                              gate: v.gate, tests_in: v.tests_in, test_node: v.test_node, test_change: v.test_change,
+                              vm_caps: JSON.parse(v.vm_caps || "{}"),
+                              ...rnFieldsOut(v)})});
       if (j.error) return stop(j.error);
       // Said out loud when the session was left on what it started with,
       // and why, and when it was ended.
