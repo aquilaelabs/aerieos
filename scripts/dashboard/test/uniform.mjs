@@ -70,10 +70,10 @@ const DRIVERS = {
   // A Library entry's own page (R183): the first toolchain's on the node.
   entry: {
     open: () => page.evaluate(async () => {
-      if (!lib || !lib.rows) await loadLibrary();
-      // From the whole list: the page holds shelves or a page of one (R256).
-      const all = (await getJSON('/api/library?node=' + encodeURIComponent(libNode))).rows || [];
-      const r = all.find(x => x.kind === 'toolchain' && !x.wrong_platform);
+      // One the Library already holds (its shelves, R256), read for nothing
+      // more: the entry's page asks /api/library for its own row, and the
+      // opening's count holds the page to one ask of it.
+      const r = libKnown().find(x => x.kind === 'toolchain' && !x.wrong_platform);
       openEntry(libNode, r ? `toolchain:${r.name}` : 'agent:claude-code');
     }),
     readyWhen: '.entrytab details.sect, .entrytab .notice',
