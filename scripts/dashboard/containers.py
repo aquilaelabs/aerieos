@@ -956,10 +956,8 @@ def manager_view(nid, seen):
     # opens that one's page. The scanners are a compose job of their own on
     # the node, never an instance, so their containers are put under
     # System here by their compose project's name.
-    import router
-    import scanners
-    ours = {nginxproxy.container_name(got["node"]): "nginx", router.container_name(got["node"]): "router",
-            scanners.container_name(got["node"]): "scanners"} if got.get("node") else {}
+    import services
+    ours = services.container_names(got["node"]) if got.get("node") else {}
     for c in got.get("containers") or []:
         if c.get("project") and ours.get(c["project"]) == "scanners":
             c["owner"], c["system"] = devapp.SYSTEM, "scanners"

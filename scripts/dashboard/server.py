@@ -3212,31 +3212,11 @@ def _unguarded_rows(who):
     return out
 
 
-# nginx and the Scanners as services of the Library (R264): each one's
-# entry, whether it is on a node, and its Install and Remove, which are its
-# own page's Deploy and Remove. What sets them is their pages'.
-OWN_SERVICES = {
-    "nginx": {"pack": lambda: nginxproxy.pack(), "deployed": lambda nid: nginxproxy.deployed(devapp, nid),
-              "install": lambda nid, by: nginxproxy.deploy(nid, containers, devactions, devapp),
-              "remove": lambda nid, by: nginxproxy.remove(nid, devactions, devapp),
-              "removes": "Its routes and certificates are kept here; the hostnames it answers for stop answering."},
-    "scanners": {"pack": lambda: scanners.pack(), "deployed": lambda nid: bool(scanners.record(nid).get("deployed")),
-                 "install": lambda nid, by: scanners.deploy(nid, by),
-                 "remove": lambda nid, by: scanners.remove(nid, by),
-                 "removes": "What they found is kept; nothing scans the spaces on this node until they are installed again."},
-}
-
-
-def service_rows(nid):
-    """nginx's and the Scanners' rows for a node's Library and Installed
-    pages: the entry as its pack, and whether it is deployed there."""
-    out = []
-    for sv in OWN_SERVICES.values():
-        manifest, errors = toolpacks.validate(sv["pack"](), shipped=())
-        if errors:
-            continue
-        out.append({"manifest": manifest, "status": {"deployed": bool(sv["deployed"](nid))}, "ready": "", "removes": sv["removes"]})
-    return out
+# The model router, nginx and the Scanners as services of the Library (R172,
+# R264): services.py's table says each one's entry, whether it is on a node,
+# and its Install and Remove, which are its own Deploy and Remove. What sets
+# nginx and the Scanners is their pages'; the router's is its card's.
+import services                                                  # noqa: E402
 
 
 def turn_scope(project, uid, agent="claude", slot=1):
@@ -4976,6 +4956,7 @@ router.configure(state=STATE, write_json=write_json, seal=signing.seal, unseal=s
                  node_addr=lambda nid: str((nodes.node(nid) or {}).get("addr") or ((nodes.node(nid) or {}).get("agent") or {}).get("addr") or ""),
                  project_names=lambda: list(prefs.all_projects(WORKSPACE)), job_add=nodes.job_add,
                  job_get=lambda jid: nodes.job(jid, with_log=True),
+                 node_gpu=lambda nid: bool(((nodes.node(nid) or {}).get("reported") or {}).get("gpu_card")),
                  container_gone=lambda name: not devapp.is_file_source(name))
 # Every module that seals under the install key: one left out kept its
 # secrets under the key before, and lost them when that went (B567).
@@ -5799,11 +5780,11 @@ releasecheck.configure(version=lambda: image_stamp().get("version") or "", bare_
 # setting, when it last ran read off its own module, and Check now.
 import checks                                                    # noqa: E402
 checks.configure(state=STATE, settings_mod=settings,
-                 last={"images": imagecheck.last_at, "nginx": lambda: int(nginxproxy.latest_image().get("at") or 0),
-                       "scanners": lambda: int(scanners._load()["latest"].get("at") or 0),
+                 # nginx's and the scanners' are their modules' own, by services.py's table.
+                 last={"images": imagecheck.last_at, **services.check_last(),
                        "catalog": lambda: int(toolchains._tc_checked or 0)},
                  run={**({"release": lambda: (releasecheck.check(), checks.stamp("release"))} if BARE_METAL else {}),
-                      "images": imagecheck.check, "nginx": nginxproxy.check_image, "scanners": scanners.check_versions,
+                      "images": imagecheck.check, **services.check_run(),
                       "catalog": lambda: toolchains.start_job("check", [p["name"] for p in toolchains.TOOLCHAINS], auto=True)})
 
 
@@ -13165,21 +13146,17 @@ class Handler(BaseHTTPRequestHandler):
         # the Node settings section read it; a person who may write
         # containers may deploy it, as the nginx page's. The added packs'
         # answers here, for Configure on their cards.
-        services = []
-        if n and not users.may_node(who, "configure", nid):
-            services.append({"manifest": toolpacks.validate(router.pack(), shipped=())[0], "status": router.status(nid),
-                             "ready": router._ready(nid), "all_projects": sorted(prefs.all_projects(WORKSPACE))})
         # ...and nginx and the Scanners (R264), for whoever may write
         # containers there, as their own pages ask: each deployed or not,
-        # its page what Open on Installed leads to.
-        if n and not users.may_node(who, "docker-write", nid):
-            services += service_rows(nid)
+        # its page what Open on Installed leads to. Each one's grant is
+        # services.py's table's, asked of this node.
+        own = services.rows(nid, lambda grant: not users.may_node(who, grant, nid)) if n else []
         pack_values = {name: packconfig.get(nid, name, fields) for name, fields in toolpacks.configs().items()} if n and not users.may_node(who, "configure", nid) else {}
         # ...and this person's own (R172 step 5), where they work on the node.
         yours_ok = bool(n) and self._works_on_node(who, nid) and bool(users.uid_of(who))
         pack_mine = {name: packconfig.get_mine(nid, name, fields, users.uid_of(who)) for name, fields in toolpacks.configs().items()
                      if packconfig.person_fields(fields)} if yours_ok else {}
-        rows = library.rows(tc, agentcode.rows(n) if n else [], napps, cat.get("index"), apps.view(), services, pack_values, pack_mine)
+        rows = library.rows(tc, agentcode.rows(n) if n else [], napps, cat.get("index"), apps.view(), own, pack_values, pack_mine)
         # The page asks for one look at it (R256): the rows narrowed, counted
         # and paged here, so it never holds the whole catalog; an entry's
         # page asks for its one row by kind:name. Asked with neither, the
@@ -13235,18 +13212,23 @@ class Handler(BaseHTTPRequestHandler):
         if not nid or not nodes.node(nid):
             return self._json({"error": "which node?"}, 400)
         by = who.get("name") or ""
-        if pack in OWN_SERVICES:
+        # The service this pack is (services.py), or "": a service with a
+        # page of its own is installed and removed here and no more; the
+        # router, set on its card, has the branch under it. Each branch
+        # names its own gate, which docs/api.md is written from.
+        kind = services.of_pack(pack)
+        if kind and services.paged(kind):
             # nginx's and the Scanners' Install and Remove (R264): what
             # their pages' Deploy and Remove do, a written container's.
             if self._refused("docker-write"):
                 return None
             if act not in ("install", "remove"):
                 return self._json({"error": f"{pack} is installed and removed here; the rest is on its own page"}, 400)
-            r = OWN_SERVICES[pack][act](nid, by)
+            r = services.install(kind, nid, by) if act == "install" else services.remove(kind, nid, by)
             if not r.get("error"):
                 db.audit(f"user:{by}", f"{pack}-{act}", nid, {})
             return self._result(r)
-        if pack == "model-router":
+        if kind == "router":
             # Configure on this node (R174): its settings, its deploy and
             # removal; the router's containers are this node's.
             if (why := users.may_node(who, "configure", nid)):
@@ -13272,9 +13254,9 @@ class Handler(BaseHTTPRequestHandler):
                 if not r.get("error") and router.record(nid).get("deployed"):
                     r = router.apply(nid, containers, devactions, devapp, gpu) | {"saved": True}
             elif act == "install":
-                r = router.deploy(nid, containers, devactions, devapp, gpu)
+                r = services.install(kind, nid, by)
             elif act == "remove":
-                r = router.remove(nid, devactions, devapp)
+                r = services.remove(kind, nid, by)
             elif act == "ollama-pull":
                 r = router.ollama_pull(nid, field(req, "model"), by)
             elif act == "ollama-remove":
@@ -15044,9 +15026,11 @@ def main():
     threading.Thread(target=wssync.look_loop, name="sync-look", daemon=True).start()
     if imagecheck.AUTOCHECK and "image-updates" not in featuresoff.off():  # every container's registry images, weekly (R195)
         threading.Thread(target=imagecheck.check_loop, name="image-check", daemon=True).start()
-    if nginxproxy.AUTOCHECK and "image-updates" not in featuresoff.off():  # the nginx image, weekly (R192)
-        threading.Thread(target=nginxproxy.check_loop, name="nginx-check", daemon=True).start()
-        threading.Thread(target=scanners.check_loop, name="scanners-check", daemon=True).start()
+    # The nginx image, weekly (R192), and the scanners' versions with it:
+    # each service's own check, started under nginx's switch.
+    if nginxproxy.AUTOCHECK and "image-updates" not in featuresoff.off():
+        for kind, loop in services.check_loops().items():
+            threading.Thread(target=loop, name=f"{kind}-check", daemon=True).start()
     # The ACME renewals of the nginx page's certificates (R150), thirty days
     # before a pair ends, whatever the image checks are set to: started under
     # their switch, turning image updates off stopped every renewal without a

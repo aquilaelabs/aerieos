@@ -34,6 +34,7 @@ from pathlib import Path
 _here = os.path.dirname(os.path.abspath(__file__))
 if _here not in sys.path:
     sys.path.insert(0, _here)
+import checks  # noqa: E402
 import statefile  # noqa: E402
 
 write_json = None
@@ -150,7 +151,7 @@ KEYS = {
     # How often each check runs by itself (R176, checks.py): weekly unless
     # an administrator says otherwise; Check now beside each runs it at once.
     **{f"check_{k}": {"default": "weekly", "kind": "choice", "applied": "now", "choices": ["daily", "weekly", "monthly", "off"]}
-       for k in ("release", "images", "nginx", "scanners", "catalog")},
+       for k in checks.KINDS},
     "update_hour": {"default": 4, "kind": "number", "min": 0, "max": 23, "applied": "now"},
     # How many versions an update pushes out of its slot stay on the boot
     # menu (R201), 0 for none; AerieOS alone.

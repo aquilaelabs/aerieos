@@ -49,6 +49,7 @@ node_addr = None            # nid -> the node's address, as the sessions and thi
 project_names = None        # () -> every project's name
 job_add = None
 job_get = None              # jid -> the job row with its log
+node_gpu = None             # nid -> whether the node reports a graphics card, which Ollama is then given
 container_gone = None       # name -> True once no written container has that name (R238)
 _lock = threading.Lock()
 _rev = 0
@@ -379,6 +380,40 @@ def remove(nid, devactions, devapp):
         d[str(nid)] = rec
         _save(d)
     return r
+
+
+# ---- the Library's service (services.py) --------------------------------------
+# What the Library asks of every service by the same names: whether it is on
+# a node, its Install and its Remove, which are Deploy and Remove here, and
+# the sentence Remove shows, which for the router is the page's own. The
+# three modules a written container is made, built and removed through are
+# imported when asked, since containers.py reads this module itself.
+
+REMOVES = ""
+
+
+def service_deployed(nid):
+    return bool(record(nid).get("deployed"))
+
+
+def service_install(nid, by=""):
+    import containers                                       # noqa: PLC0415
+    import devactions                                       # noqa: PLC0415
+    import devapp                                           # noqa: PLC0415
+    return deploy(nid, containers, devactions, devapp, bool(node_gpu(nid)) if node_gpu else False)
+
+
+def service_remove(nid, by=""):
+    import devactions                                       # noqa: PLC0415
+    import devapp                                           # noqa: PLC0415
+    return remove(nid, devactions, devapp)
+
+
+def service_row(nid):
+    """What the router's row carries beyond the others': its status whole
+    (the card draws its configuration from it), what it still needs before
+    a deploy, and the spaces its card offers to allow."""
+    return {"status": status(nid), "ready": _ready(nid), "all_projects": sorted(project_names())}
 
 
 # ---- Ollama's models ---------------------------------------------------------------

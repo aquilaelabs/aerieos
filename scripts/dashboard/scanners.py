@@ -284,6 +284,26 @@ def remove(nid, by=""):
     return {"ok": True, "job": r.get("job", ""), "note": r.get("error", "")}
 
 
+# ---- the Library's service (services.py) --------------------------------------
+# What the Library asks of every service by the same names: whether it is on
+# a node, its Install and its Remove, which are this page's Deploy and
+# Remove, and the sentence Remove shows.
+
+REMOVES = "What they found is kept; nothing scans the spaces on this node until they are installed again."
+
+
+def service_deployed(nid):
+    return bool(record(nid).get("deployed"))
+
+
+def service_install(nid, by=""):
+    return deploy(nid, by)
+
+
+def service_remove(nid, by=""):
+    return remove(nid, by)
+
+
 # ---- the versions: a weekly check, Update when behind ---------------------------
 
 def latest_versions():
@@ -342,10 +362,16 @@ def check_versions():
 import checks  # noqa: E402 (the cadence, R176)
 
 
+def checked_at():
+    """When the versions were last read upstream, or 0: what the check's
+    cadence counts from (checks.py)."""
+    return int(_load()["latest"].get("at") or 0)
+
+
 def check_loop():
     time.sleep(CHECK_DELAY)
     while True:
-        if AUTOCHECK and checks.due("scanners", int(_load()["latest"].get("at") or 0)):
+        if AUTOCHECK and checks.due("scanners", checked_at()):
             with contextlib.suppress(Exception):            # noqa: BLE001 (the loop outlives one bad answer)
                 check_versions()
         time.sleep(600)

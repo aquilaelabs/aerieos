@@ -19,8 +19,13 @@ import threading
 import time
 from pathlib import Path
 
+import services
+
 CADENCE = {"daily": 86400, "weekly": 7 * 86400, "monthly": 30 * 86400, "off": None}
-KINDS = ("release", "images", "nginx", "scanners", "catalog")
+# Every check, in the order Controller settings lists them: the services'
+# own (nginx's image, the scanners' versions) between the images and the
+# catalog, by the kinds services.py's table says have one.
+KINDS = ("release", "images", *services.CHECKED, "catalog")
 STATE = Path("/config")
 settings = None
 _last = {}       # kind -> fn returning the epoch it last ran, or 0

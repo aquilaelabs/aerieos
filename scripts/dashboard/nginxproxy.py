@@ -585,13 +585,19 @@ def attention(deployed):
 import checks  # noqa: E402 (the cadence, R176)
 
 
+def checked_at():
+    """When the registry was last read, or 0: what the check's cadence
+    counts from (checks.py)."""
+    return int(latest_image().get("at") or 0)
+
+
 def check_loop():
     """The weekly check, from when the last one happened rather than from
     the start: a container restart is not a reason to ask the registry
     again. Started by the server beside the toolchains' loop."""
     time.sleep(CHECK_DELAY)
     while True:
-        if checks.due("nginx", int(latest_image().get("at") or 0)):
+        if checks.due("nginx", checked_at()):
             with contextlib.suppress(Exception):   # noqa: BLE001 (the loop outlives one bad answer)
                 check_image()
         time.sleep(300)
@@ -1178,3 +1184,31 @@ def remove(nid, devactions, devapp):
     if not devapp.is_file_source(name):
         return {"error": f"{name} is not on the Containers page"}
     return devactions.remove_instance(name, devapp.MAIN)
+
+
+# ---- the Library's service (services.py) --------------------------------------
+# What the Library asks of every service by the same names: whether it is on
+# a node, its Install and its Remove, which are this page's Deploy and
+# Remove, and the sentence Remove shows. The three modules a written
+# container is made, built and removed through are imported when asked,
+# since containers.py reads this module itself.
+
+REMOVES = "Its routes and certificates are kept here; the hostnames it answers for stop answering."
+
+
+def service_deployed(nid):
+    import devapp                                           # noqa: PLC0415
+    return deployed(devapp, nid)
+
+
+def service_install(nid, by=""):
+    import containers                                       # noqa: PLC0415
+    import devactions                                       # noqa: PLC0415
+    import devapp                                           # noqa: PLC0415
+    return deploy(nid, containers, devactions, devapp)
+
+
+def service_remove(nid, by=""):
+    import devactions                                       # noqa: PLC0415
+    import devapp                                           # noqa: PLC0415
+    return remove(nid, devactions, devapp)
