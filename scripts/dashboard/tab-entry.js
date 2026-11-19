@@ -69,8 +69,11 @@ function renderEntryInto(i){
   const may = el.may || {};
   // The card's head: its icon beside its name and pills, where it stands at
   // the action bar's left as on the card's foot, then its one verb.
+  // Where it stands, left out when it has no words: an empty one beside the
+  // one verb kept that verb off the head's line, alone under its facts (B976).
+  const st = libState(r), said = st.replace(/<[^>]*>/g, "").trim() ? st : "";
   const head = pageHead({title: r.label, pills: libPills(r), facts: [["Node", el.name || ""]],
-    actions: `${libState(r)}${libActs(r, may)}`, cls: "entryhead"}).replace('<div class="name">', `<div class="name">${libIcon(r)}`);
+    actions: `${said}${libActs(r, may)}`, cls: "entryhead"}).replace('<div class="name">', `<div class="name">${libIcon(r)}`);
   const err = !r.running && (r.kind === "toolchain" || r.kind === "pack") && el.job?.errors?.[r.name] ? `<div class="field"><div class="sub bad">${esc(el.job.errors[r.name])}</div></div>` : "";
   const about = `${r.about ? `<span class="sub">${esc(r.about)}</span>` : ""}${r.machine && r.name === TC_DRIVER ? libDriverPick(r.machine) : ""}${libDetail(r)}`;
   patch(d.list, `<div data-libnode="${esc(libNode)}" data-entry="${esc(entryKey)}">${head}${err}${
