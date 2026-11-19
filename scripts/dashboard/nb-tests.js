@@ -60,26 +60,11 @@ function nbTestsView({$, nb, project}){
     }, again);
   }
 
-  // Wrapped so the poll can tell this panel's own write from somebody
-  // else's while it is still out. See nbWriting.
-  async function postTests(body){ return nb.writing(() => postTestsDo(body)); }
-  async function postTestsDo(body){
-    if (nb.nbHeld()){
-      notify("a session is part-way through changing this notebook: "
-             + "check the banner at the top", true);
-      return null;
-    }
-    try{
-      const j = await postJSON("/api/tests", {project, ...body});
-      if (j.error){ notify(j.error, true); return null; }
-      nb.tests = j;
-      // This panel's own write moved nothing the poll watches: describing a
-      // test does not ingest a run, but the row it changed is redrawn from
-      // the answer rather than refetched.
-      drawTests();
-      return j;
-    }catch(e){ notify("could not reach the server: " + failWords(e), true); return null; }
-  }
+  // The registry's write (nbPoster), held by a session's batch whatever it
+  // is. This panel's own write moved nothing the poll watches: describing a
+  // test does not ingest a run, but the row it changed is redrawn from the
+  // answer rather than refetched.
+  const postTests = nbPoster(nb, "/api/tests", {ok: j => { nb.tests = j; drawTests(); }});
 
   // Durations read as seconds with one decimal up to a minute and as m:ss
   // past it, because "412.9s" is a number somebody has to divide.

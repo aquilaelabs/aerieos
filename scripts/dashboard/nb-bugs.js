@@ -69,42 +69,32 @@ function nbBugsView({$, nb, project}){
     }, again);
   }
 
-  // Wrapped so the poll can tell this panel's own write from somebody
-  // else's while it is still out. See nbWriting.
-  async function postBug(body, o){ return nb.writing(() => postBugDo(body, o)); }
-  // `keepOpen`: the first of two writes from one form, which stays drawn.
-  async function postBugDo(body, {keepOpen = false} = {}){
-    // The batch guard reaches here too: a report would survive a session's
-    // commit untouched (different file), but "held" has to mean the notebook,
-    // or the banner is a lie about its other tabs. Reading is never held.
-    if (nb.nbHeld() && body.action !== "history"){
-      notify("a session is part-way through changing this notebook: "
-             + "check the banner at the top", true);
-      return null;
-    }
-    try{
-      const j = await postJSON("/api/bugs", {project, ...body});
-      // Somebody else edited this report first (roadmap #26). The tracker
-      // that came back with the refusal is drawn; it is what the report now
-      // says, but the FORM is left alone, holding what was typed, and the
-      // caller keeps the new revision so pressing Save again writes over
-      // theirs deliberately rather than by accident.
-      if (j.conflict){
-        notify(j.error + ": what was typed is still in the form; "
-               + "Save again to write it over theirs", true);
-        if (j.bugs){ nb.bugs = j; if (nb.bugRev !== null) nb.bugRev += 1; }
-        return j;
-      }
-      if (j.error){ notify(j.error, true); return null; }
+  // The tracker's write (nbPoster). The batch guard reaches here too: a
+  // report would survive a session's commit untouched (different file), but
+  // the hold is the notebook's.
+  const postBug = nbPoster(nb, "/api/bugs", {
+    holdExcept: "history",
+    // Somebody else edited this report first (roadmap #26). The tracker
+    // that came back with the refusal is drawn; it is what the report now
+    // says, but the FORM is left alone, holding what was typed, and the
+    // caller keeps the new revision so pressing Save again writes over
+    // theirs deliberately rather than by accident.
+    conflict: j => {
+      notify(j.error + ": what was typed is still in the form; "
+             + "Save again to write it over theirs", true);
+      if (j.bugs){ nb.bugs = j; if (nb.bugRev !== null) nb.bugRev += 1; }
+      return j;
+    },
+    // `keepOpen`: the first of two writes from one form, which stays drawn.
+    ok: (j, {keepOpen = false} = {}) => {
       nb.bugs = j;
       // This panel's own write moved the revision. Left unmarked, the next
       // poll reads it as somebody else's and reloads on top of the answer
       // just received.
       if (nb.bugRev !== null) nb.bugRev += 1;
       if (!keepOpen) drawBugs(true);
-      return j;
-    }catch(e){ notify("could not reach the server: " + failWords(e), true); return null; }
-  }
+    },
+  });
 
   const SEVS = ["low", "medium", "high", "critical"];
 

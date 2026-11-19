@@ -257,27 +257,18 @@ function nbMemoryView({$, nb}){
     };
   }
 
-  // Wrapped so the poll can tell this panel's own write from somebody
-  // else's while it is still out. See nbWriting.
-  async function postMemory(body){ return nb.writing(() => postMemoryDo(body)); }
-  async function postMemoryDo(body){
-    if (nb.nbHeld() && body.action !== "history"){
-      notify("a session is part-way through changing this notebook: "
-             + "check the banner at the top", true);
+  // The memories' write (nbPoster), for the space that is open. One refused
+  // because the memory moved on disk is kept for the clash band, with what
+  // is stored, and nothing is written.
+  const postMemory = nbPoster(nb, "/api/memory", {
+    proj: () => nb.memProj, holdExcept: "history",
+    conflict: (j, body) => {
+      nb.memClash = {body, what: body.action === "index" ? "The index" : body.file,
+                  ...j.conflict};
+      drawMemClash();
       return null;
-    }
-    try{
-      const j = await postJSON("/api/memory", {project: nb.memProj, ...body});
-      if (j.conflict){
-        nb.memClash = {body, what: body.action === "index" ? "The index" : body.file,
-                    ...j.conflict};
-        drawMemClash();
-        return null;
-      }
-      if (j.error){ notify(j.error, true); return null; }
-      return j;
-    }catch(e){ notify("could not reach the server: " + failWords(e), true); return null; }
-  }
+    },
+  });
 
   // One button for the lot: any memory whose text or index line was touched.
   // Saving each field as it blurs would be fewer clicks and worse: an edit to

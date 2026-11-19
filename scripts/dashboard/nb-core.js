@@ -1182,6 +1182,37 @@ function nbRevRead(nb, o, again = false){
         && revs[k] !== got.rev && !hold?.()) nbRevRead(nb, o, true);
   });
 }
+// A view's write-through post to `url`, made once and called with each
+// body: it answers the route's answer, or null when nothing was written,
+// having said why. Wrapped so the poll can tell this panel's own write from
+// somebody else's while it is still out (nbCoreWriting).
+//
+// A session's batch holds it, as it holds the Saves: "held" has to mean the
+// notebook, or the banner is a lie about its other tabs. Reading is never
+// held, so `holdExcept` names the one action that goes through all the same
+// (a view's history), and `hold: false` is a post that asks nothing of it
+// (the roadmap's, whose staged changes are held at their Save).
+//
+// `proj` gives the space, where it is not the notebook's own; `conflict(j,
+// body)` takes a write the server refused because somebody else wrote
+// first, and what it answers is the post's; `ok(j, opts)` takes a write
+// that landed, with whatever the caller passed after the body.
+function nbPoster(nb, url, {proj = () => nb.project, hold = true, holdExcept, conflict, ok} = {}){
+  return async (body, opts) => nb.writing(async () => {
+    if (hold && nb.nbHeld() && (holdExcept === undefined || body.action !== holdExcept)){
+      notify("a session is part-way through changing this notebook: "
+             + "check the banner at the top", true);
+      return null;
+    }
+    try{
+      const j = await postJSON(url, {project: proj(), ...body});
+      if (conflict && j.conflict) return conflict(j, body);
+      if (j.error){ notify(j.error, true); return null; }
+      ok?.(j, opts);
+      return j;
+    }catch(e){ notify("could not reach the server: " + failWords(e), true); return null; }
+  });
+}
 
 // ---- this space's VMs and containers -------------------------------------
 // This project's VMs as the VMs page draws them, scoped to it (R96): the

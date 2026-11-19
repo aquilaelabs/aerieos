@@ -771,23 +771,21 @@ async function nbRmReallySend($, nb){
   openSentTo(proj);             // opens the tab, or goes to the one that is there
 }
 
-// Wrapped so the poll can tell this panel's own write from somebody
-// else's while it is still out. See nbWriting.
-async function nbRmPost($, nb, body, quiet){ return nb.writing(() => nbRmPostDo($, nb, body, quiet)); }
-async function nbRmPostDo($, nb, body, quiet){
-  try{
-    const j = await postJSON("/api/roadmap", {project: nb.memProj, ...body});
+// The roadmap's write (nbPoster), for the space that is open. No hold is
+// asked about here: a session's batch holds the staged changes at their
+// Save (nbCoreBarSays), and a send or a step marked done goes through.
+function nbRmPost($, nb, body, quiet){
+  return nbPoster(nb, "/api/roadmap", {
+    proj: () => nb.memProj, hold: false,
     // Somebody else wrote this item first (roadmap #26). Not a toast: the op
     // stays at the head of the queue and the band asks which version wins,
     // because the alternative (applying it) is how one of the two writers
     // silently loses their words.
-    if (j.conflict){ nbRmShowClash($, nb, body, j); return null; }
-    if (j.error){ notify(j.error, true); return null; }
+    conflict: j => { nbRmShowClash($, nb, body, j); return null; },
     // quiet: one of a run of moves being flushed, where redrawing between
     // each would flicker the list through every intermediate arrangement.
-    if (!quiet){ nbRmDraw($, nb, j, true); refresh(); }
-    return j;
-  }catch(e){ notify("could not reach the server: " + failWords(e), true); return null; }
+    ok: j => { if (!quiet){ nbRmDraw($, nb, j, true); refresh(); } },
+  })(body);
 }
 
 // ---- two writers, one item ------------------------------------------------
