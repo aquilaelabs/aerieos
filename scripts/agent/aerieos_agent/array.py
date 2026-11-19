@@ -22,9 +22,9 @@ import tempfile
 import threading
 import time
 
-from .base import log, read_json, write_atomic, write_json
+from .base import env_or, log, read_json, run_out, write_atomic, write_json
 from .disks import disks_now, moved
-from .pools import by_id, _out
+from .pools import by_id
 from .names import ETC, VAR
 
 RECORD = ETC + "/array.json"
@@ -52,27 +52,27 @@ NAME_RE = re.compile(r"[a-z][a-z0-9]{0,31}")
 SLOT_RE = re.compile(r"(d|p)([1-9][0-9]?)")
 
 
-def _env(k, d):
-    return os.environ.get(k) or d
+# Under this name the unit tests stand in for it.
+_out = run_out
 
 
 def read_record():
-    r = read_json(_env("BB_ARRAY_RECORD", RECORD), {})
+    r = read_json(env_or("BB_ARRAY_RECORD", RECORD), {})
     return r if isinstance(r.get("data"), list) else {}
 
 
 def write_record(rec):
-    write_json(_env("BB_ARRAY_RECORD", RECORD), rec, indent=1, sort_keys=True, mode=0o644, makedirs=True)
+    write_json(env_or("BB_ARRAY_RECORD", RECORD), rec, indent=1, sort_keys=True, mode=0o644, makedirs=True)
 
 
 def _state():
-    return read_json(_env("BB_ARRAY_STATE", STATE), {})
+    return read_json(env_or("BB_ARRAY_STATE", STATE), {})
 
 
 def _state_set(**kw):
     s = _state()
     s.update(kw)
-    write_json(_env("BB_ARRAY_STATE", STATE), s, makedirs=True)
+    write_json(env_or("BB_ARRAY_STATE", STATE), s, makedirs=True)
 
 
 def mount_of(kind, slot):
@@ -175,7 +175,7 @@ def stale_content():
     """With no array recorded, any content file on the system is an earlier
     one's (B704): taken away before a new array's first sync, which would
     otherwise read it and refuse its disks as changed."""
-    p = _env("BB_SNAPRAID_CONTENT", CONTENT)
+    p = env_or("BB_SNAPRAID_CONTENT", CONTENT)
     for x in (p, p + ".tmp", p + ".lock"):
         with contextlib.suppress(OSError):
             os.unlink(x)
@@ -186,7 +186,7 @@ def on_stick():
     its /var the stick's own small partition): the kernel's command line
     says so (aerietoram=1)."""
     try:
-        with open(_env("BB_CMDLINE", "/proc/cmdline"), encoding="utf-8") as f:
+        with open(env_or("BB_CMDLINE", "/proc/cmdline"), encoding="utf-8") as f:
             return "aerietoram=1" in f.read().split()
     except OSError:
         return False
@@ -235,7 +235,7 @@ def render_fstab(rec):
 
 
 def write_fstab(rec):
-    path = _env("BB_ARRAY_FSTAB", FSTAB)
+    path = env_or("BB_ARRAY_FSTAB", FSTAB)
     try:
         with open(path, encoding="utf-8") as f:
             kept = [ln for ln in f.read().splitlines(True) if not ln.rstrip().endswith(MARK)]
@@ -613,14 +613,14 @@ class ArrayMixin:
         for m in datas:
             if os.path.ismount(m["where"]):
                 self._sh(job, ["umount", m["where"]], timeout=120)
-            if self._sh(job, ["mount", "-T", adopt._env("BB_ADOPT_FSTAB", adopt.FSTAB), m["where"]], timeout=120) != 0:
+            if self._sh(job, ["mount", "-T", env_or("BB_ADOPT_FSTAB", adopt.FSTAB), m["where"]], timeout=120) != 0:
                 for w in sorted(plan_.get("merged") or {}):
-                    self._sh(job, ["mount", "-T", adopt._env("BB_ADOPT_FSTAB", adopt.FSTAB), w], timeout=60)
+                    self._sh(job, ["mount", "-T", env_or("BB_ADOPT_FSTAB", adopt.FSTAB), w], timeout=60)
                 say(f"{m['where']} did not mount writable (above): stopped before the parity disk was touched. The disks before it are "
                     "writable now, so the old system's parity no longer matches them; run the takeover again once it mounts\n")
                 return "failed", 1
         for w in sorted(plan_.get("merged") or {}):
-            self._sh(job, ["mount", "-T", adopt._env("BB_ADOPT_FSTAB", adopt.FSTAB), w], timeout=60)
+            self._sh(job, ["mount", "-T", env_or("BB_ADOPT_FSTAB", adopt.FSTAB), w], timeout=60)
         self._landing(say, moves, pools)
         new = {"policy": "adopted", "adopted": True, "data": [], "parity": [], "moves": moves}
         for m in datas:
@@ -783,7 +783,7 @@ class ArrayMixin:
 
         def settle():
             write_fstab(rec)
-            write_atomic(_env("BB_SNAPRAID_CONF", SNAPRAID_CONF), render_snapraid(rec))
+            write_atomic(env_or("BB_SNAPRAID_CONF", SNAPRAID_CONF), render_snapraid(rec))
             os.makedirs(os.path.dirname(CONTENT), exist_ok=True)
             write_record(rec)
 
@@ -1058,7 +1058,7 @@ class ArrayMixin:
             # data disk, or the next array's first sync reads them as this
             # one's and refuses its disks as changed (B704); on a disk taken
             # over from another system they are what this machine added.
-            for path in [_env("BB_SNAPRAID_CONTENT", CONTENT)] + [os.path.join(slot_mount("d", d), ".snapraid.content") for d in rec.get("data") or []]:
+            for path in [env_or("BB_SNAPRAID_CONTENT", CONTENT)] + [os.path.join(slot_mount("d", d), ".snapraid.content") for d in rec.get("data") or []]:
                 for p_ in (path, path + ".tmp", path + ".lock"):
                     with contextlib.suppress(OSError):
                         os.unlink(p_)
@@ -1083,7 +1083,7 @@ class ArrayMixin:
                     adopt.write_record(arec)
             rec = {}
             write_fstab(rec)
-            for path in (_env("BB_ARRAY_RECORD", RECORD), _env("BB_SNAPRAID_CONF", SNAPRAID_CONF), _env("BB_ARRAY_STATE", STATE)):
+            for path in (env_or("BB_ARRAY_RECORD", RECORD), env_or("BB_SNAPRAID_CONF", SNAPRAID_CONF), env_or("BB_ARRAY_STATE", STATE)):
                 try:
                     os.unlink(path)
                 except OSError:

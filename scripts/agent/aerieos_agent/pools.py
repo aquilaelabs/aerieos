@@ -17,7 +17,7 @@ import shutil
 import subprocess
 import time
 
-from .base import log, read_json, write_json
+from .base import log, read_json, run_out, write_json
 from .disks import disks_now, moved
 from .names import ETC
 
@@ -40,11 +40,8 @@ SNAP_RE = re.compile(r"bb-(hourly|daily|weekly|manual)-(\d{8})-(\d{4})")
 DATASET_RE = re.compile(r"[a-z][a-z0-9_-]{0,30}(/[A-Za-z0-9_.-]{1,64}){0,8}")
 
 
-def _out(argv, timeout=60):
-    try:
-        return subprocess.run(argv, capture_output=True, text=True, timeout=timeout, check=False).stdout
-    except (OSError, subprocess.SubprocessError):
-        return ""
+# Under this name the unit tests stand in for it.
+_out = run_out
 
 
 def by_id(name):

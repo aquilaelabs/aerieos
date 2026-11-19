@@ -16,7 +16,7 @@ import re
 import subprocess
 from typing import Callable
 
-from .base import log, write_atomic
+from .base import env_or, log, write_atomic
 from .names import VAR
 
 HASH_FILE = VAR + "/console-hash"
@@ -28,17 +28,13 @@ USER = "admin"
 HASH_RE = re.compile(r"\$6\$[A-Za-z0-9./]{1,16}\$[A-Za-z0-9./]{86}")
 
 
-def _env(k, d):
-    return os.environ.get(k) or d
-
-
 def on_os():
-    return os.path.isfile(_env("BB_OS_RELEASE", OS_RELEASE))
+    return os.path.isfile(env_or("BB_OS_RELEASE", OS_RELEASE))
 
 
 def kept():
     try:
-        with open(_env("BB_CONSOLE_HASH", HASH_FILE), encoding="utf-8") as f:
+        with open(env_or("BB_CONSOLE_HASH", HASH_FILE), encoding="utf-8") as f:
             h = f.read().strip()
         return h if HASH_RE.fullmatch(h) else ""
     except OSError:
@@ -47,12 +43,12 @@ def kept():
 
 def is_open():
     """Whether the screen still takes admin with no password."""
-    return on_os() and os.path.exists(_env("BB_CONSOLE_OPEN", OPEN_MARK))
+    return on_os() and os.path.exists(env_or("BB_CONSOLE_OPEN", OPEN_MARK))
 
 
 def _door(verb, run):
     try:
-        return run([_env("BB_CONSOLE_DOOR", DOOR), verb], capture_output=True, timeout=30, check=False).returncode
+        return run([env_or("BB_CONSOLE_DOOR", DOOR), verb], capture_output=True, timeout=30, check=False).returncode
     except (OSError, subprocess.SubprocessError) as e:
         log(f"console: {verb}: {e}")
         return 1
@@ -110,7 +106,7 @@ class ConsoleMixin:
             job.say("refused: a console password is AerieOS's; on a Linux of your own, log in with its own accounts\n")
             return "failed", 65
         h = str(cfg.get("hash") or "")
-        path = _env("BB_CONSOLE_HASH", HASH_FILE)
+        path = env_or("BB_CONSOLE_HASH", HASH_FILE)
         if cfg.get("clear") is True:
             try:
                 os.unlink(path)

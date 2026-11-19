@@ -41,6 +41,8 @@ CONFIRM_S = 60
 SYS_NET = os.environ.get("BUILDERBOT_SYS_NET", "/sys/class/net")
 
 
+# This module's own, not base.env_or: a variable set to nothing counts as
+# set here.
 def _env(k, d):
     return os.environ.get(k, d)
 

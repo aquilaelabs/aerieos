@@ -14,7 +14,7 @@ import shutil
 import subprocess
 import time
 
-from .base import log, read_json, write_json
+from .base import env_or, log, read_json, write_json
 from .stores import save_state
 from .names import VAR
 
@@ -23,18 +23,14 @@ NAME_RE = re.compile(r"[a-z][a-z0-9-]{0,30}")
 ROOTS = ("/mnt/", "/var/lib/aerieos-controller", "/srv/")
 
 
-def _env(k, d):
-    return os.environ.get(k) or d
-
-
 def _state():
-    return read_json(_env("BB_BACKUPS_STATE", STATE_FILE), {})
+    return read_json(env_or("BB_BACKUPS_STATE", STATE_FILE), {})
 
 
 def _state_set(name, **kw):
     s = _state()
     s[name] = {**(s.get(name) or {}), **kw}
-    write_json(_env("BB_BACKUPS_STATE", STATE_FILE), s, makedirs=True)
+    write_json(env_or("BB_BACKUPS_STATE", STATE_FILE), s, makedirs=True)
 
 
 def backups_now(state):

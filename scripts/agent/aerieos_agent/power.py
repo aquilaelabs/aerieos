@@ -10,9 +10,9 @@ its updates are whole images (osimage.py), and nothing here runs there.
 import os
 import re
 import shutil
-import subprocess
 import time
 
+from .base import run_out
 from .osimage import os_release
 from .stores import save_state
 
@@ -23,12 +23,8 @@ STATUS_WORDS = {"OL": "on line", "OB": "on battery", "LB": "low battery", "CHRG"
                 "FSD": "shutting down", "OFF": "off", "BYPASS": "on bypass", "RB": "replace battery"}
 
 
-def _out(argv, timeout=20, env=None):
-    try:
-        p = subprocess.run(argv, capture_output=True, text=True, timeout=timeout, check=False, env=env)
-        return p.stdout
-    except (OSError, subprocess.SubprocessError):
-        return ""
+# Under this name the unit tests stand in for it.
+_out = run_out
 
 
 def ups_now():
@@ -39,7 +35,7 @@ def ups_now():
     if not upsc:
         return {}
     out = {"model": "", "status": "", "words": "", "charge": None, "runtime_s": None, "load": None, "answers": False}
-    for line in _out([upsc, f"{UPS_NAME}@localhost"]).splitlines():
+    for line in _out([upsc, f"{UPS_NAME}@localhost"], timeout=20).splitlines():
         k, _, v = line.partition(":")
         k, v = k.strip(), v.strip()
         if k == "device.model" or (k == "ups.model" and not out["model"]):

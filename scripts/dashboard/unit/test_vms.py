@@ -446,6 +446,36 @@ class Agent(unittest.TestCase):
         self.agent = agentpkg.load("aerieos_agent_vms")
         self.av = sys.modules[self.agent.Agent.__module__.rsplit(".", 1)[0] + ".vms"]
 
+    def test_a_vm_s_state_is_virsh_s_word_within_its_time_or_nothing(self):
+        # Nothing where virsh knows no such VM, and nothing where libvirt
+        # holds the question past fifteen seconds: a check that the VM is
+        # off then reads it as not off, and a clone as no VM to copy.
+        from unittest import mock
+        asked = []
+
+        def sub(argv, **kw):
+            asked.append((argv[-2:], kw.get("timeout")))
+            if argv[-1] == "slow":
+                raise subprocess.TimeoutExpired(argv, kw["timeout"])
+            there = argv[-1] == "bbvm-web-db"
+            return mock.Mock(returncode=0 if there else 1, stdout="shut off\n\n" if there else "")
+
+        class Job:
+            def __init__(self):
+                self.t = []
+
+            def say(self, x):
+                self.t.append(x)
+        with mock.patch.object(self.av.subprocess, "run", side_effect=sub):
+            state = self.av.VmsMixin._vm_state
+            self.assertEqual(state("bbvm-web-db", {}), "shut off")
+            self.assertIsNone(state("gone", {}))
+            self.assertIsNone(state("slow", {}))
+            self.assertEqual(asked, [(["domstate", n], 15) for n in ("bbvm-web-db", "gone", "slow")])
+            job = Job()
+            got = self.av.VmsMixin._vm_disk_grow(self.av.VmsMixin(), job, {"disk": "vda", "gb": 20}, "slow", {})
+            self.assertEqual((got, job.t), (("failed", 75), ["refused: stop the VM first; a disk grows while it is off\n"]))
+
     def test_a_clone_copies_each_disk_and_keeps_the_rest(self):
         # R163 step 12: each file disk copied as qcow2 (the original
         # untouched), a cdrom left empty, a passed-through disk kept and

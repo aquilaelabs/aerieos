@@ -16,17 +16,13 @@ import subprocess
 import threading
 import time
 
-from .base import log, log_once, statvfs_within
+from .base import env_or, log, log_once, statvfs_within
 from .stores import save_state
 from .names import ETC
 
 ROOT = "/mnt/other"
 CREDS = ETC + "/creds"
 NAME_RE = re.compile(r"[a-z][a-z0-9-]{0,30}")
-
-
-def _env(k, d):
-    return os.environ.get(k) or d
 
 
 def _mounted(path):
@@ -44,7 +40,7 @@ def _df(path):
 def disk_dev(source):
     """The device for a disk's by-id link: its first partition's link
     where one exists (a disk with a table), else the disk's own."""
-    root = _env("BB_BY_ID", "/dev/disk/by-id")
+    root = env_or("BB_BY_ID", "/dev/disk/by-id")
     # One link's name in that folder, never a path out of it: ../../sda1
     # mounted any device.
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:+@-]{0,200}", source or ""):
@@ -62,7 +58,7 @@ def extmounts_now(state):
     for m in state.get("ext_mounts") or []:
         if not isinstance(m, dict) or not NAME_RE.fullmatch(str(m.get("name") or "")):
             continue
-        path = f"{_env('BB_OTHER_ROOT', ROOT)}/{m['name']}"
+        path = f"{env_or('BB_OTHER_ROOT', ROOT)}/{m['name']}"
         mounted = _mounted(path)
         present = bool(disk_dev(str(m.get("source") or ""))) if m.get("kind") == "disk" else True
         size, used = _df(path) if mounted else (0, 0)
@@ -107,7 +103,7 @@ class ExtMountsMixin:
     def _ext_creds(self, want):
         """An SMB share's credentials file, root's alone; the files of shares
         gone removed."""
-        root = _env("BB_CREDS", CREDS)
+        root = env_or("BB_CREDS", CREDS)
         os.makedirs(root, mode=0o700, exist_ok=True)
         keep = set()
         for r in want:
@@ -158,7 +154,7 @@ class ExtMountsMixin:
         if os.geteuid() != 0:
             return
         rows = self.state.get("ext_mounts") or []
-        root = _env("BB_OTHER_ROOT", ROOT)
+        root = env_or("BB_OTHER_ROOT", ROOT)
         errors = dict(self.state.get("ext_errors") or {})
         wanted_names = set()
         for m in rows:
@@ -211,7 +207,7 @@ class ExtMountsMixin:
             # programs or device files counting for anything here.
             return [shutil.which("mount") or "mount", "-o", "nosuid,nodev" + (",ro" if m.get("ro") else ""), dev, path] if dev else None
         if kind == "smb":
-            creds = os.path.join(_env("BB_CREDS", CREDS), m["name"])
+            creds = os.path.join(env_or("BB_CREDS", CREDS), m["name"])
             opts = f"credentials={creds},uid=0,gid=0,file_mode=0664,dir_mode=0775,vers=3.0,soft,nosuid,nodev" + (",ro" if m.get("ro") else "")
             return [shutil.which("mount") or "mount", "-t", "cifs", f"//{m.get('host')}/{m.get('path')}", path, "-o", opts]
         if kind == "nfs":

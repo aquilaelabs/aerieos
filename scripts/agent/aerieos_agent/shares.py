@@ -19,7 +19,7 @@ import shutil
 import subprocess
 import time
 
-from .base import log, write_atomic, write_json
+from .base import env_or, log, run_out, write_atomic, write_json
 from .accounts import accounts_moved
 from .stores import save_state
 from .names import ETC
@@ -51,10 +51,6 @@ CLIENT_RE = re.compile(r"[A-Za-z0-9*][A-Za-z0-9*./:_-]{0,80}")
 ROOTS = ("/mnt/", "/srv/")
 
 
-def _env(name, default):
-    return os.environ.get(name) or default
-
-
 def _read(path):
     try:
         with open(path, encoding="utf-8", errors="replace") as f:
@@ -68,7 +64,7 @@ def shares_now():
     from AerieOS's own two files; [] where neither is here."""
     smb, nfs = {}, {}
     cur = None
-    for line in _read(_env("BB_SMB_FILE", SMB_FILE)).splitlines():
+    for line in _read(env_or("BB_SMB_FILE", SMB_FILE)).splitlines():
         line = line.strip()
         m = re.fullmatch(r"\[([^\]]+)\]", line)
         if m:
@@ -92,7 +88,7 @@ def shares_now():
                 smb[cur]["writers"] = [u for u in v.split() if USER_RE.fullmatch(u)][:64]
             elif k == "fruit:time machine":
                 smb[cur]["tm"] = v.lower() == "yes"
-    for line in _read(_env("BB_NFS_FILE", NFS_FILE)).splitlines():
+    for line in _read(env_or("BB_NFS_FILE", NFS_FILE)).splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
             continue
@@ -127,7 +123,7 @@ def shares_now():
                         "nfs": {"on": True, "ro": n["ro"], "clients": n["clients"]}})
     # The shares that are folders and nothing more.
     try:
-        kept = json.loads(_read(_env("BB_SHARES_INTERNAL", INTERNAL_FILE)) or "[]")
+        kept = json.loads(_read(env_or("BB_SHARES_INTERNAL", INTERNAL_FILE)) or "[]")
     except ValueError:
         kept = []
     for k in kept if isinstance(kept, list) else []:
@@ -177,8 +173,8 @@ def _samba_hooks(main=None):
     """smb.conf told about the shares file and the names' map, once, in its
     [global] section, where the image's own says nothing of them (B672). The
     file's kept in /etc, so a boot keeps it; False when it could not be written."""
-    main = main or _env("BB_SMB_MAIN", SMB_MAIN)
-    want = [f"   username map = {_env('BB_SMB_MAP', SMB_MAP)}", f"   include = {_env('BB_SMB_FILE', SMB_FILE)}"]
+    main = main or env_or("BB_SMB_MAIN", SMB_MAIN)
+    want = [f"   username map = {env_or('BB_SMB_MAP', SMB_MAP)}", f"   include = {env_or('BB_SMB_FILE', SMB_FILE)}"]
     try:
         with open(main, encoding="utf-8") as f:
             text = f.read()
@@ -292,7 +288,7 @@ class SharesMixin:
             # LCT-00000000 tells Samba it must change first, which no share
             # client can do (B672).
             lines.append(f"{r['user']}:{uid}:{'X' * 32}:{r['nt']}:[UX         ]:LCT-{int(time.time()):08X}:\n")
-        path = _env("BB_SMB_USERS_FILE", SMB_USERS_FILE)
+        path = env_or("BB_SMB_USERS_FILE", SMB_USERS_FILE)
         try:
             os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
             fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
@@ -311,7 +307,7 @@ class SharesMixin:
         # The name a person signs in with, onto the Unix user Samba knows them
         # as (B672).
         try:
-            write_atomic(_env("BB_SMB_MAP", SMB_MAP),
+            write_atomic(env_or("BB_SMB_MAP", SMB_MAP),
                          "".join(f'{r["user"]} = "{r["name"]}"\n' for r in want if re.fullmatch(r"[A-Za-z0-9._@+-]{1,64}", r["name"])),
                          mode=0o644)
         except OSError as e:
@@ -322,10 +318,8 @@ class SharesMixin:
         log(f"shares: {len(lines)} SMB password(s) in Samba, {len(have - {r['user'] for r in want})} removed")
 
     def _out(self, argv, timeout=30):
-        try:
-            return subprocess.run(argv, capture_output=True, text=True, timeout=timeout, check=False).stdout
-        except (OSError, subprocess.SubprocessError):
-            return ""
+        # A method under this name because the unit tests stand in for it.
+        return run_out(argv, timeout=timeout)
 
     def _make_account_user(self, name):
         """An account's user made as smb_users_want makes one (a system
@@ -451,14 +445,14 @@ class SharesMixin:
             say("smb.conf could not be told about the shares file: Samba will not serve them until it can\n")
         # What nothing serves is kept apart, and is still a share.
         try:
-            write_json(_env("BB_SHARES_INTERNAL", INTERNAL_FILE),
+            write_json(env_or("BB_SHARES_INTERNAL", INTERNAL_FILE),
                        [{"name": x["name"], "path": x["path"]} for x in rest if not x["smb"]["on"] and not x["nfs"]["on"]],
                        makedirs=True)
         except OSError as e:
             say(f"the list of internal shares did not write: {e}\n")
             return "failed", 67
         smb_text, nfs_text = render(rest)
-        smb_file, nfs_file = _env("BB_SMB_FILE", SMB_FILE), _env("BB_NFS_FILE", NFS_FILE)
+        smb_file, nfs_file = env_or("BB_SMB_FILE", SMB_FILE), env_or("BB_NFS_FILE", NFS_FILE)
         try:
             for f, text in ((smb_file, smb_text), (nfs_file, nfs_text)):
                 os.makedirs(os.path.dirname(f), exist_ok=True)

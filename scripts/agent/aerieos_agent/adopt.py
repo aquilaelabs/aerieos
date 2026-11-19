@@ -32,7 +32,7 @@ import tempfile
 import time
 import xml.etree.ElementTree as ET
 from typing import Callable
-from .base import read_json, write_atomic, write_json
+from .base import env_or, read_json, write_atomic, write_json
 from .names import ETC, VAR
 
 RECORD = ETC + "/adopted.json"
@@ -51,10 +51,6 @@ NOT_POOLS = {"user", "user0", "disks", "remotes", "addons", "rootshare", "array"
 NO_REPLAY = {"xfs": "norecovery", "btrfs": "rescue=nologreplay"}
 # What blkid calls each filesystem.
 BLK = {"xfs": "xfs", "btrfs": "btrfs", "zfs": "zfs_member"}
-
-
-def _env(k, d):
-    return os.environ.get(k) or d
 
 
 def blkid(name):
@@ -108,7 +104,7 @@ def holding(d, fs, blk):
 def mnt():
     """Where the old paths go: /mnt, or under BB_ADOPT_ROOT for a proof
     that must not touch the machine's own."""
-    return _env("BB_ADOPT_ROOT", "") + "/mnt"
+    return env_or("BB_ADOPT_ROOT", "") + "/mnt"
 
 
 def plan(want, disks, blk=blkid):
@@ -295,7 +291,7 @@ def render_fstab(p):
 
 
 def write_fstab(p):
-    path = _env("BB_ADOPT_FSTAB", FSTAB)
+    path = env_or("BB_ADOPT_FSTAB", FSTAB)
     try:
         with open(path, encoding="utf-8") as f:
             kept = [ln for ln in f.read().splitlines(True) if not ln.rstrip().endswith(MARK)]
@@ -308,11 +304,11 @@ def write_fstab(p):
 
 
 def read_record():
-    return read_json(_env("BB_ADOPT_RECORD", RECORD), {})
+    return read_json(env_or("BB_ADOPT_RECORD", RECORD), {})
 
 
 def write_record(rec):
-    path = _env("BB_ADOPT_RECORD", RECORD)
+    path = env_or("BB_ADOPT_RECORD", RECORD)
     if not rec:
         try:
             os.unlink(path)
@@ -912,7 +908,7 @@ def carry_tpm(x, here, swtpm_dir=None):
     uuid = (ET.fromstring(x["xml"]).findtext("uuid") or "").strip().lower()
     state = x.get("tpm") or ""
     if state and os.path.isdir(state) and UUID_RE.fullmatch(uuid):
-        dest = os.path.join(swtpm_dir or _env("BB_SWTPM_DIR", SWTPM_DIR), uuid)
+        dest = os.path.join(swtpm_dir or env_or("BB_SWTPM_DIR", SWTPM_DIR), uuid)
         if not os.path.exists(dest):
             os.makedirs(os.path.dirname(dest), exist_ok=True)
             shutil.copytree(state, dest, symlinks=True)
@@ -921,7 +917,7 @@ def carry_tpm(x, here, swtpm_dir=None):
 
 
 def read_apps():
-    return read_json(_env("BB_ADOPT_APPS", APPS), {})
+    return read_json(env_or("BB_ADOPT_APPS", APPS), {})
 
 
 def apps_now():
@@ -960,13 +956,13 @@ class AdoptMixin:
                 self._zfs_import(None, z)
         for m in p.get("mounts") or []:
             if not os.path.ismount(m["where"]) and os.path.isdir(m["where"]):
-                subprocess.run(["mount", "-T", _env("BB_ADOPT_FSTAB", FSTAB), m["where"]], capture_output=True, timeout=60, check=False)
+                subprocess.run(["mount", "-T", env_or("BB_ADOPT_FSTAB", FSTAB), m["where"]], capture_output=True, timeout=60, check=False)
         for where, branches in (p.get("merged") or {}).items():
             # Only over every branch mounted: a disk missing at boot leaves
             # its empty folder, which mergerfs would take as the disk, its
             # files gone from the tree and new ones written to memory (B718).
             if not os.path.ismount(where) and os.path.isdir(where) and branches_mounted(branches):
-                subprocess.run(["mount", "-T", _env("BB_ADOPT_FSTAB", FSTAB), where], capture_output=True, timeout=60, check=False)
+                subprocess.run(["mount", "-T", env_or("BB_ADOPT_FSTAB", FSTAB), where], capture_output=True, timeout=60, check=False)
 
     def _zfs_import(self, job, z):
         """Import one pool as it is: no -f, never upgraded; read-only where
@@ -1074,7 +1070,7 @@ class AdoptMixin:
                     self._unmount_image(job, d)
             got["said"] = said
             got["at"] = int(time.time())
-            write_json(_env("BB_ADOPT_APPS", APPS), got, makedirs=True)
+            write_json(env_or("BB_ADOPT_APPS", APPS), got, makedirs=True)
             for line in said:
                 say(line + "\n")
             self.hello_again("the old system's containers and VMs were read")
@@ -1261,7 +1257,7 @@ class AdoptMixin:
                 say(f"{z['pool']} was not imported (above): a pool the old system did not export says it was in use on another system, "
                     "and it is not forced\n")
         for m in p["mounts"]:
-            if self._sh(job, ["mount", "-T", _env("BB_ADOPT_FSTAB", FSTAB), m["where"]], timeout=60) != 0:
+            if self._sh(job, ["mount", "-T", env_or("BB_ADOPT_FSTAB", FSTAB), m["where"]], timeout=60) != 0:
                 failed.append(m["where"])
                 if m.get("ro"):
                     say(f"{m['where']} did not mount read-only (above). A disk the old system did not shut down cleanly may need its "
@@ -1269,7 +1265,7 @@ class AdoptMixin:
         for where, branches in p["merged"].items():
             # Never over a branch that did not mount: its empty folder would
             # stand in for the disk (B718).
-            if not branches_mounted(branches) or self._sh(job, ["mount", "-T", _env("BB_ADOPT_FSTAB", FSTAB), where], timeout=60) != 0:
+            if not branches_mounted(branches) or self._sh(job, ["mount", "-T", env_or("BB_ADOPT_FSTAB", FSTAB), where], timeout=60) != 0:
                 failed.append(where)
         if failed:
             say(f"adopted, but not mounted yet: {', '.join(failed)}; tried again every minute, and Release undoes all of it\n")

@@ -19,7 +19,7 @@ import shutil
 import subprocess
 import tempfile
 import urllib.request
-from .base import write_atomic
+from .base import env_or, write_atomic
 
 RELEASE_FILE = "/usr/lib/aerieos-os/release"
 SLOT_TOOL = "/usr/lib/aerieos-os/slot"
@@ -58,7 +58,7 @@ SIG_NS = "aerieos-release"
 
 def signers():
     try:
-        with open(_env("BB_RELEASE_SIGNERS", SIGNERS), encoding="utf-8") as f:
+        with open(env_or("BB_RELEASE_SIGNERS", SIGNERS), encoding="utf-8") as f:
             return [ln.strip() for ln in f if ln.strip() and not ln.lstrip().startswith("#")]
     except OSError:
         return []
@@ -89,15 +89,18 @@ PIECES = {"root.squashfs": "live/filesystem.squashfs", "vmlinuz": "live/vmlinuz"
 VER_RE = re.compile(r"v?(\d+\.\d+\.\d+(?:-dev\.\d+)?)")  # a release, or a dev build (B589)
 
 
-def _env(name, default):
-    return os.environ.get(name) or default
+def os_work():
+    """The folder AerieOS keeps its own in on the data partition: the
+    configuration copied before each update, the older versions kept, an
+    update's download, /etc's overlay."""
+    return env_or("BB_OS_WORK", "/var/lib/aerieos-os")
 
 
 def os_release():
     """{version, snapshot, built, slot, next} on an AerieOS disk, {}
     anywhere else: the release file the image carries, and the slot tool's
     reading of this boot and the next."""
-    path = _env("BB_OS_RELEASE", RELEASE_FILE)
+    path = env_or("BB_OS_RELEASE", RELEASE_FILE)
     if not os.path.isfile(path):
         return {}
     out = {}
@@ -113,7 +116,7 @@ def os_release():
                     out["built"] = v[:24]
     except OSError:
         return {}
-    tool = _env("BB_OS_SLOT", SLOT_TOOL)
+    tool = env_or("BB_OS_SLOT", SLOT_TOOL)
     for key, verb in (("slot", "current"), ("next", "next")):
         try:
             r = subprocess.run(["bash", tool, verb], capture_output=True, text=True, timeout=10, check=False)
@@ -129,7 +132,7 @@ def os_release():
         out["trial"] = "\ntrial:" in "\n" + st
     except (OSError, subprocess.SubprocessError):
         out["trial"] = False
-    fb = os.path.join(_env("BB_OS_WORK", "/var/lib/aerieos-os"), "fell-back")
+    fb = os.path.join(os_work(), "fell-back")
     try:
         with open(fb, encoding="utf-8", errors="replace") as f:
             out["fell_back"] = f.read().strip()[:200]
@@ -142,11 +145,11 @@ def keep_state_before(say, running):
     """The controller's configuration as it is before an update (R160 step
     4, R161 step 2): a copy beside the old slot, so going back to that slot
     boots the configuration it had, and the two newest copies kept."""
-    src = _env("BB_OS_STATE", "/var/lib/aerieos-controller/config")
+    src = env_or("BB_OS_STATE", "/var/lib/aerieos-controller/config")
     if not os.path.isdir(src):
         say("no controller configuration here to copy before the update\n")
         return True
-    keep = os.path.join(_env("BB_OS_WORK", "/var/lib/aerieos-os"), "before")
+    keep = os.path.join(os_work(), "before")
     os.makedirs(keep, mode=0o700, exist_ok=True)
     dest = os.path.join(keep, f"{running or 'unknown'}.tar.gz")
     r = subprocess.run(["tar", "-czf", dest + ".new", "-C", os.path.dirname(src), "--exclude=logs", "--exclude=jobs", "--exclude=os-draft", "--exclude=.moved-*", "--exclude=.move-*",
@@ -177,13 +180,13 @@ KEEP_DEFAULT = 3
 
 
 def kept_dir():
-    return os.path.join(_env("BB_OS_WORK", "/var/lib/aerieos-os"), "kept")
+    return os.path.join(os_work(), "kept")
 
 
 def kept_boot():
     """The kept version this boot came from, or ""."""
     try:
-        with open(_env("BB_CMDLINE", "/proc/cmdline"), encoding="utf-8", errors="replace") as f:
+        with open(env_or("BB_CMDLINE", "/proc/cmdline"), encoding="utf-8", errors="replace") as f:
             for w in f.read().split():
                 if w.startswith("aeriekept="):
                     return w[len("aeriekept="):][:60]
@@ -213,7 +216,7 @@ def write_kept_menu(esp=None):
     """GRUB's Older versions, from what is kept: grub.cfg sources this file
     (nothing kept, an empty one). The root is on the same disk's data
     partition, the fifth, never another AerieOS disk's."""
-    grub = os.path.join(esp or _env("BB_OS_ESP", ESP), "grub")
+    grub = os.path.join(esp or env_or("BB_OS_ESP", ESP), "grub")
     if not os.path.isdir(grub):
         return
     rows = kept_list()
@@ -245,7 +248,7 @@ def _unname_kept(ver, say):
     named it (slot kept-next, aerie_kept_next in grubenv): GRUB with a default
     its menu no longer has boots its first entry, slot A, whichever slot is in
     use (B620). Read from the environment block itself, cleared by the tool."""
-    envf = os.path.join(_env("BB_OS_ESP", ESP), "grub", "grubenv")
+    envf = os.path.join(env_or("BB_OS_ESP", ESP), "grub", "grubenv")
     try:
         with open(envf, encoding="utf-8", errors="replace") as f:
             named = f"aerie_kept_next={ver}" in (ln.strip() for ln in f)
@@ -254,7 +257,7 @@ def _unname_kept(ver, say):
     if not named:
         return
     try:
-        subprocess.run(["bash", _env("BB_OS_SLOT", SLOT_TOOL), "kept-next"], capture_output=True, timeout=30, check=False)
+        subprocess.run(["bash", env_or("BB_OS_SLOT", SLOT_TOOL), "kept-next"], capture_output=True, timeout=30, check=False)
     except (OSError, subprocess.SubprocessError):
         return
     say(f"{ver} was to boot next, once; it is not kept any more, so the next boot is this version's slot\n")
@@ -322,7 +325,7 @@ def _keep_slot(say, dev, where, keep):
                 return
             used = int.from_bytes(head[40:48], "little")
             _prune_kept(keep - 1, say, spare=ver)
-            st = os.statvfs(kept_dir() if os.path.isdir(kept_dir()) else _env("BB_OS_WORK", "/var/lib/aerieos-os"))
+            st = os.statvfs(kept_dir() if os.path.isdir(kept_dir()) else os_work())
             if st.f_bavail * st.f_frsize < used + (1 << 30):
                 say(f"{ver} is not kept: the data partition has too little room beside its {used >> 20} MB\n")
                 return
@@ -339,7 +342,7 @@ def _keep_slot(say, dev, where, keep):
                     left -= len(chunk)
         for piece in ("vmlinuz", "initrd", "release"):
             shutil.copyfile(os.path.join(where, piece), os.path.join(new, piece))
-        state = os.path.join(_env("BB_OS_WORK", "/var/lib/aerieos-os"), "before", f"{ver}.tar.gz")
+        state = os.path.join(os_work(), "before", f"{ver}.tar.gz")
         if os.path.isfile(state):
             shutil.copyfile(state, os.path.join(new, "state.tar.gz"))
         shutil.rmtree(d, ignore_errors=True)
@@ -356,8 +359,8 @@ def pin_hostid():
     pool to the host id that last had it, and every update otherwise looked
     to its own pools like another machine. Once only: the copy kept is what
     every later image shows."""
-    kept = os.path.join(_env("BB_OS_WORK", "/var/lib/aerieos-os"), "etc", "upper", "hostid")
-    hostid = _env("BB_HOSTID", "/etc/hostid")
+    kept = os.path.join(os_work(), "etc", "upper", "hostid")
+    hostid = env_or("BB_HOSTID", "/etc/hostid")
     if not os.path.isdir(os.path.dirname(kept)) or os.path.exists(kept):
         return
     with contextlib.suppress(OSError):
@@ -431,7 +434,7 @@ def stick_status():
     """A stick boot's state (R161 step 10, the system-pool tool's status):
     {stick, pool, ready, on_stick, written_kb, boot_written_kb}, or {} where
     the tool is not here (no AerieOS)."""
-    tool = _env("BB_OS_POOL", POOL_TOOL)
+    tool = env_or("BB_OS_POOL", POOL_TOOL)
     if not os.path.isfile(tool):
         return {}
     try:
@@ -444,7 +447,7 @@ def stick_status():
     # The stick's own partition (/var): how much room it has, since what
     # fills it takes the controller down (the operator, 8 Nov).
     try:
-        du = shutil.disk_usage(_env("BB_SP_VAR", "/var"))
+        du = shutil.disk_usage(env_or("BB_SP_VAR", "/var"))
         room = {"var_total_mb": du.total >> 20, "var_free_mb": du.free >> 20}
     except OSError:
         room = {}
@@ -476,7 +479,7 @@ class OsImageMixin:
     def _apply_os_kept(self, job, cfg):
         """An older version kept (R201): `next` boots it once, `remove` takes
         it away; then a hello."""
-        tool = _env("BB_OS_SLOT", SLOT_TOOL)
+        tool = env_or("BB_OS_SLOT", SLOT_TOOL)
         verb, ver = str(cfg.get("verb") or ""), str(cfg.get("version") or "")
         if not os.path.isfile(tool):
             job.say("refused: this machine does not run AerieOS\n")
@@ -518,12 +521,12 @@ class OsImageMixin:
         if not gh:
             say("refused: no gh here to verify the image's build attestation with: nothing written\n")
             return False
-        repo = _env("BB_OS_REPO", REPO)
+        repo = env_or("BB_OS_REPO", REPO)
         bundle = os.path.join(work, "attestation.jsonl")
         extra = []
         if src:
             have = os.path.join(src, f"{name}.attestation.jsonl")
-            root = _env("BB_OS_TRUSTED_ROOT", TRUSTED_ROOT)
+            root = env_or("BB_OS_TRUSTED_ROOT", TRUSTED_ROOT)
             if not os.path.isfile(have):
                 say(f"refused: {src} holds no {name}.attestation.jsonl, the release's proof of who built the image; "
                     "bring it beside the ISO: nothing written\n")
@@ -535,7 +538,7 @@ class OsImageMixin:
             shutil.copyfile(have, bundle)
             extra = ["--custom-trusted-root", root]
         else:
-            url = _env("BB_OS_ATTEST_URL", ATTEST_URL).format(repo=repo, digest=digest)
+            url = env_or("BB_OS_ATTEST_URL", ATTEST_URL).format(repo=repo, digest=digest)
             try:
                 req = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json",
                                                            "User-Agent": "AerieOS"})
@@ -594,7 +597,7 @@ class OsImageMixin:
         containerd and libvirt, moves what the stick holds of theirs, of the
         toolchains and of the projects to the pool, keeps the name and binds
         them there at every boot; then a hello says where things are."""
-        tool = _env("BB_OS_POOL", POOL_TOOL)
+        tool = env_or("BB_OS_POOL", POOL_TOOL)
         path = str(cfg.get("path") or "")
         if not os.path.isfile(tool):
             job.say("refused: this machine does not run AerieOS, so it has no stick\n")
@@ -617,7 +620,7 @@ class OsImageMixin:
         projects where they are), or let go (`release`): the tool checks it,
         says which of `names` it holds, hands it to the controller's account,
         binds it and restarts the controller on it; then a hello."""
-        tool = _env("BB_OS_POOL", POOL_TOOL)
+        tool = env_or("BB_OS_POOL", POOL_TOOL)
         if not os.path.isfile(tool):
             job.say("refused: this machine does not run AerieOS, so it has no stick\n")
             return "failed", 77
@@ -640,7 +643,7 @@ class OsImageMixin:
         over a share); the sha256 files beside them are read either way.
         What it fetched and took out of the ISO is gone again however it
         ends: a failed update left gigabytes on the data partition (B470)."""
-        work = os.path.join(_env("BB_OS_WORK", "/var/lib/aerieos-os"), "update")
+        work = os.path.join(os_work(), "update")
         try:
             return self._os_update(job, cfg, work)
         finally:
@@ -649,7 +652,7 @@ class OsImageMixin:
     def _os_update(self, job, cfg, work):
         say = job.say
         rel = os_release()
-        tool = _env("BB_OS_SLOT", SLOT_TOOL)
+        tool = env_or("BB_OS_SLOT", SLOT_TOOL)
         if not rel or not os.path.isfile(tool):
             say("refused: this machine does not run AerieOS (no image release here), so there is no slot to write\n")
             return "failed", 77
@@ -702,7 +705,7 @@ class OsImageMixin:
                 shutil.copyfile(os.path.join(src, fn), iso)
                 shutil.copyfile(os.path.join(src, fn + ".sha256"), iso + ".sha256")
             else:
-                base = _env("BB_OS_RELEASE_URL", RELEASE_URL)
+                base = env_or("BB_OS_RELEASE_URL", RELEASE_URL)
                 job.step(f"fetching {fn}")
                 _fetch(f"{base}/{tag if tag.startswith('v') else 'v' + tag}/{fn}", iso, say)
                 _fetch(f"{base}/{tag if tag.startswith('v') else 'v' + tag}/{fn}.sha256", iso + ".sha256", say)
@@ -734,7 +737,7 @@ class OsImageMixin:
                     shutil.copyfile(os.path.join(src, "SHA256SUMS"), sums)
                     shutil.copyfile(os.path.join(src, "SHA256SUMS.sig"), sig)
                 else:
-                    at = f"{_env('BB_OS_RELEASE_URL', RELEASE_URL)}/{tag if tag.startswith('v') else 'v' + tag}"
+                    at = f"{env_or('BB_OS_RELEASE_URL', RELEASE_URL)}/{tag if tag.startswith('v') else 'v' + tag}"
                     _fetch(f"{at}/SHA256SUMS", sums, say)
                     _fetch(f"{at}/SHA256SUMS.sig", sig, say)
             except OSError as e:
@@ -759,13 +762,13 @@ class OsImageMixin:
         if size > SLOT_MIB * 1048576:
             say(f"the root image is {size >> 20} MB and a slot holds {SLOT_MIB}: nothing written\n")
             return "failed", 69
-        dev = _env(f"BB_OS_DEV_{other.upper()}", SLOT_DEV[other])
+        dev = env_or(f"BB_OS_DEV_{other.upper()}", SLOT_DEV[other])
         if not os.path.exists(dev):
             say(f"slot {other}'s partition is not here ({dev}): nothing written\n")
             return "failed", 70
         # Every AerieOS disk shares its partitions' UUIDs, so with a second
         # one in the machine (a stick) the name could be either (B470).
-        if not _env(f"BB_OS_DEV_{other.upper()}", ""):
+        if not env_or(f"BB_OS_DEV_{other.upper()}", ""):
             uuid = os.path.basename(SLOT_DEV[other])
             r = subprocess.run(["blkid", "-t", f"PARTUUID={uuid}", "-o", "device"], capture_output=True, text=True,
                                timeout=30, check=False)
@@ -785,13 +788,13 @@ class OsImageMixin:
             return "failed", 74
         # What the slot holds goes on the boot menu before it is overwritten.
         job.step(f"keeping what slot {other} holds")
-        keep_slot(say, dev, os.path.join(_env("BB_OS_ESP", ESP), "aerieos", other), cfg.get("keep", KEEP_DEFAULT))
+        keep_slot(say, dev, os.path.join(env_or("BB_OS_ESP", ESP), "aerieos", other), cfg.get("keep", KEEP_DEFAULT))
         # The slot's old release named off it before its root is written: a
         # write cut short leaves a slot that reads as empty, never as the
         # old version, which the next update's keep would have taken and
         # put in place of the good copy kept before it.
         try:
-            stale = os.path.join(_env("BB_OS_ESP", ESP), "aerieos", other, "release")
+            stale = os.path.join(env_or("BB_OS_ESP", ESP), "aerieos", other, "release")
             if os.path.exists(stale):
                 os.unlink(stale)
                 fd = os.open(os.path.dirname(stale), os.O_RDONLY)
@@ -811,7 +814,7 @@ class OsImageMixin:
         except OSError as e:
             say(f"slot {other} did not take the image: {e}\n")
             return "failed", 71
-        esp = _env("BB_OS_ESP", ESP)
+        esp = env_or("BB_OS_ESP", ESP)
         where = os.path.join(esp, "aerieos", other)
         try:
             os.makedirs(where, exist_ok=True)
@@ -837,7 +840,7 @@ class OsImageMixin:
             say(f"GRUB was not told to boot slot {other} on trial: the slot is written and the next boot stays on slot {cur}\n")
             return "failed", 73
         with contextlib.suppress(OSError):
-            os.unlink(os.path.join(_env("BB_OS_WORK", "/var/lib/aerieos-os"), "fell-back"))
+            os.unlink(os.path.join(os_work(), "fell-back"))
         say(f"slot {other} holds AerieOS {ver}, and the next boot starts it: restart this machine to finish (Reboot under Advanced on the Nodes page). "
             f"Slot {cur} keeps {rel.get('version') or 'the image running now'} to fall back to.\n")
         self.hello_again(f"AerieOS {ver} written to slot {other}")

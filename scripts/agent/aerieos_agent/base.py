@@ -1169,6 +1169,21 @@ def selfcheck(path):
     return False, " | ".join(said.splitlines()[-4:])[:400] or f"it ended with {r.returncode} and said nothing"
 
 
+def env_or(k, d):
+    """An environment variable's value, or `d` where it is not set or is
+    set to nothing."""
+    return os.environ.get(k) or d
+
+
+def run_out(argv, timeout=60, env=None):
+    """What a command wrote to its output, whatever its exit code, or ""
+    where it could not be started or did not end within `timeout` seconds."""
+    try:
+        return subprocess.run(argv, capture_output=True, text=True, timeout=timeout, check=False, env=env).stdout
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
 # ---------------------------------------------------------------------------
 # the census and the sample
 

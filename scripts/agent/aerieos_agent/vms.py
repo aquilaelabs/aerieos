@@ -586,6 +586,18 @@ class VmsMixin:
     def _vm_exists(self, name, who):
         return subprocess.run(VIRSH + ["dominfo", name], capture_output=True, check=False, **who).returncode == 0
 
+    @staticmethod
+    def _vm_state(name, who, timeout=15):
+        """A VM's state in virsh's words ("running", "shut off", "paused"),
+        or None where virsh has none to say: it knows no such VM, or it did
+        not answer within `timeout` seconds."""
+        try:
+            r = subprocess.run(VIRSH + ["domstate", name], capture_output=True, text=True, check=False,
+                               timeout=timeout, **who)
+        except subprocess.TimeoutExpired:
+            return None
+        return r.stdout.strip() if r.returncode == 0 else None
+
     def _vm_image(self, job, spec, who):
         """The cached base image for spec's OS, fetched and checked by the
         checksum file its publisher signs off on when it is not here yet."""
@@ -813,8 +825,7 @@ class VmsMixin:
         if not self._vm_exists(name, who):
             job.say(f"{name} is not on this machine\n")
             return "failed", 66
-        live = "running" in subprocess.run(VIRSH + ["domstate", name], capture_output=True, text=True,
-                                           check=False, **who).stdout
+        live = "running" in (self._vm_state(name, who) or "")
         argv = VIRSH + ["change-media", name, "sda", "--eject", "--config"] + (["--live"] if live else [])
         if self._vm_run(job, argv, who) != 0:
             return "failed", 70
@@ -832,8 +843,7 @@ class VmsMixin:
         if dev not in DISK_DEVS or not 2 <= gb <= MAX_DISK_GB:
             job.say("refused: a disk is vda to vdd and a size in GB\n")
             return "failed", 64
-        if "shut off" not in subprocess.run(VIRSH + ["domstate", name], capture_output=True, text=True,
-                                            check=False, **who).stdout:
+        if "shut off" not in (self._vm_state(name, who) or ""):
             job.say("refused: stop the VM first; a disk grows while it is off\n")
             return "failed", 75
         i = DISK_DEVS.index(dev)
@@ -856,8 +866,7 @@ class VmsMixin:
         if not 1 <= gb <= MAX_DISK_GB:
             job.say("refused: a disk is 1 GB to 4 TB\n")
             return "failed", 64
-        if "shut off" not in subprocess.run(VIRSH + ["domstate", name], capture_output=True, text=True,
-                                            check=False, **who).stdout:
+        if "shut off" not in (self._vm_state(name, who) or ""):
             job.say("refused: stop the VM first; a disk is added while it is off\n")
             return "failed", 75
         ddir = os.path.join(VM_DIR, "disks")
@@ -914,8 +923,7 @@ class VmsMixin:
         if not self._vm_exists(name, who):
             job.say(f"{name} is not on this machine\n")
             return "failed", 66
-        if "shut off" not in subprocess.run(VIRSH + ["domstate", name], capture_output=True, text=True,
-                                            check=False, **who).stdout:
+        if "shut off" not in (self._vm_state(name, who) or ""):
             job.say("refused: stop the VM first; its hardware changes while it is off\n")
             return "failed", 75
         xml = subprocess.run(VIRSH + ["dumpxml", name, "--inactive", "--security-info"], capture_output=True, text=True,
@@ -1090,8 +1098,7 @@ class VmsMixin:
         host = vmhw.host_hw()
         dev = vmhw.usb_find(host["usb"], want)
         kept = usb_kept(name)
-        running = "running" in subprocess.run(VIRSH + ["domstate", name], capture_output=True, text=True,
-                                              check=False, **who).stdout
+        running = "running" in (self._vm_state(name, who) or "")
         if give:
             if not dev:
                 job.say(f"refused: {said} is not plugged into this machine now\n")
@@ -1158,12 +1165,12 @@ class VmsMixin:
         if self._vm_exists(name, who):
             job.say(f"refused: {name} is a VM here already\n")
             return "failed", 73
-        info = subprocess.run(VIRSH + ["domstate", src], capture_output=True, text=True, check=False, **who)
-        if info.returncode != 0:
+        state = self._vm_state(src, who)
+        if state is None:
             job.say(f"refused: {src} is not a VM on this node\n")
             return "failed", 66
-        if info.stdout.strip() not in ("shut off", "crashed"):
-            job.say(f"refused: {src} is {info.stdout.strip()}: shut it down first, so its disks are copied whole\n")
+        if state not in ("shut off", "crashed"):
+            job.say(f"refused: {src} is {state}: shut it down first, so its disks are copied whole\n")
             return "failed", 75
         xml = subprocess.run(VIRSH + ["dumpxml", src, "--inactive", "--security-info"], capture_output=True, text=True, check=False, **who).stdout
         try:
@@ -1282,8 +1289,7 @@ class VmsMixin:
         m = re.search(r"<nvram([^>]*)>([^<]+)</nvram>", xml)
         if not m or "qcow2" in m.group(1):
             return True
-        if "shut off" not in subprocess.run(VIRSH + ["domstate", name], capture_output=True, text=True,
-                                            check=False, **who).stdout:
+        if "shut off" not in (self._vm_state(name, who) or ""):
             job.say("refused: this VM boots by UEFI and was made before its firmware's variables were kept in qcow2, "
                     "which a snapshot needs; stop it once and take the snapshot again, and they are moved while it is off\n")
             return False
