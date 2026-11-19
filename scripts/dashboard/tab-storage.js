@@ -465,9 +465,9 @@ function wireStoragePools(root, n){
       if (typed === null || typed === undefined) return;
       if (String(typed).trim() !== body.name){ notify("that is not the pool's name: nothing was imported", true); return; }
       body.force = true; body.confirm = body.name;
-    } else if (act === "import"){
-      if (!await askYes(`Import the pool ${body.name}?\n\nIt is taken as it is, never upgraded, so the machine that made it can take it back; its datasets appear under /mnt, and it comes back after every boot until it is exported.`, {title: "Import the pool?", verb: "Import"})) return;
     }
+    // A pool exported cleanly is imported with no question (R265: a press asks only where its yes costs something): it
+    // is taken as it is, never upgraded, and Export lets it go again.
     busy(b, act === "scrub" ? "Scrubbing" : "Working");
     const j = await postJSON("/api/v1/nodes", body);
     notify(j.error || `${act}: the job runs on the machine; the page follows its next check-in`, !!j.error);

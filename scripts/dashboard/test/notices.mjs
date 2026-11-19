@@ -299,6 +299,32 @@ await section("on a phone the stack spans the width above the dock's line", asyn
   const back = await page.$eval('#toast .tst', t => Math.round(t.getBoundingClientRect().bottom));
   ok(Math.abs(back - r.bottom) < 2, `...and back above the dock's line once it is put away (${back} against ${Math.round(r.bottom)})`);
   await page.evaluate(() => document.querySelectorAll('#toast .tst').forEach(t => t.remove()));
+  // A question is the one dialog on a phone that is not the whole screen
+  // (R265, the operator, 19 Nov: two lines and two buttons were an empty
+  // page): a sheet at the foot, as tall as its words, the page showing
+  // above it; what one press needs a yes for is listed in it, each kind
+  // under its heading; and a toast sits above the sheet.
+  page.answers.push(() => new Promise(r => setTimeout(() => r(-1), 2500)));
+  const asked = page.evaluate(() => askYes('', { title: 'Rebuild alpha?', verb: 'Rebuild', parts: [
+    { head: 'Its compose file asks for more than its own directory', lines: ['proxy mounts the docker socket: every container on the node, and root through it'] },
+    { head: 'New beside the app, which its last build did not ship', lines: ['proxy'] }, { head: 'Nothing to say', lines: [] }] }));
+  await page.waitForSelector('.modal.askdlg:not([hidden]) .askpart', { timeout: 5000 });
+  await page.evaluate(() => notify('over a question', true));
+  await toastRests();
+  const sheet = await page.evaluate(() => {
+    const m = document.querySelector('.modal.askdlg:not([hidden])'), b = m.querySelector('.box').getBoundingClientRect();
+    const foot = m.querySelector('.foot').getBoundingClientRect(), t = document.querySelector('#toast .tst').getBoundingClientRect();
+    return { top: Math.round(b.top), bottom: Math.round(innerHeight - b.bottom), h: Math.round(b.height), w: Math.round(innerWidth - b.width),
+             words: Math.round(m.querySelector('.box').scrollHeight), foot: Math.round(innerHeight - foot.bottom),
+             parts: [...m.querySelectorAll('.askpart')].map(p => `${p.querySelector('label').textContent}: ${p.querySelectorAll('li').length}`),
+             dim: getComputedStyle(m).backgroundColor, toast: Math.round(b.top - t.bottom) };
+  });
+  ok(sheet.bottom === 0 && sheet.w === 0 && sheet.h < 420 && sheet.top > 300 && Math.abs(sheet.h - sheet.words) <= 2 && sheet.foot < 60
+     && /rgba\(0, 0, 0, 0\.\d+\)/.test(sheet.dim) && sheet.parts.length === 2 && sheet.toast >= 0 && sheet.toast <= 14,
+     `on a phone a question is a sheet at the foot, as tall as its words, over the dimmed page, with what it covers under two headings and a toast above it (${JSON.stringify(sheet)})`);
+  ok(await asked === false && page.dialogs.at(-1).includes('asks for more than its own directory:\n\u2022 proxy mounts the docker socket'),
+     '...and Cancel is its no, the parts said to whoever answers as words');
+  await page.evaluate(() => document.querySelectorAll('#toast .tst').forEach(t => t.remove()));
   // ...and the page there shows one section, History while nothing waits.
   await page.evaluate(() => { openNotices(); notify('one for the phone'); });
   await until(() => page.evaluate(() => !!document.querySelector('.noticestab .ntrow')), 10000);

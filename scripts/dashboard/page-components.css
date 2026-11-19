@@ -274,6 +274,9 @@ html:not([data-theme]) .logo.away,.logo.away{color:var(--dim)}
    size: a dialog's label title is small capitals, and a question in it read
    as shouting (the operator, 23 Oct). */
 .modal.askdlg h3{font:var(--f-sect);letter-spacing:0;text-transform:none}
+/* What one yes covers (R265): a short heading over its lines, each a point. */
+.askdlg .askpart ul{padding:0 0 0 1.1em;list-style:disc}
+.askdlg .askpart li+li{margin-top:4px}
 .modal .box.prose{display:flex;flex-direction:column}
 .modal .box.prose>*{flex:none}
 .modal .box.prose>.about{flex:0 1 auto;min-height:0;display:flex;flex-direction:column}
@@ -609,6 +612,19 @@ dialog.modal::backdrop{background:transparent;--sheen:none}
     border:0;border-radius:0;box-shadow:none;display:flex;flex-direction:column}
   :where(.modal:not(.inline)>.box,.modal:not(.inline)>.box>.dlgbody)>*{flex:none}
   .modal:not(.inline)>.box>.foot,.modal:not(.inline)>.box>.dlgbody>.foot{margin-top:auto}
+  /* But for a question (R265, the operator, 19 Nov: two lines and two
+     buttons were a whole empty screen): a sheet at the foot, as tall as its
+     words, its buttons under the thumb, the page dimmed above it and a press
+     there Cancel. One long enough to fill the screen scrolls inside itself
+     and leaves a strip of the page showing. One that asks for a line of text
+     sits at the top instead, where the keyboard does not cover it. */
+  .modal.askdlg:not(.inline){align-items:flex-end;padding:0;background:rgba(0,0,0,.68)}
+  .modal.askdlg.typed:not(.inline){align-items:flex-start}
+  .modal.askdlg:not(.inline)>.box{height:auto;max-height:calc(100dvh - 56px);overflow:auto;overscroll-behavior:contain;
+    border-top:var(--hair) solid var(--line);border-radius:var(--r-surface) var(--r-surface) 0 0;
+    padding-bottom:env(safe-area-inset-bottom);box-shadow:0 -8px 28px rgba(0,0,0,.4)}
+  .modal.askdlg.typed:not(.inline)>.box{border-top:0;border-bottom:var(--hair) solid var(--line);
+    border-radius:0 0 var(--r-surface) var(--r-surface);padding:env(safe-area-inset-top) 0 0}
 }
 .modal h3{margin:0;padding:var(--row-y) var(--row-x);border-bottom:var(--hair) solid var(--line);
   font:600 13px/1.2 system-ui,sans-serif;letter-spacing:.3px;text-transform:uppercase}

@@ -1393,78 +1393,87 @@ async function ndStoreAsk(n, c){
   // whose data on the node's own disk the share then covers.
   const covered = Object.entries(d.stores || {}).filter(([r, p]) => norm(p) && norm(p) === now(r) && coverOf(norm(p)))
     .map(([r, p]) => ({role: r, path: norm(p), mount: norm(coverOf(norm(p)).path)}));
-  for (const c of covered){
-    if (!await askYes(`Mount a share at ${c.mount} on ${n.name}?\n\nThe ${c.role} store is in ${c.path}, inside it. `
+  // What the save found is asked once (R265, the operator, 19 Nov: each of
+  // these was a question of its own, one after another): alone, as its own
+  // question; several, as one with each under its heading. What a yes
+  // changes in the draft is set only after it.
+  const asks = [], moved = {}, keep = [], bring = [];
+  const note = (q, body) => asks.push({head: q, lines: [body]});
+  for (const c of covered)
+    note(`Mount a share at ${c.mount}`, `The ${c.role} store is in ${c.path}, inside it. `
         + `Once the share is mounted the store reads what is on the share, and what is in ${c.path} on the `
-        + `node's own disk is covered until it is unmounted; it is not deleted.`)) return false;
+        + `node's own disk is covered until it is unmounted; it is not deleted.`);
+  if (roles.length || mounts.length){
+    const probe = [...new Set([...roles.map(r => norm(d.stores[r])), ...roles.map(now).filter(Boolean), ...mounts])];
+    let j;
+    try{
+      j = await postJSON("/api/v1/nodes", {action: "path-state", id: n.id, paths: probe});
+    }catch(e){ j = {error: String(e)}; }
+    if (j.error){ notify(`could not see what is at those paths on ${n.name}: ${j.error}`, true); return false; }
+    const at = p => j.paths?.[p] || {};
+    for (const p of mounts){
+      if (at(p).why){ notify(`the mount at ${p}: ${at(p).why}`, true); return false; }
+      if (at(p).files) note(`Mount the share at ${p}`, `${p} already has files in it. `
+          + `The share covers them until it is unmounted; they are not deleted.`);
+    }
+    for (const role of roles){
+      const want = norm(d.stores[role]), st = at(want), old = now(role);
+      if (st.why){ notify(`the ${role} store: ${st.why}`, true); return false; }
+      let to = want, already = false;
+      const cv = coverOf(want);
+      if (cv){
+        note(`Put the ${role} store in ${want}`, `${want} is inside ${norm(cv.path)}, a mount `
+            + `saved here that the node does not have yet${(repM.find(r => norm(r.path) === norm(cv.path)) || {}).source
+              ? ` (it mounts another export there now)` : ""}, so what is on the share cannot be seen until it is `
+            + `mounted. Apply mounts it first and only then puts the store there; if the mount does not come up, `
+            + `the apply fails and ${role} stays in ${old || "its place"}.`);
+      } else if (role === "toolchains" && st.store && want.endsWith(`/${n.id}`)){
+        // This node's own folder inside a toolchain store, typed itself
+        // (R212): the setting is the store around it, since the agent keeps
+        // each node's toolchains in a folder named for it inside the store.
+        already = true;
+        to = want.slice(0, -(n.id.length + 1));
+        note(`Use ${to} as the toolchains store`, `${want} is this node's own folder inside `
+            + `the toolchain store ${to}, so the setting is ${to}: the store uses what is there, and nothing is brought `
+            + `across from ${old || "the old place"}.`);
+        moved[role] = to;
+      } else if (st.store || st.mine || st.own){
+        // Already a store (R212): AerieOS's marker in it, this node's own
+        // toolchain folder inside it, or the folder nested for this node
+        // before. Used as it is, nothing nested, nothing brought across.
+        already = true;
+        note(`Use ${want} as the ${role} store`, `${
+            st.mine ? `${want} holds this node's own ${role} folder, ${want}/${n.id}, made by AerieOS`
+            : st.store ? `${want} is a store AerieOS made`
+            : `${want} is the folder AerieOS put this node's ${role} store in before`
+            }: the store uses what is there, and nothing is brought across from ${old || "the old place"}.`);
+      } else if (st.files){
+        to = st.sub; already = !!st.sub_state?.files;
+        note(`Put the ${role} store in ${want}`, `${want} already has files in it, so the `
+            + `store goes in a folder for this node inside it, ${to}, and the setting changes to that.`
+            + (already ? ` ${to} already holds files of its own: the store uses what is there, and `
+                         + `nothing is brought across from ${old || "the old place"}.` : ""));
+        moved[role] = to;
+      } else note(`Put the ${role} store in ${want}`, st.exists ? `${want} is empty.` : `${want} does not exist yet, and is made.`);
+      // A cache is never brought across (it is rebuilt); nor is an old place
+      // with nothing in it, or a store going where files already are.
+      if (already) keep.push(role);
+      else if (role !== "cache" && old && at(old).files) bring.push({role, old, to});
+    }
   }
-  if (!roles.length && !mounts.length) return true;
-  const probe = [...new Set([...roles.map(r => norm(d.stores[r])), ...roles.map(now).filter(Boolean), ...mounts])];
-  let j;
-  try{
-    j = await postJSON("/api/v1/nodes", {action: "path-state", id: n.id, paths: probe});
-  }catch(e){ j = {error: String(e)}; }
-  if (j.error){ notify(`could not see what is at those paths on ${n.name}: ${j.error}`, true); return false; }
-  const at = p => j.paths?.[p] || {};
-  for (const p of mounts){
-    if (at(p).why){ notify(`the mount at ${p}: ${at(p).why}`, true); return false; }
-    if (at(p).files && !await askYes(`Mount the share at ${p} on ${n.name}?\n\n${p} already has files in it. `
-        + `The share covers them until it is unmounted; they are not deleted.`)) return false;
-  }
-  const keep = [];
-  for (const role of roles){
-    const want = norm(d.stores[role]), st = at(want), old = now(role);
-    if (st.why){ notify(`the ${role} store: ${st.why}`, true); return false; }
-    let to = want, already = false;
-    const cv = coverOf(want);
-    if (cv){
-      if (!await askYes(`Put the ${role} store in ${want} on ${n.name}?\n\n${want} is inside ${norm(cv.path)}, a mount `
-          + `saved here that the node does not have yet${(repM.find(r => norm(r.path) === norm(cv.path)) || {}).source
-            ? ` (it mounts another export there now)` : ""}, so what is on the share cannot be seen until it is `
-          + `mounted. Apply mounts it first and only then puts the store there; if the mount does not come up, `
-          + `the apply fails and ${role} stays in ${old || "its place"}.`)) return false;
-    } else if (role === "toolchains" && st.store && want.endsWith(`/${n.id}`)){
-      // This node's own folder inside a toolchain store, typed itself
-      // (R212): the setting is the store around it, since the agent keeps
-      // each node's toolchains in a folder named for it inside the store.
-      already = true;
-      to = want.slice(0, -(n.id.length + 1));
-      if (!await askYes(`Use ${to} as the toolchains store on ${n.name}?\n\n${want} is this node's own folder inside `
-          + `the toolchain store ${to}, so the setting is ${to}: the store uses what is there, and nothing is brought `
-          + `across from ${old || "the old place"}.`)) return false;
-      d.stores[role] = to;
-    } else if (st.store || st.mine || st.own){
-      // Already a store (R212): AerieOS's marker in it, this node's own
-      // toolchain folder inside it, or the folder nested for this node
-      // before. Used as it is, nothing nested, nothing brought across.
-      already = true;
-      if (!await askYes(`Use ${want} as the ${role} store on ${n.name}?\n\n${
-          st.mine ? `${want} holds this node's own ${role} folder, ${want}/${n.id}, made by AerieOS`
-          : st.store ? `${want} is a store AerieOS made`
-          : `${want} is the folder AerieOS put this node's ${role} store in before`
-          }: the store uses what is there, and nothing is brought across from ${old || "the old place"}.`)) return false;
-    } else if (st.files){
-      to = st.sub; already = !!st.sub_state?.files;
-      if (!await askYes(`Put the ${role} store in ${want} on ${n.name}?\n\n${want} already has files in it, so the `
-          + `store goes in a folder for this node inside it, ${to}, and the setting changes to that.`
-          + (already ? `\n\n${to} already holds files of its own: the store uses what is there, and `
-                       + `nothing is brought across from ${old || "the old place"}.` : ""))) return false;
-      d.stores[role] = to;
-    } else if (!await askYes(`Put the ${role} store in ${want} on ${n.name}?\n\n`
-        + (st.exists ? `${want} is empty.` : `${want} does not exist yet, and is made.`))) return false;
-    // A cache is never brought across (it is rebuilt); nor is an old place
-    // with nothing in it, or a store going where files already are.
-    const hasData = role !== "cache" && old && at(old).files;
-    // Its own question with its own answers (the operator, 23 Oct: OK for
-    // yes and Cancel for no was messy): Yes, No, and Cancel to stop.
-    if (already){ keep.push(role); continue; }
-    if (!hasData) continue;
-    const bring = await ask({text: `Bring the ${role} data across from ${old} to ${to}?\n\n`
+  if (asks.length === 1 && !await askYes(`${asks[0].head} on ${n.name}?\n\n${asks[0].lines[0]}`)) return false;
+  if (asks.length > 1 && !await askYes("", {title: `Save this storage on ${n.name}?`, verb: "Save", parts: asks})) return false;
+  Object.assign(d.stores, moved);
+  // Whether its data comes along is its own question with its own answers
+  // (the operator, 23 Oct: OK for yes and Cancel for no was messy): Yes,
+  // No, and Cancel to stop.
+  for (const {role, old, to} of bring){
+    const said = await ask({text: `Bring the ${role} data across from ${old} to ${to}?\n\n`
         + `Yes copies it there, and the copy in ${old} stays for you to remove. No leaves it where it `
         + `is, and ${to} starts empty.`,
       choices: [{label: "Yes", value: "yes"}, {label: "No", value: "no"}]});
-    if (bring === null) return false;
-    if (bring === "no") keep.push(role);
+    if (said === null) return false;
+    if (said === "no") keep.push(role);
   }
   d.keep = keep;
   return true;
@@ -2743,9 +2752,8 @@ function wireNodesTab(root){
     box.querySelectorAll("[data-nd]").forEach(b => b.onclick = () => pressing(b, async () => {
       const act = b.dataset.nd;
       if (act === "disable" || act === "enable"){
-        const name = (nodesList || []).find(n => n.id === id)?.name || "this node";
-        if (act === "disable" && !await askYes(`Disable ${name}?\n\nIt stays enrolled and keeps its configuration, but no project can add it, `
-              + "no picker offers it, and it is handed no work or session until you press Enable.")) return;
+        // Disable asks nothing (R265: a press asks only where its yes costs something): the node stays enrolled, its
+        // sessions run on, and Enable on the same row puts it back.
         busy(b, act === "disable" ? "Disabling" : "Enabling");
         const j = await nodeAct({action: act, id});
         if (j.error) notify(j.error, true);
@@ -2851,10 +2859,8 @@ function wireNodesTab(root){
         readMoved("nodes"); drawPanes();
         return;
       }
-      if (act === "door" && b.dataset.on === "0"){
-        const name = (nodesList || []).find(n => n.id === id)?.name || "this node";
-        if (!await askYes(`Shut the SSH door on ${name}?\n\nNothing reaches its port 22 through the tunnel until it is opened again from here.`)) return;
-      }
+      // Shutting the SSH door asks nothing (R265: a press asks only where its yes costs something): it opens again
+      // from the same row.
       if (act === "feature" && b.dataset.op === "remove"){
         const name = (nodesList || []).find(n => n.id === id)?.name || "this node";
         if (!await askYes(b.dataset.feature === "vmhost"
@@ -3240,21 +3246,16 @@ function wireNodeConf(row, id){
             ? `Static ${desired.network.address}` : "DHCP"}.`)) return;
     if (what === "storage"){
       const gone = (n?.reported?.mounts || []).filter(m => !(desired.mounts || []).some(x => x.path === m.path));
-      if (gone.length && !await askYes(`Apply storage to ${n?.name || "this node"}?\n\nThis unmounts `
-          + `${gone.map(m => m.path).join(", ")} and takes ${gone.length === 1 ? "it" : "them"} `
-          + `out of fstab. Directories and data stay.`)) return;
       // Moving a store copies what is in it, which can be tens of gigabytes
       // and take a while, so it is asked about rather than started by a
-      // text field losing focus.
+      // text field losing focus. What it unmounts and what it moves are one
+      // question (R265: they were two in a row).
       const moving = storeMoves(n);
       const copied = moving.filter(m => !m.empty), fresh = moving.filter(m => m.empty);
-      if (moving.length && !await askYes(`Apply storage to ${n?.name || "this node"}?\n\n`
-          + (copied.length ? `This moves ${copied.map(m => `${m.role} from ${m.from} to ${m.to}`).join(", and ")}: `
-             + `the contents are copied first, and the old cop${copied.length === 1 ? "y stays" : "ies stay"} `
-             + `for you to remove.` : "")
-          + (copied.length && fresh.length ? "\n\n" : "")
-          + (fresh.length ? `${fresh.map(m => `${m.role} starts empty in ${m.to}`).join(", and ")}, `
-             + `leaving what was in ${fresh.map(m => m.from).join(" and ")} where it is.` : ""))) return;
+      if ((gone.length || moving.length) && !await askYes("", {title: `Apply storage to ${n?.name || "this node"}?`, verb: "Apply", parts: [
+        {head: "Unmounted and taken out of fstab, the directories and data staying", lines: gone.map(m => m.path)},
+        {head: "Moved: the contents copied first, the old copy staying for you to remove", lines: copied.map(m => `${m.role} from ${m.from} to ${m.to}`)},
+        {head: "Starting empty, what was there left where it is", lines: fresh.map(m => `${m.role} in ${m.to}, leaving ${m.from}`)}]})) return;
     }
     const r = await pressing(b, () => { busy(b, "Applying"); return nodeAct({action: "apply", id, what}); });
     // A storage apply is followed to its end, which is kept on the record

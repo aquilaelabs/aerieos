@@ -425,8 +425,7 @@ function wireReach(root){
 
 function wireDeviceOut(root){
   root.querySelectorAll("[data-pfsignout]").forEach(b => b.onclick = async () => {
-    const r = (profile?.signins || []).find(x => x.id === b.dataset.pfsignout);
-    if (!await askYes(r?.mine ? "Sign out this browser?" : `Sign out ${r ? r.agent : "that browser"}? Its next request finds it signed out.`)) return;
+    // Signing a browser out asks nothing (R265): it signs in again.
     busy(b, "Signing out");
     try{
       const j = await postJSON("/api/profile", {action: "signin-out", id: b.dataset.pfsignout});

@@ -1141,11 +1141,10 @@ async function dmAction(project, instance, act, btn){
     readMoved("docker"); drawPanes(); loadDocker();
     return;
   }
-  if (act === "update"){
-    const d = (dockerList?.instances || []).find(i => i.project === project && i.instance === instance);
-    if (!await askYes(`Update ${d?.name || project}?\n\nThe newer ${(d?.images_behind || []).join(", ")} is pulled and it starts again on it, so it is down for a moment.`)) return;
-  }
-  if (act === "down" && !await askYes(`Take ${dmCalled(project, instance)} down?`)) return;
+  // Up, Down, Rebuild and an image's update lose nothing and ask nothing
+  // (R265, the operator, 19 Nov): the row says what the press started.
+  // nginx's update above keeps its question, since every space's sites on
+  // the node are down while it pulls.
   if (act === "remove" && !await askYes(
       `Remove ${dmCalled(project, instance)}?\n\n`
       // Which of the two halves is actually going to happen. A row whose
@@ -1184,23 +1183,23 @@ async function dmAction(project, instance, act, btn){
       notify(`the env is missing ${st.missing_env.join(", ")}: press Env`, true);
       return;
     }
-    if (act === "rebuild" && !await askYes(
-        (st.built_rev ? `Rebuild ${dmCalled(project, instance)}?\n\nBuilds the image, then down and up. `
-                      : `Build ${dmCalled(project, instance)}?\n\nBuilds the first image and brings it up. `)
-        + "New env settings stop it before up; the Env editor keeps your old values in comments.")) return;
-    if (!st.risks_ack){
-      if (!await askYes("This compose file asks for more than its own directory:"
-          + "\n\n" + (st.risks || []).map(x => "\u2022 " + x).join("\n")
-          + "\n\nStart it anyway?")) return;
-      ack = st.risks_digest || "";
-    }
-    // What it would ship beside the app that its last build did not (the
-    // operator, 17 Oct: the person knows what is actually being shipped):
-    // named, and a yes is this press's; a no leaves it unbuilt.
-    if ((st.beside_new || []).length){
-      if (!await askYes(`${projLabel(project)}'s compose now runs ${st.beside_new.join(", ")} beside the app, which its last build did not ship.`
-          + "\n\nShip it with the app? If it is not part of the app, cancel and give it a container of its own with New container.")) return;
-      beside = st.beside_digest || "";
+    // What this press needs a person's yes for, found now and asked once
+    // (R265: it was a question for the rebuild itself, another for what the
+    // compose reaches and a third for what it ships new, each a screen):
+    // what the compose file asks for past its own directory, until that
+    // list is acknowledged, and what it would run beside the app that its
+    // last build did not ship (the operator, 17 Oct: the person knows what
+    // is actually being shipped). With neither, the press runs; a no leaves
+    // it as it was.
+    const reach = st.risks_ack ? [] : st.risks || [], fresh = st.beside_new || [];
+    if (reach.length || fresh.length){
+      const verb = act === "up" ? "Start" : st.built_rev ? "Rebuild" : "Build";
+      if (!await askYes(fresh.length ? "If a new one is not part of the app, cancel and give it a container of its own with New container." : "", {
+        title: `${verb} ${dmCalled(project, instance)}?`, verb,
+        parts: [{head: "Its compose file asks for more than its own directory", lines: reach},
+                {head: "New beside the app, which its last build did not ship", lines: fresh}]})) return;
+      if (reach.length) ack = st.risks_digest || "";
+      if (fresh.length) beside = st.beside_digest || "";
     }
   }
   if (btn) btn.disabled = true;
@@ -2582,7 +2581,6 @@ function dmWireRows(el, list = dockerList){
   const node = list?.node || dockerNode;
   el.querySelectorAll("[data-ctl]").forEach(b => b.onclick = async () => {
     const what = b.dataset.ctl, ctr = b.dataset.ctr;
-    if (what === "stop" && !await askYes(`Stop ${ctr}?`)) return;
     busy(b, {start: "Starting", stop: "Stopping", restart: "Restarting"}[what]);
     try{
       const j = await postJSON("/api/dockerctl", {action: what, container: ctr, node});
@@ -2666,8 +2664,6 @@ function dmWireRows(el, list = dockerList){
     const [project, instance] = key.split("|");
     const what = (list?.instances || []).find(
       x => x.project === project && x.instance === instance)?.name || project;
-    if (!await askYes(`Move ${what} to ${projLabel(to)}? It keeps its name, env and data, and builds from ${
-        projLabel(to)}'s tree from its next rebuild.`)){ delete dmMoveDraft[key]; return; }
     const j = await postJSON("/api/devapp", {action: "move", project, instance, to});
     if (j.error){ notify(j.error, true); return; }
     delete dmMoveDraft[key];

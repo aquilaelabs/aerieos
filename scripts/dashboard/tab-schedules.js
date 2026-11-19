@@ -257,7 +257,6 @@ function wireSchedules(root){
   });
   root.querySelectorAll("[data-schedrun]").forEach(b => b.onclick = async () => {
     const s = (schedData.schedules || []).find(x => x.id === b.dataset.schedrun);
-    if (!await askYes(`Run ${s?.name || "this schedule"} now?\n\nIt runs once on its node, as a job, whatever its timetable says.`)) return;
     busy(b, "Running");
     const j = await postSchedule({action: "run", id: b.dataset.schedrun});
     unbusy(b, "Run now");

@@ -438,7 +438,9 @@ function nbWikiView({$, nb, project}){
                                     : "took in the forge's wiki's changes"); nb.wkPages = {}; loadWiki(); }
   };
   $("wkPush").onclick = async ev => {
-    if (wikiDirty() && !await askYes("Push what is saved?\n\nA page is being edited and is not saved; its edits stay here.", {verb: "Push"})) return;
+    // A page being edited is not in the push and stays as typed: said, not
+    // asked (R265: a press asks only where its yes costs something).
+    if (wikiDirty()) notify("pushing what is saved: the page being edited is not in it, and its edits stay here");
     busy(ev.target, "Pushing");
     let j = await postJSON("/api/wiki", {project, action: "push"});
     // The forge has something this wiki has not: most often the one page

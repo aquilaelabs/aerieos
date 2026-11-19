@@ -313,7 +313,6 @@ function renderEmulatorInto(i){
   });
   const ab = el.querySelector('[data-emu="abort"]');
   if (ab) ab.onclick = async () => {
-    if (!await askYes("Stop this image job? A half-fetched image is removed.")) return;
     busy(ab, "Stopping");
     await postJSON("/api/v1/jobs", {action: "cancel", id: job.id});
     loadEmulator();

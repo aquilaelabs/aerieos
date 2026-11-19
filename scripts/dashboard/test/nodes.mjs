@@ -1687,10 +1687,10 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     await page.click(`${ROW} [data-nd="disable"]`);
     await page.waitForSelector(`${ROW} [data-nd="enable"]`, { timeout: 10000 });
     const dis = await napi('/api/prefs', { project: 'gamma', nodes: [minted.id] });
-    ok(page.dialogs.length === 1 && /Disable shed/.test(page.dialogs[0])
+    ok(page.dialogs.length === 0
        && /disabled/.test(await page.$eval(`#pane0 .bar .mchead [data-ndgo="${minted.id}"]`, e => e.textContent))
        && /disabled on the Nodes page/.test(dis.error || ''),
-       `Disable asks, says the node is disabled in its header's pill, and a space may not add it until Enable (${dis.error})`);
+       `Disable asks nothing (it costs nothing: Enable is on the same row), says the node is disabled in its header's pill, and a space may not add it until Enable (${dis.error})`);
     await page.evaluate(n => renameProject(n, 'project'), 'gamma');   // Also works on is the space's (R223)
     await page.waitForSelector('#rnmodal:not([hidden])', { timeout: 10000 });
     ok(!(await page.$$eval('#rnNode option', (os, id) => os.some(o => o.value === id), minted.id)),
@@ -1821,8 +1821,8 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
       const js = (await napi('/api/v1/jobs?active=1')).jobs || [];
       return js.find(x => x.type === 'system' && x.spec?.apply === 'door');
     }, 15000, 250)) || null;
-    ok(page.dialogs.length === 1 && /Shut the SSH door/.test(page.dialogs[0]) && doorJob && doorJob.spec.config.on === false,
-       `Shut the door asks, then queues the door system job with on: false (${JSON.stringify(doorJob?.spec)})`);
+    ok(page.dialogs.length === 0 && doorJob && doorJob.spec.config.on === false,
+       `Shut the door asks nothing, since it opens again from the same row, and queues the door system job with on: false (${JSON.stringify(doorJob?.spec)})`);
     if (doorJob) await napi('/api/v1/jobs', { action: 'cancel', id: doorJob.id });
     await hello({ ...CENSUS, door: { kind: 'cloudflared', host: 'ssh-shed.example.com', installed: true, active: false } });
     await page.evaluate(async () => { await refresh(); await loadNodes(); });

@@ -316,10 +316,18 @@ async function flUpload(list){
   if (!list.length || flUp) return;
   const node = flNode, root = flRoot, path = flPath;
   const there = new Set((fl?.entries || []).map(e => e.name));
+  // The names already in this folder are asked about once, together (R265:
+  // it was a question a file): a yes replaces them, Cancel leaves them as
+  // they are and sends the rest.
+  const clash = [...list].filter(f => there.has(f.name)).map(f => f.name);
+  const over = !clash.length ? false
+    : clash.length === 1 ? await askYes(`Replace ${clash[0]}?\n\nA file of that name is in this folder already.`, {verb: "Replace", danger: true})
+    : await askYes("Cancel leaves these as they are and sends the rest.", {title: `Replace ${clash.length} files?`, verb: "Replace", danger: true,
+                                                                          parts: [{head: "In this folder already", lines: clash}]});
   for (const [i, file] of list.entries()){
     let replace = false;
     if (there.has(file.name)){
-      if (!await askYes(`Replace ${file.name}?\n\nA file of that name is in this folder already.`, {verb: "Replace", danger: true})) continue;
+      if (!over) continue;
       replace = true;
     }
     flUp = {name: file.name, done: 0, size: file.size, i: i + 1, n: list.length};

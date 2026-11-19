@@ -89,6 +89,15 @@ one exception is the dialog that shows a node's one-time enrollment token:
 a stray press and Back pass it by, so the token is not lost before it is
 copied.
 
+A **question** is asked only where a yes costs something: it deletes or
+overwrites, it cuts off somebody's work (sessions end, a machine restarts),
+or it grants more reach. Rebuild, Up, Down and Stop on your own containers
+just run. One press asks once at most: when a rebuild's compose file both
+reaches past its own directory and runs something new beside the app, both
+are listed in one question under one button. On a phone a question is a
+short sheet at the foot of the screen, as tall as its words, and a press on
+the page above it is Cancel.
+
 **Help** is these docs, read in the wiki's reader: listed in the docs
 folder's README groups beside the one open (a picker above it on a phone), a
 long one opening on its contents, a link to another doc opening it in place

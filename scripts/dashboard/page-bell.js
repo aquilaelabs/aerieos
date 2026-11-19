@@ -75,7 +75,9 @@ function toastPlace(){
   if (!stack) return;
   const m = innerWidth <= 900 ? topModal() : null;
   const sheet = m && !m.classList.contains("inline") ? m : null;
-  const r = sheet?.querySelector(":scope > .box > .foot, :scope > .box > .dlgbody > .foot")?.getBoundingClientRect();
+  // ...and above a question whole, which is a short sheet at the foot (R265).
+  const r = (sheet?.classList.contains("askdlg") && !sheet.classList.contains("typed") ? sheet.querySelector(":scope > .box")
+    : sheet?.querySelector(":scope > .box > .foot, :scope > .box > .dlgbody > .foot"))?.getBoundingClientRect();
   stack.style.bottom = r?.height ? `${Math.round(innerHeight - r.top + 8)}px`
     : sheet ? "calc(8px + env(safe-area-inset-bottom))" : "";
 }

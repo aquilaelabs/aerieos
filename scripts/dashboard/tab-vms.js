@@ -354,7 +354,6 @@ function wireVms(el){
         if (!gb) return;
         body.gb = +gb;
       }
-      if (action === "eject" && !await askYes(`Eject ${v.iso} from ${v.name}?\n\nIts next boot is from its disk, where the installer put the system.`)) return;
       if (b.dataset.snap) body.snapshot = b.dataset.snap;
       if (b.dataset.force) body.force = true;
       busy(b, {start: "Starting", stop: "Stopping", restart: "Restarting", remove: "Removing", snapshot: "Saving",

@@ -610,8 +610,6 @@ function tcToolkitLine(m){
 async function tcAct(action, only){
   // A press while a job runs is queued behind it, here and on a node alike.
   if (action === "abort"){
-    if (!await askYes("Stop after the toolchain it is on? What has already installed stays."))
-      return;
     // On a node the install is a job, and stopping it is the queue's Cancel.
     if (tcNode !== "local" && toolchains?.job?.id)
       await postJSON("/api/v1/jobs", {action: "cancel", id: toolchains.job.id});
@@ -630,12 +628,12 @@ async function tcAct(action, only){
   // The driver is the one row whose install ends at a restart: said once,
   // before anything is queued.
   const drv = names.includes(TC_DRIVER) && action === "install";
-  if (drv && !await askYes(`Install NVIDIA's driver on ${toolchains?.name || "this node"}? It takes the card only when the machine restarts, which ends every session on it.`))
-    return;
   // ...and the toolkit is the one that adds a package source of somebody
-  // else's to the machine.
-  if (names.includes(TC_TOOLKIT) && action === "install"
-      && !await askYes(`Install the NVIDIA container toolkit on ${toolchains?.name || "this node"}? It adds NVIDIA's own package source to the machine. Running containers keep running.`))
+  // else's to the machine. Both in one press are one question (R265).
+  const kit = names.includes(TC_TOOLKIT) && action === "install";
+  if ((drv || kit) && !await askYes("", {title: `Install on ${toolchains?.name || "this node"}?`, verb: "Install", parts: [
+    {head: "NVIDIA's driver", lines: drv ? ["It takes the card only when the machine restarts, which ends every session on it."] : []},
+    {head: "The NVIDIA container toolkit", lines: kit ? ["It adds NVIDIA's own package source to the machine. Running containers keep running."] : []}]}))
     return;
   try{
     const body = {action, names, node: tcNode, ...(drv && tcDriverPick ? {driver: tcDriverPick} : {})};

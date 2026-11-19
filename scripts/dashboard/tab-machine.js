@@ -126,10 +126,11 @@ function olderVersionsSection(n){
 function wireOlderVersions(root){
   root.querySelectorAll("[data-oskeptdo]").forEach(b => b.onclick = () => pressing(b, async () => {
     const verb = b.dataset.oskeptdo, version = b.closest("[data-oskept]")?.dataset.oskept || "";
-    if (!await askYes(verb === "next"
-        ? `Boot ${version} next?\n\nOnce, at the next restart; the boot after is this version again. Nothing restarts until you do.`
-        : `Remove ${version} from this machine?\n\nIt goes from the boot menu and its files are deleted. A release can be installed again by updating to it.`,
-        {title: verb === "next" ? "Boot it next?" : "Remove it?", verb: verb === "next" ? "Boot it next" : "Remove", danger: verb !== "next"})) return;
+    // Boot it next asks nothing (R265: a press asks only where its yes costs something): it is once, at the next
+    // restart, and nothing restarts until the person does. Remove deletes
+    // the version's files, and asks.
+    if (verb !== "next" && !await askYes(`Remove ${version} from this machine?\n\nIt goes from the boot menu and its files are deleted. A release can be installed again by updating to it.`,
+        {title: "Remove it?", verb: "Remove", danger: true})) return;
     busy(b, verb === "next" ? "Setting" : "Removing");
     const j = await postJSON("/api/v1/nodes", {action: "os-kept", id: ownMachine()?.id || "", verb, version});
     notify(j.error || (verb === "next" ? `${version} boots next, once: restart from Advanced` : `removing ${version}`), !!j.error);
