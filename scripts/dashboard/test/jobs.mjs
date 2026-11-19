@@ -6,12 +6,11 @@
 // operator's window on all of it. Every assertion here goes through the queue
 // end to end (a job queued, placed, run, logged, ended), because the queue is
 // what this phase exists to prove.
-import { URL, launch, newPage, ok, done, ready, sleep, DIR, quiet, OWNER, api, section, REPO } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, sleep, DIR, quiet, OWNER, api, section, REPO, jobEnd } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 
 const auth = OWNER;
 const base = URL.replace(/\/$/, '');
-const OVER = ['succeeded', 'failed', 'canceled'];
 const until = async (fn, ms = 20000, step = 200) => {
   const end = Date.now() + ms;
   while (Date.now() < end){ const v = await fn(); if (v) return v; await sleep(step); }   // the loop's own period
@@ -23,7 +22,7 @@ const job =id => api(`/api/v1/jobs?id=${id}`);
 // below are about the jobs THIS file queued.
 const mine = new Set();
 const exec = async body => { const q = await api('/api/v1/nodes', { action: 'exec', ...body }); if (q.job) mine.add(q.job); return q; };
-const settled = id => until(async () => { const j = await job(id); return OVER.includes(j.state) ? j : null; });
+const settled = id => jobEnd(id, { ms: 20000, step: 200 });
 
 // ---- a job on the local node, run by the controller itself ----------------
 await section("a job on the local node, run by the controller itself", async () => {

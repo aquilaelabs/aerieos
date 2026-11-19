@@ -946,6 +946,20 @@ export const call = async (path, body, headers = OWNER) => {
   return { status: r.status, body: j };
 };
 export const api = async (path, body, headers = OWNER) => (await call(path, body, headers)).body;
+// jobEnd(id, { ms, step, headers, base }): a job waited for from outside the
+// page, asked for by its id every `step` ms until it has succeeded, failed
+// or been canceled. Answers its row, or null when `ms` ran out first; the
+// time is the caller's own and is not stretched as until's is. Asked as the
+// owner of this run's server unless `headers` and `base` say who and where.
+export async function jobEnd(id, { ms = 60000, step = 250, headers = OWNER, base = URL } = {}){
+  const at = `${base.replace(/\/$/, '')}/api/v1/jobs?id=${id}`, end = Date.now() + ms;
+  while (Date.now() < end){
+    const j = await (await fetch(at, { headers })).json().catch(() => null);
+    if (j && ['succeeded', 'failed', 'canceled'].includes(j.state)) return j;
+    await sleep(step);
+  }
+  return null;
+}
 // REPO: the checkout the suite runs from, with no trailing slash, for a
 // suite that reads a file of the tree or runs one of its scripts.
 export const REPO = fileURLToPath(new globalThis.URL('../../..', import.meta.url)).replace(/\/$/, '');

@@ -5,7 +5,7 @@
 // off; and the Enroll dialog's tick puts nginx on a node the moment it
 // enrolls. The harness's sandbox node is the node, and its stub docker reads
 // the generated compose file the way a daemon would.
-import { URL, launch, newPage, ok, done, ready, DIR, api, section } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, DIR, api, section, jobEnd } from './lib.mjs';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 // Poll fn until it answers something other than null, or give up.
@@ -492,7 +492,7 @@ ok(!after.deployed && after.routes.length === 2 && (gone || queued),
    `Remove takes the container off the Containers page, or queues its down on a quiet node, and keeps the routes here (${JSON.stringify([after.deployed, after.routes.length, gone, queued])})`);
 // The Save's rebuild (two.job) may land after the Remove forgot the row:
 // its result must not stamp a record back into being (B633).
-await until(async () => ['succeeded', 'failed', 'canceled'].includes((await api(`/api/v1/jobs?id=${two.job}`)).state) ? true : null, 60000, 500);
+await jobEnd(two.job, { ms: 60000, step: 500 });
 const ghost = JSON.parse(readFileSync(`${DIR}/state/devapps.json`, 'utf8'))['nginx-sandbox'];
 ok(!ghost || !!(await api('/api/v1/jobs?active=1')).jobs?.some(j => j.project === 'nginx-sandbox'),
    `...and the rebuild landing afterwards does not bring the row back as a ghost (${JSON.stringify(ghost || null)})`);
