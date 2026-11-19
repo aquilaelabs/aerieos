@@ -173,8 +173,15 @@ await section("a pack that brings a coding agent sits with the agents", async ()
 });
 
 // ---- no node ---------------------------------------------------------------
-await page.evaluate(() => { openInstalledTab(); nodesList = []; instNode = ''; inst = null; loadInstalled(); });
-await page.waitForSelector('.doc .installedtab .instnone', { timeout: 20000 });
+// Emptied again until the page says so: a read of the nodes or of the page
+// already out lands after the list is emptied and fills it again, as the
+// Library's own no-node step met under a gate's load.
+await page.evaluate(() => openInstalledTab());
+await page.waitForFunction(() => {
+  if (document.querySelector('.doc .installedtab .instnone')) return true;
+  if (!readBusy('nodes') && !readBusy('installed') && (nodesList?.length || instNode || inst)){ nodesList = []; nodesStale = false; instNode = ''; inst = null; loadInstalled(); }
+  return false;
+}, null, { timeout: 20000, polling: 300 });
 ok(await page.evaluate(() => !document.querySelector('.doc .installedtab .irow') && !document.querySelector('.pane .bar #ndPick')),
    'with no node enrolled it says to enroll one');
 await page.evaluate(() => { nodesList = null; nodesStale = true; instNode = ''; inst = null; loadInstalled(); });

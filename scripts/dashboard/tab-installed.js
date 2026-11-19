@@ -405,10 +405,10 @@ function wireInstalled(root){
 // Open on a row: the thing's own page on this node. A service whose
 // settings are a page of their own (nginx's routes and certificates, the
 // Scanners' schedule and runs: R264) opens that page for the node.
-const SERVICE_PAGES = {nginx: node => openNginxTab(node), scanners: () => openScannersTab()};
 function instOpen(key, at = ""){
+  const pages = {nginx: node => openNginxTab(node), scanners: () => openScannersTab()};
   const r = (inst?.rows || []).find(x => `${x.kind}:${x.name}` === key);
-  const page = r?.kind === "service" && r.installed ? SERVICE_PAGES[r.service] : null;
+  const page = r?.kind === "service" && r.installed ? pages[r.service] : null;
   if (page) return page(instNode);
   openThing(instNode, key, at);
 }
