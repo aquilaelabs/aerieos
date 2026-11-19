@@ -206,8 +206,8 @@ function claudeRestart(name, n, several, agent = "claude", slot = 1){
 // at its next poll, which after the agent's own update is over a minute
 // away (its first census), and the page said to press Restart again for a
 // restart that was about to happen by itself (the operator, 19 Nov).
-const RESTART_WAIT_S = 240;
 async function restartNow(name, r, say = () => {}){
+  const RESTART_WAIT_S = 240;
   const n = r.restart, id = r.agent || "claude", slot = r.slot || 1;
   const node = n.name || "the node";
   const j = await endSession(myAgentSession(id, name, slot), n.id, true).catch(e => ({error: failWords(e)}));
