@@ -11,7 +11,7 @@ import subprocess
 import sys
 import threading
 import time
-from .jobs import pump
+from .jobs import left_holding, pump
 from .base import (
     AGENT_INSTALLS,
     agent_prefixes,
@@ -857,6 +857,7 @@ class SessionsMixin:
         # read on this thread, so nothing was posted until the end and a
         # silent hang never reached its deadline.
         reader = pump(job, job.proc.stdout)
+        emptied = [None]
         while reader.is_alive():
             reader.join(0.5)
             if job.pending:
@@ -865,6 +866,8 @@ class SessionsMixin:
                 job.say("the installer did not finish in time\n")
                 job.cancel()
                 return "failed", 75
+            if left_holding(job, job.proc, emptied):
+                break
         code = job.proc.wait()
         job.proc = None
         if code != 0:

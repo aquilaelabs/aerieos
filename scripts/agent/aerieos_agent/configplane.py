@@ -45,7 +45,7 @@ from .sessnet import session_conf, session_sudoers
 from .runners import runner_dirs, runner_slot
 from .census import FEATURES, _os_release, boot_id, export_gaps, mounts_now, network_now, services_now
 from .disks import disks_now
-from .jobs import Job, pump
+from .jobs import Job, left_holding, pump
 
 
 # The journal kept across boots (R185) and kept to a gigabyte: journald's own
@@ -784,7 +784,7 @@ class ConfigPlaneMixin:
             Job._kill(p)
 
         reader = pump(job, p.stdout, keep_blank=False)
-        deadline, killed = time.monotonic() + timeout, False
+        deadline, killed, emptied = time.monotonic() + timeout, False, [None]
         while reader.is_alive():
             reader.join(0.5)
             if getattr(job, "pending", None):
@@ -793,6 +793,8 @@ class ConfigPlaneMixin:
                 job.say(f"timed out after {int(timeout)}s, killing it\n")
                 Job._kill(p)
                 killed = True
+            if left_holding(job, p, emptied):
+                break
         p.wait()
         with contextlib.suppress(OSError):
             p.stdout.close()
@@ -852,7 +854,7 @@ class ConfigPlaneMixin:
             job._kill(p)
 
         reader = pump(job, p.stdout)
-        deadline, killed = time.monotonic() + timeout, False
+        deadline, killed, emptied = time.monotonic() + timeout, False, [None]
         while reader.is_alive():
             reader.join(0.5)
             if job.pending:
@@ -861,6 +863,8 @@ class ConfigPlaneMixin:
                 job.say(f"timed out after {timeout}s, killing it\n")
                 job._kill(p)
                 killed = True
+            if left_holding(job, p, emptied):
+                break
         p.wait()
         job.proc = None
         if job.canceled:

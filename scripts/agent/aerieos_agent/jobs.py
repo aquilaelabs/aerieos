@@ -57,6 +57,46 @@ def pump(job, stream, keep_blank=True):
     return t
 
 
+# How long a job's output is still waited on once its process and everything
+# left in its group have ended (B983).
+TAIL_S = 10
+
+
+def _group_alive(pgid):
+    """Whether any process is left in the group a job's process led (each is
+    started with start_new_session, so its pid is its group's id)."""
+    try:
+        os.killpg(pgid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True                   # there, and not ours to signal
+
+
+def left_holding(job, p, since):
+    """Whether to stop waiting for a job's output (B983). The loops that run
+    a job wait for its pipe to close, which a process that left the job's
+    group (setsid) can hold for ever after the job's own process and the
+    rest of its group have ended, or been killed at the timeout: the job
+    stayed running and held every update of this agent as busy. True once
+    the process has ended, nothing is left in its group, and TAIL_S has
+    passed with the pipe still open, said in the job's log. `since` is the
+    caller's one-item list, the moment the group was first found empty.
+    A group with anything still in it is the job's own work, waited for as
+    before, up to the job's timeout."""
+    if p.poll() is None or _group_alive(p.pid):
+        since[0] = None
+        return False
+    if since[0] is None:
+        since[0] = time.monotonic()
+        return False
+    if time.monotonic() - since[0] < TAIL_S:
+        return False
+    job.say("its output is still held open by a process that left its group; not waited for\n")
+    return True
+
+
 def _last_frame(line):
     """A line a progress meter redrew in place (frames joined by carriage
     returns) as the frame it ended on. Every frame used to go into the log:
@@ -741,7 +781,7 @@ class Job(threading.Thread):
         # its log, and a cancel sent on the log reply could not arrive.
         reader = pump(self, p.stdout)
         deadline = time.monotonic() + timeout
-        killed = False
+        killed, emptied = False, [None]
         while reader.is_alive():
             reader.join(0.5)
             if self.pending:
@@ -750,6 +790,8 @@ class Job(threading.Thread):
                 self.say(f"timed out after {int(timeout)}s, killing it\n")
                 self._kill(p)
                 killed = True
+            if left_holding(self, p, emptied):
+                break
         p.wait()
         self.proc = None
         if self.canceled:
