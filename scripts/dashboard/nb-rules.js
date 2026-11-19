@@ -33,27 +33,24 @@ function nbRulesView({$, nb, project}){
     nb.rulesInFlight = loadRulesNow(again).finally(() => { nb.rulesInFlight = null; });
     return nb.rulesInFlight;
   }
+  // The rules' read (nbRevRead), with the code base's numbers asked beside
+  // it. An answer is kept whole, its error with it, which drawRules says.
   function loadRulesNow(again){
-    return reading(`${project}:rules`, async () => {
-      nb.loadCodebase().then(() => drawRules());
-      try{
-        nb.ruleData = await getJSON("/api/rules?project=" + encodeURIComponent(project));
-      }catch(e){ nb.ruleData = {error: String(e), rules: []}; }
-      // The answer's own revision, not the page's token as of now (B201); an
-      // answer that failed carries none, and the token stands in.
-      nb.rulesRev = nb.ruleData.rev ?? revs[`rules:${project}`] ?? nb.rulesRev;
+    return nbRevRead(nb, {
+      key: "rules", url: "/api/rules",
+      start: () => nb.loadCodebase().then(() => drawRules()),
+      rev: [() => nb.rulesRev, v => nb.rulesRev = v],
+      put: (j, threw) => nb.ruleData = threw ? {error: j.error, rules: []} : j,
       // A reload that lands on staged work keeps the work: the poll never
       // asks while the panel is dirty (HALVES), but a load already on its
       // way when Add or Edit was pressed used to land afterwards and drop the
       // row under the finger that made it (B255). What is on disk is read
       // fresh either way; Save's own conflict check is what judges the base.
-      if (!ruleDirty()) nb.ruleClash = null;
-      drawRules();
-      // Already behind (see nb-tests.js): read once more now, unless somebody
-      // is typing, which is the case the poll's own guard keeps.
-      if (!again && nb.ruleData.rev !== undefined && revs[`rules:${project}`] !== undefined
-          && revs[`rules:${project}`] !== nb.ruleData.rev && !ruleDirty()) loadRulesNow(true); return;
-    });
+      draw: () => { if (!ruleDirty()) nb.ruleClash = null; drawRules(); },
+      // No second read while somebody is typing, which is the case the
+      // poll's own guard keeps.
+      hold: ruleDirty,
+    }, again);
   }
 
   // The global rules, under the project's own: every project's sessions

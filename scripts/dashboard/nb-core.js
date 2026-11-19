@@ -1143,6 +1143,46 @@ function nbCoreWatchHalves(nb){
           () => { if (nbCoreShowing(nb, "briefing")) nb.loadPreamble(); });
 }
 
+// ---- what a view reads and writes ----------------------------------------
+// The read of a view whose half carries a revision (the bugs, the tests, the
+// rules, the approval queue): ask `url` for this space, hand the answer to
+// `put`, note the revision it carried, `draw`.
+//
+// `put(j, threw)` keeps the answer in the view's own shape and gives back
+// what it kept, or nothing to leave what was read before and end the read
+// there; a read that threw comes to it as {error: its words} with `threw`
+// set. `rev` is the pair that reads and writes the view's revision. The one
+// noted is the ANSWER's, never the page's token as of now: a write landing
+// between the read and that line moved the token, and recording that marked
+// the write as seen, so the row it made never showed (B201). An answer that
+// failed carries none, and the token stands in so the watch keeps asking
+// rather than waiting on a number that never comes.
+//
+// Already behind: a write landed while this answer was on its way, and the
+// poll fired for it BEFORE this landed, so it will not fire again. Read once
+// more now rather than wait for the next write. Once (`again`): an answer
+// and a token that disagree for good must not become a loop; and not while
+// `hold` says the view is holding work.
+//
+// `key` names the read and, unless `token` does, the revision token; `start`
+// is what else the read sets going as it begins.
+function nbRevRead(nb, o, again = false){
+  const {project} = nb;
+  const {key, token = key, url, rev: [was, note], put, draw, start, hold} = o;
+  return reading(`${project}:${key}`, async () => {
+    start?.();
+    let got;
+    try{ got = put(await getJSON(`${url}?project=${encodeURIComponent(project)}`), false); }
+    catch(e){ got = put({error: String(e)}, true); }
+    if (got === undefined) return;
+    const k = `${token}:${project}`;
+    note(got.rev ?? revs[k] ?? was());
+    draw();
+    if (!again && got.rev !== undefined && revs[k] !== undefined
+        && revs[k] !== got.rev && !hold?.()) nbRevRead(nb, o, true);
+  });
+}
+
 // ---- this space's VMs and containers -------------------------------------
 // This project's VMs as the VMs page draws them, scoped to it (R96): the
 // page's own rows and their presses, the project's card alone.

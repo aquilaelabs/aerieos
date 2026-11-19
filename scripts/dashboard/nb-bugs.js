@@ -58,21 +58,15 @@ function nbBugsView({$, nb, project}){
   nb.bugs = null;
   nb.bugRev = null;      // the tracker's revision as of the last read
 
+  // The tracker's read (nbRevRead): a read that failed is an empty tracker
+  // carrying the error, which drawBugs says.
   function loadBugs(again = false){
-    return reading(`${project}:bugs`, async () => {
-      try{
-        const j = await getJSON("/api/bugs?project=" + encodeURIComponent(project));
-        nb.bugs = j.error ? {bugs: [], error: j.error} : j;
-      }catch(e){ nb.bugs = {bugs: [], error: String(e)}; }
-      // The answer's own revision, not the page's token as of now (B201); an
-      // answer that failed carries none, and the token stands in.
-      nb.bugRev = nb.bugs.rev ?? revs[`bug:${project}`] ?? nb.bugRev;
-      drawBugs();
-      reposAlso($("bugRepos"), project, "bugs");
-      // Already behind (see nb-tests.js): read once more now.
-      if (!again && nb.bugs.rev !== undefined && revs[`bug:${project}`] !== undefined
-          && revs[`bug:${project}`] !== nb.bugs.rev) loadBugs(true); return;
-    });
+    return nbRevRead(nb, {
+      key: "bugs", token: "bug", url: "/api/bugs",
+      rev: [() => nb.bugRev, v => nb.bugRev = v],
+      put: (j, threw) => nb.bugs = threw || j.error ? {bugs: [], error: j.error} : j,
+      draw: () => { drawBugs(); reposAlso($("bugRepos"), project, "bugs"); },
+    }, again);
   }
 
   // Wrapped so the poll can tell this panel's own write from somebody

@@ -7,21 +7,15 @@
 
 function nbPendingView({$, nb, project, root}){
   // ---- what a session has waiting for approval (roadmap #27) --------------
+  // The queue's read (nbRevRead): a read that failed leaves the queue as it
+  // was last read, and its revision, which starts at 0, with it.
   function loadPending(again = false){
-    return reading(`${project}:pending`, async () => {
-      try{
-        const j = await getJSON(`/api/pending?project=${encodeURIComponent(project)}`);
-        if (j.error) return;
-        nb.pendData = j;
-      }catch(e){ return; }
-      // The answer's own revision, not the page's token as of now (B201), so
-      // the nb.watch above can tell a later move from what this copy holds.
-      nb.pendRev = nb.pendData.rev ?? revs[`pending:${project}`] ?? nb.pendRev ?? 0;
-      drawPending();
-      // Already behind (see nb-tests.js): read once more now.
-      if (!again && nb.pendData.rev !== undefined && revs[`pending:${project}`] !== undefined
-          && revs[`pending:${project}`] !== nb.pendData.rev) loadPending(true); return;
-    });
+    return nbRevRead(nb, {
+      key: "pending", url: "/api/pending",
+      rev: [() => nb.pendRev ?? 0, v => nb.pendRev = v],
+      put: (j, threw) => { if (!threw && !j.error) return nb.pendData = j; },
+      draw: drawPending,
+    }, again);
   }
   function drawPending(){
     const el = $("nbPending");

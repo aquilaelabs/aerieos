@@ -49,27 +49,15 @@ function nbTestsView({$, nb, project}){
     unbusy(btn, "Open the run's output");
   }
 
+  // The registry's read (nbRevRead): a read that failed is an empty registry
+  // carrying the error, which drawTests says.
   function loadTests(again = false){
-    return reading(`${project}:tests`, async () => {
-      try{
-        const j = await getJSON("/api/tests?project=" + encodeURIComponent(project));
-        nb.tests = j.error ? {tests: [], suites: [], error: j.error} : j;
-      }catch(e){ nb.tests = {tests: [], suites: [], error: String(e)}; }
-      // The revision the ANSWER carried, never the page's token as of now: a
-      // write landing between the read and this line moved the token, and
-      // recording that marked the write as seen, so the row it made never
-      // showed (B201). The same rule the roadmap and memory halves keep.
-      // An answer that failed carries none, and the token stands in so the
-      // watch keeps asking rather than waiting on a number that never comes.
-      nb.testsRev = nb.tests.rev ?? revs[`tests:${project}`] ?? nb.testsRev;
-      drawTests();
-      // Already behind: a write landed while this answer was on its way, and
-      // the poll fired for it BEFORE this landed, so it will not fire again.
-      // Read once more now rather than wait for the next write. Once: an
-      // answer and a token that disagree for good must not become a loop.
-      if (!again && nb.tests.rev !== undefined && revs[`tests:${project}`] !== undefined
-          && revs[`tests:${project}`] !== nb.tests.rev) loadTests(true); return;
-    });
+    return nbRevRead(nb, {
+      key: "tests", url: "/api/tests",
+      rev: [() => nb.testsRev, v => nb.testsRev = v],
+      put: (j, threw) => nb.tests = threw || j.error ? {tests: [], suites: [], error: j.error} : j,
+      draw: drawTests,
+    }, again);
   }
 
   // Wrapped so the poll can tell this panel's own write from somebody
