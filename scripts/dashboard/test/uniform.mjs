@@ -3003,17 +3003,24 @@ await section("and again on a small phone, where the room runs out first", async
     // Its box from edge to edge and top to bottom, and its foot's bottom the
     // screen's, however little the dialog holds.
     const fill = await phone.evaluate(() => {
-      const box = [...document.querySelectorAll('.modal:not(.inline)')].find(m => !m.hidden)?.querySelector('.box');
+      const modal = [...document.querySelectorAll('.modal:not(.inline)')].find(m => !m.hidden);
+      const box = modal?.querySelector('.box');
       if (!box) return 'no dialog';
       const r = box.getBoundingClientRect(), f = box.querySelector(':scope > .foot, :scope > .dlgbody > .foot')?.getBoundingClientRect();
       const off = [r.left, r.top, innerWidth - r.right, innerHeight - r.bottom].map(Math.round);
+      // But for a question (R265): a sheet at the foot, edge to edge, as tall
+      // as its words and no taller, the page showing above it.
+      if (modal.classList.contains('askdlg') && !modal.classList.contains('typed'))
+        return off[0] || off[2] || off[3] ? `a question's sheet ${off.join(',')} in from the edges`
+          : off[1] < 56 ? `a question's sheet leaves ${off[1]}px of the page showing`
+          : Math.abs(box.scrollHeight - r.height) > 2 ? `a question's sheet is ${Math.round(r.height)}px for ${box.scrollHeight}px of words` : '';
       return off.some(v => Math.abs(v) > 1) ? `box ${off.join(',')} in from the edges`
         : f && Math.abs(Math.round(innerHeight - f.bottom)) > 1 ? `foot ${Math.round(innerHeight - f.bottom)}px over the bottom` : '';
     });
     if (fill) short.push(`${name}: ${fill}`);
     await phone.evaluate(() => { document.querySelectorAll('.modal').forEach(m => { m.hidden = true; }); resumeFor = null; resumePick = null; });
   }
-  ok(short.length === 0, `on a 360px phone every dialog is the whole screen, its foot at the bottom${short.length ? ': ' + short.join(' | ') : ''}`);
+  ok(short.length === 0, `on a 360px phone every dialog is the whole screen, its foot at the bottom, and a question a sheet at the foot as tall as its words${short.length ? ': ' + short.join(' | ') : ''}`);
   ok(twice.length === 0, `on a 360px phone every dialog scrolls in one place${twice.length ? ': ' + twice.join(' | ') : ''}`);
   await phone.close();
 });

@@ -1413,8 +1413,8 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
   page.answers.push(-1);
   await page.click(`${ROW} [data-napply="storage"]`);
   await until(() => page.dialogs.length > 0, 10000, 100);
-  ok(page.dialogs.length === 1 && /unmounts \/mnt\/old/.test(page.dialogs[0]),
-     `Apply storage asks first when it would unmount something the node has (${page.dialogs[0]?.slice(0, 60)})`);
+  ok(page.dialogs.length === 1 && /Unmounted and taken out of fstab[^\n]*:\n\u2022 \/mnt\/old/.test(page.dialogs[0]),
+     `Apply storage asks once, first, when it would unmount something the node has, naming it (${page.dialogs[0]?.replace(/\n/g, ' ').slice(0, 90)})`);
   for (const j of (await napi('/api/v1/jobs?active=1')).jobs)
     await napi('/api/v1/jobs', { action: 'cancel', id: j.id });
   // A node holds its projects as a synced copy (R162), the one way it

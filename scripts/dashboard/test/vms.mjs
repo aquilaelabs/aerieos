@@ -26,9 +26,9 @@ const call = async (path, body, headers = H) => {
   return { status: r.status, ...(t ? JSON.parse(t) : {}) };
 };
 
-// The page is a tool of the Containers group, between Containers and nginx.
-ok(await page.evaluate(() => railGroups().some(g => g.key === 'containers' && g.tools.map(([k]) => k).join() === 'docker,vms,nginx,scanners')),
-   'the rail offers VMs in the Containers group, between Containers and nginx');
+// The page is a tool of the Containers group, beside Containers.
+ok(await page.evaluate(() => railGroups().some(g => g.key === 'containers' && g.tools.map(([k]) => k).join() === 'docker,vms')),
+   'the rail offers VMs in the Containers group, beside Containers');
 await page.evaluate(() => openVmsTab());
 await page.waitForSelector('.vmtab .vmnone', { timeout: 15000 });
 ok(/No node has VM host yet/.test(await page.$eval('.vmtab .vmnone', e => e.textContent)) && await page.$eval('#bVmNew', b => b.disabled),
