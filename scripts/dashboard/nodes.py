@@ -701,8 +701,9 @@ def node_storage_measure(principal, node_id):
         return {"error": "no such node"}
     if n.get("kind") != "agent":
         return {"error": "only an agent node measures its disks"}
-    if not n.get("live"):
-        return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
+    why = _reachable(n, lock=False)
+    if why:
+        return {"error": why}
     r = job_add(principal, {"node": node_id}, "storage", {"timeout": 900})
     if r.get("ok"):
         audit(principal, "node-storage", node_id, {"job": r["job"]})
@@ -716,8 +717,9 @@ def node_avd_remove(principal, node_id, project, uid, name):
     n = node(node_id)
     if not n or n.get("kind") != "agent":
         return {"error": "only an agent node keeps phones"}
-    if not n.get("live"):
-        return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
+    why = _reachable(n, lock=False)
+    if why:
+        return {"error": why}
     phones = ((n.get("reported") or {}).get("storage") or {}).get("phones") or []
     ph = next((p for p in phones if p.get("project") == project and p.get("uid") == uid
                and p.get("name") == name), None)
@@ -811,6 +813,33 @@ def node_locked(n):
                 "its mounts, address and root are managed at the OS level; Unlock "
                 "under Advanced on the Nodes page to change that")
     return ""
+
+
+def _reachable(n, also="", lock=True):
+    """Why a verb cannot act on a node's machine now, or "" when it can:
+    the lock's sentence first (node_locked), then an agent that is not
+    dialing in. `also` ends that second sentence with what the person can
+    do instead. `lock=False` is for a verb the lock does not cover, which
+    asks only whether the agent is there."""
+    why = node_locked(n) if lock else ""
+    if why:
+        return why
+    if not n.get("live"):
+        return f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine{also}"
+    return ""
+
+
+def _queue_system(principal, n, apply, config, timeout, action, detail=None, **spec_extra):
+    """Queue a system job on a node and, once it is queued, write the verb's
+    audit row: `action` on the node, with the job's id and then `detail`.
+    The spec is the one the agent reads (apply, config, timeout, then
+    whatever `spec_extra` names). The answer is job_add's own, a refusal
+    included, for the verb to hand back or add to."""
+    r = job_add(principal, {"node": n["id"]}, "system",
+                {"apply": apply, "config": config, "timeout": timeout, **spec_extra})
+    if r.get("ok"):
+        audit(principal, action, n["id"], {"job": r["job"], **(detail or {})})
+    return r
 
 
 def docker_nodes():
@@ -3847,11 +3876,7 @@ def node_uninstall(principal, node_id, rings=None):
     if busy:
         return {"error": f"{n['name']} is in use: {busy} first"}
     rings = {k: bool((rings or {}).get(k)) for k in ("stores", "configured", "doors")}
-    r = job_add(principal, {"node": node_id}, "system",
-                {"apply": "uninstall", "config": rings, "timeout": 900})
-    if r.get("ok"):
-        audit(principal, "node-uninstall", node_id, {"job": r["job"]})
-    return r
+    return _queue_system(principal, n, "uninstall", rings, 900, "node-uninstall")
 
 
 # How long a node locked down may still take its lockdown job and say how
@@ -3898,11 +3923,9 @@ def node_feature(principal, node_id, fid, op):
         return {"error": f"{n['name']} was not provisioned as a managed node with its agent as root, so {name} cannot be "
                          "installed or removed from here"}
     fe = rep.get("features") or {}
-    why = node_locked(n)
+    why = _reachable(n)
     if why:
         return {"error": why}
-    if not n.get("live"):
-        return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
     if op == "install" and fid == "vmhost" and (fe.get("vmhost") or {}).get("nokvm") == "kernel":
         return {"error": f"{n['name']}'s running kernel was built without KVM (openSUSE's minimal kernel-default-base "
                          "is one): install its full kernel (kernel-default), restart the machine, then VM host"}
@@ -3923,11 +3946,7 @@ def node_feature(principal, node_id, fid, op):
     if op == "install" and fid == "firewall" and ((n.get("reported") or {}).get("session") or {}).get("up"):
         return {"error": "this machine still runs sessions, so the firewall would shut the ports the controller "
                          "reaches them on: it is for a node enrolled hosting-only (Enroll node, sessions off)"}
-    r = job_add(principal, {"node": node_id}, "system",
-                {"apply": "feature", "config": {"id": fid, "op": op}, "timeout": 1800})
-    if r.get("ok"):
-        audit(principal, "node-feature", node_id, {"job": r["job"], "id": fid, "op": op})
-    return r
+    return _queue_system(principal, n, "feature", {"id": fid, "op": op}, 1800, "node-feature", {"id": fid, "op": op})
 
 
 def node_storage_snapshot(principal, node_id, req):
@@ -3973,15 +3992,10 @@ def node_storage_snapshot(principal, node_id, req):
             if str(req.get("confirm") or "") != name:
                 return {"error": "rolling back takes the snapshot's name typed again: everything since it is gone"}
             cfg["confirm"] = name
-    why = node_locked(n)
+    why = _reachable(n)
     if why:
         return {"error": why}
-    if not n.get("live"):
-        return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
-    r = job_add(principal, {"node": node_id}, "system", {"apply": "storage-snapshot", "config": cfg, "timeout": 900})
-    if r.get("ok"):
-        audit(principal, "storage-snapshot", node_id, {"job": r["job"], **cfg})
-    return r
+    return _queue_system(principal, n, "storage-snapshot", cfg, 900, "storage-snapshot", cfg)
 
 
 ARRAY_ACTIONS = ("create", "add", "replace", "sync", "scrub", "check", "verify", "takeover", "mover", "moves", "destroy")
@@ -4160,18 +4174,12 @@ def node_storage_array(principal, node_id, req):
         if "verify" not in have:
             return {"error": f"{n['name']}'s agent is from before Check parity: it updates itself within the hour"}
         cfg["correct"] = req.get("correct") is True
-    why = node_locked(n)
+    why = _reachable(n)
     if why:
         return {"error": why}
-    if not n.get("live"):
-        return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
-    r = job_add(principal, {"node": node_id}, "system",
-                {"apply": "storage-array", "config": cfg,
-                 # A parity check reads every disk whole: two days for a large array.
-                 "timeout": 900 if action in ("check", "destroy") else 2 * ARRAY_LONG if action == "verify" else ARRAY_LONG})
-    if r.get("ok"):
-        audit(principal, "storage-array", node_id, {"job": r["job"], **cfg})
-    return r
+    # A parity check reads every disk whole: two days for a large array.
+    timeout = 900 if action in ("check", "destroy") else 2 * ARRAY_LONG if action == "verify" else ARRAY_LONG
+    return _queue_system(principal, n, "storage-array", cfg, timeout, "storage-array", cfg)
 
 
 def node_console(principal, node_id, password, clear=False):
@@ -4199,12 +4207,10 @@ def node_console(principal, node_id, password, clear=False):
         if r.returncode != 0 or not re.fullmatch(r"\$6\$[A-Za-z0-9./]{1,16}\$[A-Za-z0-9./]{86}", h):
             return {"error": "the password could not be hashed here (openssl passwd -6)"}
         cfg["hash"] = h
-    if not n.get("live"):
-        return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
-    r = job_add(principal, {"node": node_id}, "system", {"apply": "console", "config": cfg, "timeout": 60})
-    if r.get("ok"):
-        audit(principal, "console-password", node_id, {"job": r["job"], "cleared": bool(clear)})
-    return r
+    why = _reachable(n, lock=False)
+    if why:
+        return {"error": why}
+    return _queue_system(principal, n, "console", cfg, 60, "console-password", {"cleared": bool(clear)})
 
 
 ADOPT_ACTIONS = ("dry", "adopt", "release", "read-apps", "define-vms", "docker-network", "vm")
@@ -4330,16 +4336,11 @@ def node_storage_adopt(principal, node_id, req):
         cfg["want"] = want
     elif not held_now:
         return {"error": "nothing is adopted on the machine"}
-    why = node_locked(n)
+    why = _reachable(n)
     if why:
         return {"error": why}
-    if not n.get("live"):
-        return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
-    r = job_add(principal, {"node": node_id}, "system", {"apply": "storage-adopt", "config": cfg, "timeout": 600})
-    if r.get("ok"):
-        audit(principal, "storage-adopt", node_id, {"job": r["job"], "adopt": action,
-                                                    "writable": (cfg.get("want") or {}).get("writable") is True})
-    return r
+    return _queue_system(principal, n, "storage-adopt", cfg, 600, "storage-adopt",
+                         {"adopt": action, "writable": (cfg.get("want") or {}).get("writable") is True})
 
 
 pool_keys_offer = pool_keys_forget = None
@@ -4408,16 +4409,13 @@ def node_storage_share(principal, node_id, req):
         if why:
             return {"error": why}
         skipped = []
-    why = node_locked(n)
+    why = _reachable(n)
     if why:
         return {"error": why}
-    if not n.get("live"):
-        return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
-    r = job_add(principal, {"node": node_id}, "system", {"apply": "storage-share", "config": cfg, "timeout": 120 * max(1, len(cfg.get("shares") or []))})
-    if r.get("ok"):
-        audit(principal, "storage-share", node_id, {"job": r["job"], **({"share": "set-many", "names": [x["name"] for x in cfg["shares"]]} if action == "set-many" else cfg)})
-        if skipped:
-            r["skipped"] = skipped
+    r = _queue_system(principal, n, "storage-share", cfg, 120 * max(1, len(cfg.get("shares") or [])), "storage-share",
+                      {"share": "set-many", "names": [x["name"] for x in cfg["shares"]]} if action == "set-many" else cfg)
+    if r.get("ok") and skipped:
+        r["skipped"] = skipped
     return r
 
 
@@ -4540,11 +4538,9 @@ def node_storage_pool(principal, node_id, req):
         return {"error": f"{n['name']}'s agent is not root on a managed machine, so it cannot make a pool"}
     if not ((rep.get("features") or {}).get("storage") or {}).get("zfs"):
         return {"error": "no zpool on the machine yet: install Storage on its Features section first"}
-    why = node_locked(n)
+    why = _reachable(n)
     if why:
         return {"error": why}
-    if not n.get("live"):
-        return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
     action = str(req.get("pool") or "")
     name = str(req.get("name") or "").strip()
     if action not in POOL_ACTIONS:
@@ -4604,10 +4600,7 @@ def node_storage_pool(principal, node_id, req):
             if str(req.get("confirm") or "") != name:
                 return {"error": "importing a pool another system used last takes its name typed again"}
             cfg.update(force=True, confirm=name)
-    r = job_add(principal, {"node": node_id}, "system", {"apply": "storage-pool", "config": cfg, "timeout": 900})
-    if r.get("ok"):
-        audit(principal, "storage-pool", node_id, {"job": r["job"], **cfg})
-    return r
+    return _queue_system(principal, n, "storage-pool", cfg, 900, "storage-pool", cfg)
 
 
 SPINDOWN_MINUTES = (0, 5, 10, 15, 20, 30, 60, 120)
@@ -4761,15 +4754,10 @@ def node_storage_backup(principal, node_id, name):
     name = str(name or "").strip()
     if not re.fullmatch(r"[a-z][a-z0-9-]{0,30}", name) or not any(b.get("name") == name for b in (store_backups() if store_backups else [])):
         return {"error": f"{name or 'nothing'} is not a backup on the record"}
-    why = node_locked(n)
+    why = _reachable(n)
     if why:
         return {"error": why}
-    if not n.get("live"):
-        return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
-    r = job_add(principal, {"node": node_id}, "system", {"apply": "storage-backup", "config": {"name": name}, "timeout": 86400})
-    if r.get("ok"):
-        audit(principal, "storage-backup", node_id, {"job": r["job"], "name": name})
-    return r
+    return _queue_system(principal, n, "storage-backup", {"name": name}, 86400, "storage-backup", {"name": name})
 
 
 def node_host_update(principal, node_id, reboot=False):
@@ -4787,16 +4775,11 @@ def node_host_update(principal, node_id, reboot=False):
         return {"error": f"{n['name']}'s agent is not root on a managed machine, so it cannot update its packages"}
     if rep.get("os_image"):
         return {"error": "AerieOS updates as a whole image under Controller settings, never package by package"}
-    why = node_locked(n)
+    why = _reachable(n)
     if why:
         return {"error": why}
-    if not n.get("live"):
-        return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
     cfg = {"reboot": reboot is True}
-    r = job_add(principal, {"node": node_id}, "system", {"apply": "host-update", "config": cfg, "timeout": 7200})
-    if r.get("ok"):
-        audit(principal, "host-update", node_id, {"job": r["job"], **cfg})
-    return r
+    return _queue_system(principal, n, "host-update", cfg, 7200, "host-update", cfg)
 
 
 def node_machine(principal, node_id, hostname="", timezone="", spindown=None):
@@ -4812,11 +4795,9 @@ def node_machine(principal, node_id, hostname="", timezone="", spindown=None):
     rep = n.get("reported") or {}
     if n.get("kind") != "agent" or not rep.get("administers"):
         return {"error": f"{n['name']}'s agent is not root on a managed machine, so it cannot set its name"}
-    why = node_locked(n)
+    why = _reachable(n)
     if why:
         return {"error": why}
-    if not n.get("live"):
-        return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
     # The shapes before the queue: a name that is not one is told so
     # without a job in the way.
     host = str(hostname or "").strip().lower()
@@ -4838,10 +4819,7 @@ def node_machine(principal, node_id, hostname="", timezone="", spindown=None):
     cfg = {k: v for k, v in (("hostname", host), ("timezone", tz)) if v}
     if spin is not None:
         cfg["spindown"] = spin
-    r = job_add(principal, {"node": node_id}, "system", {"apply": "machine", "config": cfg, "timeout": 120})
-    if r.get("ok"):
-        audit(principal, "machine", node_id, {"job": r["job"], **cfg})
-    return r
+    return _queue_system(principal, n, "machine", cfg, 120, "machine", cfg)
 
 
 # A draft release (the operator, 1 Nov): the controller fetches its files
@@ -4866,15 +4844,10 @@ def node_os_kept(principal, node_id, verb, version):
         return {"error": "next or remove"}
     if version not in {x.get("version") for x in (rep.get("os_kept") or {}).get("versions") or []}:
         return {"error": f"{version or 'that version'} is not kept on this machine"}
-    why = node_locked(n)
+    why = _reachable(n)
     if why:
         return {"error": why}
-    if not n.get("live"):
-        return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
-    r = job_add(principal, {"node": node_id}, "system", {"apply": "os-kept", "config": {"verb": verb, "version": version}, "timeout": 120})
-    if r.get("ok"):
-        audit(principal, "os-kept", node_id, {"job": r["job"], "verb": verb, "version": version})
-    return r
+    return _queue_system(principal, n, "os-kept", {"verb": verb, "version": version}, 120, "os-kept", {"verb": verb, "version": version})
 
 
 def node_os_update(principal, node_id, release="", from_dir=""):
@@ -4893,11 +4866,9 @@ def node_os_update(principal, node_id, release="", from_dir=""):
                          "a bare-metal install on another system updates its controller, a container install pulls its image"}
     if n.get("kind") != "agent" or not rep.get("administers"):
         return {"error": f"{n['name']}'s agent is not root on a managed machine, so it cannot write a slot"}
-    why = node_locked(n)
+    why = _reachable(n)
     if why:
         return {"error": why}
-    if not n.get("live"):
-        return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
     tag = str(release or "").strip()
     src = str(from_dir or "").strip()
     if tag and not re.fullmatch(r"v?\d+\.\d+\.\d+(?:-[a-z][a-z0-9]*\.\d+)?", tag):
@@ -4910,11 +4881,8 @@ def node_os_update(principal, node_id, release="", from_dir=""):
         d = draft_update(principal, node_id, tag, True)
         if d is not None:
             return d
-    r = job_add(principal, {"node": node_id}, "system",
-                {"apply": "os-update", "config": {**({"release": tag} if tag else {"from": src}), "keep": keep_versions()}, "timeout": 3600})
-    if r.get("ok"):
-        audit(principal, "os-update", node_id, {"job": r["job"], "release": tag, "from": src})
-    return r
+    return _queue_system(principal, n, "os-update", {**({"release": tag} if tag else {"from": src}), "keep": keep_versions()}, 3600,
+                         "os-update", {"release": tag, "from": src})
 
 
 def on_stick():
@@ -4993,15 +4961,11 @@ def node_projects_folder(principal, node_id, path="", release=False):
         cfg = {"path": path, "names": sorted(str(x) for x in (project_names() or []))[:500]}
     elif not (rep.get("os_stick") or {}).get("projects"):
         return {"error": "no folder of the machine's own is the spaces folder"}
-    why = node_locked(n)
+    why = _reachable(n)
     if why:
         return {"error": why}
-    if not n.get("live"):
-        return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
-    r = job_add(principal, {"node": node_id}, "system", {"apply": "projects-folder", "config": cfg, "timeout": 6 * 3600})
-    if r.get("ok"):
-        audit(principal, "projects-folder", node_id, {"job": r["job"], **({"path": cfg["path"]} if "path" in cfg else {"release": True})})
-    return r
+    return _queue_system(principal, n, "projects-folder", cfg, 6 * 3600, "projects-folder",
+                         {"path": cfg["path"]} if "path" in cfg else {"release": True})
 
 
 def adopted_pools(rep):
@@ -5036,18 +5000,13 @@ def node_system_pool(principal, node_id, path="", aside=False):
     mounts |= set(adopted_pools(rep))
     if path not in mounts:
         return {"error": "name a pool or the array this machine has mounted (the Storage page makes one)"}
-    why = node_locked(n)
+    why = _reachable(n)
     if why:
         return {"error": why}
-    if not n.get("live"):
-        return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
     # The id this controller's restored configuration names as its own pool's
     # (B939): that pool is taken back, never refused as another install's.
-    r = job_add(principal, {"node": node_id}, "system", {"apply": "system-pool", "config": {"path": path, "aside": aside is True,
-                                                                                         "adopt_id": install_id_kept()}, "timeout": 6 * 3600})
-    if r.get("ok"):
-        audit(principal, "system-pool", node_id, {"job": r["job"], "path": path, "aside": aside is True})
-    return r
+    return _queue_system(principal, n, "system-pool", {"path": path, "aside": aside is True, "adopt_id": install_id_kept()}, 6 * 3600,
+                         "system-pool", {"path": path, "aside": aside is True})
 
 
 def node_controller_update(principal, node_id, release=""):
@@ -5065,11 +5024,9 @@ def node_controller_update(principal, node_id, release=""):
     rep = n.get("reported") or {}
     if n.get("kind") != "agent" or not rep.get("administers"):
         return {"error": f"{n['name']}'s agent is not root on a managed machine, so it cannot run the installer"}
-    why = node_locked(n)
+    why = _reachable(n)
     if why:
         return {"error": why}
-    if not n.get("live"):
-        return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
     tag = str(release or "").strip()
     if tag and not re.fullmatch(r"v?\d+\.\d+\.\d+(?:-[a-z][a-z0-9]*\.\d+)?", tag):
         return {"error": "a release is named as its tag, vX.Y.Z or vX.Y.Z-dev.N (a dev build, B589)"}
@@ -5077,11 +5034,8 @@ def node_controller_update(principal, node_id, release=""):
         d = draft_update(principal, node_id, tag, False)
         if d is not None:
             return d
-    r = job_add(principal, {"node": node_id}, "system",
-                {"apply": "controller-update", "config": ({"release": tag} if tag else {}), "timeout": 3600})
-    if r.get("ok"):
-        audit(principal, "controller-update", node_id, {"job": r["job"], "release": tag})
-    return r
+    return _queue_system(principal, n, "controller-update", {"release": tag} if tag else {}, 3600,
+                         "controller-update", {"release": tag})
 
 
 def node_lockdown(principal, node_id):
@@ -5154,16 +5108,10 @@ def node_door(principal, node_id, on):
     kind = ((n.get("reported") or {}).get("door") or (n.get("config") or {}).get("door") or {}).get("kind")
     if kind not in ("cloudflared", "tailscale"):
         return {"error": f"{n['name']} was provisioned with no door in: Enroll node's SSH door sets one up"}
-    why = node_locked(n)
+    why = _reachable(n)
     if why:
         return {"error": why}
-    if not n.get("live"):
-        return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
-    r = job_add(principal, {"node": node_id}, "system",
-                {"apply": "door", "config": {"on": on is not False}, "timeout": 300})
-    if r.get("ok"):
-        audit(principal, "node-door", node_id, {"job": r["job"], "on": on is not False})
-    return r
+    return _queue_system(principal, n, "door", {"on": on is not False}, 300, "node-door", {"on": on is not False})
 
 
 def node_gpu_display(principal, node_id):
@@ -5186,16 +5134,10 @@ def node_gpu_display(principal, node_id):
     if isinstance(gd, dict) and not gd.get("installed"):
         return {"error": f"the NVIDIA driver is not installed on {n['name']}: install it on "
                          "the Library with that node picked first; the display runs on it"}
-    why = node_locked(n)
+    why = _reachable(n)
     if why:
         return {"error": why}
-    if not n.get("live"):
-        return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
-    r = job_add(principal, {"node": node_id}, "system",
-                {"apply": "gpu", "config": {}, "timeout": 1800})
-    if r.get("ok"):
-        audit(principal, "node-gpu-display", node_id, {"job": r["job"]})
-    return r
+    return _queue_system(principal, n, "gpu", {}, 1800, "node-gpu-display")
 
 
 def node_gpu_display_off(principal, node_id):
@@ -5209,16 +5151,10 @@ def node_gpu_display_off(principal, node_id):
     if n.get("kind") != "agent" or not (n.get("reported") or {}).get("sandbox"):
         return {"error": "only a node provisioned as an AerieOS sandbox is changed from here: "
                          "on the machine, sudo bb-sandbox gpu-off"}
-    why = node_locked(n)
+    why = _reachable(n)
     if why:
         return {"error": why}
-    if not n.get("live"):
-        return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the machine"}
-    r = job_add(principal, {"node": node_id}, "system",
-                {"apply": "gpu-off", "config": {}, "timeout": 300})
-    if r.get("ok"):
-        audit(principal, "node-gpu-display-off", node_id, {"job": r["job"]})
-    return r
+    return _queue_system(principal, n, "gpu-off", {}, 300, "node-gpu-display-off")
 
 
 def node_gpu_compute(principal, node_id, on):
@@ -5262,23 +5198,17 @@ def node_power(principal, node_id, what):
     if n.get("kind") != "agent":
         return {"error": f"{n['name']} is the controller's own machine: {verb} it from its host, "
                          "not from the dashboard running on it"}
-    why = node_locked(n)
+    why = _reachable(n, also=f": {verb} it from its console or its hypervisor")
     if why:
         return {"error": why}
-    if not n.get("live"):
-        return {"error": f"{n['name']}'s agent is not dialing in, so nothing from here reaches the "
-                         f"machine: {verb} it from its console or its hypervisor"}
     # ...nor under an install: a restart in the middle of apt, or of a
     # toolchain being unpacked, leaves it half on the machine (the operator,
     # 30 Sep), so it waits for one to end (job_waits), saying so.
     busy = [j["type"] for j in jobs_for(node_id=node_id, active=True, n=20)
             if j.get("type") in POWER_WAITS]
-    r = job_add(principal, {"node": node_id}, "system",
-                {"apply": what, "config": {}, "timeout": 60})
+    r = _queue_system(principal, n, what, {}, 60, "node-" + what)
     if r.get("ok") and busy:
         r["waits"] = f"{POWER_WAITS[busy[0]]} is running on {n['name']}: it {verb}s once that has finished"
-    if r.get("ok"):
-        audit(principal, "node-" + what, node_id, {"job": r["job"]})
     return r
 
 
@@ -5349,13 +5279,7 @@ def node_apply(principal, node_id, what):
             # ...and it waits for the node to be quiet, and holds it while it
             # runs (R120 step 7): sessions keep running and are told.
             quiet = True
-    spec = {"apply": what, "config": cfg, "timeout": timeout}
-    if quiet:
-        spec["quiet"] = True
-    r = job_add(principal, {"node": node_id}, "system", spec)
-    if r.get("ok"):
-        audit(principal, "node-apply", node_id, {"what": what, "job": r["job"]})
-    return r
+    return _queue_system(principal, n, what, cfg, timeout, "node-apply", {"what": what}, **({"quiet": True} if quiet else {}))
 
 
 def node_to_sync(principal, node_id):
