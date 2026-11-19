@@ -297,6 +297,11 @@ and runs build → down → up, unless the rebuild finds new settings in
 example with the old values preserved in comments, and leaves Up for the
 operator. Before the first build the button reads
 **Build**, and nothing is built until it is pressed.
+Up, Down and Rebuild ask nothing by themselves. A build asks once, in one
+question, when its compose file asks for more than its own directory (until
+that list has been said yes to) or would run a service beside the app that
+the last build did not ship; a session's rebuild that meets either is a
+request on the bell naming them, and Allow is the yes.
 **Build from** picks the branch it is built from. A space's tree is shared, one checkout for every session and person on it, so this does not switch it:
 the build comes from a git worktree of that branch beside the space, marked
 with a `.bbignore` so the spaces list knows what it is, and the space's own

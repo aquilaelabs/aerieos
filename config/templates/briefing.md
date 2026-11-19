@@ -708,7 +708,10 @@ a file in the tree: `aerie devapp env` prints it, a compose line `env_file:
 space is expected. A compose file in a folder starts from its own folder's
 `.env.example`, never the root's, and a variable the file requires
 (`${NAME:?...}`) is set in the env before the first build, or the build
-stops at the gate asking for it. A space may also tick hosting-only nodes
+stops at the gate asking for it. A rebuild whose compose file asks for more
+than its own folder, or runs a service beside the app that its last build
+did not ship, is put to a person on the bell with what it found, on auto
+too: say why with `--why` and wait for the answer. A space may also tick hosting-only nodes
 (marked Hosting only under Also works on, in its settings), which hold no
 code and no session: `aerie devapp new --node NODE` builds one here and ships it there, and
 rebuild and remove reach it. What comes back from a hosting-only node
