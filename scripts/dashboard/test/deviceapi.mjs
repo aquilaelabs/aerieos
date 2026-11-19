@@ -7,7 +7,7 @@
 // way to update, and the controller says the version it speaks for an app
 // newer than it to say so. The Android app's surface is
 // apps/android/api-surface.json, held by test/appapi.mjs. No browser.
-import { ok, done, DIR, URL, pinBreaks as breaks, OWNER as ADMIN, asSession, section, REPO } from './lib.mjs';
+import { ok, done, DIR, URL, pinBreaks as breaks, OWNER as ADMIN, asSession, section, REPO, aerie } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -21,8 +21,8 @@ const admin = async (path, body) => {
   return { status: r.status, ...(await r.json().catch(() => ({}))) };
 };
 const env = { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` };
-const addUser = (name, pw) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'add', name, '--role', 'user'],
-  { input: `${pw}\n${pw}\n`, encoding: 'utf8', env });
+const addUser = (name, pw) => aerie(['users', 'add', name, '--role', 'user'],
+  { input: `${pw}\n${pw}\n`, env });
 const uidOf = n => JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users[n].uid;
 const tree = `${DIR}/ws/alpha`;
 

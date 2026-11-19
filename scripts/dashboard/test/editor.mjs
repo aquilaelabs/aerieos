@@ -7,7 +7,7 @@
 // own code, driven under a stand-in for VS Code's API against this server,
 // and its terminal, AerieOS's own on /termws.
 // No browser.
-import { ok, done, sleep, until, DIR, URL, OWNER, OWNER as ADMIN, asSession, section, REPO } from './lib.mjs';
+import { ok, done, sleep, until, DIR, URL, OWNER, OWNER as ADMIN, asSession, section, REPO, aerie } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, symlinkSync, existsSync, statSync, utimesSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -22,8 +22,8 @@ const admin = async (path, body) => {
   return { status: r.status, ...(await r.json().catch(() => ({}))) };
 };
 const env = { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` };
-const addUser = (name, pw) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'add', name, '--role', 'user'],
-  { input: `${pw}\n${pw}\n`, encoding: 'utf8', env });
+const addUser = (name, pw) => aerie(['users', 'add', name, '--role', 'user'],
+  { input: `${pw}\n${pw}\n`, env });
 const uidOf = n => JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users[n].uid;
 const tree = `${DIR}/ws/alpha`;
 // The answer to one call: its status and words, never a throw.

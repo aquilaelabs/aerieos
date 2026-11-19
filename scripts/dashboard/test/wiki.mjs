@@ -3,7 +3,7 @@
 // no notebook foot; Export as a zip; and aerie wiki for a session, under
 // Agents may: Write the wiki. Pushing to a forge is wiki.py's unit tier,
 // against a repository on disk: the harness has no forge.
-import { launch, newPage, ok, done, ready, URL, DIR, section, REPO } from './lib.mjs';
+import { launch, newPage, ok, done, ready, URL, DIR, section, REPO, aerie } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 
@@ -98,8 +98,8 @@ ok(zip.status === 200 && zip.pk && /alpha-wiki\.zip/.test(zip.cd), `Export is a 
 // ---- a session, through aerie wiki, under each setting ------------------------------
 const token = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', P, 'test'],
   { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
-const bb = (...a) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'wiki', ...a], { encoding: 'utf8',
-  env: { ...process.env, BUILDERBOT_ROLE: 'node', BB_CONTROLLER: URL.replace(/\/$/, ''), BB_TOKEN: token, BB_PROJECT: P,
+const bb = (...a) => aerie(['wiki', ...a], {
+  env: { BUILDERBOT_ROLE: 'node', BB_CONTROLLER: URL.replace(/\/$/, ''), BB_TOKEN: token, BB_PROJECT: P,
          XDG_CACHE_HOME: `${DIR}/cache-wiki` } });
 const bbErr = (...a) => { try { bb(...a); return ''; } catch (e) { return String(e.stderr); } };
 const src = `${DIR}/wiki-page.md`;

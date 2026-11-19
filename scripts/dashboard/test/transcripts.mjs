@@ -2,7 +2,7 @@
 // newest first with the first thing typed, and each downloadable as a text
 // that carries the words, every command Claude ran and what came back, and
 // never Claude's private reasoning nor another account's file.
-import { URL, launch, newPage, ok, done, ready, DIR, splitPick, section, REPO } from './lib.mjs';
+import { URL, launch, newPage, ok, done, ready, DIR, splitPick, section, REPO, aerie } from './lib.mjs';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -215,8 +215,8 @@ await page.waitForSelector(`${SESS} [data-cvresume="conv-two-2025"]`, { timeout:
 const rowOf = id => `${SESS} .artrow:has([data-cvresume="${id}"])`;
 await section("A person's own session says the same of their conversations", async () => {
   // A person's own session says the same of their conversations (aerie transcripts label).
-  const cliS = (...a) => execFileSync('bash', [`${REPO}/scripts/aerie`, ...a], { encoding: 'utf8',
-    env: { ...process.env, BUILDERBOT_ROLE: 'node', BB_CONTROLLER: URL.replace(/\/$/, ''), BB_TOKEN: token, BB_PROJECT: 'alpha', XDG_CACHE_HOME: `${DIR}/cache-transcripts` } });
+  const cliS = (...a) => aerie(a, {
+    env: { BUILDERBOT_ROLE: 'node', BB_CONTROLLER: URL.replace(/\/$/, ''), BB_TOKEN: token, BB_PROJECT: 'alpha', XDG_CACHE_HOME: `${DIR}/cache-transcripts` } });
   const said = cliS('transcripts', 'label', 'conv-one-2026', 'Ticking', 'the', 'roadmap');
   const list2 = cliS('transcripts', 'list');
   ok(/conv-one-2026 is labeled: Ticking the roadmap/.test(said) && /conv-one-2026 .*Ticking the roadmap/.test(list2) && /conv-two-2025 .*kept {2}The worktree chat\n {6}note: left off at the token test next: the upgrade suite/.test(list2),
@@ -259,8 +259,8 @@ ok(readText.status === 200 && /You \(.*\):\nMake the beta page blue/.test(rj.tex
    'and reads one there as text, the same text the Profile downloads');
 const notRead = await sfetch('/api/transcripts?project=delta');
 ok(notRead.status === 400, `a space alpha does not read is not a space to the session (${notRead.status})`);
-const cli = (...a) => execFileSync('bash', [`${REPO}/scripts/aerie`, ...a], { encoding: 'utf8',
-  env: { ...process.env, BUILDERBOT_ROLE: 'node', BB_CONTROLLER: URL.replace(/\/$/, ''), BB_TOKEN: token, BB_PROJECT: 'alpha', XDG_CACHE_HOME: `${DIR}/cache-transcripts` } });
+const cli = (...a) => aerie(a, {
+  env: { BUILDERBOT_ROLE: 'node', BB_CONTROLLER: URL.replace(/\/$/, ''), BB_TOKEN: token, BB_PROJECT: 'alpha', XDG_CACHE_HOME: `${DIR}/cache-transcripts` } });
 const listed = cli('-p', 'beta', 'transcripts');
 ok(/^your conversations on beta, every agent's, newest first:\n  beta-chat-1  Claude /.test(listed) && /Make the beta page blue/.test(listed),
    `bb -p NAME transcripts lists the account's conversations on a read space, each marked with its agent (${listed.split('\n')[1]?.trim()})`);

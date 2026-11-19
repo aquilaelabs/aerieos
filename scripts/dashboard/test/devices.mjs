@@ -7,7 +7,7 @@
 // device, a read-only person's change is refused, and a device waiting on
 // the project wakes when another changes it. The Profile page lists the
 // devices and Disconnect signs one out. No browser.
-import { ok, done, sleep, until, DIR, URL, OWNER as ADMIN, asUser, asSession, section, REPO } from './lib.mjs';
+import { ok, done, sleep, until, DIR, URL, OWNER as ADMIN, asUser, asSession, section, REPO, aerie } from './lib.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 
@@ -17,8 +17,8 @@ const admin = async (path, body) => {
   return { status: r.status, ...(await r.json().catch(() => ({}))) };
 };
 const env = { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` };
-const addUser = (name, pw) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'add', name, '--role', 'user'],
-  { input: `${pw}\n${pw}\n`, encoding: 'utf8', env });
+const addUser = (name, pw) => aerie(['users', 'add', name, '--role', 'user'],
+  { input: `${pw}\n${pw}\n`, env });
 const uidOf = n => JSON.parse(readFileSync(`${DIR}/state/users.json`, 'utf8')).users[n].uid;
 const tree = `${DIR}/ws/alpha`;
 // One call on the device door: its status and body, never a throw.

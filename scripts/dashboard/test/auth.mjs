@@ -5,7 +5,7 @@
 // would be (a refusal and why, or that a websocket is asked for), which is
 // how most checks here ask; the socket itself is covered by term.mjs.
 import { launch, newPage, ok, done, until, quiet, URL, DIR, takeOn, openSection, member, splitPick, projectKey,
-         asUser, OWNER, asSession, usersPy, mint, section, REPO } from './lib.mjs';
+         asUser, OWNER, asSession, usersPy, mint, section, REPO, aerie } from './lib.mjs';
 import http from 'node:http';
 import { mkdirSync, writeFileSync, rmSync, readFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -186,8 +186,8 @@ await ctx2.close();
 await section("accounts, not one env var", async () => {
   const { readFileSync, existsSync } = await import('node:fs');
   const { execFileSync } = await import('node:child_process');
-  const bb = (args, input) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', ...args],
-    { input, encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
+  const bb = (args, input) => aerie(['users', ...args],
+    { input, env: { DASHBOARD_STATE: `${DIR}/state` } });
   const store = `${DIR}/state/users.json`;
   const read = () => JSON.parse(readFileSync(store, 'utf8'));
 
@@ -302,8 +302,8 @@ ${code}`], { encoding: 'utf8' });
 await section("a strip each", async () => {
   const { readFileSync } = await import('node:fs');
   const { execFileSync } = await import('node:child_process');
-  const bb = (args, input) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', ...args],
-    { input, encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
+  const bb = (args, input) => aerie(['users', ...args],
+    { input, env: { DASHBOARD_STATE: `${DIR}/state` } });
   const store = `${DIR}/state/users.json`;
   const read = () => JSON.parse(readFileSync(store, 'utf8'));
   ok(Object.values(read().users).every(u => /^u_[0-9a-f]{8}$/.test(u.uid || '')),
@@ -412,10 +412,8 @@ await section("a strip each", async () => {
     // that account, on the node its project is on) rather than by writing
     // the record, so what is under test is the path that makes one.
     // WORKSPACE too: the verb checks the project is one, off the filesystem.
-    const token = who => execFileSync('bash',
-      [`${REPO}/scripts/aerie`, 'users', 'token', 'beta', who],
-      { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`,
-                                 WORKSPACE: `${DIR}/ws` } }).trim();
+    const token = who => aerie(['users', 'token', 'beta', who],
+      { env: { DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
     const report = (who, email) => bare('/api/v1/claude-login', { method: 'POST',
       headers: { 'Content-Type': 'application/json',
                  Authorization: 'Bearer ' + token(who) },
@@ -850,8 +848,8 @@ print(u.remove("renamed"))`], { encoding: 'utf8' });
 await section("what a `user` sees, and does not", async () => {
   const { readFileSync } = await import('node:fs');
   const { execFileSync } = await import('node:child_process');
-  const bb = (args, input) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', ...args],
-    { input, encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state` } });
+  const bb = (args, input) => aerie(['users', ...args],
+    { input, env: { DASHBOARD_STATE: `${DIR}/state` } });
   const py = (code) => execFileSync('python3', ['-c', `
 import importlib.util, json
 spec = importlib.util.spec_from_file_location("users", "${REPO}/scripts/dashboard/users.py")
@@ -1878,7 +1876,7 @@ print(json.dumps(out))`], { encoding: 'utf8' }));
 // token and the phone app's. The switch is the owner's and not an admin's.
 await section("maintenance mode", async () => {
   const env = { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` };
-  const users = (args, input) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', ...args], { input, encoding: 'utf8', env });
+  const users = (args, input) => aerie(['users', ...args], { input, env });
   users(['add', 'maintuser', '--role', 'user'], 'maintpass11\nmaintpass11\n');
   users(['add', 'maintadm', '--role', 'admin'], 'maintpass22\nmaintpass22\n');
   await member('maintuser');
@@ -1887,7 +1885,7 @@ await section("maintenance mode", async () => {
   const form = (u, pw) => bare('/login', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: `username=${u}&password=${pw}&next=/` });
   const theirCookie = ((await form('maintuser', 'maintpass11')).headers.get('set-cookie') || '').split(';')[0];
-  const token = who => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', 'alpha', ...(who ? [who] : [])], { encoding: 'utf8', env }).trim();
+  const token = who => aerie(['users', 'token', 'alpha', ...(who ? [who] : [])], { env }).trim();
   const ownerTok = token('test'), userTok = token('maintuser');
   const set = (h, on) => bare('/api/settings', { method: 'POST', headers: h, body: JSON.stringify({ set: { maintenance_mode: on } }) });
   const SAID = /down for maintenance: only its owner can sign in/;

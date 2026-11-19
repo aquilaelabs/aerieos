@@ -4,7 +4,7 @@
 // this repository's own code makes, a definition's file and line, the ids a
 // suite names. Run over this copy of the tree, so the index it writes lands
 // beside the copy and never in the checkout.
-import { ok, done, DIR, section, REPO } from './lib.mjs';
+import { ok, done, DIR, section, REPO, aerie } from './lib.mjs';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, chmodSync, statSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
@@ -93,8 +93,7 @@ ok(names.includes('toolchains') && !names.some(n => n.startsWith('lab-')),
 
 // aerie tests preflight: the plan from named files (the copy this runs in has
 // no .git, so the branch half is not asked here).
-const pre = (...files) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'tests', 'preflight', '--dry', '--files', ...files],
-                                       { encoding: 'utf8', env: { ...process.env, BB_TREE: REPO } });
+const pre = (...files) => aerie(['tests', 'preflight', '--dry', '--files', ...files], { env: { BB_TREE: REPO } });
 const plan = pre('scripts/dashboard/tab-docker.js');
 ok(/suites:.*\bdevapp\b/.test(plan),
    `a dashboard script change plans the suites that reach it (${plan.match(/suites:.*/)?.[0].slice(0, 60)})`);

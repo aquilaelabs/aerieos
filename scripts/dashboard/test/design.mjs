@@ -3,7 +3,7 @@
 // for what they are for. Staged behind the notebook's Save; the prompts and
 // docs/design-language.md are the server's words, which is what aerie design
 // prints. The view is passive: nothing on it reaches into a session.
-import { launch, newPage, ok, done, ready, patience, openFold, URL, DIR, settled, quiet, OWNER, section, REPO } from './lib.mjs';
+import { launch, newPage, ok, done, ready, patience, openFold, URL, DIR, settled, quiet, OWNER, section, REPO, aerie } from './lib.mjs';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
@@ -461,8 +461,8 @@ ok(/^# The design language/.test(written) && /\| `--accent` \| `#ff8800` \|/.tes
    'Write the file puts docs/design-language.md in the tree: the tokens as a table, and each page under Pages');
 const token = execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', P, 'test'],
   { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
-const bb = (...a) => execFileSync('bash', [`${REPO}/scripts/aerie`, 'design', ...a], { encoding: 'utf8',
-  env: { ...process.env, BUILDERBOT_ROLE: 'node', BB_CONTROLLER: URL.replace(/\/$/, ''), BB_TOKEN: token, BB_PROJECT: P,
+const bb = (...a) => aerie(['design', ...a], {
+  env: { BUILDERBOT_ROLE: 'node', BB_CONTROLLER: URL.replace(/\/$/, ''), BB_TOKEN: token, BB_PROJECT: P,
          XDG_CACHE_HOME: `${DIR}/cache-design` } });
 ok(/Default \(dark\), Paper \(light and dark\); system sans/.test(bb()) && /1  the home dashboard  \(android app, phone, 6 blocks\)/.test(bb()),
    `aerie design lists the language and the pages, a theme with another half said so (${bb().split('\n')[0].trim()})`);

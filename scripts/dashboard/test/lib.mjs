@@ -949,6 +949,14 @@ export const api = async (path, body, headers = OWNER) => (await call(path, body
 // REPO: the checkout the suite runs from, with no trailing slash, for a
 // suite that reads a file of the tree or runs one of its scripts.
 export const REPO = fileURLToPath(new globalThis.URL('../../..', import.meta.url)).replace(/\/$/, '');
+// aerie(args, { env, cwd, input, timeout }): the checkout's own aerie run with
+// those arguments, and what it printed. `env` is laid over this process's,
+// `input` is what it reads, and a run that fails throws as execFileSync does,
+// with the status, stdout and stderr on the error.
+export function aerie(args, { env = {}, cwd, input, timeout } = {}){
+  return execFileSync('bash', [`${REPO}/scripts/aerie`, ...args],
+    { encoding: 'utf8', env: { ...process.env, ...env }, cwd, input, timeout });
+}
 // usersPy(expr): users.py asked for `expr` over the fixture's own state, and
 // what it printed. mint(project, who, ttl): a session's token for a space,
 // made as the server makes one, for the account `who` (by name) when said.

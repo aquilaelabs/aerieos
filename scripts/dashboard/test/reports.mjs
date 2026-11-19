@@ -5,7 +5,7 @@
 // their gate, a log a person clears. Nothing goes back to the session that
 // made it: that loop worked only where AerieOS's own tracker sat beside
 // the sessions reporting to it (the operator, 8 Oct).
-import { launch, newPage, ready, ok, done, saveDialog, URL, DIR, unfold, splitPick, prefsOf, OWNER as ADMIN, asUser, asSession, section, REPO } from './lib.mjs';
+import { launch, newPage, ready, ok, done, saveDialog, URL, DIR, unfold, splitPick, prefsOf, OWNER as ADMIN, asUser, asSession, section, REPO, aerie } from './lib.mjs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 
@@ -15,8 +15,8 @@ const call = async (path, body, headers = ADMIN) => {
     : { method: 'POST', headers, body: JSON.stringify(body) });
   return { status: r.status, ...(await r.json().catch(() => ({}))) };
 };
-const token = project => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', project, 'test'],
-  { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
+const token = project => aerie(['users', 'token', project, 'test'],
+  { env: { DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
 const as = asSession;
 const ALPHA = as(token('alpha'));
 const BETA = as(token('beta'));

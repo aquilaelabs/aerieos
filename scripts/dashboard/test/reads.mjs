@@ -4,7 +4,7 @@
 // as a field), the session token widened to the reads on every
 // request, every write refused by name, the relayed words kept to reads,
 // the grant carrying the reads for the view, and the briefing naming them.
-import { launch, newPage, ok, done, ready, settled, refreshUntil, saveDialog, sectSave, URL, DIR, prefsOf, projectKey, OWNER as H, asSession, section, REPO } from './lib.mjs';
+import { launch, newPage, ok, done, ready, settled, refreshUntil, saveDialog, sectSave, URL, DIR, prefsOf, projectKey, OWNER as H, asSession, section, REPO, aerie } from './lib.mjs';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
@@ -14,8 +14,8 @@ const api = async (path, body, headers = H) => {
   let j; try { j = await r.json(); } catch { j = {}; }
   return { status: r.status, ...j };
 };
-const token = project => execFileSync('bash', [`${REPO}/scripts/aerie`, 'users', 'token', project, 'test'],
-  { encoding: 'utf8', env: { ...process.env, DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
+const token = project => aerie(['users', 'token', project, 'test'],
+  { env: { DASHBOARD_STATE: `${DIR}/state`, WORKSPACE: `${DIR}/ws` } }).trim();
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 1000 } });
