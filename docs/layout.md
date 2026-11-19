@@ -231,6 +231,7 @@ scripts/
     records.py                   the notebook's records whole as JSON, YAML or Markdown, and read back in (R167)
     bugs.py                      the bug tracker; `aerie bug` drives the same file
     notebook.py                  one batch over both of those, so half of one cannot exist
+    tracker.py                   what the roadmap and the bug tracker keep the same way: the file read, the log and its trim, a batch begun, committed or reverted, and the numbers handed out
     pending.py                   what a session wants to add to the notebook, held for the operator
     ids.py                       one letter per notebook tab, so a number says which list it came from
     presence.py                  who else has a notebook open, in memory only

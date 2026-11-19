@@ -51,6 +51,7 @@ if _here not in sys.path:
 import statefile  # noqa: E402
 import ids  # noqa: E402
 import pending  # noqa: E402
+import tracker  # noqa: E402
 import time
 from pathlib import Path
 
@@ -97,8 +98,7 @@ def _by_whom():
     The Nodes page's audit has recorded the account since accounts existed
     (server._principal), and this is the same thing for the notebook.
     """
-    name = str((actor() if actor else "") or "")[:60]
-    return {"who": name} if name else {}
+    return _tracker.by_whom()
 
 
 
@@ -122,6 +122,23 @@ def replay(project, verb, args):
 # statefile.locked takes flock on the file itself, so the other process waits
 # instead of overwriting. Same sites, same shape. See statefile.py.
 _lock = statefile.on(lambda: FILE)
+
+# The file, its log, a batch and the numbers, which the roadmap keeps the
+# same way: tracker.py. What is the bug tracker's own about them is said
+# here, each of this module's names as a call that looks it up when it runs,
+# so what configure() sets later is what is read.
+_tracker = tracker.Tracker(
+    file=lambda: FILE, lock=_lock, save=lambda d: save(d),
+    number=lambda v: _int(v), actor=lambda: actor,
+    limit=lambda: MAX_HISTORY,
+    keep=lambda e: e.get("act") in KEEP_ACTS,
+    coalesce=lambda events: _coalesce(events),
+    noun="the tracker",
+    already_open="a batch is already open here",
+    find_keys=("text", "note", "act"),
+    # Every logged change moves `revn` too: see revisions() for why the
+    # history's length is not enough.
+    counts_revn=True)
 
 SEVERITIES = ("low", "medium", "high", "critical")
 # Whether it reproduces (R124), beside how: every time, now and then, the
@@ -153,14 +170,7 @@ FIELDS = ("area", "repro", "expected", "actual", "notes")
 
 
 def load():
-    try:
-        with open(FILE) as f:
-            d = json.load(f)
-        if isinstance(d, dict) and isinstance(d.get("projects"), dict):
-            return d
-    except (OSError, ValueError):
-        pass
-    return {"projects": {}}
+    return _tracker.load()
 
 
 def save(d):
@@ -203,10 +213,7 @@ KEEP_ACTS = ("filed", "fixed", "wontfix", "na")
 def _trim(h):
     """The tracker's log to its last MAX_HISTORY events, less the filings
     and closings, which stay."""
-    if len(h) <= MAX_HISTORY:
-        return
-    cut = len(h) - MAX_HISTORY
-    h[:cut] = [e for e in h[:cut] if e.get("act") in KEEP_ACTS]
+    _tracker.trim(h)
 
 
 def _log(d, project, by, ev):
@@ -217,22 +224,7 @@ def _log(d, project, by, ev):
     series of decisions the operator needs to read one at a time. The tracker
     still changes as it goes, visibly; only the record waits for commit.
     """
-    # Counted here because every write to the tracker comes through here,
-    # batched or not: see revisions() for why a length is not enough.
-    d.setdefault("revn", {})[project] = int(d.get("revn", {}).get(project) or 0) + 1
-    ev = {"at": int(time.time()),
-          "by": "claude" if by == "claude" else "you", **agents.asker(by),
-          **_by_whom(),
-          **({"approved": True} if pending.replaying() else {}), **ev}
-    b = d.get("batch", {}).get(project)
-    if b is not None and ev["by"] == b.get("by", "claude"):
-        b.setdefault("events", []).append(ev)
-        return
-    # Anyone else's change goes straight to the history, which is also what
-    # makes revert's guard work: it looks there for the operator's hand.
-    h = d.setdefault("history", {}).setdefault(project, [])
-    h.append(ev)
-    _trim(h)
+    _tracker.log(d, project, by, ev)
 
 
 # ---- the tracker's half of a notebook batch ------------------------------
@@ -289,17 +281,7 @@ def _coalesce(events):
 
 
 def begin(project, by="claude"):
-    with _lock:
-        d = load()
-        if d.get("batch", {}).get(project):
-            return {"error": "a batch is already open here"}
-        h = d.get("history", {}).get(project) or []
-        d.setdefault("batch", {})[project] = {
-            "at": int(time.time()), "by": by, "events": [],
-            "yours": sum(1 for e in h if e.get("by") == "you"),
-            "rows": json.loads(json.dumps(d["projects"].get(project) or []))}
-        save(d)
-    return {"ok": True}
+    return _tracker.begin(project, by)
 
 
 def batches():
@@ -308,87 +290,32 @@ def batches():
     One read of the file for all of them, the same as the roadmap's: this runs
     on every poll, and asking per project would be a load and a lock each.
     """
-    with _lock:
-        d = load().get("batch", {})
-    return {p: {"at": b.get("at", 0), "by": b.get("by", ""),
-                "changes": len(b.get("events") or [])}
-            for p, b in d.items() if b}
+    return _tracker.batches()
 
 
 def batch(project):
     """The open batch here, or None."""
-    with _lock:
-        b = load().get("batch", {}).get(project)
-    return None if not b else {"at": b.get("at", 0), "by": b.get("by", ""),
-                               "changes": len(b.get("events") or [])}
+    return _tracker.batch(project)
 
 
 def commit(project):
-    with _lock:
-        d = load()
-        b = d.get("batch", {}).get(project)
-        if not b:
-            return {"error": "nothing is open here"}
-        kept = _coalesce(b.get("events") or [])
-        h = d.setdefault("history", {}).setdefault(project, [])
-        h.extend(kept)
-        _trim(h)
-        del d["batch"][project]
-        save(d)
-    return {"ok": True, "written": len(kept),
-            "folded": len(b.get("events") or []) - len(kept)}
+    return _tracker.commit(project)
 
 
 def revert_blocked(project):
     """Why a revert would refuse, or None. See roadmap.revert_blocked."""
-    with _lock:
-        d = load()
-        b = d.get("batch", {}).get(project)
-        if not b:
-            return "nothing is open here"
-        h = d.get("history", {}).get(project) or []
-        if sum(1 for e in h if e.get("by") == "you") > b.get("yours", 0):
-            return ("the operator has changed the tracker since the batch "
-                    "opened; reverting would undo their work too. "
-                    "Commit it and correct what is wrong.")
-    return None
+    return _tracker.revert_blocked(project)
 
 
 def revert(project):
-    why = revert_blocked(project)
-    if why:
-        return {"error": why}
-    with _lock:
-        d = load()
-        b = d.get("batch", {}).get(project)
-        if not b:
-            return {"error": "nothing is open here"}
-        d["projects"][project] = b.get("rows") or []
-        del d["batch"][project]
-        save(d)
-    return {"ok": True, "dropped": len(b.get("events") or [])}
+    return _tracker.revert(project)
 
 
 def history(project, limit=None, since=None, find=None):
     """What has happened to the tracker, newest first, optionally narrowed by
     the same filters the roadmap's log takes, because whoever learned one
     should not have to learn the other."""
-    with _lock:
-        h = load().get("history", {}).get(project) or []
-    out = sorted(h, key=lambda e: -e.get("at", 0))
-    if since is not None:
-        cut = _int(since)
-        if cut is not None:
-            out = [e for e in out if e.get("at", 0) >= cut]
-    if find:
-        needle = str(find).lower()
-        out = [e for e in out
-               if any(needle in str(e.get(k, "")).lower()
-                      for k in ("text", "note", "act"))]
-    n = _int(limit)
-    if n is not None and n > 0:
-        out = out[:n]
-    return out
+    return _tracker.history(project, limit=limit, since=since, find=find)
 
 
 def payload(project):
@@ -571,23 +498,16 @@ def _image():
 def _next_id(d, project):
     """One above the highest number ever handed out: see roadmap._next_id.
     `reserved` is the high-water mark: held, filed, or deleted since."""
-    rows = d["projects"].get(project) or []
-    top = max((int(b.get("id", 0)) for b in rows), default=0)
-    return max(top, _int((d.get("reserved") or {}).get(project)) or 0) + 1
+    return _tracker.next_id(d["projects"].get(project) or [], d, project)
 
 
 def _took(d, project, n):
-    r = d.setdefault("reserved", {})
-    r[project] = max(_int(r.get(project)) or 0, int(n))
+    _tracker.took(d, project, n)
 
 
 def _moved_by(d, project, bug_id):
     """Who last touched this bug and when, for the refusal below."""
-    b = (d.get("batch", {}).get(project) or {}).get("events") or []
-    for e in reversed(list(d.get("history", {}).get(project) or []) + list(b)):
-        if _int(e.get("id")) == bug_id:
-            return {"by": e.get("by", ""), "at": e.get("at", 0)}
-    return {}
+    return _tracker.moved_by(d, project, bug_id)
 
 
 def _edit(project, bug_id, change, by="you", rev=None):
