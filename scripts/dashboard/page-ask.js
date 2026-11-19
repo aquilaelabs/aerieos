@@ -161,3 +161,14 @@ async function askText(text, {value = "", verb = "OK", label = ""} = {}){
   const got = await ask({text, choices: [{label: verb, value: true}], field: {value, label}});
   return got ? got.text : null;
 }
+
+// A yes that has to be typed, for what cannot be taken back: true when the
+// word typed is `word`, false for Cancel, and false with `refused` said
+// when it is another. The rest is handed to askText as it is.
+async function askTyped(text, word, {verb, label, title, refused} = {}){
+  const typed = await askText(text, {verb, label, title});
+  if (typed == null) return false;
+  if (String(typed).trim() === word) return true;
+  notify(refused, true);
+  return false;
+}

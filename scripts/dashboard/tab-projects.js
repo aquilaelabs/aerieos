@@ -1130,7 +1130,7 @@ async function createProject() {
   else if (!url) return fail("a repository address is required");
   $("pErrWrap").hidden = true;
   const b = $("pCreate");
-  busy(b, { init: "Creating", clone: "Starting", link: "Starting" }[mode]);
+  busyFor(b, mode);
   try{
     // A push has to authenticate somehow; catching this before the round-trip
     // spares typing a URL into a flow that cannot finish. Judged on the

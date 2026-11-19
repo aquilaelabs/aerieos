@@ -2868,13 +2868,7 @@ function wireNodesTab(root){
                       + "each re-downloads what it needs.")) return;
       // The verb, said on the button for the round trip and, for the
       // actions whose effect the row cannot see at once: beyond it.
-      busy(b, {"update-agent": "Updating", test: "Asking", drain: "Draining",
-               online: "Undraining", "cache-clear": "Clearing",
-               retire: "Removing", discard: "Discarding", uninstall: "Uninstalling", lockdown: "Locking down", reboot: "Rebooting", poweroff: "Shutting down", "gpu-apply": "Applying",
-               paths: "Saving", "to-sync": "Moving",
-               "sync-stop": "Stopping", "sync-resume": "Resuming", "sync-clean": "Cleaning",
-               rename: "Renaming", turns: "Saving",
-               feature: b.dataset.op === "remove" ? "Uninstalling" : "Installing"}[act] || "Working");
+      busyFor(b, act, {feature: b.dataset.op === "remove" ? "Uninstalling" : "Installing"});
       if (act === "update-agent"){
         nodesUpdating[id] = Date.now();
         const j = await nodeAct({action: "update-agent", id});

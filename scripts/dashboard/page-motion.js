@@ -770,3 +770,23 @@ function unbusy(btn, word){
   btn.disabled = false;
   btn.textContent = word;
 }
+
+// The word a press wears for its verb, where a page's buttons carry the verb
+// as data (data-vm="stop", data-starray="sync"): one table for every page, so
+// a verb is worded once. A verb the table has not got says Working.
+const BUSY_WORDS = {
+  start: "Starting", stop: "Stopping", restart: "Restarting", remove: "Removing", rename: "Renaming",
+  set: "Saving", snapshot: "Saving", paths: "Saving", turns: "Saving", take: "Taking",
+  revert: "Reverting", "snapshot-rm": "Deleting", eject: "Ejecting", "disk-grow": "Growing", "disk-add": "Adding",
+  sync: "Syncing", scrub: "Scrubbing", check: "Checking", verify: "Checking", mover: "Moving", "to-sync": "Moving",
+  on: "Mounting", off: "Unmounting", init: "Creating", clone: "Starting", link: "Starting",
+  "update-agent": "Updating", test: "Asking", drain: "Draining", online: "Undraining", "cache-clear": "Clearing",
+  retire: "Removing", discard: "Discarding", uninstall: "Uninstalling", lockdown: "Locking down",
+  reboot: "Rebooting", poweroff: "Shutting down", "gpu-apply": "Applying",
+  "sync-stop": "Stopping", "sync-resume": "Resuming", "sync-clean": "Cleaning",
+};
+// busy() by the verb. `extra` is the page's own words, looked at first: for a
+// verb whose word depends on the press, or that means something else there.
+function busyFor(btn, verb, extra = {}){
+  busy(btn, extra[verb] ?? BUSY_WORDS[verb] ?? "Working");
+}

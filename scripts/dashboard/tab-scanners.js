@@ -160,7 +160,7 @@ function renderScannersInto(i){
 
 function wireScannersTab(root){
   wireSections(root);
-  const act = (sel, fn) => root.querySelectorAll(sel).forEach(b => b.onclick = async () => { busy(b, "Working"); await fn(b); });
+  const act = (sel, fn) => root.querySelectorAll(sel).forEach(b => b.onclick = async () => { busyFor(b); await fn(b); });
   act("[data-scandeploy]", b => scannersAct({action: "deploy", node: b.dataset.scandeploy}));
   act("[data-scandeployall]", () => scannersAct({action: "deploy-all"}));
   act("[data-scanupdate]", b => scannersAct({action: "update", node: b.dataset.scanupdate}));

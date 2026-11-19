@@ -600,10 +600,8 @@ function wireAdopt(root){
     if (!n) return;
     let confirm = "";
     if (!dry){
-      const typed = await askText("Take the array over?\n\nThe data disks become writable where they are, nothing on them formatted. The old parity disk's partition is given a filesystem for SnapRAID's parity, so the old system's parity is gone: going back to it takes its own parity sync. The first sync builds the new parity from nothing, and the array is unprotected until it ends, hours for a large one.",
-                                  {verb: "Take it over", label: "Type parity to go on"});
-      if (typed === null || typed === undefined) return;
-      if (String(typed).trim() !== "parity"){ notify("the word typed is not parity; nothing taken over", true); return; }
+      if (!await askTyped("Take the array over?\n\nThe data disks become writable where they are, nothing on them formatted. The old parity disk's partition is given a filesystem for SnapRAID's parity, so the old system's parity is gone: going back to it takes its own parity sync. The first sync builds the new parity from nothing, and the array is unprotected until it ends, hours for a large one.",
+                          "parity", {verb: "Take it over", label: "Type parity to go on", refused: "the word typed is not parity; nothing taken over"})) return;
       confirm = "parity";
     }
     busy(b, dry ? "Checking" : "Taking over");

@@ -459,15 +459,13 @@ function wireStoragePools(root, n){
       // Last used by another system (B938): the machine's own pools after
       // its stick died, or disks still in use elsewhere, which this would
       // break; said so, and its name typed.
-      const typed = await askText(`Import ${body.name} anyway?\n\nIt was last used by another system and never exported. That is what this machine's own pools look like after its stick died and a new one was written: then this brings it back as it was. If these disks are in use by another machine that is still running, importing it here damages it.\n\nType the pool's name to import it.`,
-                                  {title: "Import anyway?", verb: "Import anyway", label: "The pool's name"});
-      if (typed === null || typed === undefined) return;
-      if (String(typed).trim() !== body.name){ notify("that is not the pool's name: nothing was imported", true); return; }
+      if (!await askTyped(`Import ${body.name} anyway?\n\nIt was last used by another system and never exported. That is what this machine's own pools look like after its stick died and a new one was written: then this brings it back as it was. If these disks are in use by another machine that is still running, importing it here damages it.\n\nType the pool's name to import it.`,
+                          body.name, {title: "Import anyway?", verb: "Import anyway", label: "The pool's name", refused: "that is not the pool's name: nothing was imported"})) return;
       body.force = true; body.confirm = body.name;
     }
     // A pool exported cleanly is imported with no question (R265: a press asks only where its yes costs something): it
     // is taken as it is, never upgraded, and Export lets it go again.
-    busy(b, act === "scrub" ? "Scrubbing" : "Working");
+    busyFor(b, act);
     await sayPost(null, "", "/api/v1/nodes", body, `${act}: the job runs on the machine; the page follows its next check-in`, () => refresh());
   }));
 }
@@ -527,16 +525,15 @@ function wireStorageSnapshots(root, n){
     }
     const body = {action: "storage-snapshot", id: n.node, snapshot: act, pool: b.dataset.pool || "", name: b.dataset.name || "", dataset: b.dataset.pool || ""};
     if (act === "rollback"){
-      const typed = await askText(`Roll ${body.pool} back to ${body.name}?\n\nEverything written to the pool since then is gone, and every snapshot since it with it.`, {verb: "Roll back", label: "The snapshot's name, typed again"});
-      if (typed === null || typed === undefined) return;
-      if (String(typed).trim() !== body.name){ notify("the name typed is not the snapshot's; nothing rolled back", true); return; }
+      if (!await askTyped(`Roll ${body.pool} back to ${body.name}?\n\nEverything written to the pool since then is gone, and every snapshot since it with it.`,
+                          body.name, {verb: "Roll back", label: "The snapshot's name, typed again", refused: "the name typed is not the snapshot's; nothing rolled back"})) return;
       body.confirm = body.name;
     } else if (act === "destroy"){
       if (!await askYes(`Delete the snapshot ${body.name} of ${body.pool}?`, {title: "Delete the snapshot?", verb: "Delete it", danger: true})) return;
     } else {
       body.kind = "manual"; body.keep = 50;
     }
-    busy(b, act === "take" ? "Taking" : "Working");
+    busyFor(b, act);
     await sayPost(null, "", "/api/v1/nodes", body, `${act}: the job runs on the machine; the page follows its next check-in`, () => refresh());
   }));
   root.querySelectorAll("[data-stsnapsched]").forEach(b => b.onclick = () => pressing(b, async () => {
@@ -674,12 +671,11 @@ function wireStorageArray(root, n){
       if (!how) return;
       body.correct = how === "correct";
     } else if (act === "destroy"){
-      const typed = await askText("Destroy the array?\n\nIt is unmounted and forgotten; every data disk keeps its files, readable on any Linux, and the parity disks are left as they are.", {verb: "Destroy", label: "Type array to go on"});
-      if (typed === null || typed === undefined) return;
-      if (String(typed).trim() !== "array"){ notify("the word typed is not array; nothing destroyed", true); return; }
+      if (!await askTyped("Destroy the array?\n\nIt is unmounted and forgotten; every data disk keeps its files, readable on any Linux, and the parity disks are left as they are.",
+                          "array", {verb: "Destroy", label: "Type array to go on", refused: "the word typed is not array; nothing destroyed"})) return;
       body.confirm = "array";
     }
-    busy(b, {sync: "Syncing", scrub: "Scrubbing", check: "Checking", verify: "Checking", mover: "Moving"}[act] || "Working");
+    busyFor(b, act);
     await sayPost(null, "", "/api/v1/nodes", body, `${act}: the job runs on the machine; its log is on the Jobs page and the page follows the next check-in`, () => refresh());
   }));
 }
@@ -749,7 +745,7 @@ function wireStorageOther(root, n){
       if (!await askYes("Forget this mount? It is unmounted first; nothing on it is touched.", {title: "Remove the mount?", verb: "Remove", danger: true})) return;
       body = {action: "remove", id: b.dataset.id};
     } else body = {action: act, id: b.dataset.id};
-    busy(b, {set: "Saving", remove: "Removing", off: "Unmounting", on: "Mounting"}[act] || "Working");
+    busyFor(b, act);
     await sayPost(null, "", "/api/extmounts", body,
       {set: "recorded: the machine mounts it within a minute", remove: "forgotten", off: "unmounted within a minute: the row says when it is safe to pull", on: "mounted within a minute"}[act],
       () => refresh());
