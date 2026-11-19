@@ -76,8 +76,11 @@ def agent_packs():
 
 def service_packs():
     """[(path, manifest)] for every deployed thing of AerieOS's that is a pack (R172)."""
+    import nginxproxy
     import router
-    return [(os.path.join(PACKS, "services", "model-router", "bbtool.json"), router.pack())]
+    import scanners
+    return [(os.path.join(PACKS, "services", m["name"], "bbtool.json"), m)
+            for m in (router.pack(), nginxproxy.pack(), scanners.pack())]
 
 
 def text(m):

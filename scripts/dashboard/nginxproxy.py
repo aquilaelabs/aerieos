@@ -61,6 +61,19 @@ node_name = None
 taken_ports = None
 
 
+def pack():
+    """nginx as an official pack (R264): a service a node deploys from its
+    Library card, as the model router is. Its settings are its own page
+    (the routes, the certificates), opened from its row on Installed, so
+    the entry asks nothing; what turns them into nginx's own configuration
+    is this module, named by service.kind."""
+    return {"name": "nginx", "label": "nginx", "tier": "official", "platforms": ["linux/amd64", "linux/arm64"], "terms": [],
+            "maker": "AerieOS", "credits": [{"name": "nginx", "maker": "F5"}], "framework": "2.1",
+            "about": "nginx on this node in front of its containers: a hostname routed to a container's port, with a certificate of your own "
+                     "or one from Let's Encrypt kept renewed. Its routes and certificates are on its own page, opened from Installed.",
+            "service": {"kind": "nginx"}, "image": IMAGE, "config": []}
+
+
 def configure(*, state, write_json, node_list, node_name, taken_ports):
     globals().update(STATE=Path(state), write_json=write_json, node_list=node_list,
                      node_name=node_name, taken_ports=taken_ports)

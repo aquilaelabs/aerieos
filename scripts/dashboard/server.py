@@ -3212,6 +3212,33 @@ def _unguarded_rows(who):
     return out
 
 
+# nginx and the Scanners as services of the Library (R264): each one's
+# entry, whether it is on a node, and its Install and Remove, which are its
+# own page's Deploy and Remove. What sets them is their pages'.
+OWN_SERVICES = {
+    "nginx": {"pack": lambda: nginxproxy.pack(), "deployed": lambda nid: nginxproxy.deployed(devapp, nid),
+              "install": lambda nid, by: nginxproxy.deploy(nid, containers, devactions, devapp),
+              "remove": lambda nid, by: nginxproxy.remove(nid, devactions, devapp),
+              "removes": "Its routes and certificates are kept here; the hostnames it answers for stop answering."},
+    "scanners": {"pack": lambda: scanners.pack(), "deployed": lambda nid: bool(scanners.record(nid).get("deployed")),
+                 "install": lambda nid, by: scanners.deploy(nid, by),
+                 "remove": lambda nid, by: scanners.remove(nid, by),
+                 "removes": "What they found is kept; nothing scans the spaces on this node until they are installed again."},
+}
+
+
+def service_rows(nid):
+    """nginx's and the Scanners' rows for a node's Library and Installed
+    pages: the entry as its pack, and whether it is deployed there."""
+    out = []
+    for sv in OWN_SERVICES.values():
+        manifest, errors = toolpacks.validate(sv["pack"](), shipped=())
+        if errors:
+            continue
+        out.append({"manifest": manifest, "status": {"deployed": bool(sv["deployed"](nid))}, "ready": "", "removes": sv["removes"]})
+    return out
+
+
 def turn_scope(project, uid, agent="claude", slot=1):
     """(node id, key, limit, heart, at) for a turn of `uid`'s session on
     `project` (turns.py), or None when there is no node to count on: the
@@ -13130,6 +13157,11 @@ class Handler(BaseHTTPRequestHandler):
         if n and not users.may_node(who, "configure", nid):
             services.append({"manifest": toolpacks.validate(router.pack(), shipped=())[0], "status": router.status(nid),
                              "ready": router._ready(nid), "all_projects": sorted(prefs.all_projects(WORKSPACE))})
+        # ...and nginx and the Scanners (R264), for whoever may write
+        # containers there, as their own pages ask: each deployed or not,
+        # its page what Open on Installed leads to.
+        if n and not users.may_node(who, "docker-write", nid):
+            services += service_rows(nid)
         pack_values = {name: packconfig.get(nid, name, fields) for name, fields in toolpacks.configs().items()} if n and not users.may_node(who, "configure", nid) else {}
         # ...and this person's own (R172 step 5), where they work on the node.
         yours_ok = bool(n) and self._works_on_node(who, nid) and bool(users.uid_of(who))
@@ -13191,6 +13223,17 @@ class Handler(BaseHTTPRequestHandler):
         if not nid or not nodes.node(nid):
             return self._json({"error": "which node?"}, 400)
         by = who.get("name") or ""
+        if pack in OWN_SERVICES:
+            # nginx's and the Scanners' Install and Remove (R264): what
+            # their pages' Deploy and Remove do, a written container's.
+            if self._refused("docker-write"):
+                return None
+            if act not in ("install", "remove"):
+                return self._json({"error": f"{pack} is installed and removed here; the rest is on its own page"}, 400)
+            r = OWN_SERVICES[pack][act](nid, by)
+            if not r.get("error"):
+                db.audit(f"user:{by}", f"{pack}-{act}", nid, {})
+            return self._result(r)
         if pack == "model-router":
             # Configure on this node (R174): its settings, its deploy and
             # removal; the router's containers are this node's.

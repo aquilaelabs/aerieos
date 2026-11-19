@@ -137,7 +137,7 @@ FETCH_MAX, FETCH_FORMAT = 32, 3
 CONFIG_NAME = re.compile(r"^[a-z][a-z0-9_-]{0,39}$")
 ENV_NAME = re.compile(r"^[A-Z][A-Z0-9_]{0,40}$")
 # A deployed thing an official pack stands for (R172): the model router.
-SERVICES = ("router",)
+SERVICES = ("router", "nginx", "scanners")
 AGENT_FIELDS = ("product", "command", "provider", "reported", "update_job", "login_job", "logout_job",
                 "briefing", "guards", "state", "transcripts", "latest_url", "tool")
 AGENT_BRIEFING = ("system-prompt-file", "instructions-file")

@@ -4,7 +4,7 @@
 // path and system packages, a service's Configure from its config block
 // (the model router's providers, endpoints, Ollama and projects, saved to
 // the router's own record), and Remove.
-import { launch, newPage, ok, done, ready, URL, section } from './lib.mjs';
+import { launch, newPage, ok, done, ready, URL, section, until, libraryShow } from './lib.mjs';
 
 const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
@@ -82,6 +82,41 @@ await section("the model router's page", async () => {
   await page.waitForFunction(() => lib && Array.isArray(lib.rows), null, { timeout: 20000 });
   ok(await page.$eval('.doc .librarytab .lcard[data-lrow="service:model-router"]', c => !c.querySelector('[data-libact="install"]').disabled && !c.querySelector('.lcform')),
      'the Library\'s card for it offers Install now and draws no Configure of its own');
+});
+
+// ---- nginx and the Scanners are services too (R264) ------------------------
+// Installed from their cards in the Library, as the router is; on Installed
+// once they are on the node, where Open leads to each one's own page.
+await section("nginx and the Scanners are services", async () => {
+  await page.evaluate(() => { libNode = instNode; lib = null; openLibrary(); });
+  await libraryShow(page, { kind: 'service' });
+  const cards = await page.$$eval('.doc .librarytab .lcard[data-lrow^="service:"]', cs => cs.map(c => [c.dataset.lrow, !!c.querySelector('[data-libact="install"]')]));
+  ok(['service:nginx', 'service:scanners'].every(k => cards.some(([n, install]) => n === k && install)),
+     `the Library's Services hold nginx and the Scanners beside the model router, each with Install (${JSON.stringify(cards)})`);
+  await page.evaluate(() => openInstalledTab());
+  await page.waitForFunction(() => inst && Array.isArray(inst.rows) && !readBusy('installed'), null, { timeout: 20000 });
+  ok(await page.$('.doc .installedtab .irow[data-irow="service:nginx"]') === null
+     && await page.evaluate(() => inst.rows.some(r => r.kind === 'service' && r.name === 'nginx' && !r.installed)),
+     'one that asks nothing is not on Installed until the Library put it on the node');
+  const asked = await page.evaluate(async () => (await postJSON('/api/library', { action: 'install', node: instNode, pack: 'nginx' })));
+  ok(asked && !asked.error, `its Install is the nginx page's Deploy (${JSON.stringify(asked).slice(0, 120)})`);
+  const row = await until(() => page.evaluate(async () => {
+    await loadInstalled();
+    const r = document.querySelector('.doc .installedtab .irow[data-irow="service:nginx"]');
+    return r && inst.rows.find(x => x.name === 'nginx')?.installed ? r.textContent.replace(/\s+/g, ' ').trim() : null;
+  }), 60000, 1500);
+  ok(row && /nginx/.test(row) && /deployed/.test(row) && /Open/.test(row) && /Remove/.test(row),
+     `once deployed it is a row under Services with Open and Remove (${row})`);
+  await page.click('.doc .installedtab .irow[data-irow="service:nginx"] [data-instopen]');
+  const there = await page.waitForFunction(() => !!document.querySelector('.doc.on .nginxtab'), null, { timeout: 15000 }).then(() => true, () => false);
+  ok(there, 'Open leads to its own page: the routes and certificates for this node');
+  page.dialogs.length = 0;
+  await page.evaluate(() => openInstalledTab());
+  await page.waitForFunction(() => !!document.querySelector('.doc.on .installedtab .irow[data-irow="service:nginx"] [data-instact="remove"]'), null, { timeout: 20000 });
+  await page.click('.doc.on .installedtab .irow[data-irow="service:nginx"] [data-instact="remove"]');
+  const gone = await until(() => page.evaluate(async () => { await loadInstalled(); return !inst.rows.find(x => x.name === 'nginx')?.installed; }), 60000, 1500);
+  ok(gone && /Remove nginx from .*routes and certificates are kept/.test(page.dialogs.join(' ')),
+     `Remove asks in the service's own words and takes it off the node (${(page.dialogs.at(-1) || '').slice(0, 120)})`);
 });
 
 // ---- a pack that brings a coding agent sits with the agents ---------------

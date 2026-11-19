@@ -84,7 +84,10 @@ function loadInstalled(){
 // service, and an agent whose card a person signs in on (Claude Code's,
 // so a node without it still says where its sign-in would be).
 function instHere(r){
-  if (r.kind === "service") return true;
+  // A service that asks for settings first is here before it is deployed
+  // (the router: configured, then installed); one that asks nothing (nginx,
+  // the Scanners: R264) is here once the Library put it on the node.
+  if (r.kind === "service") return r.installed || r.running || !!(r.config || []).length;
   if (r.machine) return true;
   if (r.kind === "agent") return r.installed || r.agent === "claude";
   return r.installed || r.unknown || r.running;
@@ -228,7 +231,7 @@ function instConfigField(f, v, key){
     case "switch": return `<div class="field"><label class="ndcap"><input id="${id}" type="checkbox" ${at}${v ? " checked" : ""}> ${esc(f.label)}${f.help ? helpIcon(f.help) : ""}</label></div>`;
     case "choice": return `<div class="field setrow col ctlrow">${label}<select id="${id}" ${at}>${(f.choices || []).map(c => `<option value="${esc(c.value)}"${c.value === v ? " selected" : ""}>${esc(c.label)}</option>`).join("")}</select></div>`;
     case "projects": {
-      const all = (inst?.rows || []).find(x => x.kind === "service")?.all_projects || [];
+      const all = (inst?.rows || []).find(x => x.kind === "service" && x.service === "router")?.all_projects || [];
       return `<div class="field"><div class="fsub">${esc(f.label)}${f.help ? helpIcon(f.help) : ""}</div><div class="chips">${all.length ? all.map(p => `<label class="chip"><input type="checkbox" data-icproj="${esc(f.name)}" value="${esc(p)}"${(v || []).includes(p) ? " checked" : ""}> ${esc(p)}</label>`).join("") : `<span class="dim">no spaces yet</span>`}</div></div>`;
     }
     case "list": {
@@ -348,7 +351,7 @@ function renderInstalledInto(i){
 function wireInstalled(root){
   wireSections(root);
   wireSignin(root);
-  root.querySelectorAll("[data-instopen]").forEach(b => b.onclick = () => openThing(instNode, b.dataset.instopen, b.dataset.instat || ""));
+  root.querySelectorAll("[data-instopen]").forEach(b => b.onclick = () => instOpen(b.dataset.instopen, b.dataset.instat || ""));
   root.querySelectorAll("[data-tcsys]").forEach(b => b.onclick = async () => { await tcAct("sysdeps", [b.dataset.tcsys]); loadInstalled(); });
   root.querySelectorAll("[data-tcneed]").forEach(b => b.onclick = async () => { await tcAct("install", [b.dataset.tcneed]); loadInstalled(); });
   const sd = root.querySelector("[data-instsysdeps]");
@@ -399,12 +402,23 @@ function wireInstalled(root){
   root.querySelectorAll("[data-instact]").forEach(b => b.onclick = () => instAct(b, b.dataset.instact, b.dataset.instkind, b.dataset.instname));
 }
 
+// Open on a row: the thing's own page on this node. A service whose
+// settings are a page of their own (nginx's routes and certificates, the
+// Scanners' schedule and runs: R264) opens that page for the node.
+const SERVICE_PAGES = {nginx: node => openNginxTab(node), scanners: () => openScannersTab()};
+function instOpen(key, at = ""){
+  const r = (inst?.rows || []).find(x => `${x.kind}:${x.name}` === key);
+  const page = r?.kind === "service" && r.installed ? SERVICE_PAGES[r.service] : null;
+  if (page) return page(instNode);
+  openThing(instNode, key, at);
+}
+
 async function instAct(b, act, kind, name){
   const r = (inst?.rows || []).find(x => x.kind === kind && x.name === name);
   if (!r) return;
   const where = (nodesList || []).find(x => x.id === instNode)?.name || "this node";
   if (kind === "service"){
-    if (act === "remove" && !await askYes(`Remove ${r.label} from ${where}? Its keys stay here sealed; the spaces lose their way to it.`, {verb: "Remove", danger: true})) return;
+    if (act === "remove" && !await askYes(`Remove ${r.label} from ${where}? ${r.removes || "Its keys stay here sealed; the spaces lose their way to it."}`, {verb: "Remove", danger: true})) return;
     busy(b, act === "remove" ? "Removing" : "Deploying");
     const j = await postJSON("/api/library", {action: act, node: instNode, pack: r.name});
     if (j.error) notify(j.error, true);

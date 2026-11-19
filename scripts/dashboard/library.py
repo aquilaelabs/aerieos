@@ -183,6 +183,8 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
                     "service": (m.get("service") or {}).get("kind", ""), "config": m.get("config") or [],
                     "values": service_values(m.get("config") or [], st), "ready": s.get("ready", ""), "all_projects": s.get("all_projects") or [],
                     "status": {k: st.get(k) for k in ("url", "port", "models", "models_at", "spend", "ollama", "projects")},
+                    # What Remove takes and what it leaves, in the service's own words.
+                    "removes": s.get("removes", ""),
                     "verb": "" if deployed else "install"})
     for a in apps or []:
         out.append({"kind": "app", "tier": _tier(a.get("tier", "official")), "name": a["id"], "label": a["name"], "about": a.get("what") or "", "platforms": ["linux/*"],
