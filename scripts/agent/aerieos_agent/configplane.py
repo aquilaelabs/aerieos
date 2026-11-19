@@ -67,6 +67,51 @@ class ConfigPlaneMixin:
     """Agent's configuration plane: one of the parts class Agent (agent.py) is made of."""
 
     # -- the configuration plane (docs/nodes.md §12, phase 5) -----------------
+    # Every apply a system job can name: the method it reaches, whether it
+    # needs bb-sandbox, and what the method is handed after the job ("cfg"
+    # for the job's config, "what" for the apply's own name, "" for nothing
+    # more). Needing the sandbox is per verb, not one stamp for all of them
+    # (roadmap #23): storage and network edit fstab and netplan, which only
+    # a machine provisioned as a sandbox (a MANAGED node) hands over. A
+    # runner needs only its tarball and a funnel only tailscale, and a
+    # container node (this image in the node role) or a guest machine has
+    # neither the stamp nor any reason to be refused either of those.
+    APPLIES = {
+        "root": ("_apply_root", True, "cfg"),
+        "storage": ("_apply_storage", True, "cfg"),
+        "network": ("_apply_network", True, "cfg"),
+        "runner": ("_apply_runner", False, "cfg"),
+        "funnel": ("_apply_funnel", False, "cfg"),
+        "uninstall": ("_apply_uninstall", False, "cfg"),
+        "reboot": ("_apply_power", False, "what"),
+        "poweroff": ("_apply_power", False, "what"),
+        "gpu": ("_apply_gpu", True, ""),
+        "door": ("_apply_door", False, "cfg"),
+        "lockdown": ("_apply_lockdown", False, ""),
+        "feature": ("_apply_feature", True, "cfg"),
+        "controller-update": ("_apply_controller_update", False, "cfg"),
+        "storage-share": ("_apply_storage_share", False, "cfg"),
+        "storage-pool": ("_apply_storage_pool", False, "cfg"),
+        "storage-snapshot": ("_apply_storage_snapshot", False, "cfg"),
+        "storage-array": ("_apply_storage_array", False, "cfg"),
+        # A way in at the console of AerieOS (console.py, R194).
+        "console": ("_apply_console", False, "cfg"),
+        # Another NAS's array and pools taken as they are (adopt.py).
+        "storage-adopt": ("_apply_storage_adopt", False, "cfg"),
+        "host-update": ("_apply_host_update", False, "cfg"),
+        "storage-backup": ("_apply_storage_backup", False, "cfg"),
+        "machine": ("_apply_machine", False, "cfg"),
+        # A stick's system pool (R161 step 10, osimage.py).
+        "system-pool": ("_apply_system_pool", False, "cfg"),
+        # An older version kept: boot it once, or remove it (R201).
+        "os-kept": ("_apply_os_kept", False, "cfg"),
+        # A folder on the machine's disks as the projects folder (R163).
+        "projects-folder": ("_apply_projects_folder", False, "cfg"),
+        # AerieOS: the next image into the other slot (osimage.py).
+        "os-update": ("_apply_os_update", False, "cfg"),
+        "gpu-off": ("_apply_gpu_off", True, ""),
+    }
+
     def system(self, job, spec):
         """Apply the desired storage or network config the controller holds
         for this node. Not dropped to the enrolled account, because mounts
@@ -75,81 +120,27 @@ class ConfigPlaneMixin:
         which is the stamp."""
         what = spec.get("apply")
         self.refresh_sandbox_tool(job)
-        # Per verb, not one stamp for all of them (roadmap #23): storage and
-        # network edit fstab and netplan, which only a machine provisioned
-        # as a sandbox (a MANAGED node) hands over. A runner needs only its
-        # tarball and a funnel only tailscale, and a container node (this
-        # image in the node role) or a guest machine has neither the stamp
-        # nor any reason to be refused either of those.
-        if what in ("storage", "network", "root", "gpu", "gpu-off", "feature") and not os.access(SANDBOX_BIN, os.X_OK):
+        # Only a word can be in the table: anything else the spec carries
+        # is unknown, and refused as that below.
+        entry = self.APPLIES.get(what) if isinstance(what, str) else None
+        method, sandbox, takes = entry or (None, False, "")
+        if sandbox and not os.access(SANDBOX_BIN, os.X_OK):
             job.say(f"refused: {what} edits this machine's own configuration, and this node "
                     f"was not provisioned as an AerieOS sandbox ({SANDBOX_BIN} is not here)\n")
             return "failed", 77
+        if method is None:
+            job.say(f"refused: unknown system job {what!r}\n")
+            return "failed", 64
         cfg = spec.get("config") if isinstance(spec.get("config"), dict) else {}
-        if what == "root":
-            return self._apply_root(job, cfg)
-        if what == "storage":
-            return self._apply_storage(job, cfg)
-        if what == "network":
-            return self._apply_network(job, cfg)
-        if what == "runner":
-            return self._apply_runner(job, cfg)
-        if what == "funnel":
-            return self._apply_funnel(job, cfg)
-        if what == "uninstall":
-            return self._apply_uninstall(job, cfg)
-        if what in ("reboot", "poweroff"):
-            return self._apply_power(job, what)
-        if what == "gpu":
-            return self._apply_gpu(job)
-        if what == "door":
-            return self._apply_door(job, cfg)
-        if what == "lockdown":
-            return self._apply_lockdown(job)
-        if what == "feature":
-            return self._apply_feature(job, cfg)
-        if what == "controller-update":
-            return self._apply_controller_update(job, cfg)
-        if what == "storage-share":
-            return self._apply_storage_share(job, cfg)
-        if what == "storage-pool":
-            return self._apply_storage_pool(job, cfg)
-        if what == "storage-snapshot":
-            return self._apply_storage_snapshot(job, cfg)
-        if what == "storage-array":
-            return self._apply_storage_array(job, cfg)
-        if what == "console":
-            # A way in at the console of AerieOS (console.py, R194).
-            return self._apply_console(job, cfg)
-        if what == "storage-adopt":
-            # Another NAS's array and pools taken as they are (adopt.py).
-            return self._apply_storage_adopt(job, cfg)
-        if what == "host-update":
-            return self._apply_host_update(job, cfg)
-        if what == "storage-backup":
-            return self._apply_storage_backup(job, cfg)
-        if what == "machine":
-            return self._apply_machine(job, cfg)
-        if what == "system-pool":
-            # A stick's system pool (R161 step 10, osimage.py).
-            return self._apply_system_pool(job, cfg)
-        if what == "os-kept":
-            # An older version kept: boot it once, or remove it (R201).
-            return self._apply_os_kept(job, cfg)
-        if what == "projects-folder":
-            # A folder on the machine's disks as the projects folder (R163).
-            return self._apply_projects_folder(job, cfg)
-        if what == "os-update":
-            # AerieOS: the next image into the other slot (osimage.py).
-            return self._apply_os_update(job, cfg)
-        if what == "gpu-off":
-            # The emulator off the card (R102): the display's unit stopped,
-            # the driver left alone; then a hello, as the set-up sends.
-            rc = self._sh(job, [SANDBOX_BIN, "gpu-off"], timeout=120)
-            self.hello_again("the GPU was switched off")
-            return ("succeeded", 0) if rc == 0 else ("failed", rc)
-        job.say(f"refused: unknown system job {what!r}\n")
-        return "failed", 64
+        handed = {"cfg": (cfg,), "what": (what,), "": ()}[takes]
+        return getattr(self, method)(job, *handed)
+
+    def _apply_gpu_off(self, job):
+        """The emulator off the card (R102): the display's unit stopped,
+        the driver left alone; then a hello, as the set-up sends."""
+        rc = self._sh(job, [SANDBOX_BIN, "gpu-off"], timeout=120)
+        self.hello_again("the GPU was switched off")
+        return ("succeeded", 0) if rc == 0 else ("failed", rc)
 
     def apply_ports_local(self, on):
         """Published ports bound to 127.0.0.1 by default on this node (R190,

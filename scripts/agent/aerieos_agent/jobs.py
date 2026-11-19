@@ -306,6 +306,28 @@ class Job(threading.Thread):
             with contextlib.suppress(OSError):
                 os.write(self.tty, (str(r["input"]) + "\n").encode())
 
+    # The job types whose whole run is one call into the agent, by the name
+    # of the method: each is handed the job and its spec, and what it
+    # answers is the job's state and exit. A type that does more than call
+    # (compose, toolchain, the sign-ins) is spelled out in run(), and a type
+    # in neither place is a command.
+    RUNNERS = {
+        "self-update": "self_update",
+        "system": "system",
+        # The node's own scanners over its projects (R145, scan.py).
+        "scan": "scan",
+        "vm": "vm",
+        "image": "image",
+        "sign": "sign",
+        "sign-key": "sign_key",
+        "cache-clear": "cache_clear",
+        "storage": "storage_measure",
+        "avd-remove": "avd_remove",
+        "phones-idle": "phones_idle",
+        "claude-update": "claude_update",
+        "tell": "tell",
+    }
+
     def run(self):
         spec = self.job.get("spec") or {}
         error = ""
@@ -321,20 +343,15 @@ class Job(threading.Thread):
         # while it ran (B250).
         self.flush()
         try:
-            if self.job.get("type") == "self-update":
-                state, code = self.agent.self_update(self, spec)
-            elif self.job.get("type") == "system":
-                state, code = self.agent.system(self, spec)
-            elif self.job.get("type") == "compose":
+            kind = self.job.get("type")
+            runner = self.RUNNERS.get(kind) if isinstance(kind, str) else None
+            if runner:
+                state, code = getattr(self.agent, runner)(self, spec)
+            elif kind == "compose":
                 # Port 80 let go while containers start (R202).
                 with http80.paused():
                     state, code = self.agent.compose(self, spec)
-            elif self.job.get("type") == "scan":
-                # The node's own scanners over its projects (R145, scan.py).
-                state, code = self.agent.scan(self, spec)
-            elif self.job.get("type") == "vm":
-                state, code = self.agent.vm(self, spec)
-            elif self.job.get("type") == "toolchain":
+            elif kind == "toolchain":
                 state, code = self.agent.toolchain(self, spec)
                 # A recipe landed or left: the session environment is built
                 # from the store's layout when the session half is set up,
@@ -350,31 +367,17 @@ class Job(threading.Thread):
                     # just landed read as failed until the next hello (the
                     # operator, 12 Oct: Build-Tools, installed, said failed).
                     self.agent.hello()
-            elif self.job.get("type") == "image":
-                state, code = self.agent.image(self, spec)
-            elif self.job.get("type") == "sign":
-                state, code = self.agent.sign(self, spec)
-            elif self.job.get("type") == "sign-key":
-                state, code = self.agent.sign_key(self, spec)
-            elif self.job.get("type") == "cache-clear":
-                state, code = self.agent.cache_clear(self, spec)
-            elif self.job.get("type") == "storage":
-                state, code = self.agent.storage_measure(self, spec)
-            elif self.job.get("type") == "avd-remove":
-                state, code = self.agent.avd_remove(self, spec)
-            elif self.job.get("type") == "phones-idle":
-                state, code = self.agent.phones_idle(self, spec)
-            elif self.job.get("type") in ("claude-login", *AGENT_LOGINS):
+            elif kind in ("claude-login", *AGENT_LOGINS):
                 # Claude's, or another coding agent's (R95 step 3): the same
                 # pty and the same channel, `aerie login --flow` told which.
-                state, code = self.claude_login(spec, AGENT_LOGINS.get(self.job.get("type"), ""))
+                state, code = self.claude_login(spec, AGENT_LOGINS.get(kind, ""))
                 # Said on the next heartbeat rather than in five minutes:
                 # the row that asked is waiting to read who signed in.
                 self.agent._logins_at = 0
-            elif self.job.get("type") in ("claude-logout", *AGENT_LOGOUTS):
-                state, code = self.claude_logout(spec, AGENT_LOGOUTS.get(self.job.get("type"), ""))
+            elif kind in ("claude-logout", *AGENT_LOGOUTS):
+                state, code = self.claude_logout(spec, AGENT_LOGOUTS.get(kind, ""))
                 self.agent._logins_at = 0
-            elif self.job.get("type") in ("agent-login", "agent-logout"):
+            elif kind in ("agent-login", "agent-logout"):
                 # A pack's coding agent's (R233 step 6): one pair of jobs
                 # for all of them, the spec naming which, and only one this
                 # node's bundle carries with a sign-in its pack describes.
@@ -384,18 +387,14 @@ class Job(threading.Thread):
                 if not re.fullmatch(r"[a-z][a-z0-9]{1,15}", which) or which in ("claude", *AGENT_LOGINS.values()):
                     self.say("refused: a pack's agent's sign-in names the agent it is for\n")
                     state, code = "failed", 64
-                elif self.job.get("type") == "agent-login":
+                elif kind == "agent-login":
                     state, code = self.claude_login(spec, which, pack=True)
                 else:
                     state, code = self.claude_logout(spec, which, pack=True)
                 self.agent._logins_at = 0
-            elif self.job.get("type") == "claude-update":
-                state, code = self.agent.claude_update(self, spec)
-            elif self.job.get("type") in AGENT_INSTALLS:
+            elif kind in AGENT_INSTALLS:
                 # The other coding agents' installs (R95 step 2).
                 state, code = self.agent.agent_update(self, spec)
-            elif self.job.get("type") == "tell":
-                state, code = self.agent.tell(self, spec)
             else:
                 state, code = self.exec(spec)
         except Exception as e:                       # noqa: BLE001 (reported, not raised)
