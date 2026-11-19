@@ -71,6 +71,8 @@ def api():
     return _bbapi
 
 CHECK_EVERY = 20
+# How often a working session's gate says which session it is.
+ALIVE_EVERY = 60
 
 def _uid():
     """This account's id, which is what separates one account's cache from
@@ -263,10 +265,21 @@ def main():
                "If it stays down, write where you are and what is next to your memory or "
                "your notes (that is allowed), then end the turn: the operator checks the "
                "container, and you pick up from your note.")
+    # ...and, once a minute, said as this session's (B1009): the question
+    # above names nobody, and the controller knows a session whose hooks
+    # have stopped running by hearing nothing from it while it works.
+    alive = float(last.get("alive") or 0)
+    if not why and api() is not None and now - alive >= ALIVE_EVERY:
+        alive = now
+        try:
+            api().request("/api/v1/hook", {"kind": "alive", "agent": AGENT, "slot": SLOT},
+                          auth="Bearer " + token(project), timeout=5)
+        except Exception:                                    # noqa: BLE001, S110 (a word is never worth a tool call)
+            pass
     try:
         os.makedirs(os.path.dirname(sf), mode=0o700, exist_ok=True)
         with open(sf, "w") as f:
-            json.dump({**last, "ok": not why, "at": now}, f)
+            json.dump({**last, "ok": not why, "at": now, "alive": alive}, f)
     except OSError:
         pass
     if why and own_notes():

@@ -452,6 +452,13 @@ def main():
                 sample["held"] = json.load(f)
         except (OSError, ValueError):
             sample["held"] = []
+        # ...and its sessions' rows, where a suite planted them (the guard
+        # that went quiet, B1009): a name and a pane title each.
+        try:
+            with open(os.path.join(CDIR_ROOT, "sessions.json")) as f:
+                sample["sessions"] = json.load(f)
+        except (OSError, ValueError):
+            pass
         j = call("work", {"sample": sample, "running": len(running),
                           "wait": 5}, timeout=30)
         if isinstance(j, dict) and j.get("id"):

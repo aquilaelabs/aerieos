@@ -49,10 +49,20 @@ WAIT_STALE = 20
 # nothing a machine this project runs on could honor.
 LIMIT_MAX = 64
 
+# A hook that spoke this long before a session was first seen working
+# belongs to that stretch of work: the prompt's hooks run a moment before
+# the spinner shows, and a heartbeat is up to a poll old.
+STRETCH_GRACE = 120
+# ...and a stop's word is waited for this long after the session is seen
+# idle: over a heartbeat, so the stop's hook has had a poll to be heard in.
+END_GRACE = 30
+
 _lock = threading.Lock()
 _claims = {}       # (node, key) -> when its turn began
 _ended = {}        # (node, key) -> when it said it stopped
 _waiting = {}      # (node, key) -> [first asked, last asked]
+_heard = {}        # key -> when a hook of that session last spoke
+_watch = {}        # (node, key) -> {"idle": seen idle, "began": t, "ended": t, "quiet": t}
 
 
 def _working(node, heart, at, now):
@@ -128,6 +138,63 @@ def state(node, heart, at):
         _tidy(now)
         return {"working": sorted(_working(node, heart, at, now)),
                 "waiting": sum(1 for (n, _) in _waiting if n == node)}
+
+
+def heard(key):
+    """A hook of the session `key` (its tmux name) spoke to the controller:
+    any of them, a prompt's, a tool's or a stop's."""
+    now = time.time()
+    with _lock:
+        _heard[key] = now
+        for (_n, k), w in _watch.items():
+            if k == key:
+                w["quiet"] = 0
+
+
+def watch(node, present, heart, now=None):
+    """A heartbeat of `node`: `present` the coding agents' sessions there (by
+    tmux name), `heart` the ones working.
+
+    THE GUARD THAT WENT QUIET (B1009). A session's hooks speak to the
+    controller at every turn: the prompt's before it starts, a stop's when it
+    ends, and several between. A coding agent passes over a hook that cannot
+    be run, so a session whose hooks are gone works on with no gate and says
+    nothing; the heartbeat still shows it working, which is the other source
+    this module has. So a stretch of work that began and ended under this
+    watch, with no hook of that session heard from STRETCH_GRACE before it
+    began to END_GRACE after it ended, is a session working unguarded. It is
+    marked until one of its hooks speaks again or the session is gone. A
+    stretch already under way when the controller started is never judged:
+    its beginning was not seen."""
+    now = time.time() if now is None else now
+    with _lock:
+        for (n, k) in [x for x in _watch if x[0] == node and x[1] not in present]:
+            del _watch[(n, k)]
+        for k in list(_heard):
+            if now - _heard[k] > CLAIM_MAX:
+                del _heard[k]
+        for k in present:
+            w = _watch.setdefault((node, k), {"idle": False, "began": 0, "ended": 0, "quiet": 0})
+            if k in heart:
+                if w["began"]:
+                    w["ended"] = 0                     # at work again before the last stretch was judged: one stretch
+                elif w["idle"]:
+                    w["began"] = now
+                continue
+            if w["began"] and not w["ended"]:
+                w["ended"] = now
+            if w["began"] and w["ended"] and now - w["ended"] >= END_GRACE:
+                if _heard.get(k, 0) < w["began"] - STRETCH_GRACE and not w["quiet"]:
+                    w["quiet"] = w["began"]
+                w["began"] = w["ended"] = 0
+            w["idle"] = True
+
+
+def unguarded():
+    """[(node, key, since)]: the sessions whose last stretch of work passed
+    with no hook heard (watch), oldest first."""
+    with _lock:
+        return sorted(((n, k, w["quiet"]) for (n, k), w in _watch.items() if w["quiet"]), key=lambda x: x[2])
 
 
 def limit_of(value):

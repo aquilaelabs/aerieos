@@ -2196,7 +2196,9 @@ def _attention(who):
     # their own account or an administrator: stopped work waiting on a
     # person, where the rest is an update that can wait (seen fourth, under
     # the fold of the bell, in the walk of 15 Oct).
-    rows = (_held_rows(who)
+    # ...then a session working with no word from its hooks (B1009): nothing
+    # AerieOS refuses is being refused there.
+    rows = (_held_rows(who) + _unguarded_rows(who)
             + ([] if users.may(who, "node") else nodes.attention(where) + _token_rows()
                # ...and a newer release for a bare-metal install (R90 step 5).
                + releasecheck.attention(_own_node_id())
@@ -3155,6 +3157,59 @@ def node_heart(n):
             if busy:
                 heart.add(name)
     return heart, float((rep.get("sample") or {}).get("at") or 0)
+
+
+def _claude_working(rows):
+    """(present, working) among a heartbeat's session rows, by tmux name:
+    Claude's sessions, and those whose pane title carries the spinner. The
+    one sign of work that does not come from a hook, which is what
+    turns.watch sets against what the hooks said; another agent's working
+    is its hooks' own word, so it cannot be a witness against them."""
+    present, working = set(), set()
+    for r in rows or []:
+        name = str((r or {}).get("name") or "")
+        ag, _stem = agents.of_session(tmux_base(name))
+        if not ag or ag.id != "claude":
+            continue
+        present.add(name)
+        if claude_state(str((r or {}).get("title") or ""))[0] == "working":
+            working.add(name)
+    return present, working
+
+
+def guards_watch(nid, rows):
+    """A node's heartbeat, for the guard that went quiet (turns.watch)."""
+    turns.watch(nid, *_claude_working(rows))
+
+
+def guards_heard(project, uid, agent, slot):
+    """A hook of that session spoke: by its tmux name on a node, which is
+    what the heartbeat calls it (turn_scope's key)."""
+    turns.heard(f"{uid}~{agents.session_name(agent, project, slot)}")
+
+
+def _unguarded_rows(who):
+    """The bell's rows for the sessions working with no word from their hooks
+    (turns.unguarded, B1009), for the session's own account or an
+    administrator: keyed by the stretch it was seen in, so Dismiss puts away
+    this one and not the next."""
+    marks = turns.unguarded()
+    if not marks:
+        return []
+    me, admin = users.uid_of(who), users.may(who, "admin") == ""
+    names = {u["uid"]: u["name"] for u in users.all_users()}
+    out = []
+    for nid, key, since in marks:
+        uid = tmux_owner(key)
+        if not admin and uid != me:
+            continue
+        ag, stem = agents.of_session(tmux_base(key))
+        n = nodes.node(nid) or {}
+        out.append({"kind": "unguarded", "id": f"{nid}|{key}", "node": n.get("name") or nid, "node_id": nid,
+                    "project": stem, "session": key, "uid": uid, "who": names.get(uid, ""),
+                    "agent": ag.name if ag else "", "since": int(since),
+                    "key": f"unguarded:{nid}|{key}@{int(since)}"})
+    return out
 
 
 def turn_scope(project, uid, agent="claude", slot=1):
@@ -5144,6 +5199,7 @@ claudegrant.home_for = home_for
 import channel                                                   # noqa: E402
 
 channel.configure(home_for=home_for)
+channel.sessions_seen = guards_watch
 channel.unvetted_ok = lambda: bool(settings.get("offer_unvetted"))   # a Mac's provisioner is a dev feature
 # A signing is a job on the project's node, of a build in its dist/ (R106).
 signing.node_of = lambda name: prefs.get(name)["node"]
@@ -5429,7 +5485,8 @@ import hooks                                                     # noqa: E402
 hooks.configure(users=users, rules=rules, preamble=preamble, overlap=overlap, chat=chat, roadmap=roadmap, pending=pending,
                 turns=turns, nodes=nodes, seen_note=session_seen_note, turn_scope=turn_scope,
                 asking_set=asking_set, asking_clear=asking_clear, asked=projsessions.asked,
-                agent_state=agent_state_set, agent_conv=agent_conv_set, behind=session_behind_of)
+                agent_state=agent_state_set, agent_conv=agent_conv_set, behind=session_behind_of,
+                heard_from=guards_heard)
 
 
 # Written by entrypoint.sh once every startup hook has finished. Named here as
@@ -14750,7 +14807,7 @@ class Handler(BaseHTTPRequestHandler):
 # history out of the 200,000 kept. The path, and the hook kinds by name; a
 # hook's asked and started are kept, since each says something to people.
 QUIET_POSTS = {"/api/presence": None,
-               "/api/v1/hook": {"note", "seen", "asking", "guards", "recall", "turn", "turn-done"}}
+               "/api/v1/hook": {"note", "seen", "asking", "guards", "recall", "alive", "turn", "turn-done"}}
 
 
 def _quiet_post(path, req):

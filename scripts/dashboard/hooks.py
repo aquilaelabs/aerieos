@@ -48,6 +48,7 @@ asking_set = None
 asking_clear = None
 asked = None          # projsessions.asked: what a session was last asked (B59)
 agent_conv = None     # (project, uid, agent, slot, id): the conversation a session is in (R143)
+heard_from = None     # (project, uid, agent, slot): a hook of that session spoke
 # (project, uid, agent, slot) -> [why]: what changed since the session
 # started that its briefing does not know (server.session_behind), which the
 # card says to the person and the prompt's notice says to the session.
@@ -90,6 +91,11 @@ def verb(kind, req, me, uid, project):
     # hook does not say, as a session from before slots does not.
     slot = req.get("slot") if isinstance(req, dict) else 1
     slot = int(slot) if str(slot).isdigit() and 1 <= int(slot) <= agents.MAX_SLOTS else 1
+    # Any hook's word says the session's hooks run (turns.watch, B1009).
+    if heard_from is not None:
+        heard_from(project, uid, agent, slot)
+    if kind == "alive":
+        return {"ok": True}, 200
     if kind == "note":
         path = str(req.get("path") or "")[:400]
         if not path:
@@ -192,4 +198,4 @@ def verb(kind, req, me, uid, project):
             n = nodes.node(nid) or {}
             r["node"] = n.get("name") or nid
         return {"ok": True, **r}, 200
-    return {"error": "a hook is note, asked, started, seen, asking, guards, recall, turn or turn-done"}, 400
+    return {"error": "a hook is note, asked, started, seen, asking, guards, recall, alive, turn or turn-done"}, 400

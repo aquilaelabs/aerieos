@@ -249,6 +249,17 @@ function attRow(a){
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
           <a href="#" data-bheld="${esc(a.node_id)}" data-session="${esc(a.session)}" data-claude="${esc(a.claude || a.session)}">Resume</a></span></div></div>`;
   }
+  // A session working with no word from its hooks (B1009): its gate and
+  // what AerieOS refuses are not running there. Starting it again brings
+  // them back, which is the space's Manage agent.
+  if (a.kind === "unguarded"){
+    return `<div class="bnote att bad">
+      <div class="bt">A session in ${esc(projLabel(a.project))} is working without its guards</div>
+      <div class="bsum">${esc(a.who ? `${a.who}'s` : "A")} ${esc(a.agent || "coding agent")} session on ${esc(a.node)} worked a turn${a.since ? `, ${esc(ago(a.since))},` : ""} with nothing heard from its hooks: nothing AerieOS refuses is refused there</div>
+      <div class="bfoot"><span>Restart it under Manage agent</span>
+        <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
+          <a href="#" data-bspace="${esc(a.project)}">Open the space</a></span></div></div>`;
+  }
   // A copy or move that did not happen: the reason, which used to sit on
   // the container's row for ever, here where it can be put away.
   if (a.kind === "relocate"){
@@ -885,6 +896,11 @@ function wireNeeds(root, after = () => {}){
   });
   root.querySelectorAll("[data-bleftover]").forEach(a => a.onclick = e => {
     e.preventDefault(); after(); deleteProjectCard(a.dataset.bleftover);
+  });
+  root.querySelectorAll("[data-bspace]").forEach(a => a.onclick = e => {
+    e.preventDefault();
+    after();
+    openNotebook(a.dataset.bspace);
   });
   root.querySelectorAll("[data-bsign]").forEach(a => a.onclick = e => {
     e.preventDefault();

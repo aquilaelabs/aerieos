@@ -32,6 +32,7 @@ from fields import field
 
 # The server's, set by configure(): an account's home (home_for).
 home_for = None
+sessions_seen = None     # (node id, a heartbeat's session rows): server's, for turns.watch
 # Whether dev features are offered (settings' offer_unvetted), set by server.py.
 unvetted_ok = lambda: False  # noqa: E731
 
@@ -484,6 +485,10 @@ def work(auth, req, addr, alive):
                          "nothing else"}, 403
     nid = auth["node"]
     nodes.heartbeat(nid, req.get("sample"), addr, req.get("running"))
+    # ...and its sessions' working and idle, for the guard that went quiet
+    # (turns.watch); absent from a heartbeat with no session half up.
+    if sessions_seen is not None and isinstance(req.get("sample"), dict) and isinstance(req["sample"].get("sessions"), list):
+        sessions_seen(nid, req["sample"]["sessions"])
     logins = req["sample"].get("logins") if isinstance(req.get("sample"), dict) else None
     _logins(nid, logins)
     # ...and the Claude plugins each account there installed, which

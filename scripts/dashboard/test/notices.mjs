@@ -195,6 +195,38 @@ await section("a job's toast follows the job, and its end is kept", async () => 
   await page.evaluate(() => document.querySelectorAll('#toast .tst').forEach(t => t.remove()));
 });
 
+// ---- a session working with no word from its hooks is said -----------------
+// B1009: a coding agent passes over a hook it cannot run, so a session whose
+// hooks are gone works on with no gate and says nothing. The heartbeat still
+// shows it working; a turn begun and ended with no hook heard is a bell row
+// for its account, and it goes when the session does.
+await section("a session working with no word from its hooks is said", async () => {
+  const users = await api('/api/users');
+  const uid = (users.users || []).find(u => u.name === 'test')?.uid;
+  const plant = title => writeFileSync(`${DIR}/sandboxdata/sessions.json`,
+    JSON.stringify([{ name: `${uid}~claude-alpha`, attached: false, cwd: '/workspace/alpha', created: 1, title }]));
+  const beats = () => new Promise(r => setTimeout(r, 12000));     // the stub's poll is five seconds: two of them
+  plant('✳ Claude Code'); await beats();                         // seen idle
+  plant('◐ Reading the tree'); await beats();                    // then at work, with no prompt's hook before it
+  plant('✳ Claude Code');                                        // and done, with no stop's after
+  await page.evaluate(() => toggleBell(true));
+  const row = await until(() => page.evaluate(() => {
+    refresh();
+    const r = [...document.querySelectorAll('#bellPanel .bnote.att')].find(n => /working without its guards/.test(n.textContent));
+    return r ? r.textContent.replace(/\s+/g, ' ').trim() : null;
+  }), 70000, 2000);
+  ok(row && /test's Claude session on sandbox/.test(row) && /Restart it under Manage agent/.test(row) && /Open the space/.test(row),
+     `a turn worked with nothing heard from the session's hooks is a bell row naming whose it is, where, and what to do (${row})`);
+  writeFileSync(`${DIR}/sandboxdata/sessions.json`, '[]');
+  const gone = await until(() => page.evaluate(async () => {
+    toggleBell(true); await refresh();
+    return ![...document.querySelectorAll('#bellPanel .bnote')].some(n => /working without its guards/.test(n.textContent));
+  }), 30000, 1500);
+  ok(gone, '...and it goes when the session does');
+  rmSync(`${DIR}/sandboxdata/sessions.json`, { force: true });
+  await page.evaluate(() => toggleBell(false));
+});
+
 // ---- a session an outage held is offered back -------------------------------
 // R251: a session's gate marks it held while the controller is away, its
 // node's agent reports the mark, and once the controller answers the bell
