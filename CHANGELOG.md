@@ -24,6 +24,7 @@
 - A node whose report has one field in a shape the controller cannot read still checks in, that field left out, where its whole check-in was refused (93de515)
 - Cutting a release keeps the commit each changelog line names, where it could rename a line to the change committed after it (c41fc43)
 - The vetted catalog is read up to 20,000 entries and says when it lists more, where entries past 2,000 were dropped without a word (fcf70a4)
+- A Library entry's page keeps its Install on the line with its name, where it stood alone under the node's name (39289c5)
 
 ## 0.9.0-dev.5641: 2026-11-18
 
