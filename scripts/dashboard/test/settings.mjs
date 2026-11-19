@@ -6,7 +6,7 @@
 // identity landing in the repo's own config through /api/prefs and coming out
 // of aerie settings, and bb_setting (the boot scripts' read) run as bash
 // against the same file.
-import { launch, newPage, ok, done, ready, saveDialog, sectSave, rnSect, splitPick, refreshUntil, openFold, URL, DIR, unfold, until, settled, OWNER, section } from './lib.mjs';
+import { launch, newPage, ok, done, ready, saveDialog, sectSave, rnSect, splitPick, refreshUntil, openFold, URL, DIR, unfold, until, settled, OWNER, section, pageCall } from './lib.mjs';
 import { readFileSync, existsSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -19,11 +19,7 @@ const browser = await launch();
 const page = await newPage(browser, { viewport: { width: 1280, height: 1000 } });
 await page.goto(URL);
 await ready(page);
-const post = (path, body) => page.evaluate(async ([p, b]) => {
-  const r = await fetch(p, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-                             body: JSON.stringify(b) });
-  return { status: r.status, body: await r.json() };
-}, [path, body]);
+const post = (path, body) => pageCall(page, path, body);
 
 // ---- the tab ---------------------------------------------------------------
 await page.evaluate(() => openSettingsTab());

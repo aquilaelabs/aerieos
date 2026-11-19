@@ -4,7 +4,7 @@
 // `aerie roadmap`, and either can tick it off. The open items are appended to every
 // Claude session bb-tty starts, which is the whole point: something noticed
 // mid-task and left undone used to live in the conversation and die with it.
-import { launch, newPage, ok, done, ready, animatedDuring, tmuxCapture, tmuxNew, tmuxKill, nbShown, nbGone, nbTab, patience, refreshUntil, holdPoll, freePoll, until, quiet as quietFor, settled as pageSettled, URL, DIR, closePage, nbGo, projectKey, section } from './lib.mjs';
+import { launch, newPage, ok, done, ready, animatedDuring, tmuxCapture, tmuxNew, tmuxKill, nbShown, nbGone, nbTab, patience, refreshUntil, holdPoll, freePoll, until, quiet as quietFor, settled as pageSettled, URL, DIR, closePage, nbGo, projectKey, section, pageCall } from './lib.mjs';
 // The add band unrolls the box in its place (R119 step 4): typing a line
 // presses Add to roadmap first, as a person does.
 const unroll = async pg => { if (await pg.$eval('#roadmapForm', f => f.hidden)) await pg.click('#roadmapShow'); };
@@ -74,11 +74,7 @@ const saveList = async () => {
 const bbRoadmapEarly = (...a) => execFileSync(BB, ['roadmap', ...a],
   { env: { ...process.env, BB_ROADMAP_PROJECT: 'alpha', DASHBOARD_STATE: `${DIR}/state`,
            WORKSPACE: `${DIR}/ws` } }).toString();
-const post = body => page.evaluate(async b => {
-  const r = await fetch('/api/roadmap', { method: 'POST',
-    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
-  return { status: r.status, body: await r.json() };
-}, body);
+const post = body => pageCall(page, '/api/roadmap', body);
 const open = () => page.$$eval('#roadmapList .roadmap', ts => ts.map(t => ({
   id: t.dataset.id, step: t.dataset.step, text: t.querySelector('.txt').textContent,
   sent: t.classList.contains('sent'),

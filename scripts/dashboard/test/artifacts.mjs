@@ -1,7 +1,7 @@
 // The notebook's Artifacts view: what a project has built, from its dist/.
 // The convention IS the feature: the tab lists dist/ and nothing else, so a
 // build worth keeping has to be copied there, and an empty tab says that.
-import { launch, newPage, ok, done, ready, URL, DIR, refreshUntil, openFold, nbGo, settled, OWNER, section, REPO } from './lib.mjs';
+import { launch, newPage, ok, done, ready, URL, DIR, refreshUntil, openFold, nbGo, settled, OWNER, section, REPO, pageCall } from './lib.mjs';
 import { mkdirSync, writeFileSync, symlinkSync, rmSync, renameSync, existsSync, utimesSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
@@ -397,11 +397,7 @@ ok(pushed.status === 400 && /has no node/.test(pushed.body.error),
 page.errors = [];
 
 // ---- what the POST refuses -------------------------------------------------
-const post = body => page.evaluate(async b => {
-  const r = await fetch('/api/artifacts', { method: 'POST',
-    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
-  return { status: r.status, body: await r.json() };
-}, body);
+const post = body => pageCall(page, '/api/artifacts', body);
 for (const [what, body] of [
   ['pushing the APK, which is not an extension', { action: 'push', project: 'alpha', path: 'dist/android/streamlift-1.2.apk' }],
   ['pushing a path outside dist/', { action: 'push', project: 'alpha', path: '../beta/x.xpi' }],

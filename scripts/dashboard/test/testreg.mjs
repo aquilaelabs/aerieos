@@ -6,7 +6,7 @@
 // log this file writes itself. What is faked: the run log. Nothing here runs
 // a suite: a test that ran the suite to test the thing that reads the suite
 // would be the slowest test in the suite.
-import { launch, newPage, ok, done, ready, nbShown, nbTab, URL, DIR, section } from './lib.mjs';
+import { launch, newPage, ok, done, ready, nbShown, nbTab, URL, DIR, section, pageCall } from './lib.mjs';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync,
          cpSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -567,11 +567,7 @@ page.errors = [];
 // status poll carries it on the project row, so the companion app can hold
 // its "waiting on you" note until the tests finish where the project's
 // During-a-test-run setting waits for them (the operator, 30 Sep).
-const post = body => page.evaluate(async b => {
-  const r = await fetch('/api/tests', { method: 'POST',
-    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
-  return { status: r.status, body: await r.json() };
-}, body);
+const post = body => pageCall(page, '/api/tests', body);
 const testingOf = async () => (await page.evaluate(async () =>
   (await (await fetch('/api/status')).json()).projects)).find(p => p.name === 'alpha').testing;
 ok((await testingOf()) === null, 'a space with no run going says testing: null on the status poll');

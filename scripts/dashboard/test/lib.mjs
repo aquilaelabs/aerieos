@@ -960,6 +960,16 @@ export async function jobEnd(id, { ms = 60000, step = 250, headers = OWNER, base
   }
   return null;
 }
+// pageCall(page, path, body): the server asked from inside a page, as the
+// page itself asks it: a GET when there is no body, else a POST of it as
+// JSON. Answers { status, body }, and throws when the answer is not JSON.
+export async function pageCall(page, path, body){
+  return page.evaluate(async ([p, b, post]) => {
+    const r = await fetch(p, post ? { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) } : {});
+    return { status: r.status, body: await r.json() };
+  }, [path, body, body !== undefined]);
+}
 // REPO: the checkout the suite runs from, with no trailing slash, for a
 // suite that reads a file of the tree or runs one of its scripts.
 export const REPO = fileURLToPath(new globalThis.URL('../../..', import.meta.url)).replace(/\/$/, '');

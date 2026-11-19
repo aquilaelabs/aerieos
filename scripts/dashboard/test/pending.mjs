@@ -8,7 +8,7 @@
 // hook line that tells the session what was decided, and the endpoint's
 // refusal of a session's own token. What is faked: nothing. The hook is the
 // shipped script run as a process, and bb is the checkout's.
-import { launch, newPage, ok, done, ready, saveDialog, URL, DIR, nbShown, sleep, unfold, asSession, mint, section } from './lib.mjs';
+import { launch, newPage, ok, done, ready, saveDialog, URL, DIR, nbShown, sleep, unfold, asSession, mint, section, pageCall } from './lib.mjs';
 import { readFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -40,11 +40,7 @@ await ready(page);
 // selector wait never returns: ask the DOM instead.
 const gone = sel => page.waitForFunction(q => !!document.querySelector(q)?.hidden, sel,
                                          { timeout: 30000 });
-const post = (path, body) => page.evaluate(async ([p, b]) => {
-  const r = await fetch(p, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-                             body: JSON.stringify(b) });
-  return { status: r.status, body: await r.json() };
-}, [path, body]);
+const post = (path, body) => pageCall(page, path, body);
 
 // ---- auto is today ----------------------------------------------------------
 const first = bb('roadmap', 'add', 'a thing added under auto');

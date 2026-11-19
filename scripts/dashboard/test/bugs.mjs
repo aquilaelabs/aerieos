@@ -3,7 +3,7 @@
 // report is a form submitted once, not a list curated in place), and nothing
 // is ever deleted: a bug closes as fixed or wontfix, each with a note, because
 // a closed bug is the record that stops the same report being chased twice.
-import { launch, newPage, ok, done, ready, nbShown, tmuxCapture, URL, DIR, openFold, closeFold, nbGo, section } from './lib.mjs';
+import { launch, newPage, ok, done, ready, nbShown, tmuxCapture, URL, DIR, openFold, closeFold, nbGo, section, pageCall } from './lib.mjs';
 import { readFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -499,11 +499,7 @@ const merged = execFileSync(BB, ['history', '--find', 'compose files'],
 ok(/bugs\s+claude\s+filed/.test(merged),
    'aerie history finds a bug by its words, tagged with which log it came from');
 
-const post = body => page.evaluate(async b => {
-  const r = await fetch('/api/bugs', { method: 'POST',
-    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
-  return { status: r.status, body: await r.json() };
-}, body);
+const post = body => pageCall(page, '/api/bugs', body);
 
 // ---- opening one is a slide, not a snap -------------------------------------
 // The same height tween the sidebar cards fold with. A <details> opens
