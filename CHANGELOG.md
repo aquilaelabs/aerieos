@@ -47,6 +47,7 @@
 - A restarted session shows on its space's card at once, where the card said Start agent for a minute with the session running; and every repository of a space shows the space's session in its header (7f00b50)
 - The node's name in a group header shows whole on a phone in Firefox and Safari, where it was cut short with room beside it (7f00b50)
 - Install a tool pack under Agents may in a space's settings saves, where changing it did nothing (f033e43)
+- `aerie phone status` says whether the phone is lent to the space it is run in, and by whom; those lines never printed (4dcc590)
 
 ## 0.9.0-dev.5641: 2026-11-18
 
