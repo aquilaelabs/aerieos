@@ -273,6 +273,7 @@ scripts/
     scanners.py                  AerieOS's own scanners on each node (R145): the compose project of Semgrep, Trivy and mobsfscan deployed and updated per node, one schedule for every node's runs, the SARIF each sends up, and the bell's rows
     nginxproxy.py                one nginx per node, AerieOS's own (R171): the routes and certificate kept here, the compose file generated from them, deployed and rebuilt through containers.py
     services.py                  AerieOS's own services as one table (R172, R264): the model router, nginx and the Scanners by kind, each one's module, grant and update check, read by every list of them and by the Library's rows, Install and Remove
+    syscontainer.py              a System container on a node, what nginx and the model router share (R171, R180): its name, whether it is deployed, and deploy, apply and remove of one generated compose file through containers.py, each handed what differs
     acme.py                      an ACME client on the cryptography library: Let's Encrypt certificates for the nginx page by HTTP-01 or DNS-01, renewed (R150)
     unlocks.py                   a person's tokens opened per use for the window they pick and logged, git's handout of an opened one, and a store under a key of the person's own opened only while unlocked (R158 step 5, R157)
     hardening.py                 the dashboard's process kept from core files and swap, not dumpable, and wipe() for a key let go (R158 step 6)

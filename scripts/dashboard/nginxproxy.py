@@ -32,6 +32,7 @@ import urllib.request
 from pathlib import Path
 
 import statefile
+import syscontainer
 
 STATE = None
 write_json = None
@@ -113,7 +114,7 @@ def _save(d):
 def _cert_dir(nid, host=""):
     """Where a node's certificate lives: the default at the node's own
     directory, a hostname's own under certs/<host> (R175)."""
-    d = STATE / "nginx" / re.sub(r"[^A-Za-z0-9_-]", "_", str(nid))
+    d = STATE / "nginx" / syscontainer.node_slug(nid)
     return d / "certs" / re.sub(r"[^a-z0-9.-]", "_", host.lower()) if host else d
 
 
@@ -154,8 +155,7 @@ def cert_paths(rec, host, pick=""):
 def container_name(nid):
     """The written container's name on a node: nginx-<node name>, kept to
     the characters a compose project name may have."""
-    base = re.sub(r"[^a-z0-9-]", "-", str(node_name(nid) or nid).lower()).strip("-") or "node"
-    return f"nginx-{base}"[:60]
+    return syscontainer.container_name("nginx", node_name(nid) or nid)
 
 
 # ---- the routes ------------------------------------------------------------
@@ -264,8 +264,7 @@ def nginx_conf(routes, rec=None):
 
 
 def _indent(text, n):
-    pad = " " * n
-    return "\n".join(pad + ln if ln else "" for ln in text.rstrip("\n").split("\n"))
+    return syscontainer.indent(text, n)
 
 
 def compose_text(nid, rec):
@@ -606,8 +605,7 @@ def check_loop():
 def deployed(devapp, nid):
     """Whether the nginx page's container is on this node: written from here
     (a file source under its name) and bound to this node."""
-    name = container_name(nid)
-    return bool(devapp.is_file_source(name) and devapp._read_rec(name, devapp.MAIN).get("node") == nid)
+    return syscontainer.deployed(devapp, container_name(nid), nid)
 
 
 # The daemon half of a row (the deployed container's state and the ports
@@ -1110,26 +1108,10 @@ def deploy(nid, containers, devactions, devapp):
     """The container made on the node from the generated compose file, then
     built: Deploy on a node without one, and the enroll dialog's tick once
     the node has enrolled."""
-    name = container_name(nid)
-    if devapp.is_file_source(name):
-        # The name is the node's name: one left by an uninstalled node of the
-        # same name, whose machine is gone, is this node's to take.
-        was = devapp._read_rec(name, devapp.MAIN).get("node")
-        live = {n["id"] for n in node_list() if n.get("state") != "retired"}
-        if was == nid or was in live:
-            return {"error": f"{name} is already on the Containers page"}
-        devapp.forget_container(name)
-    # A new one is the newest line the registry listed, pinned (R192).
-    pin_latest(nid)
-    rec = record(nid)
-    # AerieOS's own (R180): System's, which no picker sets.
-    r = containers.create_container(name, compose_text(nid, rec), "", node=nid, for_project=devapp.SYSTEM)
-    if r.get("error"):
-        return r
-    b = devactions.rebuild(name, devapp.MAIN, gate=False)
-    if b.get("error"):
-        return {"ok": True, "name": name, "note": f"made, but not built: {b['error']}"}
-    return {"ok": True, "name": name, "job": b.get("job")}
+    return syscontainer.deploy(nid, container_name(nid), lambda: compose_text(nid, record(nid)),
+                               containers, devactions, devapp, node_list,
+                               # A new one is the newest line the registry listed, pinned (R192).
+                               first=lambda: pin_latest(nid))
 
 
 def claim(devapp, name):
@@ -1147,16 +1129,8 @@ def apply(nid, containers, devactions, devapp):
     """A deployed nginx given its new compose file and rebuilt, so what was
     saved is what runs; nothing to do where it is not deployed yet."""
     name = container_name(nid)
-    if not devapp.is_file_source(name):
-        return {"ok": True, "deployed": False}
-    claim(devapp, name)
-    r = containers.update_container(name, compose_text(nid, record(nid)), "")
-    if r.get("error"):
-        return r
-    b = devactions.rebuild(name, devapp.MAIN, gate=False)
-    if b.get("error"):
-        return {"ok": True, "deployed": True, "note": f"saved, but not rebuilt: {b['error']}"}
-    return {"ok": True, "deployed": True, "job": b.get("job")}
+    return syscontainer.apply(name, lambda: compose_text(nid, record(nid)), containers, devactions, devapp,
+                              first=lambda: claim(devapp, name))
 
 
 def update(nid, containers, devactions, devapp):
@@ -1180,35 +1154,28 @@ def update(nid, containers, devactions, devapp):
 
 
 def remove(nid, devactions, devapp):
-    name = container_name(nid)
-    if not devapp.is_file_source(name):
-        return {"error": f"{name} is not on the Containers page"}
-    return devactions.remove_instance(name, devapp.MAIN)
+    return syscontainer.remove(container_name(nid), devactions, devapp)
 
 
 # ---- the Library's service (services.py) --------------------------------------
 # What the Library asks of every service by the same names: whether it is on
 # a node, its Install and its Remove, which are this page's Deploy and
 # Remove, and the sentence Remove shows. The three modules a written
-# container is made, built and removed through are imported when asked,
-# since containers.py reads this module itself.
+# container is made, built and removed through are syscontainer.hands().
 
 REMOVES = "Its routes and certificates are kept here; the hostnames it answers for stop answering."
 
 
 def service_deployed(nid):
-    import devapp                                           # noqa: PLC0415
+    _containers, _devactions, devapp = syscontainer.hands()
     return deployed(devapp, nid)
 
 
 def service_install(nid, by=""):
-    import containers                                       # noqa: PLC0415
-    import devactions                                       # noqa: PLC0415
-    import devapp                                           # noqa: PLC0415
+    containers, devactions, devapp = syscontainer.hands()
     return deploy(nid, containers, devactions, devapp)
 
 
 def service_remove(nid, by=""):
-    import devactions                                       # noqa: PLC0415
-    import devapp                                           # noqa: PLC0415
+    _containers, devactions, devapp = syscontainer.hands()
     return remove(nid, devactions, devapp)

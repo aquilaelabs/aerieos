@@ -34,6 +34,8 @@ import time
 import urllib.request
 from pathlib import Path
 
+import syscontainer
+
 STATE = None
 write_json = None
 node_list = None         # () -> the nodes (nodes.node_list)
@@ -116,12 +118,11 @@ def record(nid):
 
 
 def _reports_dir(nid):
-    return STATE / "scan-reports" / re.sub(r"[^A-Za-z0-9_-]", "_", str(nid))
+    return STATE / "scan-reports" / syscontainer.node_slug(nid)
 
 
 def container_name(nid):
-    base = re.sub(r"[^a-z0-9-]", "-", str(node_name(nid) or nid).lower()).strip("-") or "node"
-    return f"scanners-{base}"[:60]
+    return syscontainer.container_name("scanners", node_name(nid) or nid)
 
 
 def versions_of(rec):

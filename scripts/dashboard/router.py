@@ -37,6 +37,7 @@ import urllib.request
 from pathlib import Path
 
 import statefile
+import syscontainer
 
 STATE = None
 write_json = None
@@ -144,13 +145,11 @@ def record(nid):
 
 
 def container_name(nid):
-    base = re.sub(r"[^a-z0-9-]", "-", str(node_name(nid) or nid).lower()).strip("-") or "node"
-    return f"router-{base}"[:60]
+    return syscontainer.container_name("router", node_name(nid) or nid)
 
 
 def deployed(devapp, nid):
-    name = container_name(nid)
-    return bool(devapp.is_file_source(name) and devapp._read_rec(name, devapp.MAIN).get("node") == nid)
+    return syscontainer.deployed(devapp, container_name(nid), nid)
 
 
 def _url(nid, rec=None):
@@ -175,8 +174,7 @@ def _qc(v):
 
 
 def _indent(text, n):
-    pad = " " * n
-    return "\n".join(pad + ln if ln else ln for ln in text.splitlines())
+    return syscontainer.indent(text, n, every_break=True)
 
 
 def litellm_config(rec):
@@ -331,55 +329,36 @@ def deploy(nid, containers, devactions, devapp, gpu=False):
     why = _ready(nid)
     if why:
         return {"error": why}
-    name = container_name(nid)
-    if devapp.is_file_source(name):
-        was = devapp._read_rec(name, devapp.MAIN).get("node")
-        live = {n["id"] for n in node_list() if n.get("state") != "retired"}
-        if was == nid or was in live:
-            return {"error": f"{name} is already on the Containers page"}
-        devapp.forget_container(name)
-    rec = record(nid)
-    r = containers.create_container(name, compose_text(nid, rec, gpu), "", node=nid, for_project=devapp.SYSTEM)
-    if r.get("error"):
-        return r
-    with _lock:
-        d = _load()
-        d.setdefault(str(nid), {})["deployed"] = int(time.time())
-        _save(d)
-    b = devactions.rebuild(name, devapp.MAIN, gate=False)
-    if b.get("error"):
-        return {"ok": True, "name": name, "note": f"made, but not built: {b['error']}"}
-    return {"ok": True, "name": name, "job": b.get("job")}
+
+    def made():
+        # When it was deployed, which is what says the router is there.
+        with _lock:
+            d = _load()
+            d.setdefault(str(nid), {})["deployed"] = int(time.time())
+            _save(d)
+    return syscontainer.deploy(nid, container_name(nid), lambda: compose_text(nid, record(nid), gpu),
+                               containers, devactions, devapp, node_list, made=made)
 
 
 def apply(nid, containers, devactions, devapp, gpu=False):
     """A deployed router given its new compose file and rebuilt."""
-    name = container_name(nid)
-    if not devapp.is_file_source(name):
-        return {"ok": True, "deployed": False}
-    r = containers.update_container(name, compose_text(nid, record(nid), gpu), "")
-    if r.get("error"):
-        return r
-    b = devactions.rebuild(name, devapp.MAIN, gate=False)
-    if b.get("error"):
-        return {"ok": True, "deployed": True, "note": f"saved, but not rebuilt: {b['error']}"}
-    return {"ok": True, "deployed": True, "job": b.get("job")}
+    return syscontainer.apply(container_name(nid), lambda: compose_text(nid, record(nid), gpu),
+                              containers, devactions, devapp)
 
 
 def remove(nid, devactions, devapp):
-    name = container_name(nid)
-    if not devapp.is_file_source(name):
-        return {"error": f"{name} is not on the Containers page"}
-    r = devactions.remove_instance(name, devapp.MAIN)
-    with _lock:
-        d = _load()
-        rec = d.get(str(nid)) or {}
-        rec.pop("deployed", None)
-        rec.pop("projects", None)
-        rec.pop("models", None)
-        d[str(nid)] = rec
-        _save(d)
-    return r
+    def gone():
+        # No longer deployed, and with it the keys it had made for the
+        # spaces and the models it listed; the provider keys stay.
+        with _lock:
+            d = _load()
+            rec = d.get(str(nid)) or {}
+            rec.pop("deployed", None)
+            rec.pop("projects", None)
+            rec.pop("models", None)
+            d[str(nid)] = rec
+            _save(d)
+    return syscontainer.remove(container_name(nid), devactions, devapp, gone=gone)
 
 
 # ---- the Library's service (services.py) --------------------------------------
@@ -387,7 +366,7 @@ def remove(nid, devactions, devapp):
 # a node, its Install and its Remove, which are Deploy and Remove here, and
 # the sentence Remove shows, which for the router is the page's own. The
 # three modules a written container is made, built and removed through are
-# imported when asked, since containers.py reads this module itself.
+# syscontainer.hands().
 
 REMOVES = ""
 
@@ -397,15 +376,12 @@ def service_deployed(nid):
 
 
 def service_install(nid, by=""):
-    import containers                                       # noqa: PLC0415
-    import devactions                                       # noqa: PLC0415
-    import devapp                                           # noqa: PLC0415
+    containers, devactions, devapp = syscontainer.hands()
     return deploy(nid, containers, devactions, devapp, bool(node_gpu(nid)) if node_gpu else False)
 
 
 def service_remove(nid, by=""):
-    import devactions                                       # noqa: PLC0415
-    import devapp                                           # noqa: PLC0415
+    _containers, devactions, devapp = syscontainer.hands()
     return remove(nid, devactions, devapp)
 
 
