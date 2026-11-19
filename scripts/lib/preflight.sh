@@ -194,11 +194,23 @@ cmd_tests_preflight() {
     local cov_ok=""; [ -f "${BB_REPO:-$PWD}/.bb-map/coverage.json" ] && cov_ok=1
     for f in "${files[@]}"; do
         case "$f" in
-            scripts/dashboard/index.html|scripts/dashboard/static/*|docs/design-language.md|scripts/dashboard/test/uniform.mjs)
+            scripts/dashboard/index.html|scripts/dashboard/*.css|scripts/dashboard/static/*|docs/design-language.md|scripts/dashboard/test/uniform*.mjs)
                 checks+=(design); break ;;
             scripts/dashboard/*) [ -n "$cov_ok" ] || { checks+=(design); break; } ;;
         esac
     done
+    # The design check is uniform's three parts, a, b and c, run among the
+    # suites rather than after them (B987): as the rule's check it was part a
+    # alone, leaving the contrast in each scheme, the phone pass and the
+    # dialogs unchecked, and it ran by itself once the suites were done; the
+    # stylesheets (page-*.css since 16 Nov) set it off at all only through
+    # the line above, since no map sees a CSS rule.
+    if [[ " ${checks[*]} " == *" design "* ]] && [ "${suites[*]:-}" != ALL ]; then
+        local u
+        for u in uniform uniform-b uniform-c; do
+            case " ${suites[*]:-} " in *" $u "*) ;; *) suites+=("$u") ;; esac
+        done
+    fi
     printf '  files:   %s\n' "${files[*]}"
     printf '  suites:  %s\n' "${suites[*]:-none}"
     [ -z "$harness_only" ] || printf '  flakes:  every suite runs because the harness changed; one fails the gate only in %s\n' "${touched[*]:-none of them (the change touches no suite by itself)}"
@@ -319,8 +331,12 @@ cmd_tests_preflight() {
     [ -z "$flk_all" ] || flakes_to_bugs $flk_all 2>&1 | tee -a "$rl"
     local c
     for c in "${checks[@]}"; do
-        # design is uniform.mjs, already in the run when it is listed
-        case "$c" in design) case " ${suites[*]:-} " in *" uniform "*|*" ALL "*) continue ;; esac ;; esac
+        # design is uniform's three parts, already in the run when they are
+        # listed (above, whenever design is), or when every suite ran
+        if [ "$c" = design ]; then
+            case " ${suites[*]:-} " in *" ALL "*) continue ;; esac
+            case " ${suites[*]:-} " in *" uniform "*) case " ${suites[*]} " in *" uniform-b "*) case " ${suites[*]} " in *" uniform-c "*) continue ;; esac ;; esac ;; esac
+        fi
         if bash "$0" rules check "$c" 2>&1 | tee -a "$rl"; then :; else rc=1; fi
     done
     # A run refused for another one holding the lock ran no suite at all,

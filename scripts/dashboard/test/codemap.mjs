@@ -105,6 +105,12 @@ ok(/suites:.*\bdevapp\b/.test(plan),
 ok(/checks:\s+lint voice design/.test(pre('scripts/dashboard/index.html'))
    && /checks:\s+lint voice design/.test(pre('docs/design-language.md')),
    'a change to the stylesheet or the design language plans the design check');
+// ...a stylesheet alone too (page-*.css, out of index.html since 16 Nov),
+// which planned no suite at all; and the check is uniform's three parts,
+// run among the suites, where it had been part a alone after them (B987).
+const css = pre('scripts/dashboard/page-surfaces.css');
+ok(/checks:\s+lint voice design/.test(css) && /suites:\s+uniform uniform-b uniform-c\s*$/m.test(css),
+   `a change to a stylesheet alone plans the design check as uniform's three parts (${css.match(/suites:.*/)?.[0]})`);
 ok(/suites:\s+ALL/.test(pre('scripts/dashboard/server.py')), 'a change to server.py is the whole suite, said as such');
 ok(/suites:\s+none/.test(pre('README.md')) && /checks:\s+lint voice$/m.test(pre('README.md')),
    'a change with no suite still gets the lint and voice checks');
