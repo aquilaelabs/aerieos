@@ -25,6 +25,10 @@
 - Cutting a release keeps the commit each changelog line names, where it could rename a line to the change committed after it (c41fc43)
 - The vetted catalog is read up to 20,000 entries and says when it lists more, where entries past 2,000 were dropped without a word (fcf70a4)
 - A Library entry's page keeps its Install on the line with its name, where it stood alone under the node's name (39289c5)
+- A node's agent keeps running when one of its checks fails, where one error stopped it, left its running jobs to read lost and could restart it every few seconds (304f18a)
+- A node's settings file is saved one save at a time, where two at once could leave it unreadable and the node had to be enrolled again at its console (326f01b)
+- A network share that stops answering no longer stalls a node: its jobs, cancels and keys go on arriving, its mount tries once a minute, and its store reads as not answering, where the node read as gone for minutes at a time (2d42812)
+- A job on a node ends when its own work has, where a process it left behind holding its output kept it running for ever and held the node's agent updates (07cf898)
 
 ## 0.9.0-dev.5641: 2026-11-18
 
