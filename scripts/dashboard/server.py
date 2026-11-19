@@ -7311,6 +7311,18 @@ class Handler(BaseHTTPRequestHandler):
             return False
         return self._not_project(name)
 
+    def _q(self):
+        """The request's query string, parsed: {name: [values]}, a name
+        with an empty value left out, as parse_qs has it. One way to read
+        it, where sixty-five handlers spelled the parse three ways."""
+        return urllib.parse.parse_qs(self.path.partition("?")[2])
+
+    def _nodes_down(self):
+        """The reply of every route that needs the node store when it did
+        not open: one sentence with the reason, and 500. Twelve handlers
+        each worded it, one of them with a 200."""
+        return self._json({"error": "the node store did not open: " + NODES_OK}, 500)
+
     def _result(self, r, bad=400):
         """A module's {ok} or {error} answer as the reply: `bad` when it
         carries an error, 200 otherwise."""
@@ -8135,7 +8147,7 @@ class Handler(BaseHTTPRequestHandler):
         that VM and this minute, keyed with the node's token hash."""
         if (cross := self._ws_cross_origin()):
             return self._json({"error": cross}, 403)
-        q = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+        q = self._q()
         project, _, name = str((q.get("vm") or [""])[0]).partition("/")
         if not registry.is_project(project):
             return self._json({"error": f"no space called {project}"}, 404)
@@ -8490,7 +8502,7 @@ class Handler(BaseHTTPRequestHandler):
         version = f"{st.st_size:x}-{st.st_mtime_ns:x}"
         tag = f'W/"{version}"'
         page = rel == "index.html"
-        asked = urllib.parse.parse_qs(self.path.partition("?")[2]).get("v", [""])[0]
+        asked = self._q().get("v", [""])[0]
         cache = "private, max-age=31536000, immutable" if not page and asked == version else "no-cache"
         raw = None
         if page:
@@ -8816,7 +8828,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": why}, 403)
         for how, route, name in GET_ROUTES:
             if (path == route) if how == "exact" else self.path.startswith(route):
-                if (why := self._work_refused(route, (urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+                if (why := self._work_refused(route, (self._q()
                                                      .get("project") or [""])[0])):
                     return self._json({"error": why}, 400)
                 if (why := route_gate(name, self._who())):
@@ -8850,7 +8862,7 @@ class Handler(BaseHTTPRequestHandler):
         if not who or not (users.is_admin(who) or (who.get("session") and not self._diag_why())):
             return self._json({"error": "the trace is for an administrator, or a session whose space "
                                         "has the diagnostics grant (the Debug page)"}, 403)
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         try:
             since = float((q.get("since") or ["0"])[0])
         except ValueError:
@@ -8900,7 +8912,7 @@ class Handler(BaseHTTPRequestHandler):
     def _get_git(self):
         """GET /api/git: the notebook's Git view (gitview.view), for a
         project this account may see."""
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         name = q.get("project", [""])[0]
         if self._not_project(name):
             return
@@ -8921,7 +8933,7 @@ class Handler(BaseHTTPRequestHandler):
         host (R188), each ability with what its token says and the project's
         own override, from the kept measure; for a project this account
         sees."""
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         name = q.get("project", [""])[0]
         if self._not_project(name):
             return
@@ -8930,7 +8942,7 @@ class Handler(BaseHTTPRequestHandler):
     def _get_changelog(self):
         """GET /api/changelog: changelog.reading, for a project this account
         sees."""
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         name = q.get("project", [""])[0]
         if self._not_project(name):
             return
@@ -8946,7 +8958,7 @@ class Handler(BaseHTTPRequestHandler):
         certificate itself, for a phone or the companion to pin."""
         if self._refused("controller-read"):
             return
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         if q.get("download", [""])[0]:
             pem = tls.certificate_pem().encode()
             if not pem:
@@ -8997,7 +9009,7 @@ class Handler(BaseHTTPRequestHandler):
         For an account that reads the controller's area."""
         if self._refused("controller"):
             return
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         person, machine = q.get("person", [""])[0][:120], q.get("machine", [""])[0][:40]
         try:
             before, n = int(q.get("before", ["0"])[0]), min(500, max(1, int(q.get("n", ["100"])[0])))
@@ -9014,7 +9026,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _get_version(self):
         """GET /api/version."""
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         name = q.get("project", [""])[0]
         if self._not_project(name):
             return
@@ -9026,7 +9038,7 @@ class Handler(BaseHTTPRequestHandler):
     def _get_artifacts(self):
         """GET /api/artifacts: artifacts.tab_view, for a project this account
         sees."""
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         name = q.get("project", [""])[0]
         if self._not_project(name):
             return
@@ -9035,7 +9047,7 @@ class Handler(BaseHTTPRequestHandler):
     def _get_artifact(self):
         """GET /api/artifact: one file of a project's, as a download
         (artifacts.download)."""
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         name = q.get("project", [""])[0]
         if self._not_project(name):
             return
@@ -9101,7 +9113,7 @@ class Handler(BaseHTTPRequestHandler):
         # ...and, for a session that names its node, the agent there and when
         # it was built (R131): what aerie status says beside the controller's.
         agent = {}
-        nid = urllib.parse.parse_qs(self.path.partition("?")[2]).get("node", [""])[0]
+        nid = self._q().get("node", [""])[0]
         if nid and (self._who() or {}).get("session") and not NODES_OK:
             ag = (nodes.node(nid) or {}).get("agent") or {}
             agent = {"version": str(ag.get("version") or ""), "built": str(ag.get("built") or "")}
@@ -9120,7 +9132,7 @@ class Handler(BaseHTTPRequestHandler):
         (artifacts.source_download). A person's download: a session's token
         does not reach this route (SESSION_ROUTES), and a session has the
         tree already."""
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         name = q.get("project", [""])[0]
         if self._not_project(name):
             return
@@ -9147,7 +9159,7 @@ class Handler(BaseHTTPRequestHandler):
         reports a person reads there (the operator, 26 Oct)."""
         if self._refused("controller-read"):
             return None
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         got, status = logs.download((q.get("what") or [""])[0], self._principal())
         if status != 200:
             return self._json(got, status)
@@ -9157,7 +9169,7 @@ class Handler(BaseHTTPRequestHandler):
         """GET /api/phone."""
         # Not on the status poll: a probe is a job on a node, so the tab
         # asks when it is opened or pressed, and reads the cache between.
-        q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        q = self._q()
         # A probe is a job on the named node, and a session's token is
         # bound to one project's node and no other (the same rule the
         # jobs endpoint keeps): a session reads the cache, an account
@@ -9172,7 +9184,7 @@ class Handler(BaseHTTPRequestHandler):
         do or about 45 s pass, so an ask reaches the app in a second rather
         than on Android's alarm. A person's, not a session's."""
         who = self._who() or {}
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         since = q.get("since", [""])[0]
         uid, admin = users.uid_of(who), users.is_admin(who)
         end = time.time() + PHONE_WAIT_S
@@ -9190,7 +9202,7 @@ class Handler(BaseHTTPRequestHandler):
         # Without Toolchains Read the tab is not offered (R152 step 3), and
         # this answers only for the nodes of the person's own projects,
         # which _node_asked keeps it to: what their projects build with.
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         nid, why = self._node_asked(q.get("node", [""])[0])
         if why:
             return self._json({"error": why, "toolchains": []})
@@ -9203,7 +9215,7 @@ class Handler(BaseHTTPRequestHandler):
         Library's): each agent's row, the version against the latest and
         any job of its own, and the asking account's own plugins and MCP
         servers there. Answered for the nodes this account may look at."""
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         nid, why = self._node_asked(q.get("node", [""])[0])
         if why or not nid or nid == "local":
             return self._json({"error": why or "which node?", "rows": []})
@@ -9229,8 +9241,8 @@ class Handler(BaseHTTPRequestHandler):
         """GET /api/emulator?node=ID: that node's system images, what could be
         added, and the image job there. The same node scope as Toolchains."""
         if NODES_OK:
-            return self._json({"error": "the node store did not open"})
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+            return self._nodes_down()
+        q = self._q()
         nid, why = self._node_asked(q.get("node", [""])[0])
         if why or not nid:
             return self._json({"error": why or "no node named"})
@@ -9365,8 +9377,7 @@ class Handler(BaseHTTPRequestHandler):
         # endpoints land under /api/v1 with their shapes written down;
         # the unversioned paths above migrate later, never both at once.
         if NODES_OK:
-            return self._json({"error": "the node store did not open: "
-                                        + NODES_OK}, 500)
+            return self._nodes_down()
         # Without Nodes Read the tab is not offered (R152 step 3), and this
         # answers with the nodes of the person's own projects alone, which a
         # Claude sign-in on them needs, as below.
@@ -9415,7 +9426,7 @@ class Handler(BaseHTTPRequestHandler):
                 got, _ = nodes.jobs_view("", {"n": ["500"]}, mine, hidden=self._jobs_hidden())
             rows, names = got.get("jobs") or [], got.get("nodes") or {}
         machines = not NODES_OK and not self._area_read_why("nodes")
-        light = urllib.parse.parse_qs(self.path.partition("?")[2]).get("light", [""])[0] == "1"
+        light = self._q().get("light", [""])[0] == "1"
         with timing.timed("home:read"):
             got = home.read(rows, names, machines, light)
         return self._json(*got)
@@ -9425,9 +9436,8 @@ class Handler(BaseHTTPRequestHandler):
         account may see unless it administers. A list's rows carry each
         job's spec cut to what names it; ?id= answers one job whole."""
         if NODES_OK:
-            return self._json({"error": "the node store did not open: "
-                                        + NODES_OK}, 500)
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+            return self._nodes_down()
+        q = self._q()
         mine, system = self._jobs_scope()
         return self._json(*nodes.jobs_view(q.get("id", [""])[0], q, mine, system, self._jobs_hidden()))
 
@@ -9465,7 +9475,7 @@ class Handler(BaseHTTPRequestHandler):
         every such node."""
         # No node named means the default, which is the arrangement that
         # predates the picker.
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         me = self._who() or {}
         sess = me.get("session") or ""
         # A session reads its own project's node, which is where it works,
@@ -9572,7 +9582,7 @@ class Handler(BaseHTTPRequestHandler):
     def _get_node_files(self):
         """GET /api/node-files?node=&root=&path= (R224): the node's roots, and
         with a root the folder's listing; an administrator's."""
-        q = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+        q = self._q()
         if not self._node_files_admin():
             return self._json({"error": "the file explorer is an administrator's"}, 403)
         nid, root = q.get("node", [""])[0], q.get("root", [""])[0]
@@ -9592,7 +9602,7 @@ class Handler(BaseHTTPRequestHandler):
         """GET /api/node-files/read?node=&root=&path=[&dl=1] (R224): a file's
         bytes streamed from its node, a download or shown in the page;
         nothing it holds runs here (a page or a script is sent as text)."""
-        q = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+        q = self._q()
         if not self._node_files_admin():
             return self._json({"error": "the file explorer is an administrator's"}, 403)
         nid, root, path = q.get("node", [""])[0], q.get("root", [""])[0], q.get("path", [""])[0]
@@ -9647,7 +9657,7 @@ class Handler(BaseHTTPRequestHandler):
         """POST /api/node-files/upload?node=&root=&path=&name= (R224): the
         request's body, the file itself, streamed to its node a megabyte
         at a time; an administrator's, audited."""
-        q = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+        q = self._q()
         if not self._node_files_admin():
             return self._json({"error": "the file explorer is an administrator's"}, 403)
         if (cross := self._ws_cross_origin()):
@@ -9820,7 +9830,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _get_claude_now(self):
         """GET /api/claude-now."""
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         name = q.get("project", [""])[0]
         if self._not_project(name):
             return
@@ -9828,7 +9838,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _get_todo(self):
         """GET /api/roadmap."""
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         name = q.get("project", [""])[0]
         if self._not_project(name):
             return
@@ -9837,7 +9847,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _get_rules(self):
         """GET /api/rules."""
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         name = q.get("project", [""])[0]
         if self._not_project(name):
             return
@@ -9863,7 +9873,7 @@ class Handler(BaseHTTPRequestHandler):
         # something that only exists inside a launcher. Readable by anyone
         # who can see the project: it is their own rules, roadmap and
         # bugs, already on the three tabs beside it.
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         name = q.get("project", [""])[0]
         if self._not_project(name):
             return
@@ -9883,7 +9893,7 @@ class Handler(BaseHTTPRequestHandler):
     def _get_brief(self):
         """GET /api/brief: brief.view, the brief waiting in a project's tree
         and the one kept after it left, for a project this account sees."""
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         name = q.get("project", [""])[0]
         if self._not_project(name):
             return
@@ -9909,7 +9919,7 @@ class Handler(BaseHTTPRequestHandler):
         """GET /api/design: design.view, a project's design language, its
         pages and the vocabulary they are drawn from, for a project this
         account sees; a session reads it too, through aerie design."""
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         name = q.get("project", [""])[0]
         if self._not_project(name):
             return
@@ -9937,7 +9947,7 @@ class Handler(BaseHTTPRequestHandler):
         """GET /api/wiki: the project's wiki (wiki.view), or one page of it
         with ?page=, for an account that sees the project; a session reads
         it too, through aerie wiki."""
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         name = q.get("project", [""])[0]
         if self._not_project(name):
             return
@@ -9957,7 +9967,7 @@ class Handler(BaseHTTPRequestHandler):
         with ?run=N (0 the newest finished) that run's jobs and the end of
         each failed job's log (cilogs), for an account that sees the
         project; a session reads it through aerie ci-log."""
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         name = q.get("project", [""])[0]
         if self._not_project(name):
             return
@@ -9972,7 +9982,7 @@ class Handler(BaseHTTPRequestHandler):
     def _get_ci_watch(self):
         """GET /api/ci-watch: what the last look at a project's CI found
         (ciwatch.read), for an account that sees the project."""
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         name = q.get("project", [""])[0]
         if self._not_project(name):
             return
@@ -9995,7 +10005,7 @@ class Handler(BaseHTTPRequestHandler):
     def _get_wiki_export(self):
         """GET /api/wiki-export: the wiki as a zip of its Markdown pages,
         whether or not the project has a remote."""
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         name = q.get("project", [""])[0]
         if self._not_project(name):
             return
@@ -10022,7 +10032,7 @@ class Handler(BaseHTTPRequestHandler):
         """GET /api/codebase."""
         # What git tracks in the project, by language: the Briefing
         # tab's first section. Tracked files only, cached by commit.
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         name = q.get("project", [""])[0]
         if self._not_project(name):
             return
@@ -10030,7 +10040,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _get_pending(self):
         """GET /api/pending."""
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         name = q.get("project", [""])[0]
         if self._not_project(name):
             return
@@ -10038,7 +10048,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _get_memory(self):
         """GET /api/memory."""
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         # Against what this account may see, like every read above it:
         # this one passed the name straight through (bug #68).
         if self._not_project(q.get("project", [""])[0]):
@@ -10050,7 +10060,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _get_tests(self):
         """GET /api/tests."""
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         name = q.get("project", [""])[0]
         if self._not_project(name):
             return
@@ -10058,7 +10068,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _get_bugs(self):
         """GET /api/bugs."""
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         name = q.get("project", [""])[0]
         if self._not_project(name):
             return
@@ -10503,8 +10513,7 @@ class Handler(BaseHTTPRequestHandler):
         if why:
             return self._json({"error": why}, 403)
         if NODES_OK:
-            return self._json({"error": "the node store did not open: "
-                                        + NODES_OK}, 500)
+            return self._nodes_down()
         # The release check, now (R90 step 5): the newest published release
         # read again, for the Updates section's Check now.
         if act == "release-check":
@@ -10546,8 +10555,7 @@ class Handler(BaseHTTPRequestHandler):
         moves when the runner reports that it stopped, which is when it
         did."""
         if NODES_OK:
-            return self._json({"error": "the node store did not open: "
-                                        + NODES_OK}, 500)
+            return self._nodes_down()
         act = field(req, "action")
         if act in ("run", "emu"):
             # Never from a session (R35), which SESSION_ACTIONS holds at the
@@ -10771,8 +10779,7 @@ class Handler(BaseHTTPRequestHandler):
         Authorization header, a file streamed, a body read, and the
         long-poll's empty answer."""
         if NODES_OK:
-            return self._json({"error": "the node store did not open: "
-                                        + NODES_OK}, 500)
+            return self._nodes_down()
         verb = self.path.split("?")[0][len("/api/v1/agent/"):]
         hdr = self.headers.get("Authorization", "")
         bearer = hdr[7:] if hdr.startswith("Bearer ") else ""
@@ -10784,7 +10791,7 @@ class Handler(BaseHTTPRequestHandler):
             mv = move.for_node(late["node"]) if late.get("node") else {}
             return self._json({"error": "this controller moved", "moved": True, "to": move.moved_to(), **({"move": mv} if mv else {})}, 410)
         auth = nodes.authenticate(bearer) if bearer else {"error": "no token"}
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         # A hosting-only node (nodes.host_only) is held to what running the
         # containers sent to it needs, before any verb is read: nothing of
         # it comes back otherwise, and asking is audited.
@@ -10877,9 +10884,9 @@ class Handler(BaseHTTPRequestHandler):
         person's name and password once, which mints that token. What stays
         here is the HTTP, as for the agent's door."""
         if NODES_OK:
-            return self._json({"error": "the store did not open: " + NODES_OK}, 500)
+            return self._nodes_down()
         verb = self.path.split("?")[0][len("/api/v1/device/"):]
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         if why := featuresoff.refused(self.command, "/api/v1/device/" + verb):
             return self._json({"error": why, "off": True}, 403)
         # An app from before a break in the door is told so, whatever it
@@ -12002,7 +12009,7 @@ class Handler(BaseHTTPRequestHandler):
         enough to time anything on (busy.report, R108). For a session, its
         own project's nodes; for a person, any project they see. Another
         project's work there is counted, never named."""
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         name = q.get("project", [""])[0]
         who = self._who() or {}
         if who.get("session") and name != who["session"]:
@@ -12010,7 +12017,7 @@ class Handler(BaseHTTPRequestHandler):
         if self._not_project(name):
             return None
         if NODES_OK:
-            return self._json({"error": "the node store did not open"}, 500)
+            return self._nodes_down()
         pr = prefs.get(name) or {}
         mine = [pr.get("node")] + list(pr.get("nodes") or []) if pr.get("node") else []
         want = q.get("node", [""])[0]
@@ -12030,7 +12037,7 @@ class Handler(BaseHTTPRequestHandler):
         own copy (signing.backup), which marks it backed up. Never a session's.
         A project whose owner set a backup password is refused here and
         downloads through the POST, which carries it in the body."""
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         return self._signing_backup(q.get("project", [""])[0], q.get("route", [""])[0],
                                     q.get("key", ["default"])[0] or "default", None)
 
@@ -12315,7 +12322,7 @@ class Handler(BaseHTTPRequestHandler):
         """GET /api/snapshots?project=NAME: the days kept of the project's
         tree (snapshots.py), newest first, and how many it keeps. An
         administrator's, like a restore."""
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         name = q.get("project", [""])[0]
         if self._refused("settings", name) or self._not_project(name):
             return None
@@ -12353,7 +12360,7 @@ class Handler(BaseHTTPRequestHandler):
         uid = users.whose(me) if me else ""
         if not me or not uid:
             return self._json({"error": "not an account"}, 403)
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         name = q.get("project", [""])[0]
         if self._not_project(name):
             return
@@ -12424,7 +12431,7 @@ class Handler(BaseHTTPRequestHandler):
         uid = users.whose(me) if me else ""
         if not me or not uid:
             return self._json({"error": "not an account"}, 403)
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         name = q.get("project", [""])[0]
         if self._not_project(name):
             return
@@ -12535,7 +12542,7 @@ class Handler(BaseHTTPRequestHandler):
         """An ISO uploaded on the VMs page: VMs Write on the project the dialog
         is for, a person's (never a session's), streamed to the controller's
         spool and fetched from there by the node's job."""
-        q = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+        q = self._q()
         project = (q.get("project") or [""])[0]
         if (self._who() or {}).get("session"):
             return self._json({"error": "uploading an installer ISO is a person's, on the VMs page"}, 403)
@@ -12563,7 +12570,7 @@ class Handler(BaseHTTPRequestHandler):
             n = int(self.headers.get("Content-Length", "0"))
         except ValueError:
             return self._json({"error": "bad request"}, 400)
-        q = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+        q = self._q()
         r = projects.spool_archive(self.rfile, n, (q.get("name") or [""])[0])
         return self._result(r)
 
@@ -12791,7 +12798,7 @@ class Handler(BaseHTTPRequestHandler):
         if self._refused("toolchains-write"):
             return
         if NODES_OK:
-            return self._json({"error": "the node store did not open"}, 500)
+            return self._nodes_down()
         action, nid = req.get("action"), field(req, "node")
         # ...on that node (R260): a role holding Toolchains on named nodes.
         if (why := users.may_node(self._who(), "toolchains-write", nid)):
@@ -12843,7 +12850,7 @@ class Handler(BaseHTTPRequestHandler):
         reason.
         """
         if NODES_OK:
-            return self._json({"error": "the node store did not open: " + NODES_OK}, 500)
+            return self._nodes_down()
         who = self._who() or {}
         proj = who.get("session") or field(req, "project")
         if proj and not who.get("session") and not users.may_see(who, proj):
@@ -13110,7 +13117,7 @@ class Handler(BaseHTTPRequestHandler):
         who = self._who() or {}
         if not who:
             return self._json({"error": "a person's to read"}, 403)
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         got = nasapps.icon_of(q.get("app", [""])[0]) if q.get("app") else toolpacks.icon_of(q.get("name", [""])[0])
         if not got:
             return self._json({"error": "no icon"}, 404)
@@ -13138,7 +13145,7 @@ class Handler(BaseHTTPRequestHandler):
         administrator's for the catalog), so the list is what the person
         may act on."""
         who = self._who() or {}
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         nid, why = self._node_asked(q.get("node", [""])[0])
         if why:
             return self._json({"error": why, "rows": []})
@@ -13314,7 +13321,7 @@ class Handler(BaseHTTPRequestHandler):
         the newest could not be taken. For whoever may install toolchains;
         never a session's."""
         who = self._who() or {}
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         # A search of it (R169 step 5): what aerie tool search answers a
         # session with, and anyone signed in: names, what each is, tier and
         # platforms, never an address or a commit; each word must be found.
@@ -13346,7 +13353,7 @@ class Handler(BaseHTTPRequestHandler):
         # ...and the folders a folder field suggests on the node picked (R238):
         # its pools, shares and disks under /mnt or /srv, as the Files page
         # lists its places.
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         nid, why = self._node_asked(q.get("node", [""])[0]) if q.get("node") else ("", "")
         n = nodes.node(nid) if nid and nid != "local" and not why and not NODES_OK else None
         roots = [r for r in fileexplorer.roots(n) if nasapps.PATH_RE.fullmatch(r["path"])] if n else []
@@ -13434,7 +13441,7 @@ class Handler(BaseHTTPRequestHandler):
         session's: a session reads its node with aerie node busy."""
         who = self._who() or {}
         if NODES_OK:
-            return self._json({"error": "the node store did not open: " + NODES_OK}, 500)
+            return self._nodes_down()
         payload, status = storage.view(nodes.node_list(), who, is_admin=users.is_admin,
                                        nodes_for=roles.nodes_for, may_see=users.may_see,
                                        level_of=roles.level_of)
@@ -13473,7 +13480,7 @@ class Handler(BaseHTTPRequestHandler):
         why = users.may(who, "node")
         if why:
             return self._json({"error": why}, 403)
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         nid, span = (q.get("node") or [""])[0], (q.get("span") or ["day"])[0]
         n = nodes.node(nid) if nid else None
         if not n or not nodes.own_machine(n):
@@ -13505,7 +13512,7 @@ class Handler(BaseHTTPRequestHandler):
         Nodes page; never a session's."""
         if self._refused("nodes"):
             return
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         nid = q.get("node", [""])[0]
         if not nid or not nodes.node(nid):
             return self._json({"error": "which node?"}, 400)
@@ -13518,7 +13525,7 @@ class Handler(BaseHTTPRequestHandler):
         project's own key, for a session of that project at its start
         (bb-tty's launcher) or a person who may work on it; {} where no
         router allows the project."""
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         name = q.get("project", [""])[0]
         if self._not_project(name):
             return
@@ -13683,7 +13690,7 @@ class Handler(BaseHTTPRequestHandler):
         """GET /api/help: the docs on the Help page (helpdocs.py, R258): the
         listing, ?doc=NAME one of them, ?q=WORDS a search across them. Any
         account and any session: they are the docs the image ships."""
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         if "q" in q:
             return self._json(*helpdocs.search((q.get("q") or [""])[0]))
         if "doc" in q:
@@ -14176,7 +14183,7 @@ class Handler(BaseHTTPRequestHandler):
         me = self._who() or {}
         if not users.is_admin(me):
             return self._json({"error": "moving the controller is an administrator's"}, 403)
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         with contextlib.suppress(Exception):                     # noqa: BLE001 (the ask never holds the read)
             move.ask_new()
         out = {**move.status(), "arrived": move.restored(), "here": _page_url(), "not_here": move.not_yet_here()}
@@ -14261,7 +14268,7 @@ class Handler(BaseHTTPRequestHandler):
         install pulling the bundle, packed fresh. No credential of either
         side travels, and nothing here opens the bundle."""
         path = self.path.split("?")[0]
-        q = {k: v[0] for k, v in urllib.parse.parse_qs(self.path.partition("?")[2]).items()}
+        q = {k: v[0] for k, v in self._q().items()}
         if path == "/api/v1/move/landed" and self.command == "GET":
             return self._json(*move.answer_asked(q))
         if path == "/api/v1/move/landed" and self.command == "POST":
@@ -14294,7 +14301,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": "the move bundle is its owner's"}, 403)
         # ?name= is the bundle the page just packed (action pack), served as
         # it is; with no name, packed fresh here as before.
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         name = q.get("name", [""])[0]
         if not name:
             r = move.pack_bundle()
@@ -14319,7 +14326,7 @@ class Handler(BaseHTTPRequestHandler):
         me = self._who() or {}
         if not users.is_owner(me):
             return self._json({"error": "the controller's backup is its owner's"}, 403)
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         p = move.backup_path(q.get("name", [""])[0])
         if not p:
             return self._json({"error": "no such backup here: make one with Download a backup"}, 404)
@@ -14364,7 +14371,7 @@ class Handler(BaseHTTPRequestHandler):
         me = self._who() or {}
         if not users.is_owner(me):
             return self._json({"error": "a backup's download is the owner's"}, 403)
-        name = (urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get("name") or [""])[0]
+        name = (self._q().get("name") or [""])[0]
         if not re.fullmatch(r"builderbot-backup-[A-Za-z0-9.+-]+-\d{8}-\d{6}(-\d+)?\.bbbackup", name):
             return self._json({"error": "which copy?"}, 400)
         p = Path(STATE) / "backup" / name
@@ -14710,7 +14717,7 @@ class Handler(BaseHTTPRequestHandler):
     def _get_project_sessions(self):
         """GET /api/project-sessions?project=NAME: every account's sessions on
         the project, for its settings dialog. An administrator's."""
-        q = urllib.parse.parse_qs(self.path.partition("?")[2])
+        q = self._q()
         name = q.get("project", [""])[0]
         if self._refused("settings", name) or self._not_project(name):
             return None
