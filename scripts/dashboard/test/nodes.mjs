@@ -3763,13 +3763,28 @@ await section("Uninstall from the row", async () => {
     // ...and in Rows the pick is a line under the card's own, the name
     // keeping its width beside the verbs, at a desk and on a phone (the
     // operator, 19 Nov: the pulldown took the name's column, a letter wide).
-    await page.evaluate(() => { libView = 'list'; drawPanes(); });
-    await page.waitForSelector(`.doc .librarytab .lgrid.lrows > .lcard[data-lrow="toolchain:nvidia-driver"] #libDrvSel`, { timeout: 20000 });
-    const rowsDesk = await libraryRowsWrong(page);
-    await page.setViewportSize({ width: 393, height: 851 });
-    await page.waitForTimeout(300);
-    const rowsPhone = await libraryRowsWrong(page);
-    await page.setViewportSize({ width: 1280, height: 900 });
+    // Asked for until it is drawn: under a gate's load one draw was not
+    // enough once (19 Nov), and what the page held then is said if it
+    // happens again.
+    const inRows = await page.waitForFunction(() => {
+      if (document.querySelector('.doc .librarytab .lgrid.lrows > .lcard[data-lrow="toolchain:nvidia-driver"] #libDrvSel')) return true;
+      libView = 'list';
+      if (!readBusy('library')) drawPanes();
+      return false;
+    }, null, { timeout: 20000, polling: 300 }).then(() => true, () => false);
+    let rowsDesk = [], rowsPhone = [];
+    if (inRows){
+      rowsDesk = await libraryRowsWrong(page);
+      await page.setViewportSize({ width: 393, height: 851 });
+      await page.waitForTimeout(300);
+      rowsPhone = await libraryRowsWrong(page);
+      await page.setViewportSize({ width: 1280, height: 900 });
+    } else {
+      rowsDesk = ['Rows never drew the driver: ' + JSON.stringify(await page.evaluate(() => ({ libView, libKind, node: libNode,
+        busy: readBusy('library'), rows: (lib?.rows || []).length, grid: document.querySelector('.doc .librarytab .lgrid')?.className || null,
+        cards: document.querySelectorAll('.doc .librarytab .lcard').length,
+        driver: !!document.querySelector('.doc .librarytab [data-lrow="toolchain:nvidia-driver"]'), pick: !!document.querySelector('#libDrvSel') })))];
+    }
     await page.evaluate(() => { libView = ''; drawPanes(); });
     ok(!rowsDesk.length && !rowsPhone.length, `in Rows the driver's version is a line under its card's, the name beside the verbs (${[...rowsDesk, ...rowsPhone].slice(0, 3).join('; ') || 'all well'})`);
     await page.evaluate(id => openThing(id, 'toolchain:nvidia-driver'), shed.id);
