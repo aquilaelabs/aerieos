@@ -1675,6 +1675,33 @@ bundle), so putting it on the toolchain store is a manual job:
 EOF
 }
 
+# A toolchain's folder taken off the store. On a share, a file some running
+# program still has open cannot go with it: the server keeps it under a
+# hidden name (.nfsXXXX, or .fuse_hidden on an export over FUSE) until the
+# program lets go, so rm ends on a directory that is not empty. An update
+# that begins with this remove then stopped with the toolchain gone and
+# nothing installed in its place (the JDK, its lib/modules held by a running
+# JVM, 19 Nov). Where such files are all that is left, the folder is set
+# aside under .gone in the store, which frees its name for the install; the
+# program goes on with the file it holds, and the next remove clears .gone
+# of what has been let go since. Anything else left is a failure, as before.
+sdk_rm_tree() {
+    local d="$1" gone left why
+    gone="$(dirname "$d")/.gone"
+    if [ -d "$gone" ]; then
+        rm -rf "${gone:?}"/* 2>/dev/null || true
+        rmdir "$gone" 2>/dev/null || true
+    fi
+    why="$(rm -rf "$d" 2>&1)" || true
+    [ -e "$d" ] || return 0
+    left="$(find "$d" ! -type d ! -name '.nfs*' ! -name '.fuse_hidden*' -print -quit 2>/dev/null || true)"
+    [ -z "$left" ] || die "could not remove ${d}: ${why:-something in it would not go}"
+    if ! { mkdir -p "$gone" && mv "$d" "$gone/$(basename "$d").$(date +%s)"; }; then
+        die "could not remove ${d}: a program still has a file of it open, and what is left would not move aside (${why})"
+    fi
+    log "a program still running has a file of it open: what is left is set aside in ${gone} until it lets go"
+}
+
 sdk_remove() {
     sdk_operator_only remove "$@"
     local what="${1:-}" d marker
@@ -1715,7 +1742,7 @@ sdk_remove() {
     if [ "$kind" != sdkmanager ]; then
         d="$(sdk_find "$what")" || die "${what} is not installed"
         log "removing ${d}"
-        rm -rf "$d"
+        sdk_rm_tree "$d"
         return 0
     fi
     case "$kind" in
