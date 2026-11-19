@@ -31,6 +31,7 @@
 - A job on a node ends when its own work has, where a process it left behind holding its output kept it running for ever and held the node's agent updates (07cf898)
 - A session left open across several controller updates keeps its guards and notices, where after the third update every hook failed and the session ran on unguarded, showing only that its stop hooks failed (64e3189)
 - Updating a toolchain while a running program still has one of its files open goes through, where the update stopped with the toolchain removed and nothing installed (1a39710)
+- A Claude session whose guards cannot be run refuses every tool and says to start it again, and a session that works a turn with nothing heard from its hooks is a row on the bell for its account and for administrators, where such a session ran on unguarded and nothing said so (2b8534a, 07fe564)
 
 ## 0.9.0-dev.5641: 2026-11-18
 
