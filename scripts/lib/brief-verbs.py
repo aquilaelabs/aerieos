@@ -14,6 +14,7 @@ import time
 import urllib.parse
 
 import bbapi
+from say import need
 
 verb = sys.argv[1] if len(sys.argv) > 1 else "show"
 auth = os.environ["BB_BRIEF_AUTH"]
@@ -29,8 +30,7 @@ if verb == "take":
 d = bbapi.call("/api/brief?project=" + urllib.parse.quote(proj), auth=auth)
 if not isinstance(d, dict):
     sys.exit("[builderbot] ERROR: the controller answered something that is not a brief")
-if d.get("error"):
-    sys.exit(f"[builderbot] ERROR: {d['error']}")
+need(d)
 if d.get("pending"):
     print(f"{proj}'s brief, waiting for its first Claude session:\n")
     print(d.get("text") or "")

@@ -11,6 +11,7 @@ import os
 import sys
 
 import bbapi
+from say import need
 
 AUTH = os.environ.get("BB_PACK_AUTH", "")
 USAGE = """usage: aerie tool search [WORDS...]
@@ -45,8 +46,7 @@ def main(argv):
     if len(rest) != 1:
         sys.exit(USAGE)
     d = bbapi.call("/api/toolpacks", {"action": "install", "name": rest[0], "why": why}, auth=AUTH)
-    if d.get("error"):
-        sys.exit(f"[builderbot] ERROR: {d['error']}")
+    need(d)
     if d.get("request") or d.get("asked") or d.get("id"):
         print(f"asked: {rest[0]} waits for a person on the bell; aerie tool search shows it as added once they allow it")
     elif d.get("note"):

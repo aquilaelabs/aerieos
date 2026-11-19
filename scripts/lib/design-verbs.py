@@ -30,6 +30,7 @@ import sys
 import urllib.parse
 
 import bbapi
+from say import die
 
 import dash  # noqa: E402
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "dashboard"))
@@ -48,10 +49,6 @@ write_file = "--file" in argv
 argv = [a for a in argv if a != "--file"]
 
 
-def fail(msg):
-    sys.exit(f"[builderbot] ERROR: {msg}")
-
-
 if verb == "save" and (len(argv) < 2 or argv[1] in ("-h", "--help")):
     # Help, not a file called -h (B342): the shape and every limit.
     r = bbapi.call("/api/design?project=" + urllib.parse.quote(proj) + "&show=schema", auth=auth)
@@ -64,9 +61,9 @@ def read_record(src):
     try:
         rec = json.loads(sys.stdin.read() if src == "-" else open(src, encoding="utf-8").read())
     except (OSError, ValueError) as e:
-        fail(f"could not read {src}: {e}")
+        die(f"could not read {src}: {e}")
     if not isinstance(rec, dict):
-        fail("the record is an object with language and pages")
+        die("the record is an object with language and pages")
     return rec
 
 
@@ -74,15 +71,15 @@ if verb == "file" and len(argv) > 1:
     # From a record given rather than the saved one (B227): a branch writes
     # the file from its own design, not from what other branches saved.
     if argv[1] != "--from" or len(argv) != 3:
-        fail("usage: aerie design file [--from FILE]")
+        die("usage: aerie design file [--from FILE]")
     rec = read_record(argv[2])
     r = bbapi.call("/api/design", {"action": "render", "project": proj,
                                    "language": rec.get("language") or {},
                                    "pages": rec.get("pages") or []}, auth=auth)
     if not isinstance(r, dict):
-        fail("the controller answered something that is not a design")
+        die("the controller answered something that is not a design")
     if r.get("error"):
-        fail(r["error"])
+        die(r["error"])
     text = str(r.get("text") or "")
     sys.stdout.write(text + ("" if text.endswith("\n") else "\n"))
     raise SystemExit(0)
@@ -101,7 +98,7 @@ def saved_file_text():
     """docs/design-language.md as the saved design writes it."""
     r = bbapi.call("/api/design?project=" + urllib.parse.quote(proj) + "&show=file", auth=auth)
     if not isinstance(r, dict) or r.get("error"):
-        fail((r or {}).get("error") if isinstance(r, dict) else "the controller answered something that is not a design")
+        die((r or {}).get("error") if isinstance(r, dict) else "the controller answered something that is not a design")
     text = str(r.get("text") or "")
     return text + ("" if text.endswith("\n") else "\n")
 
@@ -119,7 +116,7 @@ def design_file():
                           "--file writes it (aerie design file prints it)")
         return
     if not path:
-        fail("--file writes into a repository's tree, and this is not inside one")
+        die("--file writes into a repository's tree, and this is not inside one")
     text = saved_file_text()
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
@@ -133,9 +130,9 @@ def save(rec, said):
                                    "language": rec.get("language") or {},
                                    "pages": rec.get("pages") or []}, auth=auth)
     if not isinstance(r, dict):
-        fail("the controller answered something that is not a design")
+        die("the controller answered something that is not a design")
     if r.get("error"):
-        fail(r["error"])
+        die(r["error"])
     if r.get("held"):
         print(f"held for the operator's approval on {proj}'s notebook (Agents may: Add to the design is ask): "
               f"{r['held'].get('summary', '')}")
@@ -154,18 +151,18 @@ if verb == "save":
 if verb == "edit":
     # One rule or one page's notes changed in place, the record saved whole.
     if len(argv) != 4 or argv[2] not in ("--text", "--append"):
-        fail("usage: aerie design edit NAME --text FILE|--append FILE [--file] (FILE or - for stdin)")
+        die("usage: aerie design edit NAME --text FILE|--append FILE [--file] (FILE or - for stdin)")
     name, how, src = argv[1], argv[2], argv[3]
     try:
         new = sys.stdin.read() if src == "-" else open(src, encoding="utf-8").read()
     except OSError as e:
-        fail(f"could not read {src}: {e}")
+        die(f"could not read {src}: {e}")
     new = new.strip("\n")
     if not new.strip():
-        fail(f"{src} is empty; aerie design save writes a record with the rule left out")
+        die(f"{src} is empty; aerie design save writes a record with the rule left out")
     r = bbapi.call("/api/design?project=" + urllib.parse.quote(proj) + "&show=json", auth=auth)
     if not isinstance(r, dict) or r.get("error"):
-        fail((r or {}).get("error") if isinstance(r, dict) else "the controller answered something that is not a design")
+        die((r or {}).get("error") if isinstance(r, dict) else "the controller answered something that is not a design")
     rec = json.loads(str(r.get("text") or "{}"))
     rules = {n: rule for n, rule, _ in records.design_rules(rec)}
     pages = {}
@@ -178,7 +175,7 @@ if verb == "edit":
         holder, key, what = pages[name], "notes", f"the page {name}'s notes"
     else:
         near = difflib.get_close_matches(name, [*rules, *[k for k in pages if k]], n=5, cutoff=0.6)
-        fail(f"the design has no rule or page called {name}" + (f"; the nearest: {', '.join(near)}" if near else "")
+        die(f"the design has no rule or page called {name}" + (f"; the nearest: {', '.join(near)}" if near else "")
              + "; aerie design lists them")
     was = str(holder.get(key) or "")
     holder[key] = (was.rstrip("\n") + "\n\n" + new) if how == "--append" and was.strip() else new
@@ -196,13 +193,13 @@ elif verb in ("-h", "--help"):
     print(USAGE)
     raise SystemExit(0)
 else:
-    fail(USAGE)
+    die(USAGE)
 
 r = bbapi.call("/api/design?project=" + urllib.parse.quote(proj) + "&show=" + urllib.parse.quote(which), auth=auth)
 if not isinstance(r, dict):
-    fail("the controller answered something that is not a design")
+    die("the controller answered something that is not a design")
 if r.get("error"):
-    fail(r["error"])
+    die(r["error"])
 text = str(r.get("text") or "")
 if fmt not in ("text", "json") and which == "json":
     rec = json.loads(text)

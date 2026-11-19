@@ -13,6 +13,7 @@ import sys
 import time
 
 import dash
+from say import need
 
 _here = dash.beside(sys.argv[1])
 bugs = dash.load("bugs", _here)
@@ -61,7 +62,7 @@ def behind(n, verb, args, summary):
               file=sys.stderr)
         sys.exit(1)
     r = pending.hold(proj, "bugs", verb, args, summary, number=n, after=rec["id"])
-    bail(r)
+    need(r)
     print(f"held behind {B(n)}: it lands with that report when the operator "
           "approves it, and goes if they deny it")
     return True
@@ -79,12 +80,6 @@ def ident(word):
               "B1, B2, ...", file=sys.stderr)
         sys.exit(1)
     return n
-
-
-def bail(r):
-    if r.get("error"):
-        print(f"[builderbot] ERROR: {r['error']}", file=sys.stderr)
-        sys.exit(1)
 
 
 def line(b):
@@ -193,15 +188,15 @@ elif op in ("begin", "commit", "revert"):
     # The same batch `aerie roadmap begin` opens: one over the whole notebook,
     # reached from whichever tab's name you happened to be thinking in.
     if op == "begin":
-        bail(_nb.begin(proj))
+        need(_nb.begin(proj))
         print(f"batch open on {proj}'s notebook: the bug tracker and the "
               "roadmap both. Commit or revert it")
     elif op == "commit":
-        r = _nb.commit(proj); bail(r)
+        r = _nb.commit(proj); need(r)
         print(f"committed: {r['written']} entr{'y' if r['written'] == 1 else 'ies'}"
               + (f", {r['folded']} folded into them" if r["folded"] else ""))
     else:
-        r = _nb.revert(proj); bail(r)
+        r = _nb.revert(proj); need(r)
         print(f"reverted: the tracker and the roadmap are back as they were, "
               f"{r['dropped']} change{'' if r['dropped'] == 1 else 's'} dropped")
 elif op in ("find", "search"):
@@ -248,7 +243,7 @@ elif op == "add" and "--from" in rest:
     for rec in doc.get("records") or []:
         fields = {k: str(rec[k]) for k in ("area", "repro", "expected", "actual", "reproduces") if rec.get(k)}
         r = bugs.add(proj, str(rec.get("title") or ""), by="claude",
-                     severity=str(rec.get("severity") or "medium"), **fields); bail(r)
+                     severity=str(rec.get("severity") or "medium"), **fields); need(r)
         if r.get("held"):
             print(f"held for approval as {B(r['held'].get('number'))}: it lands when the operator approves it on the notebook"); continue
         print(f"filed {B(r['bug']['id'])}: {r['bug']['title']}")
@@ -314,7 +309,7 @@ elif op == "add":
         sys.exit(1)
     r = bugs.add(proj, title, by="claude",
                  severity=flags.pop("severity", "medium"), **flags)
-    bail(r)
+    need(r)
     if r.get("held"):
         h = r["held"]
         print(f"held for approval as {B(h['number'])}: it lands in the tracker "
@@ -343,7 +338,7 @@ elif op == "note":
         print(f"[builderbot] ERROR: no bug {B(n)} here", file=sys.stderr)
         sys.exit(1)
     body = (b.get("notes", "") + f"\n\n[{stamp}] " + " ".join(rest[1:])).strip()
-    r = bugs.edit(proj, n, by="claude", act="noted", notes=body); bail(r)
+    r = bugs.edit(proj, n, by="claude", act="noted", notes=body); need(r)
     print(f"noted on {B(n)}")
 elif op == "edit":
     if len(rest) < 3 or rest[1] not in ("title", "sev", "severity", "area",
@@ -357,7 +352,7 @@ elif op == "edit":
               f"{k} on {B(n)}: {' '.join(rest[2:])}"):
         sys.exit(0)
     r = bugs.edit(proj, n, by="claude", **{k: " ".join(rest[2:])})
-    bail(r)
+    need(r)
     print(f"updated {k} on {B(n)}")
 elif op in ("rm", "remove"):
     # For a report that should not exist: mis-filed, a duplicate, the wrong
@@ -368,7 +363,7 @@ elif op in ("rm", "remove"):
               file=sys.stderr)
         sys.exit(1)
     n = ident(rest[0]); behind(n, None, None, None)
-    r = bugs.remove(proj, n, why=" ".join(rest[1:]), by="claude"); bail(r)
+    r = bugs.remove(proj, n, why=" ".join(rest[1:]), by="claude"); need(r)
     print(f"removed {B(n)}; closing keeps a bug, this does not")
 elif op in ("fix", "wontfix", "na", "reopen"):
     if not rest:
@@ -397,7 +392,7 @@ elif op in ("fix", "wontfix", "na", "reopen"):
     for n in ns:
         behind(n, None, None, None)
         r = bugs.set_status(proj, n, status, note=" ".join(words), by="claude", commits=commits or None)
-        bail(r)
+        need(r)
         # A sentence, not "B7 na" (B58): what the bug is now, in words.
         said = {"fixed": "marked fixed", "wontfix": "closed as won't fix",
                 "na": "closed as not applicable", "open": "reopened"}[status]
@@ -419,7 +414,7 @@ elif op == "fixed-in":
     if add or drop:
         behind(n, None, None, None)
         r = bugs.fixed_by(proj, n, add=add, drop=drop, by="claude")
-        bail(r)
+        need(r)
         b = r.get("bug") or {}
     else:
         b = next((x for x in (bugs.load()["projects"].get(proj) or []) if x.get("id") == n), None) or {}

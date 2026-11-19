@@ -13,6 +13,7 @@ import sys
 import time
 
 import dash
+from say import need
 
 _here = dash.beside(sys.argv[1])
 roadmap = dash.load("roadmap", _here)
@@ -76,7 +77,7 @@ def behind(n, verb, args, summary):
               file=sys.stderr)
         sys.exit(1)
     r = pending.hold(proj, "roadmap", verb, args, summary, number=n, after=rec["id"])
-    bail(r)
+    need(r)
     print(f"held behind {R(n)}: it lands with that item when the operator "
           "approves it, and goes if they deny it")
     return True
@@ -145,12 +146,6 @@ def show(target=None):
                       + st["info"].replace("\n", "\n                      "))
 
 
-def bail(r):
-    if r.get("error"):
-        print(f"[builderbot] ERROR: {r['error']}", file=sys.stderr)
-        sys.exit(1)
-
-
 # Which seat this session sits in, for the two questions roadmap #26 and #27
 # both need answered: has this list moved since I last looked at it, and was
 # it me who moved it. Empty for a aerie run from a plain shell, which then does
@@ -208,7 +203,7 @@ elif op == "show":
     stepno = dot or (rest[1] if len(rest) > 1 and rest[1].isdigit() else "")
     if stepno:
         n = ident(head)
-        got = roadmap.resolve(proj, n, int(stepno)); bail(got)
+        got = roadmap.resolve(proj, n, int(stepno)); need(got)
         it, i = got["item"], got["index"]
         where = (f"{R(it['id'])} step {i + 1}" if i >= 0 else R(it["id"])) + (" (finished)" if got["where"] == "finished" else "")
         print(f"  {R(n)} step {stepno} is {where}" + (": moved there" if got["moved"] else "") if int(stepno) or got["moved"]
@@ -277,17 +272,17 @@ elif op == "add" and "--from" in rest:
     for rec in doc.get("records") or []:
         steps = [str(st.get("text") or "") for st in (rec.get("steps") or []) if isinstance(st, dict)]
         r = roadmap.add(proj, str(rec.get("text") or ""), by="claude", steps=steps, who=_who,
-                        target=str(rec.get("target") or "")); bail(r)
+                        target=str(rec.get("target") or "")); need(r)
         if r.get("held"):
             print(held_line(r)); continue
         nid = r["item"]["id"]
         if rec.get("info"):
-            bail(roadmap.set_info(proj, nid, str(rec["info"]), by="claude", who=_who))
+            need(roadmap.set_info(proj, nid, str(rec["info"]), by="claude", who=_who))
         for i, st in enumerate(rec.get("steps") or []):
             if isinstance(st, dict) and st.get("info"):
-                bail(roadmap.set_info(proj, nid, str(st["info"]), step=i, by="claude", who=_who))
+                need(roadmap.set_info(proj, nid, str(st["info"]), step=i, by="claude", who=_who))
             if isinstance(st, dict) and st.get("target"):
-                bail(roadmap.set_step_target(proj, nid, i, str(st["target"]), by="claude", who=_who))
+                need(roadmap.set_step_target(proj, nid, i, str(st["target"]), by="claude", who=_who))
         print(f"added {R(nid)}: {r['item']['text']}" + (f" ({len(steps)} steps)" if steps else ""))
 elif op == "apply":
     # An edited show back (R167): `aerie roadmap show N --format yaml > f`,
@@ -326,9 +321,9 @@ elif op == "apply":
         else:
             r = (roadmap.set_step_target(proj, rid, i, v, by="claude", who=_who) if i is not None
                  else roadmap.set_target(proj, rid, v, by="claude", who=_who))
-        bail(r)
+        need(r)
     for rid, text in adds:
-        bail(roadmap.add_step(proj, rid, text, by="claude", who=_who))
+        need(roadmap.add_step(proj, rid, text, by="claude", who=_who))
     print(f"applied: {len(changes)} field{'' if len(changes) == 1 else 's'} changed, {len(adds)} step{'' if len(adds) == 1 else 's'} added")
 elif op == "add":
     # `aerie roadmap add "title" --step "..." --step "..."`: a change that needs
@@ -354,7 +349,7 @@ elif op == "add":
         else:
             words.append(rest[i]); i += 1
     r = roadmap.add(proj, " ".join(words).strip(), by="claude", steps=steps,
-                 who=_who, target=target); bail(r)
+                 who=_who, target=target); need(r)
     if r.get("held"):
         print(held_line(r)); sys.exit(0)
     n = len(r["item"]["steps"])
@@ -368,7 +363,7 @@ elif op == "done":
     if not rest:
         print("usage: aerie roadmap done <n>", file=sys.stderr); sys.exit(1)
     n = ident(rest[0]); behind(n, None, None, None); fresh()
-    r = roadmap.tick(proj, n, by="claude", who=_who); bail(r)
+    r = roadmap.tick(proj, n, by="claude", who=_who); need(r)
     print(f"done {R(n)}: {r['item']['text']}")
 elif op in ("rm", "remove"):
     # For work that is abandoned. A finished plan is ticked, not dropped.
@@ -379,7 +374,7 @@ elif op in ("rm", "remove"):
         print("usage: aerie roadmap rm <n> [\"why it is going\"]", file=sys.stderr); sys.exit(1)
     n = ident(rest[0]); behind(n, None, None, None); fresh()
     r = roadmap.remove(proj, n, by="claude", why=" ".join(rest[1:]),
-                    who=_who); bail(r)
+                    who=_who); need(r)
     print(f"removed {R(n)}; aerie roadmap restore {R(n)} puts it back")
 elif op == "restore":
     # The other half of rm: the dropped row comes back from the history as it
@@ -387,7 +382,7 @@ elif op == "restore":
     if not rest:
         print("usage: aerie roadmap restore <n>", file=sys.stderr); sys.exit(1)
     n = ident(rest[0]); fresh()
-    r = roadmap.restore(proj, n, by="claude", who=_who); bail(r)
+    r = roadmap.restore(proj, n, by="claude", who=_who); need(r)
     print(f"put back {R(n)}: {r['item']['text']}")
 elif op == "reopen":
     # A finished item back on the list, steps and details and all: more work
@@ -395,7 +390,7 @@ elif op == "reopen":
     if not rest:
         print("usage: aerie roadmap reopen <n>", file=sys.stderr); sys.exit(1)
     n = ident(rest[0]); fresh()
-    r = roadmap.reopen(proj, n, by="claude", who=_who); bail(r)
+    r = roadmap.reopen(proj, n, by="claude", who=_who); need(r)
     print(f"reopened {R(n)}: {r['item']['text']}")
 elif op in ("begin", "commit", "revert"):
     # Working something out is not a series of decisions the operator has to
@@ -408,15 +403,15 @@ elif op in ("begin", "commit", "revert"):
     # one be committed while the other is reverted would leave a roadmap
     # describing work against a tracker that never recorded why.
     if op == "begin":
-        bail(_nb.begin(proj))
+        need(_nb.begin(proj))
         print(f"batch open on {proj}'s notebook: the roadmap and the bug "
               "tracker both. Commit or revert it")
     elif op == "commit":
-        r = _nb.commit(proj); bail(r)
+        r = _nb.commit(proj); need(r)
         print(f"committed: {r['written']} entr{'y' if r['written'] == 1 else 'ies'}"
               + (f", {r['folded']} folded into them" if r["folded"] else ""))
     else:
-        r = _nb.revert(proj); bail(r)
+        r = _nb.revert(proj); need(r)
         print(f"reverted: the roadmap and the tracker are back as they were, "
               f"{r['dropped']} change{'' if r['dropped'] == 1 else 's'} dropped")
 elif op in ("mv", "move"):
@@ -429,7 +424,7 @@ elif op in ("mv", "move"):
     n = ident(rest[0]); behind(n, None, None, None)
     r = roadmap.move(proj, n, dir=-1 if rest[1] == "up" else 1, by="claude",
                   who=_who)
-    bail(r)
+    need(r)
     print(f"moved {R(n)} {rest[1]}")
 elif op == "target":
     # The release an item is meant to ship in (the operator, 21 Oct):
@@ -448,7 +443,7 @@ elif op == "target":
         v = "" if rest[-1].lower() == "none" else rest[-1]
         if behind(n, None, None, None):
             sys.exit(0)
-        r = roadmap.set_step_target(proj, n, int(step) - 1, v, by="claude", who=_who); bail(r)
+        r = roadmap.set_step_target(proj, n, int(step) - 1, v, by="claude", who=_who); need(r)
         st = r["item"]["steps"][int(step) - 1]
         print(f"step {step} of {R(n)} is for {st['target']}" if st.get("target")
               else f"step {step} of {R(n)} goes with its item" + (f" ({r['item']['target']})" if r["item"].get("target") else ""))
@@ -458,7 +453,7 @@ elif op == "target":
     if behind(n, "target", {"item_id": n, "version": v, "who": _who},
               f"{R(n)} for {v}" if v else f"{R(n)} with no target"):
         sys.exit(0)
-    r = roadmap.set_target(proj, n, v, by="claude", who=_who); bail(r)
+    r = roadmap.set_target(proj, n, v, by="claude", who=_who); need(r)
     print(f"{R(n)} is for {r['item']['target']}" if r["item"].get("target") else f"{R(n)} has no target")
 elif op == "shelve":
     # Parked, not dropped: a reason to keep it, no intention of doing it now.
@@ -470,7 +465,7 @@ elif op == "shelve":
     if not rest:
         print("usage: aerie roadmap shelve <n>", file=sys.stderr); sys.exit(1)
     n = ident(rest[0]); behind(n, None, None, None)
-    r = roadmap.shelve(proj, n, True, by="claude", who=_who); bail(r)
+    r = roadmap.shelve(proj, n, True, by="claude", who=_who); need(r)
     print(f"shelved {R(n)}; say in your reply why. `aerie roadmap unshelve {R(n)} WHY` asks for it back")
 elif op == "unshelve":
     # The other direction is a request, not a change (R78): taking one off
@@ -481,7 +476,7 @@ elif op == "unshelve":
         print("usage: aerie roadmap unshelve <n> [WHY]", file=sys.stderr); sys.exit(1)
     n = ident(rest[0])
     r = roadmap.shelve(proj, n, False, by="claude", who=_who,
-                       why=" ".join(rest[1:]).strip()); bail(r)
+                       why=" ".join(rest[1:]).strip()); need(r)
     if r.get("held"):
         print(f"asked to take {R(n)} off the shelf: held for approval on the notebook, "
               "where a person on the space allows or denies it. Carry on with something "
@@ -499,7 +494,7 @@ elif op == "edit":
               f"reword {R(n)}: {' '.join(rest[1:])}"):
         sys.exit(0)
     fresh()
-    r = roadmap.edit(proj, n, " ".join(rest[1:]), by="claude", who=_who); bail(r)
+    r = roadmap.edit(proj, n, " ".join(rest[1:]), by="claude", who=_who); need(r)
     print(f"reworded {R(n)}")
 elif op == "info":
     # The technical half, attached where the work is: which files, which
@@ -538,7 +533,7 @@ elif op == "info":
             sys.exit(0)
         fresh()
         r = roadmap.set_info(proj, item, " ".join(rest[2:]),
-                          step=n - 1, by="claude", who=_who); bail(r)
+                          step=n - 1, by="claude", who=_who); need(r)
         print(f"details on step {rest[1]} of {R(item)}")
     else:
         if behind(item, "info", {"item_id": item, "text": " ".join(rest[1:]), "who": _who},
@@ -546,7 +541,7 @@ elif op == "info":
             sys.exit(0)
         fresh()
         r = roadmap.set_info(proj, item, " ".join(rest[1:]), by="claude",
-                          who=_who); bail(r)
+                          who=_who); need(r)
         print(f"details on {R(item)}")
 elif op == "step":
     sub, srest = (rest[0] if rest else ""), rest[1:]
@@ -574,7 +569,7 @@ elif op == "step":
                   f"a step on {R(item)}: {' '.join(srest[1:])}"):
             sys.exit(0)
         r = roadmap.add_step(proj, item, " ".join(srest[1:]), by="claude",
-                          who=_who); bail(r)
+                          who=_who); need(r)
         print(f"added a step to {R(item)}")
     elif sub == "edit" and len(srest) >= 3:
         # 1-based on the way in, because that is how the step is numbered
@@ -582,13 +577,13 @@ elif op == "step":
         behind(item, None, None, None); fresh()
         r = roadmap.edit(proj, item, " ".join(srest[2:]),
                       step=step_index(srest[1]),
-                      by="claude", who=_who); bail(r)
+                      by="claude", who=_who); need(r)
         print(f"reworded step {srest[1]} of {R(item)}")
     elif sub in ("rm", "remove") and len(srest) >= 2:
         behind(item, None, None, None); fresh()
         r = roadmap.remove(proj, item,
                         step=step_index(srest[1]),
-                        by="claude", why=" ".join(srest[2:]), who=_who); bail(r)
+                        by="claude", why=" ".join(srest[2:]), who=_who); need(r)
         # The steps after it move up a number, said so (B818): a fold that
         # removed one then named the old numbers in nine reasons.
         left = len(next((x.get("steps") or [] for x in roadmap.items(proj) if x.get("id") == item), []))
@@ -600,14 +595,14 @@ elif op == "step":
         behind(item, None, None, None); fresh()
         r = roadmap.set_info(proj, item, " ".join(srest[2:]),
                           step=step_index(srest[1]),
-                          by="claude", who=_who); bail(r)
+                          by="claude", who=_who); need(r)
         print(f"details on step {srest[1]} of {R(item)}")
     elif sub == "done" and len(srest) >= 2:
         # A session's own mark, distinct from the dashboard's "sent": this
         # step is finished, whether or not anybody sent it. See roadmap.step_done.
         behind(item, None, None, None)
         r = roadmap.step_done(proj, item, step_index(srest[1]),
-                           by="claude", note=" ".join(srest[2:]), who=_who); bail(r)
+                           by="claude", note=" ".join(srest[2:]), who=_who); need(r)
         print(f"step {srest[1]} of {R(item)} done"
               + (f", the last one, so {R(item)} is done and off the list"
                  if r.get("finished") else ""))
@@ -616,7 +611,7 @@ elif op == "step":
         # ticked, or one found not finished. See roadmap.step_undone.
         behind(item, None, None, None)
         r = roadmap.step_undone(proj, item, step_index(srest[1]),
-                                by="claude", note=" ".join(srest[2:]), who=_who); bail(r)
+                                by="claude", note=" ".join(srest[2:]), who=_who); need(r)
         print(f"step {srest[1]} of {R(item)} is to do again")
     elif sub in ("mv", "move") and len(srest) >= 3 and srest[2] not in ("up", "down"):
         # To another item (R168): `step mv N M TO [POSITION]`, or `step mv
@@ -624,7 +619,7 @@ elif op == "step":
         to = ident(srest[2])
         pos = srest[3] if len(srest) > 3 and srest[3].isdigit() else None
         behind(item, None, None, None); behind(to, None, None, None); fresh()
-        r = roadmap.step_mv(proj, item, step_index(srest[1]), to, position=pos, by="claude", who=_who); bail(r)
+        r = roadmap.step_mv(proj, item, step_index(srest[1]), to, position=pos, by="claude", who=_who); need(r)
         print(f"moved step {srest[1]} of {R(item)} to {R(to)}, its step {r['step'] + 1}; "
               f"aerie roadmap show {R(item)}.{srest[1]} still finds it")
     elif sub in ("mv", "move") and len(srest) >= 2 and "." in srest[0]:
@@ -632,7 +627,7 @@ elif op == "step":
         item, to = ident(head), ident(srest[1])
         pos = srest[2] if len(srest) > 2 and srest[2].isdigit() else None
         behind(item, None, None, None); behind(to, None, None, None); fresh()
-        r = roadmap.step_mv(proj, item, step_index(dot), to, position=pos, by="claude", who=_who); bail(r)
+        r = roadmap.step_mv(proj, item, step_index(dot), to, position=pos, by="claude", who=_who); need(r)
         print(f"moved step {dot} of {R(item)} to {R(to)}, its step {r['step'] + 1}; "
               f"aerie roadmap show {R(item)}.{dot} still finds it")
     elif sub in ("mv", "move") and len(srest) >= 3 and srest[2] in ("up", "down"):
@@ -643,7 +638,7 @@ elif op == "step":
         r = roadmap.move(proj, item,
                       step=step_index(srest[1]),
                       dir=-1 if srest[2] == "up" else 1, by="claude",
-                      who=_who); bail(r)
+                      who=_who); need(r)
         print(f"moved step {srest[1]} of {R(item)} {srest[2]}")
     else:
         print("usage: aerie roadmap step add <n> \"...\" | step edit <n> <step> \"...\""
@@ -675,7 +670,7 @@ elif op == "split":
         else:
             print(f"[builderbot] ERROR: not a step number or --into: {rest[i]!r}", file=sys.stderr); sys.exit(1)
     behind(n, None, None, None); fresh()
-    r = roadmap.split(proj, n, groups, by="claude", who=_who); bail(r)
+    r = roadmap.split(proj, n, groups, by="claude", who=_who); need(r)
     if r.get("held"):
         print(held_line(r, "the split")); sys.exit(0)
     for made in r["made"]:
@@ -693,7 +688,7 @@ elif op == "fold":
     n = ident(rest[0]); head, _, dot = rest[2].partition("."); m = ident(head)
     behind(n, None, None, None); behind(m, None, None, None); fresh()
     r = roadmap.fold(proj, n, m, into_step=(int(dot) - 1 if dot.isdigit() and int(dot) >= 1 else None),
-                     by="claude", who=_who, why=" ".join(rest[3:])); bail(r)
+                     by="claude", who=_who, why=" ".join(rest[3:])); need(r)
     print(f"folded {R(n)} into {R(m)} step {r['folded'][1]}; aerie roadmap restore {R(n)} undoes it")
 elif op == "refs":
     # The list's own words checked (R168): every R number and step they

@@ -12,6 +12,7 @@ import time
 
 import bbapi
 import waits
+from say import need
 
 auth = os.environ["BB_SIGN_AUTH"]
 project = os.environ.get("BB_SIGN_PROJECT", "")
@@ -31,8 +32,7 @@ def status_verb(rest):
     words."""
     tag = rest[0] if rest else ""
     d = bbapi.call("/api/signing", {"action": "release", "project": project}, auth=auth)
-    if d.get("error"):
-        sys.exit(f"[builderbot] ERROR: {d['error']}")
+    need(d)
     r = d.get("release") or {}
     if not r.get("wanted"):
         print(f"  {project}'s workflows hand over no unsigned APK (an artifact named bb-release-apk-TAG), "
@@ -67,8 +67,7 @@ def release_verb(why):
     before = int(((bbapi.call("/api/signing", {"action": "release", "project": project}, auth=auth)
                    .get("release") or {}).get("last") or {}).get("at") or 0)
     r = bbapi.call("/api/signing", {"action": "release-sign", "project": project, "why": why}, auth=auth)
-    if r.get("error"):
-        sys.exit(f"[builderbot] ERROR: {r['error']}")
+    need(r)
     if r.get("id") and not r.get("ok"):
         print(f"[builderbot] asked {r.get('to') or 'the space owner'} (#{r['id']}), waiting up to "
               "15 minutes for Approve in their bell", file=sys.stderr)
@@ -112,8 +111,7 @@ def keys_verb(sub, route, why, rest):
     """aerie sign keys | key new NAME | map PACKAGE KEY (R106 step 6)."""
     if sub == "--keys":
         d = bbapi.call("/api/signing", {"action": "keys", "project": project}, auth=auth)
-        if d.get("error"):
-            sys.exit(f"[builderbot] ERROR: {d['error']}")
+        need(d)
         for name, slots in (d.get("keys") or {}).items():
             for rt, rec in slots.items():
                 print(f"  {name:<14} {rt:<9} " + (f"{rec.get('alias')}  {rec.get('sha256')}" if rec else "-"))
@@ -135,8 +133,7 @@ def keys_verb(sub, route, why, rest):
             sys.exit("[builderbot] ERROR: aerie sign map PACKAGE KEY --why \"...\" (KEY \"\" unmaps it)")
         body = {"action": "map", "package": rest[0], "key": rest[1]}
     r = bbapi.call("/api/signing", body | {"project": project, "why": why}, auth=auth, timeout=180)
-    if r.get("error"):
-        sys.exit(f"[builderbot] ERROR: {r['error']}")
+    need(r)
     if r.get("id") and not r.get("keys") and not r.get("key"):
         print(f"[builderbot] asked {r.get('to') or 'the space owner'} (#{r['id']}), waiting up to "
               "15 minutes for Approve in their bell", file=sys.stderr)
@@ -163,8 +160,7 @@ if not syncwait.up(project, "the controller signs the build in its copy of dist/
     sys.exit("[builderbot] ERROR: not asked: the build here has not reached the controller yet; try again in a moment")
 r = bbapi.call("/api/signing", {"action": "sign", "project": project, "file": file, "route": route,
                                 "key": os.environ.get("BB_SIGN_KEY", ""), "why": why}, auth=auth, timeout=60)
-if r.get("error"):
-    sys.exit(f"[builderbot] ERROR: {r['error']}")
+need(r)
 job = r.get("job") or ""
 if not job and r.get("id"):
     print(f"[builderbot] asked {r.get('to') or 'the space owner'} (#{r['id']}), waiting up to "

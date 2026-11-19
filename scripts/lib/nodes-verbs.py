@@ -12,6 +12,7 @@ import os
 import sys
 
 import dash
+from say import need
 
 verb, py = sys.argv[1], sys.argv[2]
 arg = sys.argv[3] if len(sys.argv) > 3 else ""
@@ -139,8 +140,7 @@ def enroll_token():
         user = rest[i + 1]
     nodes.configure(state=os.environ["DASHBOARD_STATE"])
     r = nodes.enroll_mint("user:shell", name, user=user, own="--own" in rest)
-    if r.get("error"):
-        sys.exit(f"[builderbot] ERROR: {r['error']}")
+    need(r)
     print(r["token"])
     print(f"{name} ({r['id']}) waits for it, until {__import__('time').strftime('%d %b %H:%M', __import__('time').localtime(r['expires']))}",
           file=sys.stderr)

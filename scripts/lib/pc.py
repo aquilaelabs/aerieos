@@ -15,14 +15,10 @@ import sys
 import time
 
 import bbapi
+from say import need
 
 auth, args = os.environ["BB_PC_AUTH"], sys.argv[1:]
 post = lambda b, t=60: bbapi.call("/api/pc", b, auth=auth, timeout=t)  # noqa: E731
-
-
-def fail(d):
-    if d.get("error"):
-        sys.exit(f"[builderbot] ERROR: {d['error']}")
 
 
 def take(name):
@@ -38,7 +34,7 @@ def take(name):
 
 if not args or args[0] in ("ls", "list"):
     d = post({"action": "lent"})
-    fail(d)
+    need(d)
     print(f"Use a lent PC: {d.get('mode')}")
     if not d.get("pcs"):
         print("no PC lends anything to this space now: its person sets it up in the Windows companion, "
@@ -55,13 +51,13 @@ if verb == "editor-call":
         sys.exit("usage: aerie pc editor-call METHOD PATH [--body JSON] [--why \"...\"]")
     call = {"method": args[0], "path": args[1], "body": body}
 d = post({"action": "run", "verb": verb, "args": call, "why": why})
-fail(d)
+need(d)
 print(f"[builderbot] asked {d['pc']} to {verb}" + (": its person is asked first" if d.get("mode") == "ask" else ""),
       flush=True)
 end = time.time() + 900
 while time.time() < end:
     r = post({"action": "result", "id": d["id"], "wait": 25}, 40)
-    fail(r)
+    need(r)
     if r["state"] in ("done", "refused", "lapsed"):
         res = r.get("result") or {}
         if r["state"] == "lapsed":

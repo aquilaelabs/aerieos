@@ -16,6 +16,7 @@ import time
 
 import bbapi
 import waits
+from say import die
 
 AUTH = os.environ.get("BB_VM_AUTH", "")
 PROJECT = os.environ.get("BB_VM_PROJECT", "")
@@ -31,11 +32,6 @@ USAGE = """usage: aerie vm [list]
        aerie vm devices [NODE]
        aerie vm usb NAME give|take VENDOR:PRODUCT[:SERIAL] [--port 1-3]
        aerie vm ip NAME | ssh NAME [COMMAND...]"""
-
-
-def die(msg):
-    print(f"[builderbot] ERROR: {msg}", file=sys.stderr)
-    sys.exit(1)
 
 
 def read():

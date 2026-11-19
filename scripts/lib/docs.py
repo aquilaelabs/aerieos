@@ -20,14 +20,10 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from typing import NoReturn
+
+from say import die
 
 MAX_PAGES = 20          # drawn when no --pages is given: a long PDF is read, not looked at
-
-
-def die(msg) -> NoReturn:
-    sys.stderr.write(f"[builderbot] ERROR: {msg}\n")
-    sys.exit(1)
 
 
 def say(msg):

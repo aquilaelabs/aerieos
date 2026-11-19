@@ -13,6 +13,7 @@ import sys
 
 import bbapi
 import waits
+from say import need
 
 
 def status():
@@ -33,8 +34,7 @@ def new():
               "name": os.environ["BB_C_NAME"], "compose": compose, "env": env,
               "node": os.environ.get("BB_C_NODE", ""), "for": os.environ.get("BB_C_FOR", ""),
               "project": os.environ.get("BB_PHONE_PROJECT", "")})
-    if r.get("error"):
-        print(f"[builderbot] ERROR: {r['error']}", file=sys.stderr); sys.exit(1)
+    need(r)
     if not r.get("id"):
         # Done at once: the setting is auto and it is this project's own.
         print(f"[builderbot] created {r.get('name') or 'it'}; the build is a job on the Jobs page")

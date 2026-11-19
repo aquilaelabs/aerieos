@@ -9,6 +9,7 @@ import os
 import sys
 
 import bbapi
+from say import need
 
 
 d = bbapi.call("/api/nodelog",
@@ -16,8 +17,7 @@ d = bbapi.call("/api/nodelog",
                 "stream": os.environ["BB_LOG_STREAM"],
                 "lines": int(os.environ["BB_LOG_LINES"])},
                auth=os.environ["BB_LOG_AUTH"], timeout=180)
-if d.get("error"):
-    sys.exit(f"[builderbot] ERROR: {d['error']}")
+need(d)
 sys.stdout.write(d.get("out") or "")
 if d.get("state") and d["state"] != "succeeded":
     sys.exit(f"[builderbot] ERROR: the read {d['state']} on the node")

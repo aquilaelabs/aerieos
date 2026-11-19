@@ -15,6 +15,7 @@ import sys
 import time
 
 import bbapi
+from say import need
 
 import urllib.parse
 
@@ -36,8 +37,7 @@ if jid:
         raise SystemExit(1)
     rows, names = [d], {}
 else:
-    if d.get("error"):
-        sys.exit(f"[builderbot] ERROR: {d['error']}")
+    need(d)
     rows, names = d.get("jobs") or [], d.get("nodes") or {}
 if not rows:
     print("no jobs yet; a compose action, an exec on a node or an agent update makes one")

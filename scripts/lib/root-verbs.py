@@ -11,6 +11,7 @@ import sys
 
 import bbapi
 import waits
+from say import need
 
 
 def status():
@@ -41,8 +42,7 @@ def run():
               "project": os.environ.get("BB_PHONE_PROJECT", ""),
               # A node the project hosts containers on, when named (--node).
               **({"node": os.environ["BB_PHONE_NODE"]} if os.environ.get("BB_PHONE_NODE") else {})})
-    if r.get("error"):
-        print(f"[builderbot] ERROR: {r['error']}", file=sys.stderr); sys.exit(1)
+    need(r)
     rid = r["id"]
     print(f"[builderbot] asked {r.get('to') or 'the administrators'} (#{rid}) for root on {r.get('node') or 'the node'}, "
           "waiting up to 15 minutes for Approve on the dashboard's Nodes page or bell", file=sys.stderr)

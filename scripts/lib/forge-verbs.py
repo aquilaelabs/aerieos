@@ -12,15 +12,11 @@ import os
 import sys
 
 import bbapi
+from say import die
 
 GROUPS = ("pr", "issue", "run", "release")
 # Flags that take no value.
 SWITCHES = {"draft", "approve", "request-changes", "failed", "job", "json"}
-
-
-def fail(msg):
-    print(f"[builderbot] ERROR: {msg}", file=sys.stderr)
-    raise SystemExit(1)
 
 
 proj, words = sys.argv[1], list(sys.argv[2:])
@@ -30,14 +26,14 @@ if not words or words[0] in ("-h", "--help", "help"):
 verb = words.pop(0)
 if verb in GROUPS:
     if not words:
-        fail(f"aerie forge {verb} needs an action: list, view ...")
+        die(f"aerie forge {verb} needs an action: list, view ...")
     verb = f"{verb} {words.pop(0)}"
 pos, flags = [], {}
 while words:
     w = words.pop(0)
     if w == "-f":
         if not words:
-            fail("-f needs NAME=VALUE")
+            die("-f needs NAME=VALUE")
         flags.setdefault("field", []).append(words.pop(0))
     elif w.startswith("--"):
         k, eq, v = w[2:].partition("=")
@@ -48,14 +44,14 @@ while words:
         elif words:
             flags[k] = words.pop(0)
         else:
-            fail(f"--{k} needs a value")
+            die(f"--{k} needs a value")
     else:
         pos.append(w)
 as_json = bool(flags.pop("json", False))
 r = bbapi.call("/api/forge", {"project": proj, "verb": verb, "args": {"pos": pos, "flags": flags}},
                auth=os.environ.get("BB_FORGE_AUTH", ""), timeout=120)
 if isinstance(r, dict) and r.get("error"):
-    fail(r["error"])
+    die(r["error"])
 if as_json:
     print(json.dumps(r, indent=1))
 elif verb == "whoami":

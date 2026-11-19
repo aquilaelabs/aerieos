@@ -12,9 +12,9 @@ BB_MEMORY_PROJECT the repository.
 import os
 import sys
 import urllib.parse
-from typing import NoReturn
 
 import bbapi
+from say import die
 
 argv = sys.argv[1:]
 verb = argv[0] if argv else "list"
@@ -23,23 +23,19 @@ proj = os.environ["BB_MEMORY_PROJECT"]
 TYPES = ("user", "feedback", "project", "reference")
 
 
-def fail(msg) -> NoReturn:
-    sys.exit(f"[builderbot] ERROR: {msg}")
-
-
 def read():
     r = bbapi.call(f"/api/memory?project={urllib.parse.quote(proj)}", auth=auth)
     if not isinstance(r, dict) or r.get("error"):
-        fail(r.get("error") if isinstance(r, dict) else "the controller answered something that is not a list")
+        die(r.get("error") if isinstance(r, dict) else "the controller answered something that is not a list")
     return r
 
 
 def post(body):
     r = bbapi.call("/api/memory", body={"project": proj, **body}, auth=auth)
     if not isinstance(r, dict):
-        fail("the controller answered something that is not a result")
+        die("the controller answered something that is not a result")
     if r.get("error"):
-        fail(r["error"])
+        die(r["error"])
     return r
 
 
@@ -61,10 +57,10 @@ if verb == "list":
         print(f"  ! {i.get('text')}")
 elif verb == "show":
     if len(argv) < 2:
-        fail("aerie memory show NAME")
+        die("aerie memory show NAME")
     m = named(read(), argv[1])
     if not m:
-        fail(f"no memory called {argv[1]} on {proj}: aerie memory list names them")
+        die(f"no memory called {argv[1]} on {proj}: aerie memory list names them")
     print(m.get("text") or "", end="" if (m.get("text") or "").endswith("\n") else "\n")
 elif verb == "add":
     args, name, mtype, about, body = argv[1:], "", "", "", []
@@ -81,21 +77,21 @@ elif verb == "add":
             body.append(a)
             i += 1
     if not name or not body:
-        fail('aerie memory add NAME --type user|feedback|space|reference --about "one line" "what to remember"')
+        die('aerie memory add NAME --type user|feedback|space|reference --about "one line" "what to remember"')
     if mtype not in TYPES:
-        fail(f"--type is one of: {', '.join(TYPES)}")
+        die(f"--type is one of: {', '.join(TYPES)}")
     if not about:
-        fail('--about "one line": what recall matches it against, and its line in the index')
+        die('--about "one line": what recall matches it against, and its line in the index')
     title = name.replace("-", " ").capitalize()
     r = post({"action": "create", "name": name, "title": title, "hook": about, "type": mtype, "body": " ".join(body)})
     print(f"saved {r.get('file')} on {proj}")
 elif verb == "forget":
     if len(argv) < 2:
-        fail("aerie memory forget NAME")
+        die("aerie memory forget NAME")
     m = named(read(), argv[1])
     if not m:
-        fail(f"no memory called {argv[1]} on {proj}")
+        die(f"no memory called {argv[1]} on {proj}")
     post({"action": "delete", "file": m["file"]})
     print(f"forgot {m['file']} on {proj}")
 else:
-    fail("aerie memory [list | show NAME | add NAME --type T --about \"...\" BODY | forget NAME]")
+    die("aerie memory [list | show NAME | add NAME --type T --about \"...\" BODY | forget NAME]")

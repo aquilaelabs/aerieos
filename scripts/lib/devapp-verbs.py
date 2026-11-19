@@ -22,6 +22,7 @@ import urllib.parse
 import bbapi
 import syncwait
 import waits
+from say import need
 
 
 def built_from(st):
@@ -40,8 +41,7 @@ def status():
                                    "container": os.environ.get("BB_DEV_CONTAINER", ""),
                                    "action": "state"},
                    auth=os.environ["BB_DEV_AUTH"])
-    if d.get("error"):
-        sys.exit(f"[builderbot] ERROR: {d['error']}")
+    need(d)
     st = d.get("state") if isinstance(d.get("state"), dict) else d
     if not st.get("compose"):
         print("no compose file at this space's root (docker-compose.yml or compose.yml), so there is "
@@ -173,9 +173,8 @@ def rebuild():
         r = {}
     if r.get("hung_up"):
         r = _after_hang_up(look, post, was)
-    if r.get("error"):
-        # The refusal names the dial, so it is printed as it came.
-        sys.exit(f"[builderbot] ERROR: {r['error']}")
+    # The refusal names the dial, so it is printed as it came.
+    need(r)
     if r.get("id") and not r.get("started"):
         # This project is on `ask`: nothing is building yet, a person has the
         # reason in front of them, and the wait is theirs. Allowing starts the
@@ -317,8 +316,7 @@ def new():
     if path:
         body["text"] = open(path, encoding="utf-8").read()
     r = post(body)
-    if r.get("error"):
-        sys.exit(f"[builderbot] ERROR: {r['error']}")
+    need(r)
     inst = r.get("instance") or ""
     name = r.get("name") or inst
     if r.get("id"):
@@ -435,8 +433,7 @@ def edit():
     text = open(path, encoding="utf-8").read() if path else None
     if verb == "env" and not setting:
         d = post({"action": "env-get"})
-        if d.get("error"):
-            sys.exit(f"[builderbot] ERROR: {d['error']}")
+        need(d)
         # Ended with a newline whatever was stored, so a line appended to
         # this output stands on its own (B314).
         text = d.get("text") or ""
@@ -451,8 +448,7 @@ def edit():
     if text is not None:
         body["text"] = text
     r = post(body)
-    if r.get("error"):
-        sys.exit(f"[builderbot] ERROR: {r['error']}")
+    need(r)
     if r.get("id"):
         # On ask: Allow removes it, or writes the env and builds nothing,
         # since the card said env set and the rebuild is the next ask.
@@ -539,8 +535,7 @@ def ctl():
     r = bbapi.call("/api/dockerctl", {"action": "logs" if verb == "log" else verb, "container": name,
                                       "project": os.environ.get("BB_DEV_PROJECT", ""),
                                       "why": os.environ.get("BB_DEV_WHY", "")}, auth=auth)
-    if r.get("error"):
-        sys.exit(f"[builderbot] ERROR: {r['error']}")
+    need(r)
     if verb == "log":
         sys.stdout.write(r.get("text") or "")
         raise SystemExit(0)
@@ -573,8 +568,7 @@ def probe():
                                    "container": os.environ.get("BB_DEV_CONTAINER", ""),
                                    "action": "probe", "port": port, "path": path},
                    auth=os.environ["BB_DEV_AUTH"])
-    if d.get("error"):
-        sys.exit(f"[builderbot] ERROR: {d['error']}")
+    need(d)
     print(f"{d.get('name') or 'the instance'} on {d.get('node') or 'its node'}, from its loopback, GET {path}:")
     bad = 0
     for p in d.get("ports") or []:
@@ -594,8 +588,7 @@ def override():
     post, _ = _client()
     syncwait.up(os.environ["BB_DEV_PROJECT"], "the controller reads the compose files from its copy")
     r = post({"action": "override", "file": os.environ.get("BB_DEV_OVERRIDE", "")})
-    if r.get("error"):
-        sys.exit(f"[builderbot] ERROR: {r['error']}")
+    need(r)
     print(f"[builderbot] {'its override is ' + r['override'] if r.get('override') else 'no override'}; "
           "aerie devapp rebuild applies it", file=sys.stderr)
 

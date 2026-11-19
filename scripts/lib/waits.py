@@ -16,6 +16,7 @@ import sys
 import time
 
 import bbapi
+from say import need
 
 
 def outcome(auth, rid, denied, unanswered=""):
@@ -27,8 +28,7 @@ def outcome(auth, rid, denied, unanswered=""):
     for _ in range(900):
         time.sleep(1)
         o = bbapi.call("/api/phone", {"action": "outcome", "id": rid}, auth=auth)
-        if o.get("error"):
-            sys.exit(f"[builderbot] ERROR: {o['error']}")
+        need(o)
         if o["state"] == "denied":
             sys.exit(f"[builderbot] {denied}")
         if o["state"] == "done":
@@ -43,8 +43,7 @@ def follow(auth, jid):
     shown = 0
     while True:
         j = bbapi.call(f"/api/v1/jobs?id={jid}", auth=auth)
-        if j.get("error"):
-            sys.exit(f"[builderbot] ERROR: {j['error']}")
+        need(j)
         log = j.get("log") or ""
         if len(log) > shown:
             sys.stdout.write(log[shown:])

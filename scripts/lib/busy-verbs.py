@@ -15,6 +15,7 @@ import time
 import urllib.parse
 
 import bbapi
+from say import need
 
 auth = os.environ["BB_BUSY_AUTH"]
 project = os.environ.get("BB_BUSY_PROJECT", "")
@@ -33,8 +34,7 @@ def now_load():
 def ask():
     q = urllib.parse.urlencode({"project": project, "node": node})
     d = bbapi.call(f"/api/node-busy?{q}", auth=auth)
-    if d.get("error"):
-        sys.exit(f"[builderbot] ERROR: {d['error']}")
+    need(d)
     # The load now, from here, where it is fresher than the heartbeat:
     # a machine that filled up since says so at once.
     load = now_load()

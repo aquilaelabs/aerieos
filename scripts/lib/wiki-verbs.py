@@ -21,6 +21,7 @@ import time
 import urllib.parse
 
 import bbapi
+from say import die
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "dashboard"))
 import records  # noqa: E402
@@ -35,15 +36,11 @@ USAGE = ("usage: aerie wiki [list | show NAME [--rev] | save NAME FILE|- [--why 
          "rm NAME [--why \"...\"] | mv OLD NEW | history]")
 
 
-def fail(msg):
-    sys.exit(f"[builderbot] ERROR: {msg}")
-
-
 def opt(name):
     if name in argv:
         i = argv.index(name)
         if i + 1 >= len(argv) or argv[i + 1].startswith("--"):
-            fail(f"{name} takes a value")
+            die(f"{name} takes a value")
         v = argv[i + 1]
         del argv[i:i + 2]
         return v
@@ -54,16 +51,16 @@ def get(page=""):
     q = "/api/wiki?project=" + urllib.parse.quote(proj) + ("&page=" + urllib.parse.quote(page) if page else "")
     r = bbapi.call(q, auth=auth)
     if not isinstance(r, dict):
-        fail("the controller answered something that is not a wiki")
+        die("the controller answered something that is not a wiki")
     return r
 
 
 def post(body):
     r = bbapi.call("/api/wiki", dict(body, project=proj), auth=auth, timeout=60)
     if not isinstance(r, dict):
-        fail("the controller answered something that is not a wiki")
+        die("the controller answered something that is not a wiki")
     if r.get("error"):
-        fail(r["error"])
+        die(r["error"])
     return r
 
 
@@ -79,7 +76,7 @@ if verb in ("-h", "--help"):
 if verb == "list":
     r = get()
     if r.get("error"):
-        fail(r["error"])
+        die(r["error"])
     if fmt != "text":
         sys.stdout.write(records.dump(records.document("wiki", r.get("pages") or [], proj), fmt)); raise SystemExit(0)
     rem = r.get("remote") or {}
@@ -91,7 +88,7 @@ if verb == "list":
 elif verb == "show" and len(argv) >= 2:
     r = get(argv[1])
     if r.get("error"):
-        fail(r["error"])
+        die(r["error"])
     if "--rev" in argv:
         print(r["rev"])
     elif fmt != "text":
@@ -103,7 +100,7 @@ elif verb == "save" and len(argv) >= 3:
     try:
         text = sys.stdin.read() if src == "-" else open(src, encoding="utf-8").read()
     except OSError as e:
-        fail(f"could not read {src}: {e}")
+        die(f"could not read {src}: {e}")
     if base is None:
         cur = get(name)
         base = "" if cur.get("error") else cur.get("rev", "")
@@ -125,8 +122,8 @@ elif verb == "mv" and len(argv) >= 3:
 elif verb == "history":
     r = get()
     if r.get("error"):
-        fail(r["error"])
+        die(r["error"])
     for h in r.get("history") or []:
         print(f"  {h['commit']}  {when(h['at'])}  {h['by']:<16} {h['what']}")
 else:
-    fail(USAGE)
+    die(USAGE)

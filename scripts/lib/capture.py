@@ -34,15 +34,19 @@ import subprocess
 import sys
 import time
 
+# This file's directory, for say.py beside it: artifacts.py loads this file
+# by path, from a process whose path may not carry that directory. It goes
+# at the end, so nothing the dashboard imports by name is found here first.
+_here = os.path.dirname(os.path.abspath(__file__))
+if _here not in sys.path:
+    sys.path.append(_here)
+from say import die  # noqa: E402
+
 FONTS = ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
          "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
          "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
          "/usr/share/fonts/dejavu/DejaVuSans.ttf",
          "/usr/share/fonts/liberation-sans/LiberationSans-Regular.ttf")
-
-
-def die(msg):
-    sys.exit(f"[builderbot] ERROR: {msg}")
 
 
 def ffmpeg():

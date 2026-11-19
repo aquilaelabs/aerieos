@@ -14,22 +14,19 @@ import sys
 import urllib.parse
 
 import bbapi
+from say import die
 
 auth = os.environ["BB_CI_AUTH"]
 proj = os.environ["BB_CI_PROJECT"]
 args = sys.argv[1:]
 
 
-def fail(msg):
-    sys.exit(f"[builderbot] ERROR: {msg}")
-
-
 def get(query):
     r = bbapi.call("/api/ci-runs?project=" + urllib.parse.quote(proj) + query, auth=auth, timeout=120)
     if not isinstance(r, dict):
-        fail("the controller answered something that is not a run")
+        die("the controller answered something that is not a run")
     if r.get("error"):
-        fail(r["error"])
+        die(r["error"])
     return r
 
 
@@ -46,7 +43,7 @@ if "--list" in args:
 run = next((a for a in args if not a.startswith("-")), "")
 run = run.split("-")[0]
 if run and not run.isdigit():
-    fail("aerie ci-log RUN: a run is named by its number, as aerie ci-log --list prints it")
+    die("aerie ci-log RUN: a run is named by its number, as aerie ci-log --list prints it")
 r = get("&run=" + (run or "0"))
 m = r.get("run") or {}
 print(f"{r.get('repo')} run {m.get('id')}: {m.get('name')} on {m.get('branch')}, "

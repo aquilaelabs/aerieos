@@ -12,6 +12,7 @@ import sys
 import bbapi
 import hand
 import waits
+from say import need
 
 
 def status():
@@ -53,8 +54,7 @@ def run():
     # session's token carries its project; a person running this names theirs.
     r = post({"action": "ask", "why": os.environ["BB_PHONE_WHY"], "cmd": sys.argv[2:],
               "project": os.environ.get("BB_PHONE_PROJECT", "")})
-    if r.get("error"):
-        print(f"[builderbot] ERROR: {r['error']}", file=sys.stderr); sys.exit(1)
+    need(r)
     rid = r["id"]
     if r.get("allowed"):
         print(f"[builderbot] #{rid}: {r.get('to') or 'the owner'} allowed this session's commands to the phone",
@@ -95,9 +95,7 @@ def use(op, args=None, quiet=False):
             r = {"error": o.get("out") or "no answer"}
         if o.get("code") and not r.get("error"):
             r["error"] = "it did not run"
-    if r.get("error"):
-        print(f"[builderbot] ERROR: {r['error']}", file=sys.stderr)
-        sys.exit(1)
+    need(r)
     if not quiet and r.get("out"):
         sys.stdout.write(r["out"] if r["out"].endswith("\n") else r["out"] + "\n")
     if r.get("code"):

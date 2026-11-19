@@ -49,18 +49,13 @@ import shutil
 import subprocess
 import sys
 import time
-from typing import NoReturn
 
 import hand
+from say import die
 
 EV_SYN, EV_KEY, EV_ABS = 0, 1, 3
 ABS_MT_SLOT, ABS_MT_TOUCH_MAJOR, ABS_MT_POSITION_X, ABS_MT_POSITION_Y = 0x2F, 0x30, 0x35, 0x36
 ABS_MT_TOOL_TYPE, ABS_MT_TRACKING_ID, ABS_MT_PRESSURE = 0x37, 0x39, 0x3A
-
-
-def die(msg) -> NoReturn:
-    sys.stderr.write(f"[builderbot] ERROR: {msg}\n")
-    sys.exit(1)
 
 
 def adb():

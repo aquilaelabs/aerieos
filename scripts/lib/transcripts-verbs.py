@@ -23,15 +23,12 @@ import time
 import urllib.parse
 
 import bbapi
+from say import die
 
 argv = sys.argv[1:]
 verb = argv[0] if argv else "list"
 auth = os.environ["BB_TRANSCRIPTS_AUTH"]
 proj = os.environ["BB_TRANSCRIPTS_PROJECT"]
-
-
-def fail(msg):
-    sys.exit(f"[builderbot] ERROR: {msg}")
 
 
 # How much of a long conversation `show` prints, from its end, without --all.
@@ -45,7 +42,7 @@ def size(n):
 if verb == "list":
     r = bbapi.call(f"/api/transcripts?project={urllib.parse.quote(proj)}", auth=auth)
     if not isinstance(r, dict) or r.get("error"):
-        fail(r.get("error") if isinstance(r, dict) else "the controller answered something that is not a list")
+        die(r.get("error") if isinstance(r, dict) else "the controller answered something that is not a list")
     rows, seen = r.get("rows") or [], r.get("visible") or []
     if not rows and not seen:
         print(f"no conversations of yours on {proj} yet")
@@ -79,13 +76,13 @@ if verb == "list":
 if verb in ("label", "note", "keep", "unkeep"):
     words = verb in ("label", "note")
     if len(argv) < 2 or (not words and len(argv) != 2):
-        fail(f"aerie transcripts {verb} ID" + (" WORDS (no words takes it off)" if words else ""))
+        die(f"aerie transcripts {verb} ID" + (" WORDS (no words takes it off)" if words else ""))
     body = {"project": proj, "id": argv[1], "action": verb}
     if words:
         body["text"] = " ".join(argv[2:])
     r = bbapi.call("/api/transcripts", body, auth=auth)
     if not isinstance(r, dict) or r.get("error"):
-        fail(r.get("error") if isinstance(r, dict) else "the controller did not answer")
+        die(r.get("error") if isinstance(r, dict) else "the controller did not answer")
     if verb == "label":
         print(f"{argv[1]} is labeled: {r.get('label')}" if r.get("label") else f"{argv[1]} has no label now: it is listed by its first words")
     elif verb == "note":
@@ -102,7 +99,7 @@ if verb == "audit":
     q = urllib.parse.urlencode({"project": proj, "audit": days})
     r = bbapi.call(f"/api/transcripts?{q}", auth=auth, timeout=300)
     if not isinstance(r, dict) or r.get("error"):
-        fail(r.get("error") if isinstance(r, dict) else "the controller answered something that is not an audit")
+        die(r.get("error") if isinstance(r, dict) else "the controller answered something that is not an audit")
     a = r.get("audit") or {}
     print(f"your conversations on {proj} over the last {a.get('days')} days: "
           f"{a.get('conversations', 0)}, with {a.get('bash', 0)} shell commands"
@@ -123,7 +120,7 @@ if verb == "audit":
 if verb == "show":
     sid = argv[1] if len(argv) > 1 and not argv[1].startswith("--") else ""
     if not sid:
-        fail("aerie transcripts show ID [--tz ZONE] [--all]: the id from aerie transcripts")
+        die("aerie transcripts show ID [--tz ZONE] [--all]: the id from aerie transcripts")
     tz = ""
     if "--tz" in argv:
         k = argv.index("--tz")
@@ -134,7 +131,7 @@ if verb == "show":
                                 "tail": 0 if "--all" in argv else SHOW_TAIL_MB})
     r = bbapi.call(f"/api/transcript?{q}", auth=auth, timeout=600 if "--all" in argv else 120)
     if not isinstance(r, dict) or r.get("error"):
-        fail(r.get("error") if isinstance(r, dict) else "the controller answered something that is not a transcript")
+        die(r.get("error") if isinstance(r, dict) else "the controller answered something that is not a transcript")
     sys.stdout.write(r.get("text") or "")
     raise SystemExit(0)
 
@@ -146,7 +143,7 @@ if verb == "fetch":
     import re
     sid = argv[1] if len(argv) > 1 and not argv[1].startswith("--") else ""
     if not sid or not re.fullmatch(r"[0-9A-Za-z-]+", sid):
-        fail("aerie transcripts fetch ID [--into DIR]: the id from aerie transcripts")
+        die("aerie transcripts fetch ID [--into DIR]: the id from aerie transcripts")
     into = ""
     if "--into" in argv:
         k = argv.index("--into")
@@ -165,7 +162,7 @@ if verb == "fetch":
             got = json.loads(r.read() or b"{}")
             c.close()
             if r.status != 200:
-                fail(got.get("error") or f"HTTP {r.status}")
+                die(got.get("error") or f"HTTP {r.status}")
             print(f"{sid} is here already")
             raise SystemExit(0)
         os.makedirs(into, exist_ok=True)
@@ -179,7 +176,7 @@ if verb == "fetch":
         want = int(r.getheader("Content-Length") or n)
         if n != want:
             os.remove(tmp)
-            fail(f"the download stopped at {size(n)} of {size(want)}")
+            die(f"the download stopped at {size(n)} of {size(want)}")
         mt = int(r.getheader("X-Mtime-Ms") or 0)
         if mt:
             # The controller's time, so the node's mirror reads the two as
@@ -188,8 +185,8 @@ if verb == "fetch":
         os.chmod(tmp, 0o600)
         os.replace(tmp, dest)
     except OSError as e:
-        fail(f"could not fetch {sid}: {e}")
+        die(f"could not fetch {sid}: {e}")
     print(f"fetched {sid} ({size(n)}) from the controller")
     raise SystemExit(0)
 
-fail("aerie transcripts [list | show ID [--tz ZONE] | fetch ID [--into DIR]]")
+die("aerie transcripts [list | show ID [--tz ZONE] | fetch ID [--into DIR]]")
