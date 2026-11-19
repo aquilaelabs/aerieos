@@ -1893,8 +1893,11 @@ function rnRevertSect(sect){
   } else if (sect === "runs"){
     delete $("rnNodesMore").dataset.drawn;
     rnFillNode();
+  } else if (sect === "build"){
+    // Tests run is Build and test's own choice, put back by its Revert: it
+    // was put back by Where it runs', so Build and test's left it changed.
     $("rnDevTest").value = w.tests_in; if ($("rnTestNode")) $("rnTestNode").value = w.test_node || "";
-  if ($("rnTests")) $("rnTests").value = `${w.tests_in || "node"}|${w.tests_in === "only" ? "" : (w.test_node || "")}`;
+    if ($("rnTests")) $("rnTests").value = `${w.tests_in || "node"}|${w.tests_in === "only" ? "" : (w.test_node || "")}`;
   } else if (sect === "files"){
     rnFtpDraft = {}; rnDrawFtp();
   } else if (sect === "tools"){
