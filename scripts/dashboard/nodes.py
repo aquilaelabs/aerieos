@@ -6357,6 +6357,22 @@ def exec_out(log):
     return log[len("exec\n"):] if log.startswith("exec\n") else log
 
 
+def _await_job(job_id, timeout, grace=10):
+    """Wait for a job to end: its row once it has, or None when `timeout`
+    seconds and then `grace` have passed, the grace being the job's own way
+    to the node and its answer's way back. It looks at every wake (a job's
+    end is one) and each WAIT_LOOK_S besides. A job that never answered is
+    left as it is: canceling it, and what to say of it, are the caller's."""
+    deadline = time.time() + timeout + grace
+    while time.time() < deadline:
+        gen = _wake_now()
+        j = job(job_id)
+        if j and j["state"] in JOB_END:
+            return j
+        _await_wake(gen, min(WAIT_LOOK_S, deadline - time.time()))
+    return None
+
+
 def run_wait(principal, node_id, argv, env=None, timeout=30, files=None,
              sizes=None, project="", forget=False, outputs=None, title="", cwd="", docker=False):
     """One command on a node, waited for: queued as an exec job, picked up
@@ -6398,16 +6414,12 @@ def run_wait(principal, node_id, argv, env=None, timeout=30, files=None,
     r = job_add(principal, {"node": node_id}, "exec", spec, project)
     if r.get("error"):
         return {"error": r["error"]}
-    deadline = time.time() + timeout + 10
-    while time.time() < deadline:
-        gen = _wake_now()
-        j = job(r["job"])
-        if j and j["state"] in JOB_END:
-            if forget:
-                job_forget(r["job"])
-            return {"code": j.get("exit_code") if j["state"] == "succeeded" or j.get("exit_code") is not None else 1,
-                    "out": exec_out(j.get("log") or ""), "job": r["job"], "state": j["state"]}
-        _await_wake(gen, min(WAIT_LOOK_S, deadline - time.time()))
+    j = _await_job(r["job"], timeout)
+    if j:
+        if forget:
+            job_forget(r["job"])
+        return {"code": j.get("exit_code") if j["state"] == "succeeded" or j.get("exit_code") is not None else 1,
+                "out": exec_out(j.get("log") or ""), "job": r["job"], "state": j["state"]}
     # Taken back, not left in the queue: a probe nobody is waiting for any
     # more would otherwise run whenever the node's slot freed: an `adb
     # install` an hour after the operator read it as failed.
@@ -6544,19 +6556,15 @@ def tell_wait(node_id, session, text, timeout=20, who="dashboard"):
                 {"session": str(session), "text": str(text), "timeout": int(timeout)})
     if r.get("error"):
         return {"error": r["error"]}
-    deadline = time.time() + timeout + 10
-    while time.time() < deadline:
-        gen = _wake_now()
-        j = job(r["job"])
-        if j and j["state"] in JOB_END:
-            code = j.get("exit_code")
-            if j["state"] == "succeeded" and code == 0:
-                return {"ok": True, "sent": True, "text": text, "job": r["job"]}
-            if code == 3:
-                return {"ok": True, "sent": False, "typed": True, "text": text, "job": r["job"]}
-            last = [x for x in (j.get("log") or "").splitlines() if x.strip()]
-            return {"error": last[-1] if last else f"the send failed on {n['name']} (exit {code})"}
-        _await_wake(gen, min(WAIT_LOOK_S, deadline - time.time()))
+    j = _await_job(r["job"], timeout)
+    if j:
+        code = j.get("exit_code")
+        if j["state"] == "succeeded" and code == 0:
+            return {"ok": True, "sent": True, "text": text, "job": r["job"]}
+        if code == 3:
+            return {"ok": True, "sent": False, "typed": True, "text": text, "job": r["job"]}
+        last = [x for x in (j.get("log") or "").splitlines() if x.strip()]
+        return {"error": last[-1] if last else f"the send failed on {n['name']} (exit {code})"}
     job_cancel("dashboard", r["job"])
     return {"error": f"the agent on {n['name']} took the send but did not report back within {timeout}s"}
 
@@ -6592,14 +6600,10 @@ def root_wait(principal, node_id, argv, why="", timeout=600, light=False):
     if r.get("error"):
         return {"error": r["error"]}
     audit(principal, "root-run", node_id, {"argv": argv, "why": why, "job": r["job"]})
-    deadline = time.time() + timeout + 10
-    while time.time() < deadline:
-        gen = _wake_now()
-        j = job(r["job"])
-        if j and j["state"] in JOB_END:
-            return {"code": j.get("exit_code") if j["state"] == "succeeded" or j.get("exit_code") is not None else 1,
-                    "out": j.get("log") or "", "job": r["job"], "state": j["state"]}
-        _await_wake(gen, min(WAIT_LOOK_S, deadline - time.time()))
+    j = _await_job(r["job"], timeout)
+    if j:
+        return {"code": j.get("exit_code") if j["state"] == "succeeded" or j.get("exit_code") is not None else 1,
+                "out": j.get("log") or "", "job": r["job"], "state": j["state"]}
     why = _no_answer(r["job"], node_id, timeout)
     job_cancel(principal, r["job"])
     return {"error": why}
@@ -8081,16 +8085,14 @@ def agent_test(principal, n):
                       {"argv": ["uname", "-srm"], "timeout": 20})
     if r.get("error"):
         return {"on": False, "why": r["error"]}
-    deadline = time.time() + 15
-    while time.time() < deadline:
-        j = job(r["job"])
-        if j and j["state"] in JOB_END:
-            out = (j.get("log") or "").strip()
-            db.audit(principal, "node-test", n["id"],
-                     {"on": j["state"] == "succeeded"})
-            return {"on": j["state"] == "succeeded",
-                    "why": out or f"{j['state']} (exit {j['exit_code']})"}
-        time.sleep(0.3)
+    # Fifteen seconds in all, with no grace on top: the page is waiting.
+    j = _await_job(r["job"], 15, grace=0)
+    if j:
+        out = (j.get("log") or "").strip()
+        db.audit(principal, "node-test", n["id"],
+                 {"on": j["state"] == "succeeded"})
+        return {"on": j["state"] == "succeeded",
+                "why": out or f"{j['state']} (exit {j['exit_code']})"}
     return {"on": False, "why": "the agent took the job but did not "
                                 "report back within 15s"}
 
