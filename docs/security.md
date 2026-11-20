@@ -396,13 +396,53 @@ console allows unsigned builds takes them from a branch's build as it takes
 that build's agent. A key added at the console counts here as it does for
 the agent: root's tools signed by it are kept.
 
+**Nor the other files a release ships in that bundle.** `aerie` itself and
+its library (the toolchain installer and its checksum logic are in it, and a
+script the agent runs as root to list sign-ins where accounts own their
+homes), the shipped catalog, the publishers' keys a download is checked
+against, the terminal's launcher and the hooks a session is handed all ride
+in the same bundle. The bundle carries the list of them, a line a file with
+its sha256 (`nodes/bundle.list`, made one way by
+`scripts/lib/bundleparts.py` for the build's signer and the controller
+alike), and the release's signature over that list (`nodes/bundle.sig`, the
+third part of `scripts/agent/agent.sig`). A pinned node unpacks a bundle
+only when that signature is under a key it trusts and every file in the
+bundle is the one the list names: none changed, none missing, no link, and
+none beside them except what a controller adds of its own. A bundle that
+fails is unpacked nowhere, in the job account's store or in root's copies:
+the node goes on with the bundle it has, names the first file that was
+wrong in the job's log and its own, and does not fetch that bundle again
+until its console's trust changes or the controller offers another. A
+machine whose console allows unsigned builds takes a branch's bundle as it
+takes that build's agent, and a key added at the console counts as it does
+there. A controller whose own files are not the ones its build signed (one
+edited in place) says so once in its log, and one whose dashboard is served
+from a checkout (`aerie dashboard dev`) packs that checkout's files, which
+no build signed: either way its pinned nodes stay on the bundle they have.
+To hold an install against a checkout, an administrator's
+read of the Nodes page (`/api/v1/nodes`) carries the list's digest as `files`
+with whether the build signed it as `files_signed`, and `tools/sign-agent.py
+--digests` prints the same digest for a tree.
+
+What a controller adds beside those files is still its word, and no
+release can sign it: the tool packs a person added and the ones made on
+that install (`config/toolpacks.json`, `config/toolpacks/NAME.bundle`), and
+the vetted catalog's newer rows for the shipped toolchains
+(`config/toolchains.catalog.json`, which a node reads in the shipped
+catalog's place where the bundle carries it; the shipped file itself goes
+as the release signed it). So whoever holds a controller can still hand a
+pinned node a recipe of their own: what a recipe downloads and runs, it
+runs as the jobs account, and the system packages it names are installed
+by root from that machine's own repositories.
+
 **The rest, it still does, unless its console says otherwise.** The agent
 runs as root; a root command an administrator approves is run as given
 (which, on a node provisioned as a sandbox, could also undo the pin); and
 the jobs account's Docker is root's on a node that runs containers. So
 whoever holds the controller (a copy of its state with the install key, an
 administrator's sign-in) still holds those nodes: the signatures close the
-update and root's own tools as ways in, not the others. What bounds them
+update, root's own tools and the files a release ships in the bundle as
+ways in, not the others. What bounds them
 on the controller's side: **Lock system changes** on a node's row has the
 controller refuse storage, network and root changes there, and every root
 command is on the record with who approved it. Two things are held by the
@@ -425,7 +465,7 @@ holds, never one that arrives with the thing itself:
 | What is checked | The public half an install holds | Where the private half is |
 |---|---|---|
 | The catalog's index | `config/catalog.pub`, shipped in the release | the catalog repository's secret `CATALOG_SIGNING_KEY`, used by its `sign` workflow |
-| A node's agent update | `config/aerieos-release.pub`, pinned by the node when it enrolls | the release build's secret `AERIEOS_RELEASE_KEY`, read by two jobs on a `v*` tag alone ([versions.md](versions.md#the-release-key-on-github)) |
+| A node's agent update, root's tools and the files of the bundle it fetches | `config/aerieos-release.pub`, pinned by the node when it enrolls | the release build's secret `AERIEOS_RELEASE_KEY`, read by two jobs on a `v*` tag alone ([versions.md](versions.md#the-release-key-on-github)) |
 | A release's list of its files (`SHA256SUMS`), for a dev build | `config/release-signers`, its `aerieos-dev` lines: the release key and its spare again, as OpenSSH keys | the release build's secret `AERIEOS_RELEASE_KEY` |
 | A release's list of its files, for a stable release | `config/release-signers`, its `aerieos-release` line | offline, on the stable key holder's own machine |
 
