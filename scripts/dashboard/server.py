@@ -7284,6 +7284,31 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _content_length(self, bad=-1, missing=0):
+        """How long the request says its body is: `missing` where it says
+        nothing, `bad` where what it says is no number. The limits, and
+        whether a body of nothing is one, are each caller's own."""
+        try:
+            return int(self.headers.get("Content-Length", missing))
+        except ValueError:
+            return bad
+
+    def _read_form(self):
+        """The fields of a form a page of the sign-in posts, as parse_qs
+        gives them, each a list. None means an answer was already sent."""
+        n = self._content_length(bad=None)
+        if n is None:
+            self._json({"error": "bad request"}, 400)
+            return None
+        try:
+            if not 0 <= n <= MAX_BODY:
+                self._json({"error": "body too large"}, 413)
+                return None
+            return urllib.parse.parse_qs(self.rfile.read(n).decode("utf-8", "replace"))
+        except (ValueError, TypeError):
+            self._json({"error": "bad request"}, 400)
+            return None
+
     def _setup_post(self):
         """Make the owner, once. Refused the moment there is one.
 
@@ -7295,13 +7320,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._login_page(ACCOUNTS_UNREADABLE)
         if users.all_users():
             return self._login_page("This container already has an account.")
-        try:
-            n = int(self.headers.get("Content-Length", "0"))
-            if not 0 <= n <= MAX_BODY:
-                return self._json({"error": "body too large"}, 413)
-            form = urllib.parse.parse_qs(self.rfile.read(n).decode("utf-8", "replace"))
-        except (ValueError, TypeError):
-            return self._json({"error": "bad request"}, 400)
+        form = self._read_form()
+        if form is None:
+            return None
         name = form.get("username", [""])[0]
         pw, pw2 = form.get("password", [""])[0], form.get("password2", [""])[0]
         # Moving here (the operator, 9 Nov): the accounts arrive with the
@@ -7350,13 +7371,9 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def _login_post(self):
-        try:
-            n = int(self.headers.get("Content-Length", "0"))
-            if not 0 <= n <= MAX_BODY:
-                return self._json({"error": "body too large"}, 413)
-            form = urllib.parse.parse_qs(self.rfile.read(n).decode("utf-8", "replace"))
-        except (ValueError, TypeError):
-            return self._json({"error": "bad request"}, 400)
+        form = self._read_form()
+        if form is None:
+            return None
         u = users.authenticate(form.get("username", [""])[0],
                                form.get("password", [""])[0], where=self._peer())
         if u:
@@ -7497,13 +7514,9 @@ class Handler(BaseHTTPRequestHandler):
     def _mfa_post(self):
         """POST /login/2fa: a code or a recovery code for the account the
         bb_mfa cookie names (R127)."""
-        try:
-            n = int(self.headers.get("Content-Length", "0"))
-            if not 0 <= n <= MAX_BODY:
-                return self._json({"error": "body too large"}, 413)
-            form = urllib.parse.parse_qs(self.rfile.read(n).decode("utf-8", "replace"))
-        except (ValueError, TypeError):
-            return self._json({"error": "bad request"}, 400)
+        form = self._read_form()
+        if form is None:
+            return None
         u, _ = purpose_user(self._cookie("bb_mfa"), "mfa")
         nxt = form.get("next", ["/"])[0]
         if not nxt.startswith("/") or nxt.startswith("//"):
@@ -7801,18 +7814,10 @@ class Handler(BaseHTTPRequestHandler):
         the Containers page; an administrator alone when the project's Agents may:
         Run its container is Deny; and the container one of the instance's
         running ones, asked of its daemon now, never taken from the URL."""
-        m = _ARG_CTR.match(arg)
-        if not m:
-            return "not a container's terminal: ctr:NAME:INSTANCE:CONTAINER"
-        name, inst, ctr = m.groups()
-        no_shell = users.may(me, "terminal")
-        if no_shell:
-            return no_shell
-        if inst not in (devapp.instances(name) or []):
-            return f"no instance {inst} of {name} on record here"
-        owner = _ctr_owner(name, inst)
-        admin = users.is_admin(me)
-        if not admin:
+        def owned(name, inst):
+            owner = _ctr_owner(name, inst)
+            if users.is_admin(me):
+                return ""
             if not owner:
                 return f"{name} belongs to no space, so its shell is an administrator's"
             why = users.may(me, "write", owner)
@@ -7821,14 +7826,9 @@ class Handler(BaseHTTPRequestHandler):
             if (prefs.get(owner) or {}).get("devbuild") == "deny":
                 return (f"{owner}'s Agents may: Run its container is Deny, so a shell in its containers "
                         "is an administrator's")
-        t = ctr_target(name, inst)
-        if t["where"] == "refused":
-            return t["why"]
-        if t.get("no_shell"):
-            return t["no_shell"]
-        if ctr not in devactions.running_names(name, inst):
-            return f"{ctr} is not a running container of {devapp.pname(name, inst)} now"
-        return ""
+            return ""
+        return self._ctr_checks(_ARG_CTR.match(arg), me, "not a container's terminal: ctr:NAME:INSTANCE:CONTAINER",
+                                "terminal", owned, shell=True)
 
     def _ctr_log_refused(self, arg, me):
         """A sentence when this account may not follow the log of the
@@ -7836,21 +7836,35 @@ class Handler(BaseHTTPRequestHandler):
         Containers page's Log reads it (docker-write, and the container's
         project on the account's list), the container one of the instance's
         running ones now."""
-        m = _ARG_LOGCTR.match(arg)
+        return self._ctr_checks(_ARG_LOGCTR.match(arg), me, "not a container's log: log:ctr:NAME:INSTANCE:CONTAINER",
+                                "docker-write", lambda name, inst: self._not_on_list(me, _ctr_owner(name, inst)))
+
+    def _ctr_checks(self, m, me, said, may, owned, shell=False):
+        """What a container's shell and its log are both asked, in the one
+        order, a sentence at the first that fails and "" when none does: the
+        argument's shape (`m` its match, `said` the sentence when it has
+        none), the permission `may` on the account, the instance on record
+        here, `owned(name, inst)` (the caller's own rule about the
+        container's project, a sentence or ""), a machine its daemon is
+        reached from (ctr_target), for a shell one that opens a shell in a
+        container, and the container one of the instance's running ones
+        now."""
         if not m:
-            return "not a container's log: log:ctr:NAME:INSTANCE:CONTAINER"
+            return said
         name, inst, ctr = m.groups()
-        why = users.may(me, "docker-write")
+        why = users.may(me, may)
         if why:
             return why
         if inst not in (devapp.instances(name) or []):
             return f"no instance {inst} of {name} on record here"
-        why = self._not_on_list(me, _ctr_owner(name, inst))
+        why = owned(name, inst)
         if why:
             return why
         t = ctr_target(name, inst)
         if t["where"] == "refused":
             return t["why"]
+        if shell and t.get("no_shell"):
+            return t["no_shell"]
         if ctr not in devactions.running_names(name, inst):
             return f"{ctr} is not a running container of {devapp.pname(name, inst)} now"
         return ""
@@ -8835,10 +8849,7 @@ class Handler(BaseHTTPRequestHandler):
         policy (R158 step 4), kept for the Doctor (csp.report). The browser
         sends it on its own, from the login page too, so it is taken before
         the credential check, from anyone, and kept small."""
-        try:
-            n = int(self.headers.get("Content-Length", "0"))
-        except ValueError:
-            n = -1
+        n = self._content_length()
         if not 0 <= n <= 8192:
             return self._json({"error": "body too large"}, 413)
         body = self.rfile.read(n)
@@ -9521,10 +9532,7 @@ class Handler(BaseHTTPRequestHandler):
         if (cross := self._ws_cross_origin()):
             return self._json({"error": cross}, 403)
         nid, root, path, name = (q.get(k, [""])[0] for k in ("node", "root", "path", "name"))
-        try:
-            n = int(self.headers.get("Content-Length", "-1"))
-        except ValueError:
-            n = -1
+        n = self._content_length(missing=-1)
         if n < 0:
             return self._json({"error": "the upload says no length"}, 411)
         tg = fileexplorer._target(True, nid, root)
@@ -9960,8 +9968,11 @@ class Handler(BaseHTTPRequestHandler):
         """The body, once. Read here rather than in each handler: doing it
         after dispatch is how the request stream ends up consumed twice or
         not at all. None means an answer was already sent."""
+        n = self._content_length(bad=None)
+        if n is None:
+            self._json({"error": "bad request"}, 400)
+            return None
         try:
-            n = int(self.headers.get("Content-Length", "0"))
             most = MAX_BODY_FOR.get(self.path.partition("?")[0], MAX_BODY)
             if not 0 <= n <= most:
                 self._json({"error": f"body too large: {n} bytes, and this takes {most}"}, 413)
@@ -10675,10 +10686,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(got, status)
             return self._send_file(got)
         if verb in ("artifact", "sync-put", "claude-put", "devimage-put", "devdata-put", "signing-put", "scan-put", "oldapps-put"):
-            try:
-                length = int(self.headers.get("Content-Length", "0"))
-            except ValueError:
-                length = 0
+            length = self._content_length(bad=0)
             if verb == "sync-put":
                 return self._json(*channel.sync_put(auth, q, self.rfile, length))
             if verb == "claude-put":
@@ -10796,11 +10804,7 @@ class Handler(BaseHTTPRequestHandler):
             got, status = devices.file_verb(verb, auth, q)
             return self._send_file(got) if status == 200 else self._json(got, status)
         if verb == "sync-put":
-            try:
-                length = int(self.headers.get("Content-Length", "0"))
-            except ValueError:
-                length = 0
-            return self._json(*devices.put(auth, q, self.rfile, length))
+            return self._json(*devices.put(auth, q, self.rfile, self._content_length(bad=0)))
         if self.command != "POST":
             return self._json({"error": "POST"}, 405)
         req = self._read_json()
@@ -12410,9 +12414,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": "which space's VMs is it for? name one"}, 400)
         if self._refused("vms-write", project):
             return None
-        try:
-            n = int(self.headers.get("Content-Length", "0"))
-        except ValueError:
+        n = self._content_length(bad=None)
+        if n is None:
             return self._json({"error": "bad request"}, 400)
         return self._result(vms.iso_upload(self._principal(), self.rfile, n, (q.get("node") or [""])[0],
                                            (q.get("name") or [""])[0]))
@@ -12424,9 +12427,8 @@ class Handler(BaseHTTPRequestHandler):
         for a user account to fill the controller's disk."""
         if self._refused("create"):
             return None
-        try:
-            n = int(self.headers.get("Content-Length", "0"))
-        except ValueError:
+        n = self._content_length(bad=None)
+        if n is None:
             return self._json({"error": "bad request"}, 400)
         q = self._q()
         r = projects.spool_archive(self.rfile, n, (q.get("name") or [""])[0])
@@ -14292,10 +14294,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._login_page(ACCOUNTS_UNREADABLE)
         if users.all_users():
             return self._login_page("This controller already has an account: its pools are imported on the Storage page.")
-        try:
-            n = int(self.headers.get("Content-Length", "0"))
-        except ValueError:
-            n = -1
+        n = self._content_length()
         if not 0 < n <= 1 << 20:
             return self._restore_page("pick a pool and type its name; a copy to upload goes with Restore it")
         spool = Path(STATE) / f".move-restore-pool-{os.getpid()}"
@@ -14326,10 +14325,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._login_page(ACCOUNTS_UNREADABLE)
         if users.all_users():
             return self._login_page("This controller already has an account; a saved configuration lands only on a fresh install.")
-        try:
-            n = int(self.headers.get("Content-Length", "0"))
-        except ValueError:
-            n = -1
+        n = self._content_length()
         if not 0 < n <= 16 << 30:
             return self._restore_page("the upload is empty or past 16 GB")
         # Room for it said before a byte is taken, as a landing's is (B720).
@@ -14494,10 +14490,7 @@ class Handler(BaseHTTPRequestHandler):
         """The move's form taken into a spool under `where` a megabyte at a
         time, the bundle from it or pulled from the old controller, and
         restored: (result, "") or (None, why)."""
-        try:
-            n = int(self.headers.get("Content-Length", "0"))
-        except ValueError:
-            n = -1
+        n = self._content_length()
         if not 0 < n <= 16 << 30:
             return None, "the upload is empty or past 16 GB"
         # One landing at a time (B720): two at once shared a spool, one's
