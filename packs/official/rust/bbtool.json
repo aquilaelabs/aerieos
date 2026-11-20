@@ -48,7 +48,7 @@
    },
    "fresh_only": true,
    "kind": "script",
-   "online": "rustup-init, its pinned installer, downloads the stable toolchain from static.rust-lang.org, each file held to the sha256 its channel manifest states.",
+   "online": "rustup downloads the stable toolchain from static.rust-lang.org and checks each file against its channel's list",
    "run": [
     "{script}",
     "-y",

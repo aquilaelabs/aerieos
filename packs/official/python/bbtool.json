@@ -44,7 +44,7 @@
    },
    "fresh_only": true,
    "kind": "script",
-   "online": "uv, its pinned program, downloads the Python 3.12 interpreter from github.com/astral-sh/python-build-standalone and holds it to the sha256 that release of uv carries for it.",
+   "online": "uv downloads the Python 3.12 interpreter from GitHub and checks it against the sha256 uv carries for it",
    "run": [
     "sh",
     "-ec",

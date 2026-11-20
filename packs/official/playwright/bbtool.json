@@ -71,7 +71,7 @@
      "to": "dl/npm"
     }
    ],
-   "online": "Playwright, installed from the pinned packages this entry declares with no network asked, then downloads the Chromium, Firefox and WebKit builds its version names from its publisher's own host, cdn.playwright.dev; nothing in this entry holds those files.",
+   "online": "Playwright downloads its Chromium, Firefox and WebKit builds from cdn.playwright.dev, and nothing here checks them",
    "requires": "npm",
    "run": [
     "sh",

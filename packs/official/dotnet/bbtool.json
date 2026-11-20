@@ -34,7 +34,7 @@
     "version": "10.0.404"
    },
    "kind": "tarball",
-   "online": "After the pinned SDK is unpacked, its workload step has dotnet download the maui-android workload's packages from api.nuget.org by itself.",
+   "online": "dotnet downloads the maui-android workload from api.nuget.org",
    "then": [
     {
      "env": {

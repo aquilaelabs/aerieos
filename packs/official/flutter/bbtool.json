@@ -30,7 +30,7 @@
    },
    "fresh_only": true,
    "kind": "git",
-   "online": "Its first run downloads the Dart SDK and the engine's artifacts for this machine from storage.googleapis.com, and its own tool's packages from pub.dev.",
+   "online": "its first run downloads the Dart SDK and its engine from storage.googleapis.com, and its packages from pub.dev",
    "safe_directory": true,
    "tag": "3.50.1",
    "track": {

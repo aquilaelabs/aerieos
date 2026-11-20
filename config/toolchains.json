@@ -349,7 +349,7 @@
             "https://dl.google.com/android/repository/repository2-3.xml"
           ]
         },
-        "online": "sdkmanager, the program of the Android command-line tools, downloads this package from dl.google.com by itself and holds it to the sha1 Google's repository listing states."
+        "online": "sdkmanager downloads this package from dl.google.com and checks it against Google's own listing"
       },
       "updatable": true,
       "terms": [
@@ -432,7 +432,7 @@
             "https://dl.google.com/android/repository/repository2-3.xml"
           ]
         },
-        "online": "sdkmanager, the program of the Android command-line tools, downloads this package from dl.google.com by itself and holds it to the sha1 Google's repository listing states."
+        "online": "sdkmanager downloads this package from dl.google.com and checks it against Google's own listing"
       },
       "updatable": true,
       "terms": [
@@ -473,7 +473,7 @@
             "https://dl.google.com/android/repository/repository2-3.xml"
           ]
         },
-        "online": "sdkmanager, the program of the Android command-line tools, downloads this package from dl.google.com by itself and holds it to the sha1 Google's repository listing states."
+        "online": "sdkmanager downloads this package from dl.google.com and checks it against Google's own listing"
       },
       "updatable": true,
       "terms": [
@@ -511,7 +511,7 @@
             "https://dl.google.com/android/repository/repository2-3.xml"
           ]
         },
-        "online": "sdkmanager, the program of the Android command-line tools, downloads this package from dl.google.com by itself and holds it to the sha1 Google's repository listing states."
+        "online": "sdkmanager downloads this package from dl.google.com and checks it against Google's own listing"
       },
       "updatable": true,
       "terms": [
@@ -549,7 +549,7 @@
             "https://dl.google.com/android/repository/repository2-3.xml"
           ]
         },
-        "online": "sdkmanager, the program of the Android command-line tools, downloads this package from dl.google.com by itself and holds it to the sha1 Google's repository listing states."
+        "online": "sdkmanager downloads this package from dl.google.com and checks it against Google's own listing"
       },
       "updatable": true,
       "terms": [
@@ -587,7 +587,7 @@
             "https://dl.google.com/android/repository/repository2-3.xml"
           ]
         },
-        "online": "sdkmanager, the program of the Android command-line tools, downloads this package from dl.google.com by itself and holds it to the sha1 Google's repository listing states."
+        "online": "sdkmanager downloads this package from dl.google.com and checks it against Google's own listing"
       },
       "updatable": true,
       "terms": [
@@ -637,7 +637,7 @@
           "resolver": "approximate",
           "bytes": 520000000
         },
-        "online": "Its first run downloads the Dart SDK and the engine's artifacts for this machine from storage.googleapis.com, and its own tool's packages from pub.dev.",
+        "online": "its first run downloads the Dart SDK and its engine from storage.googleapis.com, and its packages from pub.dev",
         "commit": "ae9b586f34a8443573f82ef57c3bf914a908cbf7",
         "tag": "3.50.1"
       },
@@ -793,7 +793,7 @@
             "linux-musl/arm64": "e4dae17cbf0c26afb05eda8c2f5365ab291cf32ffd7c115fc0525a9cba268d30"
           }
         },
-        "online": "After the pinned SDK is unpacked, its workload step has dotnet download the maui-android workload's packages from api.nuget.org by itself."
+        "online": "dotnet downloads the maui-android workload from api.nuget.org"
       },
       "updatable": true,
       "terms": [
@@ -924,7 +924,7 @@
             "from": "github-asset"
           }
         },
-        "online": "uv, its pinned program, downloads the Python 3.12 interpreter from github.com/astral-sh/python-build-standalone and holds it to the sha256 that release of uv carries for it."
+        "online": "uv downloads the Python 3.12 interpreter from GitHub and checks it against the sha256 uv carries for it"
       },
       "terms": [
         {
@@ -1190,7 +1190,7 @@
             ]
           }
         ],
-        "online": "Playwright, installed from the pinned packages this entry declares with no network asked, then downloads the Chromium, Firefox and WebKit builds its version names from its publisher's own host, cdn.playwright.dev; nothing in this entry holds those files.",
+        "online": "Playwright downloads its Chromium, Firefox and WebKit builds from cdn.playwright.dev, and nothing here checks them",
         "fetch": [
           {
             "url": "https://registry.npmjs.org/playwright/-/playwright-1.65.1.tgz",
@@ -4124,7 +4124,7 @@
             "url": "{url}.sha256"
           }
         },
-        "online": "rustup-init, its pinned installer, downloads the stable toolchain from static.rust-lang.org, each file held to the sha256 its channel manifest states."
+        "online": "rustup downloads the stable toolchain from static.rust-lang.org and checks each file against its channel's list"
       },
       "terms": [
         {

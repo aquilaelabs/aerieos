@@ -178,7 +178,7 @@ function tcHeldLine(p){
   if (!h?.word) return "";
   const why = esc(String(h.why || "").replace(/\.+$/, ""));
   if (h.word === "pinned") return `<span class="sub tcheld">Every download is pinned, and its install runs with no network.</span>`;
-  if (h.word === "installer") return `<span class="sub tcheld">Its installer is pinned and downloads the rest itself${why ? `: ${why}` : ""}.</span>`;
+  if (h.word === "installer") return `<span class="sub tcheld">Its installer is pinned${why ? `; ${why}` : " and downloads the rest itself"}.</span>`;
   return `<span class="sub tcheld">Its downloads are not pinned: what its install fetches is not checked against anything it carries.</span>`;
 }
 
