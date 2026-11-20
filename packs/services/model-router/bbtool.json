@@ -78,7 +78,13 @@
    "name": "Ollama"
   }
  ],
- "framework": "2.1",
+ "format": 5,
+ "framework": "5.1",
+ "images": {
+  "db": "postgres:16-alpine@sha256:1d5b02d3a9941fbd52437db4107f8c52d6297dac553ca1e5c299ebb3756b4857",
+  "litellm": "ghcr.io/berriai/litellm:main-stable@sha256:ef798594ca3db8d81bad2e1439f536f49b71fe095ee9f20416f5e149b4e22035",
+  "ollama": "ollama/ollama:0.40.16@sha256:910d0d8107b538fb0894e63163eb195de0cc7aefcbc666dc62d3b18f71124592"
+ },
  "label": "Model router",
  "maker": "AerieOS",
  "name": "model-router",

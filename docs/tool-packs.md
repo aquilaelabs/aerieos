@@ -540,6 +540,15 @@ tag that is not `latest`. A compose file of your own is held to the same
 two: a digest, or a tag that is not `latest`. An app whose every image has
 its digest reads **pinned**, as a tool whose every download is held does.
 
+AerieOS's own services are held the same way: the model router, nginx and
+the Scanners each name every image they run in their entry's `images`, a
+name of the service's own for each and the image as `name:tag@sha256:...`,
+written from the one file that holds them
+(`scripts/dashboard/service-images.json`). `images` is an official service
+pack's alone. `tools/pins.py` proposes a moved digest for a service's
+images and for a compose file's, asking the registry each image names
+([Moving a pin](toolchains.md#moving-a-pin)).
+
 ## Official packs and agent packs
 
 Everything AerieOS ships is a pack in this same format too (R169): under

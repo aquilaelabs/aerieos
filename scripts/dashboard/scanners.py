@@ -34,6 +34,7 @@ import urllib.request
 from pathlib import Path
 
 import nodeset
+import services
 import statefile
 import syscontainer
 from vers import vkey
@@ -65,18 +66,20 @@ TIMEOUT = 4 * 3600
 MAX_REPORT = 64 << 20
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
 PRINCIPAL = "scanners"
+# The pack this service is, and so the row of services.py's images that is its own.
+PACK = "scanners"
 
 
 def pack():
     """The Scanners as an official pack (R264): a service a node deploys from
     its Library card. Their schedule, their runs and what they found are
     their own page, opened from Installed; the entry asks nothing."""
-    return {"name": "scanners", "label": "Scanners", "tier": "official", "platforms": ["linux/amd64", "linux/arm64"], "terms": [],
+    return services.entry({"name": PACK, "label": "Scanners", "tier": "official", "platforms": ["linux/amd64", "linux/arm64"], "terms": [],
             "maker": "AerieOS", "credits": [{"name": "Semgrep", "maker": "Semgrep"}, {"name": "Trivy", "maker": "Aqua Security"}, {"name": "mobsfscan", "maker": "MobSF"}],
             "framework": "2.1",
             "about": "The scanners on this node, run over the spaces it holds on a schedule or when asked: what each found is on the "
                      "space's notebook. Their schedule and their runs are on their own page, opened from Installed.",
-            "service": {"kind": "scanners"}, "config": []}
+            "service": {"kind": "scanners"}, "config": []})
 
 
 def configure(**deps):

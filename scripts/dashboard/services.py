@@ -13,7 +13,8 @@ the server's runners and loops).
 A service's module answers by the same names as the others, which is all
 this file asks of it:
 
-  pack()                     its Library entry, a manifest
+  pack()                     its Library entry, a manifest, with the
+                             images it runs (entry, below)
   container_name(nid)        the name its containers go by on that node
   service_deployed(nid)      whether it is on that node
   service_install(nid, by)   Install on its card: {ok, ...} or {error}
@@ -31,6 +32,10 @@ toolpacks and checks read the table while they load, and nginxproxy and
 scanners import checks themselves.
 """
 import importlib
+import json
+import os
+
+import packformat
 
 # kind (a pack's service.kind) -> the module that is the service; the grant
 # on a node that its Library row comes to (the server's Install and Remove
@@ -47,6 +52,40 @@ KINDS = tuple(TABLE)
 # The kinds with an update check of their own, each a cadence under
 # Controller settings by its kind's name.
 CHECKED = tuple(k for k, s in TABLE.items() if s["check"])
+
+
+# The images each service runs, by its pack's name: the one copy, a file
+# beside this one that tools/pins.py moves. Each is named by its tag and
+# the digest of what is pulled, and a service's module reads its own by
+# the names the file gives them: nothing of an image is a constant in code.
+IMAGES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "service-images.json")
+_images = {}
+
+
+def images(name):
+    """{key: reference} for the images the service whose pack is `name`
+    runs, each name:tag@sha256:..., read once; {} for a name the file has
+    no row for, or a row that is not what the format takes."""
+    if not _images:
+        try:
+            with open(IMAGES_FILE, encoding="utf-8") as f:
+                rows = json.load(f)["services"]
+        except (OSError, ValueError, KeyError, TypeError):
+            rows = []
+        for r in rows if isinstance(rows, list) else []:
+            if isinstance(r, dict) and isinstance(r.get("name"), str):
+                _images[r["name"]] = packformat.images_checked(r.get("images"))[0]
+    return dict(_images.get(name) or {})
+
+
+def entry(m):
+    """A service's Library entry `m` with the images it runs, as its row
+    of the file names them: pack format 5's, which the entry then says."""
+    refs = images(m.get("name", ""))
+    if not refs:
+        return m
+    m = {**m, "format": packformat.HELD_FORMAT, "images": refs}
+    return {**m, "framework": packformat.least(m) or f"{packformat.HELD_FORMAT}.0"}
 
 
 def module(kind):

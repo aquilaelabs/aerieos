@@ -32,6 +32,7 @@ import urllib.request
 from pathlib import Path
 
 import nodeset
+import services
 import statefile
 import syscontainer
 
@@ -44,6 +45,8 @@ _lock = threading.Lock()
 # runs is what the record says; the line's tag here is only what a node
 # deployed before any check had read the registry says of itself.
 IMAGE = "nginx:1.27-alpine"
+# The pack this service is, and so the row of services.py's images that is its own.
+PACK = "nginx"
 IMAGE_LINE = re.compile(r"^(\d+)\.(\d+)-alpine$")
 # Docker Hub's tag list for the official image, read weekly like the
 # toolchains' upstreams; a test points it at a file.
@@ -68,11 +71,11 @@ def pack():
     (the routes, the certificates), opened from its row on Installed, so
     the entry asks nothing; what turns them into nginx's own configuration
     is this module, named by service.kind."""
-    return {"name": "nginx", "label": "nginx", "tier": "official", "platforms": ["linux/amd64", "linux/arm64"], "terms": [],
+    return services.entry({"name": PACK, "label": "nginx", "tier": "official", "platforms": ["linux/amd64", "linux/arm64"], "terms": [],
             "maker": "AerieOS", "credits": [{"name": "nginx", "maker": "F5"}], "framework": "2.1",
             "about": "nginx on this node in front of its containers: a hostname routed to a container's port, with a certificate of your own "
                      "or one from Let's Encrypt kept renewed. Its routes and certificates are on its own page, opened from Installed.",
-            "service": {"kind": "nginx"}, "image": IMAGE, "config": []}
+            "service": {"kind": "nginx"}, "config": []})
 
 
 def configure(*, state, write_json, node_list, node_name, taken_ports):

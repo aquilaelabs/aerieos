@@ -36,6 +36,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+import services
 import statefile
 import syscontainer
 
@@ -55,9 +56,9 @@ container_gone = None       # name -> True once no written container has that na
 _lock = threading.Lock()
 SEALED = "bbseal:"
 PORT = 4000
-IMAGE = "ghcr.io/berriai/litellm:main-stable"
-OLLAMA_IMAGE = "ollama/ollama:latest"
-DB_IMAGE = "postgres:16-alpine"
+# The pack this service is, and so the row of services.py's images that is
+# its own: LiteLLM, its database and Ollama, each by its digest.
+PACK = "model-router"
 TIMEOUT = 20
 # Each provider: its environment variable in the compose file, the
 # wildcard LiteLLM routes to it, and its name on the page.
@@ -76,7 +77,7 @@ def pack():
     its Library card, its configuration the fields the Node settings
     section asked before, written to packs/services/model-router by
     tools/packs-export.py and held to this by aerie lint."""
-    return {"name": "model-router", "label": "Model router", "tier": "official", "platforms": ["linux/amd64", "linux/arm64"], "terms": [],
+    return services.entry({"name": PACK, "label": "Model router", "tier": "official", "platforms": ["linux/amd64", "linux/arm64"], "terms": [],
             # Two makers' programs behind one card: AerieOS's, each credited.
             "maker": "AerieOS", "credits": [{"name": "LiteLLM", "maker": "BerriAI"}, {"name": "Ollama", "maker": "Ollama"}],
             "framework": "2.1",
@@ -92,7 +93,7 @@ def pack():
                          {"name": "ollama", "label": "Run Ollama beside it", "kind": "switch",
                           "help": "on this node's card where it has one, else its CPU and memory; its models one more provider (ollama/NAME)"},
                          {"name": "projects", "label": "Spaces that may use it", "kind": "projects",
-                          "help": "each handed the address and its own key at a session's start; a session of any other space cannot reach it"}]}
+                          "help": "each handed the address and its own key at a session's start; a session of any other space cannot reach it"}]})
 MODEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,119}$")
 
 
@@ -205,10 +206,12 @@ def litellm_config(rec):
 def compose_text(nid, rec, gpu=False):
     """The router's compose file: LiteLLM on the node's address, its
     database beside it, Ollama where it is on (the card given to it where
-    the node has one), the keys as the services' environment, the config
-    inline."""
+    the node has one), each the image its entry names by digest, the keys
+    as the services' environment, the config inline."""
     addr = node_addr(nid) if node_addr else ""
     name = container_name(nid)
+    # What each service runs: the image its entry names, by its digest.
+    image = services.images(PACK)
     port = int(rec.get("port") or PORT)
     env = [f"      LITELLM_MASTER_KEY: {_qc(_open(rec.get('master')))}",
            f"      DATABASE_URL: {_qc('postgresql://litellm:' + _open(rec.get('dbpass')) + '@db:5432/litellm')}"]
@@ -221,7 +224,7 @@ def compose_text(nid, rec, gpu=False):
     out = ["# Written by AerieOS from a node's Model router section (router.py); Save there rewrites it.",
            "services:",
            "  litellm:",
-           f"    image: {IMAGE}",
+           f"    image: {image['litellm']}",
            f"    container_name: {name}",
            "    restart: unless-stopped",
            "    command: [\"--config\", \"/app/config.yaml\", \"--port\", \"4000\"]",
@@ -234,7 +237,7 @@ def compose_text(nid, rec, gpu=False):
            "    depends_on:",
            "      - db",
            "  db:",
-           f"    image: {DB_IMAGE}",
+           f"    image: {image['db']}",
            "    restart: unless-stopped",
            "    environment:",
            "      POSTGRES_USER: litellm",
@@ -244,7 +247,7 @@ def compose_text(nid, rec, gpu=False):
            "      - router_db:/var/lib/postgresql/data"]
     if (rec.get("ollama") or {}).get("on"):
         out += ["  ollama:",
-                f"    image: {OLLAMA_IMAGE}",
+                f"    image: {image['ollama']}",
                 "    restart: unless-stopped",
                 "    volumes:",
                 "      - router_ollama:/root/.ollama"]

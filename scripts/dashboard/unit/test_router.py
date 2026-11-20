@@ -147,6 +147,11 @@ class Router(unittest.TestCase):
         self.assertIn("CUSTOM_0_KEY: \"lab-secret\"", text)
         self.assertIn(f"\"127.0.0.1:{self.port}:4000\"", text, "published on the node's address alone")
         self.assertIn("ollama/ollama", text)
+        import packformat
+        import services
+        self.assertEqual(sorted(packformat.compose_images(text)), sorted(services.images("model-router").values()),
+                         "every image is the one its entry names, by its digest")
+        self.assertTrue(all(packformat.image_digest(ref) for ref in packformat.compose_images(text)))
         self.assertIn("driver: nvidia", text)
         conf = router.litellm_config(rec)
         self.assertIn('model_name: "anthropic/*"', conf)

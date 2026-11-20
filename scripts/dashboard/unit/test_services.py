@@ -55,6 +55,24 @@ class Table(unittest.TestCase):
         self.assertEqual(services.of_pack("router"), "", "a kind is not a pack's name")
         self.assertEqual(services.of_pack(""), "")
 
+    def test_each_entry_names_every_image_it_runs_by_digest(self):
+        import packformat
+        for m in services.packs():
+            clean, errors = toolpacks.validate(m, shipped=(), official=True)
+            self.assertEqual(errors, [], m["name"])
+            self.assertEqual((m["format"], clean["images"]), (packformat.HELD_FORMAT, services.images(m["name"])), m["name"])
+            self.assertTrue(clean["images"], m["name"])
+            for ref in clean["images"].values():
+                parts = packformat.image_parts(ref)
+                self.assertTrue(parts["tag"] and parts["digest"], f"{m['name']}: {ref} is a tag a person reads and the digest that is pulled")
+            self.assertEqual(packformat.held(m), ("pinned", packformat.IMAGES_SAID), m["name"])
+        one = services.packs()[1]
+        self.assertTrue(any("names no" in e or "images maps" in e for e in toolpacks.validate({**one, "images": {"nginx": "nginx:1.31-alpine"}}, official=True)[1]),
+                        "an image named by its tag alone is refused")
+        self.assertTrue(any("pack format 5" in e for e in toolpacks.validate({**one, "format": 4, "framework": "4.1"}, official=True)[1]))
+        plain = {"name": "mine", "label": "Mine", "platforms": ["linux/*"], "install": {"steps": []}, "format": 5, "images": one["images"]}
+        self.assertTrue(any("official service pack's alone" in e for e in toolpacks.validate(plain)[1]))
+
     def test_each_module_answers_by_the_same_names(self):
         for kind in services.KINDS:
             m = services.module(kind)

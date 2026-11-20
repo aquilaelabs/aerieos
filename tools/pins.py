@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Moves the pins of the toolchains AerieOS ships (config/toolchains.json).
+"""Moves the pins of what AerieOS ships: the toolchains (config/toolchains.json),
+the coding agents' recipes, the CI runners and the images its services run.
 
 Whatever a row fetches from somewhere else is held to something the row
 itself carries: the sha256 of the exact file, or, for a repository, a
@@ -47,11 +48,27 @@ version and digest back there and raises the recipe's rev: an installer with a v
 address moves with its track, a program a platform moves as one set, and a vendor's one moving
 script, which has nothing to track, is asked for the bytes it answers today.
 
+A container image is held the same way, by the digest of what is pulled: name:tag@sha256:DIGEST.
+A row that names images (the services AerieOS deploys, scripts/dashboard/service-images.json) is
+asked through the registry each image names, by the registry protocol and its anonymous token
+(scripts/dashboard/imageregistry.py, one client whatever the host): check says where a tag
+serves another digest than the one pinned, move writes the digest the tag serves now, pin gives
+an image written with its tag alone its first digest, and verify reads each pinned manifest by
+its digest and holds its bytes to it. The digest is the manifest list's where the image is built
+for several platforms, which covers each of them; a row may name the platforms it needs
+(platforms), and a tag whose list lacks one holds the row where it is.
+
     --file PATH     another table than config/toolchains.json. The official packs are written only
                     for the shipped one, and the coding agents' recipes are read beside it alone.
-                    A table lists its rows under toolchains, or under runners: the CI runners a
-                    node installs are pinned the same way, in scripts/dashboard/runner-pins.json,
-                    and --file with that path checks, moves, pins and verifies them.
+                    A table lists its rows under toolchains, under runners or under services: the
+                    CI runners a node installs are pinned the same way, in
+                    scripts/dashboard/runner-pins.json, and the images of AerieOS's own services
+                    in scripts/dashboard/service-images.json, and --file with either path checks,
+                    moves, pins and verifies them. A move of the shipped services' images writes
+                    packs/services again.
+    --compose FILE  the images a compose file names, in the table's place: a Docker app's
+                    compose.yml in the catalog. The file is one row, named for its folder, and a
+                    move or a pin rewrites its image lines and nothing else of it.
     --agents PATH   another file of the coding agents' recipes than the shipped one.
     --version V     with pin or move and one NAME: that version, not the one the resolver finds (a
                     release whose files for every platform are not out yet).
@@ -82,6 +99,7 @@ sys.path.insert(0, os.path.join(ROOT, "scripts", "lib"))
 sys.path.insert(0, os.path.join(ROOT, "scripts", "dashboard"))
 import agents  # noqa: E402
 import catalogrows  # noqa: E402
+import imageregistry  # noqa: E402
 import packformat  # noqa: E402
 import sdkmeta  # noqa: E402
 
@@ -91,10 +109,12 @@ AGENTS = os.path.join(ROOT, "scripts", "dashboard", "agent-recipes.json")
 # A digest its publisher states that is no sha256 is checked while the file
 # is hashed, by these.
 ALSO = ("sha1", "sha512")
-# The name a table's document lists its rows under: the toolchains', or the
+# The images AerieOS's own services run, the one copy of them (services.py).
+SERVICES = os.path.join(ROOT, "scripts", "dashboard", "service-images.json")
+# The name a table's document lists its rows under: the toolchains', the
 # CI runners' (scripts/dashboard/runner-pins.json), whose rows are written
-# as a toolchain's source is.
-LISTS = ("toolchains", "runners")
+# as a toolchain's source is, or the services', whose rows name images.
+LISTS = ("toolchains", "runners", "services")
 
 
 class Refused(Exception):
@@ -650,10 +670,88 @@ def lock_parts(row, waiting=False):
     return parts
 
 
+# ---- the images a row runs -------------------------------------------------------
+# A row that names images (`images`: each under a name of the row's own, or,
+# for a compose file, under the reference its line had) is held by each
+# one's digest. What a tag serves now is its registry's to say, asked by
+# the protocol every registry speaks: nothing here knows one from another.
+def image_rows(row):
+    refs = row.get("images")
+    return list(refs.items()) if isinstance(refs, dict) else []
+
+
+def image_said(row, key):
+    """An image of a row as a line names it: by the row's name for it, or,
+    in a compose file, by the image itself."""
+    return f"its image {key}" if not row.get("compose") else (packformat.image_parts(key) or {}).get("name") or key
+
+
+def image_learned(row, ref):
+    """What an image's pin would be now: {"ref", "how", "held"}. Its tag is
+    asked of its registry; a digest that is the pinned one is as its entry
+    pins it and nothing more is read. Another is read by that digest, for
+    the platforms it names: a list that lacks one the row needs holds the
+    row where it is."""
+    parts = packformat.image_parts(ref)
+    if not parts or not parts["tag"]:
+        raise Refused(f"{ref} names no tag: there is nothing to ask its registry about")
+    tagged = f"{parts['name']}:{parts['tag']}"
+    digest, err = imageregistry.digest_of(tagged)
+    if err:
+        raise Refused(err)
+    if digest == parts["digest"]:
+        return {"ref": ref, "how": "its registry serves the digest it is pinned to", "held": ""}
+    _, doc, err = imageregistry.manifest_of(f"{tagged}@{digest}", by_digest=True)
+    if err:
+        raise Refused(err)
+    plats, need = imageregistry.platforms_of(doc), [p for p in row.get("platforms") or [] if isinstance(p, str)]
+    lacks = [p for p in need if p not in plats] if plats else (need if len(need) > 1 else [])
+    how = f"read from its registry: a list for {', '.join(plats)}" if plats else "read from its registry: one image's own manifest"
+    held = f"{tagged} is served for {', '.join(plats) or 'one platform'} now, and not for {', '.join(lacks)}" if lacks else ""
+    return {"ref": f"{tagged}@{digest}", "how": how, "held": held}
+
+
+def image_parts(row, waiting=False):
+    """plan's parts for the images a row names, a part an image. With
+    `waiting`, only the ones with no digest yet: what a first pin fills in."""
+    parts = []
+    for key, ref in image_rows(row):
+        have = packformat.image_parts(ref) or {}
+        if waiting and have.get("digest"):
+            continue
+        what = image_said(row, key)
+        try:
+            got = image_learned(row, ref)
+        except ERRORS as e:
+            raise Refused(f"{what} could not be learned ({said(e)})") from e
+        new = packformat.image_parts(got["ref"])
+        old = f"{have.get('tag')} {have.get('digest', '')[7:19]}".strip() if have.get("digest") else ""
+        part = {"what": what, "old": old, "new": f"{new['tag']} {new['digest'][7:19]}", "note": got["how"]}
+        if got["held"]:
+            part.update(new=old, held=got["held"], note=f"{got['held']}: it stays where it is")
+        elif got["ref"] != ref:
+            part["apply"] = lambda r, key=key, to=got["ref"]: r["images"].__setitem__(key, to)
+        else:
+            part["new"] = old
+        parts.append(part)
+    return parts
+
+
+def row_refused(row):
+    """Why a row is not one its format takes, or "": its source, or the
+    images it names."""
+    if image_rows(row) or "images" in row:
+        loose = [ref for _, ref in image_rows(row) if not packformat.image_digest(ref)]
+        return f"{loose[0]} names no digest" if loose else ("" if image_rows(row) else "it names no image")
+    return packformat.source_refused(row.get("source"))
+
+
 # ---- what a row is, and what would move ---------------------------------------
 def is_pinned(row):
     """Whether a row has anything pinned for check and move to ask about. A
     row with a download still waiting for its first pin is `pin`'s."""
+    if image_rows(row):
+        return all(packformat.image_digest(ref) for _, ref in image_rows(row))
     src = row.get("source") or {}
     held = bool(sdkmeta.pin_of(row) or (src.get("kind") == "git" and src.get("commit")) or any(fetch_held(f) for f in fetch_rows(row)))
     return held and not unheld(row) and not unlocked(row)
@@ -665,6 +763,8 @@ def plan(row, version=""):
     own download, its commit, a declared download). `apply` writes the part
     into a copy of the row. A part that is as its entry pins it is listed
     with old and new alike."""
+    if image_rows(row):
+        return image_parts(row)
     src = row.get("source") or {}
     parts = []
     pin = sdkmeta.pin_of(row)
@@ -777,7 +877,7 @@ def moved(row, parts):
     for p in todo:
         p["apply"](new)
     new["rev"] = catalogrows.rev_of(row) + 1
-    why = packformat.source_refused(new.get("source"))
+    why = row_refused(new)
     if why:
         raise Refused(f"what it would become is refused: {why}")
     return new
@@ -836,7 +936,7 @@ def agent_rows(recipes):
 # What this tool keeps in the table's document beside the table: the
 # agents' rows, the file they came from, which of the two files moved, and
 # the name the table lists its rows under.
-BESIDE = ("_agents", "_recipes", "_moved", "_list")
+BESIDE = ("_agents", "_recipes", "_moved", "_list", "_compose", "_text")
 
 
 def agents_written(doc):
@@ -878,8 +978,8 @@ def cmd_check(doc, names, opts, out):
     for row in chosen(doc, names):
         name = row["name"]
         if not is_pinned(row):
-            if names:
-                out(f"{name}: not pinned ({packformat.held(row)[1]})")
+            if names or row.get("compose"):
+                out(f"{name}: not pinned ({row_refused(row) if image_rows(row) else packformat.held(row)[1]})")
             continue
         try:
             parts = plan(row)
@@ -925,13 +1025,16 @@ def cmd_move(doc, names, opts, out):
             continue
         for line in lines(name, [p for p in parts if p.get("apply")]):
             out(line)
-        out(f"{name}: rev {catalogrows.rev_of(row)} to {new['rev']}")
+        if not row.get("compose"):
+            out(f"{name}: rev {catalogrows.rev_of(row)} to {new['rev']}")
         put(doc, row, new)
         changed += 1
     return finish(doc, opts, out, changed, failed)
 
 
 def cmd_pin(doc, names, opts, out):
+    # A compose file is one row: it needs no naming.
+    names = names or [r["name"] for r in table(doc) if r.get("compose")]
     if len(names) != 1:
         raise Refused("pin takes one NAME")
     row = chosen(doc, names)[0]
@@ -944,6 +1047,24 @@ def cmd_pin(doc, names, opts, out):
 def pin_row(doc, row, opts, out):
     name, src = row["name"], row.get("source") or {}
     new = copy.deepcopy(row)
+    # The images it names with no digest yet: every one of them, or the
+    # row is left as it was.
+    if image_rows(row) or "images" in row:
+        parts = image_parts(row, waiting=True)
+        if not parts:
+            raise Refused(f"it is pinned already: tools/pins.py move {name} moves it" if image_rows(row) else "it names no image")
+        held = next((p["held"] for p in parts if p.get("held")), "")
+        if held:
+            raise Refused(held)
+        for p in parts:
+            p["apply"](new)
+        for line in lines(name, parts):
+            out(line)
+        new["rev"] = catalogrows.rev_of(row) + 1
+        put(doc, row, new)
+        if not row.get("compose"):
+            out(f"{name}: rev {catalogrows.rev_of(row)} to {new['rev']}")
+        return finish(doc, opts, out, 1, 0)
     # Its own source, where that is not pinned yet: a repository's commit,
     # a tarball's or a script's file.
     kind = src.get("kind")
@@ -984,7 +1105,14 @@ def pin_row(doc, row, opts, out):
 def finish(doc, opts, out, changed, failed):
     """Write the table where a row of it changed, the coding agents'
     recipes where one of theirs did, and the official packs from them where
-    either is the shipped one."""
+    either is the shipped one (the toolchains' table, or the services'
+    images); a compose file where the row is one."""
+    if changed and doc.get("_compose"):
+        # A compose file: its image lines rewritten, and nothing else of it.
+        row = table(doc)[0]
+        with open(doc["_compose"], "w", encoding="utf-8") as f:
+            f.write(packformat.compose_repinned(doc["_text"], row["images"]))
+        return 1 if failed else 0
     if changed:
         shipped = False
         if "agents" in doc.get("_moved", ()):
@@ -996,7 +1124,7 @@ def finish(doc, opts, out, changed, failed):
                 failed += 1
         if "table" in doc.get("_moved", ("table",)):
             save(opts["file"], {k: v for k, v in doc.items() if k not in BESIDE})
-            shipped = shipped or os.path.abspath(opts["file"]) == os.path.abspath(TABLE)
+            shipped = shipped or os.path.abspath(opts["file"]) in (os.path.abspath(TABLE), os.path.abspath(SERVICES))
         if shipped:
             p = subprocess.run([sys.executable, os.path.join(HERE, "packs-export.py"), "--write"], capture_output=True, text=True, check=False)
             out((p.stdout + p.stderr).strip())
@@ -1009,6 +1137,25 @@ def cmd_verify(doc, names, opts, out):
     for row in chosen(doc, names):
         name, src = row["name"], row.get("source") or {}
         if not is_pinned(row):
+            continue
+        # An image is read by the digest it is pinned to, and its bytes held
+        # to it: what a node that pulls it is answered.
+        for key, ref in image_rows(row):
+            seen += 1
+            what = image_said(row, key)
+            digest, mdoc, err = imageregistry.manifest_of(ref, by_digest=True)
+            plats = imageregistry.platforms_of(mdoc)
+            want = [opts["platform"]] if opts.get("platform") else [p for p in row.get("platforms") or [] if isinstance(p, str)]
+            lacks = [p for p in want if p not in plats] if plats else []
+            if err:
+                out(f"{name}: NOT VERIFIED: {what}, {ref}: {err}")
+                bad += 1
+            elif lacks:
+                out(f"{name}: NOT ITS PIN: {what}, {ref} is a list for {', '.join(plats)}, and not for {', '.join(lacks)}")
+                bad += 1
+            else:
+                out(f"{name}: {what} is its pin ({'a list for ' + ', '.join(plats) if plats else 'one image'}, sha256 {digest[7:19]})")
+        if image_rows(row):
             continue
         files = []
         try:
@@ -1070,7 +1217,7 @@ def main(argv, out=print):
     args = list(argv)
     while args:
         a = args.pop(0)
-        if a in ("--file", "--version", "--platform", "--agents"):
+        if a in ("--file", "--version", "--platform", "--agents", "--compose"):
             if not args:
                 out(f"{a} takes a value")
                 return 1
@@ -1092,8 +1239,22 @@ def main(argv, out=print):
     if opts.get("platform") and not packformat.PLATFORM_KEY.fullmatch(opts["platform"]):
         out(f"{opts['platform']} is no platform a row names: linux/amd64, linux/arm64, linux-musl/amd64, darwin/arm64, ...")
         return 1
+    if opts.get("compose"):
+        # A compose file in the table's place: one row of the images its
+        # lines name, each under the reference it had.
+        opts["file"] = opts["compose"]
     try:
-        doc = load(opts["file"])
+        if opts.get("compose"):
+            with open(opts["compose"], encoding="utf-8") as f:
+                text = f.read()
+            refs = packformat.compose_images(text)
+            if not refs:
+                raise ValueError("it names no image")
+            row = {"name": os.path.basename(os.path.dirname(os.path.abspath(opts["compose"]))) or opts["compose"], "compose": True,
+                   "images": {ref: ref for ref in refs}, **({"platforms": [opts["platform"]]} if opts.get("platform") else {})}
+            doc = {LISTS[2]: [row], "_compose": opts["compose"], "_text": text}
+        else:
+            doc = load(opts["file"])
         doc["_list"] = next((k for k in LISTS if isinstance(doc.get(k), list)), "")
         if not doc["_list"]:
             raise ValueError(f"it has no list of {' or '.join(LISTS)}")

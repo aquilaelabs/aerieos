@@ -86,6 +86,7 @@ def _ask(host, repo, reference, method):
             raise
         # The anonymous token the challenge names: realm, service, scope.
         ch = dict(re.findall(r'(\w+)="([^"]*)"', e.headers.get("WWW-Authenticate") or ""))
+        e.close()
         if not ch.get("realm", "").startswith("https://"):
             raise PermissionError(f"{host} asks for a sign-in this check does not have") from e
         q = urllib.parse.urlencode({k: v for k, v in (("service", ch.get("service")), ("scope", ch.get("scope") or f"repository:{repo}:pull")) if v})
@@ -99,6 +100,7 @@ def _said(e, host, repo, reference):
     if isinstance(e, PermissionError):
         return str(e)
     if isinstance(e, urllib.error.HTTPError):
+        e.close()
         return (f"{host} has no {repo}:{reference}" if e.code == 404
                 else f"{host} would not say ({e.code}): a private image needs a sign-in this check does not have")
     return f"could not reach {host}: {e}"[:200]

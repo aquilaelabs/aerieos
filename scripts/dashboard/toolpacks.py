@@ -839,6 +839,18 @@ def validate(m, shipped=(), official=False):
             errors.append(f"service.kind is one of {', '.join(SERVICES)}")
         else:
             out["service"] = {"kind": str(sv["kind"])}
+    # The images a deployed thing runs, each by its tag and its digest
+    # (pack format 5): its entry's own, as a pack's downloads are.
+    if m.get("images") is not None:
+        refs, bad = packformat.images_checked(m["images"])
+        if "service" not in out:
+            errors.append("images (what a deployed thing of AerieOS's runs) is an official service pack's alone")
+        elif bad:
+            errors += bad
+        elif fmt < packformat.HELD_FORMAT:
+            errors.append(f'images is pack format {packformat.HELD_FORMAT}\'s: the manifest says "format": {packformat.HELD_FORMAT}')
+        else:
+            out["images"] = refs
     if m.get("config") is not None:
         out["config"] = _config(m["config"], errors)
     stands_in = "shipped" in out or "agent" in out or "service" in out or "pack_agent" in out

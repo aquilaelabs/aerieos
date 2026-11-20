@@ -481,6 +481,34 @@ tools/pins.py --file scripts/dashboard/runner-pins.json move gitea     # the new
 tools/pins.py --file scripts/dashboard/runner-pins.json verify --all   # each pinned file streamed, hashed and held to its pin
 ```
 
+**The images AerieOS's own services run** are pinned the same way: the
+model router's (LiteLLM, its database, Ollama), nginx's and the scanners'
+are each named in `scripts/dashboard/service-images.json` by a tag and the
+digest of what is pulled, `name:tag@sha256:...`, and a node pulls each by
+that digest. For an image built for several platforms the digest is the
+manifest list's, which covers every platform the list names. The tool asks
+the registry each image names, by the registry protocol and its anonymous
+token, whatever host that is: `check` says where a tag serves another
+digest than the pinned one, `move` writes the digest the tag serves now,
+raises the row's `rev` and rewrites `packs/services`, `pin` gives an image
+written with its tag alone its first digest, and `verify` reads each
+pinned manifest by its digest and holds its bytes to it. A row names the
+platforms it needs (`platforms`), and a tag whose list lacks one holds the
+row where it is. A newer version of an image is a newer tag: write the tag
+into the row and `move` learns its digest.
+
+```bash
+tools/pins.py --file scripts/dashboard/service-images.json check     # each image's pin, and the digest its tag serves now
+tools/pins.py --file scripts/dashboard/service-images.json move nginx
+tools/pins.py --compose packs/apps/NAME/compose.yml check            # the same over a Docker app's compose file
+tools/pins.py --compose packs/apps/NAME/compose.yml pin              # each image named by its tag alone given its digest
+```
+
+`--compose FILE` reads a compose file in the table's place, which is how a
+Docker app's images are pinned and moved in the catalog: the file is one
+row, named for its folder, and a `pin` or a `move` rewrites its image lines
+and nothing else of it.
+
 **What a package manager installs** moves the same way. A row says what it
 asks pip or npm for (`source.lock`: the requirements, and for pip the
 Python and the platforms), and the tool asks the manager's own resolver
