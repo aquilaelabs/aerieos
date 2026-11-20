@@ -151,6 +151,24 @@ class Mirror(unittest.TestCase):
         self.assertEqual(catalogmirror.forget(), {"ok": True})
         self.assertIsNone(catalogmirror.held())
 
+    def test_an_import_is_measured_as_the_catalog_s_own_answer_is(self):
+        # One rule for two signed indexes (catalogindex.older), here and on
+        # the network: a mirror that does not say when it was made is not a
+        # way past the one held, one of the same moment is taken, and a
+        # word in the date's place does not hold every later mirror off.
+        self.assertTrue(catalogmirror.take(self.make(self.catalog("2026-10-29T10:00:00Z")), 1).get("ok"))
+        for odd in ("x", "", "2026-10-30"):
+            self.assertEqual(catalogmirror.take(self.make(self.catalog(odd)), 2).get("error"),
+                             "not imported: it does not say when it was made, and the mirror held here was made 2026-10-29T10:00:00Z", repr(odd))
+        self.assertEqual(catalogmirror.take(self.make(self.catalog("2026-10-29T09:59:59Z")), 3).get("error"),
+                         "not imported: it was made 2026-10-29T09:59:59Z, before the mirror held here (2026-10-29T10:00:00Z)")
+        self.assertEqual(catalogmirror.held()["imported_at"], 1, "the one held stands")
+        self.assertTrue(catalogmirror.take(self.make(self.catalog("2026-10-29T10:00:00Z")), 4).get("ok"), "the same moment is taken")
+        self.assertEqual(catalogmirror.forget(), {"ok": True})
+        self.assertTrue(catalogmirror.take(self.make(self.catalog("zzzz")), 5).get("ok"), "with none held, a mirror with no date is taken")
+        self.assertTrue(catalogmirror.take(self.make(self.catalog("2026-10-30T10:00:00Z")), 6).get("ok"), "and gives way to a dated one")
+        self.assertEqual(catalogmirror.held()["generated"], "2026-10-30T10:00:00Z")
+
     def test_an_archive_on_disk_is_taken_once_per_mirror(self):
         arc = self.make(self.catalog("2026-10-29T10:00:00Z"))
         self.assertTrue(catalogmirror.take_file(arc, 5).get("ok"))

@@ -2,13 +2,17 @@
 fetched from the catalog's address, the signature checked against the
 maintainers' public key this install ships (config/catalog.pub) before a
 single entry is read, so a tampered index is refused and the one before
-kept; each entry pins a pack to an exact commit and its archive's sha256,
-never latest; a withdrawn entry puts a line on the bell for every install
-that holds the pack. Read on demand with the copy kept an hour under the
-state, and fetched again on a press.
+kept; an index made before the one kept is refused the same way, signed as
+it is, so an old one served again brings back nothing the catalog withdrew
+(older, below); each entry pins a pack to an exact commit and its archive's
+sha256, never latest; a withdrawn entry puts a line on the bell for every
+install that holds the pack. Read on demand with the copy kept an hour under
+the state, and fetched again on a press.
 """
+import calendar
 import json
 import os
+import re
 import threading
 import time
 import urllib.request
@@ -90,7 +94,6 @@ def parse(index_bytes):
         return None, "index.json is not JSON"
     if not isinstance(d, dict) or d.get("version") != 1 or not isinstance(d.get("packs"), list):
         return None, "index.json is not a version 1 catalog index"
-    import re
     out = []
     for p in d["packs"][:ENTRIES_MOST]:
         if not isinstance(p, dict):
@@ -183,6 +186,47 @@ def too_new(entry, index=None):
     return packformat.too_new(fmt, ((index or {}).get("formats") or {}).get(str(fmt), ""))
 
 
+def made(index):
+    """When an index was made, in seconds: its `generated`, the UTC stamp
+    the catalog's tools write (2026-11-12T21:34:58Z), or None for one that
+    says none or says it any other way. Read as a time, never compared as
+    text, where a word would sort after every date."""
+    said = (index or {}).get("generated")
+    if not isinstance(said, str) or not re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", said):
+        return None
+    try:
+        return calendar.timegm(time.strptime(said, "%Y-%m-%dT%H:%M:%SZ"))
+    except ValueError:
+        return None
+
+
+def older(new, held, what="the index kept here"):
+    """Why `new` is not taken in the place of `held` (`what`, in the
+    refusal's words), or "": the one comparison of two signed indexes, for
+    the catalog's answer, an imported mirror and the choice between them.
+
+    A signature says who made an index, never that it is the newest, so
+    whoever can answer at the catalog's address could serve an old one
+    again: its withdrawn packs come back and its older pins read as
+    updates. So one made before the one held is refused. One that does not
+    say when it was made is refused too wherever the one held does, or
+    leaving the date out would be the way round. One made at the same
+    moment is taken, the same bytes or not: the catalog's signing does not
+    stamp the index yet, so two different ones can carry one date, and an
+    install that refused the second would be kept from the catalog's
+    newest. Nothing held, or a held one with no date of its own, refuses
+    nothing: there is nothing to be older than."""
+    was = made(held)
+    if was is None:
+        return ""
+    now = made(new)
+    if now is None:
+        return f"it does not say when it was made, and {what} was made {held.get('generated')}"
+    if now < was:
+        return f"it was made {new.get('generated')}, before {what} ({held.get('generated')})"
+    return ""
+
+
 def _path():
     return os.path.join(STATE, "catalog-index.json")
 
@@ -193,7 +237,7 @@ def _fallback(base):
     step 6), or None."""
     k = _kept(base)
     m = mirror_index() if mirror_index else None
-    if m and (not k or str(m.get("generated", "")) >= str(k.get("generated", ""))):
+    if m and not older(m, k):
         return m
     return k
 
@@ -213,8 +257,9 @@ def _kept(base=None):
 
 def fetch(url=None, opener=None):
     """The index from the catalog, verified, kept and answered: {index}
-    or {error, index: the one kept before, if any}. `opener(url)` returns
-    bytes, for a test to stand in for the network."""
+    or {error, index: the one kept before, if any}. One made before the
+    one kept is refused as a wrong signature is (older). `opener(url)`
+    returns bytes, for a test to stand in for the network."""
     base = (url or DEFAULT_URL).rstrip("/") + "/"
     get = opener or (lambda u: urllib.request.urlopen(u, timeout=20).read(MAX_BYTES + 1))
     try:
@@ -233,6 +278,13 @@ def fetch(url=None, opener=None):
     idx["fetched_at"] = int(time.time())
     idx["url"] = base
     with _lock:
+        # Signed, and still not taken when it was made before the one kept
+        # from this address (older): the kept one stands and the reason is
+        # said, as for a signature that does not match.
+        held = (_kept(base) if STATE else None) or (_cache["index"] if (_cache["index"] or {}).get("url", base) == base else None)
+        why = older(idx, held)
+        if why:
+            return {"error": f"the index the catalog answered is refused: {why}; the one kept stays in use", "index": _fallback(base)}
         if STATE:
             os.makedirs(STATE, exist_ok=True)
             (write_json or _write)(_path(), idx)

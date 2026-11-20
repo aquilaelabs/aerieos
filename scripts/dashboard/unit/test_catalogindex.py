@@ -37,10 +37,113 @@ class Index(unittest.TestCase):
         open(pubfile, "w").write("builderbot-catalog-ed25519 " + self.pub.hex() + "\n")
         catalogindex.PUB_FILE = pubfile
 
-    def signed(self, packs):
-        data = json.dumps({"version": 1, "generated": "2026-10-28T00:00:00Z", "packs": packs}).encode()
+    def signed(self, packs, generated="2026-10-28T00:00:00Z"):
+        """index.json and index.sig over it; `generated` None leaves the date out."""
+        data = json.dumps({"version": 1, **({} if generated is None else {"generated": generated}), "packs": packs}).encode()
         sig = "builderbot-catalog-ed25519-signature " + self.priv.sign(data).hex() + "\n"
         return data, sig
+
+    def served(self, packs, generated="2026-10-28T00:00:00Z"):
+        """What stands in for the network: the catalog answering this index, signed."""
+        data, sig = self.signed(packs, generated)
+        files = {"index.json": data, "index.sig": sig.encode()}
+        return lambda u: files[u.rsplit("/", 1)[1]]
+
+    def on_disk(self):
+        with open(os.path.join(self.d, "catalog-index.json"), encoding="utf-8") as f:
+            return json.load(f)
+
+    def test_an_older_signed_index_is_refused_and_the_kept_one_still_answers(self):
+        # Whoever can answer at the catalog's address can serve an index the
+        # maintainers signed once and have replaced since: its signature is
+        # good, and what the catalog withdrew since would come back.
+        url = "https://catalog.example/"
+        now = catalogindex.fetch(url, opener=self.served([dict(ENTRY, withdrawn=True)], "2026-10-29T00:00:00Z"))
+        self.assertNotIn("error", now, now)
+        replay = self.served([ENTRY], "2026-10-28T23:59:59Z")
+        r = catalogindex.fetch(url, opener=replay)
+        self.assertEqual(r.get("error"), "the index the catalog answered is refused: it was made 2026-10-28T23:59:59Z, "
+                                         "before the index kept here (2026-10-29T00:00:00Z); the one kept stays in use")
+        self.assertEqual(r["index"]["generated"], "2026-10-29T00:00:00Z", "the one kept answers beside the reason")
+        self.assertTrue(r["index"]["packs"][0]["withdrawn"])
+        self.assertEqual(self.on_disk()["generated"], "2026-10-29T00:00:00Z", "and is what stays under the state")
+        self.assertEqual(catalogindex.withdrawn(["ghidra"]), ["ghidra"], "what the catalog withdrew stays withdrawn")
+        # As the Library reads it (server.py's catalog_error): the kept index
+        # and the reason, on a press of Refresh and on the reads after it,
+        # which do not ask again for five minutes.
+        seen = catalogindex.index(url, fresh=True, opener=replay)
+        self.assertIn("before the index kept here", seen["error"])
+        self.assertEqual(seen["index"]["generated"], "2026-10-29T00:00:00Z")
+        kept = self.on_disk()
+        kept["fetched_at"] = 0
+        with open(os.path.join(self.d, "catalog-index.json"), "w", encoding="utf-8") as f:
+            json.dump(kept, f)
+        catalogindex._cache.update(at=0.0, index=None)
+        again = catalogindex.index(url, opener=down_fail)
+        self.assertEqual((again["error"], again["index"]["generated"]), (seen["error"], "2026-10-29T00:00:00Z"))
+        # After a restart the rule reads the copy under the state.
+        catalogindex._cache.update(at=0.0, index=None, missed={})
+        self.assertIn("before the index kept here", catalogindex.fetch(url, opener=replay)["error"])
+        self.assertEqual(self.on_disk()["generated"], "2026-10-29T00:00:00Z")
+
+    def test_a_newer_index_is_taken_and_one_of_the_same_moment_too(self):
+        url = "https://catalog.example/"
+        catalogindex.fetch(url, opener=self.served([ENTRY], "2026-10-29T00:00:00Z"))
+        r = catalogindex.fetch(url, opener=self.served([ENTRY, dict(ENTRY, name="newer")], "2026-10-29T00:00:01Z"))
+        self.assertNotIn("error", r, r)
+        self.assertEqual((self.on_disk()["generated"], len(self.on_disk()["packs"])), ("2026-10-29T00:00:01Z", 2))
+        # The same moment and other bytes: taken. The catalog's signing does
+        # not stamp the index yet, so two indexes can carry one date, and an
+        # install is not kept from the catalog's newest over that.
+        same = catalogindex.fetch(url, opener=self.served([dict(ENTRY, name="other")], "2026-10-29T00:00:01Z"))
+        self.assertNotIn("error", same, same)
+        self.assertEqual([p["name"] for p in self.on_disk()["packs"]], ["other"])
+        # ...and the same index read again is simply read again.
+        self.assertNotIn("error", catalogindex.fetch(url, opener=self.served([dict(ENTRY, name="other")], "2026-10-29T00:00:01Z")))
+
+    def test_an_index_that_does_not_say_when_it_was_made_is_no_way_round(self):
+        url = "https://catalog.example/"
+        catalogindex.fetch(url, opener=self.served([dict(ENTRY, withdrawn=True)], "2026-10-29T00:00:00Z"))
+        # No date, an empty one, a word (which sorts after every date as
+        # text), a day alone, a date that is none, a number, another zone,
+        # a stamp with something after it.
+        for odd in (None, "", "x", "zzzz", "2026-10-30", "2026-13-40T00:00:00Z", 20261030000000, "2026-10-30T00:00:00+00:00", "2026-10-30T00:00:00Z "):
+            r = catalogindex.fetch(url, opener=self.served([ENTRY], odd))
+            self.assertEqual(r.get("error"), "the index the catalog answered is refused: it does not say when it was made, "
+                                             "and the index kept here was made 2026-10-29T00:00:00Z; the one kept stays in use", repr(odd))
+            self.assertEqual(r["index"]["generated"], "2026-10-29T00:00:00Z", repr(odd))
+            self.assertEqual(self.on_disk()["generated"], "2026-10-29T00:00:00Z", repr(odd))
+
+    def test_with_nothing_dated_kept_there_is_nothing_to_be_older_than(self):
+        # A first read takes what is signed, dated or not, and a kept index
+        # with no date of its own gives way to any signed one: no install is
+        # locked out of the catalog by what it holds.
+        url = "https://catalog.example/"
+        first = catalogindex.fetch(url, opener=self.served([ENTRY], None))
+        self.assertNotIn("error", first, first)
+        self.assertEqual(self.on_disk()["generated"], "")
+        self.assertNotIn("error", catalogindex.fetch(url, opener=self.served([ENTRY], "x")))
+        self.assertNotIn("error", catalogindex.fetch(url, opener=self.served([ENTRY], "2026-10-29T00:00:00Z")))
+        # Once a dated one is kept, one with no date is refused again.
+        self.assertIn("does not say when it was made", catalogindex.fetch(url, opener=self.served([ENTRY], None))["error"])
+        # The index kept is one address's (B443): another catalog's first
+        # answer is not measured against it.
+        other = catalogindex.fetch("https://other.example/", opener=self.served([ENTRY], "2026-10-01T00:00:00Z"))
+        self.assertNotIn("error", other, other)
+
+    def test_the_mirror_answers_for_a_silent_catalog_only_when_it_is_not_the_older(self):
+        # The one comparison (older) picks between the kept index and the
+        # imported mirror's too.
+        url = "https://catalog.example/"
+        catalogindex.fetch(url, opener=self.served([ENTRY], "2026-10-29T00:00:00Z"))
+        self.addCleanup(setattr, catalogindex, "mirror_index", None)
+
+        def down(u):
+            raise OSError("no route")
+        for mirror_made, answers in (("2026-10-28T00:00:00Z", False), ("2026-10-29T00:00:00Z", True), ("2026-11-01T00:00:00Z", True), ("x", False), ("", False)):
+            catalogindex.mirror_index = lambda g=mirror_made: {"generated": g, "packs": [], "mirror": True}
+            got = catalogindex.fetch(url, opener=down)["index"]
+            self.assertEqual(bool(got.get("mirror")), answers, mirror_made)
 
     def test_a_signed_index_is_read_and_a_tampered_one_refused_with_the_last_kept(self):
         data, sig = self.signed([ENTRY, {"name": "Bad Name", "url": "https://x", "commit": "c" * 40, "sha256": "d" * 64}])
@@ -124,6 +227,25 @@ class Index(unittest.TestCase):
 
 def down_fail(u):
     raise AssertionError("the kept index should have answered")
+
+
+class Made(unittest.TestCase):
+    def test_an_index_s_date_is_read_as_a_time_and_compared_one_way(self):
+        made, older = catalogindex.made, catalogindex.older
+        self.assertEqual(made({"generated": "1970-01-01T00:00:10Z"}), 10)
+        self.assertLess(made({"generated": "2026-10-28T23:59:59Z"}), made({"generated": "2026-10-29T00:00:00Z"}))
+        for odd in (None, {}, {"generated": None}, {"generated": ""}, {"generated": "x"}, {"generated": 7}, {"generated": "2026-02-30T00:00:00Z"},
+                    {"generated": "2026-10-29 00:00:00Z"}, {"generated": "2026-10-29T00:00:00"}, {"generated": "2026-10-29T00:00:00Z\n"}):
+            self.assertIsNone(made(odd), odd)
+        new, old = {"generated": "2026-10-29T00:00:00Z"}, {"generated": "2026-10-28T00:00:00Z"}
+        self.assertEqual(older(new, old), "")
+        self.assertEqual(older(new, dict(new, packs=[1])), "", "the same moment is not older")
+        self.assertEqual(older(old, new), "it was made 2026-10-28T00:00:00Z, before the index kept here (2026-10-29T00:00:00Z)")
+        self.assertEqual(older(old, new, "the mirror held here"), "it was made 2026-10-28T00:00:00Z, before the mirror held here (2026-10-29T00:00:00Z)")
+        self.assertEqual(older({"generated": "zzzz"}, new), "it does not say when it was made, and the index kept here was made 2026-10-29T00:00:00Z")
+        self.assertEqual(older(old, None), "")
+        self.assertEqual(older(old, {"generated": "zzzz"}), "", "a kept index with no date refuses nothing")
+        self.assertEqual(older({}, {}), "")
 
 
 class Folders(unittest.TestCase):

@@ -167,9 +167,11 @@ def _take(unpack_into, now):
         idx, why = _read(d)
         if why:
             return {"error": f"not imported: {why}"}
-        was = index()
-        if was and str(idx.get("generated", "")) < str(was.get("generated", "")):
-            return {"error": f"not imported: it was made {idx.get('generated') or 'earlier'}, before the mirror held here ({was.get('generated')})"}
+        # One made before the mirror held is not taken in its place: the
+        # catalog's one rule for two signed indexes (catalogindex.older).
+        why = catalogindex.older(idx, index(), "the mirror held here")
+        if why:
+            return {"error": f"not imported: {why}"}
         extra = [p.name for p in d.iterdir() if p.name not in ("index.json", "index.sig", "repos")]
         if extra:
             return {"error": f"not imported: a mirror holds index.json, index.sig and repos/ alone, and this has {', '.join(sorted(extra)[:5])}"}

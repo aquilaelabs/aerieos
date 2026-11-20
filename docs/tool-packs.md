@@ -425,7 +425,13 @@ commit, never a branch or latest. The index is signed with the
 maintainers' Ed25519 key; the public half ships with AerieOS
 (`config/catalog.pub`), and an install reads an entry only after the
 signature checks: an index changed on the way, or signed by another key,
-is refused and the one read before stands, with the reason said. The file
+is refused and the one read before stands, with the reason said. So is an
+index made before the one the install holds, signed as it is: a signature
+says who made an index, never that it is the newest, and an old one served
+again would bring back what the catalog withdrew since. When an index was
+made is its `generated`, the stamp the catalog's tools write
+(`2026-11-12T21:34:58Z`): one of the same moment is taken, and one that
+says none, or says it another way, is refused once a dated one is held. The file
 may name a spare key on a second line, and an index signed by either is
 read ([security.md](security.md#the-signing-keys-and-replacing-one)). Where it
 is read from is the **Address** in Controller settings' Vetted catalog group. A pack the
