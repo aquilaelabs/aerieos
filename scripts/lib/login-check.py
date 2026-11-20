@@ -17,7 +17,6 @@ one the loud lines are about. The session's auth header is bbapi's own
 (BB_AUTH_HEADER, from api_py in aerie); HOME and BB_NODE are the machine's,
 and BB_NODE_ID its id as bb-tty was told it.
 """
-import importlib.util
 import json
 import os
 import shutil
@@ -25,6 +24,7 @@ import subprocess
 import sys
 
 import bbapi
+import dash
 
 
 loud = len(sys.argv) > 1 and sys.argv[1] == "--loud"
@@ -87,11 +87,7 @@ def whoami():
 def readers():
     """login-list.py, which holds the one reading of every agent's sign-in
     (who_of): the files are read as `aerie login --list` reads them."""
-    spec = importlib.util.spec_from_file_location(
-        "login_list", os.path.join(os.path.dirname(os.path.abspath(__file__)), "login-list.py"))
-    ll = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(ll)
-    return ll
+    return dash.load_path("login_list", os.path.join(os.path.dirname(os.path.abspath(__file__)), "login-list.py"))
 
 
 def plan_now():

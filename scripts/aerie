@@ -5141,6 +5141,28 @@ cmd_drift() {
     fi
 }
 
+# project_dist: the dist folder of the space this was run from, whatever
+# directory inside it that was (B6), or the working directory's own where it
+# was run from no space: where a capture lands and where the captures are
+# listed from.
+project_dist() {
+    local proj; proj="$(project_here 2>/dev/null || true)"
+    if [ -n "$proj" ]; then printf '%s' "$WORKSPACE/$proj/dist"; else printf '%s' "$PWD/dist"; fi
+}
+
+# pw_browser_dirs: the folders Playwright's browsers may be in that exist
+# here, one a line, in the order their answers can be trusted:
+# PLAYWRIGHT_BROWSERS_PATH (what the image sets and any project honors), then
+# the toolchain store directly, then the historical /opt path. The one list,
+# for Chromium, for Firefox and for the folder a capture hands Playwright.
+pw_browser_dirs() {
+    local base
+    for base in "${PLAYWRIGHT_BROWSERS_PATH:-}" "$(sdk_root)/playwright" /opt/pw-browsers; do
+        [ -n "$base" ] && [ -d "$base" ] && printf '%s\n' "$base"
+    done
+    return 0
+}
+
 # Where Chromium actually is, in the order the answers can be trusted:
 # PLAYWRIGHT_BROWSERS_PATH (what the image sets and any project honors), then
 # the toolchain store directly, then the historical /opt path. Resolved rather than
@@ -5150,8 +5172,8 @@ cmd_drift() {
 # sitting right there on the share.
 find_chromium() {
     local base exe
-    for base in "${PLAYWRIGHT_BROWSERS_PATH:-}" "$(sdk_root)/playwright" /opt/pw-browsers; do
-        [ -n "$base" ] && [ -d "$base" ] || continue
+    local -a bases=(); mapfile -t bases < <(pw_browser_dirs)
+    for base in "${bases[@]}"; do
         exe="$base/chromium"
         [ -x "$exe" ] || exe="$(find -L "$base" -path '*/chromium-*/chrome-linux*/chrome' -type f 2>/dev/null | head -1)"
         [ -n "$exe" ] && [ -x "$exe" ] || continue
@@ -5209,9 +5231,7 @@ cmd_capture() {
         ls|prune)
             local verb="$1"; shift
             case "${1:-}" in -h|--help) cmd_capture --help; return 0 ;; esac
-            local proj; proj="$(project_here 2>/dev/null || true)"
-            local dist="${proj:+${WORKSPACE}/${proj}/dist}"
-            [ -n "$dist" ] || dist="$PWD/dist"
+            local dist; dist="$(project_dist)"
             python3 "$BB_LIB/capture.py" "$verb" "$dist" "$@"
             ;;
         *) cat <<'EOT'
@@ -5243,9 +5263,14 @@ EOT
 # A browser with an extension loaded (R247): Playwright's Chrome for Testing
 # and Firefox from the store, driven by browser.mjs on the store's node.
 cmd_browser() {
-    local root ff node
+    local root ff="" node base
+    local -a bases=(); mapfile -t bases < <(pw_browser_dirs 2>/dev/null)
     root="$(sdk_root 2>/dev/null || true)"
-    ff="$(find -L "${PLAYWRIGHT_BROWSERS_PATH:-$root/playwright}" -path '*/firefox-*/firefox/firefox' -type f 2>/dev/null | head -1)"
+    # The first of the folders that has one, as Chromium is found.
+    for base in "${bases[@]}"; do
+        ff="$(find -L "$base" -path '*/firefox-*/firefox/firefox' -type f 2>/dev/null | head -1)"
+        [ -z "$ff" ] || break
+    done
     node="$(command -v node || true)"; [ -n "$node" ] || { [ -x "$root/node/bin/node" ] && node="$root/node/bin/node"; }
     [ -n "$node" ] || die "aerie browser runs on Node, and there is no node toolchain here; installing it is the operator's"
     BB_BROWSER_CHROME="$(find_chromium 2>/dev/null || true)" BB_BROWSER_FIREFOX="$ff" exec "$node" "$BB_LIB/browser.mjs" "$@"
@@ -5280,11 +5305,9 @@ capture_person_only() {
 # The store's tools for capture.py, which shot and reel share.
 # Where Playwright's browsers are: the folder named, the store's, the image's.
 pw_browsers_path() {
-    local base
-    for base in "${PLAYWRIGHT_BROWSERS_PATH:-}" "$(sdk_root 2>/dev/null)/playwright" /opt/pw-browsers; do
-        [ -n "$base" ] && [ -d "$base" ] && { printf '%s' "$base"; return 0; }
-    done
-    return 0
+    local first=""
+    IFS= read -r first < <(pw_browser_dirs 2>/dev/null) || true
+    printf '%s' "$first"
 }
 
 capture_env() {
@@ -5342,9 +5365,7 @@ aerie capture reel --video FILE | --url URL | --emu [PKG] | --display :N  [--sec
 EOT
             return 0 ;;
     esac
-    local proj; proj="$(project_here 2>/dev/null || true)"
-    local out="${proj:+${WORKSPACE}/${proj}/dist/reel}"
-    [ -n "$out" ] || out="$PWD/dist/reel"
+    local out; out="$(project_dist)/reel"
     BB_CAPTURE_OUT="$out" capture_env python3 "$BB_LIB/reel.py" "$@"
 }
 
@@ -5373,8 +5394,7 @@ capture_shot() {
     # command is run in (B6), under emu/ or shot/ with a record beside it
     # (--mark): the Artifacts tab lists those as captures and the project's
     # sweep removes them by age (R96).
-    local proj dist; proj="$(project_here 2>/dev/null || true)"
-    dist="${proj:+${WORKSPACE}/${proj}/dist}"; [ -n "$dist" ] || dist="$PWD/dist"
+    local dist; dist="$(project_dist)"
     # Used by the test harness, which needs the same answer this does and
     # should not re-implement the search to get it.
     if [ "${1:-}" = --print-chromium ]; then find_chromium; printf '\n'; return 0; fi

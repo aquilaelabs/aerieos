@@ -34,6 +34,18 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 # Its own: the harness sources nothing of bb's, and the sentence a failed copy
 # meant to say ended as "die: command not found" (B231).
 die() { printf '[dashboard-test] ERROR: %s\n' "$*" >&2; exit 1; }
+# What a run takes out of the environment it starts in, for a fresh world's
+# own shell and for a suite attached to a kept one. Run from a session ON A
+# NODE, this script inherits BUILDERBOT_ROLE=node, the real controller's
+# address and pin, and the account the session runs as, and every `bash
+# scripts/aerie` a test makes then relays to the real controller with no
+# token, or reads a node's home. The suite drives the checkout's aerie as the
+# CONTROLLER's, against its own server; the tests that mean a node say so in
+# their own env. BB_EMU_LOCAL says "already on the node's store": aerie emu
+# would run here.
+SCRUB=(BUILDERBOT_ROLE BB_CONTROLLER BB_CONTROLLER_PIN BB_NODE BUILDERBOT_NODE
+       BB_ACCOUNT_NAME BB_ACCOUNT_UID BB_PROJECT BB_TREE BB_TREE_OWNER BB_CI_LOG_DIR
+       BB_NODE_TOOLCHAINS BB_EMU_LOCAL)
 # The root tier is the one thing here that is root's to run (R240 step 5):
 # what the root agent does in a folder an account controls. `aerie devapp test
 # root-tier` reaches it through the space's test command inside its dev
@@ -108,6 +120,7 @@ if [ -z "${BB_TEST_HOLD:-}" ] && [ -z "${BB_TEST_WORKER:-}" ] && [ -z "${BB_TEST
         cp "$HERE"/../*.js "$HERE"/../*.html "$KEEP_HERE/../" 2>/dev/null || true
         cp "$HERE/lib.mjs" "$KEEP_HERE/lib.mjs"
         rc=0
+        scrub=(); for v in "${SCRUB[@]}"; do scrub+=(-u "$v"); done
         for t in "$@"; do
             case "$t" in
                 /*) f="$KEEP_HERE/_probe-$(basename "${t%.mjs}").mjs"; cp "$t" "$f" ;;
@@ -116,11 +129,9 @@ if [ -z "${BB_TEST_HOLD:-}" ] && [ -z "${BB_TEST_WORKER:-}" ] && [ -z "${BB_TEST
             printf '[dashboard-test] == %s == (attached to the kept fixture at %s)\n' "$(basename "$f")" "$KEEP_URL"
             # The kept world's own environment, the same as a fresh run sets
             # below: its private tmux server, its git config, and none of the
-            # node's or the session's own variables. Without it a suite that
-            # ends or makes a tmux session refused to run attached (B230).
-            env -u TMUX -u BUILDERBOT_ROLE -u BB_CONTROLLER -u BB_CONTROLLER_PIN -u BB_NODE \
-                -u BUILDERBOT_NODE -u BB_ACCOUNT_NAME -u BB_ACCOUNT_UID -u BB_PROJECT -u BB_TREE \
-                -u BB_TREE_OWNER -u BB_CI_LOG_DIR -u BB_NODE_TOOLCHAINS -u BB_EMU_LOCAL \
+            # node's or the session's own variables (SCRUB). Without it a suite
+            # that ends or makes a tmux session refused to run attached (B230).
+            env -u TMUX "${scrub[@]}" \
                 TMUX_TMPDIR="$KEEP_S/tmux" GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL="$KEEP_S/gitconfig" \
                 DASHBOARD_TEST_URL="$KEEP_URL" DASHBOARD_TEST_CHROME="$KEEP_CHROME" \
                 BB_TEST_ORIGIN="${KEEP_ORIGIN:-$_here_root}" \
@@ -259,16 +270,16 @@ fi
 # every CI run of this suite was green without running a test (bug B74).
 # A run that could not start is not a pass.
 #
-# The same search bb uses, for both: the module and the browsers live on the
+# The same search aerie uses, for both: the module and the browsers live on the
 # store, and the /opt path is a symlink that only exists once the startup
-# hook has run. The checkout's bb, not the one on PATH: this harness tests
+# hook has run. The checkout's aerie, not the one on PATH: this harness tests
 # this tree, and the installed copy is whatever the running image shipped.
-NODE_PATH="$(bash "$DASH/../bb" capture shot --print-node-path 2>/dev/null \
+NODE_PATH="$(bash "$DASH/../aerie" capture shot --print-node-path 2>/dev/null \
             || printf '%s' "${NODE_PATH:-/usr/lib/node_modules}")"
 export NODE_PATH
 node -e "require.resolve('playwright')" 2>/dev/null \
     || die "node and playwright are not on PATH here (NODE_PATH=$NODE_PATH); on a node they are the playwright recipe in the toolchain store, installed from the Library"
-CHROME="$(bash "$DASH/../bb" capture shot --print-chromium 2>/dev/null || true)"
+CHROME="$(bash "$DASH/../aerie" capture shot --print-chromium 2>/dev/null || true)"
 [ -x "${CHROME:-}" ] || die "no Playwright chromium: install it with: aerie toolchains install playwright"
 command -v tmux >/dev/null || die "tmux is not installed"
 
@@ -283,15 +294,22 @@ command -v tmux >/dev/null || die "tmux is not installed"
 # server, a race in principle, and not one in practice on a box running two
 # of these at most, where the alternative is a constant that collides every
 # time. DASHBOARD_TEST_PORT still pins it for anyone who needs a known port.
-free_port() {
-    python3 - <<'PY'
-import socket
-s = socket.socket()
-s.bind(("127.0.0.1", 0))
-print(s.getsockname()[1])
-s.close()
+free_ports() {
+    # N distinct free ports, one per line. Bound all at once and released
+    # together, so the kernel cannot hand the same number to two of them,
+    # which it could if each of a run's workers asked for its own a moment
+    # apart.
+    python3 - "$1" <<'PY'
+import socket, sys
+socks = [socket.socket() for _ in range(int(sys.argv[1]))]
+for s in socks:
+    s.bind(("127.0.0.1", 0))
+    print(s.getsockname()[1])
+for s in socks:
+    s.close()
 PY
 }
+free_port() { free_ports 1; }
 PORT="${DASHBOARD_TEST_PORT:-$(free_port)}"
 [ -n "$PORT" ] || die "could not find a free port for the test server"
 # Refuse a port we do not own, before doing anything else. An interrupted run
@@ -460,21 +478,9 @@ default_suites() {
 # them, so a worker takes none, and a worker never reruns a failed suite:
 # the parent does that, alone, after every worker is done, so "flaky" means
 # what it means in a single run, failed under load and passed by itself.
+# The workers' ports are asked for in one call (free_ports), so no two get
+# the same one.
 #
-free_ports() {
-    # N distinct free ports, one per line. Bound all at once and released
-    # together, so the kernel cannot hand the same number to two of them,
-    # which it could if each worker asked for its own a moment apart.
-    python3 - "$1" <<'PY'
-import socket, sys
-socks = [socket.socket() for _ in range(int(sys.argv[1]))]
-for s in socks:
-    s.bind(("127.0.0.1", 0))
-    print(s.getsockname()[1])
-for s in socks:
-    s.close()
-PY
-}
 stream_log() {
     # A worker's log as it grows, until the worker ends, then the rest of it.
     # tail --pid is GNU's and uutils' both; anywhere without it the log is
@@ -879,15 +885,8 @@ except Exception: print("")' 2>/dev/null || true)"
 fi
 
 unset BB_TOKEN
-# And the role. Run from a session ON A NODE, this script inherits
-# BUILDERBOT_ROLE=node, the real controller's address and pin, and the
-# account the session runs as, and every `bash scripts/aerie` a test makes
-# then relays to the real controller with no token, or reads a node's
-# home. The suite drives the checkout's bb as the CONTROLLER's, against its
-# own server; the tests that mean a node say so in their own env.
-unset BUILDERBOT_ROLE BB_CONTROLLER BB_CONTROLLER_PIN BB_NODE BUILDERBOT_NODE \
-      BB_ACCOUNT_NAME BB_ACCOUNT_UID BB_PROJECT BB_TREE BB_TREE_OWNER BB_CI_LOG_DIR \
-      BB_NODE_TOOLCHAINS BB_EMU_LOCAL   # "already on the node's store": aerie emu would run here
+# And the role, with the rest of what a node's session carries (SCRUB).
+unset "${SCRUB[@]}"
 export TMUX_TMPDIR="$S/tmux"
 mkdir -p "$TMUX_TMPDIR"
 # git's global and system config are the suite's own, not the machine's. The

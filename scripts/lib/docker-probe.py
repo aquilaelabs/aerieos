@@ -13,16 +13,15 @@ The probe is devapp.available(), the same call the Artifacts view makes on its
 own poll, so nothing here can drift into disagreeing with the tab about
 whether the thing is up.
 """
-import importlib.util
 from pathlib import Path
 import os
 import sys
 
+import dash
+
 
 def load(path):
-    spec = importlib.util.spec_from_file_location("devapp", path)
-    m = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(m)
+    m = dash.load_path("devapp", path)
     _wire_nodes(m, path)
     return m
 
@@ -38,9 +37,7 @@ def _wire_nodes(m, path):
     if not os.path.isfile(npath) or not os.path.isdir(state):
         return
     try:
-        spec = importlib.util.spec_from_file_location("nodes", npath)
-        nodes = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(nodes)
+        nodes = dash.load_path("nodes", npath)
         nodes.db.open_readonly(state)
     except Exception:                             # noqa: BLE001 - the probe still answers
         return

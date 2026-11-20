@@ -143,11 +143,7 @@ def login():
 def signed():
     """A coding agent's account here, read as `aerie login --list` reads
     it (login-list.py), so doctor and the Installed page cannot disagree."""
-    import importlib.util
-    spec = importlib.util.spec_from_file_location(
-        "login_list", os.path.join(os.path.dirname(os.path.abspath(__file__)), "login-list.py"))
-    ll = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(ll)
+    ll = dash.load_path("login_list", os.path.join(os.path.dirname(os.path.abspath(__file__)), "login-list.py"))
     a = ll.signins().get(args[0])
     got = ll.who_of(os.path.expanduser("~"), args[0], a) if a else None
     if not got or not got.get("email"):

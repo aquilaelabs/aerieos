@@ -39,7 +39,6 @@ answer, in their first session.
 """
 import contextlib
 import fcntl
-import importlib.util
 import os
 import re
 import select
@@ -50,6 +49,8 @@ import subprocess
 import sys
 import termios
 import time
+
+import dash
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # The terminal the program draws on: wide, so a link is one row of it.
@@ -75,10 +76,7 @@ def say(msg):
 
 def readers():
     """login-list.py, which holds the one reading of who signs in how."""
-    spec = importlib.util.spec_from_file_location("login_list", os.path.join(HERE, "login-list.py"))
-    ll = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(ll)
-    return ll
+    return dash.load_path("login_list", os.path.join(HERE, "login-list.py"))
 
 
 def flows():
