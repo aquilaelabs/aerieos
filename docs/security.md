@@ -412,7 +412,13 @@ none beside them except what a controller adds of its own. A bundle that
 fails is unpacked nowhere, in the job account's store or in root's copies:
 the node goes on with the bundle it has, names the first file that was
 wrong in the job's log and its own, and does not fetch that bundle again
-until its console's trust changes or the controller offers another. A
+until its console's trust changes or the controller offers another. While
+the refusal stands the node reports it with its hello, and whoever manages
+nodes sees it: a row on the bell for that node, saying it keeps the bundle
+it had with the node's own reason and what its console can do, and the same
+words under Sessions on the node's page; both leave when the node takes a
+bundle or the controller serves another. A container's shell on such a node
+opens from the bundle it kept, with no wait for one it will not take. A
 machine whose console allows unsigned builds takes a branch's bundle as it
 takes that build's agent, and a key added at the console counts as it does
 there. A controller whose own files are not the ones its build signed (one
