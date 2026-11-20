@@ -934,6 +934,15 @@ def validate(m, shipped=(), official=False):
         out["online"], said = packformat.online_checked(inst["online"], "install.online")
         errors.extend(said)
         new.append("install.online")
+    # What it asks a package manager for (packformat.lock_checked): how the
+    # set of files its steps install from is found again. The files are
+    # declared downloads like any other, kept under the lock's directory;
+    # the requirements or the lock its steps install by are in its
+    # repository, as all its files are.
+    if inst.get("lock") is not None:
+        out["lock"], said = packformat.lock_checked(inst["lock"], "install.lock")
+        errors.extend(said)
+        new.append("install.lock")
     if new and fmt < packformat.HELD_FORMAT:
         errors.append(f'{", ".join(new)} {"is" if len(new) == 1 else "are"} pack format {packformat.HELD_FORMAT}\'s: '
                       f'the manifest says "format": {packformat.HELD_FORMAT}')

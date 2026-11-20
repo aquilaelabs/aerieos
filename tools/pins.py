@@ -10,6 +10,14 @@ newer version is found and how its digest is learned are the row's own data
 source.track), read with the resolvers of scripts/lib/sdkmeta.py: nothing
 here knows a vendor.
 
+What a package manager installs is held the same way. A row says what it
+asks pip or npm for (source.lock), the manager's own resolver says which
+exact files that is (uv for pip, npm for npm: both must be on the PATH),
+and each file becomes a declared download of the row under the lock's
+directory, with the requirements or the lock an install reads written into
+source.files. check says when a lock's resolution would change, and move
+replaces the lock's set whole, leaving the row's other downloads alone.
+
     tools/pins.py check [NAME...]     what each pinned row is pinned to, what its own resolver finds
                                       now, and whether a pinned file that has no resolver still
                                       answers the pinned bytes. Reads the network, writes nothing.
@@ -25,7 +33,8 @@ here knows a vendor.
                                       found; a repository's commit is pinned by its source.track; and
                                       each download it declares with no digest yet (a row written with
                                       its address, its track and no sha256) is given the version its
-                                      track finds now and its digest.
+                                      track finds now and its digest; and each lock with no downloads
+                                      yet is resolved to its first set.
     tools/pins.py verify [NAME...]    downloads each pinned file and holds it to its pin, for this
                                       machine's platform; --platform P for another, --all for every
                                       one. A file is streamed and hashed, never kept. Exit 1 naming
@@ -42,13 +51,17 @@ downloads the file, hashes it, and holds it to what the publisher does
 state. A row moves whole: one platform's file that cannot be learned leaves
 the row as it was, said by name.
 """
+import base64
 import copy
 import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
+import tomllib
 import urllib.error
 import urllib.request
 
@@ -114,7 +127,7 @@ def said(e):
     if isinstance(e, urllib.error.URLError):
         return f"it could not be reached: {e.reason}"
     if isinstance(e, subprocess.TimeoutExpired):
-        return "git did not answer in time"
+        return f"{os.path.basename(str(e.cmd[0] if isinstance(e.cmd, (list, tuple)) and e.cmd else e.cmd))} did not answer in time"
     if isinstance(e, StopIteration):
         return "its resolver found no version"
     if isinstance(e, KeyError):
@@ -275,12 +288,25 @@ def fetch_of(row, to, plat):
     return next(f for f in fetch_rows(row) if f.get("to") == to and str(f.get("platform") or "") == plat)
 
 
+def fetch_write(f, changed):
+    """What moved written into a declared download, its keys left in the
+    order a row writes them: the address, the version, the digest, then
+    where it is kept and how the next one is found."""
+    f.update(changed)
+    for k in ("to", "platform", "signed", "track", "found"):
+        if k in f:
+            f[k] = f.pop(k)
+
+
 def fetch_learned(row, f, cache):
     """What a declared download would be now: {"version", "url", "sha256",
     "how"}. One that says track is asked for its newest version, once for
     every download that says the same track; one that says none has
     nothing to track, and its address is asked for the bytes it answers
-    today."""
+    today. A file in a repository is tracked by the repository: its
+    version is the newest tag (with the track's trims off), or the commit a
+    branch is at. A tracked download that is at the version found already
+    is as its entry pins it, and is not asked for again."""
     track = f.get("track") if isinstance(f.get("track"), dict) else None
     plat = str(f.get("platform") or "")
     version, url = str(f.get("version") or ""), ""
@@ -289,16 +315,321 @@ def fetch_learned(row, f, cache):
             key = json.dumps(track, sort_keys=True) + "\0" + plat
             if key not in cache:
                 if track.get("resolver") in packformat.GIT_RESOLVERS:
-                    # A repository's tag as the version in a file's name.
-                    cache[key] = (sdkmeta.trimmed(sdkmeta.git_newest({**row, "source": {"url": track.get("url")}}, track)[0], track), "")
+                    name, commit = sdkmeta.git_newest({**row, "source": {"url": track.get("url")}}, track)
+                    cache[key] = (commit if track["resolver"] == "git-branch" else sdkmeta.trimmed(name, track), "")
                 else:
                     cache[key] = sdkmeta.newest(row, track)
             version, url = cache[key]
         url = url or sdkmeta.declared_address({**f, "version": version})
         if isinstance(f.get("signed"), dict):
             return {"version": version, "url": url, "sha256": "", "how": "held by its publisher's signature"}
+        if track and f.get("sha256") and version == f.get("version") and url == sdkmeta.declared_address(f):
+            return {"version": version, "url": url, "sha256": f["sha256"], "how": "its track finds the version it is pinned to"}
         digest, how = digest_of(row, url, version, f.get("found"))
     return {"version": version, "url": url, "sha256": digest, "how": how}
+
+
+# ---- what a package manager installs -------------------------------------------
+# A row says what it asks a package manager for (source.lock), and the
+# manager's own resolver says which exact files that is today. Each file
+# becomes a declared download of the row, kept under the lock's directory,
+# and the small files the manager installs by (its requirements with their
+# hashes, its lock) go into source.files beside them. The install step
+# then installs from that directory with no index and no network.
+#
+# One function a manager turns what its resolver says into those rows
+# (pip_locked, npm_locked), and one asks the resolver (pip_resolved,
+# npm_resolved), which is the only part that runs a program and reaches
+# the network: a test stands in for it. A lock's set is replaced whole
+# when it moves, and the row's other downloads are left alone.
+def locks(row):
+    got = (row.get("source") or {}).get("lock")
+    return [lk for lk in got if isinstance(lk, dict) and lk.get("to")] if isinstance(got, list) else []
+
+
+def lock_rows(row, lk):
+    """The declared downloads of `row` a lock owns: the ones kept under
+    its directory."""
+    return [f for f in fetch_rows(row) if str(f.get("to") or "").startswith(lk["to"] + "/")]
+
+
+def lock_files(row, lk):
+    """The files `row` carries that a lock owns, {path: text}."""
+    files = (row.get("source") or {}).get("files")
+    return {p: t for p, t in files.items() if p.startswith(lk["to"] + "/")} if isinstance(files, dict) else {}
+
+
+def unlocked(row):
+    """The locks of a row with no downloads yet: waiting for a first pin."""
+    return [lk for lk in locks(row) if not lock_rows(row, lk)]
+
+
+def _tool(name, what):
+    path = shutil.which(name)
+    if not path:
+        raise Refused(f"there is no {name} here to resolve {what} with")
+    return path
+
+
+def _ran(argv, cwd, what):
+    """Run a resolver, or a Refused with the end of what it said."""
+    p = subprocess.run(argv, cwd=cwd, capture_output=True, text=True, timeout=900, check=False)
+    if p.returncode:
+        raise Refused(f"{what}: {' '.join((p.stderr or p.stdout).split())[-400:] or 'it failed'}")
+
+
+def pip_resolved(requirements, python, target):
+    """What `requirements` resolve to for a Python and a platform, as the
+    packages of the pylock.toml uv writes: each {name, version, wheels:
+    [{url, hashes: {sha256}}]}, the wheels the ones that fit the platform.
+    The index states each file's sha256, so nothing is downloaded to learn
+    one, and nothing is built: a source distribution's own code does not
+    run here either."""
+    uv = _tool("uv", "what pip is asked for")
+    with tempfile.TemporaryDirectory() as d:
+        with open(os.path.join(d, "requirements.in"), "w", encoding="utf-8") as f:
+            f.write("".join(r + "\n" for r in requirements))
+        _ran([uv, "pip", "compile", "requirements.in", "--python-version", python, "--python-platform", target, "--no-build",
+              "--format", "pylock.toml", "-o", "pylock.toml", "--no-header", "-q"], d, f"uv could not resolve {', '.join(requirements)} for {target}")
+        with open(os.path.join(d, "pylock.toml"), "rb") as f:
+            return tomllib.load(f).get("packages") or []
+
+
+def wheel_rank(name):
+    """How closely a wheel is built for a machine, to pick one among those
+    a resolver says fit it: one built for the interpreter before one for
+    the stable ABI before a pure one, the newest interpreter it names, and
+    the newest baseline of the system."""
+    stem = name.removesuffix(".whl").split("-")
+    py, abi, plat = stem[-3:] if len(stem) >= 5 else ("", "", "")
+
+    def baseline(tag):
+        """The system baseline a platform tag names, as numbers: a glibc
+        or a musl version, a macOS release; the three old names by theirs."""
+        for old, was in (("manylinux1_", [2, 5]), ("manylinux2010_", [2, 12]), ("manylinux2014_", [2, 17])):
+            if tag.startswith(old):
+                return was
+        m = re.match(r"(?:manylinux|musllinux|macosx)_(\d+)_(\d+)_", tag)
+        return [int(m.group(1)), int(m.group(2))] if m else [0, 0]
+
+    newest = max(([int(n) for n in re.findall(r"\d+", tag)] for tag in py.split(".")), default=[])
+    return (abi not in ("abi3", "none"), abi == "abi3", newest, plat != "any", max(baseline(tag) for tag in plat.split(".")), name)
+
+
+# A platform as a requirements file's marker says it, for a lock resolved
+# for several: a package only some of them need, or need another version of.
+MARKERS = {"linux": "sys_platform == 'linux'", "linux-musl": "sys_platform == 'linux'", "darwin": "sys_platform == 'darwin'"}
+MACHINES = {("linux", "amd64"): "x86_64", ("linux", "arm64"): "aarch64", ("linux-musl", "amd64"): "x86_64", ("linux-musl", "arm64"): "aarch64",
+            ("darwin", "amd64"): "x86_64", ("darwin", "arm64"): "arm64"}
+
+
+def marker(plat):
+    system, _, arch = plat.partition("/")
+    return MARKERS[system] + (f" and platform_machine == '{MACHINES[(system, arch)]}'" if arch != "*" else "")
+
+
+def pip_locked(row, lk, have):
+    """A pip lock as the row holds it: {"fetch", "files", "said"}. For each
+    platform the lock names, what its requirements resolve to and the one
+    wheel of each package that fits it best; every wheel a declared
+    download, named for its platform where not every one takes it; and
+    requirements.txt, each package at its version with the sha256 of each
+    wheel, which the install step requires. A package with no wheel for a
+    platform is refused by name."""
+    plats, chosen = lk.get("for") or {}, {}
+    for plat, target in plats.items():
+        chosen[plat] = {}
+        for pkg in pip_resolved(lk["requirements"], lk["python"], target):
+            name, version = str(pkg.get("name") or ""), str(pkg.get("version") or "")
+            wheels = [w for w in pkg.get("wheels") or [] if isinstance(w, dict) and w.get("url") and packformat.SHA256.fullmatch(str((w.get("hashes") or {}).get("sha256") or ""))]
+            if not wheels:
+                raise Refused(f"{name} {version} has no wheel for {plat}: a source distribution runs its own code at install, and is not taken")
+            best = max(wheels, key=lambda w: wheel_rank(sdkmeta._name_of(w["url"])))
+            chosen[plat][name] = {"version": version, "url": best["url"], "sha256": best["hashes"]["sha256"], "file": sdkmeta._name_of(best["url"])}
+    # Each wheel once, for every platform or for the ones that take it.
+    wheels = {}
+    for plat in plats:
+        for c in chosen[plat].values():
+            wheels.setdefault(c["url"], (c, []))[1].append(plat)
+    fetch = []
+    for url, (c, takes) in wheels.items():
+        base = {"url": url, "sha256": c["sha256"], "to": f"{lk['to']}/{c['file']}"}
+        fetch += [base] if len(takes) == len(plats) else [{**base, "platform": p} for p in takes]
+    # The requirements: a line a package and version, with the platforms
+    # that take it where that is not every one.
+    lines_, said_ = [], {}
+    for name in sorted({n for p in plats for n in chosen[p]}):
+        by_version = {}
+        for plat in plats:
+            if name in chosen[plat]:
+                by_version.setdefault(chosen[plat][name]["version"], []).append(plat)
+        said_[name] = ", ".join(by_version)
+        for version, takes in by_version.items():
+            sums = sorted({chosen[p][name]["sha256"] for p in takes})
+            only = "" if len(takes) == len(plats) else " ; " + " or ".join(f"({marker(p)})" for p in takes)
+            lines_.append(f"{name}=={version}{only}" + "".join(f" --hash=sha256:{s}" for s in sums))
+    return {"fetch": sorted(fetch, key=lambda f: (f["to"], f.get("platform", ""))), "said": said_,
+            "files": {f"{lk['to']}/requirements.txt": "".join(ln + "\n" for ln in lines_)}}
+
+
+def pip_said(files, lk):
+    """{package: version} as a pip lock's carried requirements say it."""
+    out = {}
+    for ln in str(files.get(f"{lk['to']}/requirements.txt") or "").splitlines():
+        name, eq, rest = ln.partition("==")
+        if eq:
+            out[name] = ", ".join(v for v in (out.get(name), rest.split()[0]) if v)
+    return out
+
+
+def npm_resolved(requirements):
+    """(package.json, package-lock.json) as npm writes them for a project
+    that asks for `requirements`, both as objects, with nothing installed
+    and nobody's script run: the lock names every package's tarball and its
+    integrity."""
+    npm = _tool("npm", "what npm is asked for")
+    with tempfile.TemporaryDirectory() as t:
+        # The lock is named for its directory, so the directory is always this one.
+        d = os.path.join(t, "entry")
+        os.mkdir(d)
+        with open(os.path.join(d, "package.json"), "w", encoding="utf-8") as f:
+            f.write('{"private": true}\n')
+        _ran([npm, "install", "--package-lock-only", "--ignore-scripts", "--no-audit", "--no-fund", "--loglevel=error", "--", *requirements], d,
+             f"npm could not resolve {', '.join(requirements)}")
+        return load(os.path.join(d, "package.json")), load(os.path.join(d, "package-lock.json"))
+
+
+def _allows(listed, value):
+    """Whether a lock's `os`, `cpu` or `libc` list takes `value`: named, or
+    not ruled out where the list only rules out (a leading !)."""
+    listed = [str(x) for x in listed] if isinstance(listed, list) else []
+    yes = [x for x in listed if not x.startswith("!")]
+    return "!" + value not in listed and (not yes or value in yes)
+
+
+def npm_platforms(pkg, named):
+    """The platforms of a row, as it keys them, that a package of an npm
+    lock is for: None for one that is for every platform, [] for one that
+    is for none the row names (it is left out), else the keys, a system's
+    two processors as "<os>/*"."""
+    if not any(pkg.get(k) for k in ("os", "cpu", "libc")):
+        return None
+
+    def covered(system, arch):
+        """Whether the row names this machine: a musl one is a linux one."""
+        system = system.replace("linux-musl", "linux")
+        return any(str(n).replace("linux-musl/", "linux/") in (f"{system}/{arch}", f"{system}/*") for n in named)
+
+    out = []
+    for system, npm_os, libc in (("linux", "linux", "glibc"), ("linux-musl", "linux", "musl"), ("darwin", "darwin", "")):
+        fits = [arch for cpu, arch in (("x64", "amd64"), ("arm64", "arm64"))
+                if _allows(pkg.get("os"), npm_os) and _allows(pkg.get("cpu"), cpu) and (not libc or _allows(pkg.get("libc"), libc)) and covered(system, arch)]
+        out += [f"{system}/*"] if len(fits) == 2 else [f"{system}/{a}" for a in fits]
+    # A musl machine takes what is named for linux too: named once.
+    return [k for k in out if not (k.startswith("linux-musl/") and (k.replace("linux-musl/", "linux/") in out or "linux/*" in out))]
+
+
+def npm_hashed(url, integrity):
+    """The sha256 of a package's tarball, downloaded and hashed here and
+    held to the integrity its lock states (a sha512, or a sha1 on an old
+    one): the registry states no sha256."""
+    for one in str(integrity).split():
+        algo, _, b64 = one.partition("-")
+        if algo in ALSO:
+            want = base64.b64decode(b64).hex()
+            got = hashed(url, algo)
+            if got[algo] != want:
+                raise Refused(f"{url} answers a file whose {algo} is {got[algo]}, and its lock states {want}")
+            return got["sha256"]
+    raise Refused(f"{url} is held by {str(integrity)[:40]!r} in its lock, which is no digest read here")
+
+
+def npm_locked(row, lk, have):
+    """An npm lock as the row holds it: {"fetch", "files", "said"}. Every
+    package of the lock npm writes a declared download, its tarball hashed
+    here and held to the lock's integrity (`have` is the digests the row
+    holds already, by address: a tarball is not fetched twice), one for a
+    system or a processor named for that platform; and package.json with
+    package-lock.json, which the install step installs by."""
+    manifest, lock = npm_resolved(lk["requirements"])
+    fetch, said_ = {}, {}
+    for path, pkg in (lock.get("packages") or {}).items():
+        if not path or not isinstance(pkg, dict) or pkg.get("link") or pkg.get("inBundle"):
+            continue
+        name = str(pkg.get("name") or path.rsplit("node_modules/", 1)[-1])
+        said_[path.removeprefix("node_modules/")] = str(pkg.get("version") or "")
+        url, integrity = str(pkg.get("resolved") or ""), pkg.get("integrity")
+        if not url.startswith("https://") or not integrity:
+            raise Refused(f"{name} is not a tarball its lock holds: it names {url[:80] or 'no address'}" + ("" if integrity else " and no integrity"))
+        plats = npm_platforms(pkg, row.get("platforms") or [])
+        if plats == []:
+            continue
+        to = f"{lk['to']}/{name.lstrip('@').replace('/', '-')}-{pkg.get('version')}.tgz"
+        digest = have.get(url) or npm_hashed(url, integrity)
+        for plat in plats or [""]:
+            if fetch.get((to, plat), {"url": url})["url"] != url:
+                raise Refused(f"two packages of its lock would be kept as {to}")
+            fetch[(to, plat)] = {"url": url, "sha256": digest, "to": to, **({"platform": plat} if plat else {})}
+    return {"fetch": [fetch[k] for k in sorted(fetch)], "said": said_,
+            "files": {f"{lk['to']}/package.json": json.dumps(manifest, indent=2) + "\n",
+                      f"{lk['to']}/package-lock.json": json.dumps(lock, separators=(",", ":")) + "\n"}}
+
+
+def npm_said(files, lk):
+    """{package: version} as an npm lock's carried package-lock.json says it."""
+    try:
+        packages = json.loads(files.get(f"{lk['to']}/package-lock.json") or "{}").get("packages") or {}
+    except ValueError:
+        return {}
+    return {p.removeprefix("node_modules/"): str(v.get("version") or "") for p, v in packages.items() if p and isinstance(v, dict) and not v.get("link")}
+
+
+# A package manager: what turns its resolver's answer into the row's
+# downloads and files, and what reads the versions back out of the files.
+LOCKS = {"pip": (pip_locked, pip_said), "npm": (npm_locked, npm_said)}
+
+
+def write_lock(row, lk, got):
+    """A lock's set written into `row` whole: its downloads in the place of
+    the ones it owned, after the row's others, and its files likewise."""
+    src = row["source"]
+    under = lk["to"] + "/"
+    src["fetch"] = [f for f in src.get("fetch") or [] if not (isinstance(f, dict) and str(f.get("to") or "").startswith(under))] + got["fetch"]
+    src["files"] = {**{p: t for p, t in (src.get("files") or {}).items() if not p.startswith(under)}, **got["files"]}
+
+
+def lock_parts(row, waiting=False):
+    """plan's parts for what a row asks its package managers for, a part a
+    lock: what its resolver finds now against the set the row holds. With
+    `waiting`, only the locks with no downloads yet."""
+    parts = []
+    for lk in locks(row):
+        mine, kind = lock_rows(row, lk), str(lk.get("kind"))
+        if waiting and mine:
+            continue
+        if kind not in LOCKS:
+            raise Refused(f"its lock for {lk['to']} is of kind {kind}, which is none of {', '.join(LOCKS)}")
+        locked, said_of = LOCKS[kind]
+        what = f"its {kind} lock ({lk['to']})"
+        try:
+            got = locked(row, lk, {sdkmeta.declared_address(f): f["sha256"] for f in mine if f.get("sha256")})
+        except ERRORS as e:
+            raise Refused(f"{what} could not be resolved ({said(e)})") from e
+        key = lambda f: (f.get("to"), f.get("platform") or "", f.get("url"), f.get("sha256"))  # noqa: E731
+        files = lock_files(row, lk)
+        old = f"{len(mine)} file(s)" if mine else ""
+        part = {"what": what, "old": old, "new": f"{len(got['fetch'])} file(s)"}
+        if sorted(map(key, mine)) != sorted(map(key, got["fetch"])) or files != got["files"]:
+            was = said_of(files, lk)
+            moved_ = [f"{n} {was[n]} to {v}" if n in was else f"{n} {v} added" for n, v in got["said"].items() if was.get(n) != v]
+            moved_ += [f"{n} {v} gone" for n, v in was.items() if n not in got["said"]]
+            if mine and moved_:
+                part["note"] = "; ".join(moved_[:8]) + (f"; and {len(moved_) - 8} more" if len(moved_) > 8 else "")
+            part["apply"] = lambda r, lk=lk, got=got: write_lock(r, lk, got)
+        else:
+            part["new"], part["note"] = old, "its resolver finds the set it holds"
+        parts.append(part)
+    return parts
 
 
 # ---- what a row is, and what would move ---------------------------------------
@@ -307,7 +638,7 @@ def is_pinned(row):
     row with a download still waiting for its first pin is `pin`'s."""
     src = row.get("source") or {}
     held = bool(sdkmeta.pin_of(row) or (src.get("kind") == "git" and src.get("commit")) or any(fetch_held(f) for f in fetch_rows(row)))
-    return held and not unheld(row)
+    return held and not unheld(row) and not unlocked(row)
 
 
 def plan(row, version=""):
@@ -383,7 +714,7 @@ def plan(row, version=""):
             parts.append(part)
         else:
             parts.append({"what": "its commit", "old": str(src["commit"])[:12], "new": str(src["commit"])[:12], "note": "it says no source.track: nothing to ask"})
-    return parts + declared_parts(row)
+    return parts + declared_parts(row) + lock_parts(row)
 
 
 def declared_parts(row, waiting=False):
@@ -394,7 +725,8 @@ def declared_parts(row, waiting=False):
     nothing yet: what a first pin fills in."""
     parts, cache = [], {}
     for f in fetch_rows(row):
-        if waiting and fetch_held(f):
+        # A lock's downloads are its lock's to move, as one set (lock_parts).
+        if (waiting and fetch_held(f)) or packformat.lock_of(locks(row), f.get("to")):
             continue
         what = fetch_said(f)
         try:
@@ -409,7 +741,7 @@ def declared_parts(row, waiting=False):
             changed["url"] = got["url"]
         if changed:
             key = (f.get("to"), str(f.get("platform") or ""))
-            part["apply"] = lambda r, key=key, changed=changed: fetch_of(r, *key).update(changed)
+            part["apply"] = lambda r, key=key, changed=changed: fetch_write(fetch_of(r, *key), changed)
         else:
             part["new"] = old
         parts.append(part)
@@ -547,7 +879,7 @@ def pin_row(doc, row, opts, out):
     # a tarball's or a script's file.
     kind = src.get("kind")
     own = (kind == "git" and not src.get("commit")) or (kind in ("tarball", "script") and not sdkmeta.pin_of(row))
-    waiting = unheld(row)
+    waiting = unheld(row) or unlocked(row)
     if not own and not waiting:
         if kind in ("git", "tarball", "script") or fetch_rows(row):
             raise Refused(f"it is pinned already: tools/pins.py move {name} moves it")
@@ -561,10 +893,11 @@ def pin_row(doc, row, opts, out):
         write_pin(new, got, src.get("checksum"))
         for line in lines(name, [{"what": "its download", "old": "", "new": got["version"], "files": got["files"], "apply": True}]):
             out(line)
-    # What it declares and holds to nothing yet: every one of them, or the
-    # row is left as it was.
+    # What it declares and holds to nothing yet, and what it asks a
+    # package manager for and has no files for yet: every one of them, or
+    # the row is left as it was.
     if waiting:
-        parts = declared_parts(row, waiting=True)
+        parts = declared_parts(row, waiting=True) + lock_parts(row, waiting=True)
         for p in parts:
             p["apply"](new)
         for line in lines(name, parts):

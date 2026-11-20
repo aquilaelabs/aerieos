@@ -82,7 +82,10 @@ FORMATS = {
        "the network, with the sentence that says what it downloads by itself (online), and a pack's word that it "
        "downloads nothing (an empty install.fetch), which cuts its steps from the network; and how a newer pin is found, "
        "read by the tool that proposes one and by no install: a pin's found, a declared download's version, track and found, "
-       "a repository's track and the tag its commit is fetched under, and the resolvers match, git-tag and git-branch",
+       "a repository's track and the tag its commit is fetched under, and the resolvers match, git-tag and git-branch; "
+       "and what a package manager installs held the same way: what the entry asks pip or npm for (lock), resolved by that "
+       "tool to exact files that are each a declared download, with the small files an install of them reads carried by a "
+       "shipped row itself (files)",
 }
 
 
@@ -271,8 +274,9 @@ def pin_refused(ck):
 HELD_FORMAT = 5
 # A declared download: how many an entry may name, the address it is fetched
 # from (https and nothing else) and the file inside the entry's directory
-# it is kept as.
-FETCH_MAX = 32
+# it is kept as. The number is what a package manager's set asks for (lock,
+# below): a tool with a few hundred packages under it declares each one.
+FETCH_MAX = 256
 HTTPS = re.compile(r"^https://[A-Za-z0-9.-]{1,253}(:\d{1,5})?/[\x21-\x7e]{0,1900}$")
 REL = re.compile(r"^(?!/)(?!.*(?:^|/)\.\.?(?:/|$))[A-Za-z0-9._/-]{1,200}$")
 FETCH_KEYS = frozenset(("url", "sha256", "to", "platform", "signed", "version", "track", "found"))
@@ -435,10 +439,109 @@ def online_checked(raw, what="install.online"):
     return text, []
 
 
+# ---- what a package manager installs ----------------------------------------
+# An install step that runs `pip install` or `npm install` downloads what
+# the manager resolves that day, which is held to nothing. So an entry says
+# what it asks its manager for as data (`lock`), the tool that proposes a
+# pin resolves that to exact files (tools/pins.py, by the manager's own
+# resolver), and each file is a declared download of the entry like any
+# other: fetched and held to its sha256 by AerieOS before a step runs. The
+# step then installs from the directory they landed in, with no index and
+# no network. Nothing here is read by an install: a lock is how the set is
+# found again, as a download's track is.
+#
+# A lock owns a directory inside the entry (`to`): every declared download
+# kept under it is the lock's, written by the tool and replaced whole when
+# the lock moves, and the entry's other downloads are left alone. Beside
+# them go the small files the manager installs by (pip's requirements with
+# their hashes, npm's package.json and its lock), which a pack keeps in its
+# repository and a shipped row carries itself (`files`, below).
+#
+#   pip   requirements (what pip is asked for, as a requirements file
+#         writes each), python (the version it installs for) and `for`: the
+#         platforms it is resolved for, each with the resolver's own name
+#         for it. Wheels only: a source distribution runs its own code at
+#         install, so a package with no wheel for a platform is refused.
+#   npm   requirements (what npm is asked for: a name, or name@range).
+#         Every package's tarball is a download, one named for a system or
+#         a processor for that platform alone.
+LOCK_KINDS = ("pip", "npm")
+LOCK_KEYS = {"pip": frozenset(("kind", "to", "requirements", "python", "for")), "npm": frozenset(("kind", "to", "requirements"))}
+LOCK_MOST, LOCK_REQS = 4, 64
+# What a manager is asked for: one line that starts with a name, so it can
+# never be read as an option of the resolver's.
+REQUIREMENT = re.compile(r"^[A-Za-z0-9@][\x20-\x7e]{0,199}$")
+PYTHON = re.compile(r"^3\.\d{1,2}$")
+LOCK_TARGET = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
+# The small files a shipped row carries into its directory: a few, text,
+# and small together. A pack's files are its repository.
+FILES_MOST, FILES_MAX = 8, 96 * 1024
+
+
+def lock_checked(raw, what="install.lock"):
+    """What an entry asks a package manager for, held to its shape:
+    (clean, errors). A list of up to LOCK_MOST locks, each {kind, to,
+    requirements} with what its kind adds, no two of them owning one
+    directory or one inside the other."""
+    said = (f"{what} lists up to {LOCK_MOST} of {{kind, to, requirements}}: the package manager ({', '.join(LOCK_KINDS)}), the directory inside "
+            f"the entry its downloads are kept in, and up to {LOCK_REQS} things it is asked for, each one line that starts with a name; "
+            'pip adds python ("3.12") and for ({platform: the resolver\'s name for it})')
+    if not isinstance(raw, list) or not 1 <= len(raw) <= LOCK_MOST:
+        return [], [said]
+    clean = []
+    for lk in raw:
+        kind = lk.get("kind") if isinstance(lk, dict) else None
+        if kind not in LOCK_KINDS or set(lk) - LOCK_KEYS[kind]:
+            return [], [said]
+        to, reqs = lk.get("to"), lk.get("requirements")
+        ok = isinstance(to, str) and REL.fullmatch(to) and isinstance(reqs, list) and 1 <= len(reqs) <= LOCK_REQS
+        ok = ok and all(isinstance(r, str) and REQUIREMENT.fullmatch(r) and r == r.strip() for r in reqs)
+        ok = ok and not any(to == c["to"] or to.startswith(c["to"] + "/") or c["to"].startswith(to + "/") for c in clean)
+        if kind == "pip":
+            plats = lk.get("for")
+            ok = ok and isinstance(lk.get("python"), str) and PYTHON.fullmatch(lk["python"])
+            ok = ok and isinstance(plats, dict) and 1 <= len(plats) <= PIN_PLATFORMS
+            ok = ok and all(isinstance(p, str) and PLATFORM_KEY.fullmatch(p) and isinstance(t, str) and LOCK_TARGET.fullmatch(t) for p, t in plats.items())
+        if not ok:
+            return [], [said]
+        clean.append({k: lk[k] for k in ("kind", "to", "requirements", "python", "for") if k in lk})
+    return clean, []
+
+
+def lock_of(locks, to):
+    """The lock that owns the file an entry keeps as `to`, or None: the
+    one whose directory it is under."""
+    for lk in locks if isinstance(locks, list) else []:
+        if isinstance(lk, dict) and isinstance(lk.get("to"), str) and str(to).startswith(lk["to"] + "/"):
+            return lk
+    return None
+
+
+def files_checked(raw, what="source.files"):
+    """The small files a shipped row carries, held to their shape: (clean,
+    errors). {path: text}: each a file inside the row's directory that
+    AerieOS writes before anything of the row runs, never one of its own
+    marks or of git's."""
+    said = (f"{what} maps up to {FILES_MOST} files inside the row's directory to their text, {FILES_MAX // 1024} KB together: "
+            "what a package manager installs by (its requirements, its lock), written before the steps run")
+    if not isinstance(raw, dict) or not 1 <= len(raw) <= FILES_MOST:
+        return {}, [said]
+    for path, text in raw.items():
+        ok = isinstance(path, str) and REL.fullmatch(path) and isinstance(text, str)
+        ok = ok and not any(part == ".git" or part.startswith(".bb-") for part in path.split("/"))
+        ok = ok and all(c.isprintable() or c in "\n\t" for c in text)
+        if not ok:
+            return {}, [said]
+    if sum(len(t.encode()) for t in raw.values()) > FILES_MAX:
+        return {}, [said]
+    return dict(raw), []
+
+
 def source_refused(src):
     """Why a row's source says something of its downloads that the format
     does not write, or "": its pin, its declared downloads, the keys it
-    carries, and whether its steps keep the network."""
+    carries, whether its steps keep the network, what it asks a package
+    manager for and the small files it carries."""
     if not isinstance(src, dict):
         return "it has no source"
     ck = src.get("checksum")
@@ -455,6 +558,10 @@ def source_refused(src):
             errors.append("source.online and source.offline are both said: its steps keep the network or run with none")
     if src.get("offline") not in (None, True, False):
         errors.append("source.offline is true or false")
+    if src.get("lock") is not None:
+        errors += lock_checked(src["lock"], "source.lock")[1]
+    if src.get("files") is not None:
+        errors += files_checked(src["files"], "source.files")[1]
     # A repository's pin: the commit, the tag it is fetched under, and how
     # the commit to pin is found.
     git = src.get("kind") == "git"
@@ -472,12 +579,14 @@ def source_format(src):
     """The least pack format a row's source needs for what it says of its
     downloads: 5 where it pins its download, declares downloads, carries
     keys, says its steps run with no network or keep it, names the tag a
-    repository's commit is fetched under or how its commit is found, or
-    follows a tarball with steps; 1 otherwise."""
+    repository's commit is fetched under or how its commit is found, says
+    what it asks a package manager for, carries files, or follows a
+    tarball with steps; 1 otherwise."""
     if not isinstance(src, dict):
         return 1
     ck = src.get("checksum")
-    new = (isinstance(ck, dict) and ck.get("from") == "pin") or any(src.get(k) for k in ("fetch", "keyring", "online", "offline", "tag", "track")) \
+    new = (isinstance(ck, dict) and ck.get("from") == "pin") \
+        or any(src.get(k) for k in ("fetch", "keyring", "online", "offline", "tag", "track", "lock", "files")) \
         or (src.get("kind") == "tarball" and src.get("then"))
     return HELD_FORMAT if new else 1
 

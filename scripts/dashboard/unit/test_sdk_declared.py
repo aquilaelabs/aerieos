@@ -21,6 +21,12 @@ SENTENCE = "Its installer downloads the compiler's components from static.exampl
 NO_CUT = "unshare() { return 1; }\n"
 
 
+def mock_die():
+    """sdkmeta.die as a refusal a test can read: it ends the process."""
+    from unittest import mock  # noqa: PLC0415
+    return mock.patch.object(sdkmeta, "die", side_effect=SystemExit)
+
+
 class Script(sdkstore.KitCase):
     def test_its_declared_download_is_fetched_and_checked_before_its_installer_runs(self):
         sha = self.kit()
@@ -118,6 +124,49 @@ class Online(sdkstore.KitCase):
         head = self.receipt("kit")
         self.assertEqual((head[1], head[7], head[8]), (sha, "online", SENTENCE))
         self.assertIn("its steps kept the network, as its entry says: " + SENTENCE, out, "the receipt's own words say it")
+
+
+class Files(sdkstore.KitCase):
+    """The small files a row carries (source.files): what a package manager
+    installs by, written into the row's directory before anything of the
+    row runs."""
+
+    REQS = "kit==1.0 --hash=sha256:" + "ab" * 32 + "\n"
+
+    def test_they_are_there_before_its_steps_run_beside_what_it_declares(self):
+        self.s.row("cmd", {"kind": "command", "run": ["sh", "-c", "cat {dir}/dl/pip/requirements.txt {dir}/dl/data.bin > {dir}/read; echo run=${CUT:-no} > {dir}/ran-how"],
+                           "fetch": [{"url": self.data_url, "sha256": self.data_sha, "to": "dl/data.bin"}],
+                           "files": {"dl/pip/requirements.txt": self.REQS, "package.json": "{}\n"}})
+        rc, out = self.s.sh("sdk_install cmd", PATH=self.s.can_cut())
+        self.assertEqual(rc, 0, out)
+        self.assertIn("wrote from its entry: dl/pip/requirements.txt, package.json", out)
+        self.assertEqual((self.s.read("cmd", "read"), self.s.read("cmd", "package.json"), self.s.read("cmd", "ran-how")), (self.REQS + "forty-two", "{}\n", "run=yes\n"))
+        # A row that carries files and says nothing of its downloads has declared nothing: it is installed as it always was.
+        self.s.row("plain", {"kind": "command", "run": ["sh", "-c", "cp {dir}/notes.txt {dir}/copied; echo run=${CUT:-no} > {dir}/ran-how"], "files": {"notes.txt": "kept\n"}})
+        rc, out = self.s.sh("sdk_install plain", PATH=self.s.can_cut())
+        self.assertEqual((rc, self.s.read("plain", "copied"), self.s.read("plain", "ran-how")), (0, "kept\n", "run=no\n"), out)
+        self.assertFalse(os.path.exists(os.path.join(self.s.dir("plain"), ".bb-net")))
+
+    def test_a_path_outside_the_directory_or_on_a_mark_writes_nothing_and_installs_nothing(self):
+        for bad in ("../escaped.txt", "/tmp/escaped.txt", ".bb-receipt", "dl/.bb-net", ".git/config"):
+            self.s.row("cmd", {"kind": "command", "run": ["sh", "-c", "touch {dir}/ran"], "files": {"ok.txt": "fine\n", bad: "no\n"}})
+            rc, out = self.s.sh("sdk_install cmd; echo went-on", PATH=self.s.can_cut())
+            self.assertNotEqual(rc, 0, bad)
+            self.assertIn("is no file inside its directory: nothing of source.files was written", out, bad)
+            self.assertIn("cmd: the files its entry carries could not be written: nothing is installed", out, bad)
+            self.assertNotIn("went-on", out, bad)
+            self.assertFalse(os.path.exists(os.path.join(self.s.dir("cmd"), "ran")) or os.path.exists(os.path.join(self.s.dir("cmd"), "ok.txt")), bad)
+        self.assertFalse(os.path.exists(os.path.join(self.s.store, "here", "escaped.txt")))
+
+    def test_a_link_out_of_the_directory_is_not_written_through(self):
+        d = os.path.join(self.root, "tree")
+        os.makedirs(d)
+        os.symlink(self.root, os.path.join(d, "out"))
+        with mock_die() as die, self.assertRaises(SystemExit):
+            sdkmeta.write_files({"name": "x", "source": {"files": {"out/escaped.txt": "no\n"}}}, d)
+        self.assertIn("is no file inside its directory", die.call_args[0][0])
+        self.assertFalse(os.path.exists(os.path.join(self.root, "escaped.txt")))
+        self.assertEqual(sdkmeta.write_files({"name": "x", "source": {}}, d), [])
 
 
 class Kinds(sdkstore.KitCase):

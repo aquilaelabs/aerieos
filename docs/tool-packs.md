@@ -199,6 +199,111 @@ manifest of an earlier format that has one means what it meant: its steps
 run with the network. A pack that leaves `fetch` out says nothing of what
 its steps download.
 
+**What a package manager installs.** A step that runs `pip install` or
+`npm install` downloads whatever the manager resolves that day, which is
+held to nothing. So the files it would install are declared like any
+other download, and the step installs from where they landed, with no
+index and no network. Two things make that practical. The manifest says
+what it asks the manager for, as data (`install.lock`), so the set can be
+found again when it moves; and the downloads of that set are kept under a
+directory of the lock's own (`to`), so they are replaced whole and the
+pack's other downloads are left alone.
+
+For pip, resolve once for each platform, with hashes, and for wheels
+alone: a source distribution runs its own code at install, so a package
+with no wheel for a platform is one to leave out or to build yourself.
+`uv` does it without downloading anything, since the index states each
+file's sha256:
+
+```bash
+uv pip compile requirements.in --python-version 3.12 \
+   --python-platform x86_64-manylinux_2_28 --no-build --generate-hashes \
+   -o requirements.txt
+```
+
+Commit `requirements.txt` to the pack's repository: it names each package
+at its version, with the sha256 of that version's files. Declare the wheel
+of each package for each platform you name, under the wheel's own file
+name, which is how pip finds it:
+
+```json
+"format": 5,
+"install": {
+  "lock": [
+    {"kind": "pip", "to": "dl/pip", "requirements": ["plover-tables[xlsx]"], "python": "3.12",
+     "for": {"linux/amd64": "x86_64-manylinux_2_28", "linux/arm64": "aarch64-manylinux_2_28"}}
+  ],
+  "fetch": [
+    {"url": "https://files.pythonhosted.org/packages/3a/7c/5d1f...3f2e/plover_tables-2.3.0-py3-none-any.whl",
+     "sha256": "0b918943df0962bc7a1824c0555a389347b4febdc7cf9d1254406d80ce44e3f9",
+     "to": "dl/pip/plover_tables-2.3.0-py3-none-any.whl"},
+    {"url": "https://files.pythonhosted.org/packages/c4/58/8f1e...4b6d/fastcsv-1.9.2-cp312-cp312-manylinux_2_28_x86_64.whl",
+     "sha256": "3d914f9348c9cc0ff8a79716700b9fcd4d2f3e711608004eb8f138bcba7f14d9",
+     "to": "dl/pip/fastcsv-1.9.2-cp312-cp312-manylinux_2_28_x86_64.whl",
+     "platform": "linux/amd64"},
+    {"url": "https://files.pythonhosted.org/packages/6e/2a/0c9b...2f1a/fastcsv-1.9.2-cp312-cp312-manylinux_2_28_aarch64.whl",
+     "sha256": "73475cb40a568e8da8a045ced110137e159f890ac4da883b6b17dc651b3a8049",
+     "to": "dl/pip/fastcsv-1.9.2-cp312-cp312-manylinux_2_28_aarch64.whl",
+     "platform": "linux/arm64"}
+  ],
+  "steps": [["sh", "{dir}/install.sh"]]
+}
+```
+
+and `install.sh` installs from that directory alone, with the hashes
+required:
+
+```sh
+python3 -m venv "$here/venv"
+"$here/venv/bin/pip" install --no-index --find-links "$here/dl/pip" \
+    --require-hashes -r "$here/requirements.txt"
+```
+
+A pure wheel (`py3-none-any`) is one download for every platform; a built
+one is a download a platform, each under its own name. `lock` names the
+manager (`kind`), the directory its downloads are kept in (`to`), what the
+manager is asked for (`requirements`, each one line that starts with a
+name) and, for pip, the Python it installs for (`python`) and the platforms
+it is resolved for (`for`: each platform with the resolver's own name for
+it). An entry may have up to four locks, none inside another's directory.
+An install reads none of it: it fetches what `fetch` says. The lock is for
+whoever moves the pins, and for a reviewer to see what the files are the
+resolution of.
+
+For npm the shape is the same. `npm install --package-lock-only` writes
+`package-lock.json`, which names every package's tarball and its
+integrity; commit it with `package.json`, declare each tarball under the
+lock's directory (the registry states a sha512, so hash each file for its
+sha256), name a package for one system or processor (`os`, `cpu` in the
+lock) with its `platform`, and have the step install from them with
+npm's own word that it is offline:
+
+```json
+"lock": [{"kind": "npm", "to": "dl/npm", "requirements": ["gannet"]}]
+```
+
+```sh
+cache="$(mktemp -d)"
+npm cache add --cache "$cache" "$here"/dl/npm/*.tgz
+npm ci --offline --cache "$cache" --ignore-scripts --prefix "$here"
+```
+
+`npm ci` installs exactly the lock's tree and holds each tarball to the
+lock's integrity again; `--ignore-scripts` keeps a package's own install
+script from running. Anything a package's script would have downloaded (a
+browser, a prebuilt binary) is a declared download of its own, or the
+pack's `online` sentence.
+
+A toolchain AerieOS ships says the same in its row (`source.lock`), and
+`tools/pins.py` writes the lock's downloads for it: it asks `uv` or `npm`
+what the requirements resolve to for each platform the row names, writes
+each file as a declared download, and writes the requirements or the lock
+the step reads into the row itself (`source.files`, a few small text files
+AerieOS writes into the row's directory before its steps: a row has no
+repository to keep them in, which is why a pack has no such key). An entry
+may declare up to 256 downloads, which is what a tool with a couple of
+hundred packages under it asks for.
+
 **What a node does with them.** AerieOS fetches each download itself, over
 `https` alone, before anything of the pack runs, and holds it to its sha256
 or its signature; one that answers another file stops the install, naming
@@ -597,7 +702,7 @@ on its Details what that install leaves out.
 | 2.2 | A sign-in whose program ends itself once signed in (`signin.flow.ends`), whose link may start in more than one way (`signin.flow.url` as a list), that says where who is signed in is read (`signin.flow.who`), and whose sign-out takes keys out of a settings file (`signin.flow.forget`). | Takes the entry and leaves such a flow out: the agent signs in in its session's terminal. | the releases after 0.9.0-dev.5284 |
 | 3.2 | Declared downloads (`install.fetch`): every file an install takes from somewhere else, with its address and its sha256, fetched and checked by AerieOS before the install steps run, which then run with no network. | Hides the entry: needs the first AerieOS that reads pack format 3. | the releases after 0.9.0-dev.5341 |
 | 4.2 | A Docker app that declares its own fields (`fields`: each the variable it fills, its label, its kind, a default, a line of help and whether it is required), drawn by New container as the app's panel; one on the machine's own network (`network`); one being replaced, with what to install in its place (`going`). | Hides the entry: needs the first AerieOS that reads pack format 4. | the releases after 0.9.0-dev.5341 |
-| 5.2 | Every download held to something its entry carries ([Declared downloads](#declared-downloads)): a shipped toolchain's download pinned to the version and the sha256 of the exact file (`checksum` kind `pin`); declared downloads for every kind of source; one named for a platform (`platform`) or held by its publisher's signature (`signed`) under a key the entry carries (`keyring`); an installer that keeps the network, with the sentence that says what it downloads by itself (`online`); a pack's word that it downloads nothing (an empty `install.fetch`), which cuts its steps from the network; and how a newer pin is found, read by the tool that proposes one and by no install: a pin's `found`, a declared download's `version`, `track` and `found`, a repository's `track` and the `tag` its commit is fetched under, and the resolvers `match`, `git-tag` and `git-branch`. | Hides the entry: needs the first AerieOS that reads pack format 5. A shipped toolchain's newer row that uses them is refused there, and its own row stays. | the releases after 0.9.0-dev.5641 |
+| 5.2 | Every download held to something its entry carries ([Declared downloads](#declared-downloads)): a shipped toolchain's download pinned to the version and the sha256 of the exact file (`checksum` kind `pin`); declared downloads for every kind of source; one named for a platform (`platform`) or held by its publisher's signature (`signed`) under a key the entry carries (`keyring`); an installer that keeps the network, with the sentence that says what it downloads by itself (`online`); a pack's word that it downloads nothing (an empty `install.fetch`), which cuts its steps from the network; and how a newer pin is found, read by the tool that proposes one and by no install: a pin's `found`, a declared download's `version`, `track` and `found`, a repository's `track` and the `tag` its commit is fetched under, and the resolvers `match`, `git-tag` and `git-branch`; and what a package manager installs held the same way: what the entry asks pip or npm for (`lock`), each file of the set a declared download under the lock's directory, up to 256 downloads an entry, and the small files an install of them reads carried by a shipped row itself (`files`). | Hides the entry: needs the first AerieOS that reads pack format 5. A shipped toolchain's newer row that uses them is refused there, and its own row stays. | the releases after 0.9.0-dev.5641 |
 
 ### What stays AerieOS's own
 
@@ -622,6 +727,7 @@ AerieOS carries. These are the format's primitives:
 | How a first prompt is handed over | `after-dashdash`, `flag`, `none` |
 | How it is told what needs no asking | `settings`, `flag`, `rules-file`, `hook`, `none` |
 | An official toolchain's source, its version resolver and how its download is checked | `tarball`, `script`, `git`, `command`, `sdkmanager`; `approximate`, `android-repo`, `command-urls`, `zig-index`, `url-matches`, `text`, `node-index`, `github-release`, `match`, `git-tag`, `git-branch`; `json`, `go-json`, `none`, `file`, `github-asset`, `zsync`, `zig-index`, `android-repo`, `signature`, `pin` |
+| A package manager a lock is resolved by | `pip`, `npm` |
 | An official service's kind | `router` |
 
 A new primitive is a new format number, never a change to an old one: the
@@ -874,7 +980,8 @@ the scripts it runs:
 | `framework` | The framework's version the manifest is written for, as `"2.1"`: the newest thing it uses, whichever number brought it ([The framework's version](#the-frameworks-version)). |
 | `platforms` | Where it works, as `linux/amd64`, `linux/arm64`, `darwin/arm64` and so on; `linux/*` or `darwin/*` for any architecture of that system. A bare `*` is refused. |
 | `terms` | The licenses or agreements it is under, each a label and a link, shown on its row. |
-| `install.fetch` | Pack format 3. The downloads the install takes from somewhere else, up to 32, each `{"url", "sha256", "to"}`: an `https` address, the sha256 of what it answers, and the file inside the pack it is kept as. AerieOS fetches each and holds it to its sha256 before any step runs, and a download that answers anything else installs nothing ([Declared downloads](#declared-downloads)). |
+| `install.fetch` | Pack format 3. The downloads the install takes from somewhere else, up to 256, each `{"url", "sha256", "to"}`: an `https` address, the sha256 of what it answers, and the file inside the pack it is kept as. AerieOS fetches each and holds it to its sha256 before any step runs, and a download that answers anything else installs nothing ([Declared downloads](#declared-downloads)). |
+| `install.lock` | Pack format 5. What the install asks a package manager for, up to four, each `{"kind", "to", "requirements"}`: `pip` or `npm`, the directory inside the pack the manager's files are kept in, and what it is asked for; pip adds `python` and `for`. The files themselves are rows of `install.fetch` under that directory, and no install reads the lock ([Declared downloads](#declared-downloads)). |
 | `install.steps` | What runs after the repository is fetched into the store, each a list of words; `{dir}` is the pack's directory. A pack that declares no downloads fetches its binaries here; one that declares them (`install.fetch`) unpacks and builds here, with no network. |
 | `install.verify` | One command that must succeed for the install to count. |
 | `layout` | `bin`: directories inside the pack to put on `PATH`. `env`: variables to set, each a path inside the pack or `=VALUE`. `tool`: a file whose presence means it is installed. |

@@ -69,7 +69,7 @@ scripts/
   lib/codemap.py                 the code map aerie map answers from: an index over the tree, rebuilt when a source is newer (R75)
   lib/trace-verbs.py             aerie dashboard trace: what the server was asked over a window, by endpoint and asker
   lib/gh-fetch                   one GitHub release asset, kept only when it matches the digest GitHub states for it: the image and the bare-metal installer fetch their own tools with it (B335)
-  lib/sdkmeta.py                 reads config/toolchains.json for aerie (on a node, the catalog's newer rows beside it where the bundle carries them), with the tool packs beside it: fields, argv, versions, what a download is held to (its publisher's word, a pin, a signature) and an install's receipt
+  lib/sdkmeta.py                 reads config/toolchains.json for aerie (on a node, the catalog's newer rows beside it where the bundle carries them), with the tool packs beside it: fields, argv, versions, what a download is held to (its publisher's word, a pin, a signature), the files a row carries into its directory and an install's receipt
   lib/toolpack-run.py            `aerie tool PACK VERB`: a tool pack's verb from its manifest, the caller's words in place of {args}
   lib/docker-probe.py            which daemon is live, for `aerie doctor` and the boot log
   lib/log-split.sh               splits a long-running process's output: all of it to its own file, warnings to the boot log
@@ -198,7 +198,7 @@ scripts/
     library.py                   the Library's one list (R170): the toolchains and packs with what a node's store holds, the coding agents, the apps, the catalog's offers and the companions as rows of one shape
     catalogindex.py              the vetted catalog's index (R169 step 2): fetched from the catalog's address, its signature checked against config/catalog.pub before an entry is read, a withdrawn pack on the bell
     catalogrows.py               a shipped toolchain's recipe from the catalog when the catalog's is newer (R234 step 4): its row from its official pack's manifest, held to the primitives this build carries, kept under the state and carried by the table in the shipped row's place and by the nodes' bundle as config/toolchains.catalog.json beside the shipped file
-    packformat.py                the catalog's format number (R234): the number this build reads, what each added, and the sentence an entry past it is refused with; what an entry's downloads are held to (a pin, a declared download, the keys it carries, an installer that keeps the network) and the word for it, pinned, installer or open; unit/packformat/N keeps manifests of each
+    packformat.py                the catalog's format number (R234): the number this build reads, what each added, and the sentence an entry past it is refused with; what an entry's downloads are held to (a pin, a declared download, the keys it carries, an installer that keeps the network, what it asks a package manager for and the files a row carries) and the word for it, pinned, installer or open; unit/packformat/N keeps manifests of each
     catalogmirror.py             the vetted catalog's mirror (R169 step 6): an archive tools/catalog-mirror.py made, imported under Controller settings once its index is the maintainers', answering when the catalog does not and holding each pinned repository as a git bundle
     emulator.py                  everything behind the Emulator page: a node's Android system images
     enrollscript.py              Enroll node as one script: the answers, the token and a WireGuard tunnel inside the provisioner
@@ -454,7 +454,7 @@ tools/aerieos-usb-maker.py    the stick maker in a window (R198): which release,
 tools/api-doc.py                 writes docs/api.md from server.py's route tables; aerie lint holds the two equal
 tools/git-hosts-doc.py           writes docs/git-hosts.md from forgeaccess.ABILITIES; aerie lint holds the two equal
 tools/packs-export.py            writes the official packs under packs/ from config/toolchains.json and agents.py's table; aerie lint's --check holds them to it (R169 step 1)
-tools/pins.py                    moves the pins of the shipped toolchains: check says what each pinned row is pinned to and what its own resolver finds now, move writes the new version and digests for every platform and raises the row's rev, pin turns an origin-checked row into a pinned one, verify holds each pinned file to its pin; a row's own data says how, and no vendor is named in it
+tools/pins.py                    moves the pins of the shipped toolchains: check says what each pinned row is pinned to and what its own resolver finds now, move writes the new version and digests for every platform and raises the row's rev, pin turns an origin-checked row into a pinned one and fills in what it declares, verify holds each pinned file to its pin; what a row asks pip or npm for is resolved to exact files, each a declared download; a row's own data says how, and no vendor is named in it
 tools/check-sysdeps.py           checks every recipe's system packages, and with --controller the controller's own list, against each distribution's package index
 tools/agent-version.sh           the lint check that the agent's version moved with its file
 tools/no-em-dash.sh              the house rule voice's check: no em dash on a line this branch adds

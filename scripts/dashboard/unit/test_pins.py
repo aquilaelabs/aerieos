@@ -403,6 +403,211 @@ class Declared(Case):
         self.assertIn("tools: left as it was: dl/lint.tar.gz could not be learned (https://lint.example.org/3.3/lint.tar.gz.sha256 answered 404)", out)
 
 
+FILES = "https://files.example.org/"
+REGISTRY = "https://registry.example.org/"
+
+
+def wheel(name, data):
+    """A wheel as a resolver lists it: its address, and the sha256 its
+    index states for it."""
+    return {"url": FILES + name, "hashes": {"sha256": sha(data)}}
+
+
+def integrity(data, algo="sha512"):
+    import base64  # noqa: PLC0415
+    return f"{algo}-" + base64.b64encode(hashlib.new(algo, data.encode()).digest()).decode()
+
+
+class Locks(Case):
+    """What a package manager installs, held as declared downloads: the
+    row says what it asks pip or npm for, a resolver stood in for here
+    says which exact files that is, and each becomes a download of the row
+    under the lock's directory, with the file the install step reads."""
+
+    AMD, ARM = "x86_64-manylinux_2_28", "aarch64-manylinux_2_28"
+
+    def setUp(self):
+        super().setUp()
+        self.asked = []
+        # What the index holds, by the platform asked for: the wheels that fit it.
+        self.index = {
+            self.AMD: [{"name": "alpha", "version": "1.0", "wheels": [wheel("alpha-1.0-py3-none-any.whl", "alpha 1.0")]},
+                       {"name": "beta", "version": "2.0", "wheels": [wheel("beta-2.0-cp39-abi3-manylinux_2_28_x86_64.whl", "beta abi3"),
+                                                                     wheel("beta-2.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", "beta old"),
+                                                                     wheel("beta-2.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", "beta amd")]},
+                       {"name": "gamma", "version": "3.0", "wheels": [wheel("gamma-3.0-py3-none-manylinux_2_17_x86_64.whl", "gamma amd")]}],
+            self.ARM: [{"name": "alpha", "version": "1.0", "wheels": [wheel("alpha-1.0-py3-none-any.whl", "alpha 1.0")]},
+                       {"name": "beta", "version": "2.0", "wheels": [wheel("beta-2.0-cp312-cp312-manylinux_2_28_aarch64.whl", "beta arm")]}],
+        }
+        self.manifest = {"private": True, "dependencies": {"a": "^1.0.0", "@s/b": "^2.0.0"}}
+        self.lock = {"name": "entry", "lockfileVersion": 3, "requires": True, "packages": {
+            "": {"dependencies": {"a": "^1.0.0", "@s/b": "^2.0.0"}},
+            "node_modules/a": {"version": "1.0.0", "resolved": REGISTRY + "a/-/a-1.0.0.tgz", "integrity": integrity("a 1.0.0"), "bin": {"a": "cli.js"}},
+            "node_modules/@s/b": {"version": "2.0.0", "resolved": REGISTRY + "@s/b/-/b-2.0.0.tgz", "integrity": integrity("b 2.0.0")},
+            "node_modules/@s/b/node_modules/a": {"version": "0.9.0", "resolved": REGISTRY + "a/-/a-0.9.0.tgz", "integrity": integrity("a 0.9.0", "sha1")},
+            "node_modules/watcher": {"version": "4.0.0", "resolved": REGISTRY + "watcher/-/watcher-4.0.0.tgz", "integrity": integrity("watcher"),
+                                     "optional": True, "os": ["darwin"]},
+            "node_modules/native-linux-x64-musl": {"version": "5.0.0", "resolved": REGISTRY + "native-linux-x64-musl/-/native-linux-x64-musl-5.0.0.tgz",
+                                                   "integrity": integrity("native musl"), "optional": True, "os": ["linux"], "cpu": ["x64"], "libc": ["musl"]},
+            "node_modules/native-win32": {"version": "5.0.0", "resolved": REGISTRY + "native-win32/-/native-win32-5.0.0.tgz", "integrity": integrity("native win"),
+                                          "optional": True, "os": ["win32"]}}}
+        for data, url in (("a 1.0.0", "a/-/a-1.0.0.tgz"), ("b 2.0.0", "@s/b/-/b-2.0.0.tgz"), ("a 0.9.0", "a/-/a-0.9.0.tgz"), ("watcher", "watcher/-/watcher-4.0.0.tgz"),
+                          ("native musl", "native-linux-x64-musl/-/native-linux-x64-musl-5.0.0.tgz")):
+            self.files[REGISTRY + url] = data
+        for name, stand_in in (("pip_resolved", self.pip_resolved), ("npm_resolved", self.npm_resolved)):
+            p = mock.patch.object(pins, name, stand_in)
+            p.start()
+            self.addCleanup(p.stop)
+
+    def pip_resolved(self, requirements, python, target):
+        self.asked.append((tuple(requirements), python, target))
+        return json.loads(json.dumps(self.index[target]))
+
+    def npm_resolved(self, requirements):
+        self.asked.append(tuple(requirements))
+        return json.loads(json.dumps(self.manifest)), json.loads(json.dumps(self.lock))
+
+    def pip_row(self, **lock):
+        """A command that installs what pip resolves, with a download of
+        its own beside the lock: written as a person writes it, with no
+        file of the lock's yet."""
+        logo = "https://dl.example.org/logo.svg"
+        self.files[logo] = "a logo"
+        self.rows.append({"name": "kit", "label": "Kit", "probe": "kit", "about": "A kit.", "platforms": list(PLATS), "layout": {"bin": ["bin"], "env": {}},
+                          "source": {"kind": "command", "run": ["sh", "-c", "pip install --no-index --find-links {dir}/dl/pip -r {dir}/dl/pip/requirements.txt"],
+                                     "fetch": [{"url": logo, "sha256": sha("a logo"), "to": "dl/logo.svg"}],
+                                     "lock": [{"kind": "pip", "to": "dl/pip", "requirements": ["alpha", "beta>=2"], "python": "3.12",
+                                               "for": {"linux/amd64": self.AMD, "linux/arm64": self.ARM}, **lock}]}})
+        self.write()
+
+    def test_pin_resolves_a_pip_lock_to_one_wheel_a_package_for_each_platform(self):
+        self.pip_row()
+        self.assertEqual(self.run_tool("check", "kit")[1].splitlines()[0][:16], "kit: not pinned ")
+        rc, out = self.run_tool("pin", "kit")
+        self.assertEqual(rc, 0, out)
+        self.assertEqual(self.asked, [(("alpha", "beta>=2"), "3.12", self.AMD), (("alpha", "beta>=2"), "3.12", self.ARM)])
+        src = self.row("kit")["source"]
+        # The row's own download first, as it was; then the lock's: a pure wheel once for every platform, a built one
+        # for its platform (the one built for this interpreter and the newest baseline, of the three that fit), and
+        # a package only one platform needs for that one alone.
+        self.assertEqual([(f["to"], f.get("platform"), f["sha256"]) for f in src["fetch"]], [
+            ("dl/logo.svg", None, sha("a logo")),
+            ("dl/pip/alpha-1.0-py3-none-any.whl", None, sha("alpha 1.0")),
+            ("dl/pip/beta-2.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", "linux/amd64", sha("beta amd")),
+            ("dl/pip/beta-2.0-cp312-cp312-manylinux_2_28_aarch64.whl", "linux/arm64", sha("beta arm")),
+            ("dl/pip/gamma-3.0-py3-none-manylinux_2_17_x86_64.whl", "linux/amd64", sha("gamma amd"))])
+        self.assertEqual(src["fetch"][2]["url"], FILES + "beta-2.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl")
+        # What the install step requires: each package at its version, with the sha256 of each platform's wheel.
+        self.assertEqual(src["files"], {"dl/pip/requirements.txt":
+                                        f"alpha==1.0 --hash=sha256:{sha('alpha 1.0')}\n"
+                                        + "beta==2.0" + "".join(f" --hash=sha256:{s}" for s in sorted((sha("beta amd"), sha("beta arm")))) + "\n"
+                                        + f"gamma==3.0 ; (sys_platform == 'linux' and platform_machine == 'x86_64') --hash=sha256:{sha('gamma amd')}\n"})
+        self.assertIn("kit: its pip lock (dl/pip) pinned at 4 file(s)", out)
+        self.assertIn("kit: rev 1 to 2; it reads pinned", out)
+        self.assertEqual((packformat.source_refused(src), self.fetched), ("", []), "the index states each digest: nothing was downloaded")
+
+    def test_check_says_when_a_lock_would_resolve_otherwise_and_move_replaces_its_set_whole(self):
+        self.pip_row()
+        self.assertEqual(self.run_tool("pin", "kit")[0], 0)
+        rc, out = self.run_tool("check", "kit")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("kit: its pip lock (dl/pip) is at 4 file(s) (its resolver finds the set it holds)", out)
+        # A newer beta for one platform, a package gone, one added.
+        self.index[self.AMD][1] = {"name": "beta", "version": "2.1", "wheels": [wheel("beta-2.1-cp312-cp312-manylinux_2_28_x86_64.whl", "beta 2.1 amd")]}
+        self.index[self.AMD][2] = {"name": "delta", "version": "0.4", "wheels": [wheel("delta-0.4-py3-none-any.whl", "delta")]}
+        before = self.read()
+        rc, out = self.run_tool("check", "kit")
+        self.assertEqual((rc, self.read()), (3, before), out)
+        self.assertIn("kit: its pip lock (dl/pip) 4 file(s) to 4 file(s) (beta 2.0 to 2.1, 2.0; delta 0.4 added; gamma 3.0 gone)", out)
+        rc, out = self.run_tool("move", "kit")
+        self.assertEqual(rc, 0, out)
+        src = self.row("kit")["source"]
+        self.assertEqual([(f["to"], f.get("platform")) for f in src["fetch"]], [
+            ("dl/logo.svg", None), ("dl/pip/alpha-1.0-py3-none-any.whl", None), ("dl/pip/beta-2.0-cp312-cp312-manylinux_2_28_aarch64.whl", "linux/arm64"),
+            ("dl/pip/beta-2.1-cp312-cp312-manylinux_2_28_x86_64.whl", "linux/amd64"), ("dl/pip/delta-0.4-py3-none-any.whl", "linux/amd64")])
+        # A version one platform alone is at says which, and the row's own download was left alone.
+        self.assertIn("beta==2.1 ; (sys_platform == 'linux' and platform_machine == 'x86_64') --hash=sha256:" + sha("beta 2.1 amd"), src["files"]["dl/pip/requirements.txt"])
+        self.assertIn("beta==2.0 ; (sys_platform == 'linux' and platform_machine == 'aarch64') --hash=sha256:" + sha("beta arm"), src["files"]["dl/pip/requirements.txt"])
+        self.assertEqual((src["fetch"][0], self.row("kit")["rev"]), ({"url": "https://dl.example.org/logo.svg", "sha256": sha("a logo"), "to": "dl/logo.svg"}, 3))
+        self.assertEqual(self.run_tool("check", "kit")[0], 0)
+
+    def test_a_package_with_no_wheel_is_refused_by_name_and_the_row_stays(self):
+        self.pip_row()
+        self.index[self.ARM].append({"name": "epsilon", "version": "0.1", "sdist": {"url": FILES + "epsilon-0.1.tar.gz", "hashes": {"sha256": sha("src")}}})
+        before = self.read()
+        rc, out = self.run_tool("pin", "kit")
+        self.assertEqual((rc, self.read()), (1, before), out)
+        self.assertEqual(out, "pins: kit is left as it was: its pip lock (dl/pip) could not be resolved (epsilon 0.1 has no wheel for linux/arm64: "
+                              "a source distribution runs its own code at install, and is not taken)")
+
+    def test_a_wheel_is_picked_for_the_interpreter_then_the_stable_abi_then_the_newest_baseline(self):
+        order = ["kit-1-py3-none-any.whl", "kit-1-py3-none-manylinux_2_17_x86_64.whl", "kit-1-cp39-abi3-manylinux_2_28_x86_64.whl",
+                 "kit-1-cp311-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", "kit-1-cp311-abi3-manylinux_2_28_x86_64.whl",
+                 "kit-1-cp312-cp312-manylinux1_x86_64.manylinux_2_5_x86_64.whl", "kit-1-cp312-cp312-manylinux2014_x86_64.whl",
+                 "kit-1-cp312-cp312-manylinux_2_28_x86_64.whl"]
+        self.assertEqual(sorted(reversed(order), key=pins.wheel_rank), order)
+
+    def npm_row(self, platforms=("linux/amd64", "darwin/*")):
+        self.rows.append({"name": "srv", "label": "Srv", "probe": "srv", "about": "A server.", "platforms": list(platforms), "layout": {"bin": ["node_modules/.bin"], "env": {}},
+                          "source": {"kind": "command", "run": ["sh", "-c", "npm ci --offline --prefix {dir}"],
+                                     "lock": [{"kind": "npm", "to": "dl/npm", "requirements": ["a", "@s/b@2"]}]}})
+        self.write()
+
+    def test_pin_resolves_an_npm_lock_to_a_tarball_a_package_hashed_here_and_held_to_the_lock(self):
+        self.npm_row()
+        rc, out = self.run_tool("pin", "srv")
+        self.assertEqual(rc, 0, out)
+        self.assertEqual(self.asked, [("a", "@s/b@2")])
+        src = self.row("srv")["source"]
+        # Every package of the lock, a nested one beside the one it shadows; one for another system named for it
+        # (a musl build for a musl machine), and one for a system the row does not name left out.
+        self.assertEqual([(f["to"], f.get("platform"), f["sha256"], f["url"]) for f in src["fetch"]], [
+            ("dl/npm/a-0.9.0.tgz", None, sha("a 0.9.0"), REGISTRY + "a/-/a-0.9.0.tgz"),
+            ("dl/npm/a-1.0.0.tgz", None, sha("a 1.0.0"), REGISTRY + "a/-/a-1.0.0.tgz"),
+            ("dl/npm/native-linux-x64-musl-5.0.0.tgz", "linux-musl/amd64", sha("native musl"), REGISTRY + "native-linux-x64-musl/-/native-linux-x64-musl-5.0.0.tgz"),
+            ("dl/npm/s-b-2.0.0.tgz", None, sha("b 2.0.0"), REGISTRY + "@s/b/-/b-2.0.0.tgz"),
+            ("dl/npm/watcher-4.0.0.tgz", "darwin/*", sha("watcher"), REGISTRY + "watcher/-/watcher-4.0.0.tgz")])
+        # What npm installs by, carried by the row: the project and its lock, whole.
+        self.assertEqual(json.loads(src["files"]["dl/npm/package.json"]), self.manifest)
+        self.assertEqual(json.loads(src["files"]["dl/npm/package-lock.json"]), self.lock)
+        self.assertEqual((packformat.source_refused(src), packformat.held(self.row("srv"))[0]), ("", "pinned"))
+        self.assertEqual(len(self.fetched), 5, "the registry states no sha256: each tarball was downloaded and hashed, once")
+        # Held, nothing is downloaded again to say it is as it was.
+        self.fetched.clear()
+        rc, out = self.run_tool("check", "srv")
+        self.assertEqual((rc, self.fetched), (0, []), out)
+        self.assertIn("srv: its npm lock (dl/npm) is at 5 file(s)", out)
+        # A newer package: only its tarball is fetched, and the set moves whole.
+        self.lock["packages"]["node_modules/a"].update(version="1.1.0", resolved=REGISTRY + "a/-/a-1.1.0.tgz", integrity=integrity("a 1.1.0"))
+        self.files[REGISTRY + "a/-/a-1.1.0.tgz"] = "a 1.1.0"
+        rc, out = self.run_tool("move", "srv")
+        self.assertEqual((rc, self.fetched), (0, [REGISTRY + "a/-/a-1.1.0.tgz"]), out)
+        self.assertIn("srv: its npm lock (dl/npm) 5 file(s) to 5 file(s) (a 1.0.0 to 1.1.0)", out)
+        self.assertEqual([f["to"] for f in self.row("srv")["source"]["fetch"]][:2], ["dl/npm/a-0.9.0.tgz", "dl/npm/a-1.1.0.tgz"])
+
+    def test_a_tarball_that_is_not_what_its_lock_states_is_refused(self):
+        self.npm_row()
+        self.files[REGISTRY + "@s/b/-/b-2.0.0.tgz"] = "something else"
+        before = self.read()
+        rc, out = self.run_tool("pin", "srv")
+        self.assertEqual((rc, self.read()), (1, before), out)
+        self.assertIn("srv is left as it was: its npm lock (dl/npm) could not be resolved (https://registry.example.org/@s/b/-/b-2.0.0.tgz answers a file whose sha512 is", out)
+
+    def test_a_package_of_a_lock_is_for_the_platforms_its_os_cpu_and_libc_name(self):
+        every = ["linux/amd64", "linux/arm64", "darwin/*"]
+        for pkg, named, want in (({}, every, None),
+                                 ({"os": ["darwin"]}, every, ["darwin/*"]),
+                                 ({"os": ["darwin"]}, ["linux/*"], []),
+                                 ({"os": ["linux"], "cpu": ["x64"], "libc": ["glibc"]}, every, ["linux/amd64"]),
+                                 ({"os": ["linux"], "cpu": ["x64"], "libc": ["musl"]}, every, ["linux-musl/amd64"]),
+                                 ({"os": ["linux"], "cpu": ["arm64"]}, ["linux/amd64"], []),
+                                 ({"os": ["linux"]}, ["linux/*"], ["linux/*"]),
+                                 ({"os": ["!win32"]}, ["linux/amd64"], ["linux/amd64"]),
+                                 ({"cpu": ["x64"]}, every, ["linux/amd64", "darwin/amd64"]),
+                                 ({"os": ["win32"]}, every, [])):
+            self.assertEqual(pins.npm_platforms(pkg, named), want, (pkg, named))
+
+
 class Verify(Case):
     def test_each_pinned_file_is_downloaded_and_held_to_its_pin(self):
         rc, out = self.run_tool("verify", "--all")

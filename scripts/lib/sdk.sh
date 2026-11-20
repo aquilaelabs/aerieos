@@ -1553,6 +1553,10 @@ sdk_install_git() {
 #   source.online   a sentence: its installer downloads the rest by itself,
 #                   and from where. Its declared downloads are fetched and
 #                   checked all the same, and its steps keep the network.
+#   source.files    small text files a shipped row carries, written into
+#                   DIR before anything else here: what a package manager
+#                   installs by (sdkmeta.py write_files). A row that says
+#                   only this has declared nothing of its downloads.
 #
 # A row whose own download is held to something it carries (a pin, or its
 # publisher's signature under keys it names) has declared by that alone:
@@ -1578,9 +1582,14 @@ sdk_install_git() {
 # download, this machine's and the ones left out for another's.
 SDK_DECLARED=""
 sdk_declared() {
-    local what="$1" d="$2" plan tag net online
+    local what="$1" d="$2" plan tag net online wrote
     SDK_CUT=()
     SDK_DECLARED=""
+    # The small files the row carries (source.files) first: what a package
+    # manager installs by, its requirements with their hashes or its lock,
+    # which the steps read beside the downloads fetched below.
+    wrote="$(sdk_meta files "$what" "$d")" || die "${what}: the files its entry carries could not be written: nothing is installed"
+    [ -z "$wrote" ] || log "wrote from its entry: ${wrote//$'\n'/, }"
     plan="$(sdk_meta declared "$what")"
     [ -n "$plan" ] || return 0
     SDK_DECLARED=1

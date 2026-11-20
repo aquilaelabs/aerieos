@@ -1,0 +1,39 @@
+{
+  "name": "gannet",
+  "label": "Gannet",
+  "about": "The Gannet formatter: lays out JSON, YAML and TOML files the one way a project keeps them.",
+  "format": 5,
+  "framework": "5.2",
+  "maker": "Gannet Format Authors",
+  "tier": "official",
+  "platforms": ["linux/*", "darwin/*"],
+  "terms": [{"label": "Gannet (MIT)", "url": "https://github.com/gannet-format/gannet/blob/main/LICENSE"}],
+  "layout": {"bin": ["node_modules/.bin"], "env": {}, "tool": "node_modules/.bin/gannet"},
+  "shipped": {
+    "probe": "gannet",
+    "requires": ["node"],
+    "source": {
+      "kind": "command",
+      "requires": "npm",
+      "run": ["sh", "-ec", "t=\"$(mktemp -d)\"; npm cache add --cache \"$t\" \"$1\"/dl/npm/*.tgz >/dev/null; cp \"$1/dl/npm/package.json\" \"$1/dl/npm/package-lock.json\" \"$1/\"; npm ci --offline --cache \"$t\" --ignore-scripts --no-audit --no-fund --prefix \"$1\"; rm -rf \"$t\" \"$1/dl\"", "--", "{dir}"],
+      "verify": ["{dir}/node_modules/.bin/gannet", "--version"],
+      "lock": [{"kind": "npm", "to": "dl/npm", "requirements": ["gannet"]}],
+      "fetch": [
+        {"url": "https://registry.npmjs.org/gannet/-/gannet-4.1.0.tgz",
+         "sha256": "44cb730c420480a0477b505ae68af508fb90f96cf0ec54c6ad16949dd427f13a",
+         "to": "dl/npm/gannet-4.1.0.tgz"},
+        {"url": "https://registry.npmjs.org/yaml-lines/-/yaml-lines-2.6.1.tgz",
+         "sha256": "71ee45a3c0db9a9865f7313dd3372cf60dca6479d46261f3542eb9346e4a04d6",
+         "to": "dl/npm/yaml-lines-2.6.1.tgz"},
+        {"url": "https://registry.npmjs.org/file-watch-darwin/-/file-watch-darwin-1.3.0.tgz",
+         "sha256": "811786ad1ae74adfdd20dd0372abaaebc6246e343aebd01da0bfc4c02bf0106c",
+         "to": "dl/npm/file-watch-darwin-1.3.0.tgz",
+         "platform": "darwin/*"}
+      ],
+      "files": {
+        "dl/npm/package.json": "{\n  \"private\": true,\n  \"dependencies\": {\n    \"gannet\": \"^4.1.0\"\n  }\n}\n",
+        "dl/npm/package-lock.json": "{\"name\":\"entry\",\"lockfileVersion\":3,\"requires\":true,\"packages\":{\"\":{\"dependencies\":{\"gannet\":\"^4.1.0\"}},\"node_modules/file-watch-darwin\":{\"version\":\"1.3.0\",\"resolved\":\"https://registry.npmjs.org/file-watch-darwin/-/file-watch-darwin-1.3.0.tgz\",\"integrity\":\"sha512-m3HSJL1i83hdltRq0+o9czGb+8KJDKra4t/3JRlnPKcjI8PZm6XBHXx6zG4UuMXaDEZjR1wuXDre9G9zvN7AQw==\",\"optional\":true,\"os\":[\"darwin\"]},\"node_modules/gannet\":{\"version\":\"4.1.0\",\"resolved\":\"https://registry.npmjs.org/gannet/-/gannet-4.1.0.tgz\",\"integrity\":\"sha512-z4PhNX7vuL3xVChQ1m2AB9Yg5AULVxXcg/SpIdNs6c5H0NE8XYXysP+DGNKHfuwvY7kxvUdBeoGlODJ6+SfaPg==\",\"dependencies\":{\"yaml-lines\":\"^2.6.0\"},\"optionalDependencies\":{\"file-watch-darwin\":\"~1.3.0\"},\"bin\":{\"gannet\":\"bin/gannet.js\"}},\"node_modules/yaml-lines\":{\"version\":\"2.6.1\",\"resolved\":\"https://registry.npmjs.org/yaml-lines/-/yaml-lines-2.6.1.tgz\",\"integrity\":\"sha512-Dj51I0q8aPQ3ioaz9LMqGYujAYRbDNblAQbodDRXAMxmY6hsHqEl3F6SvhfJj5oPhcqdX1ldsgEvfMNXGUXBIw==\"}}}\n"
+      }
+    }
+  }
+}

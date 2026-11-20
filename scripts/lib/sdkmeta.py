@@ -26,6 +26,7 @@ Usage (all output is plain, and empty means "not set"):
     sdkmeta.py resolve NAME                 -> version <TAB> url
     sdkmeta.py offer   NAME                 -> version <TAB> sha256, for a pinned row
     sdkmeta.py size    NAME                 -> bytes of the download, if knowable
+    sdkmeta.py files   NAME DIR             -> writes the files the row carries into DIR
 """
 import glob
 import hashlib
@@ -239,6 +240,37 @@ def declared_address(f, key="url"):
     signed = f.get("signed") if isinstance(f.get("signed"), dict) else {}
     text = str((signed.get("sig") if key == "sig" else f.get("url")) or "")
     return fill(text, {"version": f["version"]}) if isinstance(f.get("version"), str) else text
+
+
+# A file a row carries into its directory: a path inside it, never one of
+# AerieOS's marks or of git's.
+CARRIED = re.compile(r"^(?!/)(?!.*(?:^|/)\.\.?(?:/|$))[A-Za-z0-9._/-]{1,200}$")
+
+
+def write_files(tc, d):
+    """The small files a row carries (source.files: {path: text}), written
+    into its directory `d` before anything of the row runs: what a package
+    manager installs by, its requirements with their hashes or its lock,
+    which a pack keeps in its repository and a shipped row has nowhere else
+    to keep. Returns the paths written. A path that would land outside the
+    directory, or on a mark of AerieOS's or git's, writes nothing."""
+    files = (tc.get("source") or {}).get("files")
+    if not isinstance(files, dict) or not files:
+        return []
+    root = os.path.realpath(d)
+    todo = []
+    for rel, text in files.items():
+        ok = isinstance(rel, str) and isinstance(text, str) and CARRIED.fullmatch(rel) \
+            and not any(part == ".git" or part.startswith(".bb-") for part in rel.split("/"))
+        path = os.path.realpath(os.path.join(root, rel)) if ok else ""
+        if not ok or not path.startswith(root + os.sep):
+            die(f"{tc['name']}: {str(rel)[:80]!r} is no file inside its directory: nothing of source.files was written")
+        todo.append((rel, path, text))
+    for _rel, path, text in todo:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(text)
+    return [rel for rel, _path, _text in todo]
 
 
 # What separates the fields of a line of declared_plan: a character no
@@ -1190,6 +1222,14 @@ def main(argv):
         # sdk_declared: nothing at all for one that declares nothing.
         for line in declared_plan(tc):
             print(line)
+
+    elif op == "files":
+        # files NAME DIR: the small files the row carries, written into
+        # DIR; a line a file written, nothing for a row that carries none.
+        if len(argv) < 3 or not os.path.isdir(argv[2]):
+            die("files needs the directory the row is installed in")
+        for rel in write_files(tc, argv[2]):
+            print(rel)
 
     elif op == "offer":
         # The version and the digest a pinned row has on offer, or nothing

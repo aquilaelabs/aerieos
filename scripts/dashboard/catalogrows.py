@@ -53,7 +53,10 @@ RESOLVERS = ("approximate", "android-repo", "command-urls", "url-matches", *pack
 CHECKSUMS = (*packformat.FOUND_FROM, "pin")
 SHIPPED_KEYS = ("probe", "source", "system", "requires", "updatable", "tool")
 PLATFORM = re.compile(r"^(linux|darwin)/(amd64|arm64|\*)$")
-MAX_BYTES = 64 * 1024
+# A recipe with every file a package manager installs declared, and the
+# lock it installs by, is the largest there is: a tool with two hundred
+# packages under it comes to about 120 KB.
+MAX_BYTES = 192 * 1024
 RETRY_S = 3600
 
 

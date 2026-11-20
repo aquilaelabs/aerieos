@@ -449,6 +449,23 @@ tools/pins.py verify --all       # download every pinned file and hold it to its
   `--all` for every one. For a repository it says whether the tag the row
   names is still at the pinned commit.
 
+**What a package manager installs** moves the same way. A row says what it
+asks pip or npm for (`source.lock`: the requirements, and for pip the
+Python and the platforms), and the tool asks the manager's own resolver
+which exact files that is: `uv pip compile` for each platform, wheels
+alone, with the sha256 the index states for each; `npm install
+--package-lock-only`, each tarball downloaded and hashed here and held to
+the lock's integrity. Both must be on the PATH of whoever runs the tool.
+Each file is written as a declared download under the lock's directory, and
+the requirements with their hashes, or `package.json` and its lock, into
+the row's `source.files`, which an install writes into the row's directory
+before its steps. `check` says when a lock would resolve otherwise and
+which packages moved; `move` replaces the lock's set whole and leaves the
+row's other downloads alone; `pin` resolves a lock that has no files yet. A
+package with no wheel for a platform is refused by name, since a source
+distribution runs its own code at install: such a package is a declared
+download of its own, placed by the row's step.
+
 Where a publisher states a sha256, the tool takes it and says from where.
 Where it states a sha1 or a sha512, or nothing, the tool downloads the file,
 hashes it, and holds it to what the publisher does state. `--file PATH`

@@ -195,6 +195,32 @@ class Manifest(unittest.TestCase):
         # The name it is kept as takes no version: the steps read one path whatever the pin.
         self.assertTrue(any(e.startswith("install.fetch 1 is {url, sha256, to}") for e in errors_of(manifest(fetch=[{**a, "to": "dl/a-{version}.tgz"}]))))
 
+    def test_a_lock_says_what_a_package_manager_is_asked_for_and_owns_a_directory(self):
+        # The kept manifest: what pip is asked for, and each wheel it resolved to a declared download under the lock's directory.
+        raw = kept(5, "plover")
+        plover, errors = toolpacks.validate(raw)
+        self.assertEqual((errors, plover["lock"]), ([], raw["install"]["lock"]))
+        self.assertEqual([bool(packformat.lock_of(plover["lock"], f["to"])) for f in plover["fetch"]], [True] * 4)
+        self.assertIsNone(packformat.lock_of(plover["lock"], "dl/pipes.tar.gz"), "a file beside the directory is not the lock's")
+        # Its downloads are held as any are, so the word needs no new case; and a lock is format 5's.
+        self.assertEqual(packformat.held(raw), ("pinned", packformat.PINNED_SAID))
+        self.assertEqual(errors_of(dict(raw, format=4, framework="4.2")), ['install.fetch\'s platform, install.lock are pack format 5\'s: the manifest says "format": 5'])
+        pip = {"kind": "pip", "to": "dl/pip", "requirements": ["a", "b[extra]>=2", "c<16"], "python": "3.12", "for": {"linux/amd64": "x86_64-manylinux_2_28"}}
+        npm = {"kind": "npm", "to": "dl/npm", "requirements": ["a", "@s/b@2"]}
+        for good in ([pip], [npm], [pip, npm]):
+            self.assertEqual(errors_of(manifest(lock=good)), [], good)
+        for bad in ([], pip, [{**pip, "kind": "cargo"}], [{**pip, "to": "../pip"}], [{**pip, "to": "/dl/pip"}], [{**pip, "requirements": []}],
+                    # What is asked for starts with a name: never an option of the resolver's, and one line.
+                    [{**pip, "requirements": ["--index-url https://example.com/simple"]}], [{**pip, "requirements": ["a\n-r /etc/passwd"]}], [{**pip, "requirements": [" a"]}],
+                    [{**pip, "requirements": ["a"] * (packformat.LOCK_REQS + 1)}], [{**pip, "python": "3"}], [{**pip, "python": "pypy3.10"}],
+                    [{k: v for k, v in pip.items() if k != "for"}], [{**pip, "for": {"plan9/amd64": "x"}}], [{**pip, "for": {"linux/amd64": "x y"}}],
+                    [{**npm, "python": "3.12"}], [{**npm, "also": 1}],
+                    # No two own one directory, or one inside the other.
+                    [pip, {**npm, "to": "dl/pip"}], [pip, {**npm, "to": "dl/pip/npm"}], [{**pip, "to": "dl/npm/pip"}, npm],
+                    [{**npm, "to": f"dl/{i}"} for i in range(packformat.LOCK_MOST + 1)]):
+            got = errors_of(manifest(lock=bad))
+            self.assertTrue(any(e.startswith(f"install.lock lists up to {packformat.LOCK_MOST} of {{kind, to, requirements}}") for e in got), (bad, got))
+
     def test_the_recipe_a_node_is_handed_carries_them(self):
         rec = lambda name: {"manifest": toolpacks.validate(kept(5, name))[0], "url": "https://example.com/p", "commit": "c" * 40}  # noqa: E731
         src = toolpacks.recipe(rec("tern"))["source"]
@@ -236,6 +262,44 @@ class Row(unittest.TestCase):
             got, why = catalogrows.checked(self.newer(**bad), self.shipped)
             self.assertIsNone(got, bad)
             self.assertIn(said, why, bad)
+
+    def test_a_row_carries_the_small_files_a_package_manager_installs_by(self):
+        # The kept manifest: an official pack whose row asks npm for a tool, with every tarball a declared download
+        # and the project and its lock carried in the row itself, where a pack keeps them in its repository.
+        gannet = kept(5, "gannet")
+        src = gannet["shipped"]["source"]
+        self.assertEqual((toolpacks.validate(gannet, official=True)[1], packformat.source_refused(src), packformat.held(gannet)), ([], "", ("pinned", packformat.PINNED_SAID)))
+        self.assertEqual(sorted(src["files"]), ["dl/npm/package-lock.json", "dl/npm/package.json"])
+        lock = json.loads(src["files"]["dl/npm/package-lock.json"])
+        self.assertEqual(sorted(v["resolved"] for k, v in lock["packages"].items() if k), sorted(f["url"] for f in src["fetch"]), "every tarball the lock names is declared")
+        self.assertEqual(catalogrows.row_of(catalogrows.manifest_of(catalogrows.row_of(gannet)))["source"], src, "and the row comes back whole from its pack")
+        text = "a==1.0 --hash=sha256:" + H + "\n"
+        for good in ({"files": {"dl/pip/requirements.txt": text}}, {"files": {"package.json": "{}\n", "dl/npm/package-lock.json": "{}\n"}},
+                     {"lock": [{"kind": "npm", "to": "dl/npm", "requirements": ["a"]}]}):
+            row = self.newer(**good)
+            self.assertEqual(catalogrows.checked(row, self.shipped)[1], "", good)
+            self.assertEqual((packformat.source_format(row["source"]), catalogrows.manifest_of(row)["format"]), (5, 5), good)
+        for bad in ({}, [text], {"../requirements.txt": text}, {"/etc/requirements.txt": text}, {".bb-receipt": text}, {"dl/.bb-net": "cut\n"}, {".git/config": text},
+                    {"dl/requirements.txt": 7}, {"dl/requirements.txt": "a\x00b"}, {f"dl/{i}.txt": text for i in range(packformat.FILES_MOST + 1)},
+                    {"dl/package-lock.json": "x" * (packformat.FILES_MAX + 1)}):
+            got, why = catalogrows.checked(self.newer(files=bad), self.shipped)
+            self.assertIsNone(got, str(bad)[:80])
+            self.assertIn(f"source.files maps up to {packformat.FILES_MOST} files inside the row's directory to their text", why, str(bad)[:80])
+        self.assertIn("source.lock lists up to", catalogrows.checked(self.newer(lock=[{"kind": "npm", "to": "dl/npm"}]), self.shipped)[1])
+
+    def test_a_recipe_with_every_file_of_a_package_manager_s_set_is_one_this_build_takes(self):
+        # What the largest shipped row needs: a couple of hundred downloads, and a lock of some tens of kilobytes.
+        self.assertGreaterEqual(packformat.FETCH_MAX, 256)
+        fetch = [{"url": f"https://registry.example.org/pkg-{i}/-/pkg-{i}-1.0.{i}.tgz", "sha256": H, "to": f"dl/npm/pkg-{i}-1.0.{i}.tgz"} for i in range(packformat.FETCH_MAX)]
+        row = self.newer(fetch=fetch, files={"dl/npm/package-lock.json": "x" * (packformat.FILES_MAX - 100)}, lock=[{"kind": "npm", "to": "dl/npm", "requirements": ["pkg-0"]}])
+        self.assertLess(len(json.dumps(row)), catalogrows.MAX_BYTES)
+        self.assertEqual(catalogrows.checked(row, self.shipped)[1], "")
+        self.assertIn("source.fetch lists up to 256 downloads", catalogrows.checked(self.newer(fetch=[*fetch, {**fetch[0], "to": "dl/one-more.tgz"}]), self.shipped)[1])
+        big = self.newer(online="x" * 10 + " " + "y" * 200, about="z" * catalogrows.MAX_BYTES)
+        self.assertEqual(catalogrows.checked(big, self.shipped), (None, "it is larger than a recipe is"))
+        # Every shipped row is well inside it.
+        rows = json.loads((ROOT / "config" / "toolchains.json").read_text())["toolchains"]
+        self.assertLess(max(len(json.dumps(r)) for r in rows), catalogrows.MAX_BYTES * 3 // 4)
 
     def test_how_a_newer_pin_is_found_is_held_to_its_shape_and_read_by_no_install(self):
         pin = {"from": "pin", "version": "go1.99.0", "sha256": H}
