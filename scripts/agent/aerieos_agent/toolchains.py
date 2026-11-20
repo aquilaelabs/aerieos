@@ -230,11 +230,19 @@ def extract_sandbox_tool(text):
 def read_catalog(into):
     """The catalog the bundle carries, or {} when it cannot be read, with the
     tool packs a person added (R77, config/toolpacks.json beside it) among
-    its toolchains."""
-    try:
-        with open(os.path.join(into, "config", "toolchains.json")) as f:
-            cat = json.load(f)
-    except (OSError, ValueError):
+    its toolchains. Where the bundle carries the vetted catalog's newer
+    rows (config/toolchains.catalog.json, the shipped rows with those in
+    their places), that file is the one read: the shipped one goes as its
+    release signed it."""
+    cat = None
+    for name in ("toolchains.catalog.json", "toolchains.json"):
+        try:
+            with open(os.path.join(into, "config", name)) as f:
+                cat = json.load(f)
+            break
+        except (OSError, ValueError):
+            continue
+    if cat is None:
         return {}
     try:
         with open(os.path.join(into, "config", "toolpacks.json")) as f:

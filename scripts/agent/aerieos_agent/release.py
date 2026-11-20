@@ -41,13 +41,30 @@ is the list of those files, each with its digest (tools_digest), under a
 line of its own, and a pinned node keeps a copy of them for root only when
 that signature covers the files it was sent.
 
+So is everything else a release ships in the bundle (R267 step 6): aerie,
+its library, the shipped catalog, the publishers' keys a download is checked
+against, the terminal's launcher and the hooks. The bundle carries the list
+of those files, a line each with its sha256 (nodes/bundle.list, the form of
+a SHA256SUMS file), and the release's signature over that list's digest
+under a third line (nodes/bundle.sig). A pinned node unpacks a bundle only
+when the signature is under a key it trusts and every file in the tar is
+the one the list names: none changed, none missing, and none beside them
+but what a controller adds of its own (BUNDLE_ADDS: a person's tool packs,
+the vetted catalog's newer rows, the signatures and the list). A bundle
+that fails this is unpacked nowhere, not in the job account's store and not
+in root's copies, and the node goes on with the one it has
+(may_keep_bundle). What a controller adds is still its word: a tool pack
+and a catalog row are a person's and the catalog's, and no release signs
+them.
+
 A controller somebody builds on their own machine is not a release, and its
 builder signs it with a key of their own. A node trusts such a key beside
 the release key and its spare once a person adds it at the node's console
 (`aerieos-agent release-key add HEX`, up to ALSO_MAX of them, kept in
 node.json as release_also): an update or a list of root's tools signed by an
-added key is taken as one the release signed, and said as what it is.
-Nothing a controller sends adds, changes or drops one.
+added key, or a bundle whose list one signed, is taken as one the release
+signed, and said as what it is. Nothing a controller sends adds, changes or
+drops one.
 """
 import hashlib
 import re
@@ -62,6 +79,21 @@ MESSAGE = b"aerieos agent v1\n"
 # tools_digest() of them. Another line, so neither signature passes as the
 # other.
 TOOLS_MESSAGE = b"aerieos root tools v1\n"
+# ...and for the list of every file a release ships in the bundle: this
+# line, then the digest of that list as the bundle carries it. A third line,
+# so no signature passes as another.
+BUNDLE_MESSAGE = b"aerieos bundle v1\n"
+# What a controller adds to the bundle beside the files a release ships, so
+# what a release's list never names and a pinned node lets ride: a person's
+# tool packs and the packs made on that install, which are theirs and differ
+# on every install; the vetted catalog's newer rows, which are the catalog's
+# and newer than any release; and the three members that carry the
+# signatures and the list themselves. Under any other name, a file the list
+# does not name is refused.
+BUNDLE_ADDS = re.compile(r"config/toolpacks\.json|config/toolpacks/[A-Za-z0-9][A-Za-z0-9._-]{0,79}\.bundle"
+                         r"|config/toolchains\.catalog\.json|nodes/root-tools\.sig|nodes/bundle\.list|nodes/bundle\.sig")
+# One line of the list: a file's sha256, two spaces, its name in the bundle.
+LIST_LINE = re.compile(r"([0-9a-f]{64})  ([^\n]+)")
 KEY_RE = re.compile(r"[0-9a-f]{64}")
 SIG_RE = re.compile(r"[0-9a-f]{128}")
 # How many keys a console may add beside the release key and its spare.
@@ -177,6 +209,41 @@ def tools_digest(files):
     return "sha256:" + h.hexdigest()
 
 
+def bundle_list(text):
+    """{name: sha256} as the bundle's list of its files says them, or None
+    for a text that is not such a list: a line that is not a sha256, two
+    spaces and a name, a name there twice, or a last line cut short."""
+    lines = str(text or "").split("\n")
+    if lines.pop() != "":
+        return None
+    held = {}
+    for line in lines:
+        m = LIST_LINE.fullmatch(line)
+        if not m or m.group(2) in held:
+            return None
+        held[m.group(2)] = m.group(1)
+    return held
+
+
+def bundle_wrong(text, members):
+    """Why a bundle's files are not the ones its list names, said of the
+    first one that is wrong by name, or "". `members` is {name in the tar:
+    the sha256 of its bytes}. A file the list names is there with the bytes
+    listed; one it does not name is one a controller adds (BUNDLE_ADDS)."""
+    listed = bundle_list(text)
+    if listed is None:
+        return "its list of files is not one a release makes"
+    for name in sorted(set(listed) | set(members)):
+        if name not in members:
+            return f"{name} is missing: the release's list names it and the bundle does not hold it"
+        if name in listed:
+            if members[name] != listed[name]:
+                return f"{name} is changed: its bytes are not the ones the release signed"
+        elif not BUNDLE_ADDS.fullmatch(name):
+            return f"{name} is not one a release ships: the release's list does not name it"
+    return ""
+
+
 def verify(key, digest, sig, message=MESSAGE):
     """Why `sig` is not the release key's signature over `digest`, or ""."""
     key, sig = clean_key(key), str(sig or "").strip().lower()
@@ -275,3 +342,40 @@ def may_keep_tools(state, digest, sig):
         return True, f"root's tools not checked ({why}): this node's console allows unsigned builds"
     return False, (f"refused: the tools root installs from this bundle are not signed by a key this node trusts ({why}), so "
                    f"root keeps the copy it has. This node takes only what is signed by {_named(state)}. {_console_can()}")
+
+
+def may_keep_bundle(state, text, sig, members):
+    """(ok, words) for a bundle the controller sent, before any of it is
+    unpacked: `text` is the list of its files the tar carries (bytes, or ""
+    with none), `sig` the signature that came with it, and `members` every
+    member of the tar that is not a folder, {name: the sha256 of its bytes},
+    or for one that is no plain file the words for what it is (a link, a
+    device, a name there twice).
+
+    Kept with nothing said by a node that trusts no key. Otherwise kept
+    when the signature over the list's digest is under a key this node
+    trusts (as may_install decides an update) and every file is the one the
+    list names (bundle_wrong); kept unsigned or not matching only where
+    this node's console allows unsigned builds, and said; refused otherwise,
+    with the first file that is wrong named. A member that is no plain file
+    is refused on any node that trusts a key, whatever its console allows:
+    no controller packs one."""
+    if not trusted(state):
+        return True, ""
+    tail = (f"so this node keeps the bundle it has. This node takes only what is signed by {_named(state)}. "
+            f"{_console_can()}")
+    # A plain file is here by its sha256; anything else by what it is.
+    odd = next((name for name in sorted(members) if not re.fullmatch(r"[0-9a-f]{64}", str(members[name]))), None)
+    if odd is not None:
+        return False, f"refused: this bundle holds {odd}, which is {members[odd]}, and a bundle carries plain files alone, {tail}"
+    raw = text if isinstance(text, bytes) else str(text or "").encode("utf-8")
+    digest = "sha256:" + hashlib.sha256(raw).hexdigest() if raw else ""
+    who, why = _signer(state, digest, sig, BUNDLE_MESSAGE)
+    if who:
+        why = bundle_wrong(raw.decode("utf-8", "replace"), members)
+        if not why:
+            return True, f"the bundle's files are signed by {who}"
+    why = why.replace("the update names no digest to check", "the bundle carries no list of its files")
+    if unsigned_ok(state):
+        return True, f"the bundle's files not checked ({why}): this node's console allows unsigned builds"
+    return False, f"refused: this bundle's files are not ones signed by a key this node trusts ({why}), {tail}"

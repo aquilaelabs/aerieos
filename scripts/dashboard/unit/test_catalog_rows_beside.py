@@ -1,13 +1,14 @@
 """The catalog's newer rows reach a node as a file beside the shipped
-catalog, and aerie's two readers there take it (R267 step 6).
+catalog, and the three readers there take it (R267 step 6).
 
 The bundle carried config/toolchains.json rewritten with the vetted
 catalog's newer rows, so the file a node read was never the one its release
 shipped and no release could sign it. It goes as it is now, and the merged
 rows ride as config/toolchains.catalog.json: aerie's shell half
-(sdk.sh sdk_meta_file) and its python half (sdkmeta.CATALOG) read that file
-where it is there and the shipped one where it is not. BB_TOOLCHAINS_JSON
-still names another catalog outright."""
+(sdk.sh sdk_meta_file), its python half (sdkmeta.CATALOG) and the agent's own
+reader (toolchains.read_catalog) read that file where it is there and the
+shipped one where it is not. BB_TOOLCHAINS_JSON still names another catalog
+outright."""
 import json
 import os
 import shutil
@@ -17,8 +18,10 @@ import tempfile
 import unittest
 
 REPO = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))
+sys.path.insert(0, os.path.join(REPO, "scripts", "agent"))
 sys.path.insert(0, os.path.join(REPO, "scripts", "lib"))
 import sdkmeta  # noqa: E402
+from aerieos_agent import toolchains as agent_toolchains  # noqa: E402
 
 SHIPPED = {"toolchains": [{"name": "zig", "rev": 1}, {"name": "go", "rev": 1}]}
 NEWER = {"toolchains": [{"name": "zig", "rev": 2}, {"name": "go", "rev": 1}]}
@@ -96,6 +99,18 @@ class Beside(unittest.TestCase):
         with open(os.path.join(self.b, "config", "toolpacks.json"), "w") as f:
             json.dump({"toolchains": [{"name": "hexkit", "rev": 1}]}, f)
         self.assertEqual(self.revs(sdkmeta.catalog_at(sdkmeta.catalog_file(self.shipped))), {"zig": 2, "go": 1, "hexkit": 1})
+        self.assertEqual(self.revs(agent_toolchains.read_catalog(self.b)["toolchains"]), {"zig": 2, "go": 1, "hexkit": 1})
+
+    def test_the_agent_reads_them_and_falls_back_to_the_shipped_file(self):
+        self.assertEqual(self.revs(agent_toolchains.read_catalog(self.b)["toolchains"]), {"zig": 1, "go": 1})
+        self.carry_newer()
+        self.assertEqual(self.revs(agent_toolchains.read_catalog(self.b)["toolchains"]), {"zig": 2, "go": 1})
+        self.carry_newer("{ not json")
+        self.assertEqual(self.revs(agent_toolchains.read_catalog(self.b)["toolchains"]), {"zig": 1, "go": 1},
+                         "rows that cannot be read leave the shipped ones")
+        os.unlink(self.newer)
+        os.unlink(self.shipped)
+        self.assertEqual(agent_toolchains.read_catalog(self.b), {})
 
 
 if __name__ == "__main__":

@@ -124,6 +124,13 @@ ROOT_TOOLS = ("nodes/provision-linux.sh", "nodes/bb-session", "nodes/bb-netcut")
 # The release's signature over those and the provisioner's family files, as
 # the bundle carries it where its build made one (release.tools_digest).
 TOOLS_SIG = "nodes/root-tools.sig"
+# The list of every file a release ships in the bundle, a line each with its
+# sha256, and the release's signature over that list's digest, as the bundle
+# carries them (release.may_keep_bundle, R267 step 6). The list is a few
+# kilobytes; one past LIST_MOST is read as none.
+BUNDLE_LIST = "nodes/bundle.list"
+BUNDLE_SIG = "nodes/bundle.sig"
+LIST_MOST = 1 << 20
 # Where an updated Claude Code is pinned, root-owned, for the sessions (claude_update).
 CLAUDE_DIR = "/usr/local/lib/builderbot/claude"
 # ...and the other coding agents (R95 step 2), each in a folder of its own

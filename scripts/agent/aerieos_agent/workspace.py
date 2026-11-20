@@ -7,8 +7,10 @@ import os
 import re
 import shutil
 import tarfile
+import threading
+import time
 from . import release
-from .base import ROOT_BUNDLE_DIR, ROOT_TOOLS, TOOLS_DIR, TOOLS_SIG, fs_holds, log
+from .base import BUNDLE_LIST, BUNDLE_SIG, LIST_MOST, ROOT_BUNDLE_DIR, ROOT_TOOLS, TOOLS_DIR, TOOLS_SIG, fs_holds, log
 from .stores import dir_bytes, load_state, tc_root
 
 
@@ -18,6 +20,12 @@ from .stores import dir_bytes, load_state, tc_root
 BUNDLES_MOST = 40
 # A terminal's hooks are written a moment before its session is entered.
 BUNDLE_SLACK_S = 300
+# One bundle is put in place at a time. A job's thread and the loop may each
+# fetch one, and each download lands in a file of its own, is checked there,
+# and only then takes the tar's one name under this lock, which is held until
+# it is unpacked: the tar that was checked is the tar unpacked, whatever
+# another thread was sent meanwhile.
+_UNPACK = threading.Lock()
 
 
 def sessions_from(proc="/proc", root=None):
@@ -236,7 +244,16 @@ class WorkspaceMixin:
         no job, so `job` may be None and the log is this process's) the
         sessions this node runs (roadmap #24). `.bb/current` points at the
         newest unpacked copy, which is what a shell on this node puts on its
-        PATH."""
+        PATH.
+
+        On a node that trusts a release key the bundle is held to the list
+        of files its release signed before any of it is unpacked
+        (release.may_keep_bundle, R267 step 6). One that fails is unpacked
+        nowhere, and the answer is the bundle this node had before, the
+        directory `.bb/current` points at, or '' with none. The refusal is
+        remembered with the digest and with what this node trusted, so the
+        same bundle under the same trust is not fetched again: a job's log
+        is told why each time, this process's log once."""
         say = job.say if job else (lambda t: log(t.rstrip("\n")))
         store = tc_root(self.state)
         if not store:
@@ -245,6 +262,21 @@ class WorkspaceMixin:
         self.own_dir(store, who)
         bbdir = os.path.join(store, ".bb")
         os.makedirs(bbdir, exist_ok=True)
+        # What this node trusts, read from the file its console writes (as
+        # an update's check does), not this process's copy.
+        try:
+            trust = load_state()
+        except SystemExit:
+            trust = self.state
+        trusts = (tuple(release.trusted(trust)), release.unsigned_ok(trust))
+        # Refused already, and nothing moved since: the controller's last
+        # hello names the same bundle and the console trusts what it did.
+        # A press at the console, or another bundle named, fetches again.
+        was, named = getattr(self, "bundle_refused", None), getattr(self, "bundle_named", "")
+        if was and named and was["digest"] == named and was["trust"] == trusts:
+            if job:
+                job.say(was["why"] + "\n")
+            return self._bundle_before(bbdir, job.say if job else None)
         # The tar lands where only root writes when this agent is root: a
         # path in the job's store is the job's to replace with a symlink.
         root = os.geteuid() == 0
@@ -252,7 +284,10 @@ class WorkspaceMixin:
             os.makedirs(TOOLS_DIR, mode=0o700, exist_ok=True)
             os.chmod(TOOLS_DIR, 0o700)
         tar_path = os.path.join(TOOLS_DIR if root else bbdir, "bundle.tar")
-        st, digest = self.ctl.fetch("download?what=bundle", tar_path)
+        # This call's own download, beside it: checked under this name, and
+        # given the tar's name only once it is to be unpacked (_UNPACK).
+        part = f"{tar_path}.{threading.get_ident()}"
+        st, digest = self.ctl.fetch("download?what=bundle", part)
         if st != 200:
             say(f"could not fetch aerie from the controller ({st})\n")
             return ""
@@ -260,44 +295,66 @@ class WorkspaceMixin:
         # The bytes are what the header says they are, or nothing here runs
         # them: the digest names the bundle everywhere else.
         h = hashlib.sha256()
-        with open(tar_path, "rb") as f:
+        with open(part, "rb") as f:
             for chunk in iter(lambda: f.read(1 << 20), b""):
                 h.update(chunk)
         if not hexd or h.hexdigest() != hexd:
             say(f"refused: the bundle's bytes do not match the digest the controller named ({hexd[:12]})\n")
             with contextlib.suppress(OSError):
-                os.unlink(tar_path)
+                os.unlink(part)
             return ""
-        if root:
-            # What this node trusts, read from the file its console writes
-            # (as an update's check does), not this process's copy.
-            try:
-                trust = load_state()
-            except SystemExit:
-                trust = self.state
-            self._keep_root_tools(tar_path, hexd[:16] or "bundle", say, trust)
-            self._keep_root_bundle(tar_path, hexd[:16] or "bundle", say)
         into = os.path.join(bbdir, hexd[:16] or "bundle")
-        if not os.path.isdir(into):
-            with tarfile.open(tar_path) as tar:
-                if hasattr(tarfile, "data_filter"):
-                    tar.extractall(into, filter="data")
-                else:
-                    tar.extractall(into)
-            os.chmod(os.path.join(into, "scripts", "aerie"), 0o755)
-            # The old name is in the bundle only for an agent not yet updated.
+        # Every file in it is the one its release signed, or none of it is
+        # unpacked: not here, not as root's tools, not as root's bundle.
+        ok, said = self._bundle_checked(part, trust)
+        if not ok:
             with contextlib.suppress(OSError):
-                os.unlink(os.path.join(into, "scripts", "bb"))
-            for x in ("bb-tty", "bb-work-note", "bb-prompt-relay"):
+                os.unlink(part)
+            say(said + "\n")
+            self.bundle_refused = {"digest": digest, "trust": trusts, "why": said}
+            before = self._bundle_before(bbdir, say)
+            if before and not self.session_digest:
+                # What the terminals run is said to the controller by its
+                # digest. The one before is known here by its folder, the
+                # first 16 of it, unless it is this very bundle, unpacked
+                # while this node still took it.
+                self.session_digest = digest if before == into else "sha256:" + os.path.basename(before)
+            return before
+        self.bundle_refused = None
+        with _UNPACK:
+            os.replace(part, tar_path)
+            # A download a stopped agent left half done, an hour on.
+            with contextlib.suppress(OSError):
+                for left in os.listdir(os.path.dirname(tar_path)):
+                    at = os.path.join(os.path.dirname(tar_path), left)
+                    if left.startswith("bundle.tar.") and time.time() - os.path.getmtime(at) > 3600:
+                        os.unlink(at)
+            if said and not os.path.isdir(into):
+                # Said as the bundle arrives, not by every job that fetches it.
+                say(said + "\n")
+            if root:
+                self._keep_root_tools(tar_path, hexd[:16] or "bundle", say, trust)
+                self._keep_root_bundle(tar_path, hexd[:16] or "bundle", say)
+            if not os.path.isdir(into):
+                with tarfile.open(tar_path) as tar:
+                    if hasattr(tarfile, "data_filter"):
+                        tar.extractall(into, filter="data")
+                    else:
+                        tar.extractall(into)
+                os.chmod(os.path.join(into, "scripts", "aerie"), 0o755)
+                # The old name is in the bundle only for an agent not yet updated.
                 with contextlib.suppress(OSError):
-                    os.chmod(os.path.join(into, "scripts", "dashboard", x), 0o755)
-            say(f"aerie {hexd[:12]} unpacked into {into}\n")
-        with contextlib.suppress(OSError):
-            tmp = os.path.join(bbdir, ".current.new")
-            if os.path.lexists(tmp):
-                os.unlink(tmp)
-            os.symlink(os.path.basename(into), tmp)
-            os.replace(tmp, os.path.join(bbdir, "current"))
+                    os.unlink(os.path.join(into, "scripts", "bb"))
+                for x in ("bb-tty", "bb-work-note", "bb-prompt-relay"):
+                    with contextlib.suppress(OSError):
+                        os.chmod(os.path.join(into, "scripts", "dashboard", x), 0o755)
+                say(f"aerie {hexd[:12]} unpacked into {into}\n")
+            with contextlib.suppress(OSError):
+                tmp = os.path.join(bbdir, ".current.new")
+                if os.path.lexists(tmp):
+                    os.unlink(tmp)
+                os.symlink(os.path.basename(into), tmp)
+                os.replace(tmp, os.path.join(bbdir, "current"))
         if who:
             for d, _dirs, files in os.walk(into):
                 for x in [d] + [os.path.join(d, f) for f in files]:
@@ -314,6 +371,71 @@ class WorkspaceMixin:
             self.session_stale = into
         self.session_digest = digest
         return into
+
+    @staticmethod
+    def _bundle_before(bbdir, say=None):
+        """The bundle this node goes on with when the controller's is
+        refused: the directory `.bb/current` points at, or '' when there is
+        none that holds aerie. Said where there is somebody to say it to."""
+        cur = os.path.join(bbdir, "current")
+        try:
+            name = os.readlink(cur)
+        except OSError:
+            name = ""
+        into = os.path.join(bbdir, name) if name and "/" not in name else os.path.realpath(cur) if name else ""
+        if not (into and os.path.isfile(os.path.join(into, "scripts", "aerie"))):
+            into = ""
+        if say:
+            say(f"this node goes on with the bundle it had before ({os.path.basename(into)[:12]})\n" if into
+                else "this node has no bundle from before to go on with\n")
+        return into
+
+    @staticmethod
+    def _bundle_checked(tar_path, trust):
+        """(ok, words) for the tar just fetched, before any of it is
+        unpacked: release.may_keep_bundle's answer over the list the tar
+        carries, the signature beside it and the sha256 of every member.
+        A node that trusts no key reads nothing here and keeps it, as
+        before; one that does and cannot read the tar refuses it."""
+        if not release.trusted(trust or {}):
+            return True, ""
+        text, sig, members = b"", "", {}
+        try:
+            with tarfile.open(tar_path) as tar:
+                for m in tar:
+                    if m.isdir():
+                        # A folder carries no bytes. One that names a way
+                        # out of where the bundle is unpacked is no folder
+                        # of a bundle.
+                        if m.name.startswith("/") or ".." in m.name.split("/"):
+                            members[m.name] = "a folder outside the bundle"
+                        continue
+                    if m.name in members:
+                        # Unpacked, the later one would be the file kept.
+                        members[m.name] = "there twice"
+                        continue
+                    src = tar.extractfile(m) if m.isfile() else None
+                    if src is None:
+                        members[m.name] = "a link" if m.issym() or m.islnk() else "not a plain file"
+                        continue
+                    h, keep = hashlib.sha256(), []
+                    wanted = (m.name == BUNDLE_LIST and m.size <= LIST_MOST) or (m.name == BUNDLE_SIG and m.size <= 4096)
+                    while True:
+                        chunk = src.read(1 << 20)
+                        if not chunk:
+                            break
+                        h.update(chunk)
+                        if wanted:
+                            keep.append(chunk)
+                    members[m.name] = h.hexdigest()
+                    if wanted and m.name == BUNDLE_LIST:
+                        text = b"".join(keep)
+                    elif wanted:
+                        with contextlib.suppress(ValueError, AttributeError):
+                            sig = str(json.loads(b"".join(keep).decode("utf-8", "replace")).get("sig") or "")
+        except (OSError, tarfile.TarError, EOFError) as e:
+            return False, f"refused: the bundle cannot be read as a tar ({e}), so this node keeps the bundle it has"
+        return release.may_keep_bundle(trust, text, sig, members)
 
     @staticmethod
     def _keep_root_tools(tar_path, name, say, trust=None):

@@ -199,6 +199,8 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         self.term_kinds = {}
         self.session_bundle = ""          # the digest the terminals run from
         self.session_digest = ""          # the digest bundle() last fetched
+        self.bundle_named = ""            # the digest the controller's last hello named for its bundle
+        self.bundle_refused = None        # a bundle refused (release.may_keep_bundle): {digest, trust, why}
         self.session_tried = 0
         self.session_stale = ""           # a newer bundle's directory, for the loop to restart onto
         self.session_bound = ""           # the address the relay was bound to, to notice it moving
@@ -654,6 +656,9 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             # store this process cannot write is a node with no sessions,
             # not a node with no agent.
             before = self.session_bundle
+            # ...and a bundle this node refused is not fetched again while
+            # this still names the same one (bundle()).
+            self.bundle_named = r.get("bundle") or ""
             self.session_try(r.get("bundle") or "")
             # The helper the new bundle carries goes in with the bundle. The
             # loop refreshes it before its hello and the bundle arrives after,

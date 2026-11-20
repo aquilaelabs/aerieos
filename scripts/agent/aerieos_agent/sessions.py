@@ -428,8 +428,20 @@ class SessionsMixin:
         who = self.as_user(env, self.session_account())
         into = self.bundle(None, who)
         if not into:
+            # Refused, with no bundle from before to run: said where the
+            # node's row reads why it has no terminals.
+            if getattr(self, "bundle_refused", None) and not self.session_up:
+                SESSION.update(up=False, user=self.session_account(), bundle="",
+                               why="this node refused the controller's bundle: its files are not ones a key "
+                                   "this node trusts signed (the node's log says which)")
             return
-        self.session_bundle = self.session_digest or digest
+        now = self.session_digest or digest
+        # The controller's bundle was refused (release.may_keep_bundle) and
+        # the terminals already run the one this node keeps: nothing moved,
+        # so nothing starts again at every hello that names the refused one.
+        if self.session_up and now == self.session_bundle:
+            return
+        self.session_bundle = now
         self.session_tried = time.time()
         self.session_start(into)
 
@@ -589,7 +601,12 @@ class SessionsMixin:
             return None
         # Where accounts own their homes (R125) the session account can read
         # none of them: read as root, and only from the root-owned bundle,
-        # which nothing outside a view can change.
+        # which nothing outside a view can change. On a node that pinned a
+        # release key that copy is unpacked only from a bundle whose every
+        # shipped file its release signed, this lister among them
+        # (release.may_keep_bundle, R267 step 6), so what root runs here is
+        # the release's and not the controller's word; a node with no key
+        # takes its controller's, as it takes its agent.
         lister = os.path.join(ROOT_BUNDLE_DIR, "current", "scripts", "lib", "login-list.py")
         if any(u.startswith("bbu-") for u in self._tmux_users()) and os.path.isfile(lister):
             try:
