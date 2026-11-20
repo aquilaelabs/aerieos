@@ -259,8 +259,15 @@ class Scratch(unittest.TestCase):
         self.assertEqual(code, 0, out)
         want = self.tool.catalog_dir_paths(self.cat)
         got = self.index()["packs"]
-        self.assertEqual([e["name"] for e in got], [name for _p, _m, name in want] + ["hexkit"], "the official entries, then the others as they were")
-        self.assertTrue(all(e["tier"] == "official" and e["commit"] == head and e["held"] in packformat.HELD_WORDS for e in got[:-1]))
+        self.assertEqual([e["name"] for e in got], [name for _p, _m, name in want] + ["gone", "hexkit"], "the official entries, then the others as they were")
+        self.assertTrue(all(e["tier"] == "official" and e["commit"] == head and e["held"] in packformat.HELD_WORDS for e in got[:-2]))
+        # An official entry this tree does not export is not this tool's to
+        # take away: a release listed in the catalog may still take it.
+        self.assertEqual(next(e for e in got if e["name"] == "gone")["commit"], old)
+        self.assertIn("gone is an official entry this tree does not export: kept as it was", out)
+        # ...and a new one says that it names no topics yet, and how to.
+        self.assertIn("names no topics", out)
+        self.assertNotIn("go names no topics", out)
         go = next(e for e in got if e["name"] == "go")
         manifest = json.loads(Path(self.cat, "packs/official/go/bbtool.json").read_text())
         self.assertEqual((go["format"], go["topics"], go["added"], go["shipped_rev"]), (manifest["format"], ["languages"], "2026-10-28", manifest["shipped"]["rev"]))
@@ -268,7 +275,7 @@ class Scratch(unittest.TestCase):
         self.assertIn(f"go: pack format 1 to {manifest['format']}: its format 1 pin is kept as an older one", out)
         # Every one is an entry an install parses, and says what its folder says.
         idx, why = catalogindex.parse(Path(self.cat, "index.json").read_bytes())
-        self.assertEqual((why, len(idx["packs"])), ("", len(got)))
+        self.assertEqual((why, len(idx["packs"])), ("", len(got)), why)
         for name in ("go", "diagrams", "claude", "model-router", "android-emulator"):
             e = next(e for e in got if e["name"] == name)
             self.assertEqual(catalogentry.differs(packformat.pin_for(e), self.url), [], name)

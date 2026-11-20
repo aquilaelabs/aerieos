@@ -93,7 +93,8 @@ card of such a pack says **pinned**. One whose pinned installer has to
 download the rest from its vendor says so in one sentence
 (`install.online`), and its card says **installer**, with the sentence.
 The word is on the card before anybody adds the pack, and **Look** shows
-it for yours. Aim for pinned:
+it for yours. The catalog lists a pack that reads pinned or installer and
+none that reads open, so aim for pinned:
 [Declared downloads](tool-packs.md#declared-downloads) has each shape.
 
 ## A coding agent
@@ -217,8 +218,8 @@ before format 4 has no `fields`, and `${PORT}`, `${DATA}`, `${MEDIA}`,
   "label": "whoami",
   "about": "A tiny web server that answers with the hostname, the address and the headers of the request.",
   "maker": "Traefik Labs",
-  "format": 4,
-  "framework": "4.2",
+  "format": 5,
+  "framework": "5.2",
   "license": {"label": "MIT (traefik/whoami)", "url": "https://github.com/traefik/whoami/blob/master/LICENSE"},
   "compose": "compose.yml",
   "port": 8089,
@@ -233,7 +234,7 @@ before format 4 has no `fields`, and `${PORT}`, `${DATA}`, `${MEDIA}`,
 ```yaml
 services:
   whoami:
-    image: traefik/whoami:v1.10.4
+    image: traefik/whoami:v1.10.4@sha256:1699d99cb4b9acc17f74ca670b3d8d0b7ba27c948b3445f0593b58ebece92f04
     restart: unless-stopped
     command: ["--name", "${WHOAMI_NAME}"]
     ports:
@@ -291,7 +292,8 @@ AerieOS's own validators as every supported release carries them.
     "sha256": "…", "tier": "vetted", "withdrawn": false,
     "about": "Looks inside binaries: dumps, strings, headers.",
     "platforms": ["linux/amd64", "linux/arm64"],
-    "maker": "Hexkit Project", "framework": "2.1"}
+    "maker": "Hexkit Project", "format": 5, "framework": "5.2",
+    "held": "pinned"}
    ```
 
    | Key | What it is |
@@ -302,7 +304,7 @@ AerieOS's own validators as every supported release carries them.
    | `sha256` | Of the archive at that commit: `git archive --format=tar COMMIT \| sha256sum`, or `git archive --format=tar COMMIT PATH \| sha256sum` with a `path`. |
    | `tier` | `vetted`. A maintainer sets `verified` for a vendor `verified-vendors.json` lists. |
    | `format` | The manifest's `format`, when it is more than 1. |
-   | `held` | What the manifest's downloads are held to, the word **Look** shows for your pack: `pinned`, `installer` or `open`. With `installer`, `online` repeats the manifest's sentence. |
+   | `held` | What the manifest's downloads are held to, the word **Look** shows for your pack: `pinned` or `installer`. With `installer`, `online` repeats the manifest's sentence. The check works the word out from your manifest and refuses an entry that says another, says none, or reads `open`. |
    | `works_with` | The manifest's `works_with`, when it names any: an install on another release line does not list the entry. |
    | `kind` | `"app"` for a Docker app; left out for a pack. |
    | `agent`, `label` | `true` and the agent's name, for a pack that brings a coding agent. |
@@ -319,7 +321,9 @@ AerieOS's own validators as every supported release carries them.
    The first line fetches each AerieOS release the catalog supports
    (`aerieos-releases` lists them); the second holds your entry to every
    one that reads its format. It prints each problem in a sentence and
-   ends `0 problems` when there are none.
+   ends `0 problems` when there are none. Where the first line says no
+   release is listed yet, name AerieOS's branch for it to fetch instead:
+   `tools/aerieos-checkouts.sh main`.
 
 Do not sign anything: `index.sig` is the maintainers', and a pull request
 that changes it is not merged.

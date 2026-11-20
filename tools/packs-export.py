@@ -284,7 +284,10 @@ def catalog_index(root, drop=()):
     """DIR/index.json with an official entry per pack exported from this
     tree, each written from its folder at DIR's HEAD (entry_at); other
     entries kept. An entry that moves to a newer pack format keeps the pin
-    it had as an older one."""
+    it had as an older one. An official entry this tree does not export is
+    kept as it is and said: a release listed there may still take it, and
+    taking one away is a person's choice (its `withdrawn`), never this
+    tool's."""
     head = catalog_head(root)
     if not head:
         return 1
@@ -301,10 +304,18 @@ def catalog_index(root, drop=()):
             continue
         if said:
             print(f"  {name}: {said}")
+        if not entry.get("topics"):
+            print(f"  [note] {name} names no topics, which the catalog's check asks of every entry: --entry {folder} --topics a,b")
         new.append(entry)
     if bad:
         print("  nothing was written")
         return 1
+    # Not this tree's to drop: it stays where it was, after the ones written.
+    wrote = {e["name"] for e in new}
+    left = [p for name, p in have.items() if name not in wrote]
+    for p in left:
+        print(f"  [note] {p.get('name')} is an official entry this tree does not export: kept as it was")
+    kept = left + kept
     if index_write(root, idx, dropped(new + kept, drop)):
         moved = sum(1 for e in new if e != have.get(e["name"]))
         print(f"  wrote {len(new)} official entries from {head[:12]} ({moved} changed, {len(kept)} others kept) in {os.path.join(root, 'index.json')}; sign it")
