@@ -25,6 +25,10 @@ replaces the lock's set whole, leaving the row's other downloads alone.
                                       Exit 0 when nothing would move, 3 when something would, 1 on
                                       an error. A newer release that is not out for every platform
                                       a row names holds the row where it is: said, and not a move.
+                                      With nothing named and no table named, everything this tree
+                                      ships that carries a pin: the toolchains, the coding agents'
+                                      recipes, the CI runners and the services' images, so a
+                                      release's pass is this one command.
     tools/pins.py move [NAME...]      writes the new version and digests into the table for the rows
                                       named (every pinned row with none named), every platform a row
                                       names or none of them, raises the row's rev by one, and runs
@@ -69,6 +73,17 @@ for several platforms, which covers each of them; a row may name the platforms i
     --compose FILE  the images a compose file names, in the table's place: a Docker app's
                     compose.yml in the catalog. The file is one row, named for its folder, and a
                     move or a pin rewrites its image lines and nothing else of it.
+    --catalog DIR   a checkout of the catalog, in the table's place: every folder under its packs/
+                    is a row, named as its manifest names it. A pack's bbtool.json gives what it
+                    declares (install.fetch) and what it asks a package manager for (install.lock,
+                    whose requirements or lock are files of the pack's own folder); a shipped
+                    toolchain's pack its whole recipe (shipped), a coding agent's its install recipe
+                    (agent.install), a service's the images it runs (images); and a Docker app's
+                    compose.yml the images its lines name, held for the platforms its bbapp.json
+                    names. check, move, pin and verify read and write those files where they lie, a
+                    manifest written back in the layout it had, so the catalog's scheduled pass is
+                    one command too. What moved is the catalog's to commit and pin in its index
+                    (tools/packs-export.py --catalog DIR --entry FOLDER).
     --agents PATH   another file of the coding agents' recipes than the shipped one.
     --version V     with pin or move and one NAME: that version, not the one the resolver finds (a
                     release whose files for every platform are not out yet).
@@ -111,6 +126,11 @@ AGENTS = os.path.join(ROOT, "scripts", "dashboard", "agent-recipes.json")
 ALSO = ("sha1", "sha512")
 # The images AerieOS's own services run, the one copy of them (services.py).
 SERVICES = os.path.join(ROOT, "scripts", "dashboard", "service-images.json")
+# The CI runners a node installs, the one copy of them (runners.py).
+RUNNERS = os.path.join(ROOT, "scripts", "dashboard", "runner-pins.json")
+# Everything this tree ships that carries a pin: each table, and the file
+# of the coding agents' recipes read beside the toolchains'.
+SHIPPED = ((TABLE, AGENTS), (RUNNERS, ""), (SERVICES, ""))
 # The name a table's document lists its rows under: the toolchains', the
 # CI runners' (scripts/dashboard/runner-pins.json), whose rows are written
 # as a toolchain's source is, or the services', whose rows name images.
@@ -743,7 +763,12 @@ def row_refused(row):
     if image_rows(row) or "images" in row:
         loose = [ref for _, ref in image_rows(row) if not packformat.image_digest(ref)]
         return f"{loose[0]} names no digest" if loose else ("" if image_rows(row) else "it names no image")
-    return packformat.source_refused(row.get("source"))
+    src = row.get("source")
+    # A pack's lock's files are files of its own folder, as large as they
+    # are: what a row may carry (source.files) is a shipped row's limit.
+    if isinstance(row.get("pack"), dict) and isinstance(src, dict):
+        src = {k: v for k, v in src.items() if k != "files"}
+    return packformat.source_refused(src)
 
 
 # ---- what a row is, and what would move ---------------------------------------
@@ -936,7 +961,7 @@ def agent_rows(recipes):
 # What this tool keeps in the table's document beside the table: the
 # agents' rows, the file they came from, which of the two files moved, and
 # the name the table lists its rows under.
-BESIDE = ("_agents", "_recipes", "_moved", "_list", "_compose", "_text")
+BESIDE = ("_agents", "_recipes", "_moved", "_list", "_compose", "_text", "_file", "_agents_file", "_pack")
 
 
 def agents_written(doc):
@@ -973,7 +998,10 @@ def chosen(doc, names):
     return [r for r in rows if not names or r.get("name") in names]
 
 
-def cmd_check(doc, names, opts, out):
+def check_rows(doc, names, opts, out):
+    """What each row named would move to, said: (how many rows would move,
+    how many could not be asked, how many wait for a release that is not
+    out for every platform they name)."""
     would, failed, waiting = 0, 0, 0
     for row in chosen(doc, names):
         name = row["name"]
@@ -995,9 +1023,19 @@ def cmd_check(doc, names, opts, out):
             waiting += 1
         else:
             would += any(p.get("apply") for p in parts)
+    return would, failed, waiting
+
+
+def checked(counts, out):
+    """check's last line and its exit, for the rows of one table or of several."""
+    would, failed, waiting = (sum(c[i] for c in counts) for i in range(3))
     out((f"{would} row(s) would move" if would else "nothing would move")
         + (f"; {waiting} row(s) wait for a release that is not out for every platform they name" if waiting else ""))
     return 1 if failed else 3 if would else 0
+
+
+def cmd_check(doc, names, opts, out):
+    return checked([check_rows(doc, names, opts, out)], out)
 
 
 def cmd_move(doc, names, opts, out):
@@ -1025,7 +1063,7 @@ def cmd_move(doc, names, opts, out):
             continue
         for line in lines(name, [p for p in parts if p.get("apply")]):
             out(line)
-        if not row.get("compose"):
+        if has_rev(doc, row):
             out(f"{name}: rev {catalogrows.rev_of(row)} to {new['rev']}")
         put(doc, row, new)
         changed += 1
@@ -1062,7 +1100,7 @@ def pin_row(doc, row, opts, out):
             out(line)
         new["rev"] = catalogrows.rev_of(row) + 1
         put(doc, row, new)
-        if not row.get("compose"):
+        if has_rev(doc, row):
             out(f"{name}: rev {catalogrows.rev_of(row)} to {new['rev']}")
         return finish(doc, opts, out, 1, 0)
     # Its own source, where that is not pinned yet: a repository's commit,
@@ -1093,20 +1131,35 @@ def pin_row(doc, row, opts, out):
         for line in lines(name, parts):
             out(line)
     new["rev"] = catalogrows.rev_of(row) + 1
-    why = packformat.source_refused(new["source"])
+    why = row_refused(new)
     if why:
         raise Refused(f"what it would become is refused: {why}")
     put(doc, row, new)
     word, why = packformat.held(new)
-    out(f"{name}: rev {catalogrows.rev_of(row)} to {new['rev']}; it reads {word}" + (f" ({why})" if word == "open" else ""))
+    out(f"{name}: " + (f"rev {catalogrows.rev_of(row)} to {new['rev']}; " if has_rev(doc, row) else "") + f"it reads {word}" + (f" ({why})" if word == "open" else ""))
     return finish(doc, opts, out, 1, 0)
+
+
+def has_rev(doc, row):
+    """Whether a row carries a rev that a move raises: a table's row, a
+    recipe. A compose file has none, nor a pack that is pinned by the
+    commit it is at."""
+    return not (row.get("compose") or (doc.get("_pack") or {}).get("kind") in ("pack", "service"))
 
 
 def finish(doc, opts, out, changed, failed):
     """Write the table where a row of it changed, the coding agents'
     recipes where one of theirs did, and the official packs from them where
     either is the shipped one (the toolchains' table, or the services'
-    images); a compose file where the row is one."""
+    images); a compose file where the row is one; a catalog pack's
+    manifest where the row is that."""
+    if changed and doc.get("_pack"):
+        try:
+            pack_written(doc)
+        except Refused as e:
+            out(f"{doc['_pack']['name']}: its manifest is left as it was: {e}")
+            failed += 1
+        return 1 if failed else 0
     if changed and doc.get("_compose"):
         # A compose file: its image lines rewritten, and nothing else of it.
         row = table(doc)[0]
@@ -1117,14 +1170,14 @@ def finish(doc, opts, out, changed, failed):
         shipped = False
         if "agents" in doc.get("_moved", ()):
             try:
-                save(opts["agents"], agents_written(doc))
-                shipped = os.path.abspath(opts["agents"]) == os.path.abspath(AGENTS)
+                save(doc["_agents_file"], agents_written(doc))
+                shipped = os.path.abspath(doc["_agents_file"]) == os.path.abspath(AGENTS)
             except Refused as e:
                 out(f"the coding agents' recipes are left as they were: {e}")
                 failed += 1
         if "table" in doc.get("_moved", ("table",)):
-            save(opts["file"], {k: v for k, v in doc.items() if k not in BESIDE})
-            shipped = shipped or os.path.abspath(opts["file"]) in (os.path.abspath(TABLE), os.path.abspath(SERVICES))
+            save(doc["_file"], {k: v for k, v in doc.items() if k not in BESIDE})
+            shipped = shipped or os.path.abspath(doc["_file"]) in (os.path.abspath(TABLE), os.path.abspath(SERVICES))
         if shipped:
             p = subprocess.run([sys.executable, os.path.join(HERE, "packs-export.py"), "--write"], capture_output=True, text=True, check=False)
             out((p.stdout + p.stderr).strip())
@@ -1132,7 +1185,9 @@ def finish(doc, opts, out, changed, failed):
     return 1 if failed else 0
 
 
-def cmd_verify(doc, names, opts, out):
+def verify_rows(doc, names, opts, out):
+    """Each pinned file of the rows named held to its pin, said: (how many
+    are not their pin, how many were asked for)."""
     bad, seen = 0, 0
     for row in chosen(doc, names):
         name, src = row["name"], row.get("source") or {}
@@ -1205,19 +1260,220 @@ def cmd_verify(doc, names, opts, out):
                 bad += 1
             else:
                 out(f"{name}: {what} is its pin ({got['bytes']} bytes, sha256 {want[:12]})")
+    return bad, seen
+
+
+def verified(counts, out):
+    """verify's last line and its exit, for the rows of one table or of several."""
+    bad, seen = (sum(c[i] for c in counts) for i in range(2))
     out(f"{bad} of {seen} pinned file(s) are not their pin" if bad else f"every one of the {seen} pinned file(s) asked for is its pin")
     return 1 if bad else 0
+
+
+def cmd_verify(doc, names, opts, out):
+    return verified([verify_rows(doc, names, opts, out)], out)
 
 
 VERBS = {"check": cmd_check, "move": cmd_move, "pin": cmd_pin, "verify": cmd_verify}
 
 
+# ---- the tables a run reads ------------------------------------------------------
+def table_doc(path, recipes=""):
+    """A table's document as the verbs read it: its rows under the name it
+    lists them by, the file it came from, and beside it the coding agents'
+    rows from `recipes`, the file of their install recipes, where one is
+    named."""
+    doc = load(path)
+    doc["_list"] = next((k for k in LISTS if isinstance(doc.get(k), list)), "")
+    if not doc["_list"]:
+        raise ValueError(f"it has no list of {' or '.join(LISTS)}")
+    doc.update(_file=path, _agents=[], _recipes={"recipes": {}}, _moved=set())
+    if recipes:
+        doc["_recipes"] = load(recipes)
+        if not isinstance(doc["_recipes"].get("recipes"), dict):
+            raise ValueError(f"{recipes} has no recipes")
+        doc.update(_agents=agent_rows(doc["_recipes"]["recipes"]), _agents_file=recipes)
+    return doc
+
+
+def compose_doc(path, plats=()):
+    """A compose file in a table's place: one row of the images its lines
+    name, each under the reference it had, held for `plats`."""
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+    refs = packformat.compose_images(text)
+    if not refs:
+        raise ValueError("it names no image")
+    row = {"name": os.path.basename(os.path.dirname(os.path.abspath(path))) or path, "compose": True,
+           "images": {ref: ref for ref in refs}, **({"platforms": list(plats)} if plats else {})}
+    return {LISTS[2]: [row], "_list": LISTS[2], "_compose": path, "_text": text, "_file": path, "_agents": [], "_recipes": {"recipes": {}}, "_moved": set()}
+
+
+# ---- a checkout of the catalog -----------------------------------------------------
+# Every folder under the catalog's packs/ is a row here, read from the file
+# that holds its pins and written back to it: a pack's bbtool.json or an
+# app's compose.yml. What a manifest is says which part of it carries pins
+# (a shipped toolchain's recipe, a coding agent's install recipe, the
+# images a service runs, a pack's own declared install), and nothing here
+# knows one pack from another.
+MANIFEST, APP, COMPOSE = "bbtool.json", "bbapp.json", "compose.yml"
+# The small files a lock installs by are a pack's own, kept in its folder.
+LOCK_FILE_MAX = 4 << 20
+
+
+def laid_out(text, doc):
+    """How a JSON file is laid out, as what json.dumps takes to write it
+    the same way: the indent and the key order that give back its text, so
+    a move's diff is the lines that changed. One laid out by hand is
+    written with its own indent and its keys in the order they were."""
+    for indent in (1, 2, 4, "\t"):
+        for sort in (True, False):
+            kw = {"indent": indent, "sort_keys": sort, "ensure_ascii": False}
+            if json.dumps(doc, **kw) + "\n" == text:
+                return kw
+    m = re.search(r"^([ \t]+)\S", text, re.M)
+    lead = m.group(1) if m else " "
+    return {"indent": "\t" if lead[0] == "\t" else len(lead), "sort_keys": False, "ensure_ascii": False}
+
+
+def pack_source(m, folder):
+    """A pack's own install as the source a row has: what it declares, the
+    keys it carries, its sentence, what it asks a package manager for, and
+    the files a lock installs by, read from its folder."""
+    inst = m.get("install") if isinstance(m.get("install"), dict) else {}
+    src = {"kind": "command", **{k: inst[k] for k in ("fetch", "keyring", "online", "lock") if inst.get(k)}}
+    files = {}
+    for lk in inst.get("lock") if isinstance(inst.get("lock"), list) else []:
+        under = os.path.join(folder, str(lk.get("to") or "")) if isinstance(lk, dict) and packformat.REL.fullmatch(str(lk.get("to") or "")) else ""
+        for base, _dirs, names in os.walk(under) if under and os.path.isdir(under) else ():
+            for name in sorted(names):
+                path = os.path.join(base, name)
+                if os.path.getsize(path) <= LOCK_FILE_MAX:
+                    with open(path, encoding="utf-8") as f:
+                        files[os.path.relpath(path, folder)] = f.read()
+    if files:
+        src["files"] = files
+    return src
+
+
+def catalog_docs(root, plat=""):
+    """A document for every folder under the catalog's packs/ that carries
+    a pin's file, in the folders' order: (docs, what could not be read).
+    `plat` is the one platform an app's images are held for, in the place
+    of the ones its manifest names."""
+    docs, bad = [], []
+    top = os.path.join(root, "packs")
+    for group in sorted(os.listdir(top)) if os.path.isdir(top) else []:
+        for name in sorted(os.listdir(os.path.join(top, group))) if os.path.isdir(os.path.join(top, group)) else []:
+            folder = os.path.join(top, group, name)
+            rel = os.path.relpath(folder, root)
+            try:
+                if os.path.isfile(os.path.join(folder, APP)) and os.path.isfile(os.path.join(folder, COMPOSE)):
+                    # A Docker app: its compose's images, held for the
+                    # platforms its manifest names one by one.
+                    meta = load(os.path.join(folder, APP))
+                    plats = [p for p in meta.get("platforms") or [] if isinstance(p, str) and "*" not in p] if isinstance(meta, dict) else []
+                    docs.append(compose_doc(os.path.join(folder, COMPOSE), [plat] if plat else plats))
+                    continue
+                path = os.path.join(folder, MANIFEST)
+                if not os.path.isfile(path):
+                    continue
+                with open(path, encoding="utf-8") as f:
+                    text = f.read()
+                m = json.loads(text)
+                if not isinstance(m, dict) or not isinstance(m.get("name"), str):
+                    raise ValueError("it is no manifest")
+                pack = {"path": path, "folder": folder, "manifest": m, "text": text, "name": m["name"]}
+                doc = {LISTS[0]: [], "_list": LISTS[0], "_file": path, "_agents": [], "_recipes": {"recipes": {}}, "_moved": set(), "_pack": pack}
+                install = (m.get("agent") or {}).get("install") if isinstance(m.get("agent"), dict) else None
+                if isinstance(m.get("shipped"), dict):
+                    pack["kind"] = "shipped"
+                    doc[LISTS[0]] = [catalogrows.row_of(m)]
+                elif m.get("tier") == "official" and isinstance(install, dict):
+                    pack["kind"] = "agent"
+                    doc["_recipes"] = {"recipes": {m["name"]: install}}
+                    doc["_agents"] = agent_rows(doc["_recipes"]["recipes"])
+                    pack["name"] = doc["_agents"][0]["name"]
+                elif isinstance(m.get("images"), dict):
+                    pack["kind"] = "service"
+                    doc[LISTS[0]] = [{"name": m["name"], "platforms": m.get("platforms") or [], "images": dict(m["images"])}]
+                else:
+                    pack["kind"] = "pack"
+                    # `pack` says the keys a signed download is checked with are the pack's own (packformat.held).
+                    doc[LISTS[0]] = [{"name": m["name"], "platforms": m.get("platforms") or [], "source": pack_source(m, folder), "pack": {}}]
+                docs.append(doc)
+            except (OSError, ValueError, AttributeError, TypeError) as e:
+                bad.append(f"{rel}: {said(e)}")
+    return docs, bad
+
+
+def pack_written(doc):
+    """A catalog pack's manifest written with what its row holds now, in
+    the layout it had, and a pack's lock's files into its folder. Refused,
+    with nothing written, where the manifest would no longer be one an
+    install takes."""
+    import toolpacks  # noqa: PLC0415 (the validator, and all it loads, for a catalog's manifest alone)
+    pack = doc["_pack"]
+    m = copy.deepcopy(pack["manifest"])
+    files = {}
+    if pack["kind"] == "shipped":
+        m = catalogrows.manifest_of(table(doc)[0])
+    elif pack["kind"] == "agent":
+        m["agent"]["install"] = agents_written(doc)["recipes"][pack["manifest"]["name"]]
+    elif pack["kind"] == "service":
+        m["images"] = dict(table(doc)[0]["images"])
+    else:
+        src = table(doc)[0]["source"]
+        m["install"] = {**m["install"], "fetch": src.get("fetch") or []}
+        files = src.get("files") or {}
+    errors = toolpacks.validate(m, (), official=m.get("tier") == "official")[1]
+    if errors:
+        raise Refused("what it would become is refused: " + "; ".join(errors))
+    # A lock's files: the set it installs by now, in the place of the one it had.
+    had = pack_source(pack["manifest"], pack["folder"]).get("files") or {}
+    for rel in had:
+        if rel not in files:
+            os.remove(os.path.join(pack["folder"], rel))
+    for rel, text in files.items():
+        if had.get(rel) != text:
+            os.makedirs(os.path.dirname(os.path.join(pack["folder"], rel)), exist_ok=True)
+            with open(os.path.join(pack["folder"], rel), "w", encoding="utf-8") as f:
+                f.write(text)
+    with open(pack["path"], "w", encoding="utf-8") as f:
+        f.write(json.dumps(m, **laid_out(pack["text"], pack["manifest"])) + "\n")
+
+
+# ---- a run over several tables -------------------------------------------------------
+def names_of(doc):
+    return [r.get("name") for r in table(doc) + doc.get("_agents", [])]
+
+
+def run(verb, docs, names, opts, out, what="row"):
+    """One verb over several documents (the tables this tree ships, the
+    folders of a catalog): each is asked for the rows of it that are named,
+    every one with none named, and the verb answers once for all of them."""
+    missing = [n for n in names if not any(n in names_of(d) for d in docs)]
+    if missing:
+        raise Refused(f"no {what} named {', '.join(missing)}")
+    mine = [(d, [n for n in names if n in names_of(d)]) for d in docs]
+    mine = [(d, ns) for d, ns in mine if ns or not names]
+    if verb == "check":
+        return checked([check_rows(d, ns, opts, out) for d, ns in mine], out)
+    if verb == "verify":
+        return verified([verify_rows(d, ns, opts, out) for d, ns in mine], out)
+    if verb == "pin":
+        if len(names) != 1 or len(mine) != 1:
+            raise Refused("pin takes one NAME")
+        return cmd_pin(mine[0][0], names, opts, out)
+    return max([cmd_move(d, ns, opts, out) for d, ns in mine], default=0)
+
+
 def main(argv, out=print):
-    opts, names = {"file": TABLE}, []
+    opts, names = {}, []
     args = list(argv)
     while args:
         a = args.pop(0)
-        if a in ("--file", "--version", "--platform", "--agents", "--compose"):
+        if a in ("--file", "--version", "--platform", "--agents", "--compose", "--catalog"):
             if not args:
                 out(f"{a} takes a value")
                 return 1
@@ -1239,31 +1495,47 @@ def main(argv, out=print):
     if opts.get("platform") and not packformat.PLATFORM_KEY.fullmatch(opts["platform"]):
         out(f"{opts['platform']} is no platform a row names: linux/amd64, linux/arm64, linux-musl/amd64, darwin/arm64, ...")
         return 1
-    if opts.get("compose"):
-        # A compose file in the table's place: one row of the images its
-        # lines name, each under the reference it had.
-        opts["file"] = opts["compose"]
+    reading = ""
+    if sum(k in opts for k in ("file", "compose", "catalog")) > 1:
+        out("--file, --compose and --catalog each name what is read in the table's place: one of them")
+        return 1
+    try:
+        if opts.get("catalog"):
+            # A checkout of the catalog: every folder of its packs/ a row.
+            if not os.path.isdir(os.path.join(opts["catalog"], "packs")):
+                out(f"pins: cannot read {opts['catalog']}: it is no checkout of the catalog (no packs/)")
+                return 1
+            docs, bad = catalog_docs(opts["catalog"], opts.get("platform", ""))
+            for line in bad:
+                out(f"pins: cannot read {line}")
+            code = run(verb, docs, names, opts, out, "pack or app of the catalog")
+            return 1 if bad else code
+        if verb == "check" and not names and not any(k in opts for k in ("file", "compose", "agents")):
+            # Everything this tree ships that carries a pin: the toolchains
+            # with the coding agents' recipes, the CI runners, the services' images.
+            docs = []
+            for reading, recipes in SHIPPED:
+                docs.append(table_doc(reading, recipes))
+            return run(verb, docs, names, opts, out)
+    except (OSError, ValueError, AttributeError) as e:
+        out(f"pins: cannot read {reading or opts.get('catalog')}: {said(e)}")
+        return 1
+    except ERRORS as e:
+        out(f"pins: {said(e)}")
+        return 1
+    opts.setdefault("file", opts.get("compose") or TABLE)
     try:
         if opts.get("compose"):
-            with open(opts["compose"], encoding="utf-8") as f:
-                text = f.read()
-            refs = packformat.compose_images(text)
-            if not refs:
-                raise ValueError("it names no image")
-            row = {"name": os.path.basename(os.path.dirname(os.path.abspath(opts["compose"]))) or opts["compose"], "compose": True,
-                   "images": {ref: ref for ref in refs}, **({"platforms": [opts["platform"]]} if opts.get("platform") else {})}
-            doc = {LISTS[2]: [row], "_compose": opts["compose"], "_text": text}
+            # A compose file in the table's place: one row of the images its
+            # lines name, each under the reference it had.
+            doc = compose_doc(opts["compose"], [opts["platform"]] if opts.get("platform") else ())
         else:
-            doc = load(opts["file"])
-        doc["_list"] = next((k for k in LISTS if isinstance(doc.get(k), list)), "")
-        if not doc["_list"]:
-            raise ValueError(f"it has no list of {' or '.join(LISTS)}")
+            doc = table_doc(opts["file"])
     except (OSError, ValueError, AttributeError) as e:
         out(f"pins: cannot read {opts['file']}: {said(e)}")
         return 1
     # The coding agents' recipes beside the table: the shipped ones beside
     # the shipped table, or the file named. Another table alone has none.
-    doc.update(_agents=[], _recipes={"recipes": {}}, _moved=set())
     if "agents" not in opts and os.path.abspath(opts["file"]) == os.path.abspath(TABLE):
         opts["agents"] = AGENTS
     if opts.get("agents"):
@@ -1271,7 +1543,7 @@ def main(argv, out=print):
             doc["_recipes"] = load(opts["agents"])
             if not isinstance(doc["_recipes"].get("recipes"), dict):
                 raise ValueError("it has no recipes")
-            doc["_agents"] = agent_rows(doc["_recipes"]["recipes"])
+            doc.update(_agents=agent_rows(doc["_recipes"]["recipes"]), _agents_file=opts["agents"])
         except (OSError, ValueError, AttributeError) as e:
             out(f"pins: cannot read {opts['agents']}: {said(e)}")
             return 1

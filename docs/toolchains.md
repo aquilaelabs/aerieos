@@ -433,10 +433,14 @@ tools/pins.py check              # what each pinned row is pinned to, and what i
 tools/pins.py move go zig        # write the new version and digests for those rows, every platform
 tools/pins.py pin NAME           # a row not pinned yet becomes a pin at what its resolver finds now
 tools/pins.py verify --all       # download every pinned file and hold it to its pin
+tools/pins.py check --catalog DIR   # the same four verbs over a checkout of the catalog
 ```
 
 - **check** reads the network and writes nothing. It exits 0 when nothing
-  would move, 3 when something would, 1 on an error. A file with no version
+  would move, 3 when something would, 1 on an error. With nothing named it
+  asks everything this tree ships that carries a pin, the toolchains, the
+  coding agents' recipes, the CI runners and the services' images, so a
+  release's pass is this one command. A file with no version
   in its address has nothing to track: check downloads it and says when its
   bytes are no longer the pinned ones, which is the day an install of it
   starts being refused. A newer release that is not out for every platform
