@@ -123,7 +123,8 @@ class TheFour(unittest.TestCase):
     def test_a_nodes_test_waits_fifteen_seconds_in_all_and_cancels_nothing(self):
         with mock.patch.object(nodes.db, "audit") as audit:
             r = self.run_it(ended(log="exec\nLinux 6 x86_64\n"), "agent_test", "user:t", dict(NODE))
-            self.assertEqual(r, {"on": True, "why": "exec\nLinux 6 x86_64"})
+            self.assertEqual(r, {"on": True, "why": "exec\nLinux 6 x86_64",
+                                 "trust": {"ok": True, "said": "takes whatever this controller sends: no key is pinned there"}})
             self.assertEqual(self.waits, [("j1", 15, 0)])
             audit.assert_called_once_with("user:t", "node-test", "n1", {"on": True})
             self.assertEqual(self.run_it(ended("failed", 127), "agent_test", "user:t", dict(NODE)), {"on": False, "why": "failed (exit 127)"})

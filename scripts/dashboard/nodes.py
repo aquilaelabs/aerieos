@@ -8319,13 +8319,15 @@ def agent_test(principal, n):
         out = (j.get("log") or "").strip()
         db.audit(principal, "node-test", n["id"],
                  {"on": j["state"] == "succeeded"})
-        ok, said = build_taken(n)
-        return {"on": j["state"] == "succeeded",
-                "why": out or f"{j['state']} (exit {j['exit_code']})",
-                # ...and whether it would take what this controller ships,
-                # which the round trip says nothing of (the operator, 20
-                # Nov: does Test test the signing key).
-                "trust": {"ok": ok, "said": said}}
+        got = {"on": j["state"] == "succeeded",
+               "why": out or f"{j['state']} (exit {j['exit_code']})"}
+        if got["on"]:
+            # ...and whether it would take what this controller ships,
+            # which the round trip says nothing of (the operator, 20 Nov:
+            # does Test test the signing key).
+            ok, said = build_taken(n)
+            got["trust"] = {"ok": ok, "said": said}
+        return got
     return {"on": False, "why": "the agent took the job but did not "
                                 "report back within 15s"}
 
