@@ -208,10 +208,16 @@ def text(shipped_text):
 
 def wanted(index, shipped_rows):
     """The index's official entries whose shipped_rev is past the row this
-    install would use today (its own, or one kept already)."""
+    install would use today (its own, or one kept already). Each entry is
+    read at the pin this build takes (packformat.pin_for), so the rev and
+    the commit are those of a recipe written in a format it reads; an
+    entry with no such pin is left, and the shipped row stays."""
     have = {r["name"]: rev_of(r) for r in merged(list(shipped_rows)) if isinstance(r, dict) and r.get("name")}
     out = []
-    for e in (index or {}).get("packs") or []:
+    for listed in (index or {}).get("packs") or []:
+        e = packformat.pin_for(listed)
+        if e is None:
+            continue
         # An index names a toolchain with its colon as a hyphen.
         name = next((n for n in have if n.replace(":", "-") == e.get("name")), None)
         rev = e.get("shipped_rev")

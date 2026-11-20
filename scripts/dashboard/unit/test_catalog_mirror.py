@@ -19,6 +19,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, ".."))
 import catalogindex  # noqa: E402
 import catalogmirror  # noqa: E402
+import packformat  # noqa: E402
 import statefile  # noqa: E402
 import toolpacks  # noqa: E402
 
@@ -88,11 +89,13 @@ class Mirror(unittest.TestCase):
             t.extractall(dest, filter="data")
         return {"files": 1}
 
-    def catalog(self, generated, sign_with=None):
-        """A catalog checkout: index.json pinning the pack, index.sig over it."""
+    def catalog(self, generated, sign_with=None, **more):
+        """A catalog checkout: index.json pinning the pack, index.sig over it.
+        `more` is what else the entry says."""
         c = tempfile.mkdtemp(dir=self.d)
         data = json.dumps({"version": 1, "generated": generated, "packs": [
-            {"name": "hexkit", "url": self.url, "commit": self.commit, "sha256": self.sha, "tier": "vetted", "about": "x", "platforms": ["linux/amd64"]}]}).encode()
+            {"name": "hexkit", "url": self.url, "commit": self.commit, "sha256": self.sha, "tier": "vetted", "about": "x", "platforms": ["linux/amd64"],
+             **more}]}).encode()
         with open(os.path.join(c, "index.json"), "wb") as f:
             f.write(data)
         with open(os.path.join(c, "index.sig"), "w") as f:
@@ -133,6 +136,32 @@ class Mirror(unittest.TestCase):
         self.assertIn("did not answer", r["error"])
         self.assertTrue(r["index"]["mirror"])
         self.assertEqual([p["name"] for p in r["index"]["packs"]], ["hexkit"])
+
+    def test_a_mirror_holds_every_pin_an_entry_keeps(self):
+        # An entry that moved to a newer pack format keeps the pin of the
+        # one before: the mirror holds both commits, so it serves a build
+        # that reads the newer format and one that reads only the older.
+        with open(os.path.join(self.repo, "bbtool.json"), "w") as f:
+            json.dump({**PACK, "about": "Looks inside binaries, more closely."}, f)
+        git("commit", "-qam", "the pack, again", cwd=self.repo)
+        newer = git("rev-parse", "HEAD", cwd=self.repo)
+        tar = subprocess.run(["git", "archive", "--format=tar", newer], cwd=self.repo, capture_output=True, check=True).stdout
+        past = packformat.FORMAT + 1
+        arc = self.make(self.catalog("2026-10-29T10:00:00Z", commit=newer, sha256=hashlib.sha256(tar).hexdigest(), format=past,
+                                     older=[{"format": 1, "commit": self.commit, "sha256": self.sha, "platforms": ["linux/amd64"]}]))
+        with tarfile.open(arc) as t:
+            t.extractall(os.path.join(self.d, "look"), filter="data")
+        heads = catalogmirror._heads(os.path.join(self.d, "look", "catalog-mirror", "repos", f"{catalogmirror.key(self.url)}.bundle"))
+        self.assertEqual(heads, {self.commit, newer})
+        # This build reads the older pin alone, and installs it from the mirror.
+        self.assertTrue(catalogmirror.take(arc, 1000).get("ok"))
+        os.rename(self.repo, self.repo + ".gone")
+        e = catalogindex.named(catalogmirror.index(), "hexkit")
+        self.assertEqual(e["commit"], self.commit)
+        self.assertNotIn("error", toolpacks.fetch(self.url, e["commit"], sha256=e["sha256"]))
+        with mock.patch.object(packformat, "FORMAT", past):
+            self.assertEqual(catalogindex.named(catalogmirror.index(), "hexkit")["commit"], newer)
+            self.assertIsNotNone(catalogmirror.bundle(self.url, newer))
 
     def test_an_import_is_refused_unsigned_incomplete_or_older(self):
         other = ed25519.Ed25519PrivateKey.generate()

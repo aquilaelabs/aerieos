@@ -5065,9 +5065,7 @@ phone.vm_runner = lambda project, req, by: _vm_do(f"session:{project} (allowed b
 def _catalog_pin(url, commit, sha256, path=""):
     """The kept index's pack entry pinning exactly this url, commit, sha256
     and folder, withdrawn ones left out, or None (B440)."""
-    return next((e for e in (catalogindex.index(settings.get("catalog_url") or None).get("index") or {}).get("packs") or []
-                 if e.get("kind", "pack") == "pack" and not e.get("withdrawn") and e["url"] == url and e["commit"] == commit
-                 and e["sha256"] == sha256 and (e.get("path") or "") == (path or "")), None)
+    return catalogindex.pinning(catalogindex.index(settings.get("catalog_url") or None).get("index"), url, commit, sha256, path)
 
 
 def _catalog_official(name):
@@ -5076,8 +5074,7 @@ def _catalog_official(name):
     read when the catalog's is newer than this release's (R169 step 13).
     From the index as last read, never asked for now: a press on Update
     reads this, and the Library's own read keeps the index fresh."""
-    return next((e for e in (catalogindex.known(settings.get("catalog_url") or None) or {}).get("packs") or []
-                 if e["name"] == name and e.get("tier") == "official" and e.get("kind", "pack") == "pack" and not e.get("withdrawn")), None)
+    return catalogindex.official(catalogindex.known(settings.get("catalog_url") or None), name)
 
 
 def _pack_from_catalog(entry, by, may_root=False):
@@ -5097,8 +5094,7 @@ def _catalog_pack(name):
     """The vetted catalog's tool pack entry of this name, withdrawn ones
     left out, or None: what a session's aerie tool install names when it is
     no toolchain AerieOS ships."""
-    return next((e for e in (catalogindex.index(settings.get("catalog_url") or None).get("index") or {}).get("packs") or []
-                 if e["name"] == name and e.get("kind", "pack") == "pack" and not e.get("withdrawn")), None)
+    return catalogindex.named(catalogindex.index(settings.get("catalog_url") or None).get("index"), name)
 
 
 # A session's aerie tool install (toolchains.session_install): the catalog's
@@ -13185,7 +13181,7 @@ class Handler(BaseHTTPRequestHandler):
             have = set(toolpacks.packs()) - toolchains.shipped_names()
             rows = [{"name": e["name"], "kind": e.get("kind", "pack"), "tier": e.get("tier"), "about": e.get("about", ""),
                      "platforms": e.get("platforms") or [], "added": e["name"] in have}
-                    for e in ((idx.get("index") or {}).get("packs") or [])
+                    for e in packformat.taken(idx.get("index"))
                     if not e.get("withdrawn") and all(w in f"{e['name']} {e.get('about', '')}".lower() for w in words)]
             return self._json({"packs": rows[:50], "more": max(0, len(rows) - 50), "error": idx.get("error", "")})
         if who.get("session"):
@@ -13194,7 +13190,10 @@ class Handler(BaseHTTPRequestHandler):
         if why:
             return self._json({"error": why}, 403)
         r = catalogindex.index(settings.get("catalog_url") or None, fresh=(q.get("fresh") or [""])[0] == "1")
-        return self._json({"index": r.get("index"), "error": r.get("error", ""), "url": settings.get("catalog_url")})
+        # Its entries as this build takes them: the page looks at and adds
+        # the pin it is handed, which is the one this build reads.
+        idx = {**r["index"], "packs": packformat.taken(r["index"])} if r.get("index") else r.get("index")
+        return self._json({"index": idx, "error": r.get("error", ""), "url": settings.get("catalog_url")})
 
     def _get_nasapps(self):
         """GET /api/nasapps (R164 step 2): the catalog of ready apps the New
@@ -13235,8 +13234,7 @@ class Handler(BaseHTTPRequestHandler):
         # in the signed index, never from what the page sends, so whoever
         # may make containers takes it; New container then offers it.
         if action == "add-catalog":
-            entry = next((e for e in (catalogindex.index(settings.get("catalog_url") or None).get("index") or {}).get("packs") or []
-                          if e.get("kind") == "app" and e["name"] == field(req, "app") and not e.get("withdrawn")), None)
+            entry = catalogindex.named(catalogindex.index(settings.get("catalog_url") or None).get("index"), field(req, "app"), kind="app")
             r = nasapps.add_catalog(entry, by=who.get("name") or "", fetch=toolpacks.fetch_folder)
             return self._result(r)
         if action in ("preview", "add", "source", "remove"):

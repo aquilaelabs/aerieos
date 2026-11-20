@@ -21,6 +21,7 @@ import tempfile
 from pathlib import Path
 
 import catalogindex
+import packformat
 
 STATE = None
 unpack = None            # projects.unpack_archive: a spooled upload into a folder
@@ -175,8 +176,11 @@ def _take(unpack_into, now):
         extra = [p.name for p in d.iterdir() if p.name not in ("index.json", "index.sig", "repos")]
         if extra:
             return {"error": f"not imported: a mirror holds index.json, index.sig and repos/ alone, and this has {', '.join(sorted(extra)[:5])}"}
+        # Every entry at the pin this build takes (packformat.taken): what
+        # it would fetch, which for an entry that moved to a newer format
+        # is the older pin it keeps.
         missing = []
-        for e in idx.get("packs") or []:
+        for e in packformat.taken(idx):
             if e.get("withdrawn"):
                 continue
             b = d / "repos" / f"{key(e['url'])}.bundle"

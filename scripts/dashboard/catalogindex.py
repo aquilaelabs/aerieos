@@ -86,6 +86,55 @@ def verify(index_bytes, sig_text, pub=None):
     return "the index's signature does not match: it was changed on the way or signed by another key, and is refused"
 
 
+def _pin(p, own=True):
+    """What moves with a pin (packformat.ENTRY_PIN) as `p` says it, each
+    part held to its shape: `p` is an entry, whose own fields are its newest
+    pin, or one of its `older` pins. None where its commit, its sha256 or
+    its format is none. An entry's own format is kept where it is past 1,
+    as it always was; an older pin's is always said."""
+    if not re.fullmatch(r"[0-9a-f]{40}", str(p.get("commit") or "")) or not re.fullmatch(r"[0-9a-f]{64}", str(p.get("sha256") or "")):
+        return None
+    # The format its manifest is written in (R234), which the entry
+    # repeats: one past this build's is listed and says so, and is not
+    # fetched. An entry whose format is no number is no entry.
+    fmt = packformat.of(p)
+    if fmt is None:
+        return None
+    out = {"commit": str(p["commit"]), "sha256": str(p["sha256"]),
+           "platforms": [str(x)[:20] for x in (p.get("platforms") or []) if isinstance(x, str)][:8]}
+    # A shipped coding agent's entry says its install recipe's rev (R169
+    # step 13), so an install fetches the pack only when that is higher
+    # than the recipe its release carries.
+    rev = p.get("install_rev")
+    if isinstance(rev, int) and not isinstance(rev, bool) and 1 <= rev <= 9999:
+        out["install_rev"] = rev
+    # Its name as a person reads it, where the entry says: a card shows
+    # it before the pack is fetched, as it does once it is kept.
+    if isinstance(p.get("label"), str) and p["label"].strip():
+        out["label"] = p["label"].strip()[:60]
+    # A shipped toolchain's entry says its recipe's rev (R234 step 4), so
+    # an install fetches the pack only when that is past its own row's.
+    rev = p.get("shipped_rev")
+    if isinstance(rev, int) and not isinstance(rev, bool) and 2 <= rev <= 9999:
+        out["shipped_rev"] = rev
+    if fmt > 1 or not own:
+        out["format"] = fmt
+    # ...and the framework's version it is written for, where it says
+    # one past its format alone (packformat.framework_of): what a card
+    # says of an entry this build takes and leaves part of out.
+    fw = packformat.framework_of(p)
+    if fw is not None and fw[1]:
+        out["framework"] = packformat.said(fw)
+    # The AerieOS release lines its manifest says it works with, where
+    # the entry repeats them: an install on another line does not list
+    # the entry at all (the operator, 12 Nov), which it could only learn
+    # after fetching the pack before.
+    ww = p.get("works_with")
+    if isinstance(ww, list) and 0 < len(ww) <= 12 and all(isinstance(x, str) and re.fullmatch(r"\d{1,3}\.\d{1,3}", x) for x in ww):
+        out["works_with"] = list(ww)
+    return out
+
+
 def parse(index_bytes):
     """The entries, each held to its shape, or (None, why)."""
     try:
@@ -99,8 +148,10 @@ def parse(index_bytes):
         if not isinstance(p, dict):
             continue
         name = str(p.get("name") or "")
-        if not re.fullmatch(r"[a-z][a-z0-9-]{1,39}", name) or not re.fullmatch(r"[0-9a-f]{40}", str(p.get("commit") or "")) \
-                or not re.fullmatch(r"[0-9a-f]{64}", str(p.get("sha256") or "")) or not str(p.get("url") or "").startswith("https://"):
+        # Its newest pin, which the entry's own fields are (_pin): an entry
+        # whose commit, sha256 or format is none is no entry.
+        pin = _pin(p)
+        if not re.fullmatch(r"[a-z][a-z0-9-]{1,39}", name) or pin is None or not str(p.get("url") or "").startswith("https://"):
             continue
         # A pack kept in a folder of one repository (R170 step 6: the shipped
         # packs live in the catalog's own): its path, held to a plain
@@ -110,28 +161,17 @@ def parse(index_bytes):
             continue
         # What the entry is (R170 step 7, R172): a tool pack, a Docker app or a service.
         kind = p.get("kind") if p.get("kind") in ("app", "service") else "pack"
-        out.append({"name": name, "url": str(p["url"])[:300], "commit": str(p["commit"]), "sha256": str(p["sha256"]), "path": path, "kind": kind,
+        out.append({"name": name, "url": str(p["url"])[:300], "path": path, "kind": kind,
                     "tier": packformat.tier_of(p.get("tier")), "withdrawn": p.get("withdrawn") is True,
-                    "about": str(p.get("about") or "")[:400],
-                    "platforms": [str(x)[:20] for x in (p.get("platforms") or []) if isinstance(x, str)][:8]})
+                    "about": str(p.get("about") or "")[:400], **pin})
         # Who the tool is by, where the entry says: a card names them
         # before the pack is fetched, as it does once it is kept.
         if packformat.maker_of(p):
             out[-1]["maker"] = packformat.maker_of(p)
-        # A shipped coding agent's entry says its install recipe's rev (R169
-        # step 13), so an install fetches the pack only when that is higher
-        # than the recipe its release carries.
-        rev = p.get("install_rev")
-        if isinstance(rev, int) and not isinstance(rev, bool) and 1 <= rev <= 9999:
-            out[-1]["install_rev"] = rev
         # A pack that brings a coding agent says so, and the Library files
         # its card with the agents before it is installed as after.
         if p.get("agent") is True:
             out[-1]["agent"] = True
-        # Its name as a person reads it, where the entry says: a card shows
-        # it before the pack is fetched, as it does once it is kept.
-        if isinstance(p.get("label"), str) and p["label"].strip():
-            out[-1]["label"] = p["label"].strip()[:60]
         # What it is about (R256): the catalog's topics this build knows,
         # and the day it was added, for the Library's Topic and Recently
         # added. A build from before either leaves them out.
@@ -141,33 +181,18 @@ def parse(index_bytes):
         added = str(p.get("added") or "")
         if re.fullmatch(r"20\d\d-[01]\d-[0-3]\d", added):
             out[-1]["added"] = added
-        # A shipped toolchain's entry says its recipe's rev (R234 step 4), so
-        # an install fetches the pack only when that is past its own row's.
-        rev = p.get("shipped_rev")
-        if isinstance(rev, int) and not isinstance(rev, bool) and 2 <= rev <= 9999:
-            out[-1]["shipped_rev"] = rev
-        # The format its manifest is written in (R234), which the entry
-        # repeats: one past this build's is listed and says so, and is not
-        # fetched. An entry whose format is no number is no entry.
-        fmt = packformat.of(p)
-        if fmt is None:
-            out.pop()
-            continue
-        if fmt > 1:
-            out[-1]["format"] = fmt
-        # ...and the framework's version it is written for, where it says
-        # one past its format alone (packformat.framework_of): what a card
-        # says of an entry this build takes and leaves part of out.
-        fw = packformat.framework_of(p)
-        if fw is not None and fw[1]:
-            out[-1]["framework"] = packformat.said(fw)
-        # The AerieOS release lines its manifest says it works with, where
-        # the entry repeats them: an install on another line does not list
-        # the entry at all (the operator, 12 Nov), which it could only learn
-        # after fetching the pack before.
-        ww = p.get("works_with")
-        if isinstance(ww, list) and 0 < len(ww) <= 12 and all(isinstance(x, str) and re.fullmatch(r"\d{1,3}\.\d{1,3}", x) for x in ww):
-            out[-1]["works_with"] = list(ww)
+        # The pins of the earlier formats it still serves (packformat.pin_for),
+        # each read as the entry's own pin is. An `older` that is not the
+        # format's is dropped whole and the entry kept: its newest pin is as
+        # good as it was, so a build that reads it loses nothing, a build
+        # that does not is left with a card that says what it needs and
+        # fetches nothing, and what the entry says of itself (that it is
+        # withdrawn, above all) is never lost with it. Part of a list that
+        # does not hold together is never guessed at.
+        if p.get("older") is not None and not packformat.older_refused(p):
+            older = [_pin(o, own=False) for o in p["older"]]
+            if all(older):
+                out[-1]["older"] = older
     # The first AerieOS that reads each format, where the index says, for a
     # card to name ({"3": "0.10.0"}).
     since = {str(k): str(v)[:40] for k, v in (d.get("formats") or {}).items()
@@ -184,6 +209,38 @@ def too_new(entry, index=None):
     that reads it where the index says."""
     fmt = packformat.of(entry) or 1
     return packformat.too_new(fmt, ((index or {}).get("formats") or {}).get(str(fmt), ""))
+
+
+def named(index, name, kind="pack", tier=""):
+    """The index's entry of this name and kind, as this build takes it
+    (packformat.taken: at the newest pin whose pack format it reads, which
+    for an entry that moved to a newer format is the older pin it keeps),
+    withdrawn ones left out, or None. `tier` narrows it to that tier. The
+    way a request reads one entry out of the index, so what is looked at,
+    added and kept is that pin and never one past this build; an entry with
+    no pin this build reads is answered too, for the caller to say what it
+    needs (too_new)."""
+    return next((e for e in packformat.taken(index)
+                 if e["name"] == name and e.get("kind", "pack") == kind and not e.get("withdrawn") and (not tier or e.get("tier") == tier)), None)
+
+
+def official(index, name):
+    """The index's official pack entry of this name at a pin this build
+    reads, or None: where a shipped coding agent's newer install recipe is
+    read (R169 step 13). An entry whose every pin is in a format past this
+    build's names no recipe it could run, and is not answered."""
+    e = named(index, name, tier="official")
+    return e if e and not too_new(e, index) else None
+
+
+def pinning(index, url, commit, sha256, path=""):
+    """The index's pack entry that pins exactly this address, commit,
+    sha256 and folder at the pin this build takes, withdrawn ones left
+    out, or None (B440): the tier of what a page asks to add is this
+    entry's, never the request's."""
+    return next((e for e in packformat.taken(index)
+                 if e.get("kind", "pack") == "pack" and not e.get("withdrawn") and e["url"] == url and e["commit"] == commit
+                 and e["sha256"] == sha256 and (e.get("path") or "") == (path or "")), None)
 
 
 def made(index):

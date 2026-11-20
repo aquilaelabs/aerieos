@@ -523,9 +523,11 @@ _trying = {}           # {(app, commit): when it was last tried}, so one that fa
 def wanted(index):
     """[(app, entry)] for the kept apps the signed index pins another
     commit of: an app entry of the same repository and folder, not
-    withdrawn, in a format this build reads."""
+    withdrawn, in a format this build reads. The pin compared is the one
+    this build takes (packformat.taken): an app kept from an entry's older
+    pin is as its entry pins it for as long as this build reads no newer."""
     mine, out = _load(), []
-    for e in (index or {}).get("packs") or []:
+    for e in packformat.taken(index):
         pin = (mine.get(e.get("name")) or {}).get("pin") or {}
         if e.get("kind") != "app" or e.get("withdrawn") or not pin or pin.get("commit") == e.get("commit"):
             continue

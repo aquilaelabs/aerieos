@@ -102,11 +102,16 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
     its answers on this node} for the packs with a config block."""
     out = []
     pack_values = pack_values or {}
+    # The catalog's entries, each at the pin this build takes
+    # (packformat.pin_for): an entry whose newest pin is in a format past
+    # this build's is read at the older pin it keeps for it, and nothing
+    # is said of the newer one.
+    entries = packformat.taken(catalog_index)
     # Who each tool is by (the operator, 12 Nov), for its card to name beside
     # the tier: a shipped row's own word, a coding agent's provider, and for
     # what the signed catalog lists, the entry's. Never a sideloaded pack's
     # own claim: what nobody vetted does not get to say whose it is.
-    said = {e["name"]: e.get("maker", "") for e in (catalog_index or {}).get("packs") or []}
+    said = {e["name"]: e.get("maker", "") for e in entries}
     # ...and this person's own answers, for the fields a pack scopes to a
     # person (R172 step 5): None where it asks none of them, or they may not.
     pack_mine = pack_mine or {}
@@ -154,8 +159,10 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
     packs_here = set()
     # The index's pin of each pack it offers: one kept from it at another
     # commit is offered the new pin on its row (R169 step 4).
-    # A pin written in a format past this build's is no update to offer.
-    pins = {e["name"]: e for e in (catalog_index or {}).get("packs") or []
+    # A pin written in a format past this build's is no update to offer:
+    # the pin compared is the one this build takes, so a pack kept from an
+    # entry's older pin is offered its newer one only by a build that reads it.
+    pins = {e["name"]: e for e in entries
             if e.get("kind", "pack") == "pack" and not e.get("withdrawn") and not _too_new(e, catalog_index)}
     for i in tc.get("items") or []:
         pack = i.get("pack")
@@ -222,7 +229,7 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
     # that row, listed once (R170 step 6).
     shipped = {i["name"].replace(":", "-") for i in tc.get("items") or []} | {r.get("agent", "") for r in agent_rows or []}
     app_ids = {a["id"] for a in apps or []}
-    for e in (catalog_index or {}).get("packs") or []:
+    for e in entries:
         # One added already is among the items with its pack; one the catalog
         # withdrew is not offered (the bell says so to an install that holds it).
         if e["name"] in packs_here or e.get("withdrawn") or (e.get("tier") == "official" and e["name"] in shipped):
@@ -260,7 +267,7 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
     # What each is about and when the catalog added it (R256), where its
     # index entry says: a shipped toolchain's and a kept pack's as well as
     # an offer's, by name.
-    told = {e["name"]: e for e in (catalog_index or {}).get("packs") or []}
+    told = {e["name"]: e for e in entries}
     for r in out:
         e = told.get(r["name"]) if r["kind"] != "agent" and r["kind"] != "companion" else None
         if e and e.get("topics"):

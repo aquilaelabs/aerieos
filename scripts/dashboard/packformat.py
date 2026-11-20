@@ -12,6 +12,10 @@ the format has a number. The promise the number keeps:
     fetches anything whether an entry is one it reads.
   - An install too old for an entry says so on the card and adds nothing;
     it never guesses at a format it has not met.
+  - An entry whose pack moved to a newer format keeps the pin of the
+    manifest written in each earlier one a listed release still reads
+    (`older`), and an install is offered the newest pin it reads (pin_for,
+    below), with nothing said of the ones past it.
   - What a manifest can name but not describe (a source kind, a version
     resolver, a named hook shape, an app's blanks, a service's kind) is a
     primitive, written down in docs/tool-packs.md. A new primitive is a new
@@ -943,3 +947,99 @@ def too_new(fmt, since=""):
         return ""
     need = f"AerieOS {since} or newer" if since else "a newer AerieOS than this one"
     return f"needs {need} (it is written in pack format {fmt}, and this AerieOS reads up to {FORMAT})"
+
+
+# ---- the pins an index entry carries -------------------------------------------
+# An entry of the signed index pins one manifest: the commit it is at, the
+# sha256 of its archive there, and what the entry repeats of that manifest
+# so an install knows it before it fetches anything (ENTRY_PIN). The entry's
+# own fields are its newest pin, as they always were.
+#
+# A pack that moves to a newer format keeps serving the releases that read
+# only the one before (the operator, 20 Nov): its older manifest is still
+# there at its older commit, so nothing is copied, and the entry keeps that
+# pin beside the newest under `older`, newest first:
+#
+#   {"name": ..., "url": ..., "path": ..., "tier": ..., "maker": ...,
+#    "format": 6, "framework": "6.0", "commit": ..., "sha256": ...,
+#    "older": [{"format": 5, "framework": "5.2", "commit": ..., "sha256": ...}]}
+#
+# A pin is whole: an older one says everything of ENTRY_PIN its manifest
+# gave the entry when it was the newest, and takes nothing from the pins
+# beside it. What is the entry's own (its name, where it is kept, its tier,
+# who it is by, what it is about, whether it is withdrawn) is said once.
+# One function answers the entry as a build takes it (pin_for), and every
+# reader of an index goes through it (taken).
+ENTRY_PIN = ("format", "framework", "commit", "sha256", "platforms", "label", "works_with", "held", "online", "install_rev", "shipped_rev")
+ENTRY_OWN = ("name", "url", "path", "kind", "tier", "maker", "about", "topics", "added", "withdrawn", "agent", "older")
+OLDER_MOST = 8
+ENTRY_COMMIT = re.compile(r"^[0-9a-f]{40}$")
+
+
+def older_refused(entry):
+    """Why an entry's `older` is not its earlier pins as the format writes
+    them, or "" (and "" for an entry with none): a list of up to OLDER_MOST,
+    each with its format, its commit and its archive's sha256, the formats
+    going down from below the entry's own with none twice, and nothing in
+    a pin that is the entry's own to say. A key no build has met yet is
+    left for the build that reads it."""
+    older = entry.get("older") if isinstance(entry, dict) else None
+    if older is None:
+        return ""
+    below = of(entry)
+    if not isinstance(older, list) or not 1 <= len(older) <= OLDER_MOST or below is None:
+        return f"older lists up to {OLDER_MOST} earlier pins of the entry, each {{format, commit, sha256}} with what the entry repeats of that manifest"
+    for pin in older:
+        fmt = pin.get("format") if isinstance(pin, dict) else None
+        if not (isinstance(fmt, int) and not isinstance(fmt, bool) and fmt >= 1 and isinstance(pin.get("commit"), str)
+                and ENTRY_COMMIT.fullmatch(pin["commit"]) and isinstance(pin.get("sha256"), str) and SHA256.fullmatch(pin["sha256"])):
+            return "an older pin says its format (a whole number from 1), its commit (the full 40-character hash) and its archive's sha256"
+        own = sorted(k for k in pin if k in ENTRY_OWN)
+        if own:
+            return f"an older pin says {', '.join(own)}, which the entry says once: a pin is {', '.join(ENTRY_PIN)}"
+        if fmt >= below:
+            return (f"older lists pack format {fmt} at or after {below}: earlier pins go from the newest format down, "
+                    "each below the one before and all below the entry's own")
+        below = fmt
+    return ""
+
+
+def pin_for(entry, reads=None):
+    """An index entry as a build that reads pack format `reads` (this
+    build's, when none is named) takes it: its newest pin where the build
+    reads that format, else the newest of its older pins the build reads,
+    laid over the entry's own fields, with no `older` left on it; None
+    where no pin of it is readable. An `older` that is not the format's
+    (older_refused) is read as none."""
+    reads = FORMAT if reads is None else reads
+    fmt = of(entry) if isinstance(entry, dict) else None
+    if fmt is None:
+        return None
+    if fmt <= reads:
+        return {k: v for k, v in entry.items() if k != "older"} if "older" in entry else entry
+    pin = next((p for p in entry.get("older") or [] if p["format"] <= reads), None) if not older_refused(entry) else None
+    return _at(entry, pin) if pin else None
+
+
+def _at(entry, pin):
+    """An entry at one of its older pins: the entry's own fields with the
+    pin's in the place of its newest pin's, none of those carried over."""
+    return {**{k: v for k, v in entry.items() if k not in ENTRY_PIN and k != "older"}, **{k: pin[k] for k in ENTRY_PIN if k in pin}}
+
+
+def taken(index, reads=None):
+    """An index's entries as a build takes them, in the index's order:
+    each at the pin the build reads (pin_for). One with no readable pin is
+    answered at the oldest pin it has, the one nearest the build: its format
+    is past the build's, so every reader leaves it as it leaves any entry
+    too new, and what its card says it needs is the least that would do."""
+    out = []
+    for e in (index.get("packs") if isinstance(index, dict) else None) or []:
+        if not isinstance(e, dict) or of(e) is None:
+            continue
+        got = pin_for(e, reads)
+        if got is None:
+            last = e["older"][-1] if e.get("older") and not older_refused(e) else None
+            got = _at(e, last) if last else {k: v for k, v in e.items() if k != "older"} if "older" in e else e
+        out.append(got)
+    return out

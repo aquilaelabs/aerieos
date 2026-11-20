@@ -64,10 +64,13 @@ def main():
     idx, why = catalogindex.parse(data)
     if why:
         die(why)
+    # Every commit an entry pins: its newest, and the older pins it keeps
+    # for the releases that read only an earlier pack format, so one mirror
+    # serves whichever of them imports it.
     pins = {}
     for e in idx["packs"]:
         if not e.get("withdrawn"):
-            pins.setdefault(e["url"], set()).add(e["commit"])
+            pins.setdefault(e["url"], set()).update(p["commit"] for p in (e, *(e.get("older") or [])))
     work = Path(tempfile.mkdtemp(prefix="catalog-mirror-"))
     try:
         root = work / "catalog-mirror"
