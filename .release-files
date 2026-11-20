@@ -22,3 +22,10 @@ aerieos-os-@VER@.iso.sha256
 aerieos-os-@VER@.attestation.jsonl
 aerieos-os-@VER@.stick.raw.xz
 aerieos-os-@VER@.stick.raw.xz.sha256
+# The list of the files above with each one's sha256, and its signature
+# (R199): what every install holds a file it takes to, so a release is not
+# whole, and a dev build is not published, until it is signed
+# (tools/release-sign.py: seal in the tag's build for a dev build, sign by
+# the stable key's holder for a stable release).
+SHA256SUMS
+SHA256SUMS.sig

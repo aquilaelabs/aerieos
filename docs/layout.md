@@ -440,7 +440,7 @@ tools/sign-agent.py              the agent's release signature (R227): --keygen 
 tools/bb-ref.sh                  writes the aerie block of docs/reference.md from aerie help; aerie lint holds the two equal
 tools/aerieos-stick.py        the USB stick maker (R161 step 5): a release's stick image onto a removable disk on Windows, a Mac or Linux, checked and read back, Python's own library alone
 tools/release-notes.py           a dev build's release notes: what the changelog's Unreleased gained since the last published release
-tools/release-sign.py            makes the release key and signs a release's SHA256SUMS on the key holder's own machine (R199): never run in CI, the repository or a controller
+tools/release-sign.py            makes a release's SHA256SUMS from its files' own bytes and signs it (R199): sign on the stable key holder's own machine (aerieos-release), seal in CI for a dev build with the release build's key (aerieos-dev, a stable tag refused); key makes the stable key
 tools/release-signers.py         writes config/release-signers' dev lines from config/aerieos-release.pub and the stick maker's copy from config/release-signers; --check is aerie lint's, so neither is typed and neither drifts
 tools/release-place.sh           where a release may be cut from: a dev build on its branch, a stable release or a candidate only on main (the tag's first check)
 tools/root-tier.sh               the root tier as root in a throwaway container of the controller's image: the image's own copy, or a checkout's with --tree (the lint workflow's root job, the image workflow's upgrade job)
