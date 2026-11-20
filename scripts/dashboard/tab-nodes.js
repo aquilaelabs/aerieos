@@ -88,6 +88,12 @@ function loadNodes(opts){
 function nodesKnown(){
   return loadNodes(nodesStale ? undefined : {join: 120000});
 }
+// One node of the list by its id, or undefined: a node the list does not
+// hold, or a list not read yet.
+function nodeOf(id){ return (nodesList || []).find(n => n.id === id); }
+// ...and its name, for a sentence about it. `or` is what the sentence calls a
+// node the list does not hold.
+function nodeNameOf(id, or = "this node"){ return nodeOf(id)?.name || or; }
 
 // A node's action: a refusal said, the nodes read again, the answer back.
 function nodeAct(body){ return poster("/api/v1/nodes", {reload: () => loadNodes()})(body); }
@@ -1612,7 +1618,7 @@ function nodeMountForm(f, i){
 // it is saved (a store being typed stays a draft of its own); the draft's
 // mounts follow.
 async function nodeMountsSave(id, c, mounts, btn){
-  const n = nodesList.find(x => x.id === id);
+  const n = nodeOf(id);
   const d = n?.config?.desired || {};
   const config = {stores: {...(d.stores || {})}, keep: [...(d.keep || [])],
     network: {mode: "dhcp", address: "", gateway: "", dns: [], interface: "", routes: [], ...(d.network || {})}, mounts};
@@ -2099,7 +2105,7 @@ function ndRowHtml(n, lead = ""){
         // the id is the one in its enroll script's name.
         ndFacts([where, census, seen, agentVer, ndUpdatesFact(n), n.kind === "agent" ? n.config?.user || "" : "",
                  // A VM AerieOS made on another node (R91 step 14).
-                 n.config?.vm_of ? `${(nodesList || []).find(x => x.id === n.config.vm_of)?.name || n.config.vm_of}, as a VM` : "", n.id])}
+                 n.config?.vm_of ? `${nodeNameOf(n.config.vm_of, n.config.vm_of)}, as a VM` : "", n.id])}
         ${keepLine(n)}
         ${agentBar}${pendingBar}
       </div>
@@ -2308,7 +2314,7 @@ function nodesReadOnly(root){
     if (c.id !== "ndPick" && !c.closest("[data-signin]") && !c.closest(".phonetab")) c.disabled = true;
   });
   root.querySelectorAll(".ndrow[data-node]").forEach(r => {
-    if (nodeMay((nodesList || []).find(x => x.id === r.dataset.node)) !== "write") dead(r);
+    if (nodeMay(nodeOf(r.dataset.node)) !== "write") dead(r);
   });
   if (!(nodesList || []).some(n => nodeMay(n) === "write")) dead(root);
 }
@@ -2754,7 +2760,7 @@ function wireNodesTab(root){
         return;
       }
       if (act === "unenroll"){
-        const n = (nodesList || []).find(x => x.id === id);
+        const n = nodeOf(id);
         if (n) openUnenroll(n);
         return;
       }
@@ -2769,14 +2775,14 @@ function wireNodesTab(root){
       // A reboot ends every session on the node, so the press names them,
       // as Update agent's does; a shutdown also does not come back by itself.
       if (act === "lockdown"){
-        const name = (nodesList || []).find(n => n.id === id)?.name || "this node";
+        const name = nodeNameOf(id);
         if (!await askYes(`Lock down ${name}?\n\nFrom now it may ask this controller for nothing but the job that stops `
               + "every container there, its nginx with them, keeps them from starting at a boot and shuts its SSH door. "
               + "Its credential is revoked when that job ends, or in five minutes if the box never answers, and the node is removed.\n\n"
               + "If the box itself may be taken over, also power it off from its provider's console: that stop does not need the agent.")) return;
       }
       if (act === "reboot" || act === "poweroff"){
-        const nd = (nodesList || []).find(n => n.id === id), name = nd?.name || "this node";
+        const nd = nodeOf(id), name = nd?.name || "this node";
         // Everybody's, as the node reports them, not only this account's
         // (the operator, 26 Oct): each is ended cleanly before the machine
         // goes, so none is left open on the record.
@@ -2801,44 +2807,44 @@ function wireNodesTab(root){
         const mine = here.filter(x => agentOfSession(tmuxBase(x.name)));
         if (here.length && !await askYes(
               `Update the agent on ${
-                (nodesList || []).find(n => n.id === id)?.name || "this node"}?\n\n`
+                nodeNameOf(id)}?\n\n`
               + `This ends the ${here.length} session`
               + `${here.length === 1 ? "" : "s"} open there`
               + `${mine.length ? ` (${mine.length} of them a ${agentsWord(mine.map(x => x.name))} conversation)` : ""}`
               + `. Transcripts are kept; whatever they were running stops.`)) return;
       }
       if (act === "gpu-display"
-          && !await askYes(`Set up the GPU display on ${(nodesList || []).find(n => n.id === id)?.name || "this node"}?\n\n`
+          && !await askYes(`Set up the GPU display on ${nodeNameOf(id)}?\n\n`
                       + "This installs the NVIDIA driver and a headless X server on the card, which "
                       + "takes minutes, and the driver takes the card only after a reboot: the row "
                       + "says when to press Reboot.")) return;
       // Leaving the synced copy (R164) ends the sessions, as a reboot does;
       // cleaning up removes the copies, which only the drain allows.
       if (act === "sync-stop"){
-        const name = (nodesList || []).find(n => n.id === id)?.name || "this node";
+        const name = nodeNameOf(id);
         const here = (state?.sessions || []).filter(x => x.node_id === id);
         if (!await askYes(`Stop syncing ${name}?\n\n`
               + (here.length ? `This ends the ${here.length} session${here.length === 1 ? "" : "s"} open there; transcripts are kept. ` : "")
               + "No session starts there while it sends up what is left; then Clean up /workspace removes its copies.")) return;
       }
       if (act === "sync-clean"){
-        const name = (nodesList || []).find(n => n.id === id)?.name || "this node";
+        const name = nodeNameOf(id);
         if (!await askYes(`Remove the space copies on ${name}?\n\n`
               + "Everything there has reached the controller. The node then holds no spaces until it moves to a synced copy again.")) return;
       }
       if (act === "host-only"){
-        const name = (nodesList || []).find(n => n.id === id)?.name || "this node";
+        const name = nodeNameOf(id);
         if (!await askYes(`Make ${name} hosting only?\n\nIt keeps running the containers sent to it. `
               + "No space may list it, no session or synced copy runs there, and its agent may ask "
               + "the controller for nothing but its own jobs. A space that lists it now has to be "
               + "moved off it first.")) return;
       }
       if (act === "discard"){
-        const n = (nodesList || []).find(x => x.id === id);
+        const n = nodeOf(id);
         if (!await askYes(`Discard ${n?.name || "this row"}?\n\nNothing has enrolled with its script, so the row goes outright and the script it was made for stops working.`)) return;
       }
       if (act === "reenroll"){
-        const n = (nodesList || []).find(x => x.id === id);
+        const n = nodeOf(id);
         if (n){ modal.hidden = false; mintForm({}, n); }
         return;
       }
@@ -2855,7 +2861,7 @@ function wireNodesTab(root){
       // Shutting the SSH door asks nothing (R265: a press asks only where its yes costs something): it opens again
       // from the same row.
       if (act === "feature" && b.dataset.op === "remove"){
-        const name = (nodesList || []).find(n => n.id === id)?.name || "this node";
+        const name = nodeNameOf(id);
         if (!await askYes(b.dataset.feature === "vmhost"
               ? `Uninstall VM host from ${name}?\n\nThe packages AerieOS added for it come off; what the machine had before stays. It is refused while any VM is still there.`
               : b.dataset.feature === "iommu"
@@ -2876,7 +2882,7 @@ function wireNodesTab(root){
         // A failed update frees the button at once, never retried: the
         // person reads why on the toast and presses again (B862). A good one
         // keeps it busy until the agent's hello brings the new digest.
-        else if (j.ok) notifyJob(j.job, `agent update on ${(nodesList || []).find(n => n.id === id)?.name || "the node"}`,
+        else if (j.ok) notifyJob(j.job, `agent update on ${nodeNameOf(id, "the node")}`,
           r => { if (r.state !== "succeeded"){ delete nodesUpdating[id]; readMoved("nodes"); drawPanes(); } });
         else delete nodesUpdating[id];
         return;
@@ -2884,7 +2890,7 @@ function wireNodesTab(root){
       if (act === "rename"){
         const inp = box.querySelector('.ndname [data-k="name"]');
         const name = (inp ? inp.value : "").trim();
-        const was = (nodesList || []).find(x => x.id === id)?.name || "";
+        const was = nodeNameOf(id, "");
         if (!name || name === was) return notify("type the new name first", true);
         const j = await nodeAct({action: "update", id, fields: {name}});
         if (j.error) return notify(j.error, true);
@@ -2902,7 +2908,7 @@ function wireNodesTab(root){
         // The Sessions section's one Save (the operator, 18 Oct): what
         // changed of its switches and numbers, each by its own action, said
         // in one line.
-        const n0 = nodesList.find(x => x.id === id) || {}, conf = n0.config || {};
+        const n0 = nodeOf(id) || {}, conf = n0.config || {};
         const val = k => box.querySelector(`[data-k="${k}"]`);
         const said = [];
         busy(b, "Saving");
@@ -2932,7 +2938,7 @@ function wireNodesTab(root){
       if (act === "gpu-apply"){
         // The GPU section's Apply: each switch only where its tick differs
         // from what the node has. The emulator's is a job on the node.
-        const n = nodesList.find(x => x.id === id) || {};
+        const n = nodeOf(id) || {};
         const ge = box.querySelector('[data-k="gpuemu"]'), gc = box.querySelector('[data-k="gpucomp"]');
         const emuWas = /^(up|starting|reboot)/.test(n.reported?.gpu_display || "");
         const compWas = !n.config?.no_gpu_compute;
@@ -2992,10 +2998,10 @@ function wireNodesTab(root){
     // on exactly that, now and then).
     const ni = box.querySelector('.ndname [data-k="name"]');
     if (ni){
-      ni.oninput = () => { const c = nodeDraft(nodesList.find(x => x.id === id)); c.draft.nameText = ni.value;
+      ni.oninput = () => { const c = nodeDraft(nodeOf(id)); c.draft.nameText = ni.value;
                            // Rename wakes on a new name (the operator, 18 Oct).
                            const rn = box.querySelector('[data-nd="rename"]'), v = ni.value.trim();
-                           if (rn) rn.disabled = !v || v === (nodesList.find(x => x.id === id)?.name || ""); };
+                           if (rn) rn.disabled = !v || v === nodeNameOf(id, ""); };
     }
     // The same for the limit on sessions working at once, in the Sessions
     // section: a number is typed across a heartbeat as easily as a path.
@@ -3006,37 +3012,37 @@ function wireNodesTab(root){
     // the section's Save, like the limit beside it.
     // The Sessions section's drafts: each change wakes its one Save and
     // Revert, which sleep again when every field is back where it was.
-    const sessWake = () => { const dirty = nodeSessDirty(nodesList.find(x => x.id === id) || {});
+    const sessWake = () => { const dirty = nodeSessDirty(nodeOf(id) || {});
       box.querySelectorAll('[data-nd="sess-save"], [data-nd="sess-revert"]').forEach(x => { x.disabled = !dirty; }); };
     for (const [k, key] of [["rootasks", "rootAsks"], ["portslocal", "portsLocal"]]){
       const el = box.querySelector(`[data-k="${k}"]`);
-      if (el) el.onchange = () => { const c = nodeDraft(nodesList.find(x => x.id === id)); c.draft[key] = el.checked; sessWake(); };
+      if (el) el.onchange = () => { const c = nodeDraft(nodeOf(id)); c.draft[key] = el.checked; sessWake(); };
     }
-    wireUsbSection(box, nodesList.find(x => x.id === id) || {});
-    wireMachineSection(box, nodesList.find(x => x.id === id) || {});
-    wireReportSection(box, nodesList.find(x => x.id === id) || {});
+    wireUsbSection(box, nodeOf(id) || {});
+    wireMachineSection(box, nodeOf(id) || {});
+    wireReportSection(box, nodeOf(id) || {});
     // The GPU section's two switches (R102): drafts until its Apply.
     const ge = box.querySelector('[data-k="gpuemu"]');
-    if (ge) ge.onchange = () => { const c = nodeDraft(nodesList.find(x => x.id === id)); c.draft.gpuEmu = ge.checked; };
+    if (ge) ge.onchange = () => { const c = nodeDraft(nodeOf(id)); c.draft.gpuEmu = ge.checked; };
     const gc = box.querySelector('[data-k="gpucomp"]');
-    if (gc) gc.onchange = () => { const c = nodeDraft(nodesList.find(x => x.id === id)); c.draft.gpuComp = gc.checked; };
+    if (gc) gc.onchange = () => { const c = nodeDraft(nodeOf(id)); c.draft.gpuComp = gc.checked; };
     const ti = box.querySelector('[data-k="turns"]');
     if (ti){
-      ti.oninput = () => { const c = nodeDraft(nodesList.find(x => x.id === id)); c.draft.turnsText = ti.value; sessWake(); };
+      ti.oninput = () => { const c = nodeDraft(nodeOf(id)); c.draft.turnsText = ti.value; sessWake(); };
     }
     const wi = box.querySelector('[data-k="workers"]');
     if (wi){
-      wi.oninput = () => { const c = nodeDraft(nodesList.find(x => x.id === id)); c.draft.workersText = wi.value; sessWake(); };
+      wi.oninput = () => { const c = nodeDraft(nodeOf(id)); c.draft.workersText = wi.value; sessWake(); };
     }
   });
 }
 // The path mapping's records: one open at a time, its form kept across a
 // repaint, its Save writing the whole mapping with that pair changed.
 function wireNodePaths(box, id){
-  const n = nodesList.find(x => x.id === id);
+  const n = nodeOf(id);
   if (!n) return;
   const c = nodeDraft(n);
-  const pairs = () => Object.entries(nodesList.find(x => x.id === id)?.config?.paths || {});
+  const pairs = () => Object.entries(nodeOf(id)?.config?.paths || {});
   const open = (i, form) => {
     c.pathEdit = {i, form};
     readMoved("nodes"); drawPanes();
@@ -3153,7 +3159,7 @@ function wireNodeConf(row, id){
   // A runner's record: Edit opens it in place, one at a time, what is typed
   // in it kept across a repaint.
   fold.querySelectorAll("[data-nredit]").forEach(b => b.onclick = () => {
-    const n = nodesList.find(x => x.id === id);
+    const n = nodeOf(id);
     const want = n?.services?.runners?.[b.dataset.nredit] || {};
     c.runEdit = {slot: b.dataset.nredit, form: {token: "", labels: (want.labels || []).join(", ")}};
     readMoved("nodes"); drawPanes();
@@ -3163,12 +3169,12 @@ function wireNodeConf(row, id){
     c.runEdit.form[el.dataset.rf] = el.value;
     // A token typed wakes Install where none was stored.
     const inst = el.closest(".ndrunform")?.querySelector('[data-nrunner="install"]');
-    if (inst && el.dataset.rf === "token" && !n0Busy()) inst.disabled = !el.value && !(nodesList.find(x => x.id === id)?.runner_tokens || []).includes(c.runEdit.slot);
+    if (inst && el.dataset.rf === "token" && !n0Busy()) inst.disabled = !el.value && !(nodeOf(id)?.runner_tokens || []).includes(c.runEdit.slot);
   });
-  const n0Busy = () => { const n = nodesList.find(x => x.id === id); return !!(n?.applying || nodeStale(n)); };
+  const n0Busy = () => { const n = nodeOf(id); return !!(n?.applying || nodeStale(n)); };
   fold.querySelectorAll("[data-nruncancel]").forEach(b => b.onclick = () => { c.runEdit = null; readMoved("nodes"); drawPanes(); });
   fold.querySelectorAll("[data-nrunner]").forEach(b => b.onclick = async () => {
-    const n = nodesList.find(x => x.id === id);
+    const n = nodeOf(id);
     const want = b.dataset.nrunner === "install", slot = b.dataset.slot;
     if (!want && !await askYes(`Remove the runner ${slot} from ${n?.name || "this node"}?\n\nIt is deregistered `
         + `from its host first; workflows that target its label will wait for a runner.`)) return;
@@ -3217,14 +3223,14 @@ function wireNodeConf(row, id){
   fold.querySelectorAll("[data-nsave]").forEach(save => { save.onclick = () => pressing(save, async () => {
     const was = save.textContent;
     busy(save, "Checking");
-    if (!await ndStoreAsk(nodesList.find(x => x.id === id), c)){ unbusy(save, was); return; }
+    if (!await ndStoreAsk(nodeOf(id), c)){ unbusy(save, was); return; }
     busy(save, "Saving");
     const r = await nodeAct({action: "config", id, config: c.draft});
     if (!r.error){ c.dirty = false; c.draft = null; readMoved("nodes"); drawPanes(); }
   }); });
   fold.querySelectorAll("[data-napply]").forEach(b => b.onclick = async () => {
     const what = b.dataset.napply;
-    const n = nodesList.find(x => x.id === id);
+    const n = nodeOf(id);
     const desired = n?.config?.desired || {};
     if (what === "network" && !await askYes(
         `Apply the network change to ${n?.name || "this node"}?\n\nThe node re-addresses `

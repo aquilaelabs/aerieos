@@ -256,8 +256,7 @@ function packDeploy(b, node, r, act, after){
 // Install a coding agent on a node, or update the one there. An update ends
 // the agent's sessions on the node first, so it is asked.
 async function agentUpdate(b, node, r, after){
-  const where = (nodesList || []).find(x => x.id === node)?.name || "this node";
-  if (r.installed && !await askYes(`Update ${r.label} on ${where}? Its sessions there end first; they start again from the space rows.`)) return;
+  if (r.installed && !await askYes(`Update ${r.label} on ${nodeNameOf(node)}? Its sessions there end first; they start again from the space rows.`)) return;
   await sayPost(b, "Asking", "/api/agents", {action: "install", node, agent: r.agent || ""}, "", after);
 }
 // ---- tool packs (R77) -------------------------------------------------------
