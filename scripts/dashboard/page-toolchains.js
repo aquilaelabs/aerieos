@@ -3,7 +3,8 @@
 // dialogs: the read of a node's store (/api/toolchains), the jobs it
 // runs one at a time, queued behind each other (tcAct: install, remove, check, the system packages, abort),
 // the lines a toolchain's row says (its terms, system packages, what it
-// needs, how its download was checked), the machine's own rows (the NVIDIA
+// needs, how its download was checked), where a row stands and the presses
+// the two pages share, the machine's own rows (the NVIDIA
 // driver and the container toolkit) and the tool pack dialog (R77). Not a
 // page: the Toolchains page it was went with R170, the Library in its place.
 //
@@ -180,6 +181,84 @@ function tcReceiptLines(p){
   if (r.differs?.length) lines.push(`<span class="sub warn tcreceipt">The same manifest left other files on ${esc(r.differs.map(d => d.node).join(", "))} (receipt ${
     r.differs.map(d => `<code>${short(d.tree)}</code>`).join(", ")}): something its install fetches is not pinned.</span>`);
   return lines.join("");
+}
+
+// ---- what a row says and does on both pages ---------------------------------
+// The Library's card and the Installed page's row are about the same thing
+// on the same node, each from its own read of /api/library: the facts and
+// the presses the two share are here, and each page keeps its own markup
+// around them (a card there, a row here).
+
+// Where a row stands, as the few words at its right: the one shape both
+// pages draw them in.
+function packState(words, cls = ""){ return `<span class="state${cls ? " " + cls : ""}">${words}</span>`; }
+// One of the machine's own two rows, the NVIDIA driver or the container
+// toolkit. `absent` is what the page says of one that is not installed:
+// nothing on a Library card, whose Install says it, and "not installed" on
+// the Installed page's row.
+function packMachineState(r, absent = ""){
+  const m = r.machine, st = m.state;
+  if (!m.managed) return packState("installed by hand on this machine");
+  if (r.name === TC_DRIVER) return st === "absent" ? packState(absent) : st === "loaded" ? packState("installed and in use", "ok")
+    : packState(st === "nocard" ? "installed, no card now" : st === "leaving" ? "removed, until a restart" : m.newer ? "software update available" : "installed, takes the card at a restart", "warn");
+  return st === "absent" ? packState(absent) : st === "ready" ? packState(m.driver_loaded ? "ready" : "installed, needs the driver running", m.driver_loaded ? "ok" : "warn")
+    : packState(st === "nocard" ? "installed, no card now" : "installed, Docker not configured", "warn");
+}
+// A toolchain, a pack or an agent with nothing else to say of it: installed,
+// behind what is out, a copy an earlier manifest made, or installed in a
+// version nobody could read.
+function packHeldState(r){
+  if (r.installed && !r.update && r.receipt?.stale) return packState("installed from an earlier manifest", "warn");
+  if (r.installed) return packState(r.update ? "software update available" : "installed", r.update ? "warn" : "ok");
+  if (r.unknown) return packState("installed, version unknown");
+  return packState("");
+}
+// The version installed, as a pill, or "" where there is none to name: a
+// row not installed, and one that is only known to be present.
+function packVersionPill(r){
+  return r.version && r.version !== "-" && r.version !== "present" ? `<span class="pill" title="installed">${esc(r.version)}</span>` : "";
+}
+// What the node's last job said went wrong with a toolchain or a pack, as
+// the line under its name, or "": nothing while its own job runs.
+function packJobErr(r, job){
+  return !r.running && (r.kind === "toolchain" || r.kind === "pack") && job?.errors?.[r.name] ? `<div class="sub bad">${esc(job.errors[r.name])}</div>` : "";
+}
+
+// What a page's read of a node tells the store's own state. The lines a
+// toolchain's and an agent's row say read the node's sandbox flag (Install
+// them now on a system line) and this person's plugins and MCP servers there
+// (an agent's Yours). tcAct refuses a second job by the record of the one
+// running, which the read keeps current: where the store's rows have not
+// been read, a stand-in holding the job alone, marked `stub` so nothing
+// takes it for the rows (toolchainsFor).
+function toolchainsSeen(read){
+  tcSandboxNow = !!read.sandbox; agYours = read.yours || {plugins: [], mcp: {}};
+  if (toolchains && !toolchains.nonode && !toolchains.error) toolchains.job = read.job;
+  else toolchains = {name: read.name, job: read.job, items: [], stub: true};
+}
+// A node's store with its rows, read first where they are not held. The pack
+// dialogs find the pack they open on in the rows (tpOpen), and the stand-in
+// a page keeps for the running job has none: taken for them, a kept pack was
+// not found, and its Edit or its Manifest update opened as Add your own on
+// an empty address.
+async function toolchainsFor(node){
+  if (!toolchains || toolchains.stub || toolchains.nonode || toolchains.error || tcNode !== node) await loadToolchains();
+  return toolchains;
+}
+
+// Deploy a service on a node as a written container, or take it off: the
+// build is a job whose row the Containers page has, said when one starts.
+function packDeploy(b, node, r, act, after){
+  const off = act === "remove";
+  return sayPost(b, off ? "Removing" : "Deploying", "/api/library", {action: act, node, pack: r.name},
+    j => j.job ? `${off ? "removing" : "deploying"} ${r.label}: its row on the Containers page has the build` : "", after);
+}
+// Install a coding agent on a node, or update the one there. An update ends
+// the agent's sessions on the node first, so it is asked.
+async function agentUpdate(b, node, r, after){
+  const where = (nodesList || []).find(x => x.id === node)?.name || "this node";
+  if (r.installed && !await askYes(`Update ${r.label} on ${where}? Its sessions there end first; they start again from the space rows.`)) return;
+  await sayPost(b, "Asking", "/api/agents", {action: "install", node, agent: r.agent || ""}, "", after);
 }
 // ---- tool packs (R77) -------------------------------------------------------
 // The one dialog the Library's Add tool pack and a pack's Edit open (tpDraw).

@@ -52,8 +52,7 @@ function loadInstalled(){
     inst = got;
     let wantPage = "";
     if (!inst.error){
-      tcSandboxNow = !!inst.sandbox; agYours = inst.yours || {plugins: [], mcp: {}};
-      if (toolchains && !toolchains.nonode && !toolchains.error) toolchains.job = inst.job; else toolchains = {name: inst.name, job: inst.job, items: []};
+      toolchainsSeen(inst);
       if (instWantAgent){
         const r = (inst.rows || []).find(x => x.kind === "agent" && x.agent === instWantAgent);
         instWantAgent = "";
@@ -82,27 +81,17 @@ function instHere(r){
 
 // Where it stands, in a few words at the row's right.
 function instState(r){
-  const w = (t, cls = "") => `<span class="state${cls ? " " + cls : ""}">${t}</span>`;
+  const w = packState;
   if (r.running) return w(`${esc(r.doing === "remove" ? "removing" : r.doing === "check" ? "checking" : r.doing === "deploy" ? "deploying" : r.installed ? "updating" : "installing")}<span class="dots"></span>`);
   if (r.kind === "service") return r.installed ? w("deployed", "ok") : r.ready ? w(esc(r.ready), "warn") : w("configured, not deployed", "warn");
-  if (r.machine){
-    const m = r.machine, st = m.state;
-    if (!m.managed) return w("installed by hand on this machine");
-    if (r.name === TC_DRIVER) return st === "absent" ? w("not installed") : st === "loaded" ? w("installed and in use", "ok")
-      : w(st === "nocard" ? "installed, no card now" : st === "leaving" ? "removed, until a restart" : m.newer ? "software update available" : "installed, takes the card at a restart", "warn");
-    return st === "absent" ? w("not installed") : st === "ready" ? w(m.driver_loaded ? "ready" : "installed, needs the driver running", m.driver_loaded ? "ok" : "warn")
-      : w(st === "nocard" ? "installed, no card now" : "installed, Docker not configured", "warn");
-  }
+  if (r.machine) return packMachineState(r, "not installed");
   if (r.kind === "agent" && !r.installed) return w("not installed: the Library installs it", "warn");
   // Kept here and not fitting this AerieOS: switched off until one that
   // does is kept, which its Library card offers when the catalog has one.
   if (r.pack?.disabled) return w(esc(r.pack.disabled) + ": the Library offers a version that fits when there is one", "warn");
   // The version that is out is the row's pill ("2.1.314 is out"), so the
   // state says only that, as the Library's card does.
-  if (r.installed && !r.update && r.receipt?.stale) return w("installed from an earlier manifest", "warn");
-  if (r.installed) return w(r.update ? "software update available" : "installed", r.update ? "warn" : "ok");
-  if (r.unknown) return w("installed, version unknown");
-  return w("");
+  return packHeldState(r);
 }
 
 // The row's verbs: Update where its state says one is available, as the
@@ -280,8 +269,8 @@ function instServiceLines(r){
 // Configure where it asks for anything, open its own page (R181 step 2).
 function instRow(r, may){
   const key = `${r.kind}:${r.name}`;
-  const ver = r.version && r.version !== "-" && r.version !== "present" ? ` <span class="pill" title="installed">${esc(r.version)}</span>` : "";
-  const err = !r.running && (r.kind === "toolchain" || r.kind === "pack") && inst?.job?.errors?.[r.name] ? `<div class="sub bad">${esc(inst.job.errors[r.name])}</div>` : "";
+  const pill = packVersionPill(r), ver = pill && ` ${pill}`;
+  const err = packJobErr(r, inst?.job);
   const conf = instConfigurable(r) ? `<button type="button" data-instopen="${esc(key)}" data-instat="configure">Configure</button>` : "";
   return `<div class="row irow" data-irow="${esc(key)}"><div class="grow">
       <div class="name">${esc(r.label)}${ver}${r.update && r.latest ? ` <span class="pill warn">${esc(r.latest)} is out</span>` : ""} <button type="button" class="link imore" data-instopen="${esc(key)}">Open</button></div>
@@ -406,37 +395,28 @@ async function instAct(b, act, kind, name){
   const where = (nodesList || []).find(x => x.id === instNode)?.name || "this node";
   if (kind === "service"){
     if (act === "remove" && !await askYes(`Remove ${r.label} from ${where}? ${r.removes || "Its keys stay here sealed; the spaces lose their way to it."}`, {verb: "Remove", danger: true})) return;
-    busy(b, act === "remove" ? "Removing" : "Deploying");
-    const j = await postJSON("/api/library", {action: act, node: instNode, pack: r.name});
-    if (j.error) notify(j.error, true);
-    else if (j.job) notify(`${act === "remove" ? "removing" : "deploying"} ${r.label}: its row on the Containers page has the build`);
-    await loadInstalled();
+    await packDeploy(b, instNode, r, act, loadInstalled);
     return;
   }
   if (act === "update"){
-    if (kind === "agent"){
-      if (!await askYes(`Update ${r.label} on ${where}? Its sessions there end first; they start again from the space rows.`)) return;
-      busy(b, "Asking");
-      const j = await postJSON("/api/agents", {action: "install", node: instNode, agent: r.agent || ""});
-      if (j.error) notify(j.error, true);
-    } else {
-      busy(b, "Updating");
-      if (!toolchains || toolchains.nonode || toolchains.error || tcNode !== instNode) await loadToolchains();
-      await tcAct("install", [r.name]);
-    }
+    if (kind === "agent"){ await agentUpdate(b, instNode, r, loadInstalled); return; }
+    busy(b, "Updating");
+    // The job reads the store's record of this node, not its rows: the
+    // stand-in the page's read keeps will do.
+    if (!toolchains || toolchains.nonode || toolchains.error || tcNode !== instNode) await loadToolchains();
+    await tcAct("install", [r.name]);
     await loadInstalled();
     return;
   }
   if (kind === "agent"){
     if (!await askYes(`Remove ${r.label} from ${where}? Its sessions end, and none starts there until it is installed again.`)) return;
-    busy(b, "Removing");
-    const j = await postJSON("/api/agents", {action: "remove", node: instNode, agent: r.agent || ""});
-    if (j.error) notify(j.error, true);
-    await loadInstalled();
+    await sayPost(b, "Removing", "/api/agents", {action: "remove", node: instNode, agent: r.agent || ""}, "", loadInstalled);
     return;
   }
   if (act === "edit"){
-    if (!toolchains || toolchains.nonode || toolchains.error || tcNode !== instNode) await loadToolchains();
+    // The dialog finds the pack in the store's rows, read first where the
+    // page holds only its stand-in for them.
+    await toolchainsFor(instNode);
     tpOpen(r.name);
     return;
   }

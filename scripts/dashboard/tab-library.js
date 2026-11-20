@@ -138,18 +138,8 @@ function loadLibrary(){
       // The agent's own entry page (R183), once the card is drawn.
       if (found) setTimeout(() => openEntry(libNode, `agent:${found.name}`));
     }
-    // The lines the Toolchains and Agents pages draw read their own page's
-    // state: the node's sandbox flag (Install them now on a system line) and
-    // this person's plugins and MCP servers there (an agent's Yours).
-    if (!lib.error){
-      tcSandboxNow = !!lib.sandbox; agYours = lib.yours || {plugins: [], mcp: {}};
-      // ...and tcAct refuses a second job by the Toolchains page's record of
-      // the one running, which this read keeps current for it: where that
-      // page has not read its rows, a stand-in holding the job alone, marked
-      // so the pack dialogs read the rows they need (libWithToolchains).
-      if (toolchains && !toolchains.nonode && !toolchains.error) toolchains.job = lib.job;
-      else toolchains = {name: lib.name, job: lib.job, items: [], stub: true};
-    }
+    // What the store's own lines and tcAct read off this page's read.
+    if (!lib.error) toolchainsSeen(lib);
     // One follow-up while a job writes a row, not a poll: the toolchains
     // revision moves when the job ends, and the row's "installing" until then.
     clearTimeout(libFollow); libFollow = null;
@@ -200,7 +190,7 @@ function makerLine(r){
 function libPills(r){
   const by = r.maker ? `<span class="lcby" title="who ${esc(r.label)} is by">${esc(r.maker)}</span>` : "";
   const tier = `${by}<span class="pill${r.tier === "vetted" || r.tier === "verified" ? " ok" : ""}">${esc(libTierWord(r.tier).toLowerCase())}</span>`;
-  const ver = r.version && r.version !== "-" && r.version !== "present" ? ` <span class="pill" title="installed">${esc(r.version)}</span>` : "";
+  const pill = packVersionPill(r), ver = pill && ` ${pill}`;
   const upd = r.update && r.latest ? ` <span class="pill warn" title="update available">${esc(r.latest)} is out</span>` : "";
   const dev = r.dev ? devMark() : "";
   return `${tier}${ver}${upd}${dev}`;
@@ -208,7 +198,7 @@ function libPills(r){
 
 // Where the row stands on the node, in a few words at its right.
 function libState(r){
-  const w = (t, cls = "") => `<span class="state${cls ? " " + cls : ""}">${t}</span>`;
+  const w = packState;
   if (r.running) return w(`${esc(r.doing === "remove" ? "removing" : r.doing === "check" ? "checking" : r.kind === "agent" && r.installed ? "updating" : "installing")}<span class="dots"></span>`);
   // Pressed while another job ran: it goes when that one ends.
   if (r.queued) return w("queued, after the job running now");
@@ -221,14 +211,11 @@ function libState(r){
   if (r.kind === "companion") return r.download ? w(esc(r.version ? `held, ${r.version}` : "held")) : w(esc(r.absent ? `not in ${r.absent}` : "not fetched yet"), "warn");
   if (r.wrong_platform) return w(esc(r.wrong_platform), "warn");
   if (r.machine){
-    const m = r.machine, st = m.state;
-    if (!m.managed) return w("installed by hand on this machine", "");
-    // A newer version of what is here is the news, whatever runs the card now.
-    if (m.here && m.newer && st !== "nocard" && st !== "leaving") return w("software update available", "warn");
-    if (r.name === "nvidia-driver") return st === "absent" ? w("") : st === "loaded" ? w("installed and in use", "ok")
-      : w(st === "nocard" ? "installed, no card now" : st === "leaving" ? "removed, until a restart" : m.newer ? "software update available" : "installed, takes the card at a restart", "warn");
-    return st === "absent" ? w("") : st === "ready" ? w(m.driver_loaded ? "ready" : "installed, needs the driver running", m.driver_loaded ? "ok" : "warn")
-      : w(st === "nocard" ? "installed, no card now" : "installed, Docker not configured", "warn");
+    const m = r.machine;
+    // A newer version of what is here is the news, whatever runs the card
+    // now: the card is where it is installed from, so it says that first.
+    if (m.managed && m.here && m.newer && m.state !== "nocard" && m.state !== "leaving") return w("software update available", "warn");
+    return packMachineState(r);
   }
   // A pack kept here that does not fit this AerieOS is switched off until
   // one that does is kept (the operator, 12 Nov): said in the warning
@@ -237,10 +224,7 @@ function libState(r){
   // The catalog pins a newer commit of a pack kept from it: said as what
   // it is, the pack's manifest and not the program on the node.
   if (r.repin) return w("manifest update available", "warn");
-  if (r.installed && !r.update && r.receipt?.stale) return w("installed from an earlier manifest", "warn");
-  if (r.installed) return w(r.update ? "software update available" : "installed", r.update ? "warn" : "ok");
-  if (r.unknown) return w("installed, version unknown");
-  return w("");
+  return packHeldState(r);
 }
 
 // The one verb a row takes, and Remove where it is installed (the
@@ -423,7 +407,7 @@ function libDriverPick(m){
 // ...Details opening the entry's own page (R183), never the card in place.
 function libRow(r, may){
   const key = `${r.kind}:${r.name}`;
-  const err = !r.running && (r.kind === "toolchain" || r.kind === "pack") && lib?.job?.errors?.[r.name] ? `<div class="sub bad">${esc(lib.job.errors[r.name])}</div>` : "";
+  const err = packJobErr(r, lib?.job);
   return `<div class="lcard${r.running ? " busy" : ""}" data-lrow="${esc(key)}">
     <div class="lchead">${libIcon(r)}
       <div class="lctitle"><div class="name"><span class="lcname">${esc(r.label)}</span> <button type="button" class="link lmore" data-libmore="${esc(key)}">Details</button></div><div class="lcmeta">${libPills(r)}</div></div></div>
@@ -675,21 +659,16 @@ function wireLibrary(root){
   root.querySelectorAll("[data-liblook]").forEach(b => b.onclick = () => libLook(b.dataset.liblook));
 }
 
-// The pack dialogs read the Toolchains page's rows (tpOpen's Edit finds the
-// pack there), so they are read for this node first where they are not yet.
-// The stand-in loadLibrary keeps for the running job is no rows: taken for
-// them, a kept pack was not found, its Manifest update opened as a fresh
-// install and its Add sent no address, refused as a pin the catalog does
-// not make.
+// The pack dialogs read the store's rows (tpOpen's Edit finds the pack
+// there), so they are read for this node first where they are not yet.
 async function libWithToolchains(f){
-  if (!toolchains || toolchains.stub || toolchains.nonode || toolchains.error || tcNode !== libNode) await loadToolchains();
+  await toolchainsFor(libNode);
   f();
 }
 
 async function libAct(b, act, kind, name){
   const r = libFind(x => x.kind === kind && x.name === name);
   if (!r) return;
-  const n = (nodesList || []).find(x => x.id === libNode), where = n?.name || "this node";
   if (kind === "app"){
     if (act === "edit"){ tpOpenApp(name); return; }
     // One the vetted catalog offers is kept first, from its pin in the
@@ -705,22 +684,8 @@ async function libAct(b, act, kind, name){
     openNewContainerApp(name, lib?.docker ? libNode : "");
     return;
   }
-  if (kind === "service"){
-    busy(b, "Deploying");
-    const j = await postJSON("/api/library", {action: "install", node: libNode, pack: r.name});
-    if (j.error) notify(j.error, true);
-    else if (j.job) notify(`deploying ${r.label}: its row on the Containers page has the build`);
-    await libReload();
-    return;
-  }
-  if (kind === "agent"){
-    if (r.installed && !await askYes(`Update ${r.label} on ${where}? Its sessions there end first; they start again from the space rows.`)) return;
-    busy(b, "Asking");
-    const j = await postJSON("/api/agents", {action: act, node: libNode, agent: r.agent || ""});
-    if (j.error) notify(j.error, true);
-    await libReload();
-    return;
-  }
+  if (kind === "service"){ await packDeploy(b, libNode, r, "install", libReload); return; }
+  if (kind === "agent"){ await agentUpdate(b, libNode, r, libReload); return; }
   if (act === "add"){ libWithToolchains(() => tpOpenCatalog({...r.catalog, name: r.name, tier: r.tier, about: r.about, platforms: r.platforms})); return; }
   if (act === "edit"){ libWithToolchains(() => tpOpen(r.name)); return; }
   if (act === "repin"){ libWithToolchains(() => tpOpen(r.name, r.repin)); return; }
