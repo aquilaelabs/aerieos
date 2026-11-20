@@ -2165,6 +2165,11 @@ print(json.dumps(sorted(os.listdir(d))))
       ok(still === 'running' && took < 9000 && !probe.error,
          `Test answers beside a job that holds the node's one slot, rather than after it (${took}ms, the long job ${still}: ${
            JSON.stringify(probe).slice(0, 90)})`);
+      // ...and says, beside the round trip, whether the node takes what
+      // this controller ships: one phrase, with no key in it.
+      ok(probe.on && probe.trust && typeof probe.trust.ok === 'boolean' && /this controller/.test(probe.trust.said || '')
+         && probe.trust.said.length < 100 && !/[0-9a-f]{8}/.test(probe.trust.said),
+         `...and says whether the node takes this controller's builds (${JSON.stringify(probe.trust)})`);
       await api('/api/v1/jobs', { action: 'cancel', id: long.job });
       await jobEnd(long.job, { ms: 20000, step: 200 });
     }

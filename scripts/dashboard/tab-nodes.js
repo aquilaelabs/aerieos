@@ -2985,9 +2985,11 @@ function wireNodesTab(root){
         const now = root.querySelector(`.ndrow[data-node="${CSS.escape(id)}"] .ndtest`) || out;
         if (!now) return;
         now.hidden = false;
-        now.textContent = j.on ? (j.why || "answers, and says it is a sandbox")
-                               : (j.why || "no answer");
-        now.classList.toggle("warn", !j.on);
+        // ...and, for a node that answered, whether it takes what this
+        // controller ships: the round trip proves the channel alone.
+        now.textContent = (j.on ? (j.why || "answers, and says it is a sandbox")
+                                : (j.why || "no answer")) + (j.on && j.trust?.said ? `; ${j.trust.said}` : "");
+        now.classList.toggle("warn", !j.on || j.trust?.ok === false);
         return;
       }
       // Every other verb is its name, sent with the node: the door's press

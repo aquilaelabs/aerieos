@@ -3915,6 +3915,45 @@ def enroll_pins():
             "agent": " ".join(words[:2]) if words[:1] == ["--release-key"] else ""}
 
 
+def agent_sig_key():
+    """The key this build's agent is signed under, as agent.sig names it,
+    or "" for a build with no signature over the agent it ships."""
+    if not agent_sig():
+        return ""
+    try:
+        key = str(json.loads((AGENT_DIR / "agent.sig").read_text()).get("key") or "").lower()
+    except (OSError, ValueError, AttributeError):
+        return ""
+    return key if re.fullmatch(r"[0-9a-f]{64}", key) else ""
+
+
+def build_taken(n):
+    """(ok, words): whether this node takes the build this controller
+    ships, in one phrase with no key in it. Read off what the node reports
+    of its console's trust (the release key, its spare and the keys added
+    there, each by its first characters, and whether unsigned builds are
+    allowed) and the key this build's signature is under: what Test says
+    beside its round trip, which proves the channel and nothing of this."""
+    rep = (n or {}).get("reported") or {}
+    pins = [str(k) for k in (rep.get("release_key"), rep.get("release_spare")) if k]
+    also = [str(k) for k in rep.get("release_also") or [] if isinstance(k, str) and k]
+    if not pins and not also:
+        return True, "takes whatever this controller sends: no key is pinned there"
+    by = agent_sig_key()[:16]
+    who = ""
+    if by and rep.get("release_key") and by == str(rep["release_key"]):
+        who = "the release key"
+    elif by and by in pins:
+        who = "the release key's spare"
+    elif by and by in also:
+        who = "a key added at its console"
+    if who:
+        return True, f"takes this controller's builds, signed by {who}"
+    if rep.get("unsigned_ok") is True:
+        return True, "takes this controller's builds unchecked: its console allows unsigned builds"
+    return False, "will not take this controller's builds: " + ("they are signed by a key it does not trust" if by else "they are unsigned")
+
+
 def agent_sig(digest=None):
     """The release's signature over the agent this controller ships, where
     its build made one (scripts/agent/agent.sig, tools/sign-agent.py), or
@@ -8280,8 +8319,13 @@ def agent_test(principal, n):
         out = (j.get("log") or "").strip()
         db.audit(principal, "node-test", n["id"],
                  {"on": j["state"] == "succeeded"})
+        ok, said = build_taken(n)
         return {"on": j["state"] == "succeeded",
-                "why": out or f"{j['state']} (exit {j['exit_code']})"}
+                "why": out or f"{j['state']} (exit {j['exit_code']})",
+                # ...and whether it would take what this controller ships,
+                # which the round trip says nothing of (the operator, 20
+                # Nov: does Test test the signing key).
+                "trust": {"ok": ok, "said": said}}
     return {"on": False, "why": "the agent took the job but did not "
                                 "report back within 15s"}
 
