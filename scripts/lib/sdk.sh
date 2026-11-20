@@ -1288,6 +1288,12 @@ sdk_install_android() {
     pkg="$(sdk_android_id "$what")"
     [ -n "$pkg" ] || die "could not find a ${what#android:} package to install"
     log "installing ${pkg} into $(sdk_dir android)"
+    # sdkmanager is the installer here, and downloads the package by
+    # itself: said in the row's own sentence where it has one (an id with no
+    # row of its own has none to say).
+    local online
+    online="$(sdk_meta field "$what" source.online 2>/dev/null)" || online=""
+    [ -z "$online" ] || log "${what} keeps the network, as its entry says: ${online}"
     sdk_android_clear_stale_installer "$pkg"
     sdk_mark_partial "$(sdk_android_pkg_dir "$pkg")"
     sdkmgr --install "$pkg"
@@ -1467,9 +1473,35 @@ sdk_install_git() {
         "${g[@]}" checkout -q --detach FETCH_HEAD
         [ "$("${g[@]}" rev-parse HEAD)" = "$commit" ] \
             || die "${what}: ${url} answered $("${g[@]}" rev-parse --short HEAD) where ${commit:0:12} was approved"
+        # A tool that reads its own version off its repository's tag, and
+        # its channel off its branch and origin, finds neither in a checkout
+        # fetched by a commit's hash alone. So an entry may name them
+        # beside the commit: the tag (source.tag) is fetched by name and
+        # kept only where it is at the pinned commit, and the branch
+        # (source.branch) is what the checkout is called, following the
+        # address it came from. Neither is what holds the checkout: the
+        # commit is, and a tag that has moved off it installs nothing.
+        local tag
+        tag="$(sdk_meta field "$what" source.tag)"
+        if [ -n "$tag" ]; then
+            "${g[@]}" fetch -q --depth 1 "$url" "refs/tags/${tag}:refs/tags/${tag}" \
+                || die "${what}: ${url} has no tag ${tag}, which its entry names for ${commit:0:12}"
+            [ "$("${g[@]}" rev-parse "refs/tags/${tag}^{commit}")" = "$commit" ] \
+                || die "${what}: the tag ${tag} is at $("${g[@]}" rev-parse --short "refs/tags/${tag}^{commit}") and its entry pins ${commit:0:12}: nothing was installed"
+        fi
+        if [ -n "$branch" ]; then
+            "${g[@]}" checkout -q -B "$branch"
+            "${g[@]}" remote add origin "$url"
+            "${g[@]}" update-ref "refs/remotes/origin/${branch}" "$commit"
+            "${g[@]}" config "branch.${branch}.remote" origin
+            "${g[@]}" config "branch.${branch}.merge" "refs/heads/${branch}"
+        fi
         # The commit's hash is the check on what was fetched (R137): what the
-        # Installed page says of a pack's row.
-        printf 'sha1\t%s\tthe git commit an administrator approved\n' "$commit" > "$d/.bb-verified" 2>/dev/null || true
+        # Installed page says of a pack's row, and of a shipped row's whose
+        # entry pins the commit.
+        local held="the git commit an administrator approved"
+        [ -n "$(sdk_meta field "$what" pack)" ] || held="the commit its entry pins"
+        printf 'sha1\t%s\t%s\n' "$commit" "$held" > "$d/.bb-verified" 2>/dev/null || true
         sdk_mark_exec "$what" "$d"
     else
         log "cloning ${what} (${branch:-default}) into ${d}"

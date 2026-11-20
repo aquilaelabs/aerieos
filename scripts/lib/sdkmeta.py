@@ -187,6 +187,13 @@ def this_platform():
     return f"{_p.system().lower()}/{_ARCH.get(_p.machine().lower(), _p.machine().lower())}"
 
 
+# The platform to answer for in place of this machine's, as a row keys one
+# ("linux/arm64", "linux-musl/amd64", "darwin/*"). Empty at every install:
+# the tool that proposes pins (tools/pins.py) sets it to each platform a row
+# names in turn, so one machine learns every platform's file.
+AS_PLATFORM = ""
+
+
 def for_platform(value):
     """A recipe field that may differ per platform: a plain value, or a
     dict keyed "<os>/<arch>" with "<os>/*" as a fallback. A recipe whose
@@ -194,11 +201,11 @@ def for_platform(value):
     everything else stays a string."""
     if not isinstance(value, dict):
         return value
-    plat = this_platform()
+    plat = AS_PLATFORM.replace("linux-musl/", "linux/", 1) or this_platform()
     # A musl system (Alpine) cannot load a glibc build, so a recipe that
     # publishes a musl one says so under linux-musl/<arch>, tried first.
     musl = "linux-musl/" + plat.partition("/")[2]
-    if musl in value and glob.glob("/lib/ld-musl-*.so.1"):
+    if musl in value and (AS_PLATFORM.startswith("linux-musl/") if AS_PLATFORM else glob.glob("/lib/ld-musl-*.so.1")):
         return value[musl]
     if plat in value:
         return value[plat]
@@ -221,6 +228,17 @@ def declared(tc):
     it is held to, or `signed` where its publisher's signature holds it."""
     rows = (tc.get("source") or {}).get("fetch")
     return [f for f in rows if isinstance(f, dict) and f.get("url") and on_platform(f.get("platform"))] if isinstance(rows, list) else []
+
+
+def declared_address(f, key="url"):
+    """A declared download's address as it is fetched, or with `key` "sig"
+    its signature's: {version} filled with the version the entry itself
+    says the download is, with nobody asked. How a newer one is found
+    (`track`, `found`) is beside it for the tool that proposes a pin, and is
+    not read here."""
+    signed = f.get("signed") if isinstance(f.get("signed"), dict) else {}
+    text = str((signed.get("sig") if key == "sig" else f.get("url")) or "")
+    return fill(text, {"version": f["version"]}) if isinstance(f.get("version"), str) else text
 
 
 # What separates the fields of a line of declared_plan: a character no
@@ -269,7 +287,7 @@ def declared_plan(tc):
     for f in rows:
         signed = f.get("signed") if isinstance(f.get("signed"), dict) else {}
         if on_platform(f.get("platform")):
-            out.append(said("fetch", f["url"], f.get("sha256"), f.get("to"), signed.get("sig"), signed.get("keys")))
+            out.append(said("fetch", declared_address(f), f.get("sha256"), f.get("to"), declared_address(f, "sig"), signed.get("keys")))
         else:
             out.append(said("skip", f.get("to"), f.get("platform")))
     return out
@@ -395,8 +413,6 @@ def resolve(tc):
     template to fill in.
     """
     src = tc.get("source") or {}
-    spec = src.get("version") or {}
-    kind = spec.get("resolver")
     version, url = "", ""
 
     pin = pin_of(tc)
@@ -404,9 +420,117 @@ def resolve(tc):
         # Pinned: the version its entry carries and the address made from
         # it. The resolver stays in the row as how a newer version is
         # found, which is not an install's question.
-        version, kind = str(pin.get("version") or ""), None
+        version = str(pin.get("version") or "")
         if not pinned_digest(tc):
             die(f"{tc['name']}: the row offers no pinned download for {this_platform()}")
+    else:
+        version, url = newest(tc)
+
+    if src.get("url"):
+        url = fill(for_platform(src["url"]) or "", {"version": version})
+        if not url:
+            die(f"{tc['name']}: no download for {this_platform()}; the recipe names "
+                f"{', '.join(sorted(src['url']))}")
+    return version, url
+
+
+def _vkey(text):
+    """A version as something to order by: its runs of digits as numbers,
+    what is between them as text."""
+    return [(0, int(p)) if p.isdigit() else (1, p) for p in re.findall(r"\d+|\D+", str(text))]
+
+
+def git_refs(url, *refs):
+    """What `git ls-remote` says of a repository's refs, as text: one
+    "<commit>\\t<ref>" a line. No object is fetched."""
+    if not str(url).lower().startswith("https://"):
+        raise ValueError(f"not a repository's https address: {str(url)[:60]}")
+    p = subprocess.run(["git", "ls-remote", url, *refs], capture_output=True, text=True, timeout=120, check=False,
+                       env=dict(os.environ, GIT_TERMINAL_PROMPT="0"))
+    if p.returncode:
+        raise ValueError(f"git could not list {url}: {(p.stderr or '').strip()[-200:]}")
+    return p.stdout
+
+
+def git_newest(tc, spec=None):
+    """(name, commit) for a repository: the tag or the branch its
+    source.track names and the commit it is at now, read with ls-remote.
+
+        git-tag     the newest tag `match` matches, by version order
+        git-branch  the head of `branch`
+    """
+    src = tc.get("source") or {}
+    spec = src.get("track") if spec is None else spec
+    kind = (spec or {}).get("resolver")
+    if kind == "git-branch":
+        ref = f"refs/heads/{spec['branch']}"
+        for line in git_refs(src["url"], ref).splitlines():
+            commit, _, name = line.partition("\t")
+            if name == ref:
+                return spec["branch"], commit
+        die(f"{tc['name']}: {src['url']} has no branch {spec['branch']}")
+    if kind == "git-tag":
+        tags = {}
+        for line in git_refs(src["url"], "refs/tags/*").splitlines():
+            commit, _, name = line.partition("\t")
+            name = name.removeprefix("refs/tags/")
+            # An annotated tag is listed twice: the tag itself, and under
+            # ^{} the commit it names, which is the one to pin.
+            if name.endswith("^{}"):
+                tags[name[:-3]] = commit
+            else:
+                tags.setdefault(name, commit)
+        want = [t for t in tags if re.search(spec.get("match") or "", t)]
+        if not want:
+            die(f"{tc['name']}: {src['url']} has no tag matching {spec.get('match')!r}")
+        tag = max(want, key=_vkey)
+        return tag, tags[tag]
+    die(f"{tc['name']}: unknown resolver for a repository {kind!r}")
+
+
+def _github_release(tc, spec):
+    """(tag, url) from a repository's releases as GitHub's API lists them,
+    newest first, for a resolver that says more than the repository: the
+    first whose tag `tag` matches and that has been out `settled` days (a
+    publisher that keeps only some of its builds for good), and, with
+    `asset`, the address of the file whose name that pattern matches, one
+    pattern per platform."""
+    import calendar  # noqa: PLC0415
+    repo = spec["repo"]
+    before = time.time() - 86400 * float(spec.get("settled") or 0)
+    for rel in json.loads(get(f"https://api.github.com/repos/{repo}/releases?per_page=100")):
+        tag = str(rel.get("tag_name") or "")
+        if rel.get("draft") or rel.get("prerelease") or (spec.get("tag") and not re.search(spec["tag"], tag)):
+            continue
+        if spec.get("settled"):
+            try:
+                out = calendar.timegm(time.strptime(str(rel.get("published_at")), "%Y-%m-%dT%H:%M:%SZ"))
+            except ValueError:
+                continue
+            if out > before:
+                continue
+        if not spec.get("asset"):
+            return tag, ""
+        want = for_platform(spec["asset"])
+        if not want:
+            die(f"{tc['name']}: its resolver names no asset for {AS_PLATFORM or this_platform()}")
+        for a in rel.get("assets") or []:
+            if re.search(want, str(a.get("name") or "")):
+                return tag, str(a.get("browser_download_url") or "")
+        die(f"{tc['name']}: {repo}'s release {tag} has no asset matching {want!r}")
+    die(f"{tc['name']}: {repo} lists no release its resolver takes")
+
+
+def newest(tc, spec=None):
+    """(version, url) as a version resolver finds them now: what upstream
+    currently offers. `spec` is the row's source.version when left out (a
+    declared download's track otherwise); url is the address where the
+    resolver supplies it itself, and "" where the entry's own template is
+    filled. Asked by an install of a row that pins nothing, and by the tool
+    that proposes a newer pin; never by an install of a pinned row."""
+    spec = ((tc.get("source") or {}).get("version") or {}) if spec is None else spec
+    kind = spec.get("resolver")
+    version, url = "", ""
 
     if kind == "text":
         # A file whose whole content is the current version. go.dev serves one.
@@ -416,8 +540,14 @@ def resolve(tc):
             die(f"{tc['name']}: expected a version starting {want!r}, got {version!r}")
 
     elif kind == "github-release":
-        tag = final_url(f"https://github.com/{spec['repo']}/releases/latest").rstrip("/")
-        tag = tag.rsplit("/", 1)[-1]
+        if any(spec.get(k) for k in ("tag", "settled", "asset")):
+            tag, url = _github_release(tc, spec)
+        else:
+            # The release GitHub calls latest, read off where its page
+            # redirects to: a tag may be written with a slash, of which
+            # the last part is taken, and with a plus sign.
+            tag = final_url(f"https://github.com/{spec['repo']}/releases/latest").rstrip("/")
+            tag = urllib.parse.unquote(tag.rsplit("/", 1)[-1])
         version = tag
         for k, cut in (("trim_prefix", str.removeprefix), ("trim_suffix", str.removesuffix)):
             if spec.get(k):
@@ -430,10 +560,11 @@ def resolve(tc):
         # them: the nightly is not what anybody asked to install.
         index = json.loads(get(spec["url"]))
         version = next(k for k in index if k != "master")
-        asset = index[version].get(spec["asset"]) or {}
+        name = for_platform(spec["asset"])
+        asset = index[version].get(name) or {}
         url = asset.get("tarball") or ""
         if not url:
-            die(f"{tc['name']}: the index offers no {spec['asset']} build for {version}")
+            die(f"{tc['name']}: the index offers no {name or 'build for this platform'} build for {version}")
 
     elif kind == "node-index":
         # nodejs.org's own index, newest release first. LTS only: a node
@@ -446,14 +577,18 @@ def resolve(tc):
         if not version:
             die(f"{tc['name']}: the index offers no LTS release")
 
+    elif kind == "match":
+        # A document its publisher serves and a pattern: the version is
+        # what the pattern's first group matches first (a release file's
+        # `version = '1.2.3'` line, the newest release an API names).
+        m = re.search(spec["match"], get(spec["url"]), re.M)
+        if not m:
+            die(f"{tc['name']}: {spec['url']} holds nothing its resolver's pattern matches")
+        version = m.group(1) if m.groups() else m.group(0)
+
     elif kind:
         die(f"{tc['name']}: unknown version resolver {kind!r}")
 
-    if src.get("url"):
-        url = fill(for_platform(src["url"]) or "", {"version": version})
-        if not url:
-            die(f"{tc['name']}: no download for {this_platform()}; the recipe names "
-                f"{', '.join(sorted(src['url']))}")
     return version, url
 
 
@@ -548,11 +683,13 @@ def signed_by(data, sig, keys, tc=None):
     return m.group(1) if m else "a key of the publisher's"
 
 
-def checksum(tc, url, version):
+def checksum(tc, url, version, spec=None):
     """(algorithm, hex digest, where it came from) for the file `url`
     downloads, or ("none", "", why) for a row whose publisher states nothing
-    to check it against. A row that names no source is refused."""
-    spec = (tc.get("source") or {}).get("checksum")
+    to check it against. A row that names no source is refused. `spec` is
+    the row's source.checksum when left out; the tool that proposes a pin
+    hands it the pin's `found`, how the publisher states the digest."""
+    spec = (tc.get("source") or {}).get("checksum") if spec is None else spec
     if not isinstance(spec, dict) or not spec.get("from"):
         die(f"{tc['name']}: the catalog says nowhere to check its download against")
     how, name = spec["from"], _name_of(url)
@@ -641,7 +778,7 @@ def download_urls(tc):
     """Every URL an install of this toolchain would fetch, or none: what
     its source names or can be asked for (_source_urls), and each download
     it declares for this machine."""
-    return _source_urls(tc) + [f["url"] for f in declared(tc)]
+    return _source_urls(tc) + [declared_address(f) for f in declared(tc)]
 
 
 def _source_urls(tc):

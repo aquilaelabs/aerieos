@@ -80,7 +80,9 @@ FORMATS = {
        "and the sha256 of the exact file), declared downloads for every kind of source, one named for a platform (platform) "
        "or held by its publisher's signature (signed) under a key the entry carries (keyring), an installer that keeps "
        "the network, with the sentence that says what it downloads by itself (online), and a pack's word that it "
-       "downloads nothing (an empty install.fetch), which cuts its steps from the network",
+       "downloads nothing (an empty install.fetch), which cuts its steps from the network; and how a newer pin is found, "
+       "read by the tool that proposes one and by no install: a pin's found, a declared download's version, track and found, "
+       "a repository's track and the tag its commit is fetched under, and the resolvers match, git-tag and git-branch",
 }
 
 
@@ -196,22 +198,61 @@ def topics_refused(doc):
 PLATFORM_KEY = re.compile(r"^(linux|linux-musl|darwin)/(amd64|arm64|\*)$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 PIN_VERSION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$")
-PIN_KEYS = frozenset(("from", "version", "sha256"))
+PIN_KEYS = frozenset(("from", "version", "sha256", "found"))
 PIN_PLATFORMS = 8
+
+# How a newer pin is found is the entry's own too, written for the tool
+# that proposes one (tools/pins.py) and read by nothing at install time: an
+# install takes the pin and asks nobody. Two parts, each a primitive by its
+# name:
+#   how the newest version is found (a row's source.version, a declared
+#   download's track, a repository's source.track), by one of these
+#   resolvers;
+TRACK_RESOLVERS = ("text", "github-release", "node-index", "zig-index", "match", "git-tag", "git-branch")
+#   and how the new file's digest is learned from its publisher's own
+#   statement without downloading it (`found`), written as a checksum that
+#   asks the origin is. Where the publisher states no sha256, the tool
+#   downloads the file and hashes it itself.
+FOUND_FROM = ("json", "android-repo", "go-json", "none", "file", "github-asset", "zsync", "signature", "zig-index")
+# A repository's commit, the tag it may be fetched under, and the
+# resolvers that find a commit to pin.
+COMMIT = re.compile(r"^[0-9a-f]{40}$|^[0-9a-f]{64}$")
+GIT_REF = re.compile(r"^(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9._+/-]{0,99}$")
+GIT_RESOLVERS = ("git-tag", "git-branch")
+
+
+def found_refused(spec, what="its pin's found"):
+    """Why `spec` is not how a digest is learned from a publisher's own
+    statement, or "": an object written as a checksum that asks the origin
+    is, its `from` one of FOUND_FROM."""
+    if not isinstance(spec, dict) or spec.get("from") not in FOUND_FROM:
+        return f"{what} is how a newer file's digest is learned from its publisher, from one of: {', '.join(FOUND_FROM)}"
+    return ""
+
+
+def track_refused(spec, what="track", among=TRACK_RESOLVERS):
+    """Why `spec` is not how a newer version is found, or "": an object
+    naming one of the resolvers, written as a row's source.version is."""
+    if not isinstance(spec, dict) or spec.get("resolver") not in among:
+        return f"{what} is how a newer version is found, by one of: {', '.join(among)}"
+    return ""
 
 
 def pin_refused(ck):
     """Why a row's source.checksum is not a pin as the format writes one,
     or "": {"from": "pin", "version": the version the file is (left out for
     a download with none in its address), "sha256": the digest of the exact
-    file, 64 hex digits, or one per platform}."""
+    file, 64 hex digits, or one per platform}. It may say how a newer
+    file's digest is learned (`found`), which no install reads."""
     if not isinstance(ck, dict) or ck.get("from") != "pin":
         return "its checksum is no pin"
     if set(ck) - PIN_KEYS:
-        return f"its pin names {', '.join(sorted(set(ck) - PIN_KEYS))}: a pin is from, version and sha256"
+        return f"its pin names {', '.join(sorted(set(ck) - PIN_KEYS))}: a pin is from, version and sha256, and may say found"
     v = ck.get("version")
     if v is not None and not (isinstance(v, str) and PIN_VERSION.fullmatch(v)):
         return "its pin's version is not a version: up to 64 of letters, digits, dot, dash, plus and underscore"
+    if ck.get("found") is not None and found_refused(ck["found"]):
+        return found_refused(ck["found"])
     sha = ck.get("sha256")
     if isinstance(sha, str):
         return "" if SHA256.fullmatch(sha) else "its pin's sha256 is not 64 hex digits, in lower case"
@@ -234,7 +275,7 @@ HELD_FORMAT = 5
 FETCH_MAX = 32
 HTTPS = re.compile(r"^https://[A-Za-z0-9.-]{1,253}(:\d{1,5})?/[\x21-\x7e]{0,1900}$")
 REL = re.compile(r"^(?!/)(?!.*(?:^|/)\.\.?(?:/|$))[A-Za-z0-9._/-]{1,200}$")
-FETCH_KEYS = frozenset(("url", "sha256", "to", "platform", "signed"))
+FETCH_KEYS = frozenset(("url", "sha256", "to", "platform", "signed", "version", "track", "found"))
 # A publisher's keys an entry carries: a few, each an armored public key
 # under a plain file name, which a signature's `keys` names.
 KEY_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
@@ -262,7 +303,15 @@ def fetch_checked(raw, what="install.fetch", reserved=()):
     platforms that cannot meet may share a name. `clean` keeps sha256 as ""
     on a signed one, so every row has the three keys format 3 gave it;
     `new` names what of format 5 they use, for the manifest's number.
-    `reserved` are file names an entry may not write over."""
+    `reserved` are file names an entry may not write over.
+
+    From format 5 a download may say the version it is (`version`), which
+    fills {version} in its address and its signature's, never in the name
+    it is kept as: the steps read one path whatever the version, so a pin
+    that moves changes the version and the digest and nothing else. Beside
+    it, for the tool that proposes a newer pin and for no install, how a
+    newer version is found (`track`) and how its digest is learned
+    (`found`)."""
     if not isinstance(raw, list) or len(raw) > FETCH_MAX:
         return [], [f"{what} lists up to {FETCH_MAX} downloads, each {{url, sha256, to}}"], set()
     clean, errors, new = [], [], set()
@@ -275,6 +324,7 @@ def fetch_checked(raw, what="install.fetch", reserved=()):
             continue
         url, to, plat = f.get("url"), f.get("to"), f.get("platform")
         sha, signed = f.get("sha256") or None, f.get("signed")
+        version, track, found = f.get("version"), f.get("track"), f.get("found")
         ok = isinstance(url, str) and HTTPS.fullmatch(url) and isinstance(to, str) and REL.fullmatch(to) and to not in reserved
         ok = ok and (sha is None) != (signed is None)
         ok = ok and (sha is None or (isinstance(sha, str) and SHA256.fullmatch(sha)))
@@ -286,6 +336,22 @@ def fetch_checked(raw, what="install.fetch", reserved=()):
         if not ok:
             errors.append(said)
             continue
+        # The version it is, and how a newer one is found.
+        named = "{version}" in url or (isinstance(signed, dict) and "{version}" in signed["sig"])
+        if version is not None and not (isinstance(version, str) and PIN_VERSION.fullmatch(version)):
+            errors.append(f"{what} {i + 1}'s version is not a version: up to 64 of letters, digits, dot, dash, plus and underscore")
+            continue
+        if named and version is None:
+            errors.append(f"{what} {i + 1} has {{version}} in its address and says no version to fill it with")
+            continue
+        if track is not None and (track_refused(track, f"{what} {i + 1}'s track") or version is None):
+            errors.append(track_refused(track, f"{what} {i + 1}'s track")
+                          or f"{what} {i + 1} says track and no version: a download with no version has nothing to track")
+            continue
+        if found is not None and (found_refused(found, f"{what} {i + 1}'s found") or signed is not None):
+            errors.append(found_refused(found, f"{what} {i + 1}'s found")
+                          or f"{what} {i + 1} says found and is held by a signature: there is no digest to learn")
+            continue
         row = {"url": url, "sha256": sha or "", "to": to}
         if plat:
             row["platform"] = plat
@@ -293,8 +359,21 @@ def fetch_checked(raw, what="install.fetch", reserved=()):
         if signed:
             row["signed"] = {"sig": signed["sig"], "keys": signed["keys"]}
             new.add("signed")
+        for key, v in (("version", version), ("track", track), ("found", found)):
+            if v is not None:
+                row[key] = v
+                new.add(key)
         clean.append(row)
     return clean, errors, new
+
+
+def download_address(f, key="url"):
+    """A declared download's address as it is fetched: {version} filled
+    with the version the entry says it is. `key` "sig" answers its
+    signature's the same way."""
+    signed = f.get("signed") if isinstance(f.get("signed"), dict) else {}
+    text = str((signed.get("sig") if key == "sig" else f.get("url")) or "")
+    return text.replace("{version}", f["version"]) if isinstance(f.get("version"), str) else text
 
 
 def fits_machine(plat, machine):
@@ -312,7 +391,8 @@ def downloads_said(fetch, machine=""):
     checked with and its signature's address, "" otherwise) and `platform`
     (the one it is for, "" for every one). `fetch` is the list as a
     manifest, the validator or a row's source has it; with `machine`, the
-    downloads that machine fetches alone."""
+    downloads that machine fetches alone. An address is the one fetched,
+    its {version} filled with the version the entry says (download_address)."""
     out = []
     for f in fetch if isinstance(fetch, list) else []:
         if not isinstance(f, dict) or not f.get("url"):
@@ -323,9 +403,9 @@ def downloads_said(fetch, machine=""):
         if not fits_machine(plat, machine):
             continue
         how = "sha256" if sha else "signed" if signed.get("keys") else ""
-        out.append({"to": str(f.get("to") or "")[:200], "url": str(f["url"])[:2000], "held": how, "sha256": sha,
+        out.append({"to": str(f.get("to") or "")[:200], "url": download_address(f)[:2000], "held": how, "sha256": sha,
                     "keys": str(signed.get("keys") or "")[:64] if how == "signed" else "",
-                    "sig": str(signed.get("sig") or "")[:2000] if how == "signed" else "", "platform": plat[:40]})
+                    "sig": download_address(f, "sig")[:2000] if how == "signed" else "", "platform": plat[:40]})
     return out[:FETCH_MAX]
 
 
@@ -375,18 +455,29 @@ def source_refused(src):
             errors.append("source.online and source.offline are both said: its steps keep the network or run with none")
     if src.get("offline") not in (None, True, False):
         errors.append("source.offline is true or false")
+    # A repository's pin: the commit, the tag it is fetched under, and how
+    # the commit to pin is found.
+    git = src.get("kind") == "git"
+    if src.get("commit") is not None and git and not (isinstance(src["commit"], str) and COMMIT.fullmatch(src["commit"])):
+        errors.append("source.commit is a commit's whole hash, in lower case")
+    if src.get("tag") is not None and not (git and src.get("commit") and isinstance(src["tag"], str) and GIT_REF.fullmatch(src["tag"])):
+        errors.append("source.tag is the tag a repository's pinned commit is fetched under: a tag's name, beside source.commit")
+    if src.get("track") is not None and (not git or track_refused(src["track"], "source.track", GIT_RESOLVERS)):
+        errors.append(track_refused(src["track"], "source.track", GIT_RESOLVERS)
+                      or "source.track is how a repository's commit to pin is found: a source of another kind says source.version")
     return errors[0] if errors else ""
 
 
 def source_format(src):
     """The least pack format a row's source needs for what it says of its
     downloads: 5 where it pins its download, declares downloads, carries
-    keys, says its steps run with no network or keep it, or follows a
-    tarball with steps; 1 otherwise."""
+    keys, says its steps run with no network or keep it, names the tag a
+    repository's commit is fetched under or how its commit is found, or
+    follows a tarball with steps; 1 otherwise."""
     if not isinstance(src, dict):
         return 1
     ck = src.get("checksum")
-    new = (isinstance(ck, dict) and ck.get("from") == "pin") or any(src.get(k) for k in ("fetch", "keyring", "online", "offline")) \
+    new = (isinstance(ck, dict) and ck.get("from") == "pin") or any(src.get(k) for k in ("fetch", "keyring", "online", "offline", "tag", "track")) \
         or (src.get("kind") == "tarball" and src.get("then"))
     return HELD_FORMAT if new else 1
 
@@ -398,7 +489,9 @@ def source_format(src):
 #              under a key it carries, or a git commit, and its steps run
 #              with no network;
 #   installer  the same for everything it declares, and it says its pinned
-#              installer downloads the rest from its vendor (online);
+#              installer downloads the rest from its vendor (online); a
+#              package another row's program installs is that installer's
+#              too, with the sentence;
 #   open       anything else: a download checked only against its own
 #              origin or against nothing, a repository at a branch, steps
 #              that run with the network and no declared reason.
@@ -468,6 +561,14 @@ def held(doc):
         elif not ((how == "signature" and ck.get("sig") and ck.get("keys")) or (how == "file" and signed.get("sig") and signed.get("keys"))):
             return "open", (f"its download is checked against what its own origin says at the moment of the install ({how}), "
                             "not against a pin or a signature its entry carries")
+    elif kind == "sdkmanager":
+        # A package of another row's program: it has no download of its
+        # own, and the program that installs it (the row it requires)
+        # downloads it by itself. With the sentence that says so it is that
+        # installer's; without one, nothing in its entry says what holds
+        # what arrives.
+        if not (isinstance(src.get("online"), str) and src["online"].strip()):
+            return "open", "its own package manager downloads it, and nothing in its entry holds what arrives"
     elif kind != "command":
         return "open", "its own package manager downloads it, and nothing in its entry holds what arrives"
     # What it declares besides.

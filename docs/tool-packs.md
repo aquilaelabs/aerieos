@@ -282,6 +282,63 @@ and before a command; the installer, the follow-up steps, a warm-up and
 the verify then run with no network, or with it where the row says
 `online`.
 
+**How a pin moves.** An install never asks a vendor what is newest: it
+takes the pin. A newer version arrives as a change to the entry, proposed
+by a tool and reviewed like any other change. How the tool finds the newer
+version is the entry's own data too, so nothing in the tool knows a vendor.
+It is read by the tool and by no install:
+
+- A pin may say `found`: how the new file's digest is learned from its
+  publisher's own statement without downloading it, written as a checksum
+  that asks the origin is (`{"from": "go-json"}`, `{"from": "file", "url":
+  "{url}.sha256"}`, `{"from": "github-asset"}`). Where the publisher states
+  no sha256 (a sha1, a sha512, or nothing), the tool downloads the file and
+  hashes it itself, holding it to what the publisher does state. The row's
+  `version` resolver says how the newest version is found.
+- A declared download may say the `version` it is, which fills `{version}`
+  in its `url` and in its signature's address, with nobody asked. The name
+  it is kept as (`to`) takes no version: the steps read one path whatever
+  the version is, so a pin that moves changes a version and a digest and
+  nothing else. Beside it, `track` says how a newer version is found, in the
+  shape of a row's `version`, and `found` how its digest is learned.
+  Downloads that say the same `track` (one tool's file for each platform)
+  move together to one version:
+
+  ```json
+  {"url": "https://github.com/heron-schema/heron/releases/download/v{version}/heron-{version}-linux-x64.tar.gz",
+   "version": "2.7.1",
+   "sha256": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a",
+   "to": "dl/heron.tar.gz",
+   "platform": "linux/amd64",
+   "track": {"resolver": "github-release", "repo": "heron-schema/heron", "trim_prefix": "v"},
+   "found": {"from": "github-asset"}}
+  ```
+
+- A download with no version in its address, a vendor's one moving file,
+  has nothing to track. It is pinned by its digest and refused on the day
+  the vendor changes it; the tool says that the bytes moved, and re-pins
+  them.
+- A repository a row is cloned from is pinned by `source.commit`, and
+  `source.track` says how the commit to pin is found: `{"resolver":
+  "git-tag", "match": "^\\d+\\.\\d+\\.\\d+$"}` for the newest tag the
+  pattern matches, by version order, or `{"resolver": "git-branch",
+  "branch": "stable"}` for a branch's head. The checkout is fetched by the
+  commit's hash. A tool that reads its own version off its tag finds none in
+  such a checkout, so the row may name the tag (`source.tag`), fetched by
+  name and kept only where it is at the pinned commit; one that has moved
+  off it installs nothing. With `source.branch` the checkout is called that
+  branch and follows the address it came from.
+
+The resolvers that find a version: `text` (a file whose first line is the
+version), `match` (a document and a pattern whose first group is the
+version), `github-release` (the release GitHub calls latest, or, with
+`tag`, `settled` and `asset`, the newest whose tag matches, that has been
+out that many days, and the file in it whose name matches, one pattern per
+platform), `node-index`, `zig-index`, `git-tag` and `git-branch`. A
+resolver that supplies the file's address itself (`zig-index`, a
+`github-release` with `asset`) has the tool write that address into the row
+beside the digest.
+
 The cut is a network namespace of the step's own. The account a node's jobs
 run as makes it itself where the machine lets an account do that. Where it
 does not (a distribution that keeps user namespaces from unprivileged
@@ -537,7 +594,7 @@ on its Details what that install leaves out.
 | 2.2 | A sign-in whose program ends itself once signed in (`signin.flow.ends`), whose link may start in more than one way (`signin.flow.url` as a list), that says where who is signed in is read (`signin.flow.who`), and whose sign-out takes keys out of a settings file (`signin.flow.forget`). | Takes the entry and leaves such a flow out: the agent signs in in its session's terminal. | the releases after 0.9.0-dev.5284 |
 | 3.2 | Declared downloads (`install.fetch`): every file an install takes from somewhere else, with its address and its sha256, fetched and checked by AerieOS before the install steps run, which then run with no network. | Hides the entry: needs the first AerieOS that reads pack format 3. | the releases after 0.9.0-dev.5341 |
 | 4.2 | A Docker app that declares its own fields (`fields`: each the variable it fills, its label, its kind, a default, a line of help and whether it is required), drawn by New container as the app's panel; one on the machine's own network (`network`); one being replaced, with what to install in its place (`going`). | Hides the entry: needs the first AerieOS that reads pack format 4. | the releases after 0.9.0-dev.5341 |
-| 5.2 | Every download held to something its entry carries ([Declared downloads](#declared-downloads)): a shipped toolchain's download pinned to the version and the sha256 of the exact file (`checksum` kind `pin`); declared downloads for every kind of source; one named for a platform (`platform`) or held by its publisher's signature (`signed`) under a key the entry carries (`keyring`); an installer that keeps the network, with the sentence that says what it downloads by itself (`online`); a pack's word that it downloads nothing (an empty `install.fetch`), which cuts its steps from the network. | Hides the entry: needs the first AerieOS that reads pack format 5. A shipped toolchain's newer row that uses them is refused there, and its own row stays. | the releases after 0.9.0-dev.5641 |
+| 5.2 | Every download held to something its entry carries ([Declared downloads](#declared-downloads)): a shipped toolchain's download pinned to the version and the sha256 of the exact file (`checksum` kind `pin`); declared downloads for every kind of source; one named for a platform (`platform`) or held by its publisher's signature (`signed`) under a key the entry carries (`keyring`); an installer that keeps the network, with the sentence that says what it downloads by itself (`online`); a pack's word that it downloads nothing (an empty `install.fetch`), which cuts its steps from the network; and how a newer pin is found, read by the tool that proposes one and by no install: a pin's `found`, a declared download's `version`, `track` and `found`, a repository's `track` and the `tag` its commit is fetched under, and the resolvers `match`, `git-tag` and `git-branch`. | Hides the entry: needs the first AerieOS that reads pack format 5. A shipped toolchain's newer row that uses them is refused there, and its own row stays. | the releases after 0.9.0-dev.5641 |
 
 ### What stays AerieOS's own
 
@@ -561,7 +618,7 @@ AerieOS carries. These are the format's primitives:
 | When its prompt event is raised | `once`, `each-call` |
 | How a first prompt is handed over | `after-dashdash`, `flag`, `none` |
 | How it is told what needs no asking | `settings`, `flag`, `rules-file`, `hook`, `none` |
-| An official toolchain's source, its version resolver and how its download is checked | `tarball`, `script`, `git`, `command`, `sdkmanager`; `approximate`, `android-repo`, `command-urls`, `zig-index`, `url-matches`, `text`, `node-index`, `github-release`; `json`, `go-json`, `none`, `file`, `github-asset`, `zsync`, `zig-index`, `android-repo`, `signature`, `pin` |
+| An official toolchain's source, its version resolver and how its download is checked | `tarball`, `script`, `git`, `command`, `sdkmanager`; `approximate`, `android-repo`, `command-urls`, `zig-index`, `url-matches`, `text`, `node-index`, `github-release`, `match`, `git-tag`, `git-branch`; `json`, `go-json`, `none`, `file`, `github-asset`, `zsync`, `zig-index`, `android-repo`, `signature`, `pin` |
 | An official service's kind | `router` |
 
 A new primitive is a new format number, never a change to an old one: the

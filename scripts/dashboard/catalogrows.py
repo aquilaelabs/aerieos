@@ -44,8 +44,13 @@ _trying = {}           # {(name, commit): when it was last tried}, so a pack tha
 # checksum readers). A new one is a new pack format, never a new meaning
 # for one of these.
 KINDS = ("tarball", "script", "git", "command", "sdkmanager")
-RESOLVERS = ("approximate", "android-repo", "command-urls", "zig-index", "url-matches", "text", "node-index", "github-release")
-CHECKSUMS = ("json", "android-repo", "go-json", "none", "file", "github-asset", "zsync", "signature", "zig-index", "pin")
+# The resolvers are the ones that say what a download weighs and the ones
+# that find a version (packformat.TRACK_RESOLVERS: a row's source.version, a
+# declared download's track, a repository's source.track); the checksums are
+# the ones that ask a file's origin (packformat.FOUND_FROM, which a pin's
+# `found` is held to as well) and the pin.
+RESOLVERS = ("approximate", "android-repo", "command-urls", "url-matches", *packformat.TRACK_RESOLVERS)
+CHECKSUMS = (*packformat.FOUND_FROM, "pin")
 SHIPPED_KEYS = ("probe", "source", "system", "requires", "updatable", "tool")
 PLATFORM = re.compile(r"^(linux|darwin)/(amd64|arm64|\*)$")
 MAX_BYTES = 64 * 1024

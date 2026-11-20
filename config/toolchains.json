@@ -112,7 +112,26 @@
     "           from where. Its declared downloads are fetched and checked all the same, and its",
     "           steps keep the network; the install, its receipt and its row say the sentence.",
     "  keyring  {name: an armored public key}: a publisher's keys the row carries itself, which a",
-    "           signature's keys names and which wins over config/release-keys' file of that name."
+    "           signature's keys names and which wins over config/release-keys' file of that name.",
+    "",
+    "How a newer pin is found is in the row too, for the tool that proposes one and for no install,",
+    "which takes the pin and asks nobody:",
+    "  version  (source.version) the resolver that finds the newest version: text, match (url, match:",
+    "           a document and a pattern whose first group is the version), github-release (repo; or",
+    "           with tag, settled and asset the newest release whose tag matches, out that many days,",
+    "           and the file in it whose name matches, per platform), node-index, zig-index. One that",
+    "           supplies the address itself has the tool write source.url beside the digest.",
+    "  found    (checksum.found, of a pin) how the new file's digest is learned from its publisher's",
+    "           statement without downloading it, written as a checksum that asks the origin is.",
+    "           Where the publisher states no sha256 the tool downloads the file and hashes it.",
+    "  a declared download may say version (fills {version} in its url and its signature's, never in",
+    "           to), track (how a newer one is found, as source.version is written) and found.",
+    "  commit, tag, track  (a git source) the commit the clone is fetched at, the tag fetched by name",
+    "           beside it and kept only where it is at that commit, and how the commit to pin is",
+    "           found: {resolver: git-tag, match} the newest tag matching, {resolver: git-branch,",
+    "           branch} a branch's head. With branch the checkout is called it and follows its origin.",
+    "A download with no version in its address has nothing to track: it is pinned by its digest and",
+    "refused when its vendor changes it, until the pin moves."
   ],
   "android_images": {
     "_comment": [

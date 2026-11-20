@@ -147,6 +147,48 @@ class Manifest(unittest.TestCase):
         src = toolpacks.recipe({"manifest": got, "url": "https://example.com/wren", "commit": "c" * 40})["source"]
         self.assertEqual((errors, src["online"], "offline" in src, packformat.held(both)), ([], SENTENCE, False, ("installer", SENTENCE)))
 
+    def test_a_download_says_the_version_it_is_and_how_a_newer_one_is_found(self):
+        # The kept manifest: two platforms' files that move together, one
+        # held by a signature, and one with no version at all.
+        heron, errors = toolpacks.validate(kept(5, "heron"))
+        self.assertEqual(errors, [])
+        self.assertEqual([(f.get("version"), (f.get("track") or {}).get("resolver"), (f.get("found") or {}).get("from")) for f in heron["fetch"]],
+                         [("2.7.1", "github-release", "github-asset"), ("2.7.1", "github-release", "github-asset"), ("2026.10", "match", None), (None, None, None)])
+        # What is fetched is the address with its own version filled in: on the page, and in the row a node is handed.
+        said = packformat.downloads_said(heron["fetch"])
+        self.assertEqual([d["url"] for d in said][:3], ["https://github.com/heron-schema/heron/releases/download/v2.7.1/heron-2.7.1-linux-x64.tar.gz",
+                                                        "https://github.com/heron-schema/heron/releases/download/v2.7.1/heron-2.7.1-linux-arm64.tar.gz",
+                                                        "https://schemas.heron.example.org/std/2026.10/std.tar.gz"])
+        self.assertEqual(said[2]["sig"], "https://schemas.heron.example.org/std/2026.10/std.tar.gz.sig")
+        self.assertTrue(all(sorted(d) == ["held", "keys", "platform", "sha256", "sig", "to", "url"] for d in said), "the same seven keys")
+        row = toolpacks.recipe({"manifest": heron, "url": "https://example.com/heron", "commit": "c" * 40})
+        self.assertEqual(row["source"]["fetch"][0]["version"], "2.7.1")
+        self.assertEqual(packformat.held(kept(5, "heron")), ("pinned", packformat.PINNED_SAID))
+        # They are format 5's.
+        self.assertEqual(errors_of(dict(kept(5, "heron"), format=4, framework="4.2")),
+                         ['install.fetch\'s found, install.fetch\'s platform, install.fetch\'s signed, install.fetch\'s track, install.fetch\'s version, '
+                          'install.keyring are pack format 5\'s: the manifest says "format": 5'])
+        a = {"url": "https://example.com/{version}/a.tgz", "sha256": H, "to": "dl/a.tgz", "version": "1.2.3"}
+        track = {"resolver": "github-release", "repo": "a/a"}
+        signed = {"sig": "https://example.com/{version}/a.tgz.sig", "keys": "pub.asc"}
+        for good in (a, {**a, "track": track}, {**a, "track": track, "found": {"from": "file", "url": "{url}.sha256"}},
+                     {**a, "url": "https://example.com/a.tgz", "found": {"from": "zsync"}}):
+            self.assertEqual(errors_of(manifest(fetch=[good])), [], good)
+        self.assertEqual(errors_of(manifest(fetch=[{"url": a["url"], "to": "dl/a.tgz", "version": "1.2.3", "signed": signed, "track": track}], keyring={"pub.asc": KEY})), [])
+        for bad, why in (({**a, "version": "1.2.3 beta"}, "install.fetch 1's version is not a version"),
+                         ({k: v for k, v in a.items() if k != "version"}, "install.fetch 1 has {version} in its address and says no version to fill it with"),
+                         ({**a, "url": "https://example.com/a.tgz", "version": None, "track": track}, "install.fetch 1 says track and no version"),
+                         ({**a, "track": {"resolver": "ask-the-vendor"}}, "install.fetch 1's track is how a newer version is found, by one of: text, github-release"),
+                         ({**a, "track": "github-release"}, "install.fetch 1's track is how a newer version is found"),
+                         ({**a, "found": {"from": "pin"}}, "install.fetch 1's found is how a newer file's digest is learned from its publisher"),
+                         ({**a, "found": "github-asset"}, "install.fetch 1's found is how a newer file's digest is learned")):
+            got = errors_of(manifest(fetch=[{k: v for k, v in bad.items() if v is not None}]))
+            self.assertTrue(any(e.startswith(why) for e in got), (bad, got))
+        got = errors_of(manifest(fetch=[{"url": a["url"], "to": "dl/a.tgz", "version": "1.2.3", "signed": signed, "found": {"from": "none"}}], keyring={"pub.asc": KEY}))
+        self.assertEqual(got, ["install.fetch 1 says found and is held by a signature: there is no digest to learn"])
+        # The name it is kept as takes no version: the steps read one path whatever the pin.
+        self.assertTrue(any(e.startswith("install.fetch 1 is {url, sha256, to}") for e in errors_of(manifest(fetch=[{**a, "to": "dl/a-{version}.tgz"}]))))
+
     def test_the_recipe_a_node_is_handed_carries_them(self):
         rec = lambda name: {"manifest": toolpacks.validate(kept(5, name))[0], "url": "https://example.com/p", "commit": "c" * 40}  # noqa: E731
         src = toolpacks.recipe(rec("tern"))["source"]
@@ -188,6 +230,41 @@ class Row(unittest.TestCase):
             got, why = catalogrows.checked(self.newer(**bad), self.shipped)
             self.assertIsNone(got, bad)
             self.assertIn(said, why, bad)
+
+    def test_how_a_newer_pin_is_found_is_held_to_its_shape_and_read_by_no_install(self):
+        pin = {"from": "pin", "version": "go1.99.0", "sha256": H}
+        # A pin's found is written as a checksum that asks the origin is, by one of the same kinds.
+        for found in ({"from": "go-json"}, {"from": "json", "url": "https://example.com/{version}.json", "path": "0.sha256"}, {"from": "none", "why": "it states a sha1"}):
+            row = self.newer(checksum={**pin, "found": found})
+            self.assertEqual(catalogrows.checked(row, self.shipped)[1], "", found)
+            self.assertEqual(packformat.held(row), ("pinned", packformat.PINNED_SAID), "and the word is the pin's, whatever found says")
+        for found in ({"from": "pin"}, {"from": "ask-the-vendor"}, "go-json", {}):
+            got, why = catalogrows.checked(self.newer(checksum={**pin, "found": found}), self.shipped)
+            self.assertIsNone(got, found)
+            self.assertIn("its pin's found is how a newer file's digest is learned from its publisher, from one of: json, android-repo", why)
+        self.assertEqual(sorted(packformat.FOUND_FROM), sorted(c for c in catalogrows.CHECKSUMS if c != "pin"))
+        # A repository: the commit, the tag it is fetched under, and how the commit to pin is found.
+        git = {"kind": "git", "url": "https://example.com/kit.git", "branch": "stable", "commit": "c" * 40}
+        shipped = {**self.shipped, "source": {"kind": "git", "url": "https://example.com/kit.git", "branch": "stable"}}
+        for good in ({}, {"tag": "3.50.1"}, {"tag": "v3.50.1", "track": {"resolver": "git-tag", "match": "^v\\d+\\.\\d+\\.\\d+$"}},
+                     {"track": {"resolver": "git-branch", "branch": "stable"}}):
+            row = {**shipped, "rev": 2, "source": {**git, **good}}
+            self.assertEqual(catalogrows.checked(row, shipped)[1], "", good)
+        for bad, said in (({"commit": "c0ffee"}, "source.commit is a commit's whole hash"), ({"commit": "C" * 40}, "source.commit is a commit's whole hash"),
+                          ({"tag": "a..b"}, "source.tag is the tag"), ({"tag": 7}, "source.tag is the tag"),
+                          ({"track": {"resolver": "github-release", "repo": "a/a"}}, "source.track is how a newer version is found, by one of: git-tag, git-branch"),
+                          ({"track": "git-tag"}, "source.track is how a newer version is found")):
+            got, why = catalogrows.checked({**shipped, "rev": 2, "source": {**git, **bad}}, shipped)
+            self.assertIsNone(got, bad)
+            self.assertIn(said, why, bad)
+        # A tag with no commit pins nothing, and a download says source.version, not track.
+        self.assertIn("source.tag is the tag", catalogrows.checked({**shipped, "rev": 2, "source": {"kind": "git", "url": git["url"], "tag": "3.50.1"}}, shipped)[1])
+        self.assertIn("a source of another kind says source.version", catalogrows.checked(self.newer(track={"resolver": "git-tag"}), self.shipped)[1])
+        for word in ("match", "git-tag", "git-branch"):
+            self.assertIn(word, catalogrows.RESOLVERS)
+        # A repository that names its tag or its track is format 5's.
+        self.assertEqual((packformat.source_format({**git, "tag": "3.50.1"}), packformat.source_format({**git, "track": {"resolver": "git-tag"}}),
+                          packformat.source_format({"kind": "git", "url": git["url"], "branch": "stable"})), (5, 5, 1))
 
     def test_its_official_pack_says_format_5_and_comes_back_whole(self):
         self.assertEqual(packformat.source_format(self.shipped["source"]), 1)
@@ -255,6 +332,14 @@ class Held(unittest.TestCase):
         self.word(toolpacks.recipe({"manifest": clean, "url": "https://example.com/k", "commit": "c" * 40}), "installer", "kestrel-up")
         self.word({"name": "r", "source": {"kind": "script", "url": "https://example.com/init.sh", "run": ["sh", "{script}"], "online": SENTENCE,
                                            "checksum": {"from": "pin", "sha256": H}}}, "installer", SENTENCE)
+        # A package another row's program installs has no download of its
+        # own: with the sentence it is that installer's, by its shape and
+        # whatever it is called.
+        self.word({"name": "kit:extras", "requires": ["kit-tools"], "source": {"kind": "sdkmanager", "package": "extras", "online": SENTENCE}}, "installer", SENTENCE)
+        # A repository at a commit whose warm-up downloads the rest.
+        self.word({"name": "f", "source": {"kind": "git", "url": "https://example.com/f.git", "branch": "stable", "commit": "c" * 40, "tag": "3.50.1",
+                                           "track": {"resolver": "git-tag", "match": "^\\d"}, "warm": ["{dir}/bin/f", "--version"], "online": SENTENCE}},
+                  "installer", SENTENCE)
 
     def test_open_says_which_part(self):
         pin = {"from": "pin", "sha256": H}
