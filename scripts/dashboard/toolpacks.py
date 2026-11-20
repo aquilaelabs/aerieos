@@ -823,6 +823,12 @@ def validate(m, shipped=(), official=False):
             a = _agent(m["agent"], errors)
             if a:
                 out["agent"] = a
+                # A recipe held to what it carries (its downloads declared,
+                # its steps run from them) is the format's as a pack's
+                # declared install is, and the manifest says that number.
+                if (a.get("install") or {}).get("steps") and fmt < packformat.HELD_FORMAT:
+                    errors.append(f"agent.install's fetch and steps are pack format {packformat.HELD_FORMAT}'s: "
+                                  f'the manifest says "format": {packformat.HELD_FORMAT}')
     # A deployed thing (R172): the model router, deployed and configured
     # from its card; an official pack's alone, like an agent's adapter.
     if m.get("service") is not None:

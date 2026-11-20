@@ -85,7 +85,8 @@ FORMATS = {
        "a repository's track and the tag its commit is fetched under, and the resolvers match, git-tag and git-branch; "
        "and what a package manager installs held the same way: what the entry asks pip or npm for (lock), resolved by that "
        "tool to exact files that are each a declared download, with the small files an install of them reads carried by a "
-       "shipped row itself (files)",
+       "shipped row itself (files); and a coding agent's install held the same way (agent.install's fetch, keyring, online and "
+       "steps in the place of script): its downloads declared, and its steps run from them, never a line a shell reads",
 }
 
 
@@ -611,16 +612,22 @@ PINNED_SAID = ("every download it makes is held to a pin, a publisher's signatur
 
 def _entry_source(doc):
     """(source, pack) for a toolchain row, an official pack's manifest (its
-    recipe under `shipped`) or a pack's manifest, raw or as the validator
-    keeps it; None for an entry whose install its entry does not describe
-    (a shipped agent, a service). A pack is fetched at the commit its
-    record or the signed index pins, which is its source here."""
+    recipe under `shipped`, or a coding agent's under agent.install) or a
+    pack's manifest, raw or as the validator keeps it; None for an entry
+    whose install its entry does not describe (a service, an agent with no
+    recipe). A pack is fetched at the commit its record or the signed index
+    pins, which is its source here; `pack` says the entry carries the keys
+    its signed downloads are checked with."""
     if isinstance(doc.get("source"), dict):
         return doc["source"], isinstance(doc.get("pack"), dict)
     sh = doc.get("shipped")
     if isinstance(sh, dict) and isinstance(sh.get("source"), dict):
         return sh["source"], False
-    if doc.get("service") is not None or (doc.get("agent") is not None and doc.get("tier") == "official"):
+    if doc.get("agent") is not None and doc.get("tier") == "official":
+        # A shipped coding agent: its recipe (agent.install) is its install.
+        inst = doc["agent"].get("install") if isinstance(doc["agent"], dict) else None
+        return (agent_source(inst), True) if isinstance(inst, dict) else None
+    if doc.get("service") is not None:
         return None
     raw = isinstance(doc.get("install"), dict)
     inst = doc["install"] if raw else doc
@@ -632,6 +639,34 @@ def _entry_source(doc):
     return {"kind": "git", "commit": "the commit it is kept at", "fetch": fetch, "keyring": inst.get("keyring") or {},
             "online": online, "offline": cut and not online, "then": inst.get("steps") or [],
             "verify": inst.get("verify")}, True
+
+
+# A coding agent's install recipe (agent.install, agents.install_checked)
+# is an install like any entry's, read as one: what it declares (fetch,
+# keyring, online) and the steps that run from it. The older form, a
+# vendor's installer fetched and handed to a shell (script), declares
+# nothing and is read as that, under a kind of its own.
+PIPED = "piped"
+PIPED_SAID = ("its vendor's installer is fetched and handed to a shell as it arrives, and it downloads the rest: "
+              "nothing in its entry holds either")
+
+
+def agent_source(inst):
+    """A coding agent's install recipe as the source held() reads: a held
+    recipe's downloads, keys and sentence with its steps, which run with no
+    network unless it says online; the older script form as PIPED."""
+    if not isinstance(inst.get("steps"), list):
+        return {"kind": PIPED}
+    online = inst.get("online") if isinstance(inst.get("online"), str) else ""
+    return {"kind": "command", "fetch": inst.get("fetch") if isinstance(inst.get("fetch"), list) else [],
+            "keyring": inst.get("keyring") if isinstance(inst.get("keyring"), dict) else {},
+            "online": online, "offline": not online.strip(), "run": inst["steps"]}
+
+
+def agent_held(inst):
+    """held_of for a coding agent's install recipe alone, as the controller
+    holds one (its table's, or the catalog's newer one)."""
+    return held_of({"tier": "official", "agent": {"install": inst}})
 
 
 def declares_none(doc):
@@ -655,6 +690,8 @@ def held(doc):
     ck = src.get("checksum") if isinstance(src.get("checksum"), dict) else {}
     how = ck.get("from")
     # Its own source.
+    if kind == PIPED:
+        return "open", PIPED_SAID
     if kind == "git":
         if not src.get("commit"):
             return "open", "its repository is fetched at a branch, with no commit: what arrives is whatever the branch holds that day"

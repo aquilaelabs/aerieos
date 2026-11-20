@@ -30,10 +30,11 @@ def rows():
 
 
 def payload():
-    """What the Nodes page reads: the latest known, when it was asked, and
-    each agent node's own version against it."""
+    """What the Nodes page reads: the version an install brings now (the
+    one its recipe pins, else the latest known), when the latest was asked,
+    and each agent node's own version against it."""
     cur = agentcode.latest("claude")
-    return {"latest": cur["version"], "checked": cur["at"], "error": cur["error"],
+    return {"latest": agentcode.offered("claude"), "checked": cur["at"], "error": cur["error"],
             "checking": cur["checking"], "nodes": rows()}
 
 

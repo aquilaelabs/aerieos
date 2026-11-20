@@ -286,20 +286,32 @@ def allow_plan(agent_id, spec=None):
 
 # ---- how an agent is installed (R169 step 13) ---------------------------------
 # A shipped agent's install recipe is its row's `install`, which its pack's
-# manifest in the catalog carries as agent.install: the vendor's installer
-# fetched over https and handed to a shell, the variable a version is pinned
-# through, the installer's environment, where the program lands under the
-# account's home, older places a removal clears, and (Claude Code) the folder
-# a named version is read from. The controller hands the recipe to the node
-# with each install, update and removal, the catalog's where the signed index
-# pins a pack whose `rev` is higher than this table's (agentcode.recipe), so
-# an installer that changes upstream is answered by a catalog commit and a
-# maintainer's signature, with no release of AerieOS. `rev` moves by one with
-# any change to a recipe here, or a catalog still holding the old one wins.
+# manifest in the catalog carries as agent.install. The controller hands the
+# recipe to the node with each install, update and removal, the catalog's
+# where the signed index pins a pack whose `rev` is higher than this table's
+# (agentcode.recipe), so a pin that moves is answered by a catalog commit and
+# a maintainer's signature, with no release of AerieOS. `rev` moves by one
+# with any change to a recipe here, or a catalog still holding the old one
+# wins.
 #
-# Held to a shape, since its words reach a shell and a removal's paths: one
-# installer over https piped to sh or bash with plain arguments, nothing
-# else a shell would run.
+# A recipe is held like any entry's install (pack format 5): what it fetches
+# is declared (`fetch`, each download with its sha256 or its publisher's
+# signature under a key in `keyring`), the node fetches and holds each before
+# anything runs, and `steps` then run from what was fetched, each a list of
+# words and never a line a shell reads. Without `online` the steps run with
+# no network; with it the recipe says in one sentence what its pinned
+# installer downloads by itself. Beside them, what is the agent's own: the
+# variable a version is handed to an installer through (`pin`), the
+# installer's environment (`env`), where the program lands under the
+# account's home (`bin`), older places a removal clears (`also`), and the
+# folder a named version is read from (`fresh`).
+#
+# The older form, a vendor's installer fetched over https and handed to a
+# shell (`script` in the place of fetch and steps), is still read, for a
+# manifest written before format 5: it means what it meant, and nothing in
+# it holds what arrives (packformat.held reads it as open). It is held to a
+# shape, since its words reach a shell: one installer over https piped to sh
+# or bash with plain arguments, nothing else a shell would run.
 _INSTALL_SCRIPT = re.compile(r"curl -fsSL https://[A-Za-z0-9._~/@+%-]{3,200} \| (?:ba)?sh(?: -s --(?: [A-Za-z0-9_${}:=.,/-]{1,60}){1,6})?")
 _INSTALL_NAME = re.compile(r"[A-Z][A-Z0-9_]{1,40}")
 _INSTALL_VALUE = re.compile(r"[A-Za-z0-9._/{}:=-]{0,200}")
@@ -307,6 +319,16 @@ _INSTALL_PATH = re.compile(r"\.?[A-Za-z0-9_-]{1,40}(/[A-Za-z0-9._{}-]{1,60}){1,5
 # What an installer's environment never sets: where programs and libraries
 # are found, and who the account is.
 _INSTALL_ENV_KEPT = ("PATH", "HOME", "USER", "LOGNAME", "SHELL", "IFS", "ENV", "BASH_ENV")
+# A step of a held recipe: a few plain words. What it runs is a file the
+# recipe fetched ({dir}/...), sh or bash on one, or one of the tools that
+# only put files in place; so a step is never a line of shell, and nothing
+# reaches a shell from the network but a file held to its entry.
+INSTALL_STEPS_MOST, INSTALL_WORDS_MOST = 8, 16
+INSTALL_HOLES = ("{dir}", "{home}", "{version}")
+INSTALL_TOOLS = ("mkdir", "tar", "unzip", "install", "ln", "chmod")
+INSTALL_SHELLS = ("sh", "bash")
+_INSTALL_WORD = re.compile(r"[A-Za-z0-9_@%+=:,./{}-]{1,200}")
+INSTALL_KEYS = frozenset(("rev", "script", "fetch", "keyring", "online", "steps", "pin", "env", "bin", "also", "fresh"))
 
 
 def _install_path(v, braces=""):
@@ -318,21 +340,103 @@ def _install_path(v, braces=""):
     return "{" not in rest and "}" not in rest
 
 
+def install_version(spec):
+    """The version a held recipe's downloads say they are, or "": the one
+    version every download that says one says. It fills {version} in the
+    recipe's steps, and is what an install brings where the program itself
+    is among the downloads and the steps run with no network."""
+    fetch = spec.get("fetch") if isinstance(spec, dict) else None
+    said = {f.get("version") for f in fetch if isinstance(f, dict) and f.get("version")} if isinstance(fetch, list) else set()
+    return said.pop() if len(said) == 1 else ""
+
+
+def install_pins(spec):
+    """The version an install of this recipe brings whatever its vendor's
+    newest is, or "": a held recipe whose steps run with no network installs
+    the program it declares, at the version that says (install_version). An
+    installer that keeps the network, and the older script form, bring
+    whichever version they are asked for."""
+    return install_version(spec) if isinstance(spec, dict) and spec.get("steps") and not spec.get("online") else ""
+
+
+def _install_steps(steps, fetch):
+    """Why a held recipe's steps are not ones, or ""."""
+    said = (f"agent.install.steps lists up to {INSTALL_STEPS_MOST} commands, each a list of plain words: a file the recipe fetched "
+            f"({{dir}}/...), sh or bash on one, or one of {', '.join(INSTALL_TOOLS)}, with {', '.join(INSTALL_HOLES)} where a path goes")
+    if not (isinstance(steps, list) and 1 <= len(steps) <= INSTALL_STEPS_MOST):
+        return said
+    kept = {"{dir}/" + f["to"] for f in fetch}
+    for step in steps:
+        if not (isinstance(step, list) and 1 <= len(step) <= INSTALL_WORDS_MOST
+                and all(isinstance(w, str) and _INSTALL_WORD.fullmatch(w) and ".." not in w.split("/") for w in step)):
+            return said
+        for w in step:
+            rest = w
+            for hole in INSTALL_HOLES:
+                rest = rest.replace(hole, "")
+            if "{" in rest or "}" in rest:
+                return said
+            # A fetched file is named as its download is kept.
+            if w.startswith("{dir}/") and w not in kept:
+                return (f"agent.install.steps names {w}, which is no download agent.install.fetch keeps: "
+                        "a step runs and reads what the recipe declares")
+        run = step[1] if step[0] in INSTALL_SHELLS and len(step) > 1 else step[0]
+        if step[0] in INSTALL_SHELLS and not run.startswith("{dir}/"):
+            return said
+        if not (run.startswith("{dir}/") or step[0] in INSTALL_TOOLS):
+            return said
+    if any("{version}" in w for step in steps for w in step) and not install_version({"fetch": fetch}):
+        return "agent.install.steps names {version}, and its downloads do not say one version to fill it with"
+    return ""
+
+
 def install_checked(spec):
     """(spec, why): an agent's install recipe as it is kept, or why it is
     refused. The node's agent holds the same shape to what it is handed
     (aerieos_agent/base.py recipe_checked; unit/test_agentcode.py holds the two
-    to each other)."""
+    to each other). A held recipe's downloads, keys and sentence are the
+    format's own shapes (packformat), read here only where a recipe says
+    them: a standalone reader of this table checks no recipe."""
     if spec in (None, "", {}):
         return None, ""
     if not isinstance(spec, dict):
-        return None, "agent.install is an object: rev, script, pin, env, bin, also, fresh"
+        return None, "agent.install is an object: rev, fetch and steps (or script), pin, env, bin, also, fresh"
     rev = spec.get("rev")
     if not (isinstance(rev, int) and not isinstance(rev, bool) and 1 <= rev <= 9999):
         return None, "agent.install.rev is a whole number from 1, one more with each change to the recipe"
     script = spec.get("script")
-    if not (isinstance(script, str) and len(script) <= 400 and _INSTALL_SCRIPT.fullmatch(script)):
+    if script is None:
+        import packformat  # noqa: PLC0415 (the format's shapes, where a recipe is checked)
+        # A key the form does not have is said, not dropped: a recipe that
+        # says `run` for steps would otherwise install nothing in silence.
+        # The script form, which is older than this, is read as it was.
+        if set(spec) - INSTALL_KEYS:
+            return None, (f"agent.install names {', '.join(sorted(str(k) for k in set(spec) - INSTALL_KEYS))}: "
+                          "it is rev, fetch, keyring, online, steps, pin, env, bin, also and fresh")
+        fetch, errors, _new = packformat.fetch_checked(spec.get("fetch"), "agent.install.fetch")
+        if not errors and not fetch:
+            errors = ["agent.install.fetch lists what its steps install from: a recipe declares at least one download"]
+        keyring, online = {}, ""
+        if not errors and spec.get("keyring") is not None:
+            keyring, errors = packformat.keyring_checked(spec["keyring"], "agent.install.keyring")
+        if not errors and spec.get("online") is not None:
+            online, errors = packformat.online_checked(spec["online"], "agent.install.online")
+        if not errors:
+            errors = [f"agent.install.fetch's {f['to']} is signed under {f['signed']['keys']}, which agent.install.keyring does not carry"
+                      for f in fetch if f.get("signed") and f["signed"]["keys"] not in keyring][:1]
+        if errors:
+            return None, errors[0]
+        why = _install_steps(spec.get("steps"), fetch)
+        if why:
+            return None, why
+        how = {"fetch": fetch, **({"keyring": keyring} if keyring else {}), **({"online": online} if online else {}),
+               "steps": [list(s) for s in spec["steps"]]}
+    elif any(spec.get(k) is not None for k in ("fetch", "keyring", "online", "steps")):
+        return None, "agent.install says script, and fetch, keyring, online or steps beside it: a recipe is one form or the other"
+    elif not (isinstance(script, str) and len(script) <= 400 and _INSTALL_SCRIPT.fullmatch(script)):
         return None, "agent.install.script is the vendor's installer over https handed to a shell: curl -fsSL https://HOST/PATH | bash, with plain arguments after -s -- if it takes any"
+    else:
+        how = {"script": script}
     pin = spec.get("pin")
     if pin is not None:
         if not (isinstance(pin, (list, tuple)) and len(pin) == 2 and all(isinstance(x, str) for x in pin)
@@ -354,7 +458,7 @@ def install_checked(spec):
     fresh = spec.get("fresh") or ""
     if fresh and not (_install_path(fresh, "{v}") and "{v}" in fresh):
         return None, "agent.install.fresh is the folder a named version is read from, with {v} for the version"
-    return {"rev": rev, "script": script, "pin": pin, "env": dict(sorted(env.items())), "bin": spec["bin"],
+    return {"rev": rev, **how, "pin": pin, "env": dict(sorted(env.items())), "bin": spec["bin"],
             "also": list(also), "fresh": fresh}, ""
 
 

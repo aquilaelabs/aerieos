@@ -1050,7 +1050,7 @@ def agent_attention(project_nodes):
         for a in agentcode.tracked() if agentcode else ():
             if agentcode.behind(n, a.id) and not agentcode.updating(n["id"], a.id):
                 tools.append({"name": a.tool, "label": a.product,
-                              "from": agentcode.installed(n, a.id), "to": agentcode.latest(a.id)["version"]})
+                              "from": agentcode.installed(n, a.id), "to": agentcode.offered(a.id)})
         if tools:
             live = claude_running(n["id"], project_nodes)
             out.append({"kind": "agents", "node": n["name"], "id": n["id"], "tools": tools,

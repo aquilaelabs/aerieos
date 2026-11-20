@@ -41,6 +41,7 @@ import urllib.request
 
 import agents
 import checks
+import packformat
 from vers import vkey
 
 VER = re.compile(r"(\d+\.\d+\.\d+)")
@@ -87,7 +88,7 @@ def _ahead(a):
     return entry if entry and int(entry.get("install_rev") or 0) > a.install["rev"] else None
 
 
-def recipe(agent_id):
+def recipe(agent_id, ask=True):
     """(recipe, "catalog" or "release"): how this agent is installed, as
     the node is handed it with every install, update and removal (R169 step
     13). The agent table's own, which shipped with this release, unless the
@@ -100,7 +101,9 @@ def recipe(agent_id):
     yet, once per commit (warm reads it ahead, behind the Library): a press
     on Update otherwise waits for nothing, which matters, since the node's
     sessions are ended right after and a slow press ended none (the node
-    had stopped counting as live)."""
+    had stopped counting as live). With `ask` false it is never asked: the
+    catalog's recipe where it has been read already, the release's until
+    then, which is what a row is drawn from."""
     a = agents.get(agent_id)
     own = a.install if a else None
     entry = _ahead(a)
@@ -109,7 +112,9 @@ def recipe(agent_id):
     key = (a.id, entry["commit"])
     with _lock:
         had = _recipes.get(key)
-    if not had or (had[2] and time.time() - had[1] > RECIPE_MISS_S):
+    if not ask and not had:
+        return own, "release"
+    if ask and (not had or (had[2] and time.time() - had[1] > RECIPE_MISS_S)):
         # Official by the signed index's word (catalog_entry answers its
         # official entries alone), which is what lets the manifest carry
         # a shipped agent's own block; the manifest cannot say it of itself.
@@ -231,8 +236,25 @@ def installed(n, agent_id):
     return m.group(1) if m else ""
 
 
+def pinned(agent_id):
+    """The version this agent's recipe pins, or "": a recipe whose program
+    is among its declared downloads and whose steps run with no network
+    installs that version whatever its vendor's newest is
+    (agents.install_pins). A newer one arrives as the pin moving, in a
+    release or in the catalog."""
+    return agents.install_pins(recipe(agent_id, ask=False)[0])
+
+
+def offered(agent_id):
+    """The version an install of this agent brings now: the one its recipe
+    pins, else the newest its vendor names. What a node is behind of, and
+    what Software update is offered for: a press that would install the
+    version already there is not offered."""
+    return pinned(agent_id) or latest(agent_id)["version"]
+
+
 def behind(n, agent_id):
-    i, cur = installed(n, agent_id), latest(agent_id)["version"]
+    i, cur = installed(n, agent_id), offered(agent_id)
     return bool(i and cur and vkey(i) < vkey(cur))
 
 
@@ -300,13 +322,16 @@ def update(principal, node_id, agent_id):
         # time takes a moment, and nothing should be down while it does.
         how = recipe_spec(a.id)
         ended = _end_sessions(node_id, a)
+        # The version asked for: the one the recipe pins where it pins the
+        # program, else the newest its vendor names.
+        to = agents.install_pins(how.get("recipe")) or latest(a.id)["version"]
         r = nodes.job_add(principal, {"node": node_id}, a.update_job,
-                          {"timeout": 900, "to": latest(a.id)["version"], "ended": ended, **how})
+                          {"timeout": 900, "to": to, "ended": ended, **how})
     finally:
         _pressed.pop((a.id, node_id), None)
     if r.get("ok"):
         if audit:
-            audit(principal, f"node-{a.id}-update", node_id, {"to": latest(a.id)["version"], "ended": ended,
+            audit(principal, f"node-{a.id}-update", node_id, {"to": to, "ended": ended,
                                                              "recipe": how.get("recipe_from", "")})
         r = r | {"ended": ended}
     return r
@@ -371,7 +396,14 @@ def row(n, agent_id):
     The version is the census's (the program's --version as the session
     account), the latest this module's check, and the job behind install,
     update and remove this module's, which ends the agent's sessions on the
-    node first."""
+    node first.
+
+    What its install is held to is its recipe's own word (packformat.held:
+    `held`, {word, why}), with each download the recipe declares, for every
+    platform (`downloads`, packformat.downloads_said). `latest` is the
+    version an install brings now: the one the recipe pins where it pins
+    the program (`pinned`, "" for a recipe that pins none), else the newest
+    its vendor names, which `vendor_latest` is either way."""
     a = agents.get(agent_id)
     se = (n.get("reported") or {}).get("session") or {}
     # A hosting-only node runs no session, so nothing there runs a coding
@@ -383,8 +415,12 @@ def row(n, agent_id):
     job = next(iter(nodes.jobs_for(node_id=n["id"], type=a.update_job, n=1) or []), None) if nodes else None
     running = updating(n["id"], a.id)
     failed = (job or {}).get("state") == "failed" and not running
+    how = recipe(a.id, ask=False)[0] or {}
+    pin = agents.install_pins(how)
     return {"name": a.tool, "agent": a.id, "label": a.product, "for": a.name,
-            "installed": inst, "latest": cur.get("version") or "",
+            "installed": inst, "latest": pin or cur.get("version") or "",
+            "pinned": pin, "vendor_latest": cur.get("version") or "",
+            "held": packformat.agent_held(how), "downloads": packformat.downloads_said(how.get("fetch")),
             "state": ("absent" if not inst else "update" if behind(n, a.id) else "current"),
             "managed": bool((n.get("reported") or {}).get("sandbox")), "here": bool(inst),
             "running": running, "action": ((job or {}).get("spec") or {}).get("action") or "install",

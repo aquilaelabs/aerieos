@@ -350,7 +350,12 @@ is added. Beside it each answers the entry's declared downloads as
 `signed` with the keys' name in `keys` and the signature's address in
 `sig`) and the `platform` it is for, empty for every one. An installed
 row's receipt lists the ones its node fetched, and what its steps ran with
-(`net`: `cut`, `open`, or `online` with the entry's sentence as `why`).
+(`net`: `cut`, `open`, or `online` with the entry's sentence as `why`). A
+coding agent's row answers `held` and `downloads` the same way, from its
+recipe, and beside them `pinned`: the version the recipe installs where its
+program is one of its downloads, empty otherwise. Its `latest` is then that
+version, since it is what an install brings, and `vendor_latest` the newest
+its vendor names.
 
 **A toolchain AerieOS ships** says the same things in its row's `source`
 (`config/toolchains.json`), whatever its kind: `fetch`, `keyring` and
@@ -395,6 +400,53 @@ installer is checked and before it runs, after a repository's checkout,
 and before a command; the installer, the follow-up steps, a warm-up and
 the verify then run with no network, or with it where the row says
 `online`.
+
+**A coding agent AerieOS ships** says the same things in its recipe, the
+`agent.install` block of its pack (`packs/agents/NAME/bbtool.json`): what
+it downloads under `fetch`, a publisher's keys under `keyring`, `online`
+where its installer keeps the network, and `steps` where a pack says its
+install steps:
+
+```json
+"format": 5,
+"agent": {
+  "install": {
+    "rev": 1,
+    "fetch": [
+      {"url": "https://github.com/merlin-code/merlin/releases/download/v{version}/install.sh",
+       "version": "3.4.0",
+       "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+       "to": "dl/install.sh",
+       "track": {"resolver": "github-release", "repo": "merlin-code/merlin", "trim_prefix": "v"},
+       "found": {"from": "github-asset"}}
+    ],
+    "online": "Its installer downloads the Merlin Code build for this machine from github.com/merlin-code/merlin's releases, and checks it against the sha256 that release states.",
+    "steps": [["sh", "{dir}/dl/install.sh", "--no-modify-path"]],
+    "pin": ["MERLIN_VERSION", "{v}"],
+    "env": {"MERLIN_INSTALL_DIR": "{home}/.local/bin"},
+    "bin": ".local/bin/merlin", "also": [".merlin/bin/merlin"], "fresh": ""
+  }
+}
+```
+
+A step is a list of plain words, run as it stands and never read by a
+shell: a file the recipe fetched (`{dir}/...`, named as its download is
+kept), `sh` or `bash` on one, or one of `mkdir`, `tar`, `unzip`, `install`,
+`ln` and `chmod`, which only put files in place. `{dir}` is where the
+downloads landed, `{home}` the account's home, and `{version}` the one
+version the downloads say they are. So nothing reaches a shell from the
+network but a file held to the recipe, and a recipe whose program is the
+download itself (a release's tarball for each platform, unpacked into
+place) needs no installer at all: it says no `online`, its steps run with
+no network, and it reads `pinned`. One that runs its vendor's installer
+says `online` with the sentence and reads `installer`. A recipe written
+before format 5 hands a vendor's installer to a shell as it arrives
+(`script`, in the place of `fetch` and `steps`); it is still valid, means
+what it meant, and reads `open`. The rest of a recipe, and how a node
+runs one, is in
+[agents.md](agents.md#where-an-agent-s-install-recipe-comes-from). A coding
+agent a pack brings needs none of this under `agent`: its program is
+installed by the pack's own `install`, which is the same keys.
 
 **How a pin moves.** An install never asks a vendor what is newest: it
 takes the pin. A newer version arrives as a change to the entry, proposed
@@ -511,7 +563,11 @@ AerieOS ships. Its `agent` block is an adapter of data, never code: it
 says how AerieOS starts the agent, hands it the briefing and holds it to
 the same guards, in the shapes AerieOS already writes for the shipped
 agents. The pack installs the agent's program like any pack (its `install`
-steps, its `layout.bin` on `PATH`), and a catalog update updates it.
+steps, its `layout.bin` on `PATH`), and a catalog update updates it. What
+that install downloads is held as every pack's is
+([Declared downloads](#declared-downloads)): a pack that brings an agent
+and one of the five AerieOS ships are held by the same keys, read by the
+same code, and get the same word.
 
 ```json
 "agent": {

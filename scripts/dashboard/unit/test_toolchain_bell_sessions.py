@@ -32,6 +32,8 @@ class Sessions(unittest.TestCase):
             updating = staticmethod(lambda nid, aid: False)
             installed = staticmethod(lambda n, aid: "2.0.1")
             latest = staticmethod(lambda aid: {"version": "2.0.2"})
+            # What an install brings: the newest, for a recipe that pins no program.
+            offered = staticmethod(lambda aid: "2.0.2")
 
         was = toolchains.nodes, toolchains.last_check, toolchains.agentcode
         toolchains.nodes, toolchains.agentcode = Nodes(), Claude()

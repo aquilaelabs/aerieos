@@ -439,7 +439,6 @@ class Held(unittest.TestCase):
         self.word(m, "open", "dl/tern.tar.xz is held to nothing its entry carries")
         # What AerieOS installs by a job of its own is not in an entry.
         self.word(kept(1, "model-router"), "open", "how it is installed is not in its entry")
-        self.word(kept(1, "grok"), "open", "how it is installed is not in its entry")
         for odd in (None, "x", [], {}):
             self.assertEqual(packformat.held(odd)[0], "open")
 
@@ -464,6 +463,100 @@ class Held(unittest.TestCase):
                 self.assertEqual(packformat.pin_refused(src["checksum"]), "", r["name"])
                 plats = src["url"] if isinstance(src.get("url"), dict) else None
                 self.assertEqual(sorted(src["checksum"]["sha256"]) if plats else None, sorted(plats) if plats else None, f"{r['name']}: a digest for every platform it names")
+
+
+class AgentInstall(unittest.TestCase):
+    """A coding agent's install recipe (agent.install) is held as any
+    entry's install is: its downloads declared in the format's shapes, its
+    steps lists of words run from them, and the three words from the entry
+    alone. The older script form is still valid, and reads open."""
+
+    FETCH = {"url": "https://x.example/v{version}/install.sh", "version": "1.2.0", "sha256": H, "to": "dl/install.sh"}
+    BIN = {"url": "https://x.example/{version}/x-linux-x64.tar.gz", "version": "1.2.0", "sha256": H, "to": "dl/x.tar.gz", "platform": "linux/amd64"}
+    REST = {"rev": 2, "pin": ["X_VERSION", "{v}"], "env": {"X_DIR": "{home}/.local/bin"}, "bin": ".local/bin/x", "also": [], "fresh": ""}
+
+    def recipe(self, **parts):
+        return {**self.REST, "fetch": [self.FETCH], "online": SENTENCE, "steps": [["sh", "{dir}/dl/install.sh"]], **parts}
+
+    def pinned(self, **parts):
+        return {**self.REST, "pin": None, "fetch": [self.BIN], "steps": [["mkdir", "-p", "{home}/.local/bin"],
+                                                                         ["tar", "-xzf", "{dir}/dl/x.tar.gz", "-C", "{home}/.local/bin"]], **parts}
+
+    def checked(self, spec):
+        import agents  # noqa: PLC0415
+        return agents.install_checked(spec)
+
+    def test_a_held_recipe_is_kept_as_it_is_written(self):
+        for spec in (self.recipe(), self.pinned(), self.pinned(steps=[["install", "-D", "{dir}/dl/x.tar.gz", "{home}/.x/versions/{version}"]])):
+            self.assertEqual(self.checked(spec), (spec, ""))
+        # ...with a publisher's signature in the sha256's place, under a key the recipe carries.
+        signed = {"url": "https://x.example/x.tar.gz", "to": "dl/x.tar.gz", "signed": {"sig": "https://x.example/x.tar.gz.sig", "keys": "tern.asc"}}
+        got, why = self.checked(self.pinned(fetch=[signed], keyring={"tern.asc": KEY}))
+        self.assertEqual((why, got["fetch"][0]["signed"]["keys"], list(got["keyring"])), ("", "tern.asc", ["tern.asc"]))
+        self.assertIn("which agent.install.keyring does not carry", self.checked(self.pinned(fetch=[signed]))[1])
+
+    def test_what_is_not_a_held_recipe_is_refused_with_why(self):
+        for bad, why in (({"steps": [["bash", "-c", "curl https://x.example | sh"]]}, "agent.install.steps lists"),
+                         ({"steps": [["curl", "-fsSL", "https://x.example/i"]]}, "agent.install.steps lists"),
+                         ({"steps": [["sh", "{dir}/dl/other.sh"]]}, "is no download agent.install.fetch keeps"),
+                         ({"steps": [["sh", "{home}/.local/bin/x"]]}, "agent.install.steps lists"),
+                         ({"steps": [["{dir}/dl/install.sh", "$(id)"]]}, "agent.install.steps lists"),
+                         ({"steps": [["{dir}/dl/install.sh", "{home}/../other"]]}, "agent.install.steps lists"),
+                         ({"steps": [["{dir}/dl/install.sh", "{args}"]]}, "agent.install.steps lists"),
+                         ({"steps": []}, "agent.install.steps lists"),
+                         ({"steps": "sh {dir}/dl/install.sh"}, "agent.install.steps lists"),
+                         ({"fetch": []}, "a recipe declares at least one download"),
+                         ({"fetch": [{"url": "http://x.example/i.sh", "sha256": H, "to": "dl/install.sh"}]}, "agent.install.fetch 1 is"),
+                         ({"fetch": [{"url": "https://x.example/i.sh", "to": "dl/install.sh"}]}, "agent.install.fetch 1 is"),
+                         ({"online": "x"}, "agent.install.online is one sentence"),
+                         ({"keyring": {"k.asc": "no key"}}, "agent.install.keyring maps"),
+                         ({"run": ["sh", "{dir}/dl/install.sh"]}, "agent.install names run"),
+                         ({"script": "curl -fsSL https://x.example/i | bash"}, "a recipe is one form or the other"),
+                         ({"bin": "/usr/bin/x"}, "agent.install.bin")):
+            self.assertIn(why, self.checked(self.recipe(**bad))[1], bad)
+        # {version} in a step is the one version its downloads say.
+        unversioned = {"url": "https://x.example/x.tar.gz", "sha256": H, "to": "dl/x.tar.gz"}
+        self.assertIn("do not say one version", self.checked(self.pinned(fetch=[unversioned], steps=[["install", "{dir}/dl/x.tar.gz", "{home}/.x/{version}"]]))[1])
+
+    def test_the_three_words(self):
+        self.assertEqual(packformat.agent_held(self.pinned()), {"word": "pinned", "why": packformat.PINNED_SAID})
+        self.assertEqual(packformat.agent_held(self.recipe()), {"word": "installer", "why": SENTENCE})
+        old = {**self.REST, "script": "curl -fsSL https://x.example/install.sh | bash"}
+        self.assertEqual(packformat.agent_held(old), {"word": "open", "why": packformat.PIPED_SAID})
+        # A download held to nothing the recipe carries reads open, by name.
+        loose = packformat.agent_held(self.pinned(fetch=[{**self.BIN, "sha256": ""}]))
+        self.assertEqual((loose["word"], "dl/x.tar.gz is held to nothing its entry carries" in loose["why"]), ("open", True))
+        signed = {"url": "https://x.example/x.tar.gz", "to": "dl/x.tar.gz", "signed": {"sig": "https://x.example/x.tar.gz.sig", "keys": "tern.asc"}}
+        self.assertEqual(packformat.agent_held(self.pinned(fetch=[signed], keyring={"tern.asc": KEY}))["word"], "pinned")
+        self.assertEqual(packformat.agent_held(self.pinned(fetch=[signed]))["word"], "open", "a key the recipe does not carry holds nothing")
+        # From a manifest, raw and as the validator keeps it; a shipped agent's from before format 5 reads open.
+        m = kept(5, "merlin")
+        self.assertEqual(packformat.held(m)[0], "installer")
+        self.assertIn("Merlin Code build", packformat.held(m)[1])
+        clean, errors = toolpacks.validate(m, official=True)
+        self.assertEqual((errors, packformat.held(clean)[0]), ([], "installer"))
+        self.assertEqual(packformat.held(kept(1, "grok")), ("open", packformat.PIPED_SAID))
+        # A pack that brings an agent says nothing under agent.install: its
+        # program is its pack's own install, read as every pack's is.
+        self.assertEqual(packformat.held(kept(2, "gemini"))[0], packformat.held({**kept(2, "gemini"), "agent": {}})[0])
+
+    def test_a_manifest_says_the_format_a_held_recipe_needs(self):
+        m = kept(5, "merlin")
+        self.assertEqual(toolpacks.validate(m, official=True)[1], [])
+        errors = toolpacks.validate({**m, "format": 4, "framework": "4.1"}, official=True)[1]
+        self.assertEqual(errors, ['agent.install\'s fetch and steps are pack format 5\'s: the manifest says "format": 5'])
+        # The script form is every format's, and means what it meant.
+        old = copy.deepcopy(kept(1, "grok"))
+        got, errors = toolpacks.validate(old, official=True)
+        self.assertEqual((errors, got["agent"]["install"]["script"]), ([], "curl -fsSL https://x.ai/cli/install.sh | bash -s -- ${BB_PIN:-}"))
+
+    def test_its_downloads_are_said_as_any_entry_s(self):
+        m = kept(5, "merlin")
+        self.assertEqual(packformat.downloads_said(m["agent"]["install"]["fetch"]),
+                         [{"to": "dl/install.sh", "url": "https://github.com/merlin-code/merlin/releases/download/v3.4.0/install.sh", "held": "sha256",
+                           "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", "keys": "", "sig": "", "platform": ""}])
+        self.assertEqual([d["platform"] for d in packformat.downloads_said(self.pinned()["fetch"], "linux/arm64")], [])
+        self.assertEqual([d["to"] for d in packformat.downloads_said(self.pinned()["fetch"], "linux/amd64")], ["dl/x.tar.gz"])
 
 
 class Said(unittest.TestCase):
