@@ -61,6 +61,11 @@ import sys
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+# The bundle this file is in, with its links followed: a hook may be reached
+# through one, and what it reads beside itself is where the link leads.
+BUNDLED = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, os.path.join(BUNDLED, "..", "lib"))
+import agentids  # noqa: E402
 
 # The tools each agent runs a command or edits a file with, by the names
 # its hooks hand over.
@@ -72,11 +77,7 @@ GREP = {"grep", "Grep", "search_file_content"}
 PATCH_FILE = re.compile(r"^\*\*\* (?:Update|Add|Delete) File: (.+)$", re.M)
 
 
-SHIPPED = ("claude", "codex", "copilot", "grok", "open")
-
-
-def packs_file():
-    return os.environ.get("BB_TOOLPACKS_JSON") or os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", "config", "toolpacks.json")
+SHIPPED = agentids.SHIPPED
 
 
 def pack_adapter(agent):
@@ -84,12 +85,7 @@ def pack_adapter(agent):
     (a shipped agent's name is never a pack's)."""
     if agent in SHIPPED or not re.fullmatch(r"[a-z][a-z0-9]{1,15}", str(agent or "")):
         return None
-    try:
-        with open(packs_file(), encoding="utf-8") as f:
-            rows = json.load(f).get("toolchains") or []
-    except (OSError, ValueError, AttributeError):
-        return None
-    for r in rows if isinstance(rows, list) else []:
+    for r in agentids.pack_rows(BUNDLED):
         if isinstance(r, dict) and r.get("name") == agent and isinstance(r.get("agent"), dict):
             return r["agent"]
     return None

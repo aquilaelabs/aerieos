@@ -19,6 +19,14 @@ import os
 import re
 import sys
 
+# agentids, from beside this file wherever a link to it is: a node's root
+# runs this with nothing else on its path (python3 -I), and the checks load
+# it by its path.
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import agentids  # noqa: E402
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
 
 def _claims(jwt):
     """The claims of a JSON web token, read and never checked: what it says
@@ -82,32 +90,21 @@ def _jwt_email(d, depth=0):
     return ""
 
 
-def packs_file():
-    """The tool packs this bundle carries, beside its catalog: where a pack
-    that brings a coding agent says how it signs in."""
-    return os.environ.get("BB_TOOLPACKS_JSON") or os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "..", "..", "config", "toolpacks.json")
-
-
 def pack_flows():
     """{agent: its adapter} for the packs' coding agents that describe a
     sign-in's flow (R233 step 6): the link, what its screens ask, and the
     file under the home its sign-in is kept in. A shipped agent's name is
     never a pack's, and a kept file that is not a plain path under the home
-    is no row."""
-    try:
-        with open(packs_file(), encoding="utf-8") as f:
-            rows = json.load(f).get("toolchains") or []
-    except (OSError, ValueError, AttributeError):
-        return {}
+    is no row. The packs are the bundle's (agentids.pack_rows), where a pack
+    that brings a coding agent says how it signs in."""
     out = {}
-    for r in rows if isinstance(rows, list) else []:
+    for r in agentids.pack_rows(HERE):
         a = r.get("agent") if isinstance(r, dict) else None
         name = str(r.get("name") or "") if isinstance(r, dict) else ""
         si = a.get("signin") if isinstance(a, dict) else None
         flow = si.get("flow") if isinstance(si, dict) else None
         if not (isinstance(flow, dict) and re.fullmatch(r"[a-z][a-z0-9]{1,15}", name)
-                and name not in ("claude", "codex", "copilot", "grok", "open")):
+                and name not in agentids.SHIPPED):
             continue
         kept, url = flow.get("kept"), flow.get("url")
         if not (isinstance(kept, str) and re.fullmatch(r"[A-Za-z0-9._/-]{1,200}", kept) and not kept.startswith("/")

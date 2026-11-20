@@ -147,6 +147,7 @@ scripts/
   lib/version-verbs.py           `aerie version`
   lib/changelog-verbs.py         `aerie changelog`
   lib/token-verbs.py             `aerie token keep`
+  lib/agentids.py                the ids of the coding agents that ship with AerieOS, and the rows of the tool packs a bundle carries: the one list login-list.py, bb-agent-hook and bb-tty tell a pack's agent from a shipped one by
   lib/login-list.py              `aerie login --list`: every account this machine is signed in as, each agent's read from what its sign-in data says (who_of), and the sign-out that forgets keys
   lib/doctor-probes.py           egl, project node, commit identity, session-capable node, signed-in account
   lib/lint-checks.py             aerie lint's own checks: runner label pinning, XML well-formedness, settings agreement

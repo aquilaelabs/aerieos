@@ -2373,6 +2373,9 @@ agent_session() {
 # A coding agent a vetted pack brings (R169 step 10): its id is the
 # argument's prefix when this bundle's config/toolpacks.json carries its
 # adapter, which bb-agent-hook reads; the agents' branch below takes it.
+# The names passed over first are the shipped agents' ids, the one list of
+# which is agentids.SHIPPED (scripts/lib/agentids.py; unit/test_agentids.py
+# holds this line to it), and this script's own shell and ctr.
 PACK_AGENT="" PACK_ADAPTER=""
 case "$target" in
     [a-z]*:*)
