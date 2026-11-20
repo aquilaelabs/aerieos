@@ -147,7 +147,12 @@ def _write(key, path):
 def _console(pub):
     """What a person does with a builder's public key, said once."""
     return ("A node that pinned AerieOS's release key takes a build signed with this one once a person adds it at that\n"
-            f"node's own console:  sudo aerieos-agent release-key add {pub}")
+            f"node's own console:  sudo aerieos-agent release-key add {pub}\n"
+            "A node whose agent is from before that verb (it answers that the release key is 64 hex characters, and\n"
+            "changes nothing) cannot be told the key yet, and refuses the build that would teach it. There, once:\n"
+            "  sudo aerieos-agent unsigned on    then let its agent update (Update agent on its row, or wait)\n"
+            f"  sudo aerieos-agent release-key add {pub}\n"
+            "  sudo aerieos-agent unsigned off")
 
 
 def _builder_keygen(args, Ed25519PrivateKey):
