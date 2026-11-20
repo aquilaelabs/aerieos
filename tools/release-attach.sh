@@ -15,15 +15,16 @@
 # id, then each file as it lands. --notes and --title are used only when the
 # release is made here; a release that exists keeps its own.
 #
-# --publish-when-whole LIST is the last job's (the operator, 11 Nov): a dev
-# build's release goes out by itself, and only once every file LIST names
-# (.release-files, @VER@ the version, * a pattern) is on it. Two dev builds
-# were published by hand from the git host's own page minutes after their
-# tags, which checks nothing, and one of them never got its image. Whole,
-# the draft is published and the line says so; a file still missing after
-# RELEASE_WAIT_S (the signed app is attached by a controller, on its own
-# clock) is named, the release stays a draft and this exits 3. A release
-# that is not a dev build is never published here: its owner reads it first.
+# --publish-when-whole LIST is the seal's last step (seal-release.yml; the
+# operator, 11 Nov): a dev build's release goes out by itself, and only once
+# every file LIST names (.release-files, @VER@ the version, * a pattern) is
+# on it, its signed list of files among them, which is made last. Two dev
+# builds were published by hand from the git host's own page minutes after
+# their tags, which checks nothing, and one of them never got its image.
+# Whole, the draft is published and the line says so; a file still missing
+# after RELEASE_WAIT_S is named, the release stays a draft and this exits 3.
+# One published already is left as it is. A release that is not a dev build
+# is never published here: its owner reads it first.
 set -euo pipefail
 
 tag="${1:?tag}"; shift

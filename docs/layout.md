@@ -426,6 +426,7 @@ config/skel/                     home directory skeleton
 config/icon.png                  the icon the Unraid template shows
 config/toolchains.json           the toolchains the Library offers, and how to install each
 config/release-signers           who may sign a release's SHA256SUMS (R199), as ssh-keygen's allowed signers, the namespace naming the channel: aerieos-dev for the release build's key and its spare (written from config/aerieos-release.pub), aerieos-release for the stable key's holder; in the image, and what AerieOS's updater, the installer, the stick maker and the Library's downloads check a release by
+config/apk-signers               the certificates a release's Android app may be signed by, one SHA-256 fingerprint a line (R199): the app is the one file no build attests, so the release's list of files is signed only over an APK apksigner verifies against one of these; read by tools/release-sign.py alone
 config/catalog.pub               the catalog maintainers' Ed25519 public key (R169 step 2): what every install checks the catalog's index.sig against, with its spare on a second line (R232)
 config/aerieos-release.pub       AerieOS's release key, public half (R227): what the Enroll script hands a node to pin, and what tools/sign-agent.py holds a build's key to; a second line names its spare (R232); read by scripts/lib/releasepub.py alone, and aerie lint fails when it does not parse to one key or two
 config/release-keys/README.md    where each publisher release key came from, and how one is refreshed (R137)
@@ -440,12 +441,14 @@ tools/sign-agent.py              the agent's release signature (R227): --keygen 
 tools/bb-ref.sh                  writes the aerie block of docs/reference.md from aerie help; aerie lint holds the two equal
 tools/aerieos-stick.py        the USB stick maker (R161 step 5): a release's stick image onto a removable disk on Windows, a Mac or Linux, checked and read back, Python's own library alone
 tools/release-notes.py           a dev build's release notes: what the changelog's Unreleased gained since the last published release
-tools/release-sign.py            makes a release's SHA256SUMS from its files' own bytes and signs it (R199): sign on the stable key holder's own machine (aerieos-release), seal in CI for a dev build with the release build's key (aerieos-dev, a stable tag refused); key makes the stable key
+tools/release-sign.py            makes a release's SHA256SUMS from its files' own bytes and signs it (R199): sign on the stable key holder's own machine (aerieos-release), seal in CI for a dev build with the release build's key (aerieos-dev, a stable tag refused), each file held to the build attestation of the workflow named for it and the Android app to config/apk-signers; seal --from seals a folder dry for the rehearsal; key makes the stable key
+tools/release-requirements.txt   the cryptography library a release's build uses its key with, and the two it needs, each pinned and held to its files' sha256
+tools/release-lib.sh             installs that list into a folder of its own with --require-hashes, in a step that holds no secret; the step that holds the key reads it by PYTHONPATH
 tools/release-signers.py         writes config/release-signers' dev lines from config/aerieos-release.pub and the stick maker's copy from config/release-signers; --check is aerie lint's, so neither is typed and neither drifts
 tools/release-place.sh           where a release may be cut from: a dev build on its branch, a stable release or a candidate only on main (the tag's first check)
 tools/root-tier.sh               the root tier as root in a throwaway container of the controller's image: the image's own copy, or a checkout's with --tree (the lint workflow's root job, the image workflow's upgrade job)
-tools/release-attach.sh          one release per tag, found among the drafts and made once, each file uploaded to it by id: what a tag's last job makes the release with, and a job run again by hand attaches with
-tools/release-missing.sh         the files .release-files names that a set of names lacks: one reading of the list for the last job and the rehearsal
+tools/release-attach.sh          one release per tag, found among the drafts and made once, each file uploaded to it by id: what a tag's last job makes the release with, what the seal attaches the signed list with and publishes a dev build by once it is whole, and what a job run again by hand attaches with
+tools/release-missing.sh         the files .release-files names that a set of names lacks: one reading of the list for the seal's publication and the rehearsal
 tools/aerieos-usb-maker.py    the stick maker in a window (R198): which release, which stick, the first boot's settings and a last page naming the stick, each step aerieos-stick.py's own; built into a Windows .exe that asks for Administrator, attached to every release
 tools/api-doc.py                 writes docs/api.md from server.py's route tables; aerie lint holds the two equal
 tools/git-hosts-doc.py           writes docs/git-hosts.md from forgeaccess.ABILITIES; aerie lint holds the two equal
@@ -512,13 +515,14 @@ docs/design-language.md          what the dashboard's surfaces owe each other: h
 .release-files                   the files every release carries, which the controller checks each release against
 .github/actionlint.yaml          this runner's labels, for workflow linting
 .github/workflows/
-  build-image.yml                GHCR publish: hosted, cached from :main, on a push to main that touches the image's inputs, the pushed image then started on each release's /config (tools/upgrade-image.sh); on a tag, the one run that builds everything the release carries (the image, the bundle, the apps, the OS image) behind the tag's checks, its last job making the release once with every file
+  build-image.yml                GHCR publish: hosted, cached from :main, on a push to main that touches the image's inputs, the pushed image then started on each release's /config (tools/upgrade-image.sh); on a tag, the one run that builds everything the release carries (the image, the bundle, the apps, the OS image) behind the tag's checks, the agent signed once by the one job that reads the release key, every file attested, its last job making the release once with every file and the image's digest, a draft
+  seal-release.yml               a release's signed list of its files (R199), started for a tag by the controller once the signed Android app is attached, or by hand: tools/release-sign.py seal --attested, the two files attached, and a dev build published once it is whole
   publish-release.yml            a release published: :dev, and for a stable one :latest and :MAJOR.MINOR, moved onto the version it built
   os-image.yml                   AerieOS built and booted under QEMU: called by build-image.yml to publish, and on its own for a branch push touching the image
   lint.yml                       aerie lint itself with nothing skipped, and the unit tier, on a pull request and before a release's tag publishes, on this runner; the root tier beside them, in a container on a hosted one
   dashboard.yml                  the dashboard's browser suites, on a pull request that changes what they test and before a release's tag publishes, on this runner
   android-app.yml                the companion app's build: on a push to main that touches it, as a job of a tag's run (the unsigned APK handed to the controller to sign), or by hand
-  companion-app.yml              the Windows companion's .exe, the .pyz and the VS Code extension: as a job of a tag's run, its files handed to that run's last job, or by hand for a release that exists, attached to it
-  release-rehearsal.yml          every build a release's tag runs and every check it is held to, on a branch by hand or aerie version rehearse, publishing nothing
+  companion-app.yml              the Windows companion's .exe, the .pyz and the VS Code extension: as a job of a tag's run, its files attested and handed to that run's last job, or by hand for a release that exists, attached to it
+  release-rehearsal.yml          every build a release's tag runs and every check it is held to, on a branch by hand or aerie version rehearse, publishing nothing; and the seal's steps dry, with a key made in the job
   runner-smoke-test.yml          proves this runner picks up jobs, carries its toolchain and cannot see the shielded PAT (manual)
 ```

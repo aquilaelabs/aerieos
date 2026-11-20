@@ -97,9 +97,72 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     uses: ./.github/workflows/dashboard.yml
 
-  build:
-    # After the tag's three checks, or at once where they do not apply.
+  # The agent's signature (R227), made once a run, here, by the one job of
+  # this workflow that reads the release key. A node that pinned AerieOS's
+  # release key takes an agent update only with this signature
+  # (scripts/agent/aerieos_agent/release.py); the key is this repository's
+  # secret and no controller's.
+  #
+  # On a release's tag alone, once its three checks have passed. Every
+  # build used to sign: a push to main, the weekly rebuild and a run by hand
+  # from any branch each read the key, in the job that also builds the
+  # image, and the OS image's build read it on a branch push (the audit of
+  # 20 Nov). Those builds ship the agent unsigned now, as a branch's always
+  # did where the secret was not set, and say so. The image, the bundle and
+  # the OS image each take the signature from this job as the run's
+  # artifact and check it against the committed key before they pack it, so
+  # none of them holds the key.
+  #
+  # `environment: release` is where the key is kept: an environment whose
+  # secrets GitHub hands only to a job that names it, and which the
+  # repository limits to v* tags (docs/versions.md, The release key on
+  # GitHub). A repository-level secret is read here all the same, so this
+  # works before the secret is moved there and after.
+  signature:
     needs: [place, lint, suites]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: release
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (R206)
+      # The library the key is used with, each file held to its hash, in a
+      # step that holds no secret: `pip install cryptography` ran in the
+      # step that held the key, and took whatever PyPI served that day.
+      - name: The pinned library the key is used with
+        run: bash tools/release-lib.sh "$RUNNER_TEMP/release-lib"
+      - name: Sign the agent with the release key
+        env:
+          AERIEOS_RELEASE_KEY: ${{ secrets.AERIEOS_RELEASE_KEY }}
+          PYTHONPATH: ${{ runner.temp }}/release-lib
+        run: python3 tools/sign-agent.py
+      # With no key set the tool says the agent ships unsigned and exits 0,
+      # which is right for a branch and shipped a release's agent unsigned,
+      # green. A release without the committed key's signature over this
+      # tree's agent stops here.
+      - name: The signature is the committed key's, over this tree's agent
+        env:
+          PYTHONPATH: ${{ runner.temp }}/release-lib
+        run: |
+          python3 tools/sign-agent.py --check || {
+            echo "::error::a release's agent must carry the release key's signature and this one does not: AERIEOS_RELEASE_KEY is not set where this job reads it (the release environment's secrets), or it is not a key config/aerieos-release.pub names"
+            exit 1
+          }
+      # A day, the shortest there is: read by the jobs of this run that pack
+      # the agent, and by nothing afterwards.
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2, pinned by commit (R206)
+        with:
+          name: agent-signature
+          path: scripts/agent/agent.sig
+          if-no-files-found: error
+          retention-days: 1
+
+  build:
+    # After the tag's three checks and the agent's signature, or at once
+    # where they do not apply.
+    needs: [place, lint, suites, signature]
     if: ${{ !cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
     # A pinned image, never ubuntu-latest: GitHub repoints that label at a new
     # release on its own date (Ubuntu 26 from 19 Oct 2026), and aerie lint fails
@@ -231,17 +294,25 @@ jobs:
           echo "built $v"
           echo "v=$v" >> "$GITHUB_OUTPUT"
 
-      - name: Sign the agent with the release key
-        # A node that pinned AerieOS's release key takes an agent update only
-        # with this signature (scripts/agent/aerieos_agent/release.py). The
-        # key is this repository's secret and no controller's; with none set
-        # the step says so and the build ships unsigned, as a branch's does.
+      # The agent's signature: a release's build takes the one this run's
+      # signature job made and checks it against the committed key before
+      # the image is built around it; this job holds no key. Any other
+      # build ships the agent unsigned, as a branch's does, and says so.
+      - name: Take the agent's signature
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0, pinned by commit (R206)
+        with:
+          name: agent-signature
+          path: scripts/agent
+      - name: The agent's signature, checked on a release
         shell: bash
-        env:
-          AERIEOS_RELEASE_KEY: ${{ secrets.AERIEOS_RELEASE_KEY }}
         run: |
-          python3 -c 'import cryptography' 2>/dev/null || python3 -m pip install --quiet --user cryptography
-          python3 tools/sign-agent.py
+          case "$GITHUB_REF" in
+            refs/tags/v*)
+              bash tools/release-lib.sh "$RUNNER_TEMP/release-lib"
+              PYTHONPATH="$RUNNER_TEMP/release-lib" python3 tools/sign-agent.py --check ;;
+            *) echo "not a release's build: the agent ships unsigned, as a branch's does (the release key is read on a v* tag alone)" ;;
+          esac
       - name: Build and push
         id: push
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc   # v7.4.0, pinned by commit (R206)
@@ -369,7 +440,7 @@ jobs:
     # Every job of the run, not the image's alone: a run whose OS image failed
     # was recorded a success (B455). A skipped job (no tag, no box ticked)
     # counts as nothing either way.
-    needs: [place, lint, suites, build, upgrade, bundle, apps, android, appliance, release]
+    needs: [place, lint, suites, signature, build, upgrade, bundle, apps, android, appliance, release]
     # Failed, canceled and skipped are exactly the outcomes worth recording.
     if: always()
     # The image is pushed by the time this runs, so nothing waits on it: with
@@ -396,7 +467,7 @@ jobs:
         # the dashboard follows for anything the web can reach, and it keeps
         # a workflow input out of a command line.
         env:
-          JOB_RESULTS: "place=${{ needs.place.result }} lint=${{ needs.lint.result }} suites=${{ needs.suites.result }} build=${{ needs.build.result }} upgrade=${{ needs.upgrade.result }} bundle=${{ needs.bundle.result }} apps=${{ needs.apps.result }} android=${{ needs.android.result }} appliance=${{ needs.appliance.result }} release=${{ needs.release.result }}"
+          JOB_RESULTS: "place=${{ needs.place.result }} lint=${{ needs.lint.result }} suites=${{ needs.suites.result }} signature=${{ needs.signature.result }} build=${{ needs.build.result }} upgrade=${{ needs.upgrade.result }} bundle=${{ needs.bundle.result }} apps=${{ needs.apps.result }} android=${{ needs.android.result }} appliance=${{ needs.appliance.result }} release=${{ needs.release.result }}"
           BUILD_VERSION: ${{ needs.build.outputs.version }}
           BUILD_DIGEST: ${{ needs.build.outputs.digest }}
           BUILD_ELAPSED: ${{ needs.build.outputs.elapsed }}
@@ -483,8 +554,9 @@ jobs:
   # tag push alone. It makes no release: the bundle and the release's notes
   # are handed to the last job, which makes the release once (R206 step 1).
   bundle:
-    # Signed with the release key, so only once the tag's checks have passed.
-    needs: [place, lint, suites]
+    # With the agent's signature in it, so only once the tag's checks have
+    # passed and the signature is made.
+    needs: [place, lint, suites, signature]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
     permissions:
@@ -495,17 +567,18 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (R206)
         with:
           fetch-depth: 0
-      - name: Sign the agent with the release key
-        # A node that pinned AerieOS's release key takes an agent update only
-        # with this signature (scripts/agent/aerieos_agent/release.py). The
-        # key is this repository's secret and no controller's; with none set
-        # the step says so and the build ships unsigned, as a branch's does.
+      # The agent's signature, from this run's signature job, checked
+      # against the committed key before the bundle is packed around it.
+      - name: Take the agent's signature
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0, pinned by commit (R206)
+        with:
+          name: agent-signature
+          path: scripts/agent
+      - name: The agent's signature, checked
         shell: bash
-        env:
-          AERIEOS_RELEASE_KEY: ${{ secrets.AERIEOS_RELEASE_KEY }}
         run: |
-          python3 -c 'import cryptography' 2>/dev/null || python3 -m pip install --quiet --user cryptography
-          python3 tools/sign-agent.py
+          bash tools/release-lib.sh "$RUNNER_TEMP/release-lib"
+          PYTHONPATH="$RUNNER_TEMP/release-lib" python3 tools/sign-agent.py --check
       - name: Pack the tag's tree
         id: pack
         shell: bash
@@ -586,11 +659,18 @@ jobs:
     with:
       tag: ${{ github.ref_name }}
       hand-on: true
-    # What the called workflow asks for, for its own run by hand, where it
-    # attaches to a release that exists; handing on writes nothing.
+    # What the called workflow asks for: to write a release for its own run
+    # by hand, where it attaches to one that exists (handing on writes
+    # nothing), and to attest each file it builds, in the job that built it.
     permissions:
       contents: write
-    secrets: inherit
+      id-token: write
+      attestations: write
+    # The Windows code-signing certificate, which is all it reads: it used
+    # to inherit every secret of the repository, the release key among them.
+    secrets:
+      BB_WIN_CERT_PFX_B64: ${{ secrets.BB_WIN_CERT_PFX_B64 }}
+      BB_WIN_CERT_PASSWORD: ${{ secrets.BB_WIN_CERT_PASSWORD }}
 
   android:
     needs: [place, lint, suites]
@@ -607,11 +687,16 @@ jobs:
   # box ticked and the weekly rebuild call it here, and the last job puts
   # what it built on the release.
   appliance:
-    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.appliance) || github.event_name == 'schedule'
+    # After the agent's signature on a tag, which the image carries; a
+    # manual run and the weekly rebuild have none to wait for, and a job
+    # that names one skipped runs only where it says it may.
+    needs: [signature]
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.appliance) || github.event_name == 'schedule') }}
     uses: ./.github/workflows/os-image.yml
-    # The release key, for the agent the image carries (os-image.yml signs it).
-    secrets:
-      AERIEOS_RELEASE_KEY: ${{ secrets.AERIEOS_RELEASE_KEY }}
+    # A release's image takes the agent's signature this run made; any other
+    # carries the agent unsigned. The called workflow is handed no secret.
+    with:
+      agent-signature: ${{ startsWith(github.ref, 'refs/tags/v') }}
 
   # The release, made once, here, by the run's last job (R206 step 1): every
   # file the run built and the notes, on one release that did not exist until
@@ -621,17 +706,23 @@ jobs:
   # started on every release's /config (upgrade), the bundle is packed, the
   # apps are built, the OS image is built and booted, and the tag's three
   # checks have passed, or this job does not run and there is no release.
-  # The signed Android app is the controller's to attach, once this is made.
+  #
+  # Two things are not this run's (R199). The signed Android app is the
+  # controller's to attach, once this is made: minutes to hours later, on
+  # its clock. And the release's signed list of its files, SHA256SUMS and
+  # its signature, can only be made over every file, the app among them, so
+  # it is seal-release.yml's, which the controller starts once the app has
+  # landed and which publishes a dev build then. This job used to wait a
+  # quarter of an hour for the app and publish; a release without its
+  # signed list is not whole, so there is nothing here to wait for.
   release:
-    needs: [place, lint, suites, build, upgrade, bundle, apps, android, appliance]
+    needs: [place, lint, suites, signature, build, upgrade, bundle, apps, android, appliance]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
     permissions:
       contents: write
       id-token: write
       attestations: write
-      # To start publish-release.yml for a dev build this job publishes.
-      actions: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (B274)
         with:
@@ -654,13 +745,32 @@ jobs:
       # with its sha256 (the operator, 30 Oct): an update takes the slot, its
       # kernel and its initrd out of the ISO, and the raw disk, qcow2 and OVA
       # stay the boot test's and the run's artifact.
-      - name: Attest the ISO and the stick
+      #
+      # And one line that names the container image this tag pushed, by its
+      # digest: ghcr.io/OWNER/NAME@sha256:... The image itself carries no
+      # attestation (the build job says why), and a registry's tag is
+      # whatever was last pushed under it. This file is in the release's
+      # signed list, so a signed release says which image is its own, and
+      # the image an install runs can be held to it.
+      - name: Name the image this tag pushed by its digest
+        shell: bash
+        env:
+          DIGEST: ${{ needs.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$DIGEST" | grep -Eqx 'sha256:[0-9a-f]{64}' \
+            || { echo "::error::the image's build handed on no digest (\"$DIGEST\"), so the release cannot name its image"; exit 1; }
+          img="$(printf '%s/%s' "$REGISTRY" "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')"
+          printf '%s@%s\n' "$img" "$DIGEST" > "out/aerieos-image-${GITHUB_REF_NAME#v}.digest"
+          cat "out/aerieos-image-${GITHUB_REF_NAME#v}.digest"
+      - name: Attest the ISO, the stick and the image's digest
         id: attest
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be   # v2.4.0, pinned by commit (R206)
         with:
           subject-path: |
             out/aerieos-os-*.iso
             out/aerieos-os-*.stick.raw.xz
+            out/aerieos-image-*.digest
       - name: Make the release, with every file and the notes
         shell: bash
         env:
@@ -688,27 +798,10 @@ jobs:
           bash tools/release-attach.sh "$tag" --notes rel/notes.md "${files[@]}" \
             out/aerieos-os-*.iso out/aerieos-os-*.iso.sha256 \
             out/aerieos-os-*.stick.raw.xz out/aerieos-os-*.stick.raw.xz.sha256 \
+            out/aerieos-image-*.digest \
             "${iso%.iso}.attestation.jsonl"
-      # A dev build's release goes out by itself, here, as the last thing its
-      # build does, and only once every file .release-files names is on it
-      # (the operator, 11 Nov): two were published by hand from the git
-      # host's page minutes after their tags, and one never got its image.
-      # The one file not on it yet is the signed Android app, which the
-      # controller attaches within minutes of the release being made; this
-      # waits for it, and a release it never reaches stays a draft, the
-      # missing file named. A release that is not a dev build stays a draft
-      # for its owner to read.
-      - name: A dev build's release goes out once it is whole
-        if: contains(github.ref_name, '-dev.')
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          tag="${GITHUB_REF_NAME}"
-          bash tools/release-attach.sh "$tag" --publish-when-whole .release-files | tee whole.log
-          # A release this job's own token publishes starts no workflow
-          # (GitHub's rule), so what follows a publication, the image tags
-          # people follow moved onto this build, is started by name.
-          if grep -q " published: whole" whole.log; then
-            gh workflow run publish-release.yml --repo "$GITHUB_REPOSITORY" --ref "$tag" -f tag="$tag"
-          fi
+          # The draft is left here. What it still lacks is the signed
+          # Android app and, after it, the signed list (seal-release.yml),
+          # whose last step publishes a dev build once every file
+          # .release-files names is on it.
+          echo "::notice title=The release is a draft::$tag has every file this run builds. The controller attaches the signed Android app, then seal-release.yml signs the list of its files and publishes a dev build."

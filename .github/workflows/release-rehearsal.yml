@@ -16,6 +16,17 @@
 # publish (R206): where a release of each kind may be cut from, said for
 # this commit and never refused here; aerie lint with the unit tier; and
 # every browser suite. Green here is what a tag on this commit would meet.
+#
+# ...and the seal's own steps, dry (R199): the library the release key is
+# used with, installed from its hash-pinned list, and the list of the
+# files this run built made and signed by tools/release-sign.py seal, with
+# a key made in the job and thrown away with it, then verified by
+# ssh-keygen against the signers file written for that key and refused
+# against the committed one. So the tool, ssh-keygen and the pinned library
+# are proved on a runner before any tag needs them. It reads no secret,
+# attaches nothing, and what it signs no install takes. What only a tag
+# can prove stays unproved here: the build attestations, the Android
+# app's signature and the release environment's key.
 name: release rehearsal
 
 on:
@@ -70,9 +81,17 @@ jobs:
     uses: ./.github/workflows/companion-app.yml
     with:
       hand-on: true
+    # What the called workflow's jobs ask for (a job may not be granted
+    # less than it names); with no tag it attaches nothing and attests
+    # nothing.
     permissions:
       contents: write
-    secrets: inherit
+      id-token: write
+      attestations: write
+    # The Windows code-signing certificate alone, as a tag's run hands it.
+    secrets:
+      BB_WIN_CERT_PFX_B64: ${{ secrets.BB_WIN_CERT_PFX_B64 }}
+      BB_WIN_CERT_PASSWORD: ${{ secrets.BB_WIN_CERT_PASSWORD }}
 
   android:
     uses: ./.github/workflows/android-app.yml
@@ -134,9 +153,51 @@ jobs:
           pattern: release-*
           path: rel
           merge-multiple: true
-      - name: Say what a release from this commit would carry
+      # The seal, dry (seal-release.yml's own steps, over what this run
+      # built): the pinned library in a step of its own, then the list made
+      # and signed with a key of this run's. Where the bundle was built at
+      # least; its outcome is a row of the summary below.
+      - name: The pinned library the seal uses its key with
+        id: lib
+        if: needs.bundle.result == 'success'
+        run: bash tools/release-lib.sh "$RUNNER_TEMP/release-lib"
+      - name: Seal what was built, dry, with a key made for this run
+        id: seal
+        if: needs.bundle.result == 'success'
         shell: bash
         env:
+          PYTHONPATH: ${{ runner.temp }}/release-lib
+        run: |
+          set -euo pipefail
+          dry="$RUNNER_TEMP/dry"
+          mkdir -p "$dry/files" out rel
+          # The files where they are, by links: the OS image is not copied.
+          find out rel -maxdepth 1 -type f -exec ln -s -t "$dry/files" "$PWD"/{} \;
+          # A key of this run's own, never the release's: 64 hex characters
+          # as the secret is, in this step's environment and nowhere else.
+          AERIEOS_RELEASE_KEY="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
+          export AERIEOS_RELEASE_KEY
+          python3 tools/release-sign.py signer > "$dry/release-signers"
+          # A dev build's tag by its shape; nothing is looked up by it.
+          tag="v$(head -1 VERSION | tr -d '[:space:]')-dev.0"
+          python3 tools/release-sign.py seal "$tag" --from "$dry/files" --signers "$dry/release-signers" --out "$dry/sealed"
+          # ssh-keygen takes the signature against the file written for the
+          # key, as an install takes a release's against its own...
+          ssh-keygen -Y verify -f "$dry/release-signers" -I aerieos-dev -n aerieos-dev \
+            -s "$dry/sealed/SHA256SUMS.sig" < "$dry/sealed/SHA256SUMS"
+          # ...and no install takes this one: the committed file names another key.
+          if ssh-keygen -Y verify -f config/release-signers -I aerieos-dev -n aerieos-dev \
+               -s "$dry/sealed/SHA256SUMS.sig" < "$dry/sealed/SHA256SUMS" >/dev/null 2>&1; then
+            echo "::error::a key made in this job verifies against config/release-signers"
+            exit 1
+          fi
+          echo "sealed dry: $(wc -l < "$dry/sealed/SHA256SUMS") files listed and signed, and nothing attached"
+      - name: Say what a release from this commit would carry
+        # Whatever the seal above made of it: its outcome is said here.
+        if: always()
+        shell: bash
+        env:
+          SEAL: ${{ steps.seal.outcome }}
           VER: ${{ needs.bundle.outputs.version }}
           BUNDLE: ${{ needs.bundle.result }}
           APPS: ${{ needs.apps.result }}
@@ -162,14 +223,18 @@ jobs:
             echo "| --- | --- |"
             echo "| aerie lint and the unit tier | $LINT |"
             echo "| The browser suites | $SUITES |"
+            echo "| The seal, dry: the pinned library, the list signed with a key made here and verified | ${SEAL:-not run} |"
             echo "| A dev build from this commit | may be cut here |"
             echo "| A stable release or a candidate from this commit | ${STABLE:-not said ($PLACE)} |"
             echo
           } >> "$GITHUB_STEP_SUMMARY"
           # The list read as the tag's last job reads it, over the files
-          # this run built. Two are never a rehearsal's: the signed Android
-          # app, which a controller attaches to a release that exists, and
-          # the OS image's attestation, which the release's own job writes.
+          # this run built. Some are never a rehearsal's: the signed Android
+          # app, which a controller attaches to a release that exists; the
+          # OS image's attestation and the line naming the pushed image by
+          # its digest, which the release's own job writes; and the signed
+          # list of the release's files, which is made over all of them once
+          # the app is there (seal-release.yml; sealed dry above).
           # A branch's OS image is named for its version as the image says
           # it of itself, X.Y.Z-dev.N+commit, where every other file is named
           # with a hyphen there; on a tag the two are one. Read as one here.
@@ -180,6 +245,7 @@ jobs:
           for f in "${lacks[@]}"; do
             case "$f" in
               aerieos-app-*.apk|aerieos-app-*.apk.sha256|aerieos-os-*.attestation.jsonl) later+=("$f") ;;
+              aerieos-image-*.digest|SHA256SUMS|SHA256SUMS.sig) later+=("$f") ;;
               *) missing+=("$f") ;;
             esac
           done
@@ -202,4 +268,5 @@ jobs:
           for r in "$LINT" "$SUITES" "$PLACE"; do
             [ "$r" = success ] || { echo "::error::not every check passed: a tag on this commit would publish nothing"; exit 1; }
           done
+          [ "$SEAL" = success ] || { echo "::error::the dry seal did not pass (${SEAL:-not run}): a release from here could not have its list of files signed"; exit 1; }
           echo "every build and every check passed: a tag on this commit carries the whole release"

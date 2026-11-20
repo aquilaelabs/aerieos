@@ -2,9 +2,9 @@
 # release's version (0.9.0, 0.9.0-dev.4501) and * as a shell pattern. The
 # controller checks each release against the list at its own tag as its
 # CI ends, and says on the bell what is missing and why, or that it is
-# complete (releasefiles.py); the tag's last job publishes a dev build once
-# it carries them all, and the release rehearsal says which were built
-# (tools/release-missing.sh).
+# complete (releasefiles.py); the seal's last step publishes a dev build
+# once it carries them all (seal-release.yml), and the release rehearsal
+# says which were built (tools/release-missing.sh).
 aerieos-controller-@VER@.tar.gz
 aerieos-controller-@VER@.tar.gz.sha256
 aerieos-companion-@VER@.exe
@@ -22,10 +22,16 @@ aerieos-os-@VER@.iso.sha256
 aerieos-os-@VER@.attestation.jsonl
 aerieos-os-@VER@.stick.raw.xz
 aerieos-os-@VER@.stick.raw.xz.sha256
+# The container image this tag pushed, named by its digest, on one line:
+# ghcr.io/aquilaelabs/aerieos@sha256:... The image carries no attestation
+# and a registry's tag is whatever was last pushed under it; this file is
+# in the signed list below, so a signed release says which image is its own.
+aerieos-image-@VER@.digest
 # The list of the files above with each one's sha256, and its signature
 # (R199): what every install holds a file it takes to, so a release is not
 # whole, and a dev build is not published, until it is signed
-# (tools/release-sign.py: seal in the tag's build for a dev build, sign by
-# the stable key's holder for a stable release).
+# (tools/release-sign.py: seal for a dev build, in seal-release.yml once the
+# signed Android app is on the release; sign by the stable key's holder for
+# a stable release).
 SHA256SUMS
 SHA256SUMS.sig

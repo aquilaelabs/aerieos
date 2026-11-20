@@ -70,7 +70,7 @@ class Gate(unittest.TestCase):
         # started the apps' workflows by name.
         jobs = load("build-image.yml")["jobs"]
         last = jobs["release"]
-        self.assertEqual(needs(last), GATE | {"build", "upgrade", "bundle", "apps", "android", "appliance"},
+        self.assertEqual(needs(last), GATE | {"signature", "build", "upgrade", "bundle", "apps", "android", "appliance"},
                          "the release waits for everything it carries, the image started on every release's /config among it")
         self.assertEqual(jobs["apps"]["uses"], "./.github/workflows/companion-app.yml")
         self.assertEqual(jobs["apps"]["with"], {"tag": "${{ github.ref_name }}", "hand-on": True})
@@ -99,12 +99,161 @@ class Gate(unittest.TestCase):
         self.assertIn({"pattern": "release-*", "path": "rel", "merge-multiple": True}, downs)
         text = runs(last)
         self.assertIn('bash tools/release-attach.sh "$tag" --notes rel/notes.md', text)
-        self.assertIn("--publish-when-whole .release-files", text)
+        # It makes the draft and publishes nothing: a release is whole only
+        # with its signed list, which is made after the Android app lands.
+        self.assertNotIn("--publish-when-whole", text)
+        self.assertNotIn("actions", last["permissions"])
         self.assertIn("tools", next(s for s in last["steps"] if str(s.get("uses", "")).startswith("actions/checkout@"))["with"]["sparse-checkout"])
         # The run's record names every job's result.
         self.assertEqual(needs(jobs["record"]), needs(last) | {"release"})
         for n in needs(jobs["record"]):
             self.assertIn(f"{n}=${{{{ needs.{n}.result }}}}", str(jobs["record"]["steps"]))
+
+    def test_the_release_key_is_read_by_one_job_on_a_tag_and_by_the_seal(self):
+        # The audit of 20 Nov: every build signed the agent (a push to main,
+        # the weekly rebuild, a run by hand from any branch, the OS image's
+        # branch pushes), in the job that built the image, with a library
+        # installed unpinned in the step that held the key, and a tag with
+        # no key set shipped an unsigned agent green.
+        key = "secrets.AERIEOS_RELEASE_KEY"
+        readers = {}
+        for name in sorted(os.listdir(WF)):
+            for job, body in load(name)["jobs"].items():
+                if key in str(body):
+                    readers[(name, job)] = body
+        self.assertEqual(sorted(readers), [("build-image.yml", "signature"), ("seal-release.yml", "seal")])
+        for (name, job), body in readers.items():
+            self.assertEqual(body["environment"], "release", f"{name} {job}: the key's environment")
+            holds = [s for s in body["steps"] if key in str(s)]
+            self.assertEqual(len(holds), 1, f"{name} {job}: one step holds the key")
+            self.assertNotIn("pip", holds[0]["run"], "nothing is installed where the key is")
+            self.assertNotIn("uses", holds[0])
+            # The library comes from the hash-pinned list, in a step before it that holds no secret.
+            lib = next(i for i, s in enumerate(body["steps"]) if "tools/release-lib.sh" in str(s.get("run") or ""))
+            self.assertLess(lib, body["steps"].index(holds[0]))
+            self.assertNotIn("secrets.", str(body["steps"][lib]))
+            self.assertEqual(holds[0]["env"]["PYTHONPATH"], "${{ runner.temp }}/release-lib")
+        for name in sorted(os.listdir(WF)):
+            with open(os.path.join(WF, name), encoding="utf-8") as f:
+                text = f.read()
+            self.assertNotIn("pip install --quiet --user cryptography", text, name)
+            self.assertNotIn("secrets: inherit", text, f"{name}: a called workflow is handed the secrets it reads, by name")
+        sig = load("build-image.yml")["jobs"]["signature"]
+        self.assertEqual(sig["if"], TAG_ONLY)
+        self.assertTrue(GATE <= needs(sig))
+        text = runs(sig)
+        self.assertIn("python3 tools/sign-agent.py --check ||", text, "a tag whose agent is not signed fails")
+        self.assertIn("exit 1", text)
+        up = next(s["with"] for s in sig["steps"] if str(s.get("uses", "")).startswith("actions/upload-artifact@"))
+        self.assertEqual((up["name"], up["path"], up["retention-days"]), ("agent-signature", "scripts/agent/agent.sig", 1))
+        # What packs the agent takes that signature and checks it, on a tag alone.
+        jobs = load("build-image.yml")["jobs"]
+        for name in ("build", "bundle"):
+            self.assertIn("signature", needs(jobs[name]), name)
+            take = next(s for s in jobs[name]["steps"] if (s.get("with") or {}).get("name") == "agent-signature")
+            self.assertEqual(take["with"]["path"], "scripts/agent")
+            self.assertIn("sign-agent.py --check", runs(jobs[name]))
+        self.assertEqual(next(s for s in jobs["build"]["steps"] if (s.get("with") or {}).get("name") == "agent-signature")["if"], TAG_ONLY)
+        self.assertIn("refs/tags/v*)", runs(jobs["build"]))
+        self.assertIn("the agent ships unsigned", runs(jobs["build"]))
+        # The OS image is handed no secret: a tag's takes the run's signature, a branch's none.
+        osi = load("os-image.yml")
+        self.assertNotIn("secrets", osi["on"]["workflow_call"])
+        self.assertEqual(osi["on"]["workflow_call"]["inputs"]["agent-signature"], {"type": "boolean", "default": False})
+        self.assertNotIn("secrets", jobs["appliance"])
+        self.assertEqual(jobs["appliance"]["with"], {"agent-signature": "${{ startsWith(github.ref, 'refs/tags/v') }}"})
+        self.assertEqual(needs(jobs["appliance"]), {"signature"})
+        for part in ("!cancelled()", "!contains(needs.*.result, 'failure')", "startsWith(github.ref, 'refs/tags/v')", "inputs.appliance", "'schedule'"):
+            self.assertIn(part, jobs["appliance"]["if"])
+        take = next(s for s in osi["jobs"]["appliance"]["steps"] if (s.get("with") or {}).get("name") == "agent-signature")
+        self.assertEqual(take["if"], "inputs.agent-signature")
+        self.assertNotIn("release-rehearsal.yml", [n for n, _ in readers])
+
+    def test_every_file_a_release_builds_is_attested_by_the_job_named_for_it(self):
+        # The two .exe, the .pyz and the .vsix had none; the seal takes
+        # each file from the workflow tools/release-sign.py names for it.
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("release_sign_for_gate", os.path.join(WF, "..", "..", "tools", "release-sign.py"))
+        tool = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(tool)
+
+        def attests(name):
+            out = {}
+            for job, body in load(name)["jobs"].items():
+                for s in body.get("steps") or []:
+                    if str(s.get("uses", "")).startswith("actions/attest-build-provenance@"):
+                        self.assertRegex(s["uses"], r"@[0-9a-f]{40}$", "pinned by commit")
+                        perms = body["permissions"]
+                        self.assertEqual((perms.get("id-token"), perms.get("attestations")), ("write", "write"), f"{name} {job}")
+                        out[job] = (s["with"]["subject-path"].split(), s.get("if"))
+            return out
+        got = {name: attests(name) for name in tool.WORKFLOWS}
+        self.assertEqual(sorted(got["companion-app.yml"]), ["build", "portable"])
+        self.assertEqual(sorted(got["build-image.yml"]), ["bundle", "release"])
+        for job, (_paths, cond) in got["companion-app.yml"].items():
+            self.assertEqual(cond, "env.TAG != ''", f"{job}: for a release alone, never a rehearsal's files")
+        # Each file the table names is a pattern some attesting step of that
+        # workflow covers, and each attested pattern is in the table.
+        import fnmatch
+        for name, pats in tool.WORKFLOWS.items():
+            subjects = [os.path.basename(p) for paths, _ in got[name].values() for p in paths if "*" in p]
+            for pat in pats:
+                if pat.startswith("aerieos-controller-"):
+                    continue    # the bundle's step names its one file by the step that packed it
+                self.assertTrue(any(fnmatch.fnmatchcase(pat.replace("*", "1.2.3"), s) for s in subjects), f"{name} attests no {pat}")
+            for s in subjects:
+                self.assertTrue(any(fnmatch.fnmatchcase(s.replace("*", "1.2.3"), p) for p in pats), f"{name} attests {s}, which the seal's table does not name")
+        self.assertEqual(load("build-image.yml")["jobs"]["bundle"]["steps"][-3]["with"], {"subject-path": "${{ steps.pack.outputs.name }}"})
+        # Both callers grant what the called jobs name.
+        for name in ("build-image.yml", "release-rehearsal.yml"):
+            self.assertEqual(load(name)["jobs"]["apps"]["permissions"],
+                             {"contents": "write", "id-token": "write", "attestations": "write"}, name)
+        # The image keeps its plain manifest, and is named by a digest file instead.
+        build = load("build-image.yml")["jobs"]["build"]
+        push = next(s for s in build["steps"] if s.get("id") == "push")
+        self.assertIs(push["with"]["provenance"], False)
+        last = load("build-image.yml")["jobs"]["release"]
+        self.assertIn('printf \'%s@%s\\n\' "$img" "$DIGEST" > "out/aerieos-image-${GITHUB_REF_NAME#v}.digest"', runs(last))
+        self.assertIn("out/aerieos-image-*.digest", runs(last))
+        with open(os.path.join(WF, "..", "..", ".release-files"), encoding="utf-8") as f:
+            self.assertIn("aerieos-image-@VER@.digest\n", f.read())
+
+    def test_the_seal_is_its_own_workflow_started_for_a_tag_and_publishes_a_dev_build_once_whole(self):
+        wf = load("seal-release.yml")
+        self.assertEqual(list(wf["on"]), ["workflow_dispatch"])
+        self.assertEqual(wf["on"]["workflow_dispatch"]["inputs"]["tag"]["required"], True)
+        self.assertEqual(wf["permissions"], {"contents": "read"})
+        # What the controller finds it by (releasesign.SEAL), outside a comment.
+        self.assertEqual(wf["concurrency"], {"group": "bb-release-seal-${{ inputs.tag }}", "cancel-in-progress": False})
+        job = wf["jobs"]["seal"]
+        self.assertEqual(job["environment"], "release")
+        self.assertEqual(job["permissions"], {"contents": "write", "attestations": "read", "actions": "write"})
+        steps = job["steps"]
+        self.assertIn('[ "$GITHUB_REF" != "refs/tags/$TAG" ]', steps[0]["run"], "run from the tag it seals")
+        self.assertIn("seal=false", steps[0]["run"], "a stable release is its holder's to sign")
+        for s in steps[1:]:
+            self.assertIn("steps.tag.outputs.seal == 'true'", s["if"])
+        text = runs(job)
+        self.assertIn('python3 tools/release-sign.py seal "$TAG" --commit "$GITHUB_SHA" --attested --wait 600 --out "$RUNNER_TEMP/sealed"', text)
+        self.assertIn('bash tools/release-attach.sh "$TAG" "$RUNNER_TEMP/sealed/SHA256SUMS" "$RUNNER_TEMP/sealed/SHA256SUMS.sig"', text)
+        last = steps[-1]
+        self.assertIn("contains(inputs.tag, '-dev.')", last["if"])
+        self.assertIn('bash tools/release-attach.sh "$TAG" --publish-when-whole .release-files', last["run"])
+        self.assertIn("gh workflow run publish-release.yml", last["run"])
+        # The tag is never written into a script: it reaches each step by its environment.
+        for s in steps:
+            self.assertNotIn("${{ inputs.tag }}", str(s.get("run") or ""))
+        # Every action in it is pinned by commit.
+        for s in steps:
+            if "uses" in s:
+                self.assertRegex(s["uses"], r"@[0-9a-f]{40}$")
+        # No other workflow names the marker, so the controller starts this one alone.
+        for name in sorted(os.listdir(WF)):
+            if name != "seal-release.yml":
+                with open(os.path.join(WF, name), encoding="utf-8") as f:
+                    self.assertNotIn("bb-release-seal-", f.read(), name)
+        with open(os.path.join(WF, "seal-release.yml"), encoding="utf-8") as f:
+            self.assertNotIn("bb-release-apk-", f.read(), "it hands over no APK, and must not read as a workflow that does")
 
     def test_the_apps_hand_their_files_on_or_attach_them_never_both(self):
         wf = load("companion-app.yml")
@@ -175,6 +324,26 @@ class Gate(unittest.TestCase):
         self.assertEqual(wf["permissions"], {"contents": "read"}, "nothing here can write a release")
         for name, job in jobs.items():
             self.assertNotIn("release-attach.sh", runs(job), name)
+        # The seal's own steps, dry: the pinned library, then the list made
+        # and signed with a key of the run's own and verified, with no
+        # secret read and no environment named.
+        m = jobs["manifest"]
+        self.assertNotIn("environment", m)
+        self.assertNotIn("${{ secrets.", str(m))
+        lib = next(s for s in m["steps"] if s.get("id") == "lib")
+        seal = next(s for s in m["steps"] if s.get("id") == "seal")
+        self.assertEqual(lib["run"], 'bash tools/release-lib.sh "$RUNNER_TEMP/release-lib"')
+        self.assertLess(m["steps"].index(lib), m["steps"].index(seal))
+        for part in ("secrets.token_hex(32)", "tools/release-sign.py signer >", '--from "$dry/files" --signers "$dry/release-signers"',
+                     'ssh-keygen -Y verify -f "$dry/release-signers" -I aerieos-dev -n aerieos-dev',
+                     "if ssh-keygen -Y verify -f config/release-signers"):
+            self.assertIn(part, seal["run"])
+        self.assertNotIn("--attested", seal["run"])
+        say = m["steps"][-1]
+        self.assertEqual(say["env"]["SEAL"], "${{ steps.seal.outcome }}")
+        self.assertIn('[ "$SEAL" = success ] ||', say["run"])
+        # The files a release gains after its run are not counted against it.
+        self.assertIn("aerieos-image-*.digest|SHA256SUMS|SHA256SUMS.sig) later+=", say["run"])
 
     def test_ci_lint_is_aerie_lint_with_nothing_skipped_and_the_unit_tier(self):
         wf = load("lint.yml")

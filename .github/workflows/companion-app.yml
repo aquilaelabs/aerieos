@@ -15,6 +15,17 @@
 # Actions storage once already (B669). Signed when the repository holds a
 # code-signing certificate (BB_WIN_CERT_PFX_B64 and BB_WIN_CERT_PASSWORD);
 # built unsigned and said so in the log where it does not.
+#
+# Each file built for a release carries a build attestation, made by the
+# job that built it (R199): the release's list of its files is signed only
+# over files whose attestation verifies (tools/release-sign.py seal
+# --attested), and these four had none. The attestation's certificate names
+# this file at the ref the run is on, also where a tag's run calls it, so
+# the seal takes a companion file from this workflow run on the release's
+# tag and from nothing else. A run by hand for a release is its tag's only
+# when started from the tag (Use workflow from: the tag); from a branch its
+# files are attested as that branch's and the seal refuses them. A rehearsal
+# names no release and attests nothing.
 name: companion app
 
 on:
@@ -36,6 +47,13 @@ on:
       hand-on:
         type: boolean
         default: false
+    # The two this reads, named, so a caller hands on these and no other
+    # secret of the repository's (it was handed all of them).
+    secrets:
+      BB_WIN_CERT_PFX_B64:
+        required: false
+      BB_WIN_CERT_PASSWORD:
+        required: false
 
 permissions:
   contents: write
@@ -52,6 +70,12 @@ jobs:
   portable:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    # The release it attaches to when run by hand, and the attestation of
+    # what it builds.
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
     env:
       TAG: ${{ github.event.release.tag_name || inputs.tag }}
     # The version every file here is named for: the tag's, or with no tag
@@ -90,6 +114,15 @@ jobs:
             sha256sum "$f" > "$f.sha256"
           done
 
+      # For a release alone: a rehearsal's files are no release's.
+      - name: Attest the .pyz and the .vsix
+        if: env.TAG != ''
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be   # v2.4.0, pinned by commit (R206)
+        with:
+          subject-path: |
+            dist/aerieos-companion-*.pyz
+            dist/aerieos-vscode-*.vsix
+
       - name: Attach them to the release that exists
         if: env.TAG != '' && !inputs.hand-on
         env:
@@ -117,6 +150,10 @@ jobs:
     needs: portable
     runs-on: windows-2025
     timeout-minutes: 30
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
     defaults:
       run:
         shell: bash
@@ -178,6 +215,16 @@ jobs:
           for f in "$EXE" "$USBEXE"; do
             sha256sum "$f" | sed 's|dist/||' > "$f.sha256"
           done
+
+      # After the code signing, which changes the bytes: what is attested
+      # is the file a person downloads. For a release alone.
+      - name: Attest the two .exe
+        if: env.TAG != ''
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be   # v2.4.0, pinned by commit (R206)
+        with:
+          subject-path: |
+            dist/aerieos-companion-*.exe
+            dist/aerieos-usb-maker-*.exe
 
       - name: Attach them to the release that exists
         if: env.TAG != '' && !inputs.hand-on
