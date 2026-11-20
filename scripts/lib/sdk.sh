@@ -651,15 +651,8 @@ sdk_check_one() {
         dotnet)
             d="$(sdk_find dotnet)" || d=""
             [ -z "$d" ] || inst="$("$d/dotnet" --list-sdks 2>/dev/null | tail -1 | awk '{print $1}')"
-            # The installer itself knows what the channel currently holds, so
-            # ask it rather than parsing a release feed that changes shape.
-            # The dry-run echoes the exact invocation it would make, version
-            # and all (a more stable thing to read than the payload URL), and
-            # it needs nothing installed to say so.
-            [ -n "$local_only" ] || latest="$(timeout 60 bash -c 'curl -fsSL https://dot.net/v1/dotnet-install.sh \
-                      | bash -s -- --channel LTS --dry-run' 2>/dev/null \
-                      | sed -n 's/.*--version "\([^"]*\)".*/\1/p' | head -1)"
-            [ -n "$latest" ] || latest="-"
+            # What is on offer is the version its entry pins (the offer,
+            # below): nothing is asked of the vendor here.
             ;;
         go)
             d="$(sdk_find go)" || d=""
@@ -937,33 +930,12 @@ sdk_update() {
         sdk_install "$what"
         return 0
     fi
+    # What is left is a row with nothing on offer, whose version is what its
+    # own tooling gives at the moment: swift (held to its publisher's
+    # signature, version in its address), playwright (the module's own
+    # browsers) and the android packages (sdkmanager's, held by its
+    # repository). flutter and dotnet are rows with an offer and went above.
     case "$what" in
-        flutter)
-            d="$(sdk_find flutter)" || die "flutter is not installed"
-            # Half of a clone an install cut short (no .git, or no
-            # bin/flutter) has nothing to fetch into: git stopped at the
-            # share's edge with "not a git repository". Installed again
-            # instead, as an install clears the same half.
-            if [ ! -e "$d/.git" ] || [ ! -x "$d/bin/flutter" ]; then
-                warn "flutter at ${d} is not a whole checkout: an earlier install did not finish; installing it again"
-                rm -rf "${d:?}"
-                sdk_install flutter
-                return
-            fi
-            log "updating flutter to the head of stable"
-            # The clone is shallow, so fetch the branch tip and move onto it;
-            # `flutter upgrade` refuses to work in a shallow checkout.
-            git -C "$d" fetch --depth 1 origin stable
-            git -C "$d" reset --hard FETCH_HEAD
-            "$d/bin/flutter" --version
-            ;;
-        dotnet)
-            d="$(sdk_find dotnet)" || die "dotnet is not installed"
-            log "installing the current LTS .NET SDK alongside what is there"
-            sdk_fetch https://dot.net/v1/dotnet-install.sh /tmp/dotnet-install.sh
-            bash /tmp/dotnet-install.sh --channel LTS --install-dir "$d" --no-path
-            rm -f /tmp/dotnet-install.sh
-            ;;
         swift|playwright)
             # Both are "unpack the current thing": swift is a tarball with the
             # version in its path, and playwright fetches whatever revisions
@@ -987,7 +959,7 @@ sdk_update() {
             log "updating ${what#android:}"
             sdkmgr --update
             ;;
-        *) die "usage: aerie toolchains update playwright|flutter|dotnet|swift|android:<package>" ;;
+        *) die "usage: aerie toolchains update NAME: a toolchain its entry pins, or playwright|swift|android:<package>" ;;
     esac
 }
 
