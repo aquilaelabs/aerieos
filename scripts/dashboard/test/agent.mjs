@@ -2539,7 +2539,11 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
     // ...except a directory without the file that completes the toolchain:
     // playwright's browsers from before the recipe carried the module.
     mkdirSync(`${PK}/playwright/chromium-1234`, { recursive: true });
-    mkdirSync(`${PK}/node/bin`, { recursive: true });   // playwright requires node
+    // playwright requires node, and a requirement counts as there only with
+    // its tool in it: a folder alone is an install that did not finish, which
+    // an install of what needs it puts right first.
+    mkdirSync(`${PK}/node/bin`, { recursive: true });
+    writeFileSync(`${PK}/node/bin/node`, '#!/bin/sh\necho v24.0.0\n', { mode: 0o755 });
     // The store listing rides the census, which refreshes at hello, and a
     // job that touches the node ends in one, which is why installing a
     // toolchain updates this list without waiting ten minutes. Any such job
