@@ -156,22 +156,6 @@ def _cert_text(kind=OWN):
         return ""
 
 
-def _carry():
-    """An install whose cert.pem held the name's certificate (one pair was
-    kept, of whichever kind was in force) has it moved to the name's own two
-    files, key and all as they are, so cert.pem and key.pem are free for
-    the install's own pair, which apply() then makes."""
-    m, d = _meta(), _dir()
-    if m.get("kind") != ACME:
-        return
-    for was, now in zip(FILES[OWN], FILES[ACME], strict=True):
-        if (d / was).exists():
-            os.replace(d / was, d / now)
-    m["acme"] = {"names": list(m.get("names") or []), "made": int(m.get("made") or 0)}
-    m.update({"kind": OWN, "names": [], "made": 0})
-    _meta_save(m)
-
-
 def fingerprint(cert_pem=""):
     """The certificate's SHA-256 fingerprint, as the phone and the
     companion pin it (colon-separated hex), or ""."""
@@ -473,7 +457,6 @@ def apply(settings_get, names=()):
     global _ctx, _mode
     mode = mode_of(settings_get)
     with _lock:
-        _carry()
         host = str(settings_get("tls_host") or "").strip()
         _own_kept([n for n in [host, *names] if n])
         _mode = mode
