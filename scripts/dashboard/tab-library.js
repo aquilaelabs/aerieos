@@ -97,7 +97,7 @@ function openLibraryOn(id, agent = ""){
   // bell's row) opens that agent's card on its sign-in once the rows land.
   if (agent) libWantAgent = agent;
   if (!(nodesList || []).some(n => n.id === id)) nodesStale = true;
-  try{ localStorage.setItem("bb.libnode", id); }catch(e){ /* private */ }
+  try{ localStorage.setItem(PAGE_KINDS.library.keep, id); }catch(e){ /* private */ }
   const was = location.hash;
   openLibrary();
   readMoved("library");
@@ -113,7 +113,7 @@ function libPick(){
   const live = (nodesList || []).filter(n => n.kind === "agent" && n.state !== "retired");
   let want = libNode;
   if (!live.some(n => n.id === want)){
-    try{ want = localStorage.getItem("bb.libnode") || localStorage.getItem("bb.tcnode") || ""; }catch(e){ want = ""; }
+    try{ want = localStorage.getItem(PAGE_KINDS.library.keep) || localStorage.getItem("bb.tcnode") || ""; }catch(e){ want = ""; }
   }
   if (!live.some(n => n.id === want)) want = live[0]?.id || "";
   libNode = want;

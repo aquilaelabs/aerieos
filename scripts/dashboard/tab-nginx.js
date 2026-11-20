@@ -106,7 +106,7 @@ function nginxPick(){
   const have = nginxList || [];
   let want = nginxNode;
   if (!have.some(n => n.node === want)){
-    try{ want = localStorage.getItem("bb.ngnode") || ""; }catch(e){ want = ""; }
+    try{ want = localStorage.getItem(PAGE_KINDS.nginx.keep) || ""; }catch(e){ want = ""; }
   }
   if (!have.some(n => n.node === want)) want = have[0]?.node || "";
   nginxNode = want;

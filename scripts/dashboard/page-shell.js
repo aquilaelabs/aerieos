@@ -29,39 +29,193 @@ const RAIL_ICONS = {
 };
 
 // The eleven groups, in the rail's order (the design's rail rule); Help, the
-// docs, last (R258). A group's
-// tools are the tab kinds it holds, the first the one its button opens; a
-// group with several draws them as the page's sub-nav.
-const RAIL = [
-  {key: "home", label: "Home", icon: "home", tools: [["home", "Home"]]},
-  {key: "projects", label: "Spaces", icon: "projects", tools: [["projects", "Spaces"], ["findings", "Analysis"]]},
-  {key: "build", label: "Build", icon: "toolchains", tools: [["library", "Library"], ["emulator", "Emulator"], ["phone", "Phone"], ["runner", "CI runner"], ["entry", "Library"]]},
-  {key: "containers", label: "Containers", icon: "docker", tools: [["docker", "Containers"], ["vms", "VMs"]]},
+// docs, last (R258).
+const RAIL_GROUPS = [
+  {key: "home", label: "Home", icon: "home"},
+  {key: "projects", label: "Spaces", icon: "projects"},
+  {key: "build", label: "Build", icon: "toolchains"},
+  {key: "containers", label: "Containers", icon: "docker"},
   // The controller, a group of its own (the operator, 22 Oct): how this
   // AerieOS behaves, with room for the pages a bare-metal install and
   // the USB edition add beside Settings (R90, R56). After Containers, so a
   // phone's bar keeps its four.
-  {key: "controller", label: "Controller", icon: "controller", tools: [["machine", "This controller"], ["settings", "Settings"], ["network", "Network"], ["keys", "Keys"], ["audit", "Audit"], ["debug", "Debug"]]},
+  {key: "controller", label: "Controller", icon: "controller"},
+  {key: "machines", label: "Machines", icon: "nodes"},
+  {key: "sessions", label: "Sessions", icon: "sessions"},
+  {key: "jobs", label: "Jobs", icon: "jobs"},
+  {key: "people", label: "People", icon: "people"},
+  {key: "settings", label: "Settings", icon: "settings"},
+  {key: "help", label: "Help", icon: "help"},
+];
+
+// Every page kind, one record each: the one place a page's facts are
+// written, and the tables under it are read off it, so a new page is one
+// record here. A group's pages are its records in the order they stand in,
+// the first the one its button opens. What a record says:
+//   group, label   the group it is a page of, and its name on the sub-nav
+//   open           what opens it from the rail, the sub-nav and its address;
+//                  a page with a key of its own in its address (an installed
+//                  thing, a Library entry) has none, the address opening it
+//   may            whether the areas this account's grants read draw it
+//                  (state.areas, "" for no Read; R152 step 3); without one
+//                  everybody is drawn it. Asked only once the areas are
+//                  known, unless the record says early
+//   node, setNode  the last part of its address, read and set: the node it
+//                  is on (R256 step 3). A page that keeps what it read for
+//                  one node forgets it when the node changes, or the other
+//                  node's list showed under this one until the read
+//   keep           the key this browser keeps that node under
+//   kept           what else a pick in the group's header keeps
+//   load           what the page on show reads again after a pick; a page
+//                  without one redraws from what setNode left it
+//   moved          the read whose revision a pick moves (readMoved)
+//   back           it is opened by a press, off its group's sub-nav (R181),
+//                  and this is the page Back goes to when it was opened by
+//                  its address alone
+//   own: false     not built for the controller's own machine, whose docker
+//                  is root over the controller (nodes.own_machine)
+//   off            why its feature is not on a node (the node, its id), or ""
+const PAGE_KINDS = {
+  home: {group: "home", label: "Home", open: () => openHome()},
+
+  projects: {group: "projects", label: "Spaces", open: () => openProjectsTab()},
+  findings: {group: "projects", label: "Analysis", open: () => openFindingsTab()},
+
+  // The Library (R170): the toolchains and the coding agents as one, so
+  // either area draws it; what each row offers is the server's to gate.
+  // Every door to the Toolchains, Agents and Apps pages it replaced lands
+  // here, and their addresses open the group.
+  library: {group: "build", label: "Library", open: () => openLibrary(),
+    may: a => !!a.install || !!a.curate || !!a.nodes,
+    node: () => libNode, setNode: v => { if (v !== libNode){ libNode = v; lib = null; } },
+    keep: "bb.libnode", load: () => loadLibrary(), moved: "library"},
+  // The Emulator's images are the toolchain store's, so the same area.
+  emulator: {group: "build", label: "Emulator", open: () => openEmulator(),
+    may: a => !!a.install,
+    node: () => emuNode, setNode: v => { if (v !== emuNode){ emuNode = v; emu = null; emuTicked.clear(); } },
+    keep: "bb.emunode", load: () => loadEmulator(), moved: "emulator",
+    off: n => {
+      const tc = n.reported?.toolchains || {};
+      return Object.keys(tc).length && !tc.emulator && !tc["android-sdk"] ? "no Android tools on this node: install them from the Library" : "";
+    }},
+  phone: {group: "build", label: "Phone", open: () => openPhoneTab(),
+    node: () => phNode, setNode: v => { if (v !== phNode){ phNode = v; phIp = ""; } },
+    load: () => phFetch(null, true),
+    off: (n, nid) => {
+      const ns = typeof ph !== "undefined" && ph?.nodes;
+      return Array.isArray(ns) && ns.length && !ns.some(x => x.id === nid) ? "no adb on this node: install Android platform tools from the Library" : "";
+    }},
+  // CI runner is offered by grant too (R137 step 3). Its page is drawn from
+  // the nodes' read.
+  runner: {group: "build", label: "CI runner", open: () => openRunnerTab(),
+    may: a => state?.can?.runner !== false && a.runner !== "",
+    node: () => runnerNode, setNode: v => { runnerNode = v; }, moved: "nodes",
+    off: n => {
+      const has = (n.reported?.services?.runners || []).length || Object.keys(n.services?.runners || {}).length;
+      return has ? "" : "no CI runner on this node yet: Add runner is on its page";
+    }},
+  // A Library entry's own page (R183), the Library's areas.
+  entry: {group: "build", label: "Library", may: a => PAGE_KINDS.library.may(a), back: "library"},
+
+  // The Containers page's node is its tab's own argument too, kept with
+  // the layout.
+  docker: {group: "containers", label: "Containers", open: () => openDocker(),
+    node: () => dockerNode, setNode: v => { if (v !== dockerNode){ dockerNode = v; dockerList = dockerSeen[v] || null; } },
+    kept: () => dockerNodeKeep(), load: () => loadDocker(), moved: "docker",
+    off: (n, nid) => {
+      const ns = typeof dockerList !== "undefined" && dockerList?.nodes;
+      return Array.isArray(ns) && ns.length && !ns.some(x => x.id === nid) ? "this node does not run Docker" : "";
+    }},
+  vms: {group: "containers", label: "VMs", open: () => openVmsTab()},
+
+  // This machine (R90 step 8): a bare-metal install's own, drawn only
+  // where the install has one; the container edition shows Settings first.
+  machine: {group: "controller", label: "This controller", open: () => openMachineTab(), may: a => !!a.controller && !!state?.own_node},
+  settings: {group: "controller", label: "Settings", open: () => openSettingsTab(), may: a => !!a.controller},
+  network: {group: "controller", label: "Network", open: () => openNetworkTab(), may: a => !!a.controller},
+  keys: {group: "controller", label: "Keys", open: () => openKeysTab(), may: a => !!a.controller},
+  audit: {group: "controller", label: "Audit", open: () => openAuditTab(), may: a => !!a.controller},
+  // The Debug page (R147) only where DEBUG_MODE=1 started the controller,
+  // and for an account with the debug grant, whatever its areas say.
+  debug: {group: "controller", label: "Debug", open: () => openDebugTab(), early: true,
+    may: () => !!state?.settings?.debug_available && state?.can?.debug !== false},
+
+  nodes: {group: "machines", label: "Nodes", open: () => openNodesTab(), may: a => !!a.nodes,
+    node: () => nodesPick, setNode: v => { nodesPick = v; }, moved: "nodes"},
+  // Storage has an area of its own (R169).
+  storage: {group: "machines", label: "Storage", open: () => openStorageTab(), may: a => !!a.storage,
+    node: () => storageNode, setNode: v => { storageNode = v; }, keep: "bb.stnode", moved: "storage"},
+  // What is installed on a node (R172): the same areas as the Library.
+  installed: {group: "machines", label: "Installed", open: () => openInstalledTab(),
+    may: a => !!a.install || !!a.configure || !!a.nodes,
+    node: () => instNode, setNode: v => { if (v !== instNode){ instNode = v; inst = null; } },
+    keep: "bb.instnode", load: () => loadInstalled(), moved: "installed"},
+  // An installed thing's own page (R181 step 2), Installed's areas.
+  thing: {group: "machines", label: "Installed", may: a => PAGE_KINDS.installed.may(a), back: "installed"},
   // nginx and the Scanners are services a node has installed (R264, the
   // operator, 19 Nov): their pages are opened from their rows on Installed,
-  // and from Configure on their containers, kept off the sub-nav (PRESSED).
-  // Their addresses from when they were the Containers group's still open
-  // (openRoute: a page that moved group keeps its old address).
-  {key: "machines", label: "Machines", icon: "nodes", tools: [["nodes", "Nodes"], ["storage", "Storage"], ["installed", "Installed"], ["thing", "Installed"],
-                                                               ["nginx", "nginx"], ["scanners", "Scanners"], ["files", "Files"]]},
-  {key: "sessions", label: "Sessions", icon: "sessions", tools: [["sessions", "Sessions"]]},
-  {key: "jobs", label: "Jobs", icon: "jobs", tools: [["jobs", "Jobs"], ["schedules", "Schedules"]]},
-  {key: "people", label: "People", icon: "people", tools: [["users", "Users"], ["roles", "Roles"]]},
-  {key: "settings", label: "Settings", icon: "settings", tools: [["profile", "Profile"]]},
-  {key: "help", label: "Help", icon: "help", tools: [["help", "Help"]]},
-];
+  // and from Configure on their containers, kept off the sub-nav. Their
+  // addresses from when they were the Containers group's still open
+  // (openRoute: a page that moved group keeps its old address), and an
+  // address with no opener lands on its group's first page (B410), so each
+  // has one. Theirs is the Nodes page's area (R171).
+  nginx: {group: "machines", label: "nginx", open: () => openNginxTab(), may: a => !!a.nodes,
+    node: () => nginxNode, setNode: v => { nginxNode = v; }, keep: "bb.ngnode", moved: "nginx",
+    back: "installed", own: false,
+    off: (n, nid) => {
+      const row = (typeof nginxList !== "undefined" && nginxList || []).find(x => x.node === nid);
+      return row && !row.deployed ? "nginx is not deployed on this node: Deploy is on its page" : "";
+    }},
+  scanners: {group: "machines", label: "Scanners", open: () => openScannersTab(), may: a => !!a.nodes, back: "installed", own: false},
+  // A machine's files (R224): an administrator's alone.
+  files: {group: "machines", label: "Files", open: () => openFilesTab(), may: () => !!state?.can?.admin,
+    node: () => flNode, setNode: v => { if (v !== flNode){ flNode = v; fl = null; flRoot = ""; flPath = ""; flSel.clear(); } },
+    keep: "bb.filenode", load: () => loadFiles()},
+
+  sessions: {group: "sessions", label: "Sessions", open: () => openSessionsTab()},
+
+  // The Jobs page has no node; the last part of its address is the chip it
+  // is narrowed to (#/jobs/failed-today, which Home's "failed today" opens,
+  // B74).
+  jobs: {group: "jobs", label: "Jobs", open: () => openJobsTab(), may: a => !!a.jobs,
+    node: () => jobsShow, setNode: v => jobsShowSet(v)},
+  // An administrator's own cron (R117), its own area.
+  schedules: {group: "jobs", label: "Schedules", open: () => openSchedulesTab(), may: a => !!a.schedules},
+
+  users: {group: "people", label: "Users", open: () => openUsersTab(), may: a => !!a.accounts},
+  roles: {group: "people", label: "Roles", open: () => openRolesTab(), may: a => !!a.accounts},
+
+  profile: {group: "settings", label: "Profile", open: () => openProfileTab()},
+
+  help: {group: "help", label: "Help", open: () => openHelp()},
+};
+// One fact of every kind that states it, by kind.
+const kindFacts = fact => Object.fromEntries(Object.entries(PAGE_KINDS).filter(([, k]) => k[fact] !== undefined).map(([kind, k]) => [kind, k[fact]]));
+
+// The rail: each group with its tools, the tab kinds it holds as [kind,
+// label], the first the one its button opens; a group with several draws
+// them as the page's sub-nav.
+const RAIL = RAIL_GROUPS.map(g => ({...g, tools: Object.entries(PAGE_KINDS).filter(([, k]) => k.group === g.key).map(([kind, k]) => [kind, k.label])}));
+// Where Back on a page a press opened goes when it was opened by its address
+// alone: the page its press is on, which need not be its group's first.
+const PRESSED_HOME = kindFacts("back");
 // The pages a press opens rather than a tab (R181): off their group's
 // sub-nav, each wearing a small top header with Back to the page it was
 // opened from.
-const PRESSED = new Set(["nginx", "scanners", "thing", "entry"]);
-// Where Back on one goes when it was opened by its address alone: the page
-// its press is on, which need not be its group's first.
-const PRESSED_HOME = {nginx: "installed", scanners: "installed", thing: "installed", entry: "library"};
+const PRESSED = new Set(Object.keys(PRESSED_HOME));
+// What opens each page (railGo, openRoute).
+const OPENERS = kindFacts("open");
+// A node page's picked node, read and set by the address (R256 step 3): the
+// node is the address's last part, so a reload, a link and Back land on it.
+const NODE_PICKED = kindFacts("node"), NODE_SET = kindFacts("setNode");
+// What a page keeps in this browser about its node, written on a pick.
+const GROUP_KEEP = kindFacts("keep");
+// What the page on show reads again after a pick; the rest redraw from
+// what NODE_SET left them.
+const GROUP_LOAD = kindFacts("load");
+// The controller's own machine is a node like any (the operator, 9 Nov), on
+// every page about a node but those not built for it.
+const NOT_ON_OWN = new Set(Object.keys(PAGE_KINDS).filter(kind => PAGE_KINDS[kind].own === false));
 
 // The five on a phone's bar: the rail's first four, so a phone and a desk
 // keep one order (the operator, 19 Oct), and More for the rest in it.
@@ -76,39 +230,13 @@ function groupOf(kind){
 }
 
 // Which tool kinds this account may open, from the areas its grants read
-// (state.areas, "" for no Read; R152 step 3): a rail item for something a
-// grant forbids is not drawn. CI runner is offered by grant too (R137 step
-// 3). Before the first poll everything is drawn, as the page always was.
+// (each record's may): a rail item for something a grant forbids is not
+// drawn. Before the first poll everything is drawn, as the page always was,
+// but a page whose answer no area gives.
 function railAllows(kind){
-  const a = state?.areas;
-  // The Debug page (R147) only where DEBUG_MODE=1 started the controller,
-  // and for an account with the debug grant, whatever its areas say.
-  if (kind === "debug") return !!state?.settings?.debug_available && state?.can?.debug !== false;
-  if (!a) return true;
-  switch (kind){
-    case "settings": case "keys": case "audit": case "network": return !!a.controller;
-    // This machine (R90 step 8): a bare-metal install's own, drawn only
-    // where the install has one; the container edition shows Settings first.
-    case "machine": return !!a.controller && !!state?.own_node;
-    case "users": case "roles": return !!a.accounts;
-    // The Emulator's images are the toolchain store's, so the same area.
-    case "emulator": return !!a.install;
-    // The Library (R170): the toolchains and the coding agents as one, so
-    // either area draws it; what each row offers is the server's to gate.
-    case "library": case "entry": return !!a.install || !!a.curate || !!a.nodes;
-    // What is installed on a node (R172): the same areas as the Library.
-    case "installed": case "thing": return !!a.install || !!a.configure || !!a.nodes;
-    // A machine's files (R224): an administrator's alone.
-    case "files": return !!state?.can?.admin;
-    case "jobs": return !!a.jobs;
-    // An administrator's own cron (R117), its own area.
-    case "schedules": return !!a.schedules;
-    // The nginx tab is the Nodes tab's area (R171); Storage its own (R169).
-    case "nodes": case "nginx": case "scanners": return !!a.nodes;
-    case "storage": return !!a.storage;
-    case "runner": return state?.can?.runner !== false && a.runner !== "";
-    default: return true;
-  }
+  const k = PAGE_KINDS[kind], a = state?.areas;
+  if (!k?.may || (!a && !k.early)) return true;
+  return k.may(a);
 }
 function railGroups(){
   return RAIL.filter(g => (g.tools || []).some(([k]) => railAllows(k)));
@@ -136,27 +264,13 @@ function railOn(){
   return groupOf(kind)?.key || (kind === "notebook" ? "projects" : "");
 }
 
-// Open a group: its first tool as a page. A press is a navigation, so the
-// address is pushed.
-const OPENERS = {
-  home: () => openHome(),
-  projects: () => openProjectsTab(), findings: () => openFindingsTab(), docker: () => openDocker(),
-  nodes: () => openNodesTab(), storage: () => openStorageTab(), installed: () => openInstalledTab(), files: () => openFilesTab(), nginx: () => openNginxTab(), vms: () => openVmsTab(),
-  // The Toolchains, Agents and Apps pages are the Library since R170: every
-  // door a person presses lands there, and their addresses open the group.
-  library: () => openLibrary(), emulator: () => openEmulator(), phone: () => openPhoneTab(),
-  runner: () => openRunnerTab(), jobs: () => openJobsTab(), debug: () => openDebugTab(), schedules: () => openSchedulesTab(), users: () => openUsersTab(),
-  roles: () => openRolesTab(), settings: () => openSettingsTab(), keys: () => openKeysTab(), profile: () => openProfileTab(),
-  sessions: () => openSessionsTab(), help: () => openHelp(),
-  // The pages of 0.9.0 (B410: an address with no opener landed on its
-  // group's first page): Scanners, Audit, This controller and Network.
-  scanners: () => openScannersTab(), audit: () => openAuditTab(), machine: () => openMachineTab(), network: () => openNetworkTab(),
-};
 function railWarm(key){
   if (key === "containers") dockerWarm();
   else if (key === "build" && !lib) loadLibrary();
 }
 
+// Open a group: its first tool as a page. A press is a navigation, so the
+// address is pushed.
 function railGo(key, tool){
   const g = RAIL.find(x => x.key === key);
   if (!g) return;
@@ -186,24 +300,6 @@ function shellPush(to, from = location.hash){
   else history.pushState(null, "", to);
   shellSeen = to;
 }
-
-// A node page's picked node, read and set by the address (R256 step 3): the
-// node is the address's last part, so a reload, a link and Back land on it.
-// The Jobs page has no node; its second segment is the chip it is narrowed
-// to (#/jobs/failed-today, which Home's "failed today" opens, B74).
-const NODE_PICKED = {jobs: () => jobsShow, nodes: () => nodesPick, storage: () => storageNode, nginx: () => nginxNode,
-  library: () => libNode, installed: () => instNode, files: () => flNode, emulator: () => emuNode, phone: () => phNode,
-  runner: () => runnerNode, docker: () => dockerNode};
-// A page that keeps what it read for one node forgets it when Back names
-// another, or the other node's list showed under this one until the read.
-const NODE_SET = {jobs: v => jobsShowSet(v), nodes: v => { nodesPick = v; }, storage: v => { storageNode = v; }, nginx: v => { nginxNode = v; },
-  library: v => { if (v !== libNode){ libNode = v; lib = null; } },
-  installed: v => { if (v !== instNode){ instNode = v; inst = null; } },
-  files: v => { if (v !== flNode){ flNode = v; fl = null; flRoot = ""; flPath = ""; flSel.clear(); } },
-  emulator: v => { if (v !== emuNode){ emuNode = v; emu = null; emuTicked.clear(); } },
-  phone: v => { if (v !== phNode){ phNode = v; phIp = ""; } },
-  runner: v => { runnerNode = v; },
-  docker: v => { if (v !== dockerNode){ dockerNode = v; dockerList = dockerSeen[v] || null; } }};
 
 // A move inside a page (a notebook view, a wiki page) is a history entry,
 // so Back returns to where it was (R256 step 3): the draw replaces the
@@ -529,16 +625,9 @@ const GROUP_HEADS = {
   build: {},
   containers: {},
 };
-// What a page keeps in this browser about its node, written on a pick.
-const GROUP_KEEP = {library: "bb.libnode", emulator: "bb.emunode", storage: "bb.stnode", installed: "bb.instnode", nginx: "bb.ngnode", files: "bb.filenode"};
-// What the page on show reads again after a pick; the rest redraw from
-// what NODE_SET left them.
-const GROUP_LOAD = {library: () => loadLibrary(), emulator: () => loadEmulator(), installed: () => loadInstalled(), files: () => loadFiles(), docker: () => loadDocker(),
-                    phone: () => phFetch(null, true)};
-// The controller's own machine is a node like any (the operator, 9 Nov), on
-// every page about a node but nginx's and the scanners', which are not built
-// for a machine whose docker is root over the controller (nodes.own_machine).
-const NOT_ON_OWN = new Set(["nginx", "scanners"]);
+// The nodes a page is offered: every machine there is but the controller's
+// container, and not the controller's own machine on a page not built for
+// one (NOT_ON_OWN).
 function machinesLive(kind = ""){
   return (nodesList || []).filter(n => n.state !== "retired" && n.kind !== "local" && !(state?.bare_metal && n.config?.own && NOT_ON_OWN.has(kind)));
 }
@@ -580,11 +669,9 @@ function groupPick(g, nid){
     if (NODE_SET[k]) NODE_SET[k](nid);
     PAGE_SEEN[k] = nid;
     if (GROUP_KEEP[k]){ try{ localStorage.setItem(GROUP_KEEP[k], nid); }catch(e){ /* private */ } }
-    if (k === "docker") dockerNodeKeep();
+    PAGE_KINDS[k].kept?.();
   });
-  if (g.key === "machines"){ readMoved("nodes"); readMoved("storage"); readMoved("installed"); readMoved("nginx"); }
-  if (g.key === "build"){ readMoved("library"); readMoved("emulator"); readMoved("nodes"); }
-  if (g.key === "containers") readMoved("docker");
+  new Set((g.tools || []).map(([k]) => PAGE_KINDS[k].moved).filter(Boolean)).forEach(key => readMoved(key));
   drawPanes();
   const on = tabOf(panes[0])?.kind;
   if (on && GROUP_LOAD[on]) GROUP_LOAD[on]();
@@ -593,28 +680,7 @@ function groupPick(g, nid){
 // there: a list not read yet marks nothing).
 function toolOff(kind, nid){
   const n = (nodesList || []).find(x => x.id === nid);
-  if (!n) return "";
-  if (kind === "nginx"){
-    const row = (typeof nginxList !== "undefined" && nginxList || []).find(x => x.node === nid);
-    return row && !row.deployed ? "nginx is not deployed on this node: Deploy is on its page" : "";
-  }
-  if (kind === "docker"){
-    const ns = typeof dockerList !== "undefined" && dockerList?.nodes;
-    return Array.isArray(ns) && ns.length && !ns.some(x => x.id === nid) ? "this node does not run Docker" : "";
-  }
-  if (kind === "emulator"){
-    const tc = n.reported?.toolchains || {};
-    return Object.keys(tc).length && !tc.emulator && !tc["android-sdk"] ? "no Android tools on this node: install them from the Library" : "";
-  }
-  if (kind === "phone"){
-    const ns = typeof ph !== "undefined" && ph?.nodes;
-    return Array.isArray(ns) && ns.length && !ns.some(x => x.id === nid) ? "no adb on this node: install Android platform tools from the Library" : "";
-  }
-  if (kind === "runner"){
-    const has = (n.reported?.services?.runners || []).length || Object.keys(n.services?.runners || {}).length;
-    return has ? "" : "no CI runner on this node yet: Add runner is on its page";
-  }
-  return "";
+  return n && PAGE_KINDS[kind]?.off ? PAGE_KINDS[kind].off(n, nid) : "";
 }
 function groupHeader(t, g){
   if (nodesList === null){

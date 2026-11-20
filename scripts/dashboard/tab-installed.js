@@ -30,7 +30,7 @@ function openInstalledOn(id, agent = "", row = ""){
   if (row){ openThing(id, row, "configure"); return; }
   if (agent) instWantAgent = agent;
   if (!(nodesList || []).some(n => n.id === id)) nodesStale = true;
-  try{ localStorage.setItem("bb.instnode", id); }catch(e){ /* private */ }
+  try{ localStorage.setItem(PAGE_KINDS.installed.keep, id); }catch(e){ /* private */ }
   const was = location.hash;
   openInstalledTab();
   readMoved("installed");
@@ -45,7 +45,7 @@ function instPick(){
   const live = (nodesList || []).filter(n => n.kind === "agent" && n.state !== "retired");
   let want = instNode;
   if (!live.some(n => n.id === want)){
-    try{ want = localStorage.getItem("bb.instnode") || localStorage.getItem("bb.libnode") || ""; }catch(e){ want = ""; }
+    try{ want = localStorage.getItem(PAGE_KINDS.installed.keep) || localStorage.getItem(PAGE_KINDS.library.keep) || ""; }catch(e){ want = ""; }
   }
   if (!live.some(n => n.id === want)) want = live[0]?.id || "";
   instNode = want;

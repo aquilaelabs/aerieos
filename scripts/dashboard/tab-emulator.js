@@ -27,7 +27,7 @@ function emuPick(){
   const live = (nodesList || []).filter(n => n.kind === "agent" && n.state !== "retired");
   let want = emuNode;
   if (!live.some(n => n.id === want)){
-    try{ want = localStorage.getItem("bb.emunode") || ""; }catch(e){ want = ""; }
+    try{ want = localStorage.getItem(PAGE_KINDS.emulator.keep) || ""; }catch(e){ want = ""; }
   }
   // The server names the node this tab is FOR: one that can hold an image,
   // and the one that already does when there is one. Which platforms the
