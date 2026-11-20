@@ -1693,6 +1693,10 @@ sdk_https_only() {
 # One that answers anything else installs nothing: the directory is the
 # partial install the caller takes off again. PLAN is what the entry
 # declares as sdk_declared read it; left out, the entry is asked here.
+# SDK_NOT_HELD is the file that answered other bytes than its entry holds,
+# for a caller that says so in its own words on the way out (held-run.sh,
+# which sources this file: nothing here reads it).
+SDK_NOT_HELD=""
 sdk_fetch_declared() {
     local what="$1" d="$2" plan tag url want to tmp got sig keys sigf keyring signer
     if [ "$#" -ge 3 ]; then plan="$3"; else plan="$(sdk_meta declared "$what")"; fi
@@ -1719,6 +1723,8 @@ sdk_fetch_declared() {
             got="$(sha256sum "$tmp" | cut -d' ' -f1)"
             if [ "$got" != "$want" ]; then
                 rm -f "$tmp"
+                # shellcheck disable=SC2034  # held-run.sh reads it on the way out
+                SDK_NOT_HELD="$to"
                 die "${what}: ${url} answered a file whose sha256 is ${got}, and its manifest declares ${want}: nothing is installed"
             fi
             log "verified: sha256 matches what ${what} declares for ${to}"
@@ -1739,6 +1745,8 @@ sdk_fetch_declared() {
                 || { rm -f "$tmp" "$sigf"; die "${what}: no keys named ${keys} to check ${to} with: nothing is installed"; }
             if ! signer="$(gpgv --keyring "$keyring" "$sigf" "$tmp" 2>&1)"; then
                 rm -f "$tmp" "$sigf"
+                # shellcheck disable=SC2034  # held-run.sh reads it on the way out
+                SDK_NOT_HELD="$to"
                 die "${what}: ${url} answered a file that does not carry its publisher's signature under ${keys}: $(printf '%s' "$signer" | tail -2 | tr '\n' ' ')nothing is installed"
             fi
             rm -f "$sigf"

@@ -21,9 +21,12 @@ from .base import (
     DOCKER_BIN,
     FIREWALL_CMD,
     FIREWALL_EVERY_S,
+    HELD_CHANGED,
+    HELD_UNFETCHED,
     IDLE_UNIT,
     NFT_BIN,
     recipe_checked,
+    recipe_version,
     respawnable,
     SESSION,
     ROOT_BUNDLE_DIR,
@@ -764,8 +767,7 @@ class SessionsMixin:
         """Install, update or remove one of the other coding agents for the
         SESSION account (R95 step 2). Which agent is AGENT_INSTALLS's row
         for this job's type; how is the recipe the controller handed over
-        (R169 step 13), held to its shape, or the row's own when it sent
-        none."""
+        (R169 step 13), held to its shape."""
         how = AGENT_INSTALLS.get(job.job.get("type") or "")
         if not how:
             job.say("refused: no coding agent is installed by this job\n")
@@ -774,10 +776,11 @@ class SessionsMixin:
         return self.agent_install(job, spec, how) if how else ("failed", 78)
 
     def agent_recipe(self, job, spec, row):
-        """The agent's row with the install recipe the controller sent in
-        place of its own, the row alone when it sent none, or None with the
-        reason said when what it sent is not a recipe: nothing is run then,
-        rather than the older way run in silence."""
+        """The agent's row with the install recipe the controller sent, the
+        row alone when it sent none (which is enough to take the agent off,
+        and installs nothing: agent_install), or None with the reason said
+        when what it sent is not a recipe: nothing is run then, rather than
+        some other way run in silence."""
         if spec.get("recipe") is None:
             return row
         recipe, why = recipe_checked(spec["recipe"])
@@ -785,6 +788,35 @@ class SessionsMixin:
             job.say(f"refused: the install recipe the controller sent for {row['product']} is not one: {why}\n")
             return None
         return {**row, **recipe, "by": "catalog" if spec.get("recipe_from") == "catalog" else ""}
+
+    def held_install(self, job, how, who, home):
+        """What runs a held recipe: (the command, the row it reads on its
+        standard input), or (None, None) with the reason said.
+
+        The command is held-run.sh from this node's bundle, root's own copy
+        where this agent is root, which the session account cannot write:
+        sdk.sh's one mechanism for every entry's declared downloads, so the
+        fetch over https, the sha256, a publisher's signature under the
+        recipe's own keys and the cut are the ones a toolchain's install
+        goes through. The row is the recipe as that mechanism reads an
+        entry: its downloads, its keys, its sentence or that its steps run
+        with no network, and the steps."""
+        into = self.bundle(job, who)
+        rooted = os.path.join(ROOT_BUNDLE_DIR, "current")
+        if into and os.geteuid() == 0 and os.path.isdir(rooted):
+            into = os.path.realpath(rooted)
+        helper = os.path.join(into, "scripts", "lib", "held-run.sh") if into else ""
+        if not helper or not os.path.isfile(helper):
+            job.say(f"refused: {how['product']}'s recipe holds what it fetches, and this node has no copy of aerie that can hold it "
+                    "(no scripts/lib/held-run.sh in its bundle): nothing was fetched and nothing run\n")
+            return None, None
+        online = how.get("online") or ""
+        row = {"name": how["product"],
+               "source": {"kind": "command", "fetch": how["fetch"], "keyring": how["keyring"], "steps": how["steps"],
+                          **({"online": online} if online else {"offline": True})}}
+        version = recipe_version(how)
+        argv = ["bash", helper, how["product"], f"home={home}"] + ([f"version={version}"] if version else [])
+        return argv, json.dumps({"toolchains": [row]}).encode()
 
     def claude_update(self, job, spec):
         """Install the current Claude Code for the SESSION account, and pin it
@@ -799,13 +831,18 @@ class SessionsMixin:
         account, from its row (AGENT_INSTALLS, CLAUDE_INSTALL): one path for
         every agent (R95 step 18).
 
-        The vendor's installer runs as the session account, into its home,
-        the way the provisioner first installed it. Then, where this agent
-        is root, the binary is copied into the row's pin folder, root-owned,
-        which the session's PATH reads first: that copy is what a session
-        runs and what the account cannot write, so an update typed in a
-        session changes nothing that runs. A guest node, where the agent is
-        not root, keeps the account's own copy and says so."""
+        The recipe runs as the session account, into its home. A held one
+        (held_install): what it declares is fetched and held to its sha256
+        or its publisher's signature first, and its steps then run from
+        that, with no network unless the recipe says its installer keeps it.
+        One of the older form is a vendor's installer handed to a shell as
+        it arrives, run as it was and said to be held by nothing. Then,
+        where this agent is root, the binary is copied into the row's pin
+        folder, root-owned, which the session's PATH reads first: that copy
+        is what a session runs and what the account cannot write, so an
+        update typed in a session changes nothing that runs. A guest node,
+        where the agent is not root, keeps the account's own copy and says
+        so."""
         product, cmd = how["product"], how["command"]
         who_name = self.session_account()
         env = dict(sdk_env(self.state))
@@ -851,24 +888,51 @@ class SessionsMixin:
             job.say("\n")
             self.hello_again(f"{product} was removed")
             return "succeeded", 0
+        # No recipe, no install: this agent carries no installer of its own
+        # to run in its place, which nothing would hold.
+        if not (how.get("steps") or how.get("script")):
+            job.say(f"refused: the controller sent no install recipe for {product}, and an install is run from one alone: "
+                    "what a recipe fetches is held to what the recipe carries, and this node keeps no installer of its own beside it\n")
+            return "failed", 78
         env["PATH"] = ":".join([os.path.join(home, ".local", "bin"), env.get("PATH") or "/usr/local/bin:/usr/bin:/bin"])
         env.setdefault("LANG", "C.UTF-8")
         for k, v in how["env"].items():
             env[k] = v.format(home=home)
-        want = str(spec.get("to") or "")
+        # The version asked for. A held recipe whose steps run with no
+        # network installs the program it declares, at the version that
+        # says: the pin decides, whatever is newest at its vendor.
+        pins = recipe_version(how) if how.get("steps") and not how.get("online") else ""
+        want = pins or str(spec.get("to") or "")
         if want and how["pin"] and re.fullmatch(r"\d+\.\d+\.\d+", want):
             env[how["pin"][0]] = how["pin"][1].format(v=want)
         stub = os.environ.get(f"BUILDERBOT_{how['id'].upper()}_INSTALLER")
-        argv = ["bash", stub] if stub else ["bash", "-c", how["script"]]
-        job.say(f"installing {product} for {who_name}" + (f" ({want} is out)" if want else "")
+        job.say(f"installing {product} for {who_name}" + (f" ({want} is the version its recipe pins)" if pins else f" ({want} is out)" if want else "")
                 + (f", by the catalog's recipe (rev {how.get('rev')})" if how.get("by") == "catalog" else "") + "\n")
+        if how.get("steps") and not stub:
+            argv, feed = self.held_install(job, how, who, home)
+            if not argv:
+                return "failed", 69
+        else:
+            argv, feed = (["bash", stub] if stub else ["bash", "-c", how["script"]]), None
+            if not stub:
+                job.say("nothing holds what this fetches: its recipe is of the older kind, a vendor's installer handed to a shell as it arrives\n")
         try:
-            p = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            p = subprocess.Popen(argv, stdin=subprocess.PIPE if feed is not None else None, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                  cwd=home if os.path.isdir(home) else "/tmp", env=env,
                                  start_new_session=True, close_fds=True, **who)
         except (OSError, ValueError) as e:
             job.say(f"could not start the installer: {e}\n")
             return "failed", 70
+        if feed is not None:
+            # The recipe's row, which held-run.sh reads whole before it
+            # fetches anything; from a thread, so a row larger than a
+            # pipe holds never waits on a reader that is not there yet.
+            def hand():
+                with contextlib.suppress(OSError, ValueError):
+                    p.stdin.write(feed)
+                with contextlib.suppress(OSError, ValueError):
+                    p.stdin.close()
+            threading.Thread(target=hand, name="agent-recipe", daemon=True).start()
         # Seen to its end as every job's child is (jobs.watched): posted as
         # it goes and timed by the clock. One that runs past its time is
         # killed and has failed, in its own words: it was canceled instead,
@@ -879,6 +943,18 @@ class SessionsMixin:
             return "canceled", 130
         if killed:
             return "failed", 75
+        if code == HELD_CHANGED and feed is not None:
+            # A declared download answered other bytes than the recipe
+            # holds (held-run.sh, which named both digests above): nothing
+            # of it was run, and nothing is until the pin moves.
+            job.say(f"refused: {product}'s vendor changed {'its installer' if how.get('online') else 'that file'} since AerieOS pinned it: "
+                    "what its address answers now is not the file the recipe holds, by the two sha256 above. "
+                    "Nothing was run and nothing is installed. A newer recipe moves the pin, in the catalog or in a release of AerieOS, "
+                    "once a person has looked at what changed\n")
+            return "failed", code
+        if code == HELD_UNFETCHED and feed is not None:
+            job.say(f"nothing of {product} was run: what its recipe declares could not be fetched, so there was nothing to hold it to\n")
+            return "failed", code
         if code != 0:
             job.say(f"the installer exited {code}\n")
             return "failed", code

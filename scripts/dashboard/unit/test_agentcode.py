@@ -2,6 +2,7 @@
 Installed page (R95 step 2): the census's version against the registry's latest, each install its
 own job, Claude Code one of them in its own words, and the node agent's
 half run against a stub installer, never a vendor's."""
+import hashlib
 import json
 import os
 import sys
@@ -102,6 +103,36 @@ class Controller(unittest.TestCase):
         self.assertEqual((r["name"], r["label"], r["installed"], r["latest"], r["state"]),
                          ("codex-cli", "Codex CLI", "0.160.0", "0.163.0", "update"))
         self.assertEqual(agentcode.row(node(), "copilot")["state"], "absent")
+
+    def test_a_row_says_what_its_recipe_is_held_to_and_what_an_install_brings(self):
+        # The word and the downloads are the recipe's own (packformat.held,
+        # downloads_said). A recipe whose program is its download pins a
+        # version: that is what an install brings, so that is what a node
+        # is behind of and what the job asks for, whatever the vendor's
+        # newest is; an installer that keeps the network brings the newest.
+        ns = self.use(node(codex="codex-cli 0.170.0"))
+        agentcode._latest["codex"]["version"] = "0.171.0"
+        with mock.patch.object(agentcode, "recipe", lambda aid, ask=True: (PLACED, "release")):
+            r = agentcode.row(node(codex="codex-cli 0.170.0"), "codex")
+            self.assertEqual((r["held"]["word"], r["pinned"], r["latest"], r["vendor_latest"], r["state"]),
+                             ("pinned", "0.170.0", "0.170.0", "0.171.0", "current"))
+            self.assertEqual([(d["to"], d["platform"], d["held"], d["url"]) for d in r["downloads"]],
+                             [("dl/codex.tar.gz", "linux/amd64", "sha256", "https://x.example/0.170.0/codex-x64.tar.gz"),
+                              ("dl/codex.tar.gz", "linux/arm64", "sha256", "https://x.example/0.170.0/codex-arm64.tar.gz")])
+            self.assertEqual((agentcode.pinned("codex"), agentcode.offered("codex")), ("0.170.0", "0.170.0"))
+            self.assertFalse(agentcode.behind(node(codex="codex-cli 0.170.0"), "codex"))
+            self.assertTrue(agentcode.behind(node(codex="codex-cli 0.169.0"), "codex"))
+            self.assertTrue(agentcode.update("user:admin", "n1", "codex")["ok"])
+            self.assertEqual(ns.added[-1][1]["to"], "0.170.0")
+        with mock.patch.object(agentcode, "recipe", lambda aid, ask=True: (HELD, "catalog")):
+            r = agentcode.row(node(codex="codex-cli 0.170.0"), "codex")
+            self.assertEqual((r["held"], r["pinned"], r["latest"], r["state"]),
+                             ({"word": "installer", "why": SENTENCE}, "", "0.171.0", "update"))
+            self.assertTrue(agentcode.update("user:admin", "n1", "codex")["ok"])
+            self.assertEqual(ns.added[-1][1]["to"], "0.171.0")
+        with mock.patch.object(agentcode, "recipe", lambda aid, ask=True: (OLD["codex-update"], "release")):
+            r = agentcode.row(node(), "codex")
+            self.assertEqual((r["held"]["word"], r["downloads"], r["pinned"]), ("open", [], ""))
 
     def test_no_session_account_no_row(self):
         self.use(node(up=False))
@@ -318,9 +349,66 @@ class Controller(unittest.TestCase):
         self.assertEqual(names[0], "claude-code")
 
 
+# The older form of a recipe, as a controller from before pack format 5
+# hands it: a node still runs it as it was.
+OLD = {"codex-update": {"rev": 1, "script": "curl -fsSL https://x.example/codex/install.sh | sh", "pin": ["CODEX_RELEASE", "{v}"],
+                        "env": {"CODEX_INSTALL_DIR": "{home}/.local/bin"}, "bin": ".local/bin/codex", "also": [], "fresh": ""},
+       "opencode-update": {"rev": 1, "script": "curl -fsSL https://x.example/install | bash -s -- --no-modify-path", "pin": ["VERSION", "{v}"],
+                           "env": {}, "bin": ".opencode/bin/opencode", "also": [".local/bin/opencode"], "fresh": ""}}
+# A held recipe both halves take: its installer declared and run from the
+# file, the network kept with its sentence; and one whose program is the
+# download, placed with no network. And what neither half takes.
+H = "ab" * 32
+SENTENCE = "Its installer downloads the build for this machine from x.example's releases."
+HELD = {"rev": 2, "fetch": [{"url": "https://x.example/v{version}/install.sh", "version": "0.170.0", "sha256": H, "to": "dl/install.sh"}],
+        "online": SENTENCE, "steps": [["sh", "{dir}/dl/install.sh"]], "pin": ["CODEX_RELEASE", "{v}"],
+        "env": {"CODEX_INSTALL_DIR": "{home}/.local/bin"}, "bin": ".local/bin/codex", "also": [], "fresh": ""}
+PLACED = {"rev": 2, "fetch": [{"url": "https://x.example/{version}/codex-x64.tar.gz", "version": "0.170.0", "sha256": H, "to": "dl/codex.tar.gz", "platform": "linux/amd64"},
+                              {"url": "https://x.example/{version}/codex-arm64.tar.gz", "version": "0.170.0", "sha256": H, "to": "dl/codex.tar.gz", "platform": "linux/arm64"}],
+          "steps": [["mkdir", "-p", "{home}/.local/bin"], ["tar", "-xzf", "{dir}/dl/codex.tar.gz", "-C", "{home}/.local/bin"]],
+          "pin": None, "env": {}, "bin": ".local/bin/codex", "also": [], "fresh": ""}
+BAD_HELD = (
+    {"steps": [["bash", "-c", "curl -fsSL https://x.example/i | bash"]]},
+    {"steps": [["curl", "-fsSL", "https://x.example/i"]]},
+    {"steps": [["sh", "{dir}/dl/other.sh"]]},
+    {"steps": [["sh", "{home}/.local/bin/x"]]},
+    {"steps": [["sh", "{dir}/dl/install.sh", "$(id)"]]},
+    {"steps": [["sh", "{dir}/dl/install.sh", "{home}/../x"]]},
+    {"steps": [["{dir}/dl/install.sh", "{args}"]]},
+    {"steps": []}, {"steps": "sh {dir}/dl/install.sh"}, {"steps": [["python3", "{dir}/dl/install.sh"]]},
+    {"fetch": []}, {"fetch": [{"url": "http://x.example/i.sh", "sha256": H, "to": "dl/install.sh"}]},
+    {"fetch": [{"url": "https://x.example/i.sh", "to": "dl/install.sh"}]},
+    {"fetch": [{"url": "https://x.example/i.sh", "sha256": "abc", "to": "dl/install.sh"}]},
+    {"fetch": [{"url": "https://x.example/i.sh", "sha256": H, "to": "../install.sh"}]},
+    {"fetch": [{"url": "https://x.example/{version}/i.sh", "sha256": H, "to": "dl/install.sh"}]},
+    {"fetch": [{"url": "https://x.example/i.sh", "to": "dl/install.sh", "signed": {"sig": "https://x.example/i.sh.sig", "keys": "x.asc"}}]},
+    {"online": "x"}, {"online": "Its installer <b>downloads</b> the rest."},
+    {"script": "curl -fsSL https://x.example/i | bash"},
+    {"bin": "/usr/bin/x"}, {"env": {"PATH": "/tmp"}}, {"pin": ["PATH", "{v}"]},
+)
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
+# curl, standing in: an address's last part is a file of the test's own.
+FAKE_CURL = '''#!/bin/sh
+out=""; url=""
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        -o) out="$2"; shift ;;
+        --proto|--proto-redir|--connect-timeout|--speed-limit|--speed-time|--retry|--retry-delay|--max-time) shift ;;
+        -*) ;;
+        *) url="$1" ;;
+    esac
+    shift
+done
+f="$FAKE_WEB/${url##*/}"
+[ -f "$f" ] || exit 22
+if [ -n "$out" ]; then cp "$f" "$out"; else cat "$f"; fi
+'''
+
+
 class NodeAgent(unittest.TestCase):
-    """The node's half: AGENT_INSTALLS's row for the job, the installer run
-    with the version pinned, the binary's version read back."""
+    """The node's half: AGENT_INSTALLS's row for the job, the recipe the
+    controller handed over run with the version pinned, the binary's
+    version read back."""
 
     def setUp(self):
         self.mod = agentpkg.load("agentinstall")
@@ -336,8 +424,38 @@ class NodeAgent(unittest.TestCase):
             f.write('mkdir -p "$CODEX_INSTALL_DIR"\n'
                     'printf "#!/bin/sh\\necho codex-cli ${CODEX_RELEASE:-0.0.0}\\n" > "$CODEX_INSTALL_DIR/codex"\n'
                     'chmod +x "$CODEX_INSTALL_DIR/codex"\necho "stub installed $CODEX_RELEASE"\n')
+        # What a vendor serves, for a run with no stub: the installer above
+        # under the name a recipe's address ends in, fetched by a curl that
+        # reads this folder and asks no network.
+        self.web = os.path.join(self.tmp.name, "web")
+        self.bin = os.path.join(self.tmp.name, "bin")
+        os.makedirs(self.web)
+        os.makedirs(self.bin)
+        with open(os.path.join(self.bin, "curl"), "w") as f:
+            f.write(FAKE_CURL)
+        os.chmod(os.path.join(self.bin, "curl"), 0o755)
+        with open(self.stub) as f, open(os.path.join(self.web, "install.sh"), "w") as w:
+            w.write(f.read())
 
-    def run_job(self, spec, type_="codex-update"):
+    def held(self, recipe=HELD, name="install.sh"):
+        """`recipe` with each download's sha256 that of the file the web
+        folder serves under `name`."""
+        with open(os.path.join(self.web, name), "rb") as f:
+            digest = hashlib.sha256(f.read()).hexdigest()
+        return recipe | {"fetch": [f | {"sha256": digest} for f in recipe["fetch"]]}
+
+    def left(self):
+        """What is under the account's home now."""
+        return sorted(os.path.relpath(os.path.join(d, x), self.home) for d, dirs, files in os.walk(self.home) for x in dirs + files)
+
+    def run_job(self, spec, type_="codex-update", stub=True):
+        # The recipe a controller hands over with every job: the older form
+        # unless the test names another, or none with None.
+        spec = dict(spec)
+        if "recipe" not in spec and type_ in OLD:
+            spec["recipe"] = OLD[type_]
+        elif spec.get("recipe", 0) is None:
+            del spec["recipe"]
         said = []
         job = type("J", (), {})()
         job.job = {"type": type_}
@@ -355,13 +473,19 @@ class NodeAgent(unittest.TestCase):
         # The one install path every agent's job goes through (R95 step 18).
         fake.agent_install = lambda job, spec, how: self.mod.Agent.agent_install(fake, job, spec, how)
         fake.agent_recipe = lambda job, spec, row: self.mod.Agent.agent_recipe(fake, job, spec, row)
-        env = {"BUILDERBOT_CODEX_INSTALLER": self.stub, "HOME": self.home}
+        # A held recipe is run by this checkout's held-run.sh, as a node
+        # runs its bundle's.
+        fake.held_install = lambda job, how, who, home: self.mod.Agent.held_install(fake, job, how, who, home)
+        fake.bundle = lambda job, who: REPO
+        env = {"HOME": self.home} | ({"BUILDERBOT_CODEX_INSTALLER": self.stub} if stub else {})
         with mock.patch.dict(os.environ, env), \
                 mock.patch("os.path.expanduser", return_value=self.home), \
                 mock.patch("os.geteuid", return_value=1000):
+            if not stub:
+                os.environ.pop("BUILDERBOT_CODEX_INSTALLER", None)
             for m in self.mod._mods:
                 if "sdk_env" in vars(m):
-                    vars(m)["sdk_env"] = lambda state: {"HOME": self.home, "PATH": "/usr/bin:/bin"}
+                    vars(m)["sdk_env"] = lambda state: {"HOME": self.home, "PATH": f"{self.bin}:/usr/bin:/bin", "FAKE_WEB": self.web}
             got = self.mod.Agent.agent_update(fake, job, spec)
         return got, "".join(said)
 
@@ -371,6 +495,95 @@ class NodeAgent(unittest.TestCase):
         self.assertIn("stub installed 0.163.0", log)
         self.assertIn("Codex CLI 0.163.0 is what a session here runs now", log)
 
+    def test_a_held_recipe_is_fetched_held_and_then_run_from_the_file(self):
+        # What the recipe declares is fetched and held to its sha256 before
+        # anything runs, and its step runs the file that was held. Its
+        # installer keeps the network, and the job says the recipe's sentence.
+        got, log = self.run_job({"to": "0.171.0", "recipe": self.held()}, stub=False)
+        self.assertEqual(got, ("succeeded", 0), log)
+        self.assertIn("fetching dl/install.sh from https://x.example/v0.170.0/install.sh", log)
+        self.assertIn("verified: sha256 matches what Codex CLI declares for dl/install.sh", log)
+        self.assertIn(f"Codex CLI keeps the network for its steps, as its entry says: {SENTENCE}", log)
+        self.assertLess(log.index("verified: sha256"), log.index("stub installed"), "held before it ran")
+        # The version asked for is still handed to an installer that takes one.
+        self.assertIn("stub installed 0.171.0", log)
+        self.assertIn("Codex CLI 0.171.0 is what a session here runs now", log)
+        self.assertNotIn("nothing holds what this fetches", log)
+        # Nothing of the fetch is left: the program, and the places it made.
+        self.assertEqual(self.left(), [".local", ".local/bin", ".local/bin/codex"])
+
+    def test_a_file_that_is_not_the_pinned_bytes_installs_nothing(self):
+        # The vendor's file is one byte off the recipe's digest: nothing of
+        # it runs, the job says both digests and that the vendor changed
+        # its installer, and the home is as it was.
+        good = self.held()
+        want = good["fetch"][0]["sha256"]
+        off = ("0" if want[0] != "0" else "1") + want[1:]
+        got, log = self.run_job({"to": "0.171.0", "recipe": good | {"fetch": [good["fetch"][0] | {"sha256": off}]}}, stub=False)
+        self.assertEqual(got, ("failed", self.mod.HELD_CHANGED), log)
+        self.assertIn(f"answered a file whose sha256 is {want}, and its manifest declares {off}", log)
+        self.assertIn("refused: Codex CLI's vendor changed its installer since AerieOS pinned it", log)
+        self.assertIn("Nothing was run and nothing is installed", log)
+        self.assertNotIn("stub installed", log)
+        self.assertEqual(self.left(), [])
+        # ...and one that cannot be fetched at all is said as that.
+        os.unlink(os.path.join(self.web, "install.sh"))
+        got, log = self.run_job({"to": "0.171.0", "recipe": good}, stub=False)
+        self.assertEqual(got, ("failed", self.mod.HELD_UNFETCHED), log)
+        self.assertIn("what its recipe declares could not be fetched", log)
+        self.assertEqual(self.left(), [])
+
+    def test_a_recipe_that_places_its_program_runs_with_no_network_and_installs_the_pinned_version(self):
+        # The program itself is the download, for this machine's platform
+        # alone, and the steps only put it in place: no sentence, so they
+        # are cut from the network where this machine can cut, and the
+        # version is the one the recipe pins, whatever the controller named.
+        import tarfile  # noqa: PLC0415
+        prog = os.path.join(self.tmp.name, "codex")
+        with open(prog, "w") as f:
+            f.write("#!/bin/sh\necho codex-cli 0.170.0\n")
+        os.chmod(prog, 0o755)
+        for name in ("codex-x64.tar.gz", "codex-arm64.tar.gz"):
+            with tarfile.open(os.path.join(self.web, name), "w:gz") as tar:
+                tar.add(prog, arcname="codex")
+        recipe = PLACED | {"fetch": [self.held(PLACED | {"fetch": [f]}, f["url"].rsplit("/", 1)[-1])["fetch"][0] for f in PLACED["fetch"]]}
+        got, log = self.run_job({"to": "0.171.0", "recipe": recipe}, stub=False)
+        self.assertEqual(got, ("succeeded", 0), log)
+        self.assertIn("(0.170.0 is the version its recipe pins)", log)
+        self.assertEqual(log.count("fetching dl/codex.tar.gz"), 1, "the one for this machine")
+        self.assertIn("leaving out dl/codex.tar.gz: it is for linux/", log)
+        self.assertTrue("its steps run with no network" in log or "this node cannot cut the network" in log, log)
+        self.assertNotIn("keeps the network", log)
+        self.assertIn("Codex CLI 0.170.0 is what a session here runs now", log)
+
+    def test_a_recipe_of_the_older_form_still_runs_and_says_nothing_held_it(self):
+        # An older catalog's row: a vendor's installer handed to a shell as
+        # it arrives. Run as it was, and said in one line.
+        got, log = self.run_job({"to": "0.163.0"}, stub=False)
+        self.assertEqual(got, ("succeeded", 0), log)
+        self.assertEqual(log.count("nothing holds what this fetches"), 1)
+        self.assertIn("stub installed 0.163.0", log)
+        self.assertIn("Codex CLI 0.163.0 is what a session here runs now", log)
+
+    def test_no_recipe_installs_nothing_and_still_takes_the_agent_off(self):
+        # This agent keeps no installer of its own: a job with no recipe
+        # is refused, with or without a stand-in, and a removal needs none.
+        marker = os.path.join(self.tmp.name, "ran")
+        with open(self.stub, "w") as f:
+            f.write(f'touch "{marker}"\n')
+        got, log = self.run_job({"to": "0.163.0", "recipe": None})
+        self.assertEqual(got, ("failed", 78), log)
+        self.assertIn("the controller sent no install recipe for Codex CLI", log)
+        self.assertFalse(os.path.exists(marker))
+        for row in (*self.mod.AGENT_INSTALLS.values(), self.mod.CLAUDE_INSTALL):
+            self.assertEqual(sorted(set(row) - {"pin_dir"}), sorted({"id", "command", "product", "reported", "bin"} | ({"also"} if "also" in row else set())))
+        os.makedirs(os.path.join(self.home, ".local", "bin"))
+        with open(os.path.join(self.home, ".local", "bin", "codex"), "w") as f:
+            f.write("#!/bin/sh\n")
+        got, log = self.run_job({"action": "remove", "recipe": None})
+        self.assertEqual(got, ("succeeded", 0), log)
+        self.assertFalse(os.path.exists(os.path.join(self.home, ".local", "bin", "codex")))
+
     def test_opencode_is_found_where_its_installer_puts_it(self):
         # B772: OpenCode's own script installs into ~/.opencode/bin whatever
         # it is told, so the update ran and then found no program at
@@ -379,7 +592,6 @@ class NodeAgent(unittest.TestCase):
         # removal takes the old place away too.
         row = self.mod.AGENT_INSTALLS["opencode-update"]
         self.assertEqual(row["bin"], ".opencode/bin/opencode")
-        self.assertIn("--no-modify-path", row["script"])
         stub = os.path.join(self.tmp.name, "opencode-installer.sh")
         with open(stub, "w") as f:
             f.write('mkdir -p "$HOME/.opencode/bin"\n'
@@ -426,13 +638,36 @@ class NodeAgent(unittest.TestCase):
             a = agents.get(how["id"])
             self.assertEqual((a.update_job, a.command, a.product, a.reported),
                              (job, how["command"], how["product"], how["reported"]))
-            # ...and its recipe, which is what runs for a controller that
-            # sends none, is the one this controller's table would send.
+            # ...and the recipe this controller's table would send is one
+            # the node takes, whole: what it fetches, what holds each
+            # download, its steps or its script, and where the program is,
+            # which is where the node's row says a removal finds it.
             sent, why = self.mod.recipe_checked(a.install)
             self.assertEqual(why, "", a.id)
-            self.assertEqual({k: sent[k] for k in ("script", "pin", "env", "bin", "also", "fresh")},
-                             {"script": how["script"], "pin": tuple(how["pin"]) if how["pin"] else None, "env": how["env"],
-                              "bin": how["bin"], "also": tuple(how.get("also", ())), "fresh": how.get("fresh", "")}, a.id)
+            self.assertEqual((sent["bin"], sent["also"]), (how["bin"], tuple(how.get("also", ()))), a.id)
+            self.assertEqual({k: sent[k] for k in ("script", "steps", "online", "keyring", "pin", "env", "fresh")},
+                             {"script": a.install.get("script", ""), "steps": a.install.get("steps", []), "online": a.install.get("online", ""),
+                              "keyring": a.install.get("keyring", {}), "pin": tuple(a.install["pin"]) if a.install["pin"] else None,
+                              "env": a.install["env"], "fresh": a.install["fresh"]}, a.id)
+            self.assertEqual([{k: f[k] for k in f if k not in ("track", "found")} for f in a.install.get("fetch", [])], sent["fetch"], a.id)
+
+    def test_both_halves_hold_a_held_recipe_to_one_shape(self):
+        # What the controller keeps of a manifest's recipe the node takes,
+        # and what one refuses the other does: a step is never a line of
+        # shell, a download is never held to nothing.
+        for good in (HELD, PLACED):
+            self.assertEqual(agents.install_checked(good), (good, ""))
+            sent, why = self.mod.recipe_checked(good)
+            self.assertEqual((why, sent["steps"], sent["fetch"], sent["online"]), ("", good["steps"], good["fetch"], good.get("online", "")))
+        for bad in BAD_HELD:
+            self.assertTrue(agents.install_checked(HELD | bad)[1], bad)
+            self.assertTrue(self.mod.recipe_checked(HELD | bad)[1], bad)
+        # How a newer pin is found is the pin tool's, and no node reads it.
+        tracked = HELD | {"fetch": [HELD["fetch"][0] | {"track": {"resolver": "github-release", "repo": "x/x", "trim_prefix": "v"}, "found": {"from": "github-asset"}}]}
+        self.assertEqual(agents.install_checked(tracked), (tracked, ""))
+        self.assertEqual(self.mod.recipe_checked(tracked)[0]["fetch"], HELD["fetch"])
+        self.assertEqual((self.mod.recipe_version(HELD), agents.install_version(HELD), agents.install_pins(HELD), agents.install_pins(PLACED)),
+                         ("0.170.0", "0.170.0", "", "0.170.0"))
 
     def test_the_recipe_the_controller_hands_over_is_what_runs(self):
         # R169 step 13: where the program lands is the recipe's word, not

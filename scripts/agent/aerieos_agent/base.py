@@ -145,17 +145,18 @@ CLAUDE_DIR = "/usr/local/lib/builderbot/claude"
 # ...and the other coding agents (R95 step 2), each in a folder of its own
 # under this one: AGENTS_DIR/codex/codex, AGENTS_DIR/copilot/copilot.
 AGENTS_DIR = os.environ.get("BUILDERBOT_AGENTS_DIR", "/usr/local/lib/builderbot/agents")
-# How each is installed, by the job the controller's agent table names for
-# it (scripts/dashboard/agents.py update_job). Which agent is a lookup
-# here; how is the recipe the controller hands over with the job (its
-# table's, or its signed catalog's where that is newer: R169 step 13), held
-# to one shape by recipe_checked below, and these rows' own for a
-# controller that sends none. Each vendor's own installer, run as the
-# session account into its home: `script` fetched fresh each time, the
-# version asked for in `pin` (formatted with the version), `env` formatted
-# with the home, and the binary it leaves at `bin` under the home. A test
-# stands its own script in with BUILDERBOT_<ID>_INSTALLER. Checked against
-# Codex CLI 0.163.0 and Copilot CLI 1.0.102 (22 Oct).
+# Which coding agent a job installs, by the job the controller's agent
+# table names for it (scripts/dashboard/agents.py update_job): its id, its
+# command, the name a person reads, its census key, and where its program
+# is under the session account's home (`bin`, and the older places a
+# removal clears in `also`), which the census, a session's PATH and a
+# removal read. How it is installed is not here: that is the recipe the
+# controller hands over with the job (its table's, or its signed catalog's
+# where that is newer: R169 step 13), held to one shape by recipe_checked
+# below. Every controller that ships this agent sends one, so these rows
+# carry no installer of their own to fall back on: an install asked for
+# with no recipe is refused, never run from a copy here that nothing
+# holds. A test stands its own script in with BUILDERBOT_<ID>_INSTALLER.
 # Each coding agent's sign-in and sign-out jobs, by the controller's agent
 # table (agents.py login_job, logout_job), to the agent `aerie login --flow` and
 # `aerie login --out` are run for. Claude's are the claude-login and
@@ -180,49 +181,61 @@ AGENT_LOGINS = {"codex-login": "codex", "copilot-login": "copilot", "grok-login"
 AGENT_LOGOUTS = {"codex-logout": "codex", "copilot-logout": "copilot", "grok-logout": "grok"}
 AGENT_INSTALLS = {
     "codex-update": {"id": "codex", "command": "codex", "product": "Codex CLI", "reported": "codex",
-                     "script": "curl -fsSL https://chatgpt.com/codex/install.sh | sh",
-                     "pin": ("CODEX_RELEASE", "{v}"), "env": {"CODEX_INSTALL_DIR": "{home}/.local/bin"},
                      "bin": ".local/bin/codex"},
     "copilot-update": {"id": "copilot", "command": "copilot", "product": "Copilot CLI", "reported": "copilot",
-                       "script": "curl -fsSL https://gh.io/copilot-install | bash",
-                       "pin": ("VERSION", "v{v}"), "env": {"PREFIX": "{home}/.local"},
                        "bin": ".local/bin/copilot"},
-    # Grok Build's installer takes the version as its argument, not from its
-    # environment: handed over through BB_PIN, empty for the newest. It does
-    # not check its download against anything published (25 Oct).
     "grok-update": {"id": "grok", "command": "grok", "product": "Grok Build", "reported": "grok",
-                    "script": 'curl -fsSL https://x.ai/cli/install.sh | bash -s -- ${BB_PIN:-}',
-                    "pin": ("BB_PIN", "{v}"), "env": {"GROK_BIN_DIR": "{home}/.local/bin"},
                     "bin": ".local/bin/grok"},
     # OpenCode (R144 step 2), the open agent any model runs through: its
-    # install script takes the version as VERSION and puts the program in
-    # ~/.opencode/bin, whatever it is told (read off the script on 11 Nov:
-    # it took OPENCODE_INSTALL_DIR on 28 Oct and no longer does, so an
-    # update installed and then found nothing at ~/.local/bin). Asked not to
-    # write the account's shell files: a session runs the pinned copy. The
-    # old place is still taken away with it on a removal.
+    # installer puts the program in ~/.opencode/bin, whatever it is told
+    # (read off the script on 11 Nov), and the old place is still taken
+    # away with it on a removal.
     "opencode-update": {"id": "open", "command": "opencode", "product": "OpenCode", "reported": "opencode",
-                        "script": "curl -fsSL https://opencode.ai/install | bash -s -- --no-modify-path",
-                        "pin": ("VERSION", "{v}"), "env": {},
                         "bin": ".opencode/bin/opencode", "also": (".local/bin/opencode",)},
 }
 # Claude Code's row in the same shape, for the claude-update job: kept out of
 # AGENT_INSTALLS, which the census and the session PATH read for the agents
-# beside Claude. Its copy is pinned in CLAUDE_DIR, its installer is handed no
-# version (the one asked for is read from the versions folder it leaves),
-# and a removal takes that folder too.
+# beside Claude. Its copy is pinned in CLAUDE_DIR, and a removal takes its
+# versions folder too.
 CLAUDE_INSTALL = {"id": "claude", "command": "claude", "product": "Claude Code", "reported": "claude",
-                  "script": "curl -fsSL https://claude.ai/install.sh | bash",
-                  "pin": None, "env": {}, "bin": ".local/bin/claude", "pin_dir": CLAUDE_DIR,
-                  "fresh": ".local/share/claude/versions/{v}", "also": (".local/share/claude",)}
+                  "bin": ".local/bin/claude", "pin_dir": CLAUDE_DIR, "also": (".local/share/claude",)}
 # The recipe the controller hands over with an install, an update or a
 # removal (its agent table's `install`, or its catalog's where that is
-# newer): what a row here says of the installer, in its place. The rows
-# above are what runs when a controller from before this sends none. Held to
-# the shape the controller holds a manifest's to (agents.py install_checked):
-# one installer over https piped to sh or bash with plain arguments, an
-# environment that names neither PATH nor the account, and paths of two or
-# more parts under the account's home.
+# newer), held to the shape the controller holds a manifest's to (agents.py
+# install_checked), in either of its two forms.
+#
+# A held recipe (pack format 5): what it fetches is declared (`fetch`: each
+# download's https address, the file it is kept as, and its sha256 or its
+# publisher's signature under a key in `keyring`), and `steps` run from
+# what was fetched, each a list of plain words: a file the recipe fetched,
+# sh or bash on one, or a tool that only puts files in place. With `online`
+# the steps keep the network and the job says the recipe's sentence;
+# without it they run with none. The fetching, the holding and the cut are
+# sdk.sh's own, the one mechanism every entry's install goes through, run
+# from this node's bundle (scripts/lib/held-run.sh): nothing here checks a
+# digest or a signature a second way.
+#
+# The older form: one installer over https piped to sh or bash with plain
+# arguments (`script`). It is run as it was, for an older catalog's row,
+# and its job says that nothing held what it fetched.
+#
+# Either way: an environment that names neither PATH nor the account, and
+# paths of two or more parts under the account's home.
+_RECIPE_URL = re.compile(r"https://[A-Za-z0-9.-]{1,253}(:\d{1,5})?/[\x21-\x7e]{0,1900}")
+_RECIPE_REL = re.compile(r"(?!/)(?!.*(?:^|/)\.\.?(?:/|$))[A-Za-z0-9._/-]{1,200}")
+_RECIPE_SHA = re.compile(r"[0-9a-f]{64}")
+_RECIPE_PLATFORM = re.compile(r"(linux|linux-musl|darwin)/(amd64|arm64|\*)")
+_RECIPE_VERSION = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,63}")
+_RECIPE_KEY = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
+_RECIPE_WORD = re.compile(r"[A-Za-z0-9_@%+=:,./{}-]{1,200}")
+RECIPE_HOLES = ("{dir}", "{home}", "{version}")
+RECIPE_TOOLS = ("mkdir", "tar", "unzip", "install", "ln", "chmod")
+RECIPE_SHELLS = ("sh", "bash")
+RECIPE_ARMOR = ("-----BEGIN PGP PUBLIC KEY BLOCK-----", "-----END PGP PUBLIC KEY BLOCK-----")
+# What held-run.sh exits with when nothing of a recipe ran: a declared
+# download that answered other bytes than the recipe holds, and one that
+# could not be fetched at all.
+HELD_CHANGED, HELD_UNFETCHED = 66, 65
 _RECIPE_SCRIPT = re.compile(r"curl -fsSL https://[A-Za-z0-9._~/@+%-]{3,200} \| (?:ba)?sh(?: -s --(?: [A-Za-z0-9_${}:=.,/-]{1,60}){1,6})?")
 _RECIPE_NAME = re.compile(r"[A-Z][A-Z0-9_]{1,40}")
 _RECIPE_VALUE = re.compile(r"[A-Za-z0-9._/{}:=-]{0,200}")
@@ -241,14 +254,100 @@ def _recipe_name(k):
     return isinstance(k, str) and bool(_RECIPE_NAME.fullmatch(k)) and k not in _RECIPE_ENV_KEPT and not k.startswith("LD_")
 
 
+def _recipe_fetch(rows):
+    """A held recipe's declared downloads as held-run.sh is handed them, or
+    None where one is not a download: {url, to} with exactly one of sha256
+    and signed ({sig, keys}), and the platform and the version it names
+    where it names them. How a newer one is found is the pin tool's to
+    read, and is left behind."""
+    if not (isinstance(rows, list) and 1 <= len(rows) <= 256):
+        return None
+    out = []
+    for f in rows:
+        if not isinstance(f, dict):
+            return None
+        url, to, sha, signed, plat, version = (f.get(k) for k in ("url", "to", "sha256", "signed", "platform", "version"))
+        sha = sha or None
+        ok = isinstance(url, str) and _RECIPE_URL.fullmatch(url) and isinstance(to, str) and _RECIPE_REL.fullmatch(to)
+        ok = ok and (sha is None) != (signed is None)
+        ok = ok and (sha is None or (isinstance(sha, str) and _RECIPE_SHA.fullmatch(sha)))
+        ok = ok and (signed is None or (isinstance(signed, dict) and set(signed) == {"sig", "keys"}
+                                        and isinstance(signed["sig"], str) and _RECIPE_URL.fullmatch(signed["sig"])
+                                        and isinstance(signed["keys"], str) and _RECIPE_KEY.fullmatch(signed["keys"])))
+        ok = ok and (plat is None or (isinstance(plat, str) and _RECIPE_PLATFORM.fullmatch(plat)))
+        ok = ok and (version is None or (isinstance(version, str) and _RECIPE_VERSION.fullmatch(version)))
+        ok = ok and (version is not None or "{version}" not in url + str((signed or {}).get("sig") or ""))
+        if not ok:
+            return None
+        out.append({"url": url, "sha256": sha or "", "to": to, **({"platform": plat} if plat else {}),
+                    **({"signed": dict(signed)} if signed else {}), **({"version": version} if version else {})})
+    return out
+
+
+def recipe_version(r):
+    """The one version a held recipe's downloads say they are, or ""."""
+    said = {f["version"] for f in (r or {}).get("fetch") or () if f.get("version")}
+    return said.pop() if len(said) == 1 else ""
+
+
+def _recipe_steps(steps, fetch):
+    """Whether a held recipe's steps are ones: each a few plain words, run
+    as they stand and never read by a shell, whose program is a file the
+    recipe fetched, sh or bash on one, or a tool that puts files in place."""
+    if not (isinstance(steps, list) and 1 <= len(steps) <= 8):
+        return False
+    kept = {"{dir}/" + f["to"] for f in fetch}
+    for step in steps:
+        if not (isinstance(step, list) and 1 <= len(step) <= 16
+                and all(isinstance(w, str) and _RECIPE_WORD.fullmatch(w) and ".." not in w.split("/") for w in step)):
+            return False
+        for w in step:
+            rest = w
+            for hole in RECIPE_HOLES:
+                rest = rest.replace(hole, "")
+            if "{" in rest or "}" in rest or (w.startswith("{dir}/") and w not in kept):
+                return False
+        run = step[1] if step[0] in RECIPE_SHELLS and len(step) > 1 else step[0]
+        if step[0] in RECIPE_SHELLS and not run.startswith("{dir}/"):
+            return False
+        if not (run.startswith("{dir}/") or step[0] in RECIPE_TOOLS):
+            return False
+    return not any("{version}" in w for step in steps for w in step) or bool(recipe_version({"fetch": fetch}))
+
+
 def recipe_checked(r):
-    """(recipe, why): an install recipe as agent_install reads it (script,
-    pin, env, bin, also, fresh, rev), or why what was sent is not one."""
+    """(recipe, why): an install recipe as agent_install reads it, or why
+    what was sent is not one. A held one keeps fetch, keyring, online and
+    steps, with script ""; the older form keeps script, with no steps.
+    Both keep pin, env, bin, also, fresh and rev."""
     if not isinstance(r, dict):
         return None, "it is not an object"
     script = r.get("script")
-    if not (isinstance(script, str) and len(script) <= 400 and _RECIPE_SCRIPT.fullmatch(script)):
+    how = {"script": "", "fetch": [], "keyring": {}, "online": "", "steps": []}
+    if script is None:
+        fetch = _recipe_fetch(r.get("fetch"))
+        if fetch is None:
+            return None, "its fetch is not a list of downloads, each an https address, the file it is kept as, and its sha256 or its publisher's signature"
+        keyring = r.get("keyring") or {}
+        if not (isinstance(keyring, dict) and len(keyring) <= 4 and all(
+                isinstance(k, str) and _RECIPE_KEY.fullmatch(k) and isinstance(v, str) and len(v) <= 32 * 1024 and v.isascii()
+                and v.strip().startswith(RECIPE_ARMOR[0]) and v.strip().endswith(RECIPE_ARMOR[1]) for k, v in keyring.items())):
+            return None, "its keyring is not a few armored public keys under plain names"
+        if any(f.get("signed") and f["signed"]["keys"] not in keyring for f in fetch):
+            return None, "it names a signature under keys its keyring does not carry"
+        online = r.get("online") or ""
+        if not (isinstance(online, str) and len(online) <= 300 and online.isprintable() and not any(c in online for c in "<>{}\\")
+                and (not online or len(online.strip()) >= 8)):
+            return None, "its online is not one plain sentence"
+        if not _recipe_steps(r.get("steps"), fetch):
+            return None, "its steps are not plain commands run from what it fetched"
+        how.update(fetch=fetch, keyring=dict(keyring), online=" ".join(online.split()), steps=[list(s) for s in r["steps"]])
+    elif any(r.get(k) is not None for k in ("fetch", "keyring", "online", "steps")):
+        return None, "it says script, and fetch or steps beside it"
+    elif not (isinstance(script, str) and len(script) <= 400 and _RECIPE_SCRIPT.fullmatch(script)):
         return None, "its script is not one installer over https handed to a shell"
+    else:
+        how["script"] = script
     pin = r.get("pin")
     if pin is not None and not (isinstance(pin, (list, tuple)) and len(pin) == 2 and _recipe_name(pin[0]) and isinstance(pin[1], str)
                                 and re.fullmatch(r"[A-Za-z0-9._-]{0,12}\{v\}[A-Za-z0-9._-]{0,12}", pin[1])):
@@ -267,7 +366,7 @@ def recipe_checked(r):
     if fresh and not (_recipe_path(fresh, "{v}") and "{v}" in fresh):
         return None, "its fresh is not a versions folder under the account's home"
     rev = r.get("rev")
-    return {"script": script, "pin": tuple(pin) if pin is not None else None, "env": dict(env), "bin": r["bin"],
+    return {**how, "pin": tuple(pin) if pin is not None else None, "env": dict(env), "bin": r["bin"],
             "also": tuple(also), "fresh": fresh,
             "rev": rev if isinstance(rev, int) and not isinstance(rev, bool) else 0}, ""
 

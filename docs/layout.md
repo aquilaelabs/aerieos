@@ -58,6 +58,7 @@ scripts/
   lib/controller-packages.sh     the controller's package list read one way, for the Dockerfile and a bare-metal install (R90)
   lib/relay-verbs                the aerie verbs a node relays to the controller (aerie and bbrelay.py both read it)
   lib/sdk.sh                     the toolchain manager: `aerie toolchains`, sourced by aerie
+  lib/held-run.sh                one entry's steps run from what the entry declares and nothing else: the row read from standard input, its downloads fetched and held by sdk.sh's own mechanism, then the steps, cut from the network unless it says online; how a node installs a coding agent from the recipe it is handed
   lib/preflight.sh               `aerie tests preflight`, sourced by aerie
   lib/bbapi.py                   the controller's API from aerie: one client, the loopback or BB_CONTROLLER, pinned https
   lib/say.py                     the `[builderbot] ERROR:` line a helper ends on with exit code 1, and the check of an answer for one
