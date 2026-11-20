@@ -23,6 +23,7 @@
 - On the stable channel a release is offered by its tag, whatever the pre-release flag beside it says (403d120)
 - Toolchains install at a version AerieOS pins, each file held to its sha256, where an install asked the vendor for its newest and checked it against the vendor's own word at that moment: Go, Zig, the JDK, FFmpeg, the Kotlin language server, xcodes, LibreOffice and Android's command line tools are pinned whole; Rust, Python, .NET, Flutter and Android's packages install from a pinned program (rustup, uv, the .NET SDK, Flutter at a release's commit, sdkmanager) that downloads the rest itself, and say so. A newer version arrives as a newer pin, from the catalog or a release, and shows as an update. .NET installs from Microsoft's SDK archive, no longer from its install script, which nothing checked (fa9a1ee, 6d6f458, 8254ecd, 82ed514)
 - A failed job's toast says why in one sentence; the whole reason is on the job's row and in its log (8a3c9c0)
+- Docker apps come from the catalog alone: AerieOS ships no table of apps, so an app is added, fixed or re-pinned by a catalog commit with no release. A container already made from an app keeps running and keeps its Configure. With no catalog reachable and none kept, the Library's Apps say so (271fb5f)
 
 ### Fixed
 
@@ -80,6 +81,8 @@
 - An imported catalog mirror also answers when the catalog itself answers an index made before the mirror's, so what the mirror's index had withdrawn does not come back (b9b41c9)
 - A coding agent's install is held like any entry's: its recipe declares what it downloads, each file held to a sha256 the recipe carries, and nothing is piped from the network to a shell. Copilot CLI and Grok Build install at a pinned version; Codex CLI, OpenCode and Claude Code run their vendor's installer from a pinned copy, which then downloads the agent itself, so an install is refused on the day a vendor changes its installer until the pin moves (f7082f0, 6b62454, 76d0a35)
 - A node's door for SSH (cloudflared, Tailscale) installs from a source its package manager verifies, the vendor's signed repository with its key carried by the provisioner or the distribution's own package, where it was a download checked against nothing and a script piped to a shell; a system with no verified source for one says so. The NVIDIA container toolkit's source is held to a key the provisioner carries. A CI runner's download is held to a pinned version and sha256 before it is unpacked (abdff8d, 31eb602, 7d7d1ef, e8d9851)
+- A container image is named by its digest. The model router, nginx and the scanners each run the images AerieOS names by digest, no service asks a registry what is newest any more, and Update on such a container means its entry names another image, shown by its short digest. A catalog app written in pack format 5 names every image by digest. The scanners run an image that already holds each tool, where one ran pip at every scan (25dc82f, fb4f20d, 3237ffe, 5767b92)
+- A coding agent's pinned install runs with no network on a node whose agent is root: the agent makes the cut itself (bc55040)
 
 ## 0.9.0-dev.5641: 2026-11-18
 
