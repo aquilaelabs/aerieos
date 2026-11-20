@@ -6,6 +6,7 @@
 
 - `aerie capture shot` and `reel` open a page in any browser installed (`--browser NAME`, or `all` for a shot in each) and as any device Playwright knows (`--device NAME`), with `--scheme` and `--set NAME=VALUE` for the rest; `aerie capture browsers` and `devices` list them (d8814eb)
 - A controller you build yourself can sign its node agent with a key of your own: `tools/sign-agent.py --builder-keygen FILE` makes it, `--builder FILE` signs a build, and a node takes such builds once the key is added at its console with `aerieos-agent release-key add HEX` (up to four, `release-key drop HEX` takes one away) (2cb12d8, b898ba9)
+- Pack format 5: an entry says what each of its downloads is held to, a sha256 or its publisher's signature under a key the entry carries, for one platform or all; a pack may declare that it downloads nothing; what an entry runs after its downloads runs with no network unless its installer must fetch the rest itself, which the entry says in one sentence. A toolchain's row may pin its download to a version and a sha256 for each platform, and an install then asks no vendor what is newest. An entry's Details page says in one line whether its downloads are pinned, and Look and an install's receipt say how each was held (5ec3484, e32d1a2, 0f32645, 20e3daf)
 
 ### Changed
 
