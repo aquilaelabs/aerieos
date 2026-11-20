@@ -1227,6 +1227,23 @@ function nbPoster(nb, url, {proj = () => nb.project, hold = true, holdExcept, co
   });
 }
 
+// What a send to a session came to, said when it did not go: the line was
+// typed into the session's input with Enter held back because it was busy,
+// and the person is told what to do about that. Answers whether it went,
+// so each view goes on to its own next thing. `noun` is what was sent
+// ("step", "bug") where a /model line can go ahead of it: which line
+// stalled matters then, since the one left in the box has the thing still
+// to come and Enter would glue the two together. A send with no noun has
+// no such line.
+function sendOutcome(j, noun){
+  if (j.sent) return true;
+  notify(noun && j.switching
+    ? `Not sent: the session is busy with the /${j.switching} line. `
+      + `Clear its tab and send the ${noun} again.`
+    : "Not sent: the session is busy. Press Enter in its tab when it is free.", true);
+  return false;
+}
+
 // ---- this space's VMs and containers -------------------------------------
 // This project's VMs as the VMs page draws them, scoped to it (R96): the
 // page's own rows and their presses, the project's card alone.

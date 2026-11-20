@@ -744,14 +744,11 @@ async function nbRmReallySend($, nb){
   const j = await nbRmPost($, nb, {action: "send", id, step, tell: true, note, session: to});
   unbusy(go, "Send");
   if (!j) { nbRmDrawSendBox($, nb, !!nb.roadmapSession); return; }
-  if (!j.sent){
-    // Which line stalled matters: a step left in the box is one to press
-    // Enter on, but a `/model` left there has the step still to come, and
-    // sending it now would glue the two together. So the switch says so.
-    notify(j.switching
-      ? `Not sent: the session is busy with the /${j.switching} line. `
-        + "Clear its tab and send the step again."
-      : "Not sent: the session is busy. Press Enter in its tab when it is free.", true);
+  // Which line stalled matters: a step left in the box is one to press
+  // Enter on, but a `/model` left there has the step still to come, and
+  // sending it now would glue the two together. So the switch says so
+  // (sendOutcome).
+  if (!sendOutcome(j, "step")){
     nbRmDrawSendBox($, nb, !!nb.roadmapSession);
     return;
   }

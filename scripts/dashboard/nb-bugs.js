@@ -453,14 +453,7 @@ function nbBugsView({$, nb, project}){
             const j = await postBug({action: "send", id, note: nb.sendNoteText, session: to});
             unbusy(go, "Send");
             if (!j) return;
-            if (!j.sent){
-              notify(j.switching
-                ? `Not sent: the session is busy with the /${j.switching} line. `
-                  + "Clear its tab and send the bug again."
-                : "Not sent: the session is busy. Press Enter in its tab when it is free.",
-                true);
-              return;
-            }
+            if (!sendOutcome(j, "bug")) return;
             nb.sendNoteText = "";
             nb.shutSendBoxes();
             openSentTo(project, j.session);   // land in the tab it went to

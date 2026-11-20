@@ -1067,10 +1067,7 @@ function nbArtWireAsk(av, box){
     try{
       const j = await postJSON("/api/version", {project, action: "ask", component: comp});
       if (j.error){ notify(j.error, true); b.disabled = false; return; }
-      if (!j.sent){
-        notify("Not sent: the session is busy. Press Enter in its tab when it is free.",
-               true);
-      }
+      sendOutcome(j);
       openSentTo(project, j.session);   // opens the tab, or goes to the one there
     }catch(e){ notify("ask: " + failWords(e), true); }
     // finally, not after the try: an exception on the way to the session

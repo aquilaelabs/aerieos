@@ -93,7 +93,7 @@ function nbGitView({$, nb, project}){
     try{
       const j = await postJSON("/api/git", {project, action: "ask", kind, args: args || {}, session: to});
       if (j.error) return notify(j.error, true);
-      if (!j.sent) notify("Not sent: the session is busy. Press Enter in its tab when it is free.", true);
+      sendOutcome(j);
       openSentTo(project, j.session);
     }catch(e){ notify("ask: " + failWords(e), true); }
     finally{ if (btn && btn.isConnected) unbusy(btn, btn.dataset.label || btn.textContent); }
