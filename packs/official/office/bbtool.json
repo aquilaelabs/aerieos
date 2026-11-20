@@ -1,6 +1,7 @@
 {
  "about": "What aerie tool office runs: LibreOffice without a window, to turn documents, decks and spreadsheets into PDFs. About 750 MB.",
- "framework": "2.1",
+ "format": 5,
+ "framework": "5.1",
  "label": "LibreOffice, headless",
  "layout": {
   "bin": [
@@ -17,9 +18,15 @@
  "shipped": {
   "probe": "office",
   "reports": "soffice",
+  "rev": 2,
   "source": {
    "checksum": {
-    "from": "zsync"
+    "found": {
+     "from": "zsync"
+    },
+    "from": "pin",
+    "sha256": "9b9d436e7ab2bf2783d4d22e5d0a93748d2a809e22fe32f215ce19e78d0e96a0",
+    "version": "26.2.2.2"
    },
    "download": {
     "bytes": 300000000,
@@ -35,11 +42,16 @@
     "{script}",
     "{dir}"
    ],
-   "url": "https://appimages.libreitalia.org/LibreOffice-fresh.basic-x86_64.AppImage",
+   "url": "https://appimages.libreitalia.org/LibreOffice-{version}.basic-x86_64.AppImage",
    "verify": [
     "{dir}/bin/soffice",
     "--version"
-   ]
+   ],
+   "version": {
+    "match": "^URL: LibreOffice-([0-9.]+)\\.basic-x86_64\\.AppImage$",
+    "resolver": "match",
+    "url": "https://appimages.libreitalia.org/LibreOffice-fresh.basic-x86_64.AppImage.zsync"
+   }
   },
   "tool": "office",
   "updatable": true
