@@ -20,6 +20,7 @@ import sdkmeta  # noqa: E402
 
 agent = agentpkg.load("aerieos_agent_receipt")
 C1, C2 = "a" * 40, "b" * 40
+SENTENCE = "Its installer downloads the compiler from releases.example.org."
 
 
 def put(root, rel, text="x", mode=0o644):
@@ -126,7 +127,24 @@ class Receipt(unittest.TestCase):
             self.assertIn("with no network" if mark == "cut" else "which this node cannot cut", said)
             self.assertEqual(self.read(d)[0][2], head[2])
             with mock.patch.object(mod, "tc_root", lambda state: store):
-                self.assertEqual(agent.sdk_receipts({})["hexkit"]["net"], mark)
+                got = agent.sdk_receipts({})["hexkit"]
+            self.assertEqual((got["net"], "why" in got), (mark, False))
+        # One whose entry kept the network for its steps (source.online):
+        # the word, and the entry's own sentence beside it.
+        put(d, ".bb-net", "online\n" + SENTENCE + "\n")
+        said = sdkmeta.receipt(d, C1)
+        self.assertIn("its steps kept the network, as its entry says: " + SENTENCE, said)
+        self.assertEqual(self.read(d)[0][7:], ["online", SENTENCE])
+        with mock.patch.object(mod, "tc_root", lambda state: store):
+            got = agent.sdk_receipts({})["hexkit"]
+        self.assertEqual((got["net"], got["why"]), ("online", SENTENCE))
+        # A sentence past its bound is cut to it, and one the installer did not write is none.
+        put(d, ".bb-receipt", "\t".join(self.read(d)[0][:7] + ["online", "x" * 900]) + "\n")
+        with mock.patch.object(mod, "tc_root", lambda state: store):
+            self.assertEqual(len(agent.sdk_receipts({})["hexkit"]["why"]), 300)
+        put(d, ".bb-receipt", "\t".join(self.read(d)[0][:7] + ["online"]) + "\n")
+        with mock.patch.object(mod, "tc_root", lambda state: store):
+            self.assertEqual(agent.sdk_receipts({})["hexkit"]["why"], "")
 
     def test_the_controller_keeps_the_shape_it_knows(self):
         import nodes  # noqa: PLC0415
@@ -140,6 +158,19 @@ class Receipt(unittest.TestCase):
         for said, kept in (("cut", "cut"), ("open", "open"), ("wide open; rm", "")):
             out = nodes._census({"toolchain_receipts": {"hexkit": {"commit": C1, "tree": t, "files": 1, "bytes": 1, "at": 1, "net": said}}})
             self.assertEqual(out["toolchain_receipts"]["hexkit"]["net"], kept)
+            self.assertNotIn("why", out["toolchain_receipts"]["hexkit"], "a sentence is an installer's that kept the network, and no other's")
+        # The entry kept the network: the word, and its sentence, one line of
+        # printable words within its bound.
+        keep = lambda why: nodes._census({"toolchain_receipts": {"hexkit": {  # noqa: E731
+            "commit": C1, "tree": t, "files": 1, "bytes": 1, "at": 1, "net": "online", "why": why}}})["toolchain_receipts"]["hexkit"]
+        self.assertEqual((keep(SENTENCE)["net"], keep(SENTENCE)["why"]), ("online", SENTENCE))
+        self.assertEqual(keep("  two\nlines \x1b[31m and a\ttab ")["why"], "two lines [31m and a tab")
+        self.assertEqual(len(keep("y" * 900)["why"]), nodes.RECEIPT_WHY_MAX)
+        for odd in (None, 7, ["a sentence"], {"a": 1}):
+            self.assertEqual(keep(odd)["why"], "", odd)
+        # A sentence beside another word is not kept.
+        out = nodes._census({"toolchain_receipts": {"hexkit": {"commit": C1, "tree": t, "files": 1, "bytes": 1, "at": 1, "net": "cut", "why": SENTENCE}}})
+        self.assertNotIn("why", out["toolchain_receipts"]["hexkit"])
 
     def test_what_a_row_says(self):
         import toolchains  # noqa: PLC0415
@@ -165,6 +196,12 @@ class Receipt(unittest.TestCase):
                             {"id": "n_b", "name": "birch", "reported": {"toolchain_receipts": {"hexkit": {"commit": C2, "tree": t2}}}},
                             {"id": "n_c", "name": "cedar", "reported": {"toolchain_receipts": {"hexkit": {"commit": C1, "tree": t1}}}}]
             self.assertEqual(toolchains.receipt_of("n_me", mine, "hexkit", row)["differs"], [{"node": "alder", "tree": t2}])
+            # What its steps ran with, and the entry's sentence where it kept the network.
+            self.assertEqual((got["net"], got["why"]), ("", ""))
+            for net, why, said in (("cut", "", ""), ("open", "", ""), ("online", SENTENCE, SENTENCE), ("cut", SENTENCE, "")):
+                rep = {"toolchain_receipts": {"hexkit": {**mine["toolchain_receipts"]["hexkit"], "net": net, **({"why": why} if why else {})}}}
+                got = toolchains.receipt_of("n_me", rep, "hexkit", row)
+                self.assertEqual((got["net"], got["why"]), (net, said))
             # Installed before receipts, or by an agent from before them.
             self.assertIsNone(toolchains.receipt_of("n_me", {}, "hexkit", row))
             self.assertIsNone(toolchains.receipt_of("n_me", mine, "other", row))

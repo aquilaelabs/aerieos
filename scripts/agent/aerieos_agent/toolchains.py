@@ -551,11 +551,12 @@ def netcut_sudoers(user, tool):
 
 def sdk_receipts(state):
     """What each pinned install left behind (R234): {name: {commit, tree,
-    files, bytes, at, before, net}} from the first line of its .bb-receipt, which
-    the installer writes (sdkmeta.py receipt). `tree` is one sha256 over
-    every file's, `before` the tree the same commit made here the last
-    time where that was another. One installed before receipts has none
-    and is left out."""
+    files, bytes, at, before, net, and why where net is online}} from the
+    first line of its .bb-receipt, which the installer writes (sdkmeta.py
+    receipt). `tree` is one sha256 over every file's, `before` the tree the
+    same commit made here the last time where that was another, `net` what
+    its steps ran with (cut, open, or online with the entry's sentence as
+    `why`). One installed before receipts has none and is left out."""
     store = tc_root(state)
     out = {}
     if not store:
@@ -575,9 +576,14 @@ def sdk_receipts(state):
                 continue
             before = r[6] if len(r) > 6 and len(r[6]) == 64 and set(r[6]) <= hexd else ""
             out[name] = {"commit": r[1][:64], "tree": r[2], "files": int(r[3]), "bytes": int(r[4]), "at": int(r[5]), "before": before,
-                         # A pack that declares its downloads: whether its
-                         # steps ran with the network cut, or this node could not.
-                         "net": r[7] if len(r) > 7 and r[7] in ("cut", "open") else ""}
+                         # An entry that declares its downloads: whether its
+                         # steps ran with the network cut, this node could
+                         # not cut it, or the entry kept it (online).
+                         "net": r[7] if len(r) > 7 and r[7] in ("cut", "open", "online") else ""}
+            # ...and for one that kept it, the entry's own sentence: what
+            # its installer downloads by itself, and from where.
+            if out[name]["net"] == "online":
+                out[name]["why"] = " ".join(r[8].split())[:300] if len(r) > 8 else ""
     return out
 
 

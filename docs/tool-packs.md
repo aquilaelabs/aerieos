@@ -177,7 +177,10 @@ With `online`, what the pack declares is still fetched and checked first,
 and its steps then keep the network; the job, the receipt (`.bb-receipt`,
 and `.bb-net` beside it) and the pack's entry say so in the pack's own
 sentence. Without it, a pack that declares its downloads runs its steps
-with no network. `online` is the one way to keep it.
+with no network. `online` is the one way to keep it. A node tells the
+controller that an install kept the network, with the sentence, once its
+agent is 0.9.478 or newer; from an earlier agent the receipt arrives
+without that word.
 
 **A pack that downloads nothing.** A pack whose steps only build from what
 its repository carries says so with an empty list, and its steps and its

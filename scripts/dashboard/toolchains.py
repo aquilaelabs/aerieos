@@ -1272,7 +1272,8 @@ def pin_rows(nid, rep):
 
 def receipt_of(nid, rep, name, p):
     """An installed pack's receipt as its row says it (R234): what the node
-    reported (commit, tree, files, bytes, at), with `stale` naming the
+    reported (commit, tree, files, bytes, at, and what its steps ran with:
+    net, and why where the entry kept the network), with `stale` naming the
     commit kept now when the copy there came from an earlier manifest,
     `before` the tree the same manifest made there the last time where it
     was another, and `differs` each other node whose copy of the same
@@ -1282,9 +1283,12 @@ def receipt_of(nid, rep, name, p):
     if not isinstance(rc, dict) or not rc.get("tree"):
         return None
     out = {k: rc.get(k) for k in ("commit", "tree", "files", "bytes", "at")}
-    # A pack that declares its downloads: whether its steps ran with the
-    # network cut there ("cut"), or the node could not ("open").
+    # An entry that declares its downloads: whether its steps ran with the
+    # network cut there ("cut"), the node could not ("open"), or the entry
+    # kept it because its installer downloads the rest ("online"), with the
+    # entry's own sentence as `why` ("" for the other two).
     out["net"] = rc.get("net") or ""
+    out["why"] = str(rc.get("why") or "") if out["net"] == "online" else ""
     kept = str(((p.get("source") or {}).get("commit")) or "")
     out["stale"] = kept if kept and rc.get("commit") and kept != rc["commit"] else ""
     out["before"] = rc.get("before") or ""

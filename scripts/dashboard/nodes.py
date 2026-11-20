@@ -1679,10 +1679,17 @@ def _c_toolchain_verified(c, out):
                                  and str(v.get("algo") or "") in ("sha1", "sha256", "sha512", "gpg", "none")}
 
 
+# The sentence of an entry whose installer keeps the network, as a receipt
+# carries it: as long as the format lets one be (packformat.ONLINE_MAX).
+RECEIPT_WHY_MAX = 300
+
+
 def _c_toolchain_receipts(c, out):
     # What each pinned install left behind (R234): the commit it came from,
     # one sha256 over every file that landed, how many and how big, when,
-    # and the tree the same commit made there before where it was another.
+    # and the tree the same commit made there before where it was another;
+    # what its steps ran with (cut, open, or online: the entry kept the
+    # network), and for online the entry's own sentence, as `why`.
     tr = c.get("toolchain_receipts") if isinstance(c.get("toolchain_receipts"), dict) else {}
     out["toolchain_receipts"] = {}
     for k, v in list(tr.items())[:80]:
@@ -1693,7 +1700,10 @@ def _c_toolchain_receipts(c, out):
                 "commit": re.sub(r"[^0-9a-f]", "", str(v.get("commit") or ""))[:64], "tree": v["tree"],
                 "files": max(0, int(v.get("files") or 0)), "bytes": max(0, int(v.get("bytes") or 0)), "at": max(0, int(v.get("at") or 0)),
                 "before": v["before"] if re.fullmatch(r"[0-9a-f]{64}", str(v.get("before") or "")) else "",
-                "net": v.get("net") if v.get("net") in ("cut", "open") else ""}
+                "net": v.get("net") if v.get("net") in ("cut", "open", "online") else ""}
+            if v.get("net") == "online":
+                why = " ".join(v["why"].split()) if isinstance(v.get("why"), str) else ""
+                out["toolchain_receipts"][str(k)[:40]]["why"] = "".join(ch for ch in why if ch.isprintable())[:RECEIPT_WHY_MAX]
 
 
 def _c_store_dirs(c, out):
