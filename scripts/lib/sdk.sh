@@ -1630,7 +1630,16 @@ sdk_install_git() {
 # The entry is asked once (sdkmeta.py declared): nothing for one that
 # declares nothing, else a line for what its steps run with and a line a
 # download, this machine's and the ones left out for another's.
+#
+# One install may be two runs of this (held-run.sh, for a caller that is
+# root and makes the cut itself): SDK_PHASE fetch fetches and holds what
+# the entry declares and decides nothing about the network, since nothing
+# runs in that run; SDK_PHASE run finds the downloads where the first run
+# held them, fetches nothing, and decides the network as ever. Empty, which
+# is every install but that one, it is both. A variable of this shell's,
+# set here: nothing in an install's environment names a phase.
 SDK_DECLARED=""
+SDK_PHASE=""
 sdk_declared() {
     local what="$1" d="$2" plan tag net online wrote
     SDK_CUT=()
@@ -1643,7 +1652,8 @@ sdk_declared() {
     plan="$(sdk_meta declared "$what")"
     [ -n "$plan" ] || return 0
     SDK_DECLARED=1
-    sdk_fetch_declared "$what" "$d" "$plan"
+    [ "$SDK_PHASE" = run ] || sdk_fetch_declared "$what" "$d" "$plan"
+    [ "$SDK_PHASE" != fetch ] || return 0
     IFS=$'\037' read -r tag net online <<< "${plan%%$'\n'*}"
     if [ "$tag" = net ] && [ "$net" = online ]; then
         log "${what} keeps the network for its steps, as its entry says: ${online}"
@@ -1770,7 +1780,27 @@ sdk_fetch_declared() {
 # namespaces, a node whose agent is not root) installs the pack all the
 # same, its steps with the network, and says so here and on its receipt
 # (the operator, 13 Nov). DIR/.bb-net keeps which, for the receipt.
+#
+# A caller that is root may have made the cut already and started this
+# inside it, as the account, with no way back to root (a node's agent
+# installing a coding agent for the session account, which has no rule for
+# the helper and is given none: held-run.sh --run). It says so with
+# SDK_CUT_MADE, a variable of this shell's that no environment sets, and is
+# believed only where this process can see it for itself: its network
+# namespace holds a loopback and nothing else (sdk_net_none). Then nothing
+# is put in front of a step, since every step already runs there. Said and
+# not so, nothing runs. So the word can take the network away from a run or
+# stop it, and gives it nothing.
 SDK_CUT=()
+SDK_CUT_MADE=""
+SDK_NET_DEV="${BUILDERBOT_NET_DEV:-/proc/self/net/dev}"
+# sdk_net_none: whether this process has no network: the interfaces of its
+# own network namespace, as the kernel lists them, are a loopback alone.
+sdk_net_none() {
+    local ifaces
+    ifaces="$(awk -F: 'NR > 2 { gsub(/[ \t]/, "", $1); print $1 }' "$SDK_NET_DEV" 2>/dev/null | sort -u | tr '\n' ' ')" || return 1
+    [ "$ifaces" = "lo " ]
+}
 SDK_NETCUT_BIN="${BUILDERBOT_NETCUT_BIN:-/usr/local/sbin/bb-netcut}"
 # A step relayed through the helper: sudo starts it with a plain environment,
 # so the step's own is written to a file only this account reads and read
@@ -1785,6 +1815,13 @@ exit "$rc"'
 sdk_net_cut() {
     local what="$1" d="$2" said="${3:-${1} declares its downloads}"
     SDK_CUT=()
+    if [ -n "$SDK_CUT_MADE" ]; then
+        sdk_net_none \
+            || die "${what}: it was started as if the network had been cut for it, and this process still has one: nothing is run"
+        log "${said}: its steps run with no network"
+        printf 'cut\n' > "$d/.bb-net" 2>/dev/null || true
+        return 0
+    fi
     if unshare --user --map-user="$(id -u)" --map-group="$(id -g)" --net true 2>/dev/null; then
         SDK_CUT=(unshare --user --map-user="$(id -u)" --map-group="$(id -g)" --net)
     elif unshare --user --map-root-user --net true 2>/dev/null; then

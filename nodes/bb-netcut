@@ -20,6 +20,13 @@ handed is run as the caller sudo names and never as root, so it gives that
 account nothing but the loss of the network: the caller is read from sudo
 alone, root is never a caller, and the environment CMD starts with is a
 plain one of the caller's, whatever sudo kept.
+
+The node's agent, where it is root, runs it too, with no sudo: for the
+steps of a coding agent's install, which run as the session account, an
+account that has no rule for this and is given none. The agent names that
+account the way sudo names a caller (SUDO_UID), and the same holds: the
+command runs as that account and never as root. Only root can say whom,
+since only root gets this far without sudo saying it.
 """
 import ctypes
 import os

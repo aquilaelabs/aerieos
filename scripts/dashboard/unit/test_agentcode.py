@@ -5,6 +5,7 @@ half run against a stub installer, never a vendor's."""
 import hashlib
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import time
@@ -465,6 +466,35 @@ class NodeAgent(unittest.TestCase):
         os.chmod(os.path.join(self.bin, "curl"), 0o755)
         with open(self.stub) as f, open(os.path.join(self.web, "install.sh"), "w") as w:
             w.write(f.read())
+        # bb-netcut, standing in: it writes down whom it was asked to run
+        # as and the environment it was started with, makes no namespace,
+        # and starts the command with a plain environment as the real one
+        # does. And the kernel's list of a process's interfaces, as a run
+        # inside a cut reads it and as one outside does.
+        self.netcut = os.path.join(self.bin, "bb-netcut")
+        self.cut_log = os.path.join(self.tmp.name, "netcut.log")
+        with open(self.netcut, "w") as f:
+            f.write(f'#!/bin/sh\nenv > "{self.cut_log}.env"\necho "$SUDO_UID $*" >> "{self.cut_log}"\nexec env -i PATH=/usr/bin:/bin "$@"\n')
+        os.chmod(self.netcut, 0o755)
+        head = "Inter-|   Receive  |  Transmit\n face |bytes    packets|bytes    packets\n"
+        self.no_net, self.a_net = (os.path.join(self.tmp.name, n) for n in ("net-none", "net-eth"))
+        with open(self.no_net, "w") as f:
+            f.write(head + "    lo:       0       0    0    0\n")
+        with open(self.a_net, "w") as f:
+            f.write(head + "    lo:       0       0    0    0\n  eth0:   91234     812    0    0\n")
+
+    def placed(self):
+        """A recipe whose program is its download, with what its vendor
+        serves for it: a tarball a platform, holding the program."""
+        import tarfile  # noqa: PLC0415
+        prog = os.path.join(self.tmp.name, "codex")
+        with open(prog, "w") as f:
+            f.write("#!/bin/sh\necho codex-cli 0.170.0\n")
+        os.chmod(prog, 0o755)
+        for name in ("codex-x64.tar.gz", "codex-arm64.tar.gz"):
+            with tarfile.open(os.path.join(self.web, name), "w:gz") as tar:
+                tar.add(prog, arcname="codex")
+        return PLACED | {"fetch": [self.held(PLACED | {"fetch": [f]}, f["url"].rsplit("/", 1)[-1])["fetch"][0] for f in PLACED["fetch"]]}
 
     def held(self, recipe=HELD, name="install.sh"):
         """`recipe` with each download's sha256 that of the file the web
@@ -477,9 +507,13 @@ class NodeAgent(unittest.TestCase):
         """What is under the account's home now."""
         return sorted(os.path.relpath(os.path.join(d, x), self.home) for d, dirs, files in os.walk(self.home) for x in dirs + files)
 
-    def run_job(self, spec, type_="codex-update", stub=True):
+    def run_job(self, spec, type_="codex-update", stub=True, root=False, more=None):
         # The recipe a controller hands over with every job: the older form
-        # unless the test names another, or none with None.
+        # unless the test names another, or none with None. With `root` the
+        # agent is root, as on a managed node: it drops to the session
+        # account (this test's own, which is all a test may become) and
+        # cuts the network through its helper, stood in for (self.netcut).
+        # `more` is added to what an install's environment starts from.
         spec = dict(spec)
         if "recipe" not in spec and type_ in OLD:
             spec["recipe"] = OLD[type_]
@@ -496,7 +530,9 @@ class NodeAgent(unittest.TestCase):
         fake = type("A", (), {})()
         fake.state = {}
         fake.session_account = lambda: "builder"
-        fake.as_user = lambda env, who: {}
+        fake.as_user = lambda env, who: {"user": os.getuid(), "group": os.getgid()} if root else {}
+        fake.held_cut = lambda who: self.netcut if root and who else self.mod.Agent.held_cut(fake, who)
+        fake.held_cut_env = self.mod.Agent.held_cut_env
         fake.session_renew = lambda: None
         fake.hello_again = lambda why: None
         # The one install path every agent's job goes through (R95 step 18).
@@ -509,12 +545,20 @@ class NodeAgent(unittest.TestCase):
         env = {"HOME": self.home} | ({"BUILDERBOT_CODEX_INSTALLER": self.stub} if stub else {})
         with mock.patch.dict(os.environ, env), \
                 mock.patch("os.path.expanduser", return_value=self.home), \
-                mock.patch("os.geteuid", return_value=1000):
+                mock.patch("os.geteuid", return_value=0 if root else 1000):
             if not stub:
                 os.environ.pop("BUILDERBOT_CODEX_INSTALLER", None)
             for m in self.mod._mods:
                 if "sdk_env" in vars(m):
-                    vars(m)["sdk_env"] = lambda state: {"HOME": self.home, "PATH": f"{self.bin}:/usr/bin:/bin", "FAKE_WEB": self.web}
+                    vars(m)["sdk_env"] = lambda state: {"HOME": self.home, "PATH": f"{self.bin}:/usr/bin:/bin", "FAKE_WEB": self.web, **(more or {})}
+                # Root's own copy of the bundle is this machine's, if it has one: the checkout's is what runs here.
+                if "ROOT_BUNDLE_DIR" in vars(m):
+                    vars(m)["ROOT_BUNDLE_DIR"] = os.path.join(self.tmp.name, "no-root-bundle")
+                # A root agent probes a program as the account that owns
+                # it, which only root can become: here it is run as it is.
+                if root and "_probe" in vars(m):
+                    vars(m)["_probe"] = lambda argv, timeout=20, **kw: (subprocess.run(argv, capture_output=True, text=True, timeout=timeout,
+                                                                                       check=False).stdout.strip(), "")
             got = self.mod.Agent.agent_update(fake, job, spec)
         return got, "".join(said)
 
@@ -567,16 +611,7 @@ class NodeAgent(unittest.TestCase):
         # alone, and the steps only put it in place: no sentence, so they
         # are cut from the network where this machine can cut, and the
         # version is the one the recipe pins, whatever the controller named.
-        import tarfile  # noqa: PLC0415
-        prog = os.path.join(self.tmp.name, "codex")
-        with open(prog, "w") as f:
-            f.write("#!/bin/sh\necho codex-cli 0.170.0\n")
-        os.chmod(prog, 0o755)
-        for name in ("codex-x64.tar.gz", "codex-arm64.tar.gz"):
-            with tarfile.open(os.path.join(self.web, name), "w:gz") as tar:
-                tar.add(prog, arcname="codex")
-        recipe = PLACED | {"fetch": [self.held(PLACED | {"fetch": [f]}, f["url"].rsplit("/", 1)[-1])["fetch"][0] for f in PLACED["fetch"]]}
-        got, log = self.run_job({"to": "0.171.0", "recipe": recipe}, stub=False)
+        got, log = self.run_job({"to": "0.171.0", "recipe": self.placed()}, stub=False)
         self.assertEqual(got, ("succeeded", 0), log)
         self.assertIn("(0.170.0 is the version its recipe pins)", log)
         self.assertEqual(log.count("fetching dl/codex.tar.gz"), 1, "the one for this machine")
@@ -584,6 +619,174 @@ class NodeAgent(unittest.TestCase):
         self.assertTrue("its steps run with no network" in log or "this node cannot cut the network" in log, log)
         self.assertNotIn("keeps the network", log)
         self.assertIn("Codex CLI 0.170.0 is what a session here runs now", log)
+
+    def test_a_root_agent_cuts_the_network_itself_for_the_session_account(self):
+        # The session account has no rule for bb-netcut, and where it can
+        # make no namespace it cut nothing: a recipe that reads pinned ran
+        # its steps with the network. The agent is root, so it makes the
+        # cut: what the recipe declares is fetched and held as the account
+        # with the network, and the steps are then started through the
+        # helper, as the account this node's sessions run as.
+        got, log = self.run_job({"to": "0.171.0", "recipe": self.placed()}, stub=False, root=True, more={"BUILDERBOT_NET_DEV": self.no_net})
+        self.assertEqual(got, ("succeeded", 0), log)
+        self.assertIn("Codex CLI declares its downloads: its steps run with no network", log)
+        self.assertNotIn("cannot cut the network", log)
+        self.assertLess(log.index("verified: sha256"), log.index("its steps run with no network"), "held with the network, then cut")
+        self.assertLess(log.index("its steps run with no network"), log.index("running mkdir -p"), "and every step behind it")
+        self.assertIn("Codex CLI 0.170.0 is what a session here runs now", log)
+        with open(self.cut_log) as f:
+            asked = f.read().splitlines()
+        self.assertEqual(len(asked), 1, "one run through the helper: the steps, never the fetch")
+        self.assertTrue(asked[0].startswith(f"{os.getuid()} env "), asked[0][:80])
+        self.assertIn(f" bash {REPO}/scripts/lib/held-run.sh --run {self.home}/.cache/aerie-held.", asked[0])
+        # The helper is started with nothing of the install's environment
+        # but whom to become: the install's own goes over as words.
+        with open(self.cut_log + ".env") as f:
+            started = dict(ln.split("=", 1) for ln in f.read().splitlines() if "=" in ln)
+        self.assertEqual({k: v for k, v in started.items() if k not in ("PWD", "SHLVL", "_", "OLDPWD")},
+                         {"PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", "LANG": "C.UTF-8", "SUDO_UID": str(os.getuid())})
+        # Nothing of the fetch is left: the program, and the places it made.
+        self.assertEqual([x for x in self.left() if "aerie-held" in x], [])
+        self.assertIn(".local/bin/codex", self.left())
+
+    def test_a_root_agent_s_install_of_a_changed_file_never_reaches_the_helper(self):
+        # The fetch is the first run, as the account: a file that is not
+        # the pinned bytes ends there, with nothing started behind a cut
+        # and nothing left.
+        good = self.placed()
+        off = [f | {"sha256": ("0" if f["sha256"][0] != "0" else "1") + f["sha256"][1:]} for f in good["fetch"]]
+        got, log = self.run_job({"to": "0.171.0", "recipe": good | {"fetch": off}}, stub=False, root=True, more={"BUILDERBOT_NET_DEV": self.no_net})
+        self.assertEqual(got, ("failed", self.mod.HELD_CHANGED), log)
+        self.assertIn("refused: Codex CLI's vendor changed that file since AerieOS pinned it", log)
+        self.assertFalse(os.path.exists(self.cut_log))
+        self.assertEqual(self.left(), [])
+
+    def test_nothing_a_job_says_names_the_account_the_steps_run_as(self):
+        # The account is the one this node's own state names for sessions,
+        # handed to the helper by the agent: a job that says another, in
+        # any word, changes nothing.
+        spec = {"to": "0.171.0", "recipe": self.placed(), "user": "root", "uid": 0, "account": "root", "session_user": "root", "as": "root",
+                "env": {"SUDO_UID": "0"}, "SUDO_UID": "0"}
+        got, log = self.run_job(spec, stub=False, root=True, more={"BUILDERBOT_NET_DEV": self.no_net})
+        self.assertEqual(got, ("succeeded", 0), log)
+        with open(self.cut_log) as f:
+            self.assertEqual([ln.split(" ", 1)[0] for ln in f.read().splitlines()], [str(os.getuid())])
+        # ...and a recipe cannot hand the helper one through its
+        # environment: that is the install's, set once the helper has
+        # become the account, and the helper was started with the agent's.
+        got, log = self.run_job({"to": "0.171.0", "recipe": self.placed() | {"env": {"SUDO_UID": "0"}}}, stub=False, root=True,
+                                more={"BUILDERBOT_NET_DEV": self.no_net})
+        self.assertEqual(got, ("succeeded", 0), log)
+        with open(self.cut_log + ".env") as f:
+            self.assertIn(f"SUDO_UID={os.getuid()}\n", f.read())
+
+    def test_which_helper_a_root_agent_cuts_with(self):
+        # bb-netcut, where the agent is root and drops to an account that
+        # is not: root's own file, which nobody else can write, or none.
+        cut = self.mod.Agent.held_cut
+        fake = type("A", (), {})()
+        made = []
+        fake.refresh_netcut_tool = lambda: made.append(1)
+        fake.held_cut_env = self.mod.Agent.held_cut_env
+        who = {"user": 1001, "group": 1001}
+        asked = []
+
+        def looks(uid=0, mode=0o100755):
+            return mock.patch("os.lstat", return_value=type("S", (), {"st_uid": uid, "st_mode": mode})())
+
+        def cuts(code=0):
+            """The helper asked for nothing: what it was started with, and how it ended."""
+            def run(argv, **kw):
+                asked.append((argv, kw.get("env")))
+                return type("P", (), {"returncode": code})()
+            return mock.patch("subprocess.run", run)
+        with mock.patch("os.geteuid", return_value=1000), looks(), cuts():
+            self.assertEqual(cut(fake, who), "", "an agent that is not root cuts nothing for anybody")
+        with mock.patch("os.geteuid", return_value=0):
+            with looks(), cuts():
+                self.assertEqual(cut(fake, who), self.mod.NETCUT_BIN)
+                self.assertEqual(made, [1], "kept as root's copy of the bundle has it, as a toolchain's install keeps it")
+                # Asked for nothing first, as the account, with a plain environment.
+                self.assertEqual(asked, [([self.mod.NETCUT_BIN, "true"], {"PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                                                                          "LANG": "C.UTF-8", "SUDO_UID": "1001"})])
+                self.assertEqual((cut(fake, {}), cut(fake, {"user": 0})), ("", ""), "nobody to drop to, or root itself")
+            for uid, mode in ((1001, 0o100755), (0, 0o100775), (0, 0o100757), (0, 0o100644), (0, 0o120777), (0, 0o040755)):
+                with looks(uid, mode), cuts():
+                    self.assertEqual(cut(fake, who), "", (uid, oct(mode)))
+            self.assertEqual(len(asked), 1, "a file that is not root's own is never started")
+            with mock.patch("os.lstat", side_effect=FileNotFoundError), cuts():
+                self.assertEqual(cut(fake, who), "", "a node with no helper")
+            # A machine that lets nobody make a namespace: the helper says so, and the install goes on as the account can.
+            with looks(), cuts(71):
+                self.assertEqual(cut(fake, who), "")
+
+    def test_a_recipe_that_keeps_the_network_is_not_cut_by_a_root_agent_either(self):
+        got, log = self.run_job({"to": "0.171.0", "recipe": self.held()}, stub=False, root=True, more={"BUILDERBOT_NET_DEV": self.no_net})
+        self.assertEqual(got, ("succeeded", 0), log)
+        self.assertIn(f"Codex CLI keeps the network for its steps, as its entry says: {SENTENCE}", log)
+        self.assertNotIn("its steps run with no network", log)
+        self.assertFalse(os.path.exists(self.cut_log), "the helper is not asked")
+
+    def test_an_agent_that_is_not_root_cuts_as_the_account_can_and_says_when_it_cannot(self):
+        # As before: the account makes its own namespace where the machine
+        # lets it, and where it cannot (here: an unshare that refuses, and
+        # no helper it may run) the steps run with the network, said.
+        with open(os.path.join(self.bin, "unshare"), "w") as f:
+            f.write("#!/bin/sh\nexit 1\n")
+        os.chmod(os.path.join(self.bin, "unshare"), 0o755)
+        got, log = self.run_job({"to": "0.171.0", "recipe": self.placed()}, stub=False,
+                                more={"BUILDERBOT_NETCUT_BIN": os.path.join(self.tmp.name, "no-helper"), "BUILDERBOT_NET_DEV": self.no_net})
+        self.assertEqual(got, ("succeeded", 0), log)
+        self.assertIn("Codex CLI declares its downloads, but this node cannot cut the network for a step", log)
+        self.assertNotIn("its steps run with no network", log)
+        self.assertFalse(os.path.exists(self.cut_log))
+
+    def test_said_to_be_cut_and_not_cut_runs_nothing(self):
+        # The second run believes the cut only where it can see it: a
+        # helper that made none (this stand-in, on a machine whose
+        # interfaces are listed) has nothing run, and nothing left.
+        got, log = self.run_job({"to": "0.171.0", "recipe": self.placed()}, stub=False, root=True, more={"BUILDERBOT_NET_DEV": self.a_net})
+        self.assertEqual(got, ("failed", 1), log)
+        self.assertIn("it was started as if the network had been cut for it, and this process still has one: nothing is run", log)
+        self.assertNotIn("running mkdir", log)
+        self.assertEqual(self.left(), [".cache"])
+
+    def test_the_second_run_takes_only_a_directory_of_the_account_s_own(self):
+        # held-run.sh --run by hand: it reads an entry and runs steps from
+        # a directory this account fetched into, by name and by owner, and
+        # from no other; and a word in its environment that the cut is
+        # made, or that this is a second run, is not heard.
+        helper = os.path.join(REPO, "scripts", "lib", "held-run.sh")
+        env = {"HOME": self.home, "PATH": f"{self.bin}:/usr/bin:/bin", "BUILDERBOT_NET_DEV": self.no_net, "SDK_CUT_MADE": "1", "SDK_PHASE": "run"}
+        elsewhere = os.path.join(self.tmp.name, "aerie-held.none")
+        link = os.path.join(self.tmp.name, "aerie-held.link")
+        real = os.path.join(self.tmp.name, "real")
+        os.makedirs(os.path.join(real, "dir"))
+        with open(os.path.join(real, "entry.json"), "w") as f:
+            f.write("{}")
+        os.symlink(real, link)
+        for top, said in ((elsewhere, "is not a directory this account fetched into"), (link, "is not a directory this account fetched into"),
+                          (real, "is not a run's own directory"), ("relative/aerie-held.x", "is not a run's own directory"), ("", "is not a run's own directory")):
+            p = subprocess.run(["bash", helper, "--run", top, "X CLI"], env=env, capture_output=True, text=True, check=False)
+            self.assertEqual(p.returncode, 1, (top, p.stderr))
+            self.assertIn(said, p.stderr, top)
+        self.assertTrue(os.path.isdir(real), "and what it does not run from it does not remove")
+        # A fetch into a directory that is there already is not this run's to take.
+        os.makedirs(elsewhere)
+        p = subprocess.run(["bash", helper, "--fetch", elsewhere, "X CLI"], env=env, input="{}", capture_output=True, text=True, check=False)
+        self.assertEqual((p.returncode, os.path.isdir(elsewhere)), (1, True), p.stderr)
+        # One run by hand, with those words in its environment: it fetches
+        # as ever and decides the cut for itself, as ever.
+        with open(os.path.join(self.bin, "unshare"), "w") as f:
+            f.write("#!/bin/sh\nexit 1\n")
+        os.chmod(os.path.join(self.bin, "unshare"), 0o755)
+        recipe = self.placed()
+        row = {"name": "X CLI", "source": {"kind": "command", "fetch": recipe["fetch"], "keyring": {}, "steps": [["mkdir", "-p", "{home}/made"]], "offline": True}}
+        p = subprocess.run(["bash", helper, "X CLI", f"home={self.home}"], input=json.dumps({"toolchains": [row]}), capture_output=True, text=True, check=False,
+                           env=env | {"FAKE_WEB": self.web, "BUILDERBOT_NETCUT_BIN": os.path.join(self.tmp.name, "no-helper")})
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("fetching dl/codex.tar.gz", p.stdout)
+        self.assertIn("this node cannot cut the network for a step", p.stdout)
 
     def test_a_recipe_of_the_older_form_still_runs_and_says_nothing_held_it(self):
         # An older catalog's row: a vendor's installer handed to a shell as

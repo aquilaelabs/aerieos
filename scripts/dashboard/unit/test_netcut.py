@@ -51,6 +51,26 @@ class Helper(unittest.TestCase):
         self.assertEqual(set(env), {"PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG"})
         self.assertEqual((env["PATH"], env["HOME"], env["USER"]), (netcut.PATH, who.pw_dir, who.pw_name))
 
+    def test_a_root_agent_names_the_account_as_sudo_does_and_gets_the_same(self):
+        # The node's agent, root, runs it with no sudo for the steps of a
+        # coding agent's install (sessions.agent_install): it starts it
+        # with the account's uid where sudo would have put the caller's,
+        # and nothing else of sudo's. The same plan: the command as that
+        # account, the plain environment, and root still nobody's to name.
+        me = str(ME.pw_uid) if ME.pw_uid else "1"
+        started = {"PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", "LANG": "C.UTF-8", "SUDO_UID": me}
+        cmd = ["env", "HOME=/somewhere/else", "SUDO_UID=0", "bash", "held-run.sh", "--run", "/home/x/.cache/aerie-held.1", "X CLI"]
+        got = netcut.plan(cmd, started, 0)
+        self.assertNotIsInstance(got, str, got)
+        who, argv, env = got
+        self.assertEqual((str(who.pw_uid), argv, env["HOME"], env["USER"]), (me, cmd, who.pw_dir, who.pw_name))
+        self.assertEqual(got[1:], netcut.plan(cmd, {**started, "SUDO_USER": who.pw_name, "SUDO_GID": str(who.pw_gid), "SUDO_COMMAND": "x"}, 0)[1:])
+        self.assertIn("never root", netcut.plan(cmd, {**started, "SUDO_UID": "0"}, 0))
+        self.assertIn("it is run through sudo", netcut.plan(cmd, started, int(me)), "and an account that starts it itself gets nothing")
+        # What the agent starts it with is those three words and no more.
+        with open(os.path.join(ROOT, "scripts", "agent", "aerieos_agent", "sessions.py"), encoding="utf-8") as f:
+            self.assertIn('"SUDO_UID": str(who["user"])', f.read())
+
     def test_what_it_refuses(self):
         for argv, environ, euid, said in (
                 ([], {"SUDO_UID": "1000"}, 0, "usage:"),

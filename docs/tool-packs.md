@@ -519,9 +519,20 @@ container that forbids namespaces) still installs the pack: its downloads
 are fetched and checked the same way, its steps run with the network, and
 the job and the pack's page on Installed say so.
 
+A coding agent's install is cut the same way and by the same helper, with
+one difference in who asks for it. Its steps run as the session account,
+which is not the job account and has no rule for `bb-netcut`. So on a
+managed node the agent, which is root, runs the steps through the helper
+itself, for the account the node's sessions run as: the downloads are
+fetched and held first, with the network, and the steps are then started
+inside the namespace as that account
+([agents.md](agents.md#where-an-agent-s-install-recipe-comes-from)). On a
+node whose agent is not root the session account makes the namespace where
+the machine lets it, and the job says so where it cannot.
+
 The cut stops an install step from fetching what the manifest does not
-name. It is not a sandbox: a step still runs as the job account, with that
-account's files.
+name. It is not a sandbox: a step still runs as the job account (a coding
+agent's as the session account), with that account's files.
 
 ### Images by digest
 

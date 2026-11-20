@@ -196,9 +196,28 @@ toolchain's install goes through (`scripts/lib/held-run.sh` in the node's
 bundle runs them), so there is one mechanism and one place to read it. A
 file that is not the pinned bytes runs nothing and leaves nothing behind:
 the job names both digests and says the vendor changed the file since
-AerieOS pinned it, and an install is refused until the pin moves. Without
-`online` the steps run with no network, where the node can cut it; with
-it, the job says the recipe's sentence.
+AerieOS pinned it, and an install is refused until the pin moves. With
+`online`, the job says the recipe's sentence and the steps keep the
+network.
+
+Without `online` the steps run with no network, and the job says so
+(`its steps run with no network`). Who makes the cut depends on the node,
+since the steps run as the session account and that account has one way to
+root, its session's view, and is given no second:
+
+- **A managed node, whose agent is root** (agent 0.9.481 or newer): the
+  agent makes the cut. The install is two runs as the session account: the
+  first, with the network, fetches and holds the downloads; the second is
+  started by the agent through its root helper, `bb-netcut`, which makes a
+  network namespace holding nothing, becomes the session account for good
+  and only then starts the steps. No sudo rule is involved. The account is
+  the one the node's own enrollment names for sessions, never a word of the
+  job's, and the second run checks for itself that it has no network before
+  it runs anything.
+- **A node whose agent is not root** (a guest node, a container): the
+  account makes the namespace itself where the machine lets an account do
+  that. Where it does not, the agent installed all the same, its steps with
+  the network, and the job says that it could not cut.
 
 **What each of the five is held to.** The Library's card says it in one
 word, from the recipe alone (`held` on the agent's row, with its
