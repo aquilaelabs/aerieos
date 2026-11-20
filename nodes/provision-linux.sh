@@ -48,6 +48,14 @@ TOKEN=""
 # AerieOS's release key, as the Enroll script carries it: pinned by the agent
 # at enrollment, after which the node takes only agent updates signed by it.
 RELEASE_KEY=""
+# What the agent that arrives is held to before any of it runs, as the Enroll
+# script carries them too: the digest of the agent the controller shipped
+# when the script was made, and the release's signature over that digest
+# where the controller's build has one (agent_proved, below).
+AGENT_DIGEST=""; AGENT_SIG=""
+# A release key, or the key and its spare after a comma: in a variable, since
+# the bash a Mac ships reads a pattern with parentheses only from one.
+RELEASE_KEYS_RE='^[0-9a-f]{64}(,[0-9a-f]{64})?$'
 STORE_DATA=/var/lib/aerieos/data
 STORE_TOOLCHAINS=/var/lib/aerieos/toolchains
 STORE_CACHE=/var/lib/aerieos/cache
@@ -163,6 +171,17 @@ it, which is a paste rather than a questionnaire.
                        opened for it. It runs jobs as the docker account
                        (--user, bb), never as root. Re-run with a fresh token to enroll again; a
                        re-run without either leaves the enrollment alone.
+  --release-key KEY[,SPARE]   AerieOS's release key, and its spare after a
+                       comma, 64 hex characters each: the node pins them as it
+                       enrolls, and from then on takes only an agent update a
+                       release signed, or as its own console allows.
+  --agent-digest sha256:…   what the agent that arrives is held to before any
+  --agent-sig HEX      of it runs: the digest of the agent the controller
+                       shipped when the script or the command was made, and
+                       the release's signature over it, checked under
+                       --release-key. Enroll node puts all three in; without
+                       them the agent is held to the digest the controller
+                       sends with it, and this says what was not checked.
   --wg-conf FILE       reach the controller through WireGuard: the config
                        (from the Nodes page's enroll script, which carries
                        it) goes in as wg-quick@bb before anything else, the
@@ -279,6 +298,8 @@ while [ $# -gt 0 ]; do
         --controller) CONTROLLER="$2"; shift 2 ;;
         --token) TOKEN="$2"; shift 2 ;;
         --release-key) RELEASE_KEY="$2"; shift 2 ;;
+        --agent-digest) AGENT_DIGEST="$2"; shift 2 ;;
+        --agent-sig) AGENT_SIG="$2"; shift 2 ;;
         --wg-conf) WG_CONF="$2"; shift 2 ;;
         --reach) REACH="$2"; shift 2 ;;
         --door) DOOR="$2"; shift 2 ;;
@@ -361,10 +382,173 @@ case "$TOKEN" in
     ""|bbe_*) ;;
     *) echo "that is not an enrollment token (they start bbe_); mint one on the Nodes tab" >&2; exit 1 ;;
 esac
+# What the agent is held to, when given at all: a digest or a signature cut
+# short by a paste is said now, not after an hour of packages.
+if [ -n "$AGENT_DIGEST" ] && ! [[ "$AGENT_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+    echo "--agent-digest takes sha256: and 64 hex characters, as the Nodes page's Enroll node gives it" >&2; exit 1
+fi
+if [ -n "$AGENT_SIG" ] && ! [[ "$AGENT_SIG" =~ ^[0-9a-f]{128}$ ]]; then
+    echo "--agent-sig takes 128 hex characters, as the Nodes page's Enroll node gives it" >&2; exit 1
+fi
+if [ -n "$RELEASE_KEY" ] && ! [[ "$RELEASE_KEY" =~ $RELEASE_KEYS_RE ]]; then
+    echo "--release-key takes the release key as 64 hex characters, and its spare after a comma" >&2; exit 1
+fi
 fi   # the options, when run rather than sourced
 
 say() { printf '\n== %s\n' "$*"; }
 warn() { printf '\n!! %s\n' "$*" >&2; }
+
+# ---- the agent, checked before it runs --------------------------------------
+#
+# The agent is fetched from the controller and, on a managed node, run as
+# root. What it is held to comes with the Enroll script, which a person
+# signed in to the dashboard made, and never from the answer that carries
+# the agent: --agent-digest is the agent the controller shipped when the
+# script was made, --agent-sig the release's signature over that digest, and
+# --release-key the key the signature is checked under, which the node then
+# pins. A digest read from the same answer as the file says only that the
+# file arrived whole.
+#
+# The signature is Ed25519 over the line "aerieos agent v1" and the digest
+# as sha256: and 64 hex characters (the agent's release.py, tools/
+# sign-agent.py). It is checked with Python's cryptography library, which
+# the agent's own check of its updates uses and a managed node has by the
+# time the agent is fetched (pkg_names pycrypto, installed just before);
+# else with OpenSSL 3's pkeyutl, for a guest whose Python lacks the
+# library. A signature nothing here can check is a refusal, never a pass.
+#
+# All of it is in this file: the Enroll script carries this script alone.
+
+# hex_bytes HEX: those bytes, on stdout. printf's own \xHH, since xxd is
+# vim's and a fresh machine may not have it.
+hex_bytes() {
+    # shellcheck disable=SC2059
+    printf "$(printf '%s' "$1" | sed 's/../\\x&/g')"
+}
+
+# The check with Python's library, as release.verify makes it: KEYS (one, or
+# two after a comma), SIG and DIGEST are its arguments, and it prints ok and
+# the key that signed, bad, or nolib where the library is not there.
+RELEASE_VERIFY_PY='import sys
+try:
+    from cryptography.exceptions import InvalidSignature
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+except ImportError:
+    print("nolib")
+    sys.exit(0)
+keys, sig, digest = sys.argv[1:4]
+for key in keys.split(","):
+    try:
+        Ed25519PublicKey.from_public_bytes(bytes.fromhex(key)).verify(bytes.fromhex(sig), b"aerieos agent v1\n" + digest.encode())
+    except (InvalidSignature, ValueError):
+        continue
+    print("ok " + key)
+    break
+else:
+    print("bad")
+'
+
+# release_sig_ok KEYS SIG DIGEST: 0 when SIG is the signature of one of KEYS
+# (the release key, its spare after a comma) over the agent whose digest is
+# DIGEST, and SIG_SAID is the key that signed; 1 when it is not; 2 when
+# nothing on this machine can check one, and SIG_SAID is why.
+SIG_SAID=""
+release_sig_ok() {
+    local keys="$1" sig="$2" digest="$3" out="" key said d
+    SIG_SAID=""
+    [[ "$keys" =~ $RELEASE_KEYS_RE ]] \
+        || { SIG_SAID="the release key is not 64 hex characters, with its spare after a comma"; return 2; }
+    [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { SIG_SAID="there is no digest to check it over"; return 2; }
+    [[ "$sig" =~ ^[0-9a-f]{128}$ ]] || return 1
+    if command -v python3 >/dev/null 2>&1; then
+        # From /, so that nothing in the folder this was run from is imported
+        # in the library's place.
+        out="$(cd / && python3 -c "$RELEASE_VERIFY_PY" "$keys" "$sig" "$digest" 2>/dev/null || true)"
+        case "$out" in
+            "ok "*) SIG_SAID="${out#ok }"; return 0 ;;
+            bad) return 1 ;;
+        esac
+    fi
+    if command -v openssl >/dev/null 2>&1 && command -v base64 >/dev/null 2>&1; then
+        d="$(mktemp -d)"
+        printf 'aerieos agent v1\n%s' "$digest" > "$d/msg"
+        hex_bytes "$sig" > "$d/sig"
+        out=""
+        for key in ${keys//,/ }; do
+            # The key as OpenSSL reads one: Ed25519's fixed twelve bytes of
+            # SubjectPublicKeyInfo, then the key's own thirty-two.
+            { printf -- '-----BEGIN PUBLIC KEY-----\n'
+              hex_bytes "302a300506032b6570032100${key}" | base64
+              printf -- '-----END PUBLIC KEY-----\n'; } > "$d/pub"
+            said="$(openssl pkeyutl -verify -pubin -inkey "$d/pub" -rawin -in "$d/msg" -sigfile "$d/sig" 2>&1 || true)"
+            case "$said" in
+                *"Signature Verified Successfully"*) out="ok $key"; break ;;
+                *"Signature Verification Failure"*) out=bad ;;
+            esac
+        done
+        rm -rf "$d"
+        case "$out" in
+            "ok "*) SIG_SAID="${out#ok }"; return 0 ;;
+            bad) return 1 ;;
+        esac
+    fi
+    SIG_SAID="its python3 has no cryptography library, and it has no OpenSSL 3 to check one with either"
+    return 2
+}
+
+# agent_sent HEADERS NAME: what the controller's answer says under NAME
+# (x-agent-digest, x-agent-sig), from the headers curl kept; nothing for none.
+agent_sent() {
+    tr -d '\r' < "$1" | awk -v n="$2:" 'tolower($1) == n { v = $2 } END { print v }'
+}
+
+# agent_proved FILE SENT: whether the agent that arrived in FILE is the one
+# to run, said either way. SENT is the digest the controller's answer names.
+# Held to the digest the script carries where it carries one, and to SENT
+# otherwise, with that said: an Enroll script from an older controller, and
+# a command somebody saved, carry none. No digest at all, and nothing
+# arriving, is a refusal: an empty file ran as an empty script, said
+# nothing, exited 0, and the node never enrolled (11 Oct). Then the
+# signature, where one came: under the release key, before any of the agent
+# runs, and refused when it is not that key's or cannot be checked here.
+agent_proved() {
+    local file="$1" sent="$2" got want rc=0
+    got="sha256:$(sha256sum "$file" | cut -d' ' -f1)"
+    want="${AGENT_DIGEST:-$sent}"
+    if [ -z "$want" ] || [ ! -s "$file" ]; then
+        warn "what ${CONTROLLER} sent for the agent is not AerieOS's ($(stat -c %s "$file" 2>/dev/null || echo 0) bytes, ${want:-no digest}): the address does not reach the controller's agent API"
+        return 1
+    fi
+    if [ "$got" != "$want" ] && [ -n "$AGENT_DIGEST" ]; then
+        warn "the agent that arrived (${got}) is not the one this enrollment was made for (${AGENT_DIGEST}), so none of it was run. Either the controller was updated after the script or the command was made, or something other than the controller answered: make a new one on the Nodes page (Enroll node)"
+        return 1
+    elif [ "$got" != "$want" ]; then
+        warn "the agent that arrived does not match the digest the controller sent (${got} vs ${want})"
+        return 1
+    fi
+    if [ -n "$AGENT_SIG" ]; then
+        if [ -z "$RELEASE_KEY" ]; then
+            warn "a signature for the agent came (--agent-sig) with no release key to check it under (--release-key), so none of the agent was run: use the script or the command as the Nodes page gave it"
+            return 1
+        fi
+        release_sig_ok "$RELEASE_KEY" "$AGENT_SIG" "$got" || rc=$?
+        case "$rc" in
+            0) printf '   the agent is %s, the one this enrollment was made for, signed by %s (%s…)\n' "${got:7:12}" \
+                   "$([ "$SIG_SAID" = "${RELEASE_KEY%%,*}" ] && echo "AerieOS's release key" || echo "the spare of AerieOS's release key")" "${SIG_SAID:0:16}" ;;
+            1) warn "the signature that came for the agent is not the release key's (${RELEASE_KEY:0:16}…), so none of the agent was run: nothing says an AerieOS release built it. Make a new script on the Nodes page (Enroll node)"
+               return 1 ;;
+            *) warn "a release signature came for the agent and this machine cannot check one (${SIG_SAID}), so none of the agent was run"
+               return 1 ;;
+        esac
+    elif [ -n "$AGENT_DIGEST" ]; then
+        printf '   the agent is %s, the one this enrollment was made for. No release signature came with it: the build this controller runs carries none (one made outside the release build, from a branch), so nothing says an AerieOS release built this agent.\n' "${got:7:12}"
+        [ -z "$RELEASE_KEY" ] || printf '   The node pins the release key all the same: it takes a later agent update only when a release signed it, or when its own console allows unsigned ones (the agent, with: unsigned on).\n'
+    else
+        printf '   the agent is %s, by the digest the controller sent with it and nothing else: this script or command carries no digest and no signature for it (an older controller made it, or it was saved from one). A new one from the Nodes page carries both.\n' "${got:7:12}"
+    fi
+    [ -n "$RELEASE_KEY" ] || printf '   No release key came with this enrollment, so the node pins none it did not hold already, and takes agent updates on the word of its controller.\n'
+    return 0
+}
 
 # ---- a GUEST node: somebody's own machine (roadmap R23) ---------------------
 #
@@ -451,7 +635,7 @@ guest_run() {
     node_json="$foot/node.json"
 
     say "the agent, from ${CONTROLLER}"
-    local hdr want got
+    local hdr want
     hdr="$(mktemp)"
     # Tried again on a transient answer: a stick's first boot asks its own
     # dashboard the moment it answers at all, and once got a 500 (B747).
@@ -459,13 +643,11 @@ guest_run() {
          "${CONTROLLER%/}/api/v1/agent/download" -o "${agent}.new" \
         || { warn "could not download the agent from ${CONTROLLER}: is that the dashboard's address, and is the token unused?"
              rm -f "$hdr" "${agent}.new"; exit 1; }
-    want="$(tr -d '\r' < "$hdr" | awk 'tolower($1)=="x-agent-digest:"{print $2}')"
-    got="sha256:$(sha256sum "${agent}.new" | cut -d' ' -f1)"
+    # Held to what the script carries before any of it runs (agent_proved);
+    # an answer with no digest was taken as it came here, and is refused.
+    want="$(agent_sent "$hdr" x-agent-digest)"
     rm -f "$hdr"
-    if [ -n "$want" ] && [ "$want" != "$got" ]; then
-        warn "the agent that arrived does not match the digest the controller sent (${got} vs ${want})"
-        rm -f "${agent}.new"; exit 1
-    fi
+    agent_proved "${agent}.new" "$want" || { rm -f "${agent}.new"; exit 1; }
     chmod 755 "${agent}.new"; mv -f "${agent}.new" "$agent"
 
     # Enrolled as this account, with every store under the footprint unless a
@@ -3591,22 +3773,14 @@ if [ -n "$CONTROLLER" ]; then
     curl -fsSL --retry 6 --retry-delay 3 --retry-connrefused -D "$hdr" -H @<(printf 'Authorization: Bearer %s\n' "${TOKEN}") \
          "${CONTROLLER%/}/api/v1/agent/download" -o "${AGENT}.new" \
         || { warn "could not download the agent from ${CONTROLLER}. Is that the dashboard's address, and is the token unused?"; rm -f "$hdr" "${AGENT}.new"; exit 1; }
-    # The digest the controller says it served, against what arrived. The
-    # same check the agent makes of its own updates, made once by hand here.
-    want="$(tr -d '\r' < "$hdr" | awk 'tolower($1)=="x-agent-digest:"{print $2}')"
-    got="sha256:$(sha256sum "${AGENT}.new" | cut -d' ' -f1)"
+    # Held to what the Enroll script carries, before any of it runs as root
+    # (agent_proved): the script's digest, and the release's signature under
+    # the release key, checked with the cryptography library installed just
+    # above. The digest the controller sends with the file stands in only
+    # for a script that carries none.
+    want="$(agent_sent "$hdr" x-agent-digest)"
     rm -f "$hdr"
-    if [ -n "$want" ] && [ "$want" != "$got" ]; then
-        warn "the agent that arrived does not match the digest the controller sent (${got} vs ${want})"
-        rm -f "${AGENT}.new"; exit 1
-    fi
-    # Nothing, or no digest to check it by, is not the controller's agent:
-    # an empty file ran as an empty script, said nothing, exited 0, and the
-    # node never enrolled (11 Oct).
-    if [ -z "$want" ] || [ ! -s "${AGENT}.new" ]; then
-        warn "what ${CONTROLLER} sent for the agent is not AerieOS's ($(stat -c %s "${AGENT}.new" 2>/dev/null || echo 0) bytes, ${want:-no digest}): the address does not reach the controller's agent API"
-        rm -f "${AGENT}.new"; exit 1
-    fi
+    agent_proved "${AGENT}.new" "$want" || { rm -f "${AGENT}.new"; exit 1; }
     chmod 755 "${AGENT}.new"; mv -f "${AGENT}.new" "$AGENT"
     svc_stop aerieos-agent
     # ...and under the name it had before (R204): never two agents on one

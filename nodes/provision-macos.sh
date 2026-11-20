@@ -25,10 +25,19 @@ FOOT="${BUILDERBOT_HOME:-$HOME/.builderbot}"
 PLIST="$HOME/Library/LaunchAgents/dev.builderbot.agent.plist"
 LABEL="dev.builderbot.agent"
 CONTROLLER=""; TOKEN=""; TOOLCHAINS=""; REMOVE=0; CHECK_ONLY=0
+# AerieOS's release key, and what the agent that arrives is held to before
+# any of it runs (agent_proved, below), as the Nodes page's command carries
+# them: the digest of the agent the controller shipped when the command was
+# made, and the release's signature over it where its build has one.
+RELEASE_KEY=""; AGENT_DIGEST=""; AGENT_SIG=""
+# A release key, or the key and its spare after a comma: in a variable, since
+# the bash a Mac ships reads a pattern with parentheses only from one.
+RELEASE_KEYS_RE='^[0-9a-f]{64}(,[0-9a-f]{64})?$'
 
 usage() {
     cat <<'EOF'
 usage: bash provision-macos.sh --controller URL --token bbe_… [--toolchains PATH]
+            [--release-key KEY[,SPARE]] [--agent-digest sha256:…] [--agent-sig HEX]
        bash provision-macos.sh --check
        bash provision-macos.sh --remove
 
@@ -43,6 +52,17 @@ token and prints this line with the address and the token in it.
                        /Volumes/SDK): this machine's toolchains land under
                        <path>/darwin-<arch> and nobody else's are touched.
                        Default: ~/.builderbot/toolchains, on this disk.
+  --release-key KEY[,SPARE]   AerieOS's release key, and its spare after a
+                       comma: the agent pins them as it enrolls, and from then
+                       on takes only an update a release signed, or as its own
+                       console allows.
+  --agent-digest sha256:…   what the agent that arrives is held to before any
+  --agent-sig HEX      of it runs: the digest of the agent the controller
+                       shipped when the command was made, and the release's
+                       signature over it, checked under --release-key. The
+                       Nodes page puts all three in the command; without them
+                       the agent is held to the digest the controller sends
+                       with it, and this says what was not checked.
   --check              only the pre-flight: say whether this Mac can be a
                        node, change nothing, exit 0 or 1.
   --remove             take the footprint away: the launchd agent, the
@@ -66,6 +86,9 @@ while [ $# -gt 0 ]; do
         --controller) CONTROLLER="$2"; shift 2 ;;
         --token) TOKEN="$2"; shift 2 ;;
         --toolchains) TOOLCHAINS="$2"; shift 2 ;;
+        --release-key) RELEASE_KEY="$2"; shift 2 ;;
+        --agent-digest) AGENT_DIGEST="$2"; shift 2 ;;
+        --agent-sig) AGENT_SIG="$2"; shift 2 ;;
         --check) CHECK_ONLY=1; shift ;;
         --remove) REMOVE=1; shift ;;
         -h|--help) usage; exit 0 ;;
@@ -73,8 +96,215 @@ while [ $# -gt 0 ]; do
     esac
 done
 
+# What the agent is held to, when given at all: a digest or a signature cut
+# short by a paste is said now.
+if [ -n "$AGENT_DIGEST" ] && ! [[ "$AGENT_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+    echo "--agent-digest takes sha256: and 64 hex characters, as the Nodes page gives it" >&2; exit 1
+fi
+if [ -n "$AGENT_SIG" ] && ! [[ "$AGENT_SIG" =~ ^[0-9a-f]{128}$ ]]; then
+    echo "--agent-sig takes 128 hex characters, as the Nodes page gives it" >&2; exit 1
+fi
+if [ -n "$RELEASE_KEY" ] && ! [[ "$RELEASE_KEY" =~ $RELEASE_KEYS_RE ]]; then
+    echo "--release-key takes the release key as 64 hex characters, and its spare after a comma" >&2; exit 1
+fi
+
 say()  { printf '\n== %s\n' "$1"; }
 warn() { printf '\n!! %s\n' "$1" >&2; }
+
+# ---- the agent, checked before it runs --------------------------------------
+#
+# The agent is fetched from the controller and run as you. What it is held to
+# comes with the command the Nodes page gave, which a person signed in to
+# the dashboard read there, and never from the answer that carries the
+# agent: --agent-digest is the agent the controller shipped when the command
+# was made, --agent-sig the release's signature over that digest, and
+# --release-key the key the signature is checked under, which the agent then
+# pins. A digest read from the same answer as the file says only that the
+# file arrived whole. The same checks nodes/provision-linux.sh makes, in the
+# bash a Mac ships.
+#
+# The signature is Ed25519 over the line "aerieos agent v1" and the digest
+# as sha256: and 64 hex characters (the agent's release.py, tools/
+# sign-agent.py). Three things can check one here, tried in this order:
+# Python's cryptography library, which the agent's own check of its updates
+# uses, where this Mac's python3 has it (the system's does not, unless
+# somebody put it there); openssl, where the one on PATH is OpenSSL 3 (the
+# system's is LibreSSL, which may not take the question); and Swift's
+# CryptoKit, which is the certain one: it comes with the command line tools
+# the pre-flight asks for, on macOS 10.15 and later. A signature none of
+# them can check is a refusal, never a pass.
+
+# hex_bytes HEX: those bytes, on stdout. printf's own \xHH, since xxd is
+# vim's and a fresh machine may not have it.
+hex_bytes() {
+    # shellcheck disable=SC2059
+    printf "$(printf '%s' "$1" | sed 's/../\\x&/g')"
+}
+
+# The check with Python's library, as release.verify makes it: KEYS (one, or
+# two after a comma), SIG and DIGEST are its arguments, and it prints ok and
+# the key that signed, bad, or nolib where the library is not there.
+RELEASE_VERIFY_PY='import sys
+try:
+    from cryptography.exceptions import InvalidSignature
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+except ImportError:
+    print("nolib")
+    sys.exit(0)
+keys, sig, digest = sys.argv[1:4]
+for key in keys.split(","):
+    try:
+        Ed25519PublicKey.from_public_bytes(bytes.fromhex(key)).verify(bytes.fromhex(sig), b"aerieos agent v1\n" + digest.encode())
+    except (InvalidSignature, ValueError):
+        continue
+    print("ok " + key)
+    break
+else:
+    print("bad")
+'
+
+# The same check in Swift, for CryptoKit: the same three arguments, and ok
+# and the key that signed, or bad, on its one line.
+RELEASE_VERIFY_SWIFT='import CryptoKit
+import Foundation
+
+func bytes(_ hex: String) -> Data? {
+    var out = Data()
+    var i = hex.startIndex
+    while i < hex.endIndex {
+        guard let j = hex.index(i, offsetBy: 2, limitedBy: hex.endIndex), let b = UInt8(hex[i..<j], radix: 16) else { return nil }
+        out.append(b)
+        i = j
+    }
+    return out
+}
+
+let a = CommandLine.arguments
+var said = "bad"
+if a.count == 4, let sig = bytes(a[2]) {
+    let message = Data(("aerieos agent v1\n" + a[3]).utf8)
+    for k in a[1].split(separator: ",") {
+        if let raw = bytes(String(k)), let key = try? Curve25519.Signing.PublicKey(rawRepresentation: raw),
+           key.isValidSignature(sig, for: message) {
+            said = "ok \(k)"
+            break
+        }
+    }
+}
+print(said)
+'
+
+# release_sig_ok KEYS SIG DIGEST: 0 when SIG is the signature of one of KEYS
+# (the release key, its spare after a comma) over the agent whose digest is
+# DIGEST, and SIG_SAID is the key that signed; 1 when it is not; 2 when
+# nothing on this machine can check one, and SIG_SAID is why.
+SIG_SAID=""
+release_sig_ok() {
+    local keys="$1" sig="$2" digest="$3" out="" key said d
+    SIG_SAID=""
+    [[ "$keys" =~ $RELEASE_KEYS_RE ]] \
+        || { SIG_SAID="the release key is not 64 hex characters, with its spare after a comma"; return 2; }
+    [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { SIG_SAID="there is no digest to check it over"; return 2; }
+    [[ "$sig" =~ ^[0-9a-f]{128}$ ]] || return 1
+    if command -v python3 >/dev/null 2>&1; then
+        # From /, so that nothing in the folder this was run from is imported
+        # in the library's place.
+        out="$(cd / && python3 -c "$RELEASE_VERIFY_PY" "$keys" "$sig" "$digest" 2>/dev/null || true)"
+        case "$out" in
+            "ok "*) SIG_SAID="${out#ok }"; return 0 ;;
+            bad) return 1 ;;
+        esac
+    fi
+    if command -v openssl >/dev/null 2>&1 && command -v base64 >/dev/null 2>&1; then
+        d="$(mktemp -d)"
+        printf 'aerieos agent v1\n%s' "$digest" > "$d/msg"
+        hex_bytes "$sig" > "$d/sig"
+        out=""
+        for key in ${keys//,/ }; do
+            # The key as OpenSSL reads one: Ed25519's fixed twelve bytes of
+            # SubjectPublicKeyInfo, then the key's own thirty-two.
+            { printf -- '-----BEGIN PUBLIC KEY-----\n'
+              hex_bytes "302a300506032b6570032100${key}" | base64
+              printf -- '-----END PUBLIC KEY-----\n'; } > "$d/pub"
+            said="$(openssl pkeyutl -verify -pubin -inkey "$d/pub" -rawin -in "$d/msg" -sigfile "$d/sig" 2>&1 || true)"
+            case "$said" in
+                *"Signature Verified Successfully"*) out="ok $key"; break ;;
+                *"Signature Verification Failure"*) out=bad ;;
+            esac
+        done
+        rm -rf "$d"
+        case "$out" in
+            "ok "*) SIG_SAID="${out#ok }"; return 0 ;;
+            bad) return 1 ;;
+        esac
+    fi
+    if command -v swift >/dev/null 2>&1; then
+        d="$(mktemp -d)"
+        printf '%s\n' "$RELEASE_VERIFY_SWIFT" > "$d/verify.swift"
+        out="$(swift "$d/verify.swift" "$keys" "$sig" "$digest" 2>/dev/null || true)"
+        rm -rf "$d"
+        case "$out" in
+            "ok "*) SIG_SAID="${out#ok }"; return 0 ;;
+            bad) return 1 ;;
+        esac
+    fi
+    SIG_SAID="its python3 has no cryptography library, its openssl is not OpenSSL 3, and swift (the command line tools) did not run the check either"
+    return 2
+}
+
+# agent_sent HEADERS NAME: what the controller's answer says under NAME
+# (x-agent-digest, x-agent-sig), from the headers curl kept; nothing for none.
+agent_sent() {
+    tr -d '\r' < "$1" | awk -v n="$2:" 'tolower($1) == n { v = $2 } END { print v }'
+}
+
+# agent_proved FILE SENT: whether the agent that arrived in FILE is the one
+# to run, said either way. SENT is the digest the controller's answer names.
+# Held to the digest the script carries where it carries one, and to SENT
+# otherwise, with that said: a command from an older controller, or one
+# somebody saved, carries none. No digest at all, and nothing
+# arriving, is a refusal: an answer with no digest was taken as it came
+# here, and an empty file runs as an empty script that says nothing. Then the
+# signature, where one came: under the release key, before any of the agent
+# runs, and refused when it is not that key's or cannot be checked here.
+agent_proved() {
+    local file="$1" sent="$2" got want rc=0
+    got="sha256:$(shasum -a 256 "$file" | cut -d' ' -f1)"
+    want="${AGENT_DIGEST:-$sent}"
+    if [ -z "$want" ] || [ ! -s "$file" ]; then
+        warn "what ${CONTROLLER} sent for the agent is not AerieOS's ($(wc -c < "$file" 2>/dev/null | tr -d ' ') bytes, ${want:-no digest}): the address does not reach the controller's agent API"
+        return 1
+    fi
+    if [ "$got" != "$want" ] && [ -n "$AGENT_DIGEST" ]; then
+        warn "the agent that arrived (${got}) is not the one this enrollment was made for (${AGENT_DIGEST}), so none of it was run. Either the controller was updated after the script or the command was made, or something other than the controller answered: make a new one on the Nodes page (Enroll node)"
+        return 1
+    elif [ "$got" != "$want" ]; then
+        warn "the agent that arrived does not match the digest the controller sent (${got} vs ${want})"
+        return 1
+    fi
+    if [ -n "$AGENT_SIG" ]; then
+        if [ -z "$RELEASE_KEY" ]; then
+            warn "a signature for the agent came (--agent-sig) with no release key to check it under (--release-key), so none of the agent was run: use the script or the command as the Nodes page gave it"
+            return 1
+        fi
+        release_sig_ok "$RELEASE_KEY" "$AGENT_SIG" "$got" || rc=$?
+        case "$rc" in
+            0) printf '   the agent is %s, the one this enrollment was made for, signed by %s (%s…)\n' "${got:7:12}" \
+                   "$([ "$SIG_SAID" = "${RELEASE_KEY%%,*}" ] && echo "AerieOS's release key" || echo "the spare of AerieOS's release key")" "${SIG_SAID:0:16}" ;;
+            1) warn "the signature that came for the agent is not the release key's (${RELEASE_KEY:0:16}…), so none of the agent was run: nothing says an AerieOS release built it. Make a new script on the Nodes page (Enroll node)"
+               return 1 ;;
+            *) warn "a release signature came for the agent and this machine cannot check one (${SIG_SAID}), so none of the agent was run"
+               return 1 ;;
+        esac
+    elif [ -n "$AGENT_DIGEST" ]; then
+        printf '   the agent is %s, the one this enrollment was made for. No release signature came with it: the build this controller runs carries none (one made outside the release build, from a branch), so nothing says an AerieOS release built this agent.\n' "${got:7:12}"
+        [ -z "$RELEASE_KEY" ] || printf '   The node pins the release key all the same: it takes a later agent update only when a release signed it, or when its own console allows unsigned ones (the agent, with: unsigned on).\n'
+    else
+        printf '   the agent is %s, by the digest the controller sent with it and nothing else: this script or command carries no digest and no signature for it (an older controller made it, or it was saved from one). A new one from the Nodes page carries both.\n' "${got:7:12}"
+    fi
+    [ -n "$RELEASE_KEY" ] || printf '   No release key came with this enrollment, so the node pins none it did not hold already, and takes agent updates on the word of its controller.\n'
+    return 0
+}
 
 # ---- taking it away --------------------------------------------------------
 if [ "$REMOVE" = 1 ]; then
@@ -150,13 +380,11 @@ hdr="$(mktemp)"
 curl -fsSL -D "$hdr" -H "Authorization: Bearer ${TOKEN}" \
      "${CONTROLLER%/}/api/v1/agent/download" -o "${AGENT}.new" \
     || { warn "could not download the agent from ${CONTROLLER}. Is that the dashboard's address, and is the token unused?"; rm -f "$hdr" "${AGENT}.new"; exit 1; }
-want="$(tr -d '\r' < "$hdr" | awk 'tolower($1)=="x-agent-digest:"{print $2}')"
-got="sha256:$(shasum -a 256 "${AGENT}.new" | cut -d' ' -f1)"
+# Held to what the command carries before any of it runs (agent_proved); an
+# answer with no digest was taken as it came here, and is refused.
+want="$(agent_sent "$hdr" x-agent-digest)"
 rm -f "$hdr"
-if [ -n "$want" ] && [ "$want" != "$got" ]; then
-    warn "the agent that arrived does not match the digest the controller sent (${got} vs ${want})"
-    rm -f "${AGENT}.new"; exit 1
-fi
+agent_proved "${AGENT}.new" "$want" || { rm -f "${AGENT}.new"; exit 1; }
 chmod 755 "${AGENT}.new"; mv -f "${AGENT}.new" "$AGENT"
 
 # Enrolled as this account, with the stores under the footprint (the

@@ -1372,7 +1372,8 @@ def enroll_script(principal, req):
     return m | {"script": enrollscript.build(ans, name=name, user=user, token=m["token"],
                                               expires=m["expires"], provisioner=prov.read_bytes(),
                                               family=fam.read_bytes() if fam and fam.is_file() else b"",
-                                              again=enrolled, machine=machine, stores=stores),
+                                              again=enrolled, machine=machine, stores=stores,
+                                              agent=agent_carried()),
                 "filename": enrollscript.filename(name, m["id"]), "reach": ans["reach"],
                 "home": enrollscript.home_rules(ans, port),
                 "tunnel_addr": ans.get("tunnel_addr", "")}
@@ -3781,6 +3782,16 @@ def agent_release_keys():
     vouched for: this side checks nothing here either."""
     keys = enrollscript.release_keys()
     return {"release_keys": keys} if keys else {}
+
+
+def agent_carried():
+    """What an enrollment made now carries of the agent (enrollscript.pins):
+    the digest this controller ships, and the release's signature over it
+    where its build made one. The provisioner holds the agent it fetches to
+    them, so the first agent is no more this controller's word at the
+    moment it is fetched than a later update is."""
+    digest = agent_file()["digest"]
+    return {"digest": digest, "sig": agent_sig(digest) if digest else ""}
 
 
 def agent_sig(digest=None):
