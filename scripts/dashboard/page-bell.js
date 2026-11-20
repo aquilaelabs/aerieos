@@ -139,6 +139,17 @@ function toastGone(el){
 const jobToasts = new Map();     // job id -> {el, label}
 // onEnd(job), when given, is called once the job is over: what pressed it
 // frees itself then, rather than waiting out a window of its own (B862).
+// Why a job failed, as a toast and the record's line say it: the reason's
+// first sentence, without a leading "refused: " or "ERROR: ", and no longer
+// than a line or two (the operator, 20 Nov: a node's refusal of an update
+// came up as a paragraph, with which keys it takes and what its console
+// can do). The whole of it is the job's own, on its row and in its log.
+function jobWhy(error){
+  let s = String(error || "").replace(/\s+/g, " ").trim().replace(/^(refused|error):\s*/i, "");
+  const end = s.search(/[.;](\s|$)/);
+  if (end > 0) s = s.slice(0, end);
+  return s.length > 140 ? s.slice(0, 139).trimEnd() + "…" : s;
+}
 function notifyJob(id, label, onEnd){
   if (!id) return notify(label);
   const el = toastAdd(`${label}: queued`, "info");
@@ -155,7 +166,7 @@ async function jobToastsCheck(){
     // the read is good when it names the job.
     if (!j || j.id !== id){ jobToasts.delete(id); continue; }
     const over = ["succeeded", "failed", "canceled"].includes(j.state);
-    const line = over ? `${t.label}: ${j.state}${j.state === "failed" && j.error ? " (" + j.error + ")" : ""}`
+    const line = over ? `${t.label}: ${j.state}${j.state === "failed" && jobWhy(j.error) ? " (" + jobWhy(j.error) + ")" : ""}`
       : `${t.label}: ${j.state === "running" && j.step ? j.step : j.state}`;
     if (t.el?.isConnected) t.el.querySelector(".tmsg").textContent = line;
     if (!over) continue;

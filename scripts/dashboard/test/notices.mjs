@@ -193,6 +193,16 @@ await section("a job's toast follows the job, and its end is kept", async () => 
   const rec = await until(async () => ((await api('/api/notices')).notices || []).find(n => n.kind === 'job' && n.job === q.job));
   ok(rec && rec.level === 'bad', '...and the end is kept on the record as a job\'s, with the job to open');
   await page.evaluate(() => document.querySelectorAll('#toast .tst').forEach(t => t.remove()));
+  // What it says of a failure is the reason's first sentence, never the
+  // paragraph a node sends with it (which keys it takes, what its console
+  // can do): that is the job's own, on its row and in its log.
+  const why = await page.evaluate(() => [
+    jobWhy("refused: its signature is not the pinned release key's. This node takes only updates signed by the release key it pinned (2eb9add8c0659634…) or its spare (5999f8948f031093…); a controller built from a branch ships an unsigned agent. To allow those on this machine, at its own console: sudo aerieos-agent unsigned on"),
+    jobWhy('exit 4'), jobWhy(''), jobWhy('ERROR: could not download https://example.com/a.tgz; the store is as it was'),
+    jobWhy('x'.repeat(300)).length, jobWhy('jdk 21.0.13 would not start: see its log')]);
+  ok(why[0] === "its signature is not the pinned release key's" && why[1] === 'exit 4' && why[2] === ''
+     && why[3] === 'could not download https://example.com/a.tgz' && why[4] === 140 && why[5] === 'jdk 21.0.13 would not start: see its log',
+     `...in one sentence: a node's refusal without its keys and its console's verbs, a short reason as it is (${JSON.stringify(why)})`);
 });
 
 // ---- a session working with no word from its hooks is said -----------------
