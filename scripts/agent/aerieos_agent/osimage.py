@@ -3,8 +3,9 @@ itself for the census, and the update that writes the next image into the
 slot not in use. The disk is image/partitions.sh's: two root slots found by
 fixed partition UUIDs, each slot's kernel and initrd under /aerieos/SLOT
 on the ESP, and GRUB booting the slot its environment names (the slot
-tool). An update fetches the release's ISO, checks it against the sha256
-the release carries and against its build attestation where gh is here,
+tool). An update reads the release's list of its files, signed by a key
+this install holds, fetches the release's ISO, checks it against the sha256
+the release carries, against its build attestation and against that list,
 takes the slot, its kernel, its initrd and its release stamp out of the
 ISO's live/ folder, writes the other slot, puts its kernel beside it, names
 it for the next boot, and asks for a restart; nothing running changes until
@@ -53,7 +54,18 @@ TRUSTED_ROOT = "/usr/lib/aerieos-os/trusted-root.jsonl"
 # config/release-signers, so a key is trusted because this install already
 # held it, never because the release names it.
 SIGNERS = "/opt/aerieos/config/release-signers"
-SIG_NS = "aerieos-release"
+# The namespace a signer is named for says the channel, and a release's tag
+# says which it may be signed in: a pre-release (vX.Y.Z-dev.N, -rc.N, any
+# name) in either, a stable release (vX.Y.Z) in aerieos-release alone, so
+# the key the release build holds, which signs dev builds as they publish
+# themselves, can never sign a stable release. The same rule, in its own
+# words, in the installer (nodes/install-controller.sh), the stick maker
+# (tools/aerieos-stick.py) and the Library's downloads (apps.py);
+# test_release_signing.py holds the four to one table of cases.
+SIG_RELEASE, SIG_DEV = "aerieos-release", "aerieos-dev"
+STABLE_TAG = re.compile(r"v\d+\.\d+\.\d+")
+PRE_TAG = re.compile(r"v\d+\.\d+\.\d+-[a-z][a-z0-9]*\.\d+")
+SIGNED_BY = {SIG_RELEASE: "AerieOS's release key", SIG_DEV: "the key AerieOS's dev builds are signed with"}
 
 
 def signers():
@@ -64,18 +76,47 @@ def signers():
         return []
 
 
-def sums_verify(sums, sig, keys, run=subprocess.run):
-    """{file: sha256} of a SHA256SUMS whose signature verifies against
-    `keys`, or None."""
+def tag_namespaces(tag):
+    """The namespaces the list of release `tag` may be signed in, by the
+    tag's shape; none for what is no release's tag."""
+    if STABLE_TAG.fullmatch(tag):
+        return (SIG_RELEASE,)
+    if PRE_TAG.fullmatch(tag):
+        return (SIG_RELEASE, SIG_DEV)
+    return ()
+
+
+def unsignable(tag, keys):
+    """Why no signature would have release `tag` taken by an install that
+    names `keys`, or "": asked before anything is fetched."""
+    may = tag_namespaces(tag)
+    if not may:
+        return f"{tag} is not a release's tag (vX.Y.Z, or vX.Y.Z-dev.N for a pre-release), so who may sign it cannot be told"
+    if SIG_DEV not in may and not any(k.split(None, 1)[0] == SIG_RELEASE for k in keys):
+        return (f"{tag} is a stable release and no stable signer is named yet: this install names only the key dev builds "
+                "are signed with, and a stable release is signed by its own key's holder")
+    return ""
+
+
+def sig_namespace(sums, sig, keys, run=subprocess.run):
+    """The namespace in which the signature `sig` over the file `sums`
+    verifies against `keys`, or "": each signer is asked for in the one
+    namespace it is named for."""
     with tempfile.TemporaryDirectory() as d:
         allowed = os.path.join(d, "signers")
         with open(allowed, "w", encoding="utf-8") as f:
             f.write("\n".join(keys) + "\n")
-        with open(sums, "rb") as fh:
-            r = run(["ssh-keygen", "-Y", "verify", "-f", allowed, "-I", SIG_NS, "-n", SIG_NS, "-s", sig],
-                    stdin=fh, capture_output=True, check=False)
-    if r.returncode != 0:
-        return None
+        for ns in (SIG_RELEASE, SIG_DEV):
+            with open(sums, "rb") as fh:
+                r = run(["ssh-keygen", "-Y", "verify", "-f", allowed, "-I", ns, "-n", ns, "-s", sig],
+                        stdin=fh, capture_output=True, check=False)
+            if r.returncode == 0:
+                return ns
+    return ""
+
+
+def sums_read(sums):
+    """{file: sha256} of a SHA256SUMS."""
     out = {}
     with open(sums, encoding="utf-8", errors="replace") as f:
         for line in f:
@@ -83,6 +124,38 @@ def sums_verify(sums, sig, keys, run=subprocess.run):
             if len(parts) == 2 and re.fullmatch(r"[0-9a-f]{64}", parts[0].lower()):
                 out[parts[1].lstrip("*")] = parts[0].lower()
     return out
+
+
+def signed_list(tag, sums, sig, keys, run=subprocess.run):
+    """({file: sha256}, who signed it, "") for release `tag`'s SHA256SUMS
+    when its signature is one the tag may carry, by a key in `keys`; else
+    (None, "", why not)."""
+    why = unsignable(tag, keys)
+    if why:
+        return None, "", why
+    try:
+        ns = sig_namespace(sums, sig, keys, run)
+    except OSError as e:
+        return None, "", f"ssh-keygen is not here to check {tag}'s signature with ({e})"
+    if not ns:
+        return None, "", f"{tag}'s list of files is signed by no key this install names"
+    if ns not in tag_namespaces(tag):
+        return None, "", (f"{tag} is a stable release and its list is signed by the key dev builds are signed with: "
+                          "a stable release takes its own key's signature alone")
+    return sums_read(sums), SIGNED_BY[ns], ""
+
+
+def unlisted(listed, name, digest, tag):
+    """Why the file `name` with sha256 `digest` is not release `tag`'s by its
+    signed list, or "": the list is what the key signed, where the sha256
+    beside a file is the release's word for itself."""
+    if name not in listed:
+        return f"{name} is not in the list of files {tag} signed"
+    if listed[name] != digest:
+        return f"{name} is not the file {tag} signed: its bytes are not the ones the signed list names"
+    return ""
+
+
 # Each piece of a slot, and where image/build.sh puts it on the ISO.
 PIECES = {"root.squashfs": "live/filesystem.squashfs", "vmlinuz": "live/vmlinuz",
           "initrd": "live/initrd", "release": "live/release"}
@@ -698,6 +771,41 @@ class OsImageMixin:
         say(f"os update: {name}, into slot {other} (slot {cur} runs now)\n")
         fn = f"{name}.iso"
         iso = os.path.join(work, fn)
+        # The release's list of its files, signed by a key this install
+        # already holds (R199), before the image is fetched: who changes the
+        # repository or a release can build and attest an image and put a
+        # sha256 beside it, not sign the list. The tag says who may have
+        # signed (tag_namespaces); a list that is unsigned, or signed by
+        # somebody the tag may not have, is refused, and only an install
+        # that names no signer at all goes on without, and says so.
+        rtag = (tag if tag.startswith("v") else "v" + tag) if tag else "v" + ver
+        at = f"{env_or('BB_OS_RELEASE_URL', RELEASE_URL)}/{rtag}"
+        keys, listed, who = signers(), None, ""
+        if keys:
+            if why := unsignable(rtag, keys):
+                say(f"refused: {why}: nothing written\n")
+                return "failed", 69
+            sums, sig = os.path.join(work, "SHA256SUMS"), os.path.join(work, "SHA256SUMS.sig")
+            try:
+                if src:
+                    shutil.copyfile(os.path.join(src, "SHA256SUMS"), sums)
+                    shutil.copyfile(os.path.join(src, "SHA256SUMS.sig"), sig)
+                else:
+                    _fetch(f"{at}/SHA256SUMS", sums, say)
+                    _fetch(f"{at}/SHA256SUMS.sig", sig, say)
+            except OSError as e:
+                say(f"refused: {rtag} carries no signed list of its files (SHA256SUMS and SHA256SUMS.sig: {e}): it was made "
+                    "before releases were signed, or its key's holder has not signed it yet; nothing written\n")
+                return "failed", 69
+            listed, who, why = signed_list(rtag, sums, sig, keys)
+            if listed is None:
+                say(f"refused: {why}: nothing written\n")
+                return "failed", 69
+            if fn not in listed:
+                say(f"refused: {unlisted(listed, fn, '', rtag)}: nothing written\n")
+                return "failed", 69
+        else:
+            say("this install holds no release key yet, so the release's signature is not checked\n")
         try:
             if src:
                 if why := _room(work, os.path.getsize(os.path.join(src, fn))):
@@ -705,10 +813,9 @@ class OsImageMixin:
                 shutil.copyfile(os.path.join(src, fn), iso)
                 shutil.copyfile(os.path.join(src, fn + ".sha256"), iso + ".sha256")
             else:
-                base = env_or("BB_OS_RELEASE_URL", RELEASE_URL)
                 job.step(f"fetching {fn}")
-                _fetch(f"{base}/{tag if tag.startswith('v') else 'v' + tag}/{fn}", iso, say)
-                _fetch(f"{base}/{tag if tag.startswith('v') else 'v' + tag}/{fn}.sha256", iso + ".sha256", say)
+                _fetch(f"{at}/{fn}", iso, say)
+                _fetch(f"{at}/{fn}.sha256", iso + ".sha256", say)
         except OSError as e:
             say(f"{fn}: not got: {e}\n")
             return "failed", 66
@@ -727,32 +834,13 @@ class OsImageMixin:
         # step 1).
         if not self._attested(job, iso, have, name, src, work):
             return "failed", 68
-        # ...and signed by a release key this install already holds (R199):
-        # who changes the repository can build and attest, not sign.
-        keys = signers()
-        if keys:
-            sums, sig = os.path.join(work, "SHA256SUMS"), os.path.join(work, "SHA256SUMS.sig")
-            try:
-                if src:
-                    shutil.copyfile(os.path.join(src, "SHA256SUMS"), sums)
-                    shutil.copyfile(os.path.join(src, "SHA256SUMS.sig"), sig)
-                else:
-                    at = f"{env_or('BB_OS_RELEASE_URL', RELEASE_URL)}/{tag if tag.startswith('v') else 'v' + tag}"
-                    _fetch(f"{at}/SHA256SUMS", sums, say)
-                    _fetch(f"{at}/SHA256SUMS.sig", sig, say)
-            except OSError as e:
-                say(f"the release carries no signature yet ({e}): it is taken once its key's holder has signed it; nothing written\n")
+        # ...and the image's own bytes are the ones the signed list names,
+        # whatever the sha256 beside it says.
+        if listed is not None:
+            if why := unlisted(listed, fn, have, rtag):
+                say(f"refused: {why}: nothing written\n")
                 return "failed", 69
-            listed = sums_verify(sums, sig, keys)
-            if listed is None:
-                say("the release's signature does not verify against this install's release key: nothing written\n")
-                return "failed", 69
-            if listed.get(fn) != have:
-                say(f"{fn} is not the image the release signed: nothing written\n")
-                return "failed", 69
-            say(f"{fn} is signed by AerieOS's release key\n")
-        else:
-            say("this install holds no release key yet, so the release's signature is not checked\n")
+            say(f"{fn} is the image {rtag}'s list names, signed by {who}\n")
         job.step("reading the image")
         files = self._iso_pieces(job, iso, work)
         if not files:

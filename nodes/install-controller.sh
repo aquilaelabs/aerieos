@@ -59,6 +59,17 @@ SUDOERS="$P/etc/sudoers.d/aerieos-controller"
 BB_BIN="$P/usr/local/bin/aerie"
 SERVICE=aerieos-controller
 REPO=aquilaelabs/aerieos
+# Who may sign a release (R199): the copy in the tree this script is in,
+# the release that runs here, so a key is trusted because this install
+# already held it and never because a download names it. Another file only
+# under the unit tests' prefix.
+SIGNERS="$TREE/config/release-signers"
+[ -z "$P" ] || SIGNERS="${BB_RELEASE_SIGNERS:-$SIGNERS}"
+# Who may have built a bundle an update takes: the release workflow,
+# build-image.yml, run on a version's tag, as the OS updater pins it
+# (osimage.signer_identity). The repository alone passed any workflow on any
+# branch that attested one.
+SIGNER_IDENTITY="^https://github\\.com/${REPO}/\\.github/workflows/build-image\\.yml@refs/tags/v"
 # How many releases are kept beside the one in use: the one before is what
 # an update that does not come up goes back to by itself.
 KEEP_RELEASES=3
@@ -723,17 +734,78 @@ cmd_firstboot() {
 }
 
 # ---- updates: the release fetched and put in place as an image pull is -----
+# release_signed TAG FILE NAME DIR: FILE, which the release TAG carries as
+# NAME, is the file the release's signed list names (R199): SHA256SUMS and
+# its signature are fetched into DIR, the signature is verified against
+# this install's signers, and FILE's own sha256 is the one the list gives
+# NAME. The tag says who may have signed: the namespace a signer is named
+# for is the channel, a pre-release (vX.Y.Z-dev.N, -rc.N, any name) takes a
+# list signed in either, and a stable release (vX.Y.Z) takes aerieos-release
+# alone, so the key the release build holds, which signs dev builds as they
+# publish themselves, can never sign a stable release. A list that is
+# unsigned, signed by nobody this install names or by somebody the tag may
+# not have, or one that does not name the file, stops the update with the
+# reason; only an install that names no signer at all goes on without, and
+# says so. The rule the OS updater (osimage.py), the stick maker
+# (tools/aerieos-stick.py) and the Library's downloads (apps.py) follow;
+# test_release_signing.py holds the four to one table of cases.
+release_signed() {
+    local tag="$1" file="$2" name="$3" d="$4" keys may ns="" want have rel who
+    keys="$(grep -v '^[[:space:]]*#' "$SIGNERS" 2>/dev/null | grep -c . || true)"
+    if [ "${keys:-0}" -eq 0 ]; then
+        printf '   this install holds no release key yet, so the release'"'"'s signature is not checked\n' >&2
+        return 0
+    fi
+    if [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        may="aerieos-release"
+    elif [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-[a-z][a-z0-9]*\.[0-9]+$ ]]; then
+        may="aerieos-release aerieos-dev"
+    else
+        die "${tag} is not a release's tag (vX.Y.Z, or vX.Y.Z-dev.N for a pre-release), so who may sign it cannot be told: not taken"
+    fi
+    if [ "$may" = aerieos-release ] && ! grep -v '^[[:space:]]*#' "$SIGNERS" | grep -q '^[[:space:]]*aerieos-release[[:space:]]'; then
+        die "${tag} is a stable release and no stable signer is named yet: this install names only the key dev builds are signed with, and a stable release is signed by its own key's holder; not taken"
+    fi
+    command -v ssh-keygen >/dev/null 2>&1 || die "ssh-keygen is not here to check the release's signature: not taken"
+    rel="https://github.com/${REPO}/releases/download/${tag}"
+    if ! curl -fsSL -o "$d/SHA256SUMS" "$rel/SHA256SUMS" 2>/dev/null || ! curl -fsSL -o "$d/SHA256SUMS.sig" "$rel/SHA256SUMS.sig" 2>/dev/null; then
+        die "${tag} carries no signed list of its files (SHA256SUMS and SHA256SUMS.sig): it was made before releases were signed, or its key's holder has not signed it yet; not taken"
+    fi
+    # Each signer is asked for in the one namespace it is named for.
+    for want in aerieos-release aerieos-dev; do
+        if ssh-keygen -Y verify -f "$SIGNERS" -I "$want" -n "$want" -s "$d/SHA256SUMS.sig" < "$d/SHA256SUMS" >/dev/null 2>&1; then
+            ns="$want"; break
+        fi
+    done
+    [ -n "$ns" ] || die "${tag}'s list of files is signed by no key this install names: not taken"
+    case " $may " in
+        *" $ns "*) ;;
+        *) die "${tag} is a stable release and its list is signed by the key dev builds are signed with: a stable release takes its own key's signature alone; not taken" ;;
+    esac
+    # The file's own bytes against the list, whatever the sha256 beside it says.
+    want="$(awk -v n="$name" 'NF == 2 { f = $2; sub(/^\*/, "", f); if (f == n) { print tolower($1); exit } }' "$d/SHA256SUMS")"
+    [ -n "$want" ] || die "${name} is not in the list of files ${tag} signed: not taken"
+    have="$(sha256sum "$file" | awk '{print $1}')"
+    [ "$want" = "$have" ] || die "${name} is not the file ${tag} signed: its bytes are not the ones the signed list names; not taken"
+    who="AerieOS's release key"
+    [ "$ns" = aerieos-release ] || who="the key AerieOS's dev builds are signed with"
+    printf '   %s is the file %s'"'"'s list names, signed by %s\n' "$name" "$tag" "$who" >&2
+}
+
 # fetch_tree [TAG]: the release's tree, unpacked in a folder of its own,
 # printed. The newest release when no tag is named, read from the releases
 # page's redirect the way the Dockerfile reads its tools' (no API budget).
 # fetch_tree [TAG]: the release's controller bundle (R90 step 5), which the
 # release workflow publishes as aerieos-controller-X.Y.Z.tar.gz with its
 # sha256 beside it and a build attestation from GitHub: the archive checked
-# against the sha256, and against the attestation where gh is here to ask;
-# a release from before the bundle falls back to the tag's source archive,
-# said as such. The tree's directory is printed.
+# against the sha256, against the attestation where gh is here to ask, and
+# against the release's signed list of its files (release_signed). A release
+# that carries no bundle is not taken: the oldest release an install can come
+# from carries one (stateversion.SUPPORTED_FROM, and a release moves forward
+# only), and a tag's source archive is signed by nobody. The tree's
+# directory is printed.
 fetch_tree() {
-    local tag="${1:-}" d url base ver sum
+    local tag="${1:-}" d base ver sum
     if [ -z "$tag" ]; then
         tag="$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/${REPO}/releases/latest" 2>/dev/null || true)"
         tag="${tag##*/}"
@@ -777,7 +849,8 @@ for r in json.load(sys.stdin):
                         "$d/att.json" "$d/att.jsonl" 2>/dev/null; then
                 att=(--bundle "$d/att.jsonl")
             fi
-            if gh attestation verify "$d/release.tar.gz" "${att[@]}" --repo "$REPO" >/dev/null 2>&1; then
+            if gh attestation verify "$d/release.tar.gz" "${att[@]}" --repo "$REPO" \
+                    --cert-identity-regex "$SIGNER_IDENTITY" >/dev/null 2>&1; then
                 printf '   build attestation: verified by gh\n' >&2
             else
                 die "gh attestation verify refused the bundle: not taken (a build not made by the release workflow, or a gh that wants a sign-in: gh auth login)"
@@ -785,35 +858,15 @@ for r in json.load(sys.stdin):
         else
             printf '   build attestation: gh is not here to check it; the sha256 is what held\n' >&2
         fi
-        # ...and signed by a release key this install already holds (R199):
-        # this tree's config/release-signers, never the download's, so who
-        # changes the repository can build and attest a bundle, not sign it.
-        local signers keys
-        signers="$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)/config/release-signers"
-        keys="$(grep -v '^[[:space:]]*#' "$signers" 2>/dev/null | grep -c . || true)"
-        if [ "${keys:-0}" -gt 0 ]; then
-            command -v ssh-keygen >/dev/null 2>&1 || die "ssh-keygen is not here to check the release's signature: not taken"
-            local rel="https://github.com/${REPO}/releases/download/${tag}"
-            if ! curl -fsSL -o "$d/SHA256SUMS" "$rel/SHA256SUMS" || ! curl -fsSL -o "$d/SHA256SUMS.sig" "$rel/SHA256SUMS.sig"; then
-                die "${tag} carries no signature yet: it is taken once its key's holder has signed it"
-            fi
-            ssh-keygen -Y verify -f "$signers" -I aerieos-release -n aerieos-release -s "$d/SHA256SUMS.sig" < "$d/SHA256SUMS" >/dev/null 2>&1 \
-                || die "${tag}'s signature does not verify against this install's release key: not taken"
-            grep -q "^${sum}  \*\?aerieos-controller-${ver}\.tar\.gz\$" "$d/SHA256SUMS" \
-                || die "the bundle is not the one ${tag} signed: not taken"
-            printf '   signed by AerieOS'"'"'s release key\n' >&2
-        else
-            printf '   this install holds no release key yet, so the release'"'"'s signature is not checked\n' >&2
-        fi
-    elif [ "$http" = 404 ] && [ "$(printf '%s\n%s\n' "${ver%%-*}" 0.9.0 | sort -V | head -1)" != 0.9.0 ]; then
-        # Only a release from before the bundle, said not to have one, falls
-        # back to its source archive: any other failure to fetch the bundle
-        # (a server error, an asset taken off) is refused, never taken
-        # unverified.
-        url="https://github.com/${REPO}/archive/refs/tags/${tag}.tar.gz"
-        printf '   %s publishes no controller bundle (a release from before 0.9.0); its source archive is taken instead, unverified\n' "$tag" >&2
-        curl -fsSL -o "$d/release.tar.gz" "$url" || die "could not download ${url}"
+        # ...and the file the release's signed list names, by a key this
+        # install already holds (R199): who changes the repository can
+        # build and attest a bundle and put a sha256 beside it, not sign
+        # the list.
+        release_signed "$tag" "$d/release.tar.gz" "aerieos-controller-${ver}.tar.gz" "$d"
     else
+        # A bundle that cannot be fetched (a release that carries none, a
+        # server error, an asset taken off) is refused, never replaced by
+        # something unverified.
         die "the controller bundle could not be fetched (${base}: HTTP ${http:-no answer}): not taken"
     fi
     tar -xzf "$d/release.tar.gz" -C "$d"

@@ -8,10 +8,24 @@ apps_* switches, settings.py), or by the seed file a generator writes beside
 a compose file, read once on the first boot and then put aside. At boot and
 once a day the controller fetches each offered app from the release that
 matches its own version (the newest release when none does, and says so),
-checks it against its sha256 file, keeps it under /config/apps, and serves
-it at /apps/NAME/FILE to anybody signed in and to a device's app, which is
-how the companion keeps itself current (R270 step 9). Nothing here runs a
-file it fetched.
+holds it to the release's signed list of its files (R199) and to its sha256
+file, keeps it under /config/apps, and serves it at /apps/NAME/FILE to
+anybody signed in and to a device's app, which is how the companion keeps
+itself current (R270 step 9). Nothing here runs a file it fetched.
+
+The signed list is what makes a file AerieOS's: the sha256 beside a file is
+the release's word for itself, and whoever can replace a file on a release
+can replace that too. The release's SHA256SUMS is fetched once a look, its
+signature verified with ssh-keygen against this install's own
+config/release-signers, and each file's bytes held to the digest the list
+gives its name. The tag says who may have signed: the namespace a signer is
+named for is the channel, a pre-release takes a list signed in either, and a
+stable release takes aerieos-release alone, so the key the release build
+holds can never sign one. A release whose list is unsigned, signed by
+nobody this install names or by somebody its tag may not have, is refused
+and said; only an install that names no signer at all goes on without, and
+says so. The rule the OS updater (osimage.py), the installer and the stick
+maker follow; test_release_signing.py holds the four to one table of cases.
 
     configure(state=, version=, setting=, write_json=, audit=)
     view()                     the Settings section's and the Library's reading
@@ -25,11 +39,15 @@ import json
 import os
 import re
 import shutil
+import subprocess
+import tempfile
 import threading
 import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
+
+import releasecheck
 
 # The releases are AerieOS's own on GitHub; a test points this at a file.
 RELEASES_URL = (os.environ.get("BB_APPS_RELEASES_URL")
@@ -56,6 +74,14 @@ APPS = {
                   "files": [("aerieos-companion-", ".exe"), ("aerieos-companion-", ".pyz")]},
 }
 SAFE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,120}$")
+# Who may sign a release: this build's own copy of config/release-signers,
+# so a key is trusted because the install held it, never because a release
+# names it. A test names another file.
+SIGNERS = os.environ.get("BB_RELEASE_SIGNERS") or os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "config", "release-signers")
+SIG_RELEASE, SIG_DEV = "aerieos-release", "aerieos-dev"
+SIGNED_BY = {SIG_RELEASE: "AerieOS's release key", SIG_DEV: "the key AerieOS's dev builds are signed with"}
+UNCHECKED = "this install holds no release key yet, so the release's signature is not checked"
 
 # Each set by configure(); the defaults are the container's own paths.
 DIR = Path("/config") / "apps"
@@ -130,6 +156,8 @@ def view():
                               for f in h.get("files") or []]})
     return {"apps": out, "checked": idx.get("checked", 0), "problem": idx.get("problem", ""),
             "release": idx.get("release", ""), "matched": bool(idx.get("matched")),
+            # Who signed the release's list of files, or that nothing was checked.
+            "signature": idx.get("signature", ""),
             "checking": _state["checking"], "version": _version()}
 
 
@@ -174,6 +202,67 @@ def _asset(rel, prefix, suffix):
     return None
 
 
+def signers():
+    """The signer lines this install holds; none when the file is not there."""
+    try:
+        with open(SIGNERS, encoding="utf-8") as f:
+            return [ln.strip() for ln in f if ln.strip() and not ln.lstrip().startswith("#")]
+    except OSError:
+        return []
+
+
+def _signed_list(rel):
+    """({file: sha256}, what to say of it, "") for release `rel`'s SHA256SUMS
+    when its signature is one the tag may carry, by a key this install
+    names; (None, the sentence, "") when this install names no signer, so
+    nothing is checked; (None, "", why) when the release is refused."""
+    keys = signers()
+    tag = str(rel.get("tag_name") or "")
+    if not keys:
+        return None, UNCHECKED, ""
+    kind = releasecheck.tag_kind(tag)
+    if not kind:
+        return None, "", f"{tag} is not a release's tag (vX.Y.Z, or vX.Y.Z-dev.N for a pre-release), so who may sign it cannot be told"
+    if kind == "stable" and not any(k.split(None, 1)[0] == SIG_RELEASE for k in keys):
+        return None, "", (f"{tag} is a stable release and no stable signer is named yet: this install names only the key "
+                          "dev builds are signed with, and a stable release is signed by its own key's holder")
+    assets = {str(a.get("name")): a for a in rel.get("assets") or [] if isinstance(a, dict)}
+    try:
+        sums = _get(_where(assets["SHA256SUMS"]), 1 << 20)
+        sig = _get(_where(assets["SHA256SUMS.sig"]), 1 << 16)
+    except (OSError, ValueError, KeyError) as e:
+        return None, "", (f"{tag} carries no signed list of its files (SHA256SUMS and SHA256SUMS.sig: {e}): it was made "
+                          "before releases were signed, or its key's holder has not signed it yet")
+    ns = ""
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            allowed, sigf = os.path.join(d, "signers"), os.path.join(d, "SHA256SUMS.sig")
+            with open(allowed, "w", encoding="utf-8") as f:
+                f.write("\n".join(keys) + "\n")
+            with open(sigf, "wb") as f:
+                f.write(sig)
+            # Each signer is asked for in the one namespace it is named for.
+            for want in (SIG_RELEASE, SIG_DEV):
+                r = subprocess.run(["ssh-keygen", "-Y", "verify", "-f", allowed, "-I", want, "-n", want, "-s", sigf],
+                                   input=sums, capture_output=True, check=False, timeout=TIMEOUT)
+                if r.returncode == 0:
+                    ns = want
+                    break
+    except (OSError, subprocess.SubprocessError) as e:
+        return None, "", f"ssh-keygen is not here to check {tag}'s signature with ({e})"
+    if not ns:
+        return None, "", f"{tag}'s list of files is signed by no key this install names"
+    if kind == "stable" and ns != SIG_RELEASE:
+        return None, "", (f"{tag} is a stable release and its list is signed by the key dev builds are signed with: "
+                          "a stable release takes its own key's signature alone")
+    listed = {}
+    for line in sums.decode("utf-8", "replace").splitlines():
+        parts = line.split()
+        if len(parts) == 2 and re.fullmatch(r"[0-9a-f]{64}", parts[0].lower()):
+            listed[parts[1].lstrip("*")] = parts[0].lower()
+    return listed, f"signed by {SIGNED_BY[ns]}", ""
+
+
 def check():
     """Fetch each offered app from the matching release, check it, keep it,
     and drop what is no longer offered. Writes the index; returns view()."""
@@ -190,6 +279,16 @@ def check():
         if "404" in str(e):
             err += " (the apps come from AerieOS's public releases, and its repository is not public yet)"
     DIR.mkdir(parents=True, exist_ok=True)
+    # The release's signed list of its files, once a look: a release it may
+    # not be taken on is said, nothing is fetched from it, and what is held
+    # stays as it is.
+    listed, signature, refused = None, "", ""
+    if rel:
+        listed, signature, refused = _signed_list(rel)
+        if refused:
+            err = f"{refused}: no app is taken from it"
+        elif listed is None:
+            print(f"[dashboard] apps: {signature}", flush=True)
     # An app the release carries no file of at all is said on its own row,
     # not as a look that did not work: a release may go out without one.
     absent = {}
@@ -198,8 +297,10 @@ def check():
             shutil.rmtree(DIR / name, ignore_errors=True)
             held.pop(name, None)
             continue
-        if not rel:
+        if not rel or refused:
             continue
+        if listed is not None:
+            _unhold(name, held, rel, listed)
         files, missing = [], []
         for prefix, suffix in a["files"]:
             asset = _asset(rel, prefix, suffix)
@@ -211,7 +312,7 @@ def check():
             if not sha_asset:
                 missing.append(f"{asset['name']}.sha256")
                 continue
-            got = _keep(name, asset, sha_asset, held.get(name) or {})
+            got = _keep(name, asset, sha_asset, held.get(name) or {}, listed, str(rel.get("tag_name") or ""))
             if isinstance(got, str):
                 missing.append(got)
             else:
@@ -227,30 +328,58 @@ def check():
             absent[name] = str(rel.get("tag_name") or "")
         elif missing and not err:
             err = f"{a['title']}: {', '.join(missing)} not in {rel.get('tag_name')}"
-    idx = {"apps": held, "checked": int(time.time()), "problem": err, "absent": absent,
+    idx = {"apps": held, "checked": int(time.time()), "problem": err, "absent": absent, "signature": signature,
            "release": str((rel or {}).get("tag_name") or idx.get("release") or ""), "matched": matched}
     write_json(INDEX, idx)
     return view()
 
 
-def _keep(name, asset, sha_asset, was):
+def _unhold(name, held, rel, listed):
+    """A file held of app `name` under a name the release carries, whose
+    sha256 is not the one the release's signed list gives that name, is
+    held no longer: it was kept on the sha256 beside it, before the list
+    was asked. A file of another release is left for its successor."""
+    h = held.get(name) or {}
+    carried = {str(a.get("name")) for a in rel.get("assets") or [] if isinstance(a, dict)}
+    good = [f for f in h.get("files") or [] if f.get("file") not in carried or listed.get(f.get("file")) == f.get("sha256")]
+    if len(good) == len(h.get("files") or []):
+        return
+    for f in h.get("files") or []:
+        if f not in good and SAFE.match(str(f.get("file") or "")):
+            (DIR / name / f["file"]).unlink(missing_ok=True)
+    if good:
+        held[name] = {**h, "files": good}
+    else:
+        held.pop(name, None)
+
+
+def _keep(name, asset, sha_asset, was, listed=None, tag=""):
     """One file of an app: kept as it is when the sha256 has not moved,
-    else downloaded and checked. Its index entry, or a sentence."""
+    else downloaded and checked, against the release's signed list
+    (`listed`, None where nothing is signed for this install to check) and
+    the sha256 beside it. Its index entry, or a sentence."""
     try:
         want = _get(_where(sha_asset), 4096).decode("ascii", "replace").split()[0].lower()
     except (OSError, ValueError, IndexError, KeyError) as e:
         return f"{sha_asset.get('name')} ({e})"
     if not re.fullmatch(r"[0-9a-f]{64}", want):
         return f"{sha_asset.get('name')} is not a sha256"
+    if listed is not None and asset["name"] not in listed:
+        return f"{asset['name']} is not in the list of files {tag} signed"
     dest = DIR / name / asset["name"]
     for f in was.get("files") or []:
-        if f.get("file") == asset["name"] and f.get("sha256") == want and dest.is_file():
+        if (f.get("file") == asset["name"] and f.get("sha256") == want and dest.is_file()
+                and (listed is None or listed[asset["name"]] == want)):
             return f
     try:
         body = _get(_where(asset))
     except (OSError, ValueError, KeyError) as e:
         return f"{asset['name']} ({e})"
-    if hashlib.sha256(body).hexdigest() != want:
+    have = hashlib.sha256(body).hexdigest()
+    # The file's own bytes against the list, whatever the sha256 beside it says.
+    if listed is not None and listed[asset["name"]] != have:
+        return f"{asset['name']} is not the file {tag} signed: its bytes are not the ones the signed list names"
+    if have != want:
         return f"{asset['name']} does not match its sha256"
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.with_name(dest.name + ".part")

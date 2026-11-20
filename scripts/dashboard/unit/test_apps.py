@@ -8,6 +8,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import apps  # noqa: E402
@@ -25,6 +26,12 @@ class Apps(unittest.TestCase):
                        write_json=write)
         self.dev = True
         apps.unvetted_ok = lambda: self.dev
+        # An install that names no signer: these are the sha256's own rules,
+        # and the signed list's are test_release_signing.py's.
+        (self.tmp / "release-signers").write_text("# no key\n")
+        named = mock.patch.object(apps, "SIGNERS", str(self.tmp / "release-signers"))
+        named.start()
+        self.addCleanup(named.stop)
 
     def release(self, tag, files, bad=()):
         rel = self.tmp / "rel"

@@ -1695,6 +1695,14 @@ fresh
 # its own asynchronously was "wait_for: No record of process", which ended
 # the whole run now and then. Their pids come back through a file outside $S.
 PIDF="$(mktemp "${TMPDIR:-/tmp}/dashboard-test-pid.XXXXXX")"
+# Who may sign a release, for this world: nobody. The tree's own
+# config/release-signers names the release build's key, and with a signer
+# named a release the Library takes its apps from must carry a list signed
+# by it; the fake release devices.mjs writes carries the sha256 files alone,
+# so this world is the install that names no signer, which checks those and
+# says the signature was not checked. The signed list's rules are the unit
+# tier's (test_release_signing.py), with real keys.
+printf '# no signer: the fake releases of the browser suites are not signed\n' > "$S/release-signers"
 start_server() {
 # The agent this world's controller ships, a copy of its own made fresh for
 # each suite: agent.mjs appends to it to make its controller ship a newer
@@ -1723,6 +1731,7 @@ rm -rf "$S/agentsrc"; cp -r "$DASH/../agent" "$S/agentsrc"
     BB_CODEX_LATEST_URL="file://$S/codex-latest.json" BB_COPILOT_LATEST_URL="file://$S/copilot-latest.json" \
     BB_NGINX_TAGS_URL="file://$S/nginx-tags.json" BB_NGINX_CHECK_DELAY=3600 \
     BB_APPS_RELEASES_URL="file://$S/releases.json" BB_APPS_BOOT_DELAY=3600 \
+    BB_RELEASE_SIGNERS="$S/release-signers" \
     BB_TOOLPACKS_FILE_URLS=1 \
     BB_IMAGE_DIGESTS_FILE="$S/image-digests.json" BB_IMAGE_CHECK_DELAY=3600 \
     BUILDERBOT_IDLE_UNIT=1 \

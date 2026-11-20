@@ -86,9 +86,15 @@ class World:
         self.env = {"BB_OS_RELEASE": self.release, "BB_OS_SLOT": self.tool, "BB_OS_DEV_A": self.dev["a"], "BB_OS_DEV_B": self.dev["b"],
                     "BB_OS_ESP": self.esp, "BB_OS_WORK": self.work, "BB_OS_RELEASE_URL": "file://" + os.path.join(self.d, "rel"),
                     "BB_OS_STATE": self.state, "BB_OS_ATTEST_URL": "file://" + os.path.join(self.d, "attestations.json"),
-                    "BB_OS_TRUSTED_ROOT": os.path.join(self.d, "trusted-root.jsonl")}
+                    "BB_OS_TRUSTED_ROOT": os.path.join(self.d, "trusted-root.jsonl"),
+                    # An install that names no signer, whatever this machine's
+                    # own /opt/aerieos holds: the signed list's rules are
+                    # test_release_signing.py's.
+                    "BB_RELEASE_SIGNERS": os.path.join(self.d, "release-signers")}
         with open(os.path.join(self.d, "trusted-root.jsonl"), "w") as f:
             f.write("{}\n")
+        with open(os.path.join(self.d, "release-signers"), "w") as f:
+            f.write("# no key\n")
 
     def publish(self, version, bad=False, without=""):
         """The release's ISO under rel/vVERSION with its sha256: here a tar

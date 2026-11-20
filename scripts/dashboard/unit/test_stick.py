@@ -328,7 +328,9 @@ class Stick(unittest.TestCase):
             got.append(url)
             raise SystemExit("fetched")
         with mock.patch.object(self.m.urllib.request, "urlopen", side_effect=lambda *a, **k: io.BytesIO(json.dumps(rows).encode())), \
-                mock.patch.multiple(self.m, die=die, say=said.append, fetch=fetch):
+                mock.patch.multiple(self.m, die=die, say=said.append, fetch=fetch, signed_list=lambda tag, name: (None, "")):
+            # (which image is picked is the subject: the release's signed
+            # list, read before it, is test_release_signing.py's)
             with self.assertRaises(SystemExit) as e:
                 self.m.release_image("latest", "normal")
             self.assertIn("pick the dev channel", str(e.exception))
@@ -344,7 +346,7 @@ class Stick(unittest.TestCase):
 
         def fetch(url, dest, say_progress=True):
             raise self.m.urllib.error.HTTPError(url, 404, "Not Found", {}, None)
-        with mock.patch.multiple(self.m, die=die, say=lambda s: None, fetch=fetch):
+        with mock.patch.multiple(self.m, die=die, say=lambda s: None, fetch=fetch, signed_list=lambda tag, name: (None, "")):
             with self.assertRaises(SystemExit) as e:
                 self.m.release_image("v0.8.2")
         self.assertIn("the v0.8.2 release carries no stick image", str(e.exception))

@@ -28,6 +28,13 @@ VER = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
 # A pre-release of any name (R218): vX.Y.Z-dev.N, -rc.N, -beta.N, N the
 # commit's ordinal whatever the name, so one number orders them all.
 DEV = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)-[a-z][a-z0-9]*\.(\d+)(?:\+[0-9a-f]+)?$")
+# A release's tag by its shape, which is what says which release it is: a
+# stable one is vX.Y.Z, a pre-release has a name and the commit's ordinal
+# after it. The channel a release is offered on and who may have signed its
+# list of files (R199) both follow the tag, never the flag the git host
+# keeps beside it, which whoever can edit a release can flip.
+STABLE_TAG = re.compile(r"v\d+\.\d+\.\d+")
+PRE_TAG = re.compile(r"v\d+\.\d+\.\d+-[a-z][a-z0-9]*\.\d+")
 
 _lock = threading.Lock()
 _latest = {"version": "", "tag": "", "at": 0, "error": "", "checking": False, "url": "", "dev": {"version": "", "tag": "", "url": ""}}
@@ -99,6 +106,13 @@ def window_pass(now=None):
         _applied["version"] = ""
         return ""
     return v
+
+
+def tag_kind(tag):
+    """"stable" for a stable release's tag, "pre" for a pre-release's, ""
+    for anything else."""
+    t = str(tag or "")
+    return "stable" if STABLE_TAG.fullmatch(t) else "pre" if PRE_TAG.fullmatch(t) else ""
 
 
 def parse(v):

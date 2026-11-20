@@ -392,8 +392,9 @@ if __name__ == "__main__":
 class TheUpdatesFetch(unittest.TestCase):
     """fetch_tree with curl and gh stood in on the PATH: the bundle verified
     by its attestation read from GitHub's public API with --bundle (no
-    sign-in), and the source archive taken unverified only for a release
-    from before the bundle that GitHub says has none."""
+    sign-in) and held to the release workflow's identity, and a release that
+    carries no bundle not taken, whatever its version. The install here
+    names no signer; the signed list's rules are test_release_signing.py's."""
 
     def world(self, code, gh_ok=True):
         d = tempfile.mkdtemp()
@@ -435,7 +436,10 @@ case " $* " in *" --bundle "*) exit {0 if gh_ok else 1};; *) exit 1;; esac
 
     def fetch(self, tag, code, gh_ok=True):
         d, bin_ = self.world(code, gh_ok)
-        r = sh(f'fetch_tree {tag}', env={"PATH": bin_ + ":" + os.environ["PATH"]}, root=d)
+        with open(os.path.join(d, "release-signers"), "w") as f:
+            f.write("# no key\n")
+        r = sh(f'fetch_tree {tag}', env={"PATH": bin_ + ":" + os.environ["PATH"],
+                                         "BB_RELEASE_SIGNERS": os.path.join(d, "release-signers")}, root=d)
         log = open(os.path.join(d, "gh.log")).read() if os.path.exists(os.path.join(d, "gh.log")) else ""
         return r, log
 
@@ -444,6 +448,10 @@ case " $* " in *" --bundle "*) exit {0 if gh_ok else 1};; *) exit 1;; esac
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("verified by gh", r.stderr)
         self.assertIn("--bundle", log)
+        # ...held to the release workflow on a version's tag, as the OS
+        # updater holds an image: the repository alone passed any workflow.
+        self.assertIn(r"--cert-identity-regex ^https://github\.com/aquilaelabs/aerieos/\.github/workflows/build-image\.yml@refs/tags/v", log)
+        self.assertIn("this install holds no release key yet, so the release's signature is not checked", r.stderr)
 
     def test_no_tag_takes_the_newest_dev_build_that_carries_the_bundle(self):
         # No stable release: the newest dev build with an aerieos-controller
@@ -464,7 +472,13 @@ case " $* " in *" --bundle "*) exit {0 if gh_ok else 1};; *) exit 1;; esac
             self.assertNotEqual(r.returncode, 0, (tag, code))
             self.assertIn("could not be fetched", r.stderr)
 
-    def test_only_a_release_from_before_the_bundle_falls_back_to_its_source(self):
+    def test_a_release_from_before_the_bundle_is_not_taken_from_its_source(self):
+        # It fell back to the tag's source archive, said as unverified:
+        # nothing an install can come from is that old (the state floor),
+        # and a source archive is in no signed list.
         r, _ = self.fetch("v0.8.2", "404")
-        self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertIn("source archive is taken instead", r.stderr)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("could not be fetched", r.stderr)
+        self.assertNotIn("source archive", r.stderr)
+        with open(INSTALLER, encoding="utf-8") as f:
+            self.assertFalse("${REPO}/archive/" in f.read(), "the installer names a source archive of AerieOS's own")
