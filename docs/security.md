@@ -316,7 +316,15 @@ console. Somebody who builds the controller themselves and signs those
 builds with a key of their own adds its public half there instead (`sudo
 aerieos-agent release-key add HEX`, four at most, and `release-key drop
 HEX` takes one away): the node then takes what that key signed beside what
-the release signed, and the update's job says which key it was. These
+the release signed, and the update's job says which key it was. The key
+is made once on the machine that builds (`tools/sign-agent.py
+--builder-keygen FILE`, which prints the command for a node's console), and
+each build is signed with it before its image is made (`tools/sign-agent.py
+--builder FILE` writes `scripts/agent/agent.sig` for the tree as it
+stands, which the image's build takes with the rest). It is kept on the
+building machine, out of the repository and out of the container's reach:
+a controller that could sign its own agent would make the nodes' check
+worth nothing. These
 choices are a person's at the machine: they take root and a
 terminal, the running agent never writes over them, and nothing the
 controller sends in the channel changes them. A pinned node that meets an

@@ -17,6 +17,17 @@ release build is handed and no controller holds:
     tools/sign-agent.py --check
         whether scripts/agent/agent.sig is the committed public key's
         signature over this tree's agent: exit 0 when it is, 1 when not.
+    tools/sign-agent.py --builder-keygen FILE
+        a builder's own key, for whoever builds a controller on their own
+        machine: the private half written to FILE (never printed), the
+        public half printed with the command that adds it at a node's
+        console. Not a release key: it goes in no repository.
+    tools/sign-agent.py --builder FILE [--out SIG]
+        signs this tree's agent and root's tools with the key in FILE,
+        whatever config/aerieos-release.pub names: a node takes the build
+        once a person has added the key at its console (aerieos-agent
+        release-key add), and no other node does. tools/build-image-here.sh
+        runs this after its build.
 
 The key never goes on a command line and is never printed after --keygen.
 The bytes signed are release.MESSAGE and the digest the controller's hello
@@ -85,6 +96,90 @@ def public_key():
     return (public_keys() or [""])[0]
 
 
+def _write(key, path):
+    """The signature file for this tree's agent and root's tools under
+    `key`, written to `path`: (the agent's digest, the tools' digest)."""
+    release = _load("release")
+    d, t = digest(), tools_digest()
+    out = {"digest": d, "sig": key.sign(release.MESSAGE + d.encode()).hex(), "key": key.public_key().public_bytes_raw().hex(),
+           # The tools root installs from the bundle, under a line of their
+           # own: the controller puts this in the bundle it serves.
+           "tools": {"digest": t, "sig": key.sign(release.TOOLS_MESSAGE + t.encode()).hex()}}
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(out, f)
+        f.write("\n")
+    return d, t
+
+
+def _console(pub):
+    """What a person does with a builder's public key, said once."""
+    return ("A node that pinned AerieOS's release key takes a build signed with this one once a person adds it at that\n"
+            f"node's own console:  sudo aerieos-agent release-key add {pub}")
+
+
+def _builder_keygen(args, Ed25519PrivateKey):
+    """--builder-keygen FILE: a builder's key made where none is, its private
+    half in FILE for this machine's account alone; one that is there is kept
+    and its public half said again."""
+    if len(args) != 1:
+        print("usage: tools/sign-agent.py --builder-keygen FILE", file=sys.stderr)
+        return 2
+    path = args[0]
+    if os.path.exists(path):
+        key = _builder_key(path, Ed25519PrivateKey)
+        if key is None:
+            return 2
+        print(f"{path} holds a builder's key already; it is kept. Its public half:")
+    else:
+        key = Ed25519PrivateKey.generate()
+        os.makedirs(os.path.dirname(os.path.abspath(path)), mode=0o700, exist_ok=True)
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(key.private_bytes_raw().hex() + "\n")
+        print(f"made a builder's key at {path} (keep it on this machine; it is not a release key and goes in no repository). "
+              "Its public half:")
+    pub = key.public_key().public_bytes_raw().hex()
+    print("  " + pub)
+    print(_console(pub))
+    return 0
+
+
+def _builder_key(path, Ed25519PrivateKey):
+    """The key a builder's file holds, or None with the reason said."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            seed = f.read().strip().lower()
+        return Ed25519PrivateKey.from_private_bytes(bytes.fromhex(seed))
+    except OSError as e:
+        print(f"the builder's key at {path} cannot be read ({e.strerror or e})", file=sys.stderr)
+    except ValueError:
+        print(f"{path} does not hold a builder's key: 64 hex characters, as --builder-keygen writes", file=sys.stderr)
+    return None
+
+
+def _builder_sign(args, Ed25519PrivateKey):
+    """--builder FILE [--out SIG]: this tree's agent and root's tools signed
+    with a builder's own key, whatever the committed file names."""
+    out = SIG
+    if "--out" in args:
+        i = args.index("--out")
+        out, args = (args[i + 1] if i + 1 < len(args) else ""), args[:i] + args[i + 2:]
+    if len(args) != 1 or not out:
+        print("usage: tools/sign-agent.py --builder FILE [--out SIG]", file=sys.stderr)
+        return 2
+    key = _builder_key(args[0], Ed25519PrivateKey)
+    if key is None:
+        return 2
+    pub = key.public_key().public_bytes_raw().hex()
+    if pub in public_keys():
+        print("that is a release key, not a builder's: a release's build signs with AERIEOS_RELEASE_KEY", file=sys.stderr)
+        return 2
+    d, t = _write(key, out)
+    print(f"signed the agent {d[:19]}… and root's tools {t[:19]}… with this builder's key {pub[:16]}…")
+    print(_console(pub))
+    return 0
+
+
 def main(argv):
     try:
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -133,6 +228,10 @@ def main(argv):
             next((w for w in [release.verify(by or public_key(), tools.get("digest"), tools.get("sig"), release.TOOLS_MESSAGE)] if w), "")
         print(f"{os.path.relpath(SIG)}: root's tools: " + (twhy or f"signed by {(by or public_key())[:16]}… for {tools_digest()[:19]}…"))
         return 1 if why or twhy else 0
+    if argv[:1] == ["--builder-keygen"]:
+        return _builder_keygen(argv[1:], Ed25519PrivateKey)
+    if argv[:1] == ["--builder"]:
+        return _builder_sign(argv[1:], Ed25519PrivateKey)
     seed = os.environ.get("AERIEOS_RELEASE_KEY", "").strip().lower()
     if not seed:
         print("no AERIEOS_RELEASE_KEY in the environment: the agent ships unsigned, as a build from a branch does")
@@ -153,14 +252,7 @@ def main(argv):
               + ", ".join(k[:16] + "…" for k in public_keys()) + "): nodes pinned to those would refuse this build, "
               "so nothing is signed", file=sys.stderr)
         return 2
-    d, t = digest(), tools_digest()
-    out = {"digest": d, "sig": key.sign(release.MESSAGE + d.encode()).hex(), "key": pub,
-           # The tools root installs from the bundle, under a line of their
-           # own: the controller puts this in the bundle it serves.
-           "tools": {"digest": t, "sig": key.sign(release.TOOLS_MESSAGE + t.encode()).hex()}}
-    with open(SIG, "w", encoding="utf-8") as f:
-        json.dump(out, f)
-        f.write("\n")
+    d, t = _write(key, SIG)
     print(f"signed the agent {d[:19]}… and root's tools {t[:19]}… with the "
           + ("spare release key" if pub in public_keys()[1:] else "release key") + f" {pub[:16]}…")
     return 0
