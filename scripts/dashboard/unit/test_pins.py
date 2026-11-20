@@ -202,9 +202,15 @@ class Move(Case):
         arm = go_url("go1.100.0", "linux/arm64")
         del self.pages[arm + ".sha256"], self.files[arm]
         before = self.row("go")
+        # A check says the row waits, and counts nothing of it as moving.
+        rc, out = self.run_tool("check", "go")
+        self.assertEqual(rc, 0, out)
+        waits = f"its resolver finds go1.100.0, and linux/arm64 could not be learned ({arm}.sha256 answered 404)"
+        self.assertIn(f"go: its download is at go1.99.0 ({waits}: it stays where it is)", out)
+        self.assertIn("nothing would move; 1 row(s) wait for a release that is not out for every platform they name", out)
         rc, out = self.run_tool("move")
         self.assertEqual(rc, 1, out)
-        self.assertIn(f"go: left as it was: linux/arm64 could not be learned ({arm}.sha256 answered 404)", out)
+        self.assertIn(f"go: left as it was: {waits}", out)
         self.assertEqual(self.row("go"), before, "not one platform of it moved")
         # The row beside it moved all the same: its vendor's file re-pinned.
         self.assertIn("app: rev 1 to 2", out)

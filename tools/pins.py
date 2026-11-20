@@ -14,7 +14,8 @@ here knows a vendor.
                                       now, and whether a pinned file that has no resolver still
                                       answers the pinned bytes. Reads the network, writes nothing.
                                       Exit 0 when nothing would move, 3 when something would, 1 on
-                                      an error.
+                                      an error. A newer release that is not out for every platform
+                                      a row names holds the row where it is: said, and not a move.
     tools/pins.py move [NAME...]      writes the new version and digests into the table for the rows
                                       named (every pinned row with none named), every platform a row
                                       names or none of them, raises the row's rev by one, and runs
@@ -290,14 +291,27 @@ def plan(row, version=""):
         if tracked:
             with As(platforms(row)[0]):
                 new_v = version or sdkmeta.newest(row)[0]
-            got = None if new_v == old_v and not version else learned(row, version)
+            got, held = None, ""
+            if new_v != old_v or version:
+                try:
+                    got = learned(row, version)
+                except Refused as e:
+                    # A version named by hand that cannot be learned is an
+                    # error. One its resolver finds is a release that is not
+                    # out for every platform the row names yet: the row
+                    # stays where it is until it is, and says so.
+                    if version:
+                        raise
+                    held = f"its resolver finds {new_v}, and {e}"
             if got and got["version"] == old_v:
                 # The version it has, named again: a move only where its
                 # publisher's file is no longer the pinned one.
                 have = pinned_files(row)
                 if all(have[p] == (f["url"], f["sha256"]) for p, f in got["files"].items()):
                     got = None
-            if got is None:
+            if held:
+                parts.append({"what": "its download", "old": old_v, "new": old_v, "held": held, "note": f"{held}: it stays where it is"})
+            elif got is None:
                 parts.append({"what": "its download", "old": old_v, "new": old_v, "note": "its resolver finds the version it is pinned to"})
             else:
                 parts.append({"what": "its download", "old": old_v, "new": got["version"], "files": got["files"],
@@ -412,7 +426,7 @@ def chosen(doc, names):
 
 
 def cmd_check(doc, names, opts, out):
-    would, failed = 0, 0
+    would, failed, waiting = 0, 0, 0
     for row in chosen(doc, names):
         name = row["name"]
         if not is_pinned(row):
@@ -427,8 +441,14 @@ def cmd_check(doc, names, opts, out):
             continue
         for line in lines(name, parts):
             out(line)
-        would += any(p.get("apply") for p in parts)
-    out(f"{would} row(s) would move" if would else "nothing would move")
+        # A release that is not out for every platform holds its row
+        # whole: nothing of that row would move.
+        if any(p.get("held") for p in parts):
+            waiting += 1
+        else:
+            would += any(p.get("apply") for p in parts)
+    out((f"{would} row(s) would move" if would else "nothing would move")
+        + (f"; {waiting} row(s) wait for a release that is not out for every platform they name" if waiting else ""))
     return 1 if failed else 3 if would else 0
 
 
@@ -444,6 +464,10 @@ def cmd_move(doc, names, opts, out):
             continue
         try:
             parts = plan(row, opts.get("version", ""))
+            # A row moves whole: a part held back holds every part of it.
+            held = next((p["held"] for p in parts if p.get("held")), "")
+            if held:
+                raise Refused(held)
             new = moved(row, parts)
         except ERRORS as e:
             out(f"{name}: left as it was: {said(e)}")

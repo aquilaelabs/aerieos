@@ -1,6 +1,7 @@
 {
  "about": "rustup, cargo and the stable toolchain. Building for Windows also needs a linker: mingw, or zig with cargo-zigbuild.",
- "framework": "2.1",
+ "format": 5,
+ "framework": "5.1",
  "label": "Rust",
  "layout": {
   "bin": [
@@ -20,14 +21,20 @@
  "shipped": {
   "probe": "rust",
   "reports": "rust",
+  "rev": 2,
   "source": {
    "after": [
     "a Windows target also needs a linker: rustup target add x86_64-pc-windows-gnu,",
     "then EXTRA_APT_PACKAGES=gcc-mingw-w64, or aerie toolchains install zig + cargo-zigbuild"
    ],
    "checksum": {
-    "from": "file",
-    "url": "{url}.sha256"
+    "found": {
+     "from": "file",
+     "url": "{url}.sha256"
+    },
+    "from": "pin",
+    "sha256": "b1c8cb14e30889e7e2999e6b69e62d9e9b9ffc0f4df8180564d306d9680e6c55",
+    "version": "1.29.3"
    },
    "chmod": true,
    "download": {
@@ -41,6 +48,7 @@
    },
    "fresh_only": true,
    "kind": "script",
+   "online": "rustup-init, its pinned installer, downloads the stable toolchain from static.rust-lang.org, each file held to the sha256 its channel manifest states.",
    "run": [
     "{script}",
     "-y",
@@ -48,11 +56,16 @@
     "--profile",
     "minimal"
    ],
-   "url": "https://static.rust-lang.org/rustup/dist/x86_64-unknown-linux-gnu/rustup-init",
+   "url": "https://static.rust-lang.org/rustup/archive/{version}/x86_64-unknown-linux-gnu/rustup-init",
    "verify": [
     "{dir}/cargo/bin/rustc",
     "--version"
-   ]
+   ],
+   "version": {
+    "match": "^version = '([^']+)'",
+    "resolver": "match",
+    "url": "https://static.rust-lang.org/rustup/release-stable.toml"
+   }
   }
  },
  "terms": [

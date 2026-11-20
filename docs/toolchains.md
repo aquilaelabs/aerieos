@@ -426,7 +426,9 @@ tools/pins.py verify --all       # download every pinned file and hold it to its
   would move, 3 when something would, 1 on an error. A file with no version
   in its address has nothing to track: check downloads it and says when its
   bytes are no longer the pinned ones, which is the day an install of it
-  starts being refused.
+  starts being refused. A newer release that is not out for every platform
+  a row names holds the row where it is: check says so, and counts nothing
+  of that row as moving.
 - **move** writes `config/toolchains.json` and then the official packs
   (`tools/packs-export.py --write`). A row that moved has its `rev` raised
   by one, which is what lets the catalog carry it to installs with no

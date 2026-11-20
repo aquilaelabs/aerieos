@@ -745,17 +745,17 @@
       "about": "The .NET SDK plus the maui-android workload: Android apps from C#.",
       "maker": "Microsoft",
       "source": {
-        "kind": "script",
-        "url": "https://dot.net/v1/dotnet-install.sh",
-        "run": [
-          "bash",
-          "{script}",
-          "--channel",
-          "LTS",
-          "--install-dir",
-          "{dir}",
-          "--no-path"
-        ],
+        "kind": "tarball",
+        "version": {
+          "resolver": "text",
+          "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/LTS/latest.version"
+        },
+        "url": {
+          "linux/amd64": "https://builds.dotnet.microsoft.com/dotnet/Sdk/{version}/dotnet-sdk-{version}-linux-x64.tar.gz",
+          "linux/arm64": "https://builds.dotnet.microsoft.com/dotnet/Sdk/{version}/dotnet-sdk-{version}-linux-arm64.tar.gz",
+          "linux-musl/amd64": "https://builds.dotnet.microsoft.com/dotnet/Sdk/{version}/dotnet-sdk-{version}-linux-musl-x64.tar.gz",
+          "linux-musl/arm64": "https://builds.dotnet.microsoft.com/dotnet/Sdk/{version}/dotnet-sdk-{version}-linux-musl-arm64.tar.gz"
+        },
         "then": [
           {
             "note": "adding the maui-android workload (android targets from C#)",
@@ -773,19 +773,17 @@
             "optional": "the maui-android workload failed; the plain SDK is still installed"
           }
         ],
-        "download": {
-          "resolver": "command-urls",
-          "run": [
-            "bash",
-            "-c",
-            "curl -fsSL https://dot.net/v1/dotnet-install.sh | bash -s -- --channel LTS --dry-run"
-          ],
-          "match": "URL #0[^:]*:\\s+(\\S+)"
-        },
         "checksum": {
-          "from": "none",
-          "why": "dotnet-install.sh is Microsoft's installer script, which Microsoft publishes no checksum for; the SDK it fetches comes from Microsoft's own download servers"
-        }
+          "from": "pin",
+          "version": "10.0.404",
+          "sha256": {
+            "linux/amd64": "c0610757a818fde4b960d27a0ac421f273068a05dc5ec7abafc01dbf84e9cb4d",
+            "linux/arm64": "dcc820a4277ab6bb3f648c609d86f2a7912ba9a3d166545e7b95dff419c12f0f",
+            "linux-musl/amd64": "f8f983bc1f784a5e4d3eec83cd70878a590c8328cd25a6d94ac8d43cd50f8c46",
+            "linux-musl/arm64": "e4dae17cbf0c26afb05eda8c2f5365ab291cf32ffd7c115fc0525a9cba268d30"
+          }
+        },
+        "online": "After the pinned SDK is unpacked, its workload step has dotnet download the maui-android workload's packages from api.nuget.org by itself."
       },
       "updatable": true,
       "terms": [
@@ -797,7 +795,8 @@
           "label": ".NET MAUI (MIT)",
           "url": "https://github.com/dotnet/maui/blob/main/LICENSE.txt"
         }
-      ]
+      ],
+      "rev": 2
     },
     {
       "name": "node",
@@ -889,7 +888,11 @@
           "resolver": "approximate",
           "bytes": 90000000
         },
-        "url": "https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-unknown-linux-gnu.tar.gz",
+        "version": {
+          "resolver": "github-release",
+          "repo": "astral-sh/uv"
+        },
+        "url": "https://github.com/astral-sh/uv/releases/download/{version}/uv-x86_64-unknown-linux-gnu.tar.gz",
         "run": [
           "sh",
           "-ec",
@@ -904,8 +907,14 @@
           "import venv, ensurepip"
         ],
         "checksum": {
-          "from": "github-asset"
-        }
+          "from": "pin",
+          "version": "0.13.9",
+          "sha256": "a7fbaff2b9a271d85c1bdb540941090fd1ce011797b4abeb48e4dcd39c2471d5",
+          "found": {
+            "from": "github-asset"
+          }
+        },
+        "online": "uv, its pinned program, downloads the Python 3.12 interpreter from github.com/astral-sh/python-build-standalone and holds it to the sha256 that release of uv carries for it."
       },
       "terms": [
         {
@@ -916,7 +925,8 @@
           "label": "Python's license (PSF)",
           "url": "https://docs.python.org/3/license.html"
         }
-      ]
+      ],
+      "rev": 2
     },
     {
       "name": "playwright",
@@ -1988,7 +1998,12 @@
         "kind": "script",
         "fresh_only": true,
         "chmod": true,
-        "url": "https://static.rust-lang.org/rustup/dist/x86_64-unknown-linux-gnu/rustup-init",
+        "version": {
+          "resolver": "match",
+          "url": "https://static.rust-lang.org/rustup/release-stable.toml",
+          "match": "^version = '([^']+)'"
+        },
+        "url": "https://static.rust-lang.org/rustup/archive/{version}/x86_64-unknown-linux-gnu/rustup-init",
         "run": [
           "{script}",
           "-y",
@@ -2014,16 +2029,23 @@
           "match": "\\[pkg\\.(?:rustc|cargo|rust-std)\\.target\\.x86_64-unknown-linux-gnu\\][^\\[]*?xz_url = \"([^\"]+)\""
         },
         "checksum": {
-          "from": "file",
-          "url": "{url}.sha256"
-        }
+          "from": "pin",
+          "version": "1.29.3",
+          "sha256": "b1c8cb14e30889e7e2999e6b69e62d9e9b9ffc0f4df8180564d306d9680e6c55",
+          "found": {
+            "from": "file",
+            "url": "{url}.sha256"
+          }
+        },
+        "online": "rustup-init, its pinned installer, downloads the stable toolchain from static.rust-lang.org, each file held to the sha256 its channel manifest states."
       },
       "terms": [
         {
           "label": "Rust's licenses (MIT or Apache 2.0)",
           "url": "https://www.rust-lang.org/policies/licenses"
         }
-      ]
+      ],
+      "rev": 2
     },
     {
       "name": "swift",

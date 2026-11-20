@@ -140,13 +140,16 @@ await section("what the language-server plugins run", async () => {
      'the language-servers recipe puts pyright and typescript-language-server on PATH from the store, beside node');
   ok(kt && kt.layout.tool === 'bin/kotlin-lsp' && /ln -sfn \.\.\/server\/bin\/intellij-server/.test(kt.source.run.join(' ')),
      'kotlin-lsp is JetBrains\' server under the name the plugin runs');
-  // The version is read out of GitHub's answer for the latest release; a
-  // copy of that answer's shape, since the harness has no network.
-  const sed = kt.source.run[2].match(/sed -n '([^']+)'/)[1];
-  const answer = join(DIR, 'kls-release.json');
-  writeFileSync(answer, '{\n  "url": "x",\n  "tag_name": "kotlin-lsp/v263.4702.0",\n  "name": "v263.4702.0"\n}\n');
-  const v = execFileSync('sed', ['-n', sed, answer], { encoding: 'utf8' }).trim();
-  ok(v === '263.4702.0', `...whose version is read out of GitHub's latest-release answer (${v})`);
+  // The server's archive is pinned in the row: the version and the sha256
+  // of each platform's file. An install asks nobody what is newest, so the
+  // harness, which has no network, can read what one would fetch.
+  const pin = kt.source.checksum;
+  ok(pin.from === 'pin' && /^[0-9.]+$/.test(pin.version) && Object.keys(kt.source.url).every(p => /^[0-9a-f]{64}$/.test(pin.sha256[p])),
+     `...whose archive is pinned for each platform it names (${pin.version})`);
+  const ktPlan = execFileSync('bash', [BB, 'toolchains', 'plan', 'kotlin-lsp'], { encoding: 'utf8' });
+  ok(ktPlan.split('\n').some(l => /^version\s/.test(l) && l.trim().endsWith(pin.version))
+     && ktPlan.includes(`/kotlin-server/${pin.version}/kotlin-server-${pin.version}`),
+     '...and its plan names that version and the address made from it, with nobody asked');
   const plan = execFileSync('bash', [BB, 'toolchains', 'plan', 'language-servers'], { encoding: 'utf8' });
   ok(/kind\s+command/.test(plan) && /npm install --prefix/.test(plan), 'aerie toolchains plan shows what an install would run');
 });
