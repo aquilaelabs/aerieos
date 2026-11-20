@@ -45,7 +45,7 @@ _trying = {}           # {(name, commit): when it was last tried}, so a pack tha
 # for one of these.
 KINDS = ("tarball", "script", "git", "command", "sdkmanager")
 RESOLVERS = ("approximate", "android-repo", "command-urls", "zig-index", "url-matches", "text", "node-index", "github-release")
-CHECKSUMS = ("json", "android-repo", "go-json", "none", "file", "github-asset", "zsync", "signature", "zig-index")
+CHECKSUMS = ("json", "android-repo", "go-json", "none", "file", "github-asset", "zsync", "signature", "zig-index", "pin")
 SHIPPED_KEYS = ("probe", "source", "system", "requires", "updatable", "tool")
 PLATFORM = re.compile(r"^(linux|darwin)/(amd64|arm64|\*)$")
 MAX_BYTES = 64 * 1024
@@ -134,6 +134,10 @@ def checked(row, shipped):
     ck = src.get("checksum")
     if isinstance(ck, dict) and ck.get("from") not in (None, *CHECKSUMS):
         return None, f"it checks a download by {ck.get('from')}, which this AerieOS does not carry: a newer AerieOS reads it"
+    # A pin is the row's own word for what its download is, so its shape is
+    # held here: a malformed one would refuse every install of the row.
+    if isinstance(ck, dict) and ck.get("from") == "pin" and packformat.pin_refused(ck):
+        return None, packformat.pin_refused(ck)
     if not isinstance(row.get("layout"), dict):
         return None, "it has no layout"
     if rev_of(row) <= rev_of(shipped):

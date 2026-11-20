@@ -43,6 +43,7 @@ release shipped unchanged, as it holds a shipped migration.
 No imports from the rest of the dashboard: the catalog's own check loads
 this beside toolpacks.py from a checkout of any release.
 """
+import re
 
 # The number this build reads, and every one before it.
 FORMAT = 4
@@ -166,6 +167,50 @@ def topics_refused(doc):
         return f"topics has {', '.join(bad[:3])}, not one of the catalog's: {', '.join(TOPICS)}"
     if len(set(got)) != len(got):
         return "topics names one twice"
+    return ""
+
+
+# ---- what a download is held to ---------------------------------------------
+# Whatever an entry fetches from somewhere else is held to something the
+# entry itself carries, the entry being held by the signed catalog or the
+# signed release: the sha256 of the exact file (a pin), its publisher's
+# signature under a key the entry carries, or a git commit. The shapes
+# below are the format's, the same for a row AerieOS ships and for anybody's
+# pack, and nothing here knows a vendor: a pin that moves is moved in the
+# entry.
+#
+# A platform as an entry keys what differs by machine: the keys source.url
+# takes, "<os>/<arch>" with "<os>/*" for any architecture of a system, and
+# linux-musl for a build that is not glibc's.
+PLATFORM_KEY = re.compile(r"^(linux|linux-musl|darwin)/(amd64|arm64|\*)$")
+SHA256 = re.compile(r"^[0-9a-f]{64}$")
+PIN_VERSION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$")
+PIN_KEYS = frozenset(("from", "version", "sha256"))
+PIN_PLATFORMS = 8
+
+
+def pin_refused(ck):
+    """Why a row's source.checksum is not a pin as the format writes one,
+    or "": {"from": "pin", "version": the version the file is (left out for
+    a download with none in its address), "sha256": the digest of the exact
+    file, 64 hex digits, or one per platform}."""
+    if not isinstance(ck, dict) or ck.get("from") != "pin":
+        return "its checksum is no pin"
+    if set(ck) - PIN_KEYS:
+        return f"its pin names {', '.join(sorted(set(ck) - PIN_KEYS))}: a pin is from, version and sha256"
+    v = ck.get("version")
+    if v is not None and not (isinstance(v, str) and PIN_VERSION.fullmatch(v)):
+        return "its pin's version is not a version: up to 64 of letters, digits, dot, dash, plus and underscore"
+    sha = ck.get("sha256")
+    if isinstance(sha, str):
+        return "" if SHA256.fullmatch(sha) else "its pin's sha256 is not 64 hex digits, in lower case"
+    if not isinstance(sha, dict) or not 1 <= len(sha) <= PIN_PLATFORMS:
+        return "its pin's sha256 is the digest of the file, or one per platform"
+    for plat, digest in sha.items():
+        if not (isinstance(plat, str) and PLATFORM_KEY.fullmatch(plat)):
+            return f"its pin names a digest for {str(plat)[:40]}, which is no platform AerieOS names"
+        if not (isinstance(digest, str) and SHA256.fullmatch(digest)):
+            return f"its pin's sha256 for {plat} is not 64 hex digits, in lower case"
     return ""
 
 

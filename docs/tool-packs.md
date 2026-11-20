@@ -389,7 +389,7 @@ AerieOS carries. These are the format's primitives:
 | When its prompt event is raised | `once`, `each-call` |
 | How a first prompt is handed over | `after-dashdash`, `flag`, `none` |
 | How it is told what needs no asking | `settings`, `flag`, `rules-file`, `hook`, `none` |
-| An official toolchain's source, its version resolver and how its download is checked | `tarball`, `script`, `git`, `command`, `sdkmanager`; `approximate`, `android-repo`, `command-urls`, `zig-index`, `url-matches`, `text`, `node-index`, `github-release`; `json`, `go-json`, `none`, `file`, `github-asset`, `zsync`, `signature` |
+| An official toolchain's source, its version resolver and how its download is checked | `tarball`, `script`, `git`, `command`, `sdkmanager`; `approximate`, `android-repo`, `command-urls`, `zig-index`, `url-matches`, `text`, `node-index`, `github-release`; `json`, `go-json`, `none`, `file`, `github-asset`, `zsync`, `zig-index`, `android-repo`, `signature`, `pin` |
 | An official service's kind | `router` |
 
 A new primitive is a new format number, never a change to an old one: the

@@ -92,7 +92,12 @@
     "           checked before it is unpacked or run (sdkmeta.py checksum): github-asset,",
     "           file (url template), go-json, zig-index, json (url, path), android-repo,",
     "           zsync, signature (sig, keys: a detached signature checked with config/release-keys),",
-    "           or none with why; a file source may be signed (signed: sig, keys)."
+    "           or none with why; a file source may be signed (signed: sig, keys).",
+    "           Each of those asks the file's own origin at the moment of the install. A pin does",
+    "           not: {from: pin, version, sha256} carries the version and the sha256 of the exact",
+    "           file (one digest, or one per platform keyed as source.url is), so the row itself",
+    "           says what the download is. A pinned row installs that version with nobody asked,",
+    "           and source.version stays as how a newer one is found."
   ],
   "android_images": {
     "_comment": [

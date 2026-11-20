@@ -24,6 +24,7 @@ Usage (all output is plain, and empty means "not set"):
     sdkmeta.py field  NAME source.strip
     sdkmeta.py argv   NAME source.run  dir=/sdk/go version=go1.27.0
     sdkmeta.py resolve NAME                 -> version <TAB> url
+    sdkmeta.py offer   NAME                 -> version <TAB> sha256, for a pinned row
     sdkmeta.py size    NAME                 -> bytes of the download, if knowable
 """
 import glob
@@ -278,8 +279,49 @@ def final_url(url):
         return r.url
 
 
+# What a pinned download is said to have been held to: in the install's log,
+# in .bb-verified and on the Installed page.
+PIN_SAID = "the pin its entry carries"
+
+
+def pin_of(tc):
+    """The pin a row's source.checksum carries, or None for a row with none:
+    {"from": "pin", "version": the version it is, "sha256": the digest of
+    the exact file, or one per platform keyed as source.url is}. The row is
+    held by the signed catalog or the signed release, so the file is held to
+    something its own origin cannot change."""
+    spec = (tc.get("source") or {}).get("checksum")
+    return spec if isinstance(spec, dict) and spec.get("from") == "pin" else None
+
+
+def pinned_digest(tc):
+    """The sha256 a row's pin names for this machine, or "" where it names
+    none for it or the row has no pin."""
+    pin = pin_of(tc)
+    got = for_platform(pin.get("sha256")) if pin else ""
+    got = got.strip().lower() if isinstance(got, str) else ""
+    return got if re.fullmatch(r"[0-9a-f]{64}", got) else ""
+
+
+def offered(tc):
+    """What a row its entry pins has on offer, (version, sha256 for this
+    machine), or None for a row whose version is whatever its vendor offers
+    at the moment: the pinned version and digest, or a git source's commit.
+    `aerie toolchains check` compares an installed copy with this, so a
+    pinned row is never measured against a vendor's latest."""
+    pin = pin_of(tc)
+    if pin is not None:
+        return str(pin.get("version") or ""), pinned_digest(tc)
+    src = tc.get("source") or {}
+    if src.get("kind") == "git" and src.get("commit"):
+        return str(src["commit"])[:8], ""
+    return None
+
+
 def resolve(tc):
-    """(version, url) for a toolchain, asking upstream what it currently offers.
+    """(version, url) for a toolchain: what its pin names where its entry
+    carries one, with nobody asked; otherwise what upstream currently
+    offers.
 
     Either may come back empty: a recipe that needs no version does not have a
     resolver, and one whose resolver supplies the download URL itself has no
@@ -289,6 +331,15 @@ def resolve(tc):
     spec = src.get("version") or {}
     kind = spec.get("resolver")
     version, url = "", ""
+
+    pin = pin_of(tc)
+    if pin is not None:
+        # Pinned: the version its entry carries and the address made from
+        # it. The resolver stays in the row as how a newer version is
+        # found, which is not an install's question.
+        version, kind = str(pin.get("version") or ""), None
+        if not pinned_digest(tc):
+            die(f"{tc['name']}: the row offers no pinned download for {this_platform()}")
 
     if kind == "text":
         # A file whose whole content is the current version. go.dev serves one.
@@ -349,6 +400,10 @@ def resolve(tc):
 #   android-repo   Google's repository listing, the archive's sha1
 #   zsync          an AppImage's .zsync, its SHA-1 line
 #   none           nothing to check against, and why (said on the install)
+# Each of those is read from the file's own origin at the moment of the
+# install, so it holds nothing against that origin. One is the row's own
+# (pack format 5):
+#   pin            the sha256 of the exact file, and the version it is
 # Each answers (algorithm, hex digest, where it came from).
 HEX = re.compile(r"^[0-9a-fA-F]{40}$|^[0-9a-fA-F]{64}$|^[0-9a-fA-F]{128}$")
 ALGOS = {40: "sha1", 64: "sha256", 128: "sha512"}
@@ -421,6 +476,11 @@ def checksum(tc, url, version):
     subs = {"version": version, "url": url, "name": name, "base": url.rsplit("/", 1)[0]}
     if how == "none":
         return "none", "", spec.get("why") or "its publisher states no checksum"
+    if how == "pin":
+        digest = pinned_digest(tc)
+        if not digest:
+            die(f"{tc['name']}: the row offers no pinned download for {this_platform()}")
+        return "sha256", digest, PIN_SAID
     if how == "github-asset":
         m = re.match(r"https://github\.com/([^/]+/[^/]+)/releases/(?:latest/download|download/([^/]+))/([^/?#]+)$", url)
         if not m:
@@ -512,6 +572,11 @@ def download_urls(tc):
     """
     src = tc.get("source") or {}
     spec = src.get("download")
+    if pin_of(tc) is not None and not src.get("online"):
+        # Pinned, with nothing fetched behind it: the pinned file is the
+        # download, whatever a dry run of the vendor's would name today.
+        _, url = resolve(tc)
+        return [url] if url and src.get("kind") in ("tarball", "script") else []
     if spec is None:
         _, url = resolve(tc)
         return [url] if url and src.get("kind") == "tarball" else []
@@ -867,6 +932,13 @@ def main(argv):
     elif op == "resolve":
         version, url = resolve(tc)
         print(f"{version}\t{url}")
+
+    elif op == "offer":
+        # The version and the digest a pinned row has on offer, or nothing
+        # for a row whose version is its vendor's latest.
+        got = offered(tc)
+        if got:
+            print(f"{got[0]}\t{got[1]}")
 
     elif op == "checksum":
         # The algorithm, the digest and where it came from, tab-separated:

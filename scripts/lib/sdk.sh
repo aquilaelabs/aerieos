@@ -609,6 +609,16 @@ sdk_check_one() {
     # half is a directory read or a --version away, and it is what the
     # toolchain list wants on every draw; the other half is a round trip to a
     # different service per toolchain and belongs behind a button.
+    #
+    # A row its entry pins (a pinned download, a git source at a commit) has
+    # the pinned version on offer and no other: its vendor is not asked
+    # what is newest, so the probes below read what is installed and the
+    # offer is the entry's (sdkmeta.py offer).
+    local offer=""
+    if [ -z "$local_only" ]; then
+        offer="$(sdk_meta offer "$what" 2>/dev/null)" || offer=""
+        [ -z "$offer" ] || local_only=pinned
+    fi
     case "$what" in
         flutter)
             d="$(sdk_find flutter)" || d=""
@@ -814,6 +824,20 @@ print(next(k for k in d if k != "master"))' 2>/dev/null)"
         *) printf '%s\t-\t-\tunknown\n' "$what"; return 0 ;;
     esac
     [ -n "$inst" ] || inst="-"
+    if [ -n "$offer" ]; then
+        # Pinned: what is on offer is the pin. An installed copy that was
+        # held to the same digest is that file, whatever each calls its
+        # version; one with no such record is compared by version below.
+        local_only=""
+        local want="${offer#*$'\t'}" have=""
+        latest="${offer%%$'\t'*}"
+        [ -n "$latest" ] || latest="-"
+        d="$(sdk_find "$what" 2>/dev/null)" || d=""
+        [ -z "$d" ] || have="$(sdk_verified_digest "$d")"
+        if [ "$inst" != "-" ] && [ -n "$want" ] && [ -n "$have" ]; then
+            if [ "$have" = "$want" ]; then status=current; else status=update; fi
+        fi
+    fi
     # A local probe knows what is installed and nothing about what exists
     # elsewhere, so it must not answer the other question. "current" from a
     # directory listing would be a claim nobody checked.
@@ -881,6 +905,17 @@ sdk_check() {
 sdk_update() {
     sdk_operator_only update "$@"
     local what="${1:-}" d
+    # A row its entry pins updates to what the entry names now and by its
+    # own recipe, held as an install is: never by a fetch of the vendor's
+    # latest written here. One that cannot install over itself is taken off
+    # first, as an install of it is.
+    if [ -n "$what" ] && [ -n "$(sdk_meta offer "$what" 2>/dev/null)" ]; then
+        d="$(sdk_find "$what")" || die "${what} is not installed"
+        log "updating ${what} to what its entry pins"
+        [ -z "$(sdk_meta field "$what" source.fresh_only)" ] || sdk_remove "$what"
+        sdk_install "$what"
+        return 0
+    fi
     case "$what" in
         flutter)
             d="$(sdk_find flutter)" || die "flutter is not installed"
@@ -1275,6 +1310,15 @@ sdk_verified_said() {
     esac
 }
 
+# sdk_verified_digest DIR: the sha256 the toolchain in DIR was held to when
+# it was installed, or nothing where it was held to none (.bb-verified).
+sdk_verified_digest() {
+    local f="$1/.bb-verified" algo want rest
+    [ -r "$f" ] || return 0
+    IFS=$'\t' read -r algo want rest < "$f" || return 0
+    [ "$algo" != sha256 ] || printf '%s' "$want"
+}
+
 # sdk_verify_download WHAT FILE URL VERSION DIR: the download held to what
 # its publisher says it is (R137), before anything unpacks or runs it: the
 # catalog row's source.checksum, answered by sdkmeta.py. A mismatch removes
@@ -1347,14 +1391,21 @@ sdk_install_tarball() {
 # Fetch an installer and run it. The URL here is a script, not the payload;
 # it goes and gets that itself, with the arguments the catalog gives.
 sdk_install_script() {
-    local what="$1" d url tmp tmpdir
+    local what="$1" d url tmp tmpdir rest version=""
     d="$(sdk_dir "$what")"
     sdk_mark_partial "$d"
     [ -z "$(sdk_meta field "$what" source.fresh_only)" ] || [ ! -d "$d" ] \
         || die "${what} is already installed at ${d} (aerie toolchains remove ${what} first)"
     url="$(sdk_meta field "$what" source.url)"
     [ -n "$url" ] || die "no installer URL in the catalog for ${what}"
-    log "installing ${what} into ${d}"
+    # A pinned installer is the version its pin names, which its address
+    # may carry: resolved as a tarball's is, with nobody asked.
+    if [ "$(sdk_meta field "$what" source.checksum.from)" = pin ]; then
+        rest="$(sdk_meta resolve "$what")"
+        version="${rest%%	*}"; url="${rest#*	}"
+        [ -n "$url" ] || die "could not resolve a download URL for ${what}"
+    fi
+    log "installing ${what}${version:+ }${version} into ${d}"
     mkdir -p "$d"
     # Kept under the name upstream gave it, in a directory of its own.
     # rustup-init decides what it is by the name it was invoked as: downloaded
@@ -1364,16 +1415,16 @@ sdk_install_script() {
     tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/bb-${what}.XXXXXX")"
     tmp="$tmpdir/$(basename "${url%%\?*}")"
     sdk_fetch "$url" "$tmp" || { rm -rf "$tmpdir"; die "could not download ${url}"; }
-    sdk_verify_download "$what" "$tmp" "$url" "" "$d"
+    sdk_verify_download "$what" "$tmp" "$url" "$version" "$d"
     [ -z "$(sdk_meta field "$what" source.chmod)" ] || chmod +x "$tmp"
     local -a cmd env
-    sdk_meta_into cmd argv "$what" source.run "dir=$d" "script=$tmp"
+    sdk_meta_into cmd argv "$what" source.run "dir=$d" "script=$tmp" "version=$version"
     [ "${#cmd[@]}" != 0 ] || { rm -f "$tmp"; die "no run command in the catalog for ${what}"; }
     sdk_meta_into env env "$what" source.env "dir=$d"
     env "${env[@]}" "${cmd[@]}" || { rm -rf "$tmpdir"; die "${what} installer failed"; }
     rm -rf "$tmpdir"
     sdk_install_steps "$what" "$d"
-    sdk_install_verify "$what" "$d" ""
+    sdk_install_verify "$what" "$d" "$version"
 }
 
 # A shallow clone. The tool updates itself in place from here, which a tarball
