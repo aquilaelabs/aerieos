@@ -22,7 +22,8 @@
    "name": "libwebp"
   }
  ],
- "framework": "2.1",
+ "format": 5,
+ "framework": "5.1",
  "label": "Graphics tools (ImageMagick, resvg, oxipng, pngquant, cwebp)",
  "layout": {
   "bin": [
@@ -39,29 +40,89 @@
  "shipped": {
   "probe": "graphics",
   "reports": "magick",
+  "rev": 2,
   "source": {
    "checksum": {
-    "from": "github-asset"
+    "found": {
+     "from": "github-asset"
+    },
+    "from": "pin",
+    "sha256": "5d1c9ffd43c82fb802d92cef8100055c612cd3e248d5a787c20079293a456e21",
+    "version": "v0.50.0"
    },
    "download": {
     "bytes": 120000000,
     "resolver": "approximate"
    },
+   "fetch": [
+    {
+     "found": {
+      "from": "github-asset"
+     },
+     "platform": "linux/amd64",
+     "sha256": "68cca0053a8f82206e72400014f32f4b654e9807f45928a2325a1d14d695fb3a",
+     "to": "dl/magick.AppImage",
+     "track": {
+      "repo": "ImageMagick/ImageMagick",
+      "resolver": "github-release"
+     },
+     "url": "https://github.com/ImageMagick/ImageMagick/releases/download/{version}/ImageMagick-{version}-x86_64.AppImage",
+     "version": "7.1.2-36"
+    },
+    {
+     "found": {
+      "from": "github-asset"
+     },
+     "platform": "linux/amd64",
+     "sha256": "1813750ef592c5350ca79c88f98b2c0876d05c826dc7156245256d4255c1ad17",
+     "to": "dl/oxipng.tar.gz",
+     "track": {
+      "repo": "oxipng/oxipng",
+      "resolver": "github-release",
+      "trim_prefix": "v"
+     },
+     "url": "https://github.com/oxipng/oxipng/releases/download/v{version}/oxipng-{version}-x86_64-unknown-linux-musl.tar.gz",
+     "version": "10.2.1"
+    },
+    {
+     "platform": "linux/amd64",
+     "sha256": "25d09032f48760d34397155f3267ffadfbbbaeb2b8b39496022fc2ef1d82529e",
+     "to": "dl/pngquant.tar.bz2",
+     "url": "https://pngquant.org/pngquant-linux.tar.bz2"
+    },
+    {
+     "platform": "linux/amd64",
+     "sha256": "1c5ffab71efecefa0e3c23516c3a3a1dccb45cc310ae1095c6f14ae268e38067",
+     "to": "dl/webp.tar.gz",
+     "track": {
+      "match": "^v\\d+\\.\\d+\\.\\d+$",
+      "resolver": "git-tag",
+      "trim_prefix": "v",
+      "url": "https://github.com/webmproject/libwebp.git"
+     },
+     "url": "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-{version}-linux-x86-64.tar.gz",
+     "version": "1.6.0"
+    }
+   ],
    "fresh_only": true,
    "kind": "script",
    "run": [
     "sh",
     "-ec",
-    "g=\"$(ldd --version 2>/dev/null | head -1 | sed 's/.* //')\"; case \"$g\" in [0-9]*.[0-9]*) ;; *) g=\"\";; esac; if [ -n \"$g\" ] && [ \"$(printf '%s\\n' 2.35 \"$g\" | sort -V | head -1)\" != \"2.35\" ]; then echo \"ImageMagick's AppImage needs glibc 2.35 and this node has $g (Rocky 9 and the other 2.34 systems): the graphics tools cannot run here\" >&2; exit 1; fi; dst=\"$2\"; bin=\"$dst/bin\"; t=\"$(mktemp -d)\"; mkdir -p \"$bin\"; get() { curl -fsSL --retry 3 -o \"$2\" \"$1\"; }; tag() { curl -fsSIL -o /dev/null -w '%{url_effective}' \"https://github.com/$1/releases/latest\" | sed 's#.*/tag/##'; }; v=\"$(tag ImageMagick/ImageMagick)\"; im=\"$t/magick.AppImage\"; get \"https://github.com/ImageMagick/ImageMagick/releases/download/$v/ImageMagick-$v-gcc-x86_64.AppImage\" \"$im\"; chmod +x \"$im\"; (cd \"$t\" && \"$im\" --appimage-extract >/dev/null); rm -rf \"$dst/magick\"; mv \"$t/squashfs-root\" \"$dst/magick\"; ln -sf ../magick/AppRun \"$bin/magick\"; rs=\"$1\"; if ! tar -tzf \"$rs\" >/dev/null 2>&1; then rs=\"$t/resvg.tgz\"; get https://github.com/linebender/resvg/releases/latest/download/resvg-linux-x86_64.tar.gz \"$rs\"; fi; tar -xzf \"$rs\" -C \"$t\"; cp \"$(find \"$t\" -name resvg -type f | head -1)\" \"$bin/\"; v=\"$(tag oxipng/oxipng)\"; get \"https://github.com/oxipng/oxipng/releases/download/$v/oxipng-${v#v}-x86_64-unknown-linux-musl.tar.gz\" \"$t/ox.tgz\"; tar -xzf \"$t/ox.tgz\" -C \"$t\"; cp \"$(find \"$t\" -name oxipng -type f | head -1)\" \"$bin/\"; get https://pngquant.org/pngquant-linux.tar.bz2 \"$t/pq.tbz\"; python3 -c 'import sys, tarfile; tarfile.open(sys.argv[1]).extractall(sys.argv[2])' \"$t/pq.tbz\" \"$t\"; cp \"$(find \"$t\" -name pngquant -type f | head -1)\" \"$bin/\"; wv=\"$(curl -fsS 'https://api.github.com/repos/webmproject/libwebp/tags?per_page=20' | grep -o '\"name\": *\"v[0-9.]*\"' | sed 's/.*\"v//; s/\"//' | sort -V | tail -1)\"; get \"https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-$wv-linux-x86-64.tar.gz\" \"$t/webp.tgz\"; tar -xzf \"$t/webp.tgz\" -C \"$t\"; cp \"$(find \"$t\" -path '*/bin/cwebp' -type f | head -1)\" \"$(find \"$t\" -path '*/bin/dwebp' -type f | head -1)\" \"$bin/\"; chmod +x \"$bin\"/*; rm -rf \"$t\"",
+    "g=\"$(ldd --version 2>/dev/null | head -1 | sed 's/.* //')\"; case \"$g\" in [0-9]*.[0-9]*) ;; *) g=\"\";; esac; if [ -n \"$g\" ] && [ \"$(printf '%s\\n' 2.35 \"$g\" | sort -V | head -1)\" != \"2.35\" ]; then echo \"ImageMagick's AppImage needs glibc 2.35 and this node has $g (Rocky 9 and the other 2.34 systems): the graphics tools cannot run here\" >&2; exit 1; fi; dst=\"$2\"; bin=\"$dst/bin\"; dl=\"$dst/dl\"; t=\"$(mktemp -d)\"; mkdir -p \"$bin\"; im=\"$t/magick.AppImage\"; cp \"$dl/magick.AppImage\" \"$im\"; chmod +x \"$im\"; (cd \"$t\" && \"$im\" --appimage-extract >/dev/null); rm -rf \"$dst/magick\"; mv \"$t/squashfs-root\" \"$dst/magick\"; ln -sf ../magick/AppRun \"$bin/magick\"; tar -xzf \"$1\" -C \"$t\"; cp \"$(find \"$t\" -name resvg -type f | head -1)\" \"$bin/\"; tar -xzf \"$dl/oxipng.tar.gz\" -C \"$t\"; cp \"$(find \"$t\" -name oxipng -type f | head -1)\" \"$bin/\"; python3 -c 'import sys, tarfile; tarfile.open(sys.argv[1]).extractall(sys.argv[2])' \"$dl/pngquant.tar.bz2\" \"$t\"; cp \"$(find \"$t\" -name pngquant -type f | head -1)\" \"$bin/\"; tar -xzf \"$dl/webp.tar.gz\" -C \"$t\"; cp \"$(find \"$t\" -path '*/bin/cwebp' -type f | head -1)\" \"$(find \"$t\" -path '*/bin/dwebp' -type f | head -1)\" \"$bin/\"; chmod +x \"$bin\"/*; rm -rf \"$t\" \"$dl\"",
     "--",
     "{script}",
     "{dir}"
    ],
-   "url": "https://github.com/linebender/resvg/releases/latest/download/resvg-linux-x86_64.tar.gz",
+   "url": "https://github.com/linebender/resvg/releases/download/{version}/resvg-linux-x86_64.tar.gz",
    "verify": [
     "{dir}/bin/magick",
     "-version"
-   ]
+   ],
+   "version": {
+    "repo": "linebender/resvg",
+    "resolver": "github-release"
+   }
   },
   "system": {
    "apk": [

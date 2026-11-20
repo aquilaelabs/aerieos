@@ -119,13 +119,15 @@
     "  version  (source.version) the resolver that finds the newest version: text, match (url, match:",
     "           a document and a pattern whose first group is the version), github-release (repo; or",
     "           with tag, settled and asset the newest release whose tag matches, out that many days,",
-    "           and the file in it whose name matches, per platform), node-index, zig-index. One that",
+    "           and the file in it whose name matches, per platform; with asset alone, the file in",
+    "           the latest release whose name matches), node-index, zig-index. One that",
     "           supplies the address itself has the tool write source.url beside the digest.",
     "  found    (checksum.found, of a pin) how the new file's digest is learned from its publisher's",
     "           statement without downloading it, written as a checksum that asks the origin is.",
     "           Where the publisher states no sha256 the tool downloads the file and hashes it.",
     "  a declared download may say version (fills {version} in its url and its signature's, never in",
-    "           to), track (how a newer one is found, as source.version is written) and found.",
+    "           to), track (how a newer one is found, as source.version is written) and found. One",
+    "           written with no sha256 yet is waiting for its first pin: tools/pins.py pin NAME.",
     "  commit, tag, track  (a git source) the commit the clone is fetched at, the tag fetched by name",
     "           beside it and kept only where it is at that commit, and how the commit to pin is",
     "           found: {resolver: git-tag, match} the newest tag matching, {resolver: git-branch,",
@@ -1226,11 +1228,11 @@
       "source": {
         "kind": "script",
         "fresh_only": true,
-        "url": "https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64",
+        "url": "https://github.com/hadolint/hadolint/releases/download/{version}/hadolint-Linux-x86_64",
         "run": [
           "sh",
           "-ec",
-          "dst=\"$2/bin\"; t=\"$(mktemp -d)\"; mkdir -p \"$dst\"; cp \"$1\" \"$dst/hadolint\"; get() { curl -fsSL --retry 3 -o \"$2\" \"$1\"; }; tag() { curl -fsSIL -o /dev/null -w '%{url_effective}' \"https://github.com/$1/releases/latest\" | sed 's#.*/tag/##'; }; get https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 \"$dst/yq\"; get https://github.com/astral-sh/ruff/releases/latest/download/ruff-x86_64-unknown-linux-gnu.tar.gz \"$t/ruff.tgz\"; tar -xzf \"$t/ruff.tgz\" -C \"$t\"; cp \"$(find \"$t\" -name ruff -type f | head -1)\" \"$dst/\"; v=\"$(tag koalaman/shellcheck)\"; get \"https://github.com/koalaman/shellcheck/releases/download/$v/shellcheck-$v.linux.x86_64.tar.xz\" \"$t/sc.txz\"; tar -xJf \"$t/sc.txz\" -C \"$t\"; cp \"$t/shellcheck-$v/shellcheck\" \"$dst/\"; v=\"$(tag rhysd/actionlint)\"; get \"https://github.com/rhysd/actionlint/releases/download/$v/actionlint_${v#v}_linux_amd64.tar.gz\" \"$t/al.tgz\"; tar -xzf \"$t/al.tgz\" -C \"$t\" actionlint; cp \"$t/actionlint\" \"$dst/\"; v=\"$(tag sharkdp/fd)\"; get \"https://github.com/sharkdp/fd/releases/download/$v/fd-$v-x86_64-unknown-linux-gnu.tar.gz\" \"$t/fd.tgz\"; tar -xzf \"$t/fd.tgz\" -C \"$t\"; cp \"$(find \"$t\" -name fd -type f | head -1)\" \"$dst/\"; chmod +x \"$dst\"/*; rm -rf \"$t\"",
+          "dst=\"$2/bin\"; dl=\"$2/dl\"; t=\"$(mktemp -d)\"; mkdir -p \"$dst\"; cp \"$1\" \"$dst/hadolint\"; cp \"$dl/yq\" \"$dst/yq\"; tar -xzf \"$dl/ruff.tar.gz\" -C \"$t\"; cp \"$(find \"$t\" -name ruff -type f | head -1)\" \"$dst/\"; tar -xJf \"$dl/shellcheck.tar.xz\" -C \"$t\"; cp \"$(find \"$t\" -name shellcheck -type f | head -1)\" \"$dst/\"; tar -xzf \"$dl/actionlint.tar.gz\" -C \"$t\" actionlint; cp \"$t/actionlint\" \"$dst/\"; tar -xzf \"$dl/fd.tar.gz\" -C \"$t\"; cp \"$(find \"$t\" -name fd -type f | head -1)\" \"$dst/\"; chmod +x \"$dst\"/*; rm -rf \"$t\" \"$dl\"",
           "--",
           "{script}",
           "{dir}"
@@ -1244,8 +1246,92 @@
           "bytes": 70000000
         },
         "checksum": {
-          "from": "github-asset"
-        }
+          "from": "pin",
+          "version": "v2.15.1",
+          "sha256": "c7187db94eeeeca956519a6af171adc31453941a1e777961f6e680f697c8c507",
+          "found": {
+            "from": "github-asset"
+          }
+        },
+        "version": {
+          "resolver": "github-release",
+          "repo": "hadolint/hadolint"
+        },
+        "fetch": [
+          {
+            "url": "https://github.com/mikefarah/yq/releases/download/{version}/yq_linux_amd64",
+            "version": "v4.54.3",
+            "to": "dl/yq",
+            "platform": "linux/amd64",
+            "track": {
+              "resolver": "github-release",
+              "repo": "mikefarah/yq"
+            },
+            "found": {
+              "from": "github-asset"
+            },
+            "sha256": "129534601871538efe0ba4c5e62a34fb1d5f469bcb975c4fddeb467d82974973"
+          },
+          {
+            "url": "https://github.com/astral-sh/ruff/releases/download/{version}/ruff-x86_64-unknown-linux-gnu.tar.gz",
+            "version": "0.17.6",
+            "to": "dl/ruff.tar.gz",
+            "platform": "linux/amd64",
+            "track": {
+              "resolver": "github-release",
+              "repo": "astral-sh/ruff"
+            },
+            "found": {
+              "from": "file",
+              "url": "{url}.sha256"
+            },
+            "sha256": "94b33791f48cd54ab35ad673a443a5c001d3e6d87effeaba9899070b700d45f3"
+          },
+          {
+            "url": "https://github.com/koalaman/shellcheck/releases/download/{version}/shellcheck-{version}.linux.x86_64.tar.xz",
+            "version": "v0.11.0",
+            "to": "dl/shellcheck.tar.xz",
+            "platform": "linux/amd64",
+            "track": {
+              "resolver": "github-release",
+              "repo": "koalaman/shellcheck"
+            },
+            "found": {
+              "from": "github-asset"
+            },
+            "sha256": "8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198"
+          },
+          {
+            "url": "https://github.com/rhysd/actionlint/releases/download/v{version}/actionlint_{version}_linux_amd64.tar.gz",
+            "version": "1.7.12",
+            "to": "dl/actionlint.tar.gz",
+            "platform": "linux/amd64",
+            "track": {
+              "resolver": "github-release",
+              "repo": "rhysd/actionlint",
+              "trim_prefix": "v"
+            },
+            "found": {
+              "from": "file",
+              "url": "{base}/actionlint_{version}_checksums.txt"
+            },
+            "sha256": "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+          },
+          {
+            "url": "https://github.com/sharkdp/fd/releases/download/{version}/fd-{version}-x86_64-unknown-linux-gnu.tar.gz",
+            "version": "v10.5.2",
+            "to": "dl/fd.tar.gz",
+            "platform": "linux/amd64",
+            "track": {
+              "resolver": "github-release",
+              "repo": "sharkdp/fd"
+            },
+            "found": {
+              "from": "github-asset"
+            },
+            "sha256": "985e24041e9ef6e9a38e9e088743405dde23d7220aa96740f091862167d9ff28"
+          }
+        ]
       },
       "updatable": true,
       "terms": [
@@ -1273,7 +1359,8 @@
           "label": "fd (MIT)",
           "url": "https://github.com/sharkdp/fd/blob/master/LICENSE-MIT"
         }
-      ]
+      ],
+      "rev": 2
     },
     {
       "name": "ffmpeg",
@@ -1538,11 +1625,11 @@
           "resolver": "approximate",
           "bytes": 120000000
         },
-        "url": "https://github.com/linebender/resvg/releases/latest/download/resvg-linux-x86_64.tar.gz",
+        "url": "https://github.com/linebender/resvg/releases/download/{version}/resvg-linux-x86_64.tar.gz",
         "run": [
           "sh",
           "-ec",
-          "g=\"$(ldd --version 2>/dev/null | head -1 | sed 's/.* //')\"; case \"$g\" in [0-9]*.[0-9]*) ;; *) g=\"\";; esac; if [ -n \"$g\" ] && [ \"$(printf '%s\\n' 2.35 \"$g\" | sort -V | head -1)\" != \"2.35\" ]; then echo \"ImageMagick's AppImage needs glibc 2.35 and this node has $g (Rocky 9 and the other 2.34 systems): the graphics tools cannot run here\" >&2; exit 1; fi; dst=\"$2\"; bin=\"$dst/bin\"; t=\"$(mktemp -d)\"; mkdir -p \"$bin\"; get() { curl -fsSL --retry 3 -o \"$2\" \"$1\"; }; tag() { curl -fsSIL -o /dev/null -w '%{url_effective}' \"https://github.com/$1/releases/latest\" | sed 's#.*/tag/##'; }; v=\"$(tag ImageMagick/ImageMagick)\"; im=\"$t/magick.AppImage\"; get \"https://github.com/ImageMagick/ImageMagick/releases/download/$v/ImageMagick-$v-gcc-x86_64.AppImage\" \"$im\"; chmod +x \"$im\"; (cd \"$t\" && \"$im\" --appimage-extract >/dev/null); rm -rf \"$dst/magick\"; mv \"$t/squashfs-root\" \"$dst/magick\"; ln -sf ../magick/AppRun \"$bin/magick\"; rs=\"$1\"; if ! tar -tzf \"$rs\" >/dev/null 2>&1; then rs=\"$t/resvg.tgz\"; get https://github.com/linebender/resvg/releases/latest/download/resvg-linux-x86_64.tar.gz \"$rs\"; fi; tar -xzf \"$rs\" -C \"$t\"; cp \"$(find \"$t\" -name resvg -type f | head -1)\" \"$bin/\"; v=\"$(tag oxipng/oxipng)\"; get \"https://github.com/oxipng/oxipng/releases/download/$v/oxipng-${v#v}-x86_64-unknown-linux-musl.tar.gz\" \"$t/ox.tgz\"; tar -xzf \"$t/ox.tgz\" -C \"$t\"; cp \"$(find \"$t\" -name oxipng -type f | head -1)\" \"$bin/\"; get https://pngquant.org/pngquant-linux.tar.bz2 \"$t/pq.tbz\"; python3 -c 'import sys, tarfile; tarfile.open(sys.argv[1]).extractall(sys.argv[2])' \"$t/pq.tbz\" \"$t\"; cp \"$(find \"$t\" -name pngquant -type f | head -1)\" \"$bin/\"; wv=\"$(curl -fsS 'https://api.github.com/repos/webmproject/libwebp/tags?per_page=20' | grep -o '\"name\": *\"v[0-9.]*\"' | sed 's/.*\"v//; s/\"//' | sort -V | tail -1)\"; get \"https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-$wv-linux-x86-64.tar.gz\" \"$t/webp.tgz\"; tar -xzf \"$t/webp.tgz\" -C \"$t\"; cp \"$(find \"$t\" -path '*/bin/cwebp' -type f | head -1)\" \"$(find \"$t\" -path '*/bin/dwebp' -type f | head -1)\" \"$bin/\"; chmod +x \"$bin\"/*; rm -rf \"$t\"",
+          "g=\"$(ldd --version 2>/dev/null | head -1 | sed 's/.* //')\"; case \"$g\" in [0-9]*.[0-9]*) ;; *) g=\"\";; esac; if [ -n \"$g\" ] && [ \"$(printf '%s\\n' 2.35 \"$g\" | sort -V | head -1)\" != \"2.35\" ]; then echo \"ImageMagick's AppImage needs glibc 2.35 and this node has $g (Rocky 9 and the other 2.34 systems): the graphics tools cannot run here\" >&2; exit 1; fi; dst=\"$2\"; bin=\"$dst/bin\"; dl=\"$dst/dl\"; t=\"$(mktemp -d)\"; mkdir -p \"$bin\"; im=\"$t/magick.AppImage\"; cp \"$dl/magick.AppImage\" \"$im\"; chmod +x \"$im\"; (cd \"$t\" && \"$im\" --appimage-extract >/dev/null); rm -rf \"$dst/magick\"; mv \"$t/squashfs-root\" \"$dst/magick\"; ln -sf ../magick/AppRun \"$bin/magick\"; tar -xzf \"$1\" -C \"$t\"; cp \"$(find \"$t\" -name resvg -type f | head -1)\" \"$bin/\"; tar -xzf \"$dl/oxipng.tar.gz\" -C \"$t\"; cp \"$(find \"$t\" -name oxipng -type f | head -1)\" \"$bin/\"; python3 -c 'import sys, tarfile; tarfile.open(sys.argv[1]).extractall(sys.argv[2])' \"$dl/pngquant.tar.bz2\" \"$t\"; cp \"$(find \"$t\" -name pngquant -type f | head -1)\" \"$bin/\"; tar -xzf \"$dl/webp.tar.gz\" -C \"$t\"; cp \"$(find \"$t\" -path '*/bin/cwebp' -type f | head -1)\" \"$(find \"$t\" -path '*/bin/dwebp' -type f | head -1)\" \"$bin/\"; chmod +x \"$bin\"/*; rm -rf \"$t\" \"$dl\"",
           "--",
           "{script}",
           "{dir}"
@@ -1552,8 +1639,67 @@
           "-version"
         ],
         "checksum": {
-          "from": "github-asset"
-        }
+          "from": "pin",
+          "version": "v0.50.0",
+          "sha256": "5d1c9ffd43c82fb802d92cef8100055c612cd3e248d5a787c20079293a456e21",
+          "found": {
+            "from": "github-asset"
+          }
+        },
+        "version": {
+          "resolver": "github-release",
+          "repo": "linebender/resvg"
+        },
+        "fetch": [
+          {
+            "url": "https://github.com/ImageMagick/ImageMagick/releases/download/{version}/ImageMagick-{version}-x86_64.AppImage",
+            "version": "7.1.2-36",
+            "to": "dl/magick.AppImage",
+            "platform": "linux/amd64",
+            "track": {
+              "resolver": "github-release",
+              "repo": "ImageMagick/ImageMagick"
+            },
+            "found": {
+              "from": "github-asset"
+            },
+            "sha256": "68cca0053a8f82206e72400014f32f4b654e9807f45928a2325a1d14d695fb3a"
+          },
+          {
+            "url": "https://github.com/oxipng/oxipng/releases/download/v{version}/oxipng-{version}-x86_64-unknown-linux-musl.tar.gz",
+            "version": "10.2.1",
+            "to": "dl/oxipng.tar.gz",
+            "platform": "linux/amd64",
+            "track": {
+              "resolver": "github-release",
+              "repo": "oxipng/oxipng",
+              "trim_prefix": "v"
+            },
+            "found": {
+              "from": "github-asset"
+            },
+            "sha256": "1813750ef592c5350ca79c88f98b2c0876d05c826dc7156245256d4255c1ad17"
+          },
+          {
+            "url": "https://pngquant.org/pngquant-linux.tar.bz2",
+            "to": "dl/pngquant.tar.bz2",
+            "platform": "linux/amd64",
+            "sha256": "25d09032f48760d34397155f3267ffadfbbbaeb2b8b39496022fc2ef1d82529e"
+          },
+          {
+            "url": "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-{version}-linux-x86-64.tar.gz",
+            "version": "1.6.0",
+            "to": "dl/webp.tar.gz",
+            "platform": "linux/amd64",
+            "track": {
+              "resolver": "git-tag",
+              "url": "https://github.com/webmproject/libwebp.git",
+              "match": "^v\\d+\\.\\d+\\.\\d+$",
+              "trim_prefix": "v"
+            },
+            "sha256": "1c5ffab71efecefa0e3c23516c3a3a1dccb45cc310ae1095c6f14ae268e38067"
+          }
+        ]
       },
       "system": {
         "apt": [
@@ -1600,7 +1746,8 @@
           "label": "libwebp (BSD)",
           "url": "https://github.com/webmproject/libwebp/blob/main/COPYING"
         }
-      ]
+      ],
+      "rev": 2
     },
     {
       "name": "diagrams",

@@ -206,15 +206,18 @@ class Shipped(sdkstore.KitCase):
             self.assertEqual((src["kind"], src["verify"], [k for k in ("run", "then", "warm", "fetch", "online") if k in src]),
                              ("tarball", verify, []), name)
         # A row that says online keeps the network, in its own sentence; any
-        # other whose own download its entry holds is cut by that alone, its
-        # installer's run included; and one that declares nothing is
-        # installed as it always was.
+        # other whose own download its entry holds, or that declares
+        # downloads, is cut by that alone, its installer's run included,
+        # with a line for each download it declares; and one that declares
+        # nothing is installed as it always was.
         for name, r in rows.items():
             plan, online = sdkmeta.declared_plan(r), " ".join(str(r["source"].get("online") or "").split())
+            declares = r["source"].get("fetch") or []
             if online:
                 self.assertEqual(plan[0], f"net\x1fonline\x1f{online}", name)
             else:
-                self.assertEqual(plan, ["net\x1fcut\x1f"] if sdkmeta.held_by_entry(r) else [], name)
+                self.assertEqual(plan[:1], ["net\x1fcut\x1f"] if sdkmeta.held_by_entry(r) or declares else [], name)
+            self.assertEqual([ln.split("\x1f")[0] for ln in plan[1:]], [("fetch" if sdkmeta.on_platform(f.get("platform")) else "skip") for f in declares], name)
         self.assertEqual((sdkmeta.declared_plan(rows["playwright"]), sdkmeta.held_by_entry(rows["playwright"])), ([], False))
         tools = rows["android-tools"]
         self.assertEqual((sdkmeta.held_by_entry(tools), tools["source"]["kind"], "online" in tools["source"]), (True, "script", False),
