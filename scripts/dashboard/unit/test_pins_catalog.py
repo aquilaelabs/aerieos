@@ -167,7 +167,7 @@ class Shipped(Case):
         spec.loader.exec_module(real)
         self.assertEqual([(os.path.relpath(t, REPO), os.path.relpath(a, REPO) if a else "") for t, a in real.SHIPPED],
                          [("config/toolchains.json", "scripts/dashboard/agent-recipes.json"), ("scripts/dashboard/runner-pins.json", ""),
-                          ("scripts/dashboard/service-images.json", "")])
+                          ("scripts/dashboard/service-images.json", ""), ("config/image-tools.json", "")])
         for table, recipes in real.SHIPPED:
             doc = real.table_doc(table, recipes)
             self.assertTrue(real.table(doc), table)

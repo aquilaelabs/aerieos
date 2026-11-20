@@ -117,27 +117,28 @@ RUN set -eux; \
 # ---------------------------------------------------------------------------
 # Linters for the file types every project here carries: Dockerfiles, GitHub
 # workflows, YAML, Python. shellcheck came from apt above; these three are
-# static single binaries with no Ubuntu package worth having. Resolved to the
-# newest release at build time, same policy as the runner and bundletool:
-# the weekly rebuild is what keeps them current. `ruff` installs via pipx so
-# it is isolated from both the system Python and any project venv.
+# static single binaries with no Ubuntu package worth having. `ruff`
+# installs via pipx so it is isolated from both the system Python and any
+# project venv.
 #
-# Each one held to the digest GitHub states for it (scripts/lib/gh-fetch,
-# B335), which asks GitHub's release API: anonymously it allows 60 calls an
-# hour per address and CI's shared addresses have usually spent them, so CI
-# hands the build its token as a secret (gh_token), in no layer of the image.
+# Each of the three is the release its row in config/image-tools.json pins:
+# a version, and the sha256 of the exact file, which scripts/lib/pin-fetch
+# holds the download to before it is kept. Nothing is asked what is newest,
+# so an image built again holds the same files until a pin moves, and
+# tools/pins.py moves one (check, move, verify, with the other tables).
 #
 # The point of having them *in the image* rather than only in CI: a session
 # (or a person) can run the same checks CI will run, before the push. That
 # is what `aerie lint` does.
 # ---------------------------------------------------------------------------
-COPY scripts/lib/gh-fetch /usr/local/bin/bb-gh-fetch
-RUN --mount=type=secret,id=gh_token,required=false \
-    set -eux; \
-    bb-gh-fetch hadolint/hadolint latest 'hadolint-linux-x86_64' /usr/local/bin/hadolint; \
-    bb-gh-fetch mikefarah/yq latest 'yq_linux_amd64' /usr/local/bin/yq; \
+COPY scripts/lib/pin-fetch /usr/local/bin/bb-pin-fetch
+COPY config/image-tools.json /opt/aerieos/config/image-tools.json
+RUN set -eux; \
+    pins=/opt/aerieos/config/image-tools.json; \
+    bb-pin-fetch "$pins" hadolint linux/amd64 /usr/local/bin/hadolint; \
+    bb-pin-fetch "$pins" yq linux/amd64 /usr/local/bin/yq; \
     chmod +x /usr/local/bin/hadolint /usr/local/bin/yq; \
-    bb-gh-fetch rhysd/actionlint latest 'actionlint_*_linux_amd64.tar.gz' /tmp/actionlint.tar.gz; \
+    bb-pin-fetch "$pins" actionlint linux/amd64 /tmp/actionlint.tar.gz; \
     tar -xzf /tmp/actionlint.tar.gz -C /usr/local/bin actionlint; \
     rm -f /tmp/actionlint.tar.gz; \
     PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install ruff; \
@@ -149,17 +150,17 @@ RUN --mount=type=secret,id=gh_token,required=false \
 # ---------------------------------------------------------------------------
 # Language/version tooling that lives outside apt: uv (Python) and mise.
 #
-# Each vendor's release asset, held to GitHub's digest for it (B335), where
-# a vendor's install script piped into sh was taken on trust. The final
-# `--version` calls make a silently-missing tool a build failure rather than
-# a runtime surprise.
+# Each vendor's release asset as config/image-tools.json pins it, held to
+# the pinned sha256 (scripts/lib/pin-fetch), where a vendor's install script
+# piped into sh was taken on trust. The final `--version` calls make a
+# silently-missing tool a build failure rather than a runtime surprise.
 # ---------------------------------------------------------------------------
-RUN --mount=type=secret,id=gh_token,required=false \
-    set -eux; \
-    bb-gh-fetch astral-sh/uv latest 'uv-x86_64-unknown-linux-gnu.tar.gz' /tmp/uv.tar.gz; \
+RUN set -eux; \
+    pins=/opt/aerieos/config/image-tools.json; \
+    bb-pin-fetch "$pins" uv linux/amd64 /tmp/uv.tar.gz; \
     tar -xzf /tmp/uv.tar.gz -C /usr/local/bin --strip-components=1 uv-x86_64-unknown-linux-gnu/uv uv-x86_64-unknown-linux-gnu/uvx; \
     rm -f /tmp/uv.tar.gz; \
-    bb-gh-fetch jdx/mise latest 'mise-v*-linux-x64' /usr/local/bin/mise; \
+    bb-pin-fetch "$pins" mise linux/amd64 /usr/local/bin/mise; \
     chmod +x /usr/local/bin/uv /usr/local/bin/uvx /usr/local/bin/mise; \
     uv --version; \
     mise --version
@@ -263,19 +264,18 @@ RUN set -eux; \
     test -f /opt/aerieos/novnc/core/rfb.js
 
 # cloudflared: the home tunnel the controller can run itself (R176), from
-# Cloudflare's release for this architecture. Latest rather than pinned,
-# like the provisioner's copy on a node: the client is kept in step with
-# Cloudflare's edge by the weekly rebuild, and a pin here would be the one
-# copy left behind. Absent on an architecture it is not built for, and the
+# Cloudflare's release for this architecture, the one config/image-tools.json
+# pins, held to the pinned sha256 (scripts/lib/pin-fetch): the client moves
+# when its pin does (tools/pins.py), where the newest release of the day of
+# the build was taken. Absent on an architecture it is not built for, and the
 # Settings tab then says the tunnel cannot run from here.
-RUN --mount=type=secret,id=gh_token,required=false \
-    set -eux; \
+RUN set -eux; \
     arch="$(dpkg --print-architecture)"; \
     case "$arch" in \
         amd64|arm64) ;; \
         *) echo "no cloudflared build for ${arch}; the home tunnel is not run from here"; exit 0 ;; \
     esac; \
-    bb-gh-fetch cloudflare/cloudflared latest "cloudflared-linux-${arch}" /usr/local/bin/cloudflared; \
+    bb-pin-fetch /opt/aerieos/config/image-tools.json cloudflared "linux/${arch}" /usr/local/bin/cloudflared; \
     chmod +x /usr/local/bin/cloudflared; \
     cloudflared --version
 

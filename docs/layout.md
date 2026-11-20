@@ -69,7 +69,7 @@ scripts/
   lib/syncwait.py                a session's aerie on a synced node waits for its copy to be in step with the controller's (R163)
   lib/codemap.py                 the code map aerie map answers from: an index over the tree, rebuilt when a source is newer (R75)
   lib/trace-verbs.py             aerie dashboard trace: what the server was asked over a window, by endpoint and asker
-  lib/gh-fetch                   one GitHub release asset, kept only when it matches the digest GitHub states for it: the image and the bare-metal installer fetch their own tools with it (B335)
+  lib/pin-fetch                  one file a table pins (config/image-tools.json), kept only when it is the pinned bytes: the image and the bare-metal installer fetch their own tools with it
   lib/sdkmeta.py                 reads config/toolchains.json for aerie (on a node, the catalog's newer rows beside it where the bundle carries them), with the tool packs beside it: fields, argv, versions, what a download is held to (its publisher's word, a pin, a signature), the files a row carries into its directory and an install's receipt
   lib/toolpack-run.py            `aerie tool PACK VERB`: a tool pack's verb from its manifest, the caller's words in place of {args}
   lib/docker-probe.py            which daemon is live, for `aerie doctor` and the boot log
@@ -442,6 +442,7 @@ config/release-keys/swift.asc    the Swift signing keys that sign each download
 config/controller.env            a bare-metal install's env file as the installer first writes it: the paths compose mounts, the settings compose passes (R90)
 config/controller-packages.tsv   what the controller needs installed, per provisioner family: the image and a bare-metal install read this one list (R90)
 config/vm-images.json            the operating systems a VM is made from: each publisher's cloud image and its checksum file (R91)
+config/image-tools.json         the programs the controller's image takes from their vendors' releases as it is built (cloudflared, hadolint, yq, actionlint, uv, mise), each pinned to a version and the sha256 of the file for each architecture: the Dockerfile and the bare-metal installer read it (scripts/lib/pin-fetch), tools/pins.py moves it (R267 step 17)
 config/templates/                briefing.md, assembled per session by preamble.py; nothing is copied into a project
 tools/readme-shots.mjs           the README's pictures (dashboard, notebook, nodes, toolchains, the phone's dashboard and terminal) from a running dashboard, normally the dev instance: default scheme, addresses scrubbed, nothing saved
 tools/sign-agent.py              the release's signatures over what a build sends its nodes (R227, R267 step 6): --keygen makes the key pair once, a release build signs the agent's digest, root's tools and the list of the bundle's files into scripts/agent/agent.sig with the key from its secret, --check holds all three to the committed public key, --digests prints what a tree would be signed as

@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# pin-fetch TABLE NAME PLATFORM DEST
+#
+# One file a table pins, kept only when it is the pinned bytes: the row
+# NAME of TABLE (config/image-tools.json, which tools/pins.py moves) gives
+# the version, the address for PLATFORM (linux/amd64, linux/arm64) and the
+# sha256 of the exact file; the address is fetched and its sha256 compared.
+# A table with no such row, a row with no pin for the platform or a
+# download that differs is refused, and DEST is left as it was. Prints the
+# pinned version on success.
+#
+# Used where the image and the bare-metal installer fetch their own tools
+# (the Dockerfile and nodes/install-controller.sh), which run before the
+# dashboard and its sdkmeta.py are in place: bash, curl, sha256sum and
+# python3 alone. Nobody is asked what is newest: a newer release arrives as
+# a change to the table.
+set -euo pipefail
+
+table="${1:?the table of pins}" name="${2:?the name of a row}" plat="${3:?a platform, linux/amd64}" dest="${4:?where to keep it}"
+[ -r "$table" ] || { echo "pin-fetch: cannot read ${table}" >&2; exit 2; }
+
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+
+# The pinned version, the pinned sha256 and the address, of the row's file for the platform.
+python3 - "$table" "$name" "$plat" > "$tmp/pin" <<'PY' || exit 1
+import json, re, sys
+path, name, plat = sys.argv[1:4]
+try:
+    rows = json.load(open(path, encoding="utf-8")).get("tools")
+except (OSError, ValueError) as e:
+    sys.exit(f"pin-fetch: {path} is no table of pins ({e})")
+row = next((r for r in rows if isinstance(r, dict) and r.get("name") == name), None) if isinstance(rows, list) else None
+if row is None:
+    sys.exit(f"pin-fetch: {path} pins nothing named {name}")
+src = row.get("source") if isinstance(row.get("source"), dict) else {}
+pin = src.get("checksum") if isinstance(src.get("checksum"), dict) else {}
+version = str(pin.get("version") or "")
+if pin.get("from") != "pin" or not version:
+    sys.exit(f"pin-fetch: {name} is not pinned in {path}: tools/pins.py pin {name} --file {path} pins it")
+def of(value):
+    return value.get(plat) if isinstance(value, dict) else value
+digest, url = of(pin.get("sha256")), of(src.get("url"))
+if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest) or not isinstance(url, str) or not url:
+    sys.exit(f"pin-fetch: {name} is not pinned for {plat} in {path}")
+url = url.replace("{version}", version)
+if not re.fullmatch(r"https?://[^\s]+", url):
+    sys.exit(f"pin-fetch: the address of {name} for {plat} is no address: {url}")
+print(version, digest, url)
+PY
+read -r version want url < "$tmp/pin"
+
+curl -fsSL --retry 3 -o "$tmp/file" "$url" || { echo "pin-fetch: could not download ${url}" >&2; exit 1; }
+got="$(sha256sum "$tmp/file" | cut -d' ' -f1)"
+if [ "$got" != "$want" ]; then
+    echo "pin-fetch: ${name} ${version} for ${plat} is not the pinned file (sha256 ${got}, pinned ${want}): not kept" >&2
+    exit 1
+fi
+mv -f "$tmp/file" "$dest"
+printf '%s\n' "$version"

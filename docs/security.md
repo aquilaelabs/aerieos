@@ -530,6 +530,19 @@ repositories and another for its rpm ones), and the RHEL family's
 repository file is written there with its `gpgkey` naming that copy,
 where Docker's own file names an address to fetch the key from.
 
+**The image's own tools are held to a pin.** What the controller's image
+takes from a vendor's GitHub release as it is built (cloudflared for the
+home tunnel, the linters hadolint, yq and actionlint, uv and mise) is a
+version this tree names, with the sha256 of the exact file for each
+architecture, in one table (`config/image-tools.json`). The Dockerfile and
+the bare-metal installer fetch each through `scripts/lib/pin-fetch`, which
+keeps a file only when it is those bytes and asks nobody what is newest,
+so an image built again holds the same files until a pin moves;
+`tools/pins.py` checks, moves and verifies the table with the others. What
+this does not cover: ruff, which pipx installs at its newest, and the
+packages apt installs from the distribution's and three vendors' own
+sources as the image is built.
+
 **A CI runner's program is held to a pin.** The runner a node installs
 (GitHub's Actions runner, or the one Gitea and Forgejo share) is a
 version this build names, with the sha256 of the exact file for each

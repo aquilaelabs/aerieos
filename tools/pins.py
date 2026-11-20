@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Moves the pins of what AerieOS ships: the toolchains (config/toolchains.json),
-the coding agents' recipes, the CI runners and the images its services run.
+the coding agents' recipes, the CI runners, the images its services run and
+the programs the controller's image takes from their vendors as it is built.
 
 Whatever a row fetches from somewhere else is held to something the row
 itself carries: the sha256 of the exact file, or, for a repository, a
@@ -27,8 +28,8 @@ replaces the lock's set whole, leaving the row's other downloads alone.
                                       a row names holds the row where it is: said, and not a move.
                                       With nothing named and no table named, everything this tree
                                       ships that carries a pin: the toolchains, the coding agents'
-                                      recipes, the CI runners and the services' images, so a
-                                      release's pass is this one command.
+                                      recipes, the CI runners, the services' images and the
+                                      image's own tools, so a release's pass is this one command.
     tools/pins.py move [NAME...]      writes the new version and digests into the table for the rows
                                       named (every pinned row with none named), every platform a row
                                       names or none of them, raises the row's rev by one, and runs
@@ -64,12 +65,14 @@ for several platforms, which covers each of them; a row may name the platforms i
 
     --file PATH     another table than config/toolchains.json. The official packs are written only
                     for the shipped one, and the coding agents' recipes are read beside it alone.
-                    A table lists its rows under toolchains, under runners or under services: the
-                    CI runners a node installs are pinned the same way, in
-                    scripts/dashboard/runner-pins.json, and the images of AerieOS's own services
-                    in scripts/dashboard/service-images.json, and --file with either path checks,
-                    moves, pins and verifies them. A move of the shipped services' images writes
-                    packs/services again.
+                    A table lists its rows under toolchains, under runners, under services or
+                    under tools: the CI runners a node installs are pinned the same way, in
+                    scripts/dashboard/runner-pins.json, the images of AerieOS's own services
+                    in scripts/dashboard/service-images.json, and the programs the controller's
+                    image takes from their vendors' releases as it is built (cloudflared, the
+                    linters, uv and mise) in config/image-tools.json, which the Dockerfile reads;
+                    --file with any of those paths checks, moves, pins and verifies them. A move
+                    of the shipped services' images writes packs/services again.
     --compose FILE  the images a compose file names, in the table's place: a Docker app's
                     compose.yml in the catalog. The file is one row, named for its folder, and a
                     move or a pin rewrites its image lines and nothing else of it.
@@ -128,13 +131,17 @@ ALSO = ("sha1", "sha512")
 SERVICES = os.path.join(ROOT, "scripts", "dashboard", "service-images.json")
 # The CI runners a node installs, the one copy of them (runners.py).
 RUNNERS = os.path.join(ROOT, "scripts", "dashboard", "runner-pins.json")
+# The programs the controller's image takes from their vendors' releases as
+# it is built, the one copy of them (the Dockerfile, scripts/lib/pin-fetch).
+IMAGE_TOOLS = os.path.join(ROOT, "config", "image-tools.json")
 # Everything this tree ships that carries a pin: each table, and the file
 # of the coding agents' recipes read beside the toolchains'.
-SHIPPED = ((TABLE, AGENTS), (RUNNERS, ""), (SERVICES, ""))
+SHIPPED = ((TABLE, AGENTS), (RUNNERS, ""), (SERVICES, ""), (IMAGE_TOOLS, ""))
 # The name a table's document lists its rows under: the toolchains', the
-# CI runners' (scripts/dashboard/runner-pins.json), whose rows are written
-# as a toolchain's source is, or the services', whose rows name images.
-LISTS = ("toolchains", "runners", "services")
+# CI runners' (scripts/dashboard/runner-pins.json) and the image's own
+# tools' (config/image-tools.json), whose rows are written as a toolchain's
+# source is, or the services', whose rows name images.
+LISTS = ("toolchains", "runners", "services", "tools")
 
 
 class Refused(Exception):
@@ -1512,7 +1519,8 @@ def main(argv, out=print):
             return 1 if bad else code
         if verb == "check" and not names and not any(k in opts for k in ("file", "compose", "agents")):
             # Everything this tree ships that carries a pin: the toolchains
-            # with the coding agents' recipes, the CI runners, the services' images.
+            # with the coding agents' recipes, the CI runners, the services'
+            # images, the image's own tools.
             docs = []
             for reading, recipes in SHIPPED:
                 docs.append(table_doc(reading, recipes))
