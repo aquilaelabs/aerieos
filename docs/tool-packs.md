@@ -102,6 +102,14 @@ in the entry.
 In a manifest each download is a row of `install.fetch`: the address it
 comes from, the file inside the pack it is kept as, and what holds it.
 
+A download lands inside the pack's own directory, on the node's toolchain
+store. A step that puts one in its place moves it (`mv`) or unpacks it; it
+does not copy it (`cp`) to another place in the same directory. A store is
+often a network share, and on some of them a copy made from one file of the
+share to another leaves both held open on the file server for a while, so
+the step's own clean-up, or a later removal, ends on a directory that is
+not empty.
+
 **A pinned download, one per platform.** The sha256 of what the address
 answers, and the platform the file is for:
 

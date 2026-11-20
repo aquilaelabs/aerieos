@@ -138,7 +138,7 @@
    "run": [
     "sh",
     "-ec",
-    "dst=\"$2/bin\"; dl=\"$2/dl\"; t=\"$(mktemp -d)\"; mkdir -p \"$dst\"; cp \"$1\" \"$dst/hadolint\"; cp \"$dl/yq\" \"$dst/yq\"; tar -xzf \"$dl/ruff.tar.gz\" -C \"$t\"; cp \"$(find \"$t\" -name ruff -type f | head -1)\" \"$dst/\"; tar -xJf \"$dl/shellcheck.tar.xz\" -C \"$t\"; cp \"$(find \"$t\" -name shellcheck -type f | head -1)\" \"$dst/\"; tar -xzf \"$dl/actionlint.tar.gz\" -C \"$t\" actionlint; cp \"$t/actionlint\" \"$dst/\"; tar -xzf \"$dl/fd.tar.gz\" -C \"$t\"; cp \"$(find \"$t\" -name fd -type f | head -1)\" \"$dst/\"; chmod +x \"$dst\"/*; rm -rf \"$t\" \"$dl\"",
+    "dst=\"$2/bin\"; dl=\"$2/dl\"; t=\"$(mktemp -d)\"; mkdir -p \"$dst\"; cp \"$1\" \"$dst/hadolint\"; mv \"$dl/yq\" \"$dst/yq\"; tar -xzf \"$dl/ruff.tar.gz\" -C \"$t\"; cp \"$(find \"$t\" -name ruff -type f | head -1)\" \"$dst/\"; tar -xJf \"$dl/shellcheck.tar.xz\" -C \"$t\"; cp \"$(find \"$t\" -name shellcheck -type f | head -1)\" \"$dst/\"; tar -xzf \"$dl/actionlint.tar.gz\" -C \"$t\" actionlint; cp \"$t/actionlint\" \"$dst/\"; tar -xzf \"$dl/fd.tar.gz\" -C \"$t\"; cp \"$(find \"$t\" -name fd -type f | head -1)\" \"$dst/\"; chmod +x \"$dst\"/*; rm -rf \"$t\" \"$dl\"",
     "--",
     "{script}",
     "{dir}"

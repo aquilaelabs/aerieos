@@ -1158,7 +1158,7 @@
         "run": [
           "sh",
           "-ec",
-          "d=\"$1\"; t=\"$(mktemp -d)\"; npm cache add --cache \"$t\" --no-update-notifier \"$d\"/dl/npm/*.tgz >/dev/null; cp \"$d\"/dl/npm/package.json \"$d\"/dl/npm/package-lock.json \"$d\"/; npm ci --offline --cache \"$t\" --ignore-scripts --no-audit --no-fund --no-update-notifier --loglevel=error --prefix \"$d\"; rm -rf \"$t\" \"$d\"/dl; \"$d/node_modules/.bin/playwright\" install chromium firefox webkit",
+          "d=\"$1\"; t=\"$(mktemp -d)\"; npm cache add --cache \"$t\" --no-update-notifier \"$d\"/dl/npm/*.tgz >/dev/null; mv \"$d\"/dl/npm/package.json \"$d\"/dl/npm/package-lock.json \"$d\"/; npm ci --offline --cache \"$t\" --ignore-scripts --no-audit --no-fund --no-update-notifier --loglevel=error --prefix \"$d\"; rm -rf \"$t\" \"$d\"/dl; \"$d/node_modules/.bin/playwright\" install chromium firefox webkit",
           "--",
           "{dir}"
         ],
@@ -1267,7 +1267,7 @@
         "run": [
           "sh",
           "-ec",
-          "dst=\"$2/bin\"; dl=\"$2/dl\"; t=\"$(mktemp -d)\"; mkdir -p \"$dst\"; cp \"$1\" \"$dst/hadolint\"; cp \"$dl/yq\" \"$dst/yq\"; tar -xzf \"$dl/ruff.tar.gz\" -C \"$t\"; cp \"$(find \"$t\" -name ruff -type f | head -1)\" \"$dst/\"; tar -xJf \"$dl/shellcheck.tar.xz\" -C \"$t\"; cp \"$(find \"$t\" -name shellcheck -type f | head -1)\" \"$dst/\"; tar -xzf \"$dl/actionlint.tar.gz\" -C \"$t\" actionlint; cp \"$t/actionlint\" \"$dst/\"; tar -xzf \"$dl/fd.tar.gz\" -C \"$t\"; cp \"$(find \"$t\" -name fd -type f | head -1)\" \"$dst/\"; chmod +x \"$dst\"/*; rm -rf \"$t\" \"$dl\"",
+          "dst=\"$2/bin\"; dl=\"$2/dl\"; t=\"$(mktemp -d)\"; mkdir -p \"$dst\"; cp \"$1\" \"$dst/hadolint\"; mv \"$dl/yq\" \"$dst/yq\"; tar -xzf \"$dl/ruff.tar.gz\" -C \"$t\"; cp \"$(find \"$t\" -name ruff -type f | head -1)\" \"$dst/\"; tar -xJf \"$dl/shellcheck.tar.xz\" -C \"$t\"; cp \"$(find \"$t\" -name shellcheck -type f | head -1)\" \"$dst/\"; tar -xzf \"$dl/actionlint.tar.gz\" -C \"$t\" actionlint; cp \"$t/actionlint\" \"$dst/\"; tar -xzf \"$dl/fd.tar.gz\" -C \"$t\"; cp \"$(find \"$t\" -name fd -type f | head -1)\" \"$dst/\"; chmod +x \"$dst\"/*; rm -rf \"$t\" \"$dl\"",
           "--",
           "{script}",
           "{dir}"
@@ -2300,7 +2300,7 @@
         "run": [
           "sh",
           "-ec",
-          "dst=\"$2\"; mkdir -p \"$dst/bin\" \"$dst/lib\"; cp \"$1\" \"$dst/lib/plantuml.jar\"; printf '#!/bin/sh\\nhere=\"$(dirname \"$(readlink -f \"$0\")\")\"\\nexec \"${JAVA:-java}\" -Djava.awt.headless=true -jar \"$here/../lib/plantuml.jar\" \"$@\"\\n' > \"$dst/bin/plantuml\"; chmod +x \"$dst/bin/plantuml\"; t=\"$(mktemp -d)\"; npm cache add --cache \"$t\" --no-update-notifier \"$dst\"/dl/npm/*.tgz >/dev/null; cp \"$dst\"/dl/npm/package.json \"$dst\"/dl/npm/package-lock.json \"$dst\"/; npm ci --offline --cache \"$t\" --ignore-scripts --no-audit --no-fund --no-update-notifier --loglevel=error --prefix \"$dst\"; rm -rf \"$t\" \"$dst\"/dl; ln -sf ../node_modules/.bin/mmdc \"$dst/bin/mmdc\"",
+          "dst=\"$2\"; mkdir -p \"$dst/bin\" \"$dst/lib\"; cp \"$1\" \"$dst/lib/plantuml.jar\"; printf '#!/bin/sh\\nhere=\"$(dirname \"$(readlink -f \"$0\")\")\"\\nexec \"${JAVA:-java}\" -Djava.awt.headless=true -jar \"$here/../lib/plantuml.jar\" \"$@\"\\n' > \"$dst/bin/plantuml\"; chmod +x \"$dst/bin/plantuml\"; t=\"$(mktemp -d)\"; npm cache add --cache \"$t\" --no-update-notifier \"$dst\"/dl/npm/*.tgz >/dev/null; mv \"$dst\"/dl/npm/package.json \"$dst\"/dl/npm/package-lock.json \"$dst\"/; npm ci --offline --cache \"$t\" --ignore-scripts --no-audit --no-fund --no-update-notifier --loglevel=error --prefix \"$dst\"; rm -rf \"$t\" \"$dst\"/dl; ln -sf ../node_modules/.bin/mmdc \"$dst/bin/mmdc\"",
           "--",
           "{script}",
           "{dir}"
@@ -3929,7 +3929,7 @@
         "run": [
           "sh",
           "-ec",
-          "d=\"$1\"; t=\"$(mktemp -d)\"; npm cache add --cache \"$t\" --no-update-notifier \"$d\"/dl/npm/*.tgz >/dev/null; cp \"$d\"/dl/npm/package.json \"$d\"/dl/npm/package-lock.json \"$d\"/; npm ci --offline --cache \"$t\" --ignore-scripts --no-audit --no-fund --no-update-notifier --loglevel=error --prefix \"$d\"; rm -rf \"$t\" \"$d\"/dl",
+          "d=\"$1\"; t=\"$(mktemp -d)\"; npm cache add --cache \"$t\" --no-update-notifier \"$d\"/dl/npm/*.tgz >/dev/null; mv \"$d\"/dl/npm/package.json \"$d\"/dl/npm/package-lock.json \"$d\"/; npm ci --offline --cache \"$t\" --ignore-scripts --no-audit --no-fund --no-update-notifier --loglevel=error --prefix \"$d\"; rm -rf \"$t\" \"$d\"/dl",
           "--",
           "{dir}"
         ],

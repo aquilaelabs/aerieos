@@ -1029,7 +1029,7 @@
    "run": [
     "sh",
     "-ec",
-    "dst=\"$2\"; mkdir -p \"$dst/bin\" \"$dst/lib\"; cp \"$1\" \"$dst/lib/plantuml.jar\"; printf '#!/bin/sh\\nhere=\"$(dirname \"$(readlink -f \"$0\")\")\"\\nexec \"${JAVA:-java}\" -Djava.awt.headless=true -jar \"$here/../lib/plantuml.jar\" \"$@\"\\n' > \"$dst/bin/plantuml\"; chmod +x \"$dst/bin/plantuml\"; t=\"$(mktemp -d)\"; npm cache add --cache \"$t\" --no-update-notifier \"$dst\"/dl/npm/*.tgz >/dev/null; cp \"$dst\"/dl/npm/package.json \"$dst\"/dl/npm/package-lock.json \"$dst\"/; npm ci --offline --cache \"$t\" --ignore-scripts --no-audit --no-fund --no-update-notifier --loglevel=error --prefix \"$dst\"; rm -rf \"$t\" \"$dst\"/dl; ln -sf ../node_modules/.bin/mmdc \"$dst/bin/mmdc\"",
+    "dst=\"$2\"; mkdir -p \"$dst/bin\" \"$dst/lib\"; cp \"$1\" \"$dst/lib/plantuml.jar\"; printf '#!/bin/sh\\nhere=\"$(dirname \"$(readlink -f \"$0\")\")\"\\nexec \"${JAVA:-java}\" -Djava.awt.headless=true -jar \"$here/../lib/plantuml.jar\" \"$@\"\\n' > \"$dst/bin/plantuml\"; chmod +x \"$dst/bin/plantuml\"; t=\"$(mktemp -d)\"; npm cache add --cache \"$t\" --no-update-notifier \"$dst\"/dl/npm/*.tgz >/dev/null; mv \"$dst\"/dl/npm/package.json \"$dst\"/dl/npm/package-lock.json \"$dst\"/; npm ci --offline --cache \"$t\" --ignore-scripts --no-audit --no-fund --no-update-notifier --loglevel=error --prefix \"$dst\"; rm -rf \"$t\" \"$dst\"/dl; ln -sf ../node_modules/.bin/mmdc \"$dst/bin/mmdc\"",
     "--",
     "{script}",
     "{dir}"

@@ -85,7 +85,7 @@
    "run": [
     "sh",
     "-ec",
-    "d=\"$1\"; t=\"$(mktemp -d)\"; npm cache add --cache \"$t\" --no-update-notifier \"$d\"/dl/npm/*.tgz >/dev/null; cp \"$d\"/dl/npm/package.json \"$d\"/dl/npm/package-lock.json \"$d\"/; npm ci --offline --cache \"$t\" --ignore-scripts --no-audit --no-fund --no-update-notifier --loglevel=error --prefix \"$d\"; rm -rf \"$t\" \"$d\"/dl",
+    "d=\"$1\"; t=\"$(mktemp -d)\"; npm cache add --cache \"$t\" --no-update-notifier \"$d\"/dl/npm/*.tgz >/dev/null; mv \"$d\"/dl/npm/package.json \"$d\"/dl/npm/package-lock.json \"$d\"/; npm ci --offline --cache \"$t\" --ignore-scripts --no-audit --no-fund --no-update-notifier --loglevel=error --prefix \"$d\"; rm -rf \"$t\" \"$d\"/dl",
     "--",
     "{dir}"
    ]
