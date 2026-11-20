@@ -333,9 +333,11 @@ def handler_calls(text):
 API_PATH = re.compile(r"(/api/[\w/.-]+)")
 TREE_FILE = re.compile(r"(?<![\w/])((?:scripts|config|tools|docs)/[\w./-]+)")
 # The server's route table: a kind, an API path and the handler's name, on
-# one line. How a python change reaches a suite: the module's functions are
-# called from a handler, the handler answers a path, and the suite asks it.
-ROUTE = re.compile(r"""\(\s*"\w+"\s*,\s*"(/api/[^"]+)"\s*,\s*"(\w+)"\s*\)""")
+# one line, as a tuple of the three or inside a longer record that goes on
+# (Route("GET", "exact", "/api/live", "_get_live", "handler")). How a python
+# change reaches a suite: the module's functions are called from a handler,
+# the handler answers a path, and the suite asks it.
+ROUTE = re.compile(r"""[(,]\s*"\w+"\s*,\s*"(/api/[^"]+)"\s*,\s*"(\w+)"\s*[,)]""")
 
 
 def strings_draw(s):

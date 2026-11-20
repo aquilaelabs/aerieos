@@ -96,6 +96,25 @@ class JavaScript(unittest.TestCase):
                                "5  function (anonymous) passed to add_filter"])
 
 
+class Routes(unittest.TestCase):
+    """A route table's rows, which are how a python change reaches the
+    suites that ask its paths."""
+
+    def test_a_row_is_read_as_a_tuple_of_three_and_inside_a_longer_record(self):
+        s = scan('GET = (("exact", "/api/live", "_get_live"),\n'
+                 '       ("prefix", "/api/files/", "_get_files"))\n'
+                 'ROUTES = (Route("GET", "exact", "/api/home", "_get_home", "handler"),\n'
+                 '          Route("POST", "prefix", "/api/v1/files", "_files_post", "person", max_body=4096),\n'
+                 '          Route("POST", "door", "/api/upload", "_upload"))\n'
+                 'said = ("see", "/api/docs", "for more")  # three strings, and a path\n'
+                 'x = f("/api/alone")\n', "server.py")
+        got = {(r["path"], r["handler"]) for r in s.routes}
+        for want in [("/api/live", "_get_live"), ("/api/files/", "_get_files"), ("/api/home", "_get_home"),
+                     ("/api/v1/files", "_files_post"), ("/api/upload", "_upload")]:
+            self.assertIn(want, got)
+        self.assertNotIn("/api/alone", {p for p, _ in got})
+
+
 class OtherProjects(unittest.TestCase):
     """What running the map over every project this one reads found."""
 
