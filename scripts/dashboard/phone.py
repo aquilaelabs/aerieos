@@ -802,7 +802,7 @@ def ask(why, argv, nid, node_name, project, by="claude", asker="", asker_uid="")
     request goes to whoever connected that phone, the asker when it is
     their own. `asker` names the account whose session asks, for the row.
     Returns the request's id."""
-    why = " ".join(str(why or "").split())[:300]
+    why = _reason(why)
     if not why:
         return {"error": "say what it is for: the operator is answering a "
                          "question about a command they did not write"}
@@ -949,6 +949,31 @@ def _queue(kind, why, argv, nid, node_name, project, by, to, to_name, asker="",
     return {"ok": True, "id": r["id"], "to": to_name, "node": node_name or nid}
 
 
+def _reason(why):
+    """A reason as it is kept and shown: on one line, 300 characters at most."""
+    return " ".join(str(why or "").split())[:300]
+
+
+def _owner_ask(kind, why, hint, project, cmd, to_uid, to_name, asker_name="", extra=None):
+    """An ask that goes to its project's owner: the reason trimmed, the ask
+    refused with the verb's own `hint` when there is none and when nobody
+    owns the project, and then queued. `cmd` and `extra` may each be a
+    function, called once the ask is known to go ahead, so what a command is
+    built from is read only then; a function for `cmd` may answer a refusal
+    ({"error"}) in place of a command."""
+    why = _reason(why)
+    if not why:
+        return {"error": hint}
+    if not to_uid:
+        return {"error": f"{project} has no owner to ask"}
+    if callable(cmd):
+        cmd = cmd()
+        if isinstance(cmd, dict):
+            return cmd
+    return _queue(kind, why, cmd, "", "", project, "claude", to_uid, to_name, asker_name,
+                  extra=extra() if callable(extra) else extra)
+
+
 def ask_push(project, cwd, args, findings, asker_uid="", asker_name="", asker_admin=False):
     """A session's push held for a person (R219): the lines pushscan
     flagged, in a box on the bell, for the account whose session pushes
@@ -978,7 +1003,7 @@ def ask_root(why, argv, nid, node_name, project, sandbox, by="claude",
     and root on it is not a user's to allow. Only a node provisioned as a
     sandbox (a MANAGED node) takes it: somebody's own machine is not the
     controller's to run root on, whoever asks."""
-    why = " ".join(str(why or "").split())[:300]
+    why = _reason(why)
     if not why:
         return {"error": "say what it is for: the operator is answering a "
                          "question about a root command they did not write"}
@@ -1013,15 +1038,11 @@ def ask_sign(why, project, file, route, to_uid, to_name, asker_name="", principa
     project whose dial is `ask` (Agents may: Sign a build, R106). It goes
     to the project's owner, who reads which build and which key; Allow
     queues the signing as the session's own."""
-    why = " ".join(str(why or "").split())[:300]
-    if not why:
-        return {"error": "say what it is for: --why \"...\" (a release for testers, the Play upload ...)"}
-    if not to_uid:
-        return {"error": f"{project} has no owner to ask"}
-    cmd = ["sign", str(file), "--for", str(route)] + (["--key", str(key)] if key else [])
-    return _queue("sign", why, cmd, "", "", project, "claude",
-                  to_uid, to_name, asker_name,
-                  extra={"file": str(file), "route": str(route), "principal": principal, "key": str(key or "")})
+    return _owner_ask(
+        "sign", why, "say what it is for: --why \"...\" (a release for testers, the Play upload ...)", project,
+        ["sign", str(file), "--for", str(route)] + (["--key", str(key)] if key else []),
+        to_uid, to_name, asker_name,
+        extra={"file": str(file), "route": str(route), "principal": principal, "key": str(key or "")})
 
 
 def ask_release(why, project, comp, plan, to_uid, to_name, asker_name="", principal="", dev=False, pre=""):
@@ -1030,17 +1051,14 @@ def ask_release(why, project, comp, plan, to_uid, to_name, asker_name="", princi
     the project's owner, who reads the tag and the commit it would mark;
     Allow runs Release as the Artifacts view does, with the project's own
     credentials, which the session never holds."""
-    why = " ".join(str(why or "").split())[:300]
-    if not why:
-        return {"error": "say what it is for: --why \"...\" (0.5.4 for testers, the store upload ...)"}
-    if not to_uid:
-        return {"error": f"{project} has no owner to ask"}
-    cmd = ["version", "release", f"{plan['tag']} on {plan['sha']}"] + (["--for", comp] if comp else []) + (
-        [f"({plan['channel']})"] if plan.get("channel") else [])
-    return _queue("release", why, cmd, "", "", project, "claude", to_uid, to_name, asker_name,
-                  extra={"comp": str(comp or ""), "tag": plan["tag"], "sha": plan["sha"],
-                         "principal": principal, "asker_name": str(asker_name or ""), "dev": bool(dev),
-                         **({"pre": str(pre)} if pre else {})})
+    return _owner_ask(
+        "release", why, "say what it is for: --why \"...\" (0.5.4 for testers, the store upload ...)", project,
+        lambda: ["version", "release", f"{plan['tag']} on {plan['sha']}"] + (["--for", comp] if comp else []) + (
+            [f"({plan['channel']})"] if plan.get("channel") else []),
+        to_uid, to_name, asker_name,
+        extra=lambda: {"comp": str(comp or ""), "tag": plan["tag"], "sha": plan["sha"],
+                       "principal": principal, "asker_name": str(asker_name or ""), "dev": bool(dev),
+                       **({"pre": str(pre)} if pre else {})})
 
 
 def ask_release_edit(why, project, plan, to_uid, to_name, asker_name="", principal=""):
@@ -1048,18 +1066,16 @@ def ask_release_edit(why, project, plan, to_uid, to_name, asker_name="", princip
     the notes replaced, files attached. Every edit is its own ask, to the
     project's owner, who reads the notes whole and each file by its name
     and size before Allow."""
-    why = " ".join(str(why or "").split())[:300]
-    if not why:
-        return {"error": "say what it is for: --why \"...\" (screenshots for the page, the APKs ...)"}
-    if not to_uid:
-        return {"error": f"{project} has no owner to ask"}
-    files = plan.get("files") or []
-    cmd = ["version", "release", "--edit", plan["tag"]] + (
-        [f"notes ({len(plan['notes'])} characters)"] if plan.get("notes") is not None else []) + [
-        f"attach {x['name']} ({_size(x['size'])}{', signed' if x['signed'] else ''})" for x in files]
-    return _queue("release-edit", why, cmd, "", "", project, "claude", to_uid, to_name, asker_name,
-                  extra={"tag": plan["tag"], "notes": plan.get("notes"), "files": files,
-                         "principal": principal, "asker_name": str(asker_name or "")})
+    def cmd():
+        files = plan.get("files") or []
+        return ["version", "release", "--edit", plan["tag"]] + (
+            [f"notes ({len(plan['notes'])} characters)"] if plan.get("notes") is not None else []) + [
+            f"attach {x['name']} ({_size(x['size'])}{', signed' if x['signed'] else ''})" for x in files]
+    return _owner_ask(
+        "release-edit", why, "say what it is for: --why \"...\" (screenshots for the page, the APKs ...)", project, cmd,
+        to_uid, to_name, asker_name,
+        extra=lambda: {"tag": plan["tag"], "notes": plan.get("notes"), "files": plan.get("files") or [],
+                       "principal": principal, "asker_name": str(asker_name or "")})
 
 
 def ask_release_remove(why, project, plan, to_uid, to_name, asker_name="", principal=""):
@@ -1067,16 +1083,13 @@ def ask_release_remove(why, project, plan, to_uid, to_name, asker_name="", princ
     always its own ask, never part of an edit, since it is the one change
     that takes something away from the people downloading (the operator,
     5 Oct). The files are named as the forge listed them, with their sizes."""
-    why = " ".join(str(why or "").split())[:300]
-    if not why:
-        return {"error": "say why they come off: --why \"...\" (a build that was broken, a duplicate ...)"}
-    if not to_uid:
-        return {"error": f"{project} has no owner to ask"}
-    cmd = ["version", "release", "--remove", plan["tag"]] + [
-        f"{x['name']}" + (f" ({_size(x['size'])})" if x.get("size") else "") for x in plan.get("files") or []]
-    return _queue("release-remove", why, cmd, "", "", project, "claude", to_uid, to_name, asker_name,
-                  extra={"tag": plan["tag"], "files": plan.get("files") or [],
-                         "principal": principal, "asker_name": str(asker_name or "")})
+    return _owner_ask(
+        "release-remove", why, "say why they come off: --why \"...\" (a build that was broken, a duplicate ...)", project,
+        lambda: ["version", "release", "--remove", plan["tag"]] + [
+            f"{x['name']}" + (f" ({_size(x['size'])})" if x.get("size") else "") for x in plan.get("files") or []],
+        to_uid, to_name, asker_name,
+        extra=lambda: {"tag": plan["tag"], "files": plan.get("files") or [],
+                       "principal": principal, "asker_name": str(asker_name or "")})
 
 
 def ask_release_withdraw(why, project, plan, to_uid, to_name, asker_name="", principal=""):
@@ -1084,17 +1097,16 @@ def ask_release_withdraw(why, project, plan, to_uid, to_name, asker_name="", pri
     (R190 step 3): always an ask, whatever the dial, since nothing undoes
     it. The person reads which tag, whether it is a pre-release and how
     many files go with it."""
-    why = " ".join(str(why or "").split())[:300]
-    if not why:
-        return {"error": "say why it is withdrawn: --why \"...\" (cut by mistake, a stable one meant as dev ...)"}
-    if not to_uid:
-        return {"error": f"{project} has no owner to ask"}
-    what = (("the pre-release" if plan.get("prerelease") else "the release")
-            + f" with its {plan.get('files', 0)} files" if plan.get("release") else "no release, already deleted")
-    cmd = ["version", "release", "--withdraw", plan["tag"], f"({what}, and the tag"
-           + ("" if plan.get("tagged") else ", already gone") + f", on {plan.get('forge')})"]
-    return _queue("release-withdraw", why, cmd, "", "", project, "claude", to_uid, to_name, asker_name,
-                  extra={"tag": plan["tag"], "principal": principal, "asker_name": str(asker_name or "")})
+    def cmd():
+        what = (("the pre-release" if plan.get("prerelease") else "the release")
+                + f" with its {plan.get('files', 0)} files" if plan.get("release") else "no release, already deleted")
+        return ["version", "release", "--withdraw", plan["tag"], f"({what}, and the tag"
+                + ("" if plan.get("tagged") else ", already gone") + f", on {plan.get('forge')})"]
+    return _owner_ask(
+        "release-withdraw", why,
+        "say why it is withdrawn: --why \"...\" (cut by mistake, a stable one meant as dev ...)", project, cmd,
+        to_uid, to_name, asker_name,
+        extra=lambda: {"tag": plan["tag"], "principal": principal, "asker_name": str(asker_name or "")})
 
 
 def ask_release_sign(why, project, to_uid, to_name, asker_name=""):
@@ -1102,13 +1114,9 @@ def ask_release_sign(why, project, to_uid, to_name, asker_name=""):
     signed again, as the Signing view's Look for unsigned APKs now does
     (R134 step 5), under its Sign a build dial. 0.7.0's retry after its key
     was added had to be a person's press."""
-    why = " ".join(str(why or "").split())[:300]
-    if not why:
-        return {"error": "say what it is for: --why \"...\" (the key was added, the node is back ...)"}
-    if not to_uid:
-        return {"error": f"{project} has no owner to ask"}
-    return _queue("release-sign", why, ["sign", "release"], "", "", project, "claude", to_uid, to_name,
-                  asker_name)
+    return _owner_ask("release-sign", why,
+                      "say what it is for: --why \"...\" (the key was added, the node is back ...)", project,
+                      ["sign", "release"], to_uid, to_name, asker_name)
 
 
 def _size(n):
@@ -1120,21 +1128,16 @@ def ask_keys(why, project, action, args, to_uid, to_name, asker_name=""):
     Manage signing keys dial is `ask` (R106 step 6). It goes to the project's
     owner: a new sideload key is an app's identity for good, which is why a
     person says yes to it."""
-    why = " ".join(str(why or "").split())[:300]
-    if not why:
-        return {"error": "say what it is for: --why \"...\""}
-    if not to_uid:
-        return {"error": f"{project} has no owner to ask"}
-    if action == "generate":
-        cmd = ["sign", "key", "new", str(args.get("key")), "--for", str(args.get("route"))]
-    elif action == "map":
-        cmd = ["sign", "map", str(args.get("package")), str(args.get("key") or "default")]
-    elif action == "rotate":
-        cmd = ["sign", "rotate", str(args.get("from")), str(args.get("to"))]
-    else:
+    def cmd():
+        if action == "generate":
+            return ["sign", "key", "new", str(args.get("key")), "--for", str(args.get("route"))]
+        if action == "map":
+            return ["sign", "map", str(args.get("package")), str(args.get("key") or "default")]
+        if action == "rotate":
+            return ["sign", "rotate", str(args.get("from")), str(args.get("to"))]
         return {"error": f"not a key change: {action}"}
-    return _queue("sign-key", why, cmd, "", "", project, "claude", to_uid, to_name, asker_name,
-                  extra={"action": action, "args": dict(args)})
+    return _owner_ask("sign-key", why, "say what it is for: --why \"...\"", project, cmd, to_uid, to_name, asker_name,
+                      extra=lambda: {"action": action, "args": dict(args)})
 
 
 def ask_rebuild(why, project, instance, name, asker_uid="", asker_name="",
@@ -1160,7 +1163,7 @@ def ask_rebuild(why, project, instance, name, asker_uid="", asker_name="",
     start, stop or restart the container called `name` on `node`, one that
     belongs to the project and that AerieOS may not have started.
     """
-    why = " ".join(str(why or "").split())[:300]
+    why = _reason(why)
     if not why:
         return {"error": f"say what the {ctl or 'rebuild'} is for: the operator is "
                          "answering a question about work they did not start"}
@@ -1199,7 +1202,7 @@ def ask_container(why, name, compose, env, nid, node_name, project, for_project=
     container is root-shaped power on the node, and starting one is
     docker-write, which no user account holds.
     """
-    why = " ".join(str(why or "").split())[:300]
+    why = _reason(why)
     if not why:
         return {"error": "say what the container is for: the administrator is answering "
                          "a question about a file they did not write"}
@@ -1225,7 +1228,7 @@ def ask_vm(why, project, req, asker_name=""):
     its project's Make VMs dial at ask: held for the administrators as a
     container is, since a VM is a machine on a node. Allow runs the same
     create or action the VMs page runs."""
-    why = " ".join(str(why or "").split())[:300]
+    why = _reason(why)
     if not why:
         return {"error": "say what the VM is for: the administrator is answering a question you are asking them"}
     action = str(req.get("action") or "")
@@ -1274,7 +1277,7 @@ def ask_pack(why, project, entry, asker_name=""):
     5), its project's Install a tool pack dial at ask: held for the
     administrators, since a pack joins every node's catalog. Allow keeps it
     at the commit the signed index pins, as the Library's Install does."""
-    why = " ".join(str(why or "").split())[:300]
+    why = _reason(why)
     if not why:
         return {"error": "say what the pack is for: a person is answering a question you are asking them"}
     keep = {k: entry.get(k) for k in ("name", "url", "commit", "sha256", "path", "tier")}
@@ -1902,7 +1905,7 @@ def verb(action, req, who, fresh):
         rec = _rec(lnid) or {}
         args = req.get("args") if isinstance(req.get("args"), dict) else {}
         shown = ["aerie", "phone", str(op)[:20]] + [f"{k}={str(v)[:120]}" for k, v in sorted(args.items())][:8]
-        why = " ".join(str(req.get("why") or "").split())[:300] or f"{op} on the phone lent to {proj}"
+        why = _reason(req.get("why")) or f"{op} on the phone lent to {proj}"
         nname = (nodes.node(lnid) or {}).get("name") if nodes is not None else lnid
         acct = users.account_of(who) or {}
         r = _allow_if_trusted(_queue("phone-use", why, shown, lnid, nname, proj, f"session:{proj}",
