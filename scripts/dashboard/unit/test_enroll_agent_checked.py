@@ -31,11 +31,13 @@ ROOT = os.path.normpath(os.path.join(HERE, "..", "..", ".."))
 LINUX = os.path.join(ROOT, "nodes", "provision-linux.sh")
 MAC = os.path.join(ROOT, "nodes", "provision-macos.sh")
 sys.path.insert(0, os.path.join(HERE, ".."))
+sys.path.insert(0, os.path.join(ROOT, "scripts", "lib"))
 sys.path.insert(0, HERE)
 import agentpkg  # noqa: E402
 import channel  # noqa: E402
 import enrollscript as es  # noqa: E402
 import nodes  # noqa: E402
+import releasepub  # noqa: E402
 
 MESSAGE = b"aerieos agent v1\n"
 AGENT = b"#!/usr/bin/env python3\nprint('the agent')\n"
@@ -499,6 +501,110 @@ class Carried(unittest.TestCase):
         channel.nodes.agent_sig = lambda digest=None: ""
         got, _status = channel.fetch("download", {"error": "no token"}, {"what": [""]}, authed=lambda: True)
         self.assertEqual(got["headers"], {"X-Agent-Digest": digest_of(AGENT)}, "no header at all for a build with none")
+
+
+class EveryWayPins(Bash):
+    """The token-only commands, a Mac and the controller's own node carry
+    the release key as the Enroll script does, and what the agent they
+    fetch is held to."""
+
+    def setUp(self):
+        super().setUp()
+        self.addCleanup(setattr, es, "RELEASE_PUB", es.RELEASE_PUB)
+        es.RELEASE_PUB = os.path.join(self.d, "release.pub")
+        with open(es.RELEASE_PUB, "w") as f:
+            f.write(f"aerieos-release-ed25519 {self.pub}\naerieos-release-ed25519 {self.spare_pub}\n")
+        ours = {"body": AGENT, "digest": self.digest, "version": "1.1"}
+        self.addCleanup(setattr, nodes, "agent_file", nodes.agent_file)
+        self.addCleanup(setattr, nodes, "agent_sig", nodes.agent_sig)
+        nodes.agent_file = lambda: ours
+        nodes.agent_sig = lambda digest=None: self.sig
+
+    def test_the_token_only_commands_are_handed_what_the_script_carries(self):
+        keys = f"{self.pub},{self.spare_pub}"
+        got = nodes.enroll_pins()
+        self.assertEqual(got["provisioner"], f"--release-key {keys} --agent-digest {self.digest} --agent-sig {self.sig}")
+        self.assertEqual(got["words"], es.pins(nodes.agent_carried()), "the Enroll script's own words")
+        self.assertEqual(got["agent"], f"--release-key {keys}", "the agent enrolled by hand pins the key")
+        nodes.agent_sig = lambda digest=None: ""
+        self.assertEqual(nodes.enroll_pins()["provisioner"], f"--release-key {keys} --agent-digest {self.digest}")
+        # Just a token answers with them, and the page ends each command with them.
+        self.assertIn('m | {"pins": enroll_pins()}', text(os.path.join(HERE, "..", "nodes.py")))
+        page = text(os.path.join(HERE, "..", "tab-nodes.js"))
+        self.assertIn("pins: r.pins || {}", page)
+        shown = between(page, "  const mintToken = (m) => {", '    body.querySelector("#ndTokDone").onclick = shut;')
+        for command, words in (("sudo bash provision-linux.sh --controller", "m.pins.provisioner"),
+                               ("bash provision-macos.sh --controller", "m.pins.provisioner"),
+                               ("aerieos-agent enroll --controller", "m.pins.agent")):
+            line = shown[shown.index(command):]
+            line = line[:line.index("</pre>")]
+            self.assertIn("${" + words + " ? ` ${esc(" + words + ")}` : \"\"}", line, command)
+
+    def test_a_mac_pins_the_key_as_it_enrolls(self):
+        src = text(MAC)
+        enroll = between(src, 'say "enrolling as $(id -un)"', '    --store "cache=$FOOT/cache" --store "artifacts=$FOOT/artifacts"')
+        agent = os.path.join(self.d, "agent")
+        with open(agent, "w") as f:
+            f.write('#!/usr/bin/env bash\nprintf "%s\\n" "$*"\n')
+        os.chmod(agent, 0o755)
+        for key in (f"{self.pub},{self.spare_pub}", ""):
+            rc, said = self.bash(STUBS + "launchctl() { return 1; }\n"
+                                 + f"AGENT={agent!r}; NODE_JSON=n.json; FOOT=foot; TOOLCHAINS=tc; LABEL=l\n"
+                                 + f"CONTROLLER=http://controller.example:7680; TOKEN=bbe_x; RELEASE_KEY={key!r}\n" + enroll)
+            self.assertEqual(rc, 0, said)
+            self.assertIn("enroll --controller http://controller.example:7680 --token bbe_x", said)
+            self.assertEqual(f"--release-key {key} " in said, bool(key), said)
+
+    def test_the_controllers_own_node_is_enrolled_with_them(self):
+        src = text(os.path.join(ROOT, "nodes", "install-controller.sh"))
+        own = between(src, "own_node() {", "    printf '   Give this machine a fixed address") + "}\n"
+        # No record of a node here, whatever this machine is.
+        own = own.replace("/etc/aerieos/node.json", f"{self.d}/no-node.json").replace("/etc/builderbot/node.json", f"{self.d}/no-node.json")
+        os.makedirs(os.path.join(self.d, "opt", "nodes"))
+        with open(os.path.join(self.d, "opt", "nodes", "provision-linux.sh"), "w") as f:
+            f.write('printf "provisioned with: %s\\n" "$*"\n')
+        aerie = os.path.join(self.d, "aerie")
+        pre = (STUBS + "lan_ip() { echo 192.168.1.5; }\nhostname() { echo shed; }\n"
+               + f"OPT={self.d}/opt; DEV=0; PORT=7680; SESSION_USER=builder; JOBS_USER=bb; BB_BIN={aerie!r}\n"
+               + f"OWN_MARK={self.d}/own-node; declare -a OS_FEATURES=()\n" + own + "own_node\n")
+        words = nodes.enroll_pins()["words"]
+        for pins in (words, []):
+            with open(aerie, "w") as f:
+                f.write('#!/usr/bin/env bash\nprintf "%s\\n" "$*" > "$FIX/asked"\necho bbe_own\n'
+                        + "".join(f"echo {w}\n" for w in pins))
+            os.chmod(aerie, 0o755)
+            rc, said = self.bash(pre)
+            self.assertEqual(rc, 0, said)
+            self.assertEqual(text(os.path.join(self.d, "asked")).strip(), "nodes enroll-token shed --user bb --own --pins")
+            line = next(ln for ln in said.splitlines() if ln.startswith("provisioned with: "))
+            self.assertIn("--controller http://192.168.1.5:7680 --token bbe_own --user bb --session-user builder ", line)
+            self.assertIn("--beside-controller", line)
+            if pins:
+                self.assertIn(f" --release-key {self.pub},{self.spare_pub} --agent-digest {self.digest} --agent-sig {self.sig} ", line)
+                self.assertNotIn("named no release key", said)
+            else:
+                # A controller that names no key: enrolled all the same, and said.
+                self.assertNotIn("--release-key", line)
+                self.assertIn("named no release key for this machine to pin", said)
+
+    def test_a_shell_is_handed_them_with_its_token(self):
+        state = os.path.join(self.d, "state")
+        os.makedirs(state)
+        verb = [sys.executable, os.path.join(ROOT, "scripts", "lib", "nodes-verbs.py"), "enroll-token",
+                os.path.join(ROOT, "scripts", "dashboard", "nodes.py")]
+        r = subprocess.run([*verb, "shed", "--own", "--pins"], capture_output=True, text=True, timeout=60, check=False,
+                           env=dict(os.environ, DASHBOARD_STATE=state))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        lines = r.stdout.split()
+        self.assertTrue(lines[0].startswith("bbe_"), r.stdout)
+        # This tree's own key file and agent, as the verb reads them.
+        keys = releasepub.read(os.path.join(ROOT, "config", "aerieos-release.pub"))[0]
+        self.assertEqual(lines[1:4], ["--release-key", ",".join(keys), "--agent-digest"])
+        self.assertRegex(lines[4], r"^sha256:[0-9a-f]{64}$")
+        # ...and the token alone without the flag, as a scripted setup reads it.
+        r = subprocess.run([*verb, "barn"], capture_output=True, text=True, timeout=60, check=False,
+                           env=dict(os.environ, DASHBOARD_STATE=state))
+        self.assertEqual((r.returncode, len(r.stdout.split())), (0, 1), r.stdout + r.stderr)
 
 
 if __name__ == "__main__":

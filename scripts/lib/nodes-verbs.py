@@ -128,10 +128,13 @@ def enroll_token():
     the row and the token Enroll node's Just a token makes, printed once.
     Its run user is --user's, bb by default. --own makes the row the
     controller's own machine, which nodes/install-controller.sh enrolls on a
-    controller installed bare metal (R90)."""
+    controller installed bare metal (R90). --pins prints, a line each after
+    the token, the words the provisioner is handed with it, as the Enroll
+    script carries them (nodes.enroll_pins): the release key the node pins,
+    and the digest and the signature its first agent is held to."""
     rest = sys.argv[3:]
     if not rest or rest[0].startswith("-"):
-        sys.exit("[builderbot] ERROR: aerie nodes enroll-token NAME [--user U] [--own]: which name?")
+        sys.exit("[builderbot] ERROR: aerie nodes enroll-token NAME [--user U] [--own] [--pins]: which name?")
     name, user = rest[0], "bb"
     if "--user" in rest:
         i = rest.index("--user")
@@ -142,6 +145,8 @@ def enroll_token():
     r = nodes.enroll_mint("user:shell", name, user=user, own="--own" in rest)
     need(r)
     print(r["token"])
+    if "--pins" in rest:
+        print("\n".join(nodes.enroll_pins()["words"]))
     print(f"{name} ({r['id']}) waits for it, until {__import__('time').strftime('%d %b %H:%M', __import__('time').localtime(r['expires']))}",
           file=sys.stderr)
 

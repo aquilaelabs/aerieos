@@ -3794,6 +3794,20 @@ def agent_carried():
     return {"digest": digest, "sig": agent_sig(digest) if digest else ""}
 
 
+def enroll_pins():
+    """What a token-only enrollment carries beside the token, as the Enroll
+    script does (enrollscript.pins): the words each of the Nodes page's
+    commands ends with. `provisioner` is for provision-linux.sh and
+    provision-macos.sh: the release key the node pins, and the digest and
+    the signature the agent it fetches is held to. `agent` is for the agent
+    fetched and enrolled by hand, which pins the key; nothing holds that
+    file to anything but the person who fetched it. `words` is the first,
+    a word each, for a shell (aerie nodes enroll-token --pins)."""
+    words = enrollscript.pins(agent_carried())
+    return {"provisioner": " ".join(words), "words": words,
+            "agent": " ".join(words[:2]) if words[:1] == ["--release-key"] else ""}
+
+
 def agent_sig(digest=None):
     """The release's signature over the agent this controller ships, where
     its build made one (scripts/agent/agent.sig, tools/sign-agent.py), or
@@ -8211,10 +8225,12 @@ def verb(principal, req):
         # Just a token for a node already here (B656): the row's id rides
         # as `node`, as the script's does, so the mint lands on the row
         # rather than seeing its name as taken.
-        return enroll_mint(principal, field(req, "name"),
-                           req.get("capabilities"),
-                           field(req, "user") or "bb", host_only=req.get("host_only") is True,
-                           nginx=req.get("nginx") is True, existing=field(req, "node") or None)
+        m = enroll_mint(principal, field(req, "name"),
+                        req.get("capabilities"),
+                        field(req, "user") or "bb", host_only=req.get("host_only") is True,
+                        nginx=req.get("nginx") is True, existing=field(req, "node") or None)
+        # ...with what the commands the page then shows carry beside it.
+        return m if m.get("error") else m | {"pins": enroll_pins()}
 
     def power():
         return node_power(principal, nid, act)

@@ -339,6 +339,13 @@ if xcode-select -p >/dev/null 2>&1; then chk ok "Xcode command line tools at $(x
 else chk fail "no Xcode command line tools: run  xcode-select --install  and come back (git and clang live there)"; fi
 if command -v python3 >/dev/null 2>&1; then chk ok "python3: $(python3 --version 2>&1)"
 else chk fail "no python3: it comes with the command line tools above"; fi
+# The library the agent checks a signed update with. A Mac's own python3 has
+# none, and an agent that pinned the release key refuses an update it cannot
+# check: said here, with the line that puts it there.
+if [ -n "$RELEASE_KEY" ] && command -v python3 >/dev/null 2>&1; then
+    if (cd / && python3 -c 'import cryptography') >/dev/null 2>&1; then chk ok "python3 has the cryptography library, which checks a signed agent update"
+    else chk warn "python3 has no cryptography library: this Mac pins the release key, and its agent then refuses an update it cannot check; python3 -m pip install --user cryptography puts it there"; fi
+fi
 if command -v brew >/dev/null 2>&1; then chk ok "Homebrew at $(command -v brew)"
 else chk warn "no Homebrew: a recipe's system packages (tmux for sessions) cannot be installed by the agent; https://brew.sh"; fi
 if command -v git >/dev/null 2>&1; then chk ok "git: $(git --version 2>&1)"
@@ -389,11 +396,13 @@ chmod 755 "${AGENT}.new"; mv -f "${AGENT}.new" "$AGENT"
 
 # Enrolled as this account, with the stores under the footprint (the
 # toolchain store wherever --toolchains said). The credential it keeps is this
-# node's own row and nothing else.
+# node's own row and nothing else. The release key is pinned as it enrolls,
+# as on any node: from then on the agent takes only an update a release
+# signed, or as its console allows.
 say "enrolling as $(id -un)"
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 BUILDERBOT_NODE_JSON="$NODE_JSON" "$AGENT" enroll --controller "$CONTROLLER" --token "$TOKEN" \
-    --user "$(id -un)" \
+    --user "$(id -un)" ${RELEASE_KEY:+--release-key "$RELEASE_KEY"} \
     --store "data=$FOOT/data" --store "toolchains=$TOOLCHAINS" \
     --store "cache=$FOOT/cache" --store "artifacts=$FOOT/artifacts"
 

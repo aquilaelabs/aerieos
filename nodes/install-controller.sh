@@ -995,7 +995,10 @@ cmd_remove() {
 # own_node: this machine as an ordinary agent node of its own controller,
 # made the way any node is: a token minted from a shell on the controller
 # (aerie nodes enroll-token --own), then provision-linux.sh run as it is, from
-# the release, with --beside-controller. It dials the controller at the
+# the release, with --beside-controller, and with what an Enroll script
+# carries (--pins): the release key, which this node pins as any other does
+# and then takes its agent updates only signed, and the digest and the
+# signature the agent it fetches is held to. It dials the controller at the
 # address a remote node would (this machine's own on its network), so a
 # session there reaches it by that address and port and by nothing else.
 # A machine that is a node already is left as it is: of this controller,
@@ -1006,8 +1009,8 @@ OWN_MARK="$ETC/own-node"
 OS_FEATURES_FILE="$P/var/lib/aerieos-os/features"
 declare -a OS_FEATURES=()
 own_node() {
-    local ip name tok ctl prov="$OPT/nodes/provision-linux.sh"
-    local -a dev=()
+    local ip name tok minted ctl prov="$OPT/nodes/provision-linux.sh"
+    local -a dev=() pins=()
     [ "$DEV" = 1 ] && dev=(--dev)
     say "this machine as a node of its own controller"
     ip="$(lan_ip)" || true
@@ -1023,10 +1026,17 @@ own_node() {
         return 0
     fi
     name="$(hostname -s 2>/dev/null || hostname)"
-    tok="$("$BB_BIN" nodes enroll-token "$name" --user "$JOBS_USER" --own)" \
+    minted="$("$BB_BIN" nodes enroll-token "$name" --user "$JOBS_USER" --own --pins)" \
         || { warn "the controller would not mint this machine a token (above)"; return 1; }
+    # The token on the first line, then the provisioner's words a line each.
+    tok="${minted%%$'\n'*}"
+    mapfile -t pins < <(printf '%s\n' "$minted" | sed 1d)
+    case " ${pins[*]} " in
+        *" --release-key "*) ;;
+        *) warn "the controller named no release key for this machine to pin (its config/aerieos-release.pub): this machine's node takes agent updates on the controller's word" ;;
+    esac
     bash "$prov" --controller "$ctl" --token "$tok" --user "$JOBS_USER" --session-user "$SESSION_USER" \
-        --beside-controller "${dev[@]}" "${OS_FEATURES[@]}" || { warn "this machine did not enroll as a node (above); --install again tries again"; return 1; }
+        "${pins[@]}" --beside-controller "${dev[@]}" "${OS_FEATURES[@]}" || { warn "this machine did not enroll as a node (above); --install again tries again"; return 1; }
     printf '%s\n' "$ctl" > "$OWN_MARK"
     printf '   enrolled as %s, at %s\n' "$name" "$ctl"
     printf '   Give this machine a fixed address: the node reaches its controller at %s.\n' "$ip"

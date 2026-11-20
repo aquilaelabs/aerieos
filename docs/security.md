@@ -325,8 +325,33 @@ sends a node whose agent is behind nothing but that update, it takes no
 other job either until the controller runs a signed build or the node's
 console allows unsigned ones: closed, on purpose, and said on the update's
 job and on the node's row. A node's row says which it
-is under Updates. While the repository names no key, no node pins one and
-updates are taken as before.
+is under Updates. The file is read one way (`scripts/lib/releasepub.py`), by
+the Enroll script, the build's signer and `aerie lint`, which fails when it
+does not name one key or two: a file that does not parse is a red build,
+never a node that quietly pinned nothing.
+
+**Nor the first agent, nor one a provisioner fetches later.** Every way of
+enrolling carries the key: the Enroll script, the token-only commands the
+Nodes page shows, a Mac's provisioner and the controller's own node on a
+bare-metal install. With it they carry the digest of the agent the
+controller shipped when the script or the command was made and, where its
+build has one, the release's signature over that digest. The provisioner
+holds the agent it fetches to the digest it was handed, where it had only
+the digest the same answer named, and checks the signature under the key
+before any of the agent runs (Python's cryptography library, OpenSSL 3, or
+Swift's CryptoKit on a Mac); another agent, a signature that is not the
+key's and one the machine cannot check are each refused with the reason,
+and so is an answer with no digest at all. A build with no signature
+enrolls on the digest alone and says so, with the key pinned for what
+comes later. A script made before any of this, or a command somebody saved,
+still enrolls, held to the digest the controller sends, and says what was
+not checked. A provisioner run again on an enrolled node asks the installed
+agent before it replaces it (`aerieos-agent check-update`, which decides as
+an update is decided), and leaves it in place on a refusal; where the
+installed agent is too old to answer, or is gone, a node that pinned a key
+gets the newer one only when the provisioner itself can check the release's
+signature under the key the node pinned, and a node that pinned none
+updates as it did.
 
 A node that has no key, one enrolled before there was one or by a script
 that named none, takes what its controller sends, and the update's job says

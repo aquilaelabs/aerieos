@@ -3084,6 +3084,13 @@ await page.click('#ndBody #ndEnTok');
 await page.waitForSelector('#ndBody .ndtoken', { timeout: 15000 });
 ok(await page.$eval('#ndBody .ndtoken', el => /--user joe/.test(el.textContent)),
    '...and the provision command it prints carries a account that is not the default');
+// What each command carries beside the token, as the Enroll script does:
+// the release key the node pins, and for the provisioner the digest the
+// agent it fetches is held to (the signature too, on a build that has one).
+ok(await page.$eval('#ndBody .ndtoken', el =>
+     /provision-linux\.sh --controller \S+ --token bbe_\S+ --user joe --release-key [0-9a-f]{64}(,[0-9a-f]{64})? --agent-digest sha256:[0-9a-f]{64}/.test(el.textContent)
+     && /aerieos-agent enroll --controller \S+ --token bbe_\S+ --user joe --release-key [0-9a-f]{64}(,[0-9a-f]{64})?\s*$/.test(el.textContent)),
+   '...and after it the release key the node pins, with the digest the provisioner holds the agent to');
 // Where the provisioner comes from (B133): the dialog's first line fetches
 // it from this controller with the same token, and that route serves it.
 ok(await page.$eval('#ndBody .ndtoken', el => /curl -fsSL -H 'Authorization: Bearer bbe_[^']+' '[^']*\/api\/v1\/agent\/download\?what=provisioner' -o provision-linux\.sh/.test(el.textContent)),

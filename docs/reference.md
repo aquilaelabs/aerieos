@@ -351,10 +351,13 @@ aerie nodes           the machines enrolled as nodes, each with the agent it run
                    read-only in a terminal; the Nodes page is where they are edited
 aerie nodes show NAME one of them in full, by name or id: its agent against the one
                    this controller ships, and what Update agent would fix
-aerie nodes enroll-token NAME [--user U] [--own]
+aerie nodes enroll-token NAME [--user U] [--own] [--pins]
                    a new node's enrollment token, printed once, from a shell on
                    the controller: Enroll node's Just a token, for a scripted setup;
-                   --own is the controller's own machine, on a bare-metal install
+                   --own is the controller's own machine, on a bare-metal install;
+                   --pins adds, a line each, what the provisioner is handed with
+                   it: the release key the node pins, and the digest and the
+                   signature the agent it fetches is held to
 aerie projects adopt FOLDER [--name NAME]
                    a folder already under the spaces share made a space, as
                    if AerieOS had made it, from a shell on the controller: a
