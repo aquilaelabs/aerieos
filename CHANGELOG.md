@@ -55,6 +55,8 @@
 - Edit on a tool pack you added yourself opens that pack's dialog from the Installed page, where it opened Add your own with an empty address whenever Installed was opened by itself (741954c)
 - A git host permission picked under Permissions and not applied yet is unsaved work: leaving the view or closing the notebook asks first, where the pick was dropped with no word (a3e8cba)
 - A node's Enable or Disable that the controller refuses says so once, where it said it twice (bdce886)
+- `aerie map` reads a method of an object written inside a call's own parentheses as the definition it is, where it read it as a call and gave what it calls to the function around it (6ec31d6)
+- A space's card shows one face in a browser that draws without 3D acceleration, where its back showed mirrored through its front (2e5a823)
 
 ## 0.9.0-dev.5641: 2026-11-18
 

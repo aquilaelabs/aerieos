@@ -382,20 +382,29 @@ once per share; from then on updates cost nothing.
 runs as one list for one node, picked in the Build group's header over
 the page (the pick holds across the Library, the Emulator, the Phone and
 the CI runner, and a sub-tab says *not here* when the node lacks what it
-needs). A section per kind, in
-this order: the coding agents a session runs (Claude Code, Codex CLI,
+needs). It browses as a store. With nothing typed it is shelves: **On
+this node** first (what is installed, anything with an update out ahead of
+the rest), then a shelf per kind with up to eight cards and **All N** for
+the rest: the coding agents a session runs (Claude Code, Codex CLI,
 Copilot CLI, Grok Build, OpenCode), the toolchains a space builds with,
-the tool packs a person added, the services a node runs for the others
-(the model router), the apps a NAS runs as containers, and under **For
-you** the companions a person downloads for their own machines. Every row
-is one shape: its name, its tier (official, shipped with AerieOS;
-vetted, from the catalog the maintainers sign; sideloaded, added by URL or
-made here), what is installed and what an update would move it to, one
-line saying what it is, and at its right the one verb it takes: Install,
-Software update, Remove, Edit on a pack, Download on a companion, Install on a
-service once it is configured on the Installed page, and on an app New
-container, since an app is not installed on the node but made as a
-container, each press another one under its own name. Details opens the
+the tool packs, the services a node runs for the others (nginx, the
+Scanners, the model router), the apps a NAS runs as containers, and under
+**For you** the companions a person downloads for their own machines. A
+kind's chip, the **Topic** pulldown or the search (by name, maker or what
+it does) turns the page into one sorted list that loads more as you
+scroll, by name, best match or **Recently added**, as cards or as rows;
+the narrowing is in the page's address, so Back and a shared link land on
+it, and what runs only on other systems than the node's is counted in a
+line over the list and shown on a press. Every card is one shape: its
+name, who made it and its tier (Packaged by Aerie, what AerieOS ships or
+its maintainers packaged; Verified, a vendor's own pack; Vetted, anybody's
+pack the maintainers reviewed; Sideloaded, added by URL or made here),
+what is installed and what an update would move it to, what it is, and
+the one verb it takes: Install, Software update, Edit on a pack a person
+added,
+Download on a companion, and on an app New container, since an app is not
+installed on the node but made as a container, each press another one
+under its own name. Remove is the Installed page's. Details opens the
 entry's own page, with a small top header whose **Back** returns to the
 page you came from, and an address of its own
 (`#/build/library/NODE/KIND:NAME`), on the catalog's entry alone (the
