@@ -20,6 +20,7 @@
 - nginx and the Scanners are services in the Library, as the model router is: Install on their cards under Services, and a row under Services on the Installed page, where Open leads to each one's page and Remove takes it off the node. Their pages moved from the Containers group to Machines (#/machines/nginx, #/machines/scanners); the old addresses still open them (4a1d05c, 2fc5855)
 - Restart, End, Reboot, Shut down, a job's Cancel, Sign out and Disconnect are amber buttons; red is kept for what deletes or cannot be undone (7f00b50)
 - On the stable channel a release is offered by its tag, whatever the pre-release flag beside it says (403d120)
+- Toolchains install at a version AerieOS pins, each file held to its sha256, where an install asked the vendor for its newest and checked it against the vendor's own word at that moment: Go, Zig, the JDK, FFmpeg, the Kotlin language server, xcodes, LibreOffice and Android's command line tools are pinned whole; Rust, Python, .NET, Flutter and Android's packages install from a pinned program (rustup, uv, the .NET SDK, Flutter at a release's commit, sdkmanager) that downloads the rest itself, and say so. A newer version arrives as a newer pin, from the catalog or a release, and shows as an update. .NET installs from Microsoft's SDK archive, no longer from its install script, which nothing checked (fa9a1ee, 6d6f458, 8254ecd, 82ed514)
 
 ### Fixed
 
