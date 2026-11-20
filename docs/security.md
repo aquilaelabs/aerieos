@@ -425,7 +425,7 @@ holds, never one that arrives with the thing itself:
 | What is checked | The public half an install holds | Where the private half is |
 |---|---|---|
 | The catalog's index | `config/catalog.pub`, shipped in the release | the catalog repository's secret `CATALOG_SIGNING_KEY`, used by its `sign` workflow |
-| A node's agent update | `config/aerieos-release.pub`, pinned by the node when it enrolls | the release build's secret `AERIEOS_RELEASE_KEY` |
+| A node's agent update | `config/aerieos-release.pub`, pinned by the node when it enrolls | the release build's secret `AERIEOS_RELEASE_KEY`, read by two jobs on a `v*` tag alone ([versions.md](versions.md#the-release-key-on-github)) |
 | A release's list of its files (`SHA256SUMS`), for a dev build | `config/release-signers`, its `aerieos-dev` lines: the release key and its spare again, as OpenSSH keys | the release build's secret `AERIEOS_RELEASE_KEY` |
 | A release's list of its files, for a stable release | `config/release-signers`, its `aerieos-release` line | offline, on the stable key holder's own machine |
 

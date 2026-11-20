@@ -494,7 +494,11 @@ image is proved on a push. A release carries two of its files, the ISO and
 the stick's image, each with its sha256 and a build attestation, and only
 after the boot: the run's last job (`release`) makes the release with them
 and every other file, once all of it has passed; the raw disk, the qcow2
-and the OVA stay the run's artifact.
+and the OVA stay the run's artifact. Only a release's image carries the
+agent's signature, made by that run's one job that reads the release key
+and checked here against the committed key; a branch's, a manual run's and
+the weekly rebuild's carry the agent unsigned, and this workflow is handed
+no secret.
 The weekly run takes the day before's snapshot, builds, and says in its
 summary which system packages moved since the last release (each image
 carries its package list, `.packages`); a patch release from it is a press
@@ -565,9 +569,31 @@ bytes to the list: the OS updater, the installer's `--update`, the stick
 maker (`write`, which carries the same lines in itself) and the Library's
 downloads of the apps.
 
+What the list is made over is every file of the release, and each is
+vouched for before it is listed. Every file CI builds carries a build
+attestation made by the job that built it: the controller bundle, the ISO,
+the stick's image and the line naming the container image by the release
+workflow (`build-image.yml`), the two `.exe`, the `.pyz` and the `.vsix` by
+the companion's workflow it calls (`companion-app.yml`), each run on the
+release's tag; the seal takes a file only from the workflow named for it
+(`tools/release-sign.py`'s `WORKFLOWS`). The Android app is the one file no
+build attests, since a controller signs it after the build: it is taken
+only when `apksigner` verifies it as signed by a certificate
+`config/apk-signers` names. The container image itself carries no
+attestation, so that the registry serves it as a plain manifest; what
+names it is `aerieos-image-VER.digest`, one line,
+`ghcr.io/aquilaelabs/aerieos@sha256:...`, attested and in the signed list,
+so a signed release says which image is its own. A container that follows
+`:dev` or `:latest` of that image is held to it on the Containers page:
+an update is said by the digest the newest signed release names, and a
+tag that serves any other image is said plainly, with no update offered
+from it. How the list is made and when is in
+[versions.md](versions.md#drafts).
+
 Who may have signed follows the release's tag, and the namespace a signer
 is named for says the channel. Dev builds publish by themselves, so their
-list is signed in CI, in the namespace `aerieos-dev`, with the release
+list is signed in CI (`seal-release.yml`, once the signed Android app is on
+the release), in the namespace `aerieos-dev`, with the release
 build's key (`tools/release-sign.py seal TAG`): the key and its spare of
 `config/aerieos-release.pub`, written into `config/release-signers` as
 OpenSSH keys by `tools/release-signers.py` and held there by `aerie lint`.

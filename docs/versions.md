@@ -72,14 +72,66 @@ image tags people follow are not. A tag pushes the image under its exact
 version alone (`:0.9.0`, `:0.9.0-dev.N`), and publishing it moves `:dev`,
 and for a stable release `:latest` and `:0.9` too.
 
-AerieOS's own dev builds are published by their build, not by a press: the
-last job of the tag's build checks that every file `.release-files` names is
-on the release and publishes it then, a pre-release and never the latest
-(`tools/release-attach.sh --publish-when-whole`). A build whose image job
-fails never reaches that step, so its release stays a draft; so does one
-still short of a file after a quarter of an hour, with the file named in
-the run. A stable release is not published this way: its owner reads it
-first, as above.
+AerieOS's own dev builds are published by CI, not by a press, and in two
+runs. The tag's own run builds every file it can, attests each one, and
+its last job makes the draft with them: the controller bundle, the OS
+image and the stick's, the companion's files, and one line naming the
+container image the tag pushed by its digest (`aerieos-image-VER.digest`).
+The Android app is not among them: that run hands it over unsigned, and the
+controller signs it with the app's own key and attaches it afterwards,
+minutes to hours later. Once it has, the controller starts the second run,
+`seal-release.yml`, for the tag and on the tag. That run makes the
+release's signed list of its files, which can only be made over every
+file: it checks that the release carries all of them, that the tag still
+names the commit it runs on, that each file's bytes match the sha256
+beside it and its build attestation by the workflow that builds it, and
+that the Android app, which no build attests, is signed by a certificate
+`config/apk-signers` names; then it signs `SHA256SUMS` with the release
+build's key, attaches it with `SHA256SUMS.sig`, and publishes the release,
+a pre-release and never the latest (`tools/release-attach.sh
+--publish-when-whole`). A release short of a file, or with a file nothing
+vouches for, is not sealed and stays a draft, with the reason in the run.
+A build whose image job fails makes no release at all. A stable release is
+not sealed or published this way: its key's holder signs its list on their
+own machine and its owner reads it first, as above.
+
+When the controller was down, or could not start the run (the bell says so,
+and the Signing view), a person starts it: the repository's Actions page,
+**seal release**, **Run workflow**, from the tag, with the tag typed as its
+input. Run again for a release that is sealed and published, it makes the
+same list and changes nothing. Run after a file was replaced (the Android
+app signed again with `aerie sign release --again`), it says what changed
+in a warning on the run and replaces the list.
+
+Two things the controller's start of it needs, as `aerie version rehearse`
+does: the space's token allowed to start workflows (Actions, write), and
+`seal-release.yml` on the repository's default branch, since GitHub starts
+a workflow by its file's name only once the default branch carries it. A
+dev build tagged on a branch before the file has reached main waits, a
+draft, until it has, and is then sealed from the Actions page.
+
+### The release key on GitHub
+
+The key CI signs with (the agent's signature and a dev build's list) is
+the repository's secret `AERIEOS_RELEASE_KEY`. Two jobs read it: `signature`
+in the tag's run, which signs the agent once for the image, the bundle and
+the OS image, and `seal` in `seal-release.yml`. A push to main, the weekly
+rebuild, a run by hand and a branch's OS image build do not read it and
+ship the agent unsigned, as a branch always did; a tag whose agent does not
+carry the committed key's signature fails. Both jobs name the environment
+`release`, and the library they use the key with is installed from
+`tools/release-requirements.txt`, each file held to its hash, in a step
+that holds no secret.
+
+One setting on GitHub, made once, keeps the key to those jobs: under the
+repository's Settings, Environments, an environment named `release`, its
+**Deployment branches and tags** set to **Selected branches and tags** with
+one rule, the tag pattern `v*`; then `AERIEOS_RELEASE_KEY` added as that
+environment's secret and deleted from the repository's own secrets. Until
+then the workflows run as they are, reading the repository's secret: a job
+that names an environment reads both. After it, a job on any ref but a
+`v*` tag is refused the environment before a step starts, and a workflow
+that does not name it is handed no key.
 
 A controller started for development, on the dev channel and holding a
 token for AerieOS's repository, sees the drafts as well. Updating

@@ -555,6 +555,22 @@ publishes it, and only when every file `.release-files` names is on it; a
 failed image job never gets there, and the release stays a draft. A stable
 release is unchanged: a draft until its owner publishes it.
 
+**A dev build's list of files is signed in a run of its own, after the
+Android app (20 Nov 2026).** Every install checks a file it takes against
+the release's signed list, so a release is whole only with it, and the list
+must cover every file. The Android app is signed on a controller with the
+app's own key, minutes to hours after the tag's run has ended, so no job of
+that run can make the list, and no key of the app's is to become a CI
+secret to change that. The tag's run therefore ends at a draft, and
+`seal-release.yml` makes the list, attaches it and publishes: started by
+the controller once it has attached the app, or by a person from the
+Actions page. It takes each file on more than the release's own word, a
+build attestation by the workflow that builds it or, for the app, its
+signature by a named certificate, which is also what lets it replace a
+list when the app is signed again. The release key is read by that run and
+by one job of the tag's, both in an environment limited to `v*` tags; every
+other build ships the agent unsigned.
+
 **A move carries the secrets on a machine of its own, through root, as
 plain words (11 Nov 2026).** There the secrets folder is root's and the
 dashboard's account can neither read nor write it, so a move left its
