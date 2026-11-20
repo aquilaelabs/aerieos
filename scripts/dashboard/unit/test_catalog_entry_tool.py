@@ -152,6 +152,7 @@ class Scratch(unittest.TestCase):
         code, out = self.run_tool("--entry", "packs/aerie/hexkit")
         self.assertEqual(code, 0, out)
         self.assertIn("hexkit: as the index has it", out)
+        self.assertIn("is as it was: nothing to write", out)
         self.assertEqual(self.entry("hexkit"), was, "its tier, topics, day, withdrawn, address and pin, all as they were")
         # Its own folder changes: the pin moves, and the rest stays.
         self.put("packs/aerie/hexkit/bbtool.json", {**PACK, "about": "Looks inside binaries, closely.", "platforms": ["linux/amd64", "linux/arm64"]})
@@ -221,7 +222,8 @@ class Scratch(unittest.TestCase):
         code, out = self.run_tool("--drop-older", "1")
         self.assertEqual(code, 0, out)
         self.assertIn("dropped 0 older pin(s) written in pack format 1", out)
-        self.assertEqual(self.index()["packs"], before["packs"])
+        self.assertEqual(self.index(), before, "nothing went: the index is left alone, its date with it")
+        self.assertIn("is as it was: nothing to write", out)
         code, out = self.run_tool("--drop-older", "2")
         self.assertIn("dropped 1 older pin(s) written in pack format 2", out)
         got = self.index()["packs"]

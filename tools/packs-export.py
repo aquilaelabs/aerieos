@@ -158,9 +158,14 @@ def index_read(root):
 
 
 def index_write(root, idx, packs):
-    """The index with these entries, stamped now. What it says beside its
-    entries (the first AerieOS that reads each pack format) is kept as it was."""
+    """The index with these entries, stamped now, and whether it was
+    written: one whose entries are all as they were is left alone, its date
+    with it. What it says beside its entries (the first AerieOS that reads
+    each pack format) is kept as it was."""
     import time
+    if packs == idx.get("packs") and idx.get("version") == 1:
+        print(f"  {os.path.join(root, 'index.json')} is as it was: nothing to write")
+        return False
     idx = {**{k: v for k, v in idx.items() if k not in ("version", "generated", "packs")},
            "version": 1, "generated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "packs": packs}
     with open(os.path.join(root, "index.json"), "w", encoding="utf-8") as f:
@@ -172,6 +177,7 @@ def index_write(root, idx, packs):
     for fmt in sorted({p.get("format", 1) for e in packs for p in (e, *(e.get("older") or [])) if isinstance(p.get("format", 1), int)}):
         if fmt > 1 and str(fmt) not in since:
             print(f"  [note] the index's formats does not say which AerieOS first reads pack format {fmt}: add it before signing")
+    return True
 
 
 def entry_at(root, folder, commit, was=None, tier="", url="", topics=None):
@@ -263,9 +269,9 @@ def catalog_index(root, drop=()):
     if bad:
         print("  nothing was written")
         return 1
-    index_write(root, idx, dropped(new + kept, drop))
-    moved = sum(1 for e in new if e != have.get(e["name"]))
-    print(f"  wrote {len(new)} official entries from {head[:12]} ({moved} changed, {len(kept)} others kept) in {os.path.join(root, 'index.json')}; sign it")
+    if index_write(root, idx, dropped(new + kept, drop)):
+        moved = sum(1 for e in new if e != have.get(e["name"]))
+        print(f"  wrote {len(new)} official entries from {head[:12]} ({moved} changed, {len(kept)} others kept) in {os.path.join(root, 'index.json')}; sign it")
     return 0
 
 
@@ -310,8 +316,8 @@ def catalog_entries(root, folders, commit="", tier="", drop=(), topics=None):
     if bad:
         print("  nothing was written")
         return 1
-    index_write(root, idx, dropped(packs, drop))
-    print(f"  wrote {os.path.join(root, 'index.json')}; sign it")
+    if index_write(root, idx, dropped(packs, drop)):
+        print(f"  wrote {os.path.join(root, 'index.json')}; sign it")
     return 0
 
 
@@ -319,8 +325,8 @@ def catalog_drop(root, drop):
     """DIR/index.json with the older pins of the formats named dropped,
     and nothing else changed."""
     idx = index_read(root)
-    index_write(root, idx, dropped([p for p in idx["packs"] if isinstance(p, dict)], drop))
-    print(f"  wrote {os.path.join(root, 'index.json')}; sign it")
+    if index_write(root, idx, dropped([p for p in idx["packs"] if isinstance(p, dict)], drop)):
+        print(f"  wrote {os.path.join(root, 'index.json')}; sign it")
     return 0
 
 

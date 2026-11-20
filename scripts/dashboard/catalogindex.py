@@ -5,8 +5,10 @@ single entry is read, so a tampered index is refused and the one before
 kept; an index made before the one kept is refused the same way, signed as
 it is, so an old one served again brings back nothing the catalog withdrew
 (older, below); each entry pins a pack to an exact commit and its archive's
-sha256, never latest; a withdrawn entry puts a line on the bell for every
-install that holds the pack. Read on demand with the copy kept an hour under
+sha256, never latest, and may keep the pins of the earlier pack formats it
+still serves, one entry read out of the index at the pin this build takes
+(named, pinning, official; packformat.pin_for); a withdrawn entry puts a
+line on the bell for every install that holds the pack. Read on demand with the copy kept an hour under
 the state, and fetched again on a press.
 """
 import calendar
