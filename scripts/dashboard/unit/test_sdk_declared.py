@@ -191,18 +191,29 @@ class Shipped(sdkstore.KitCase):
         with open(os.path.join(sdkstore.REPO, "config", "toolchains.json")) as f:
             return {r["name"]: r for r in json.load(f)["toolchains"]}
 
-    def test_the_rows_held_by_signature_are_the_ones_cut_and_each_runs_its_verify_alone(self):
+    # The shipped rows whose own download is a tarball held by a pin or by
+    # its publisher's signature, with nothing run after it but its verify.
+    UNPACKED = {"node": ["{dir}/bin/node", "--version"], "swift": ["{dir}/usr/bin/swift", "--version"], "go": ["{dir}/bin/go", "version"],
+                "jdk": ["{dir}/bin/java", "-version"], "zig": ["{dir}/zig", "version"], "ffmpeg": ["{dir}/bin/ffmpeg", "-version"]}
+
+    def test_the_rows_held_by_a_pin_or_a_signature_are_cut_and_each_runs_its_verify_alone(self):
         rows = self.shipped()
-        self.assertEqual(sorted(n for n, r in rows.items() if sdkmeta.declared_plan(r)), ["node", "swift"])
-        for name, tool in (("node", "{dir}/bin/node"), ("swift", "{dir}/usr/bin/swift")):
+        for name, verify in self.UNPACKED.items():
             src = rows[name]["source"]
             self.assertEqual(sdkmeta.declared_plan(rows[name]), ["net\x1fcut\x1f"], name)
             self.assertTrue(sdkmeta.held_by_entry(rows[name]), name)
-            # Nothing of either runs after its download but a --version of what was unpacked.
+            # Nothing of it runs after its download but a look at what was unpacked.
             self.assertEqual((src["kind"], src["verify"], [k for k in ("run", "then", "warm", "fetch", "online") if k in src]),
-                             ("tarball", [tool, "--version"], []), name)
-        for name in ("go", "jdk", "rust", "dotnet", "flutter", "playwright", "android:ndk"):
-            self.assertEqual((sdkmeta.declared_plan(rows[name]), sdkmeta.held_by_entry(rows[name])), ([], False), name)
+                             ("tarball", verify, []), name)
+        # A row that says online keeps the network, in its own sentence; one
+        # that declares nothing is installed as it always was.
+        for name, r in rows.items():
+            plan, online = sdkmeta.declared_plan(r), " ".join(str(r["source"].get("online") or "").split())
+            if online:
+                self.assertEqual(plan[0], f"net\x1fonline\x1f{online}", name)
+            elif name not in self.UNPACKED:
+                self.assertEqual((plan, sdkmeta.held_by_entry(r)), ([], False), name)
+        self.assertEqual((sdkmeta.declared_plan(rows["playwright"]), sdkmeta.held_by_entry(rows["playwright"])), ([], False))
 
     def test_node_s_recipe_runs_its_verify_behind_the_cut(self):
         # The shipped row's own source, its address a file on disk and its

@@ -464,23 +464,30 @@ def cmd_pin(doc, names, opts, out):
     if len(names) != 1:
         raise Refused("pin takes one NAME")
     row = chosen(doc, names)[0]
+    try:
+        return pin_row(doc, row, opts, out)
+    except Refused as e:
+        raise Refused(f"{row['name']} is left as it was: {e}") from e
+
+
+def pin_row(doc, row, opts, out):
     name, src = row["name"], row.get("source") or {}
     new = copy.deepcopy(row)
     if src.get("kind") == "git":
         if src.get("commit"):
-            raise Refused(f"{name} is pinned already: tools/pins.py move {name} moves it")
+            raise Refused(f"it is pinned already: tools/pins.py move {name} moves it")
         got = git_learned(row)
         new["source"].update({"commit": got["commit"], **({"tag": got["tag"]} if got["tag"] else {})})
         out(f"{name}: its commit pinned at {got['tag']} {got['commit']}".replace("  ", " "))
     elif src.get("kind") in ("tarball", "script"):
         if sdkmeta.pin_of(row):
-            raise Refused(f"{name} is pinned already: tools/pins.py move {name} moves it")
+            raise Refused(f"it is pinned already: tools/pins.py move {name} moves it")
         got = learned(row, opts.get("version", ""))
         write_pin(new, got, src.get("checksum"))
         for line in lines(name, [{"what": "its download", "old": "", "new": got["version"], "files": got["files"], "apply": True}]):
             out(line)
     else:
-        raise Refused(f"{name} has no download of its own to pin: its source is of kind {src.get('kind')}")
+        raise Refused(f"it has no download of its own to pin: its source is of kind {src.get('kind')}")
     new["rev"] = catalogrows.rev_of(row) + 1
     why = packformat.source_refused(new["source"])
     if why:

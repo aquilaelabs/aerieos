@@ -154,6 +154,10 @@ class Framework(unittest.TestCase):
             # A shipped agent that says how it signs in says who is signed
             # in from a named file, which is 2.2's.
             want = "2.2" if (m.get("agent") or {}).get("signin") else "2.1"
+            # ...and a shipped row whose entry holds its downloads is
+            # written in pack format 5, which is its first number.
+            if packformat.of(m) > 2:
+                want = f"{packformat.of(m)}.{want[2:]}"
             self.assertEqual(m.get("framework"), want, f"{f.parent.name} names its maker, which is framework 2.1's")
             if want == "2.2":
                 self.assertTrue(toolpacks.validate(dict(m, framework="2.1"))[1], f"{f.parent.name}: what it uses is held to the version it says")

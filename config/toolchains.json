@@ -197,11 +197,16 @@
       "source": {
         "kind": "tarball",
         "fresh_only": true,
+        "version": {
+          "resolver": "match",
+          "url": "https://api.adoptium.net/v3/info/release_names?release_type=ga&version=%5B21%2C22%29&page_size=1&sort_order=DESC",
+          "match": "\"(jdk-[0-9.+]+)\""
+        },
         "url": {
-          "linux/amd64": "https://api.adoptium.net/v3/binary/latest/21/ga/linux/x64/jdk/hotspot/normal/eclipse",
-          "linux/arm64": "https://api.adoptium.net/v3/binary/latest/21/ga/linux/aarch64/jdk/hotspot/normal/eclipse",
-          "darwin/arm64": "https://api.adoptium.net/v3/binary/latest/21/ga/mac/aarch64/jdk/hotspot/normal/eclipse",
-          "darwin/amd64": "https://api.adoptium.net/v3/binary/latest/21/ga/mac/x64/jdk/hotspot/normal/eclipse"
+          "linux/amd64": "https://api.adoptium.net/v3/binary/version/{version}/linux/x64/jdk/hotspot/normal/eclipse",
+          "linux/arm64": "https://api.adoptium.net/v3/binary/version/{version}/linux/aarch64/jdk/hotspot/normal/eclipse",
+          "darwin/arm64": "https://api.adoptium.net/v3/binary/version/{version}/mac/aarch64/jdk/hotspot/normal/eclipse",
+          "darwin/amd64": "https://api.adoptium.net/v3/binary/version/{version}/mac/x64/jdk/hotspot/normal/eclipse"
         },
         "strip": {
           "linux/*": 1,
@@ -216,14 +221,24 @@
           "bytes": 200000000
         },
         "checksum": {
-          "from": "json",
-          "url": {
-            "linux/amd64": "https://api.adoptium.net/v3/assets/latest/21/hotspot?architecture=x64&image_type=jdk&os=linux&vendor=eclipse",
-            "linux/arm64": "https://api.adoptium.net/v3/assets/latest/21/hotspot?architecture=aarch64&image_type=jdk&os=linux&vendor=eclipse",
-            "darwin/arm64": "https://api.adoptium.net/v3/assets/latest/21/hotspot?architecture=aarch64&image_type=jdk&os=mac&vendor=eclipse",
-            "darwin/amd64": "https://api.adoptium.net/v3/assets/latest/21/hotspot?architecture=x64&image_type=jdk&os=mac&vendor=eclipse"
+          "from": "pin",
+          "version": "jdk-21.0.13+9",
+          "sha256": {
+            "linux/amd64": "d7f5d5cf865a2902b70ff549b97586a7d3f234e016f041ab447ea740c7d66d1c",
+            "linux/arm64": "e3522e707fc7dbe2a72c30746b1e7068301a0213ecd213d4491f35a14eb55578",
+            "darwin/arm64": "bf036b35b071bfb2f54f2c0af8ee8d88afa95ee6eb3dce02c0f94cfc2524d04a",
+            "darwin/amd64": "9aa1d1c17ae5467a022679e7e0af5c00797d94ac462ed1a46f4db07a8a34a6dd"
           },
-          "path": "0.binary.package.checksum"
+          "found": {
+            "from": "json",
+            "url": {
+              "linux/amd64": "https://api.adoptium.net/v3/assets/release_name/eclipse/{version}?architecture=x64&image_type=jdk&os=linux",
+              "linux/arm64": "https://api.adoptium.net/v3/assets/release_name/eclipse/{version}?architecture=aarch64&image_type=jdk&os=linux",
+              "darwin/arm64": "https://api.adoptium.net/v3/assets/release_name/eclipse/{version}?architecture=aarch64&image_type=jdk&os=mac",
+              "darwin/amd64": "https://api.adoptium.net/v3/assets/release_name/eclipse/{version}?architecture=x64&image_type=jdk&os=mac"
+            },
+            "path": "binaries.0.package.checksum"
+          }
         }
       },
       "terms": [
@@ -231,7 +246,8 @@
           "label": "GPLv2 with the Classpath Exception",
           "url": "https://openjdk.org/legal/gplv2+ce.html"
         }
-      ]
+      ],
+      "rev": 2
     },
     {
       "name": "android-tools",
@@ -639,7 +655,17 @@
           "version"
         ],
         "checksum": {
-          "from": "go-json"
+          "from": "pin",
+          "version": "go1.27.4",
+          "sha256": {
+            "linux/amd64": "7226736c2339719cda28fbf3a54d71aa63bcefe376e98cef00034268dab24840",
+            "linux/arm64": "3392582988a273a87ab5043ee1b2c9c17a2c3c00580bf9326c47a2e0aaaeac92",
+            "darwin/arm64": "91a44a2b8a716600ad94a4f143e156116620db8828086a6e3602291be9bd0bb4",
+            "darwin/amd64": "2b799377704ef12db39bd254995d5c348c9cc8d86562ca817724390e56c38f43"
+          },
+          "found": {
+            "from": "go-json"
+          }
         }
       },
       "terms": [
@@ -647,7 +673,8 @@
           "label": "Go's BSD license",
           "url": "https://go.dev/LICENSE"
         }
-      ]
+      ],
+      "rev": 2
     },
     {
       "name": "dotnet",
@@ -1244,9 +1271,19 @@
       "source": {
         "kind": "tarball",
         "fresh_only": true,
+        "version": {
+          "resolver": "github-release",
+          "repo": "BtbN/FFmpeg-Builds",
+          "tag": "^autobuild-",
+          "settled": 15,
+          "asset": {
+            "linux/amd64": "^ffmpeg-N-.*-linux64-gpl\\.tar\\.xz$",
+            "linux/arm64": "^ffmpeg-N-.*-linuxarm64-gpl\\.tar\\.xz$"
+          }
+        },
         "url": {
-          "linux/amd64": "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-linux64-gpl.tar.xz",
-          "linux/arm64": "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-linuxarm64-gpl.tar.xz"
+          "linux/amd64": "https://github.com/FFmpeg-Builds/FFmpeg-Builds/releases/download/autobuild-2026-10-31-12-59/ffmpeg-N-128227-g4811625b5f-linux64-gpl.tar.xz",
+          "linux/arm64": "https://github.com/FFmpeg-Builds/FFmpeg-Builds/releases/download/autobuild-2026-10-31-12-59/ffmpeg-N-128227-g4811625b5f-linuxarm64-gpl.tar.xz"
         },
         "strip": 1,
         "verify": [
@@ -1254,7 +1291,15 @@
           "-version"
         ],
         "checksum": {
-          "from": "github-asset"
+          "from": "pin",
+          "version": "autobuild-2026-10-31-12-59",
+          "sha256": {
+            "linux/amd64": "67929be39bbb696f41d3295686597a439aeac902f61d82be660ccc1453c1fdfb",
+            "linux/arm64": "9064bc53f3b268865f5a5370c9f7e98d86bbdde5820ec7f6928df2beaa1d586e"
+          },
+          "found": {
+            "from": "github-asset"
+          }
         }
       },
       "terms": [
@@ -1262,7 +1307,8 @@
           "label": "FFmpeg's license (GPL for these builds)",
           "url": "https://ffmpeg.org/legal.html"
         }
-      ]
+      ],
+      "rev": 2
     },
     {
       "name": "audio",
@@ -2031,15 +2077,22 @@
           "version"
         ],
         "checksum": {
-          "from": "zig-index"
-        }
+          "from": "pin",
+          "version": "0.17.1",
+          "sha256": "3581863e3cbcfd0fce0efc682ce7e9e93da96668a977791d356a26d2a7e9b17a",
+          "found": {
+            "from": "zig-index"
+          }
+        },
+        "url": "https://ziglang.org/download/0.17.1/zig-x86_64-linux-0.17.1.tar.xz"
       },
       "terms": [
         {
           "label": "Zig (MIT)",
           "url": "https://github.com/ziglang/zig/blob/master/LICENSE"
         }
-      ]
+      ],
+      "rev": 2
     },
     {
       "name": "xcodes",

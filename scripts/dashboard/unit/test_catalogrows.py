@@ -42,7 +42,7 @@ class Whole(unittest.TestCase):
             for x in catalogrows._named(r, "resolver"):
                 self.assertIn(x, catalogrows.RESOLVERS, r["name"])
             self.assertIn((r["source"].get("checksum") or {}).get("from"), (None, *catalogrows.CHECKSUMS), r["name"])
-            self.assertEqual(catalogrows.checked(dict(r, rev=2), r)[1], "", r["name"])
+            self.assertEqual(catalogrows.checked(dict(r, rev=catalogrows.rev_of(r) + 1), r)[1], "", r["name"])
 
     def test_the_docs_list_the_same_primitives(self):
         doc = (ROOT / "docs" / "tool-packs.md").read_text()
@@ -59,11 +59,14 @@ class Taken(unittest.TestCase):
         self.addCleanup(lambda: catalogrows.configure(state="/nonexistent", write_json=lambda *a: None))
         self.zig = next(r for r in SHIPPED if r["name"] == "zig")
         self.newer = copy.deepcopy(self.zig)
-        self.newer["rev"] = 2
+        # One past whatever the shipped row is at: a pin that moved raised it.
+        self.next = catalogrows.rev_of(self.zig) + 1
+        self.newer["rev"] = self.next
         self.newer["source"]["version"]["url"] = "https://ziglang.org/download/index-v2.json"
         self.fetched = []
 
-    def entry(self, name="zig", rev=2, **more):
+    def entry(self, name="zig", rev=0, **more):
+        rev = self.next if rev == 0 else rev
         return {"name": name, "url": "https://github.com/aquilaelabs/aerieos-catalog", "commit": "a" * 40, "sha256": "b" * 64,
                 "path": f"packs/official/{name}", "tier": "official", "kind": "pack", **({"shipped_rev": rev} if rev else {}), **more}
 
@@ -88,11 +91,12 @@ class Taken(unittest.TestCase):
     def test_the_index_s_parse_keeps_the_rev_an_entry_says(self):
         idx, why = catalogindex.parse(json.dumps({"version": 1, "packs": [self.entry(), self.entry(name="jdk", rev=None), self.entry(name="go", rev=1)]}).encode())
         self.assertEqual(why, "")
-        self.assertEqual([p.get("shipped_rev") for p in idx["packs"]], [2, None, None])
+        self.assertEqual([p.get("shipped_rev") for p in idx["packs"]], [self.next, None, None])
         self.assertEqual([n for n, _e in catalogrows.wanted(idx, SHIPPED)], ["zig"])
 
     def test_an_entry_no_newer_than_the_shipped_row_is_never_fetched(self):
         self.assertEqual(self.refresh(rev=1), [])
+        self.assertEqual(self.refresh(rev=self.next - 1), [])
         self.assertEqual(self.refresh(rev=None), [])
         self.assertEqual(catalogrows.refresh({"packs": [self.entry(tier="vetted")]}, self.fetch(self.newer), SHIPPED), [], "an official entry's alone")
         self.assertEqual(self.fetched, [])
@@ -121,7 +125,7 @@ class Taken(unittest.TestCase):
 
     def test_a_row_an_upgrade_caught_up_with_is_dropped(self):
         self.refresh()
-        after = [dict(r, rev=2) if r["name"] == "zig" else r for r in SHIPPED]
+        after = [dict(r, rev=self.next) if r["name"] == "zig" else r for r in SHIPPED]
         self.assertEqual(catalogrows.merged(after), after, "the image's own is as new: it is the one used")
         catalogrows.refresh({"packs": []}, self.fetch(self.newer), after)
         self.assertEqual(catalogrows.kept(), {})
@@ -140,7 +144,7 @@ class Taken(unittest.TestCase):
             got = json.load(tar.extractfile("config/toolchains.catalog.json"))
             # ...beside the shipped file, which goes as its release signed it.
             self.assertEqual(tar.extractfile("config/toolchains.json").read().decode(), shipped_text)
-        self.assertEqual(next(r for r in got["toolchains"] if r["name"] == "zig")["rev"], 2)
+        self.assertEqual(next(r for r in got["toolchains"] if r["name"] == "zig")["rev"], self.next)
         self.assertEqual(len(got["toolchains"]), len(SHIPPED))
 
 

@@ -10,7 +10,8 @@
    "name": "these builds"
   }
  ],
- "framework": "2.1",
+ "format": 5,
+ "framework": "5.1",
  "label": "FFmpeg (video and audio)",
  "layout": {
   "bin": [
@@ -28,21 +29,40 @@
  "shipped": {
   "probe": "ffmpeg",
   "reports": "ffmpeg",
+  "rev": 2,
   "source": {
    "checksum": {
-    "from": "github-asset"
+    "found": {
+     "from": "github-asset"
+    },
+    "from": "pin",
+    "sha256": {
+     "linux/amd64": "67929be39bbb696f41d3295686597a439aeac902f61d82be660ccc1453c1fdfb",
+     "linux/arm64": "9064bc53f3b268865f5a5370c9f7e98d86bbdde5820ec7f6928df2beaa1d586e"
+    },
+    "version": "autobuild-2026-10-31-12-59"
    },
    "fresh_only": true,
    "kind": "tarball",
    "strip": 1,
    "url": {
-    "linux/amd64": "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-linux64-gpl.tar.xz",
-    "linux/arm64": "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-linuxarm64-gpl.tar.xz"
+    "linux/amd64": "https://github.com/FFmpeg-Builds/FFmpeg-Builds/releases/download/autobuild-2026-10-31-12-59/ffmpeg-N-128227-g4811625b5f-linux64-gpl.tar.xz",
+    "linux/arm64": "https://github.com/FFmpeg-Builds/FFmpeg-Builds/releases/download/autobuild-2026-10-31-12-59/ffmpeg-N-128227-g4811625b5f-linuxarm64-gpl.tar.xz"
    },
    "verify": [
     "{dir}/bin/ffmpeg",
     "-version"
-   ]
+   ],
+   "version": {
+    "asset": {
+     "linux/amd64": "^ffmpeg-N-.*-linux64-gpl\\.tar\\.xz$",
+     "linux/arm64": "^ffmpeg-N-.*-linuxarm64-gpl\\.tar\\.xz$"
+    },
+    "repo": "BtbN/FFmpeg-Builds",
+    "resolver": "github-release",
+    "settled": 15,
+    "tag": "^autobuild-"
+   }
   }
  },
  "terms": [

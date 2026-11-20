@@ -256,7 +256,15 @@ class Pin(Case):
         rc, out = self.run_tool("move", "raw")
         self.assertEqual((rc, self.row("raw")["source"]["checksum"]["version"], self.row("raw")["rev"]), (0, "go1.100.0", 3), out)
         # One pinned already is moved, not pinned again; one with nothing to pin says so.
-        self.assertEqual(self.run_tool("pin", "go"), (1, "pins: go is pinned already: tools/pins.py move go moves it"))
+        self.assertEqual(self.run_tool("pin", "go"), (1, "pins: go is left as it was: it is pinned already: tools/pins.py move go moves it"))
+        # One whose file cannot be learned for every platform is left as it was, by name.
+        self.rows[2]["source"]["checksum"] = {"from": "file", "url": "{url}.sha256"}
+        self.write()
+        del self.pages[go_url("go1.100.0", "linux/arm64") + ".sha256"], self.files[go_url("go1.100.0", "linux/arm64")]
+        before = self.read()
+        rc, out = self.run_tool("pin", "raw")
+        self.assertEqual((rc, self.read()), (1, before), out)
+        self.assertTrue(out.startswith("pins: raw is left as it was: linux/arm64 could not be learned ("), out)
 
     def test_a_resolver_that_supplies_the_address_has_it_written_beside_the_digest(self):
         asset = lambda tag, name: {"name": name, "browser_download_url": f"https://github.com/a/a/releases/download/{tag}/{name}"}  # noqa: E731

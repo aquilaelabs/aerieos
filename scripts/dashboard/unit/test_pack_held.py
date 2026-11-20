@@ -24,6 +24,11 @@ KEPT = Path(__file__).parent / "packformat"
 H = "ab" * 32
 KEY = json.loads((KEPT / "5" / "tern.json").read_text())["install"]["keyring"]["tern.asc"]
 SENTENCE = "Its installer downloads the compiler from releases.example.org."
+# Where the rows AerieOS ships stand: the ones whose every download is held
+# to something the row carries, and the ones whose pinned installer
+# downloads the rest. Every other row reads open, and waits for its pin.
+SHIPPED_PINNED = ["ffmpeg", "go", "jdk", "node", "swift", "zig"]
+SHIPPED_INSTALLER = []
 
 
 def kept(n, name):
@@ -283,10 +288,16 @@ class Row(unittest.TestCase):
         # A script's follow-up steps are format 1's, as they always ran.
         self.assertEqual(packformat.source_format({"kind": "script", "then": [{"run": ["x"]}]}), 1)
 
-    def test_no_shipped_row_or_exported_pack_moved(self):
+    def test_every_shipped_row_is_one_the_format_takes_and_says_5_where_its_entry_holds_its_downloads(self):
         rows = json.loads((ROOT / "config" / "toolchains.json").read_text())["toolchains"]
-        self.assertEqual([r["name"] for r in rows if packformat.source_format(r.get("source")) != 1], [])
         self.assertEqual([r["name"] for r in rows if packformat.source_refused(r.get("source"))], [])
+        # A row that pins, declares or says online is format 5's, and its
+        # official pack says so; the two held by a signature alone, and the
+        # rows that are still open, say nothing new.
+        for r in rows:
+            word = packformat.held(r)[0]
+            self.assertEqual(packformat.source_format(r["source"]), 1 if word == "open" or r["name"] in ("node", "swift") else 5, r["name"])
+            self.assertEqual(catalogrows.manifest_of(r).get("format", 1), packformat.source_format(r["source"]), r["name"])
 
 
 class Held(unittest.TestCase):
@@ -371,10 +382,21 @@ class Held(unittest.TestCase):
         words = {r["name"]: packformat.held(r) for r in rows}
         self.assertTrue(all(w in packformat.HELD_WORDS and why for w, why in words.values()))
         # Swift's download carries its publisher's signature, and Node's
-        # checksum list does: held, and what they run is cut by that. The
-        # rest wait for their pins.
-        self.assertEqual(sorted(n for n, (w, _why) in words.items() if w != "open"), ["node", "swift"])
-        self.assertEqual((words["node"][0], words["swift"][0], words["flutter"][0], words["go"][0]), ("pinned", "pinned", "open", "open"))
+        # checksum list does; the others here carry the sha256 of their
+        # exact file. What they run is cut by that. The rest wait for
+        # their pins.
+        self.assertEqual(sorted(n for n, (w, _why) in words.items() if w == "pinned"), SHIPPED_PINNED)
+        self.assertEqual(sorted(n for n, (w, _why) in words.items() if w == "installer"), SHIPPED_INSTALLER)
+        # An installer's sentence is the row's own, and says where the rest comes from.
+        for name in SHIPPED_INSTALLER:
+            self.assertEqual(words[name][1], " ".join(next(r for r in rows if r["name"] == name)["source"]["online"].split()), name)
+        # Every pinned row says how its newer pin is found, or is held by a signature that needs none.
+        for r in rows:
+            src = r["source"]
+            if (src.get("checksum") or {}).get("from") == "pin":
+                self.assertEqual(packformat.pin_refused(src["checksum"]), "", r["name"])
+                plats = src["url"] if isinstance(src.get("url"), dict) else None
+                self.assertEqual(sorted(src["checksum"]["sha256"]) if plats else None, sorted(plats) if plats else None, f"{r['name']}: a digest for every platform it names")
 
 
 class Said(unittest.TestCase):
@@ -417,10 +439,10 @@ class Said(unittest.TestCase):
             payload = toolchains.payload_for_node("n_1")
         items = {i["name"]: i for i in payload["items"]}
         self.assertEqual(items["tern"]["held"], {"word": "pinned", "why": packformat.PINNED_SAID})
-        self.assertEqual(items["go"]["held"]["word"], "open")
+        self.assertEqual((items["playwright"]["held"]["word"], items["go"]["held"]["word"]), ("open", "pinned"))
         rows = {r["name"]: r for r in library.rows(payload, [], [], {"packs": []}, {})}
         self.assertEqual(rows["tern"]["held"], items["tern"]["held"])
-        self.assertEqual((rows["tern"]["kind"], rows["go"]["kind"], rows["go"]["held"]["word"]), ("pack", "toolchain", "open"))
+        self.assertEqual((rows["tern"]["kind"], rows["playwright"]["kind"], rows["playwright"]["held"]["word"]), ("pack", "toolchain", "open"))
 
     def test_each_declared_download_says_how_it_is_held_and_the_platform_it_is_for(self):
         tern, quill = kept(5, "tern"), kept(5, "quill")

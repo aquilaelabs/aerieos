@@ -265,16 +265,21 @@ it happens on a worker rather than in the request: the first draw after an
 install carries the estimate and the real number arrives a moment later.
 
 **A download is held to something before it is unpacked or run.** Each row
-of the catalog says to what (`source.checksum`). Most ask its publisher at
-the moment of the install: the digest GitHub states for a release asset, a
-checksum file beside the download, the vendor's own index. Two rest on
-their publisher's signature, under keys AerieOS ships
-(`config/release-keys`) or the row carries itself. And a row may carry the
-answer whole, as a **pin**: the version and the sha256 of the exact file,
-which the signed release or the signed catalog then holds, so the file is
-held to something its own origin cannot change. A pinned row installs that
-version and asks nobody what is newest; a check offers the pinned version,
-and a newer one is the pin moving in the row. What a row held by a pin or
+of the catalog says to what (`source.checksum`). A row carries the answer
+whole, as a **pin**: the version and the sha256 of the exact file, which
+the signed release or the signed catalog then holds, so the file is held to
+something its own origin cannot change. Two rest on their publisher's
+signature instead, under keys AerieOS ships (`config/release-keys`) or the
+row carries itself, and a repository is fetched at a commit. The rows not
+moved onto a pin yet ask the publisher at the moment of the install: the
+digest GitHub states for a release asset, a checksum file beside the
+download, the vendor's own index; such a row reads **open** on its card. A
+pinned row installs its version and asks nobody what is newest; a check
+offers the pinned version, and a newer one is the pin moving in the row
+([Moving a pin](#moving-a-pin)). Where a vendor publishes one moving file
+with no version in its address, the pin is that file's bytes on the day it
+was pinned, and an install is refused from the day the vendor changes it
+until the pin moves. What a row held by a pin or
 by a signature runs after its download (its installer, its follow-up
 steps, its verify) runs with no network, unless the row says in a sentence
 that its installer downloads the rest. A download that is not what
