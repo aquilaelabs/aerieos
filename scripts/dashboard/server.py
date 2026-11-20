@@ -5295,6 +5295,44 @@ def _release_signer(project):
 
 
 phone.release_signer = _release_signer
+
+# What a space's Agents-may dial says at deny (_dialed), by dial: what Claude
+# does not do, and the dial's name in the space's settings.
+DIALS = {"release": ("release it", "Tag and publish a release"),
+         "sign": ("sign its builds", "Sign a build"),
+         "keys": ("manage its signing keys", "Manage signing keys")}
+
+# The changes to a published release, by /api/version's action
+# (_release_change). `does` is the word a session on another space is refused
+# with, `newest` whether the newest tag stands for one not named, `instead`
+# what a person does where the dial says deny, `plan` what would change
+# (name, tag, body), checked before anybody is asked, `do` the change and
+# `ask` the request queued for the owner; `asks` holds a session to asking
+# whatever the dial.
+ReleaseChange = collections.namedtuple("ReleaseChange", "does newest instead plan do ask asks")
+RELEASE_CHANGES = {
+    # Files off a published release: its own ask, never part of an edit (the
+    # operator, 5 Oct).
+    "release-remove": ReleaseChange(
+        "changes", True, ", which taking a file off its release is part of; a person removes it on the forge",
+        lambda name, tag, req: forgerelease.remove_plan(name, tag, req.get("remove") if isinstance(req.get("remove"), list) else []),
+        _release_remover, phone.ask_release_remove, False),
+    # A release and its tag taken back together (R190 step 3): always a
+    # person's answer, since nothing undoes it; a session asks, a person at
+    # the panel does it.
+    "release-withdraw": ReleaseChange(
+        "withdraws", False, ", which withdrawing one is part of; a person deletes it on the forge",
+        lambda name, tag, req: forgerelease.withdraw_plan(name, tag),
+        _release_withdrawer, phone.ask_release_withdraw, True),
+    # aerie version release --edit (R139): the published release's notes and
+    # files, every edit its own ask.
+    "release-edit": ReleaseChange(
+        "edits", True, ", which an edit of its release is part of; a person edits it on the forge",
+        lambda name, tag, req: forgerelease.edit_plan(name, tag, req.get("notes") if isinstance(req.get("notes"), str) else None,
+                                                     req.get("attach") if isinstance(req.get("attach"), list) else []),
+        _release_editor, phone.ask_release_edit, False),
+}
+
 artifacts.sign_routes = signing.routes_held
 import version                                                   # noqa: E402
 import vmtemplate                                                # noqa: E402
@@ -7230,6 +7268,22 @@ class Handler(BaseHTTPRequestHandler):
             return False
         self._json({"error": why}, 403)
         return True
+
+    def _dialed(self, project, dial, instead="", person=False):
+        """What a space's Agents-may dial says of a session's ask: "auto",
+        where it is done now, or "ask", where it waits for the owner on the
+        bell; None, with the 403 already written, where the dial says deny,
+        in the dial's own sentence (DIALS) and `instead`, what a person does
+        in its place. A `person` at the page is under no dial: "auto", and
+        the settings are not read."""
+        if person:
+            return "auto"
+        mode = (prefs.get(project) or {}).get(dial) or "ask"
+        if mode == "deny":
+            does, named = DIALS[dial]
+            self._json({"error": f"{project}'s settings say Claude does not {does} (Agents may: {named}){instead}"}, 403)
+            return None
+        return mode
 
     def _deny(self):
         """Not signed in. A person gets the login page, code gets a plain
@@ -11320,11 +11374,9 @@ class Handler(BaseHTTPRequestHandler):
             # project's own credentials, which the session never holds.
             if name != who["session"]:
                 return self._json({"error": "a session releases its own space and no other"}, 403)
-            mode = (prefs.get(name) or {}).get("release") or "ask"
-            if mode == "deny":
-                return self._json({"error": f"{name}'s settings say Claude does not release it (Agents may: "
-                                            "Tag and publish a release); a person cuts it with Release on "
-                                            "the Artifacts view"}, 403)
+            mode = self._dialed(name, "release", "; a person cuts it with Release on the Artifacts view")
+            if not mode:
+                return None
             comp = field(req, "component") or ""
             plan = version.release_plan(name, comp, dev=req.get("dev") is True, stable=req.get("stable") is True,
                                         pre=field(req, "pre") or "", env=projects._git_env(),
@@ -11351,88 +11403,8 @@ class Handler(BaseHTTPRequestHandler):
                                   asker_name=str(acct.get("name") or ""), principal=self._principal(), dev=dev,
                                   pre=plan.get("pre") or "")
             return self._json({**r, "channel": plan["channel"]}, 400 if r.get("error") else 200)
-        if act == "release-remove":
-            # Files off a published release: its own ask, never part of an
-            # edit, under the release's dial (the operator, 5 Oct).
-            if who.get("session") and name != who["session"]:
-                return self._json({"error": "a session changes its own space's release and no other"}, 403)
-            if not who.get("session") and self._refused("version", name):
-                return None
-            comp = field(req, "component") or ""
-            tag = field(req, "tag")
-            if not tag:
-                tag, why = version.current_tag(name, comp)
-                if why:
-                    return self._json({"error": why}, 400)
-            mode = (prefs.get(name) or {}).get("release") or "ask" if who.get("session") else "auto"
-            if mode == "deny":
-                return self._json({"error": f"{name}'s settings say Claude does not release it (Agents may: "
-                                            "Tag and publish a release), which taking a file off its release is "
-                                            "part of; a person removes it on the forge"}, 403)
-            names = req.get("remove") if isinstance(req.get("remove"), list) else []
-            plan = forgerelease.remove_plan(name, tag, names)
-            if plan.get("error"):
-                return self._json(plan, 400)
-            acct = users.account_of(who) or {}
-            if mode == "auto":
-                return self._json(*_release_remover(name, plan, str(acct.get("name") or ""), self._principal()))
-            r = phone.ask_release_remove(field(req, "why"), name, plan, membership.owner_of(name),
-                                         membership.owner_name(name) or "the space's owner",
-                                         asker_name=str(acct.get("name") or ""), principal=self._principal())
-            return self._result(r)
-        if act == "release-withdraw":
-            # A release and its tag taken back together (R190 step 3):
-            # always a person's answer, whatever the dial, since nothing
-            # undoes it; a session asks, a person at the panel does it.
-            if who.get("session") and name != who["session"]:
-                return self._json({"error": "a session withdraws its own space's release and no other"}, 403)
-            if not who.get("session") and self._refused("version", name):
-                return None
-            if who.get("session") and ((prefs.get(name) or {}).get("release") or "ask") == "deny":
-                return self._json({"error": f"{name}'s settings say Claude does not release it (Agents may: "
-                                            "Tag and publish a release), which withdrawing one is part of; "
-                                            "a person deletes it on the forge"}, 403)
-            plan = forgerelease.withdraw_plan(name, field(req, "tag"))
-            if plan.get("error"):
-                return self._json(plan, 400)
-            acct = users.account_of(who) or {}
-            if not who.get("session"):
-                return self._json(*_release_withdrawer(name, plan, str(acct.get("name") or ""), self._principal()))
-            r = phone.ask_release_withdraw(field(req, "why"), name, plan, membership.owner_of(name),
-                                           membership.owner_name(name) or "the space's owner",
-                                           asker_name=str(acct.get("name") or ""), principal=self._principal())
-            return self._result(r)
-        if act == "release-edit":
-            # aerie version release --edit (R139): the published release's
-            # notes and files, under the same dial as the release itself, a
-            # session's own project only, every edit its own ask.
-            if who.get("session") and name != who["session"]:
-                return self._json({"error": "a session edits its own space's release and no other"}, 403)
-            if not who.get("session") and self._refused("version", name):
-                return None
-            comp = field(req, "component") or ""
-            tag = field(req, "tag")
-            if not tag:
-                tag, why = version.current_tag(name, comp)
-                if why:
-                    return self._json({"error": why}, 400)
-            attach = req.get("attach") if isinstance(req.get("attach"), list) else []
-            notes = req.get("notes") if isinstance(req.get("notes"), str) else None
-            mode = (prefs.get(name) or {}).get("release") or "ask" if who.get("session") else "auto"
-            if mode == "deny":
-                return self._json({"error": f"{name}'s settings say Claude does not release it (Agents may: "
-                                            "Tag and publish a release), which an edit of its release is part of; "
-                                            "a person edits it on the forge"}, 403)
-            plan = forgerelease.edit_plan(name, tag, notes, attach)
-            if plan.get("error"):
-                return self._json(plan, 400)
-            acct = users.account_of(who) or {}
-            if mode == "auto":
-                return self._json(*_release_editor(name, plan, str(acct.get("name") or ""), self._principal()))
-            r = phone.ask_release_edit(field(req, "why"), name, plan, membership.owner_of(name),
-                                       membership.owner_name(name) or "the space's owner",
-                                       asker_name=str(acct.get("name") or ""), principal=self._principal())
-            return self._result(r)
+        if act in RELEASE_CHANGES:
+            return self._release_change(act, name, req, who)
         if act == "release-drafts":
             # The drafts waiting to be read and published (the operator,
             # 1 Nov), each with the files it still lacks.
@@ -11475,6 +11447,36 @@ class Handler(BaseHTTPRequestHandler):
         if act != "ask" and self._refused("version", name):
             return None
         return self._json(*version.verb(name, act, req, self._who(), self._principal()))
+
+    def _release_change(self, act, name, req, who):
+        """One of the changes to a published release (RELEASE_CHANGES). A
+        session's is on its own space and no other, under the release's
+        dial, and each is its own ask of the owner; a person's is done as it
+        is asked, by an account with the version area on the space."""
+        ch = RELEASE_CHANGES[act]
+        session = who.get("session")
+        if session and name != session:
+            return self._json({"error": f"a session {ch.does} its own space's release and no other"}, 403)
+        if not session and self._refused("version", name):
+            return None
+        tag = field(req, "tag")
+        if ch.newest and not tag:
+            tag, why = version.current_tag(name, field(req, "component") or "")
+            if why:
+                return self._json({"error": why}, 400)
+        mode = self._dialed(name, "release", ch.instead, person=not session)
+        if not mode:
+            return None
+        plan = ch.plan(name, tag, req)
+        if plan.get("error"):
+            return self._json(plan, 400)
+        acct = users.account_of(who) or {}
+        if mode == "auto" and not (session and ch.asks):
+            return self._json(*ch.do(name, plan, str(acct.get("name") or ""), self._principal()))
+        r = ch.ask(field(req, "why"), name, plan, membership.owner_of(name),
+                   membership.owner_name(name) or "the space's owner",
+                   asker_name=str(acct.get("name") or ""), principal=self._principal())
+        return self._result(r)
 
     def _members(self, req):
         """A project's owner, whether it is invite only, its people and its
@@ -11750,11 +11752,9 @@ class Handler(BaseHTTPRequestHandler):
                 if not releasesign.wants(name):
                     return self._json({"error": f"{name}'s workflows hand over no unsigned APK to sign "
                                                 f"(an artifact named {releasesign.MARK}TAG)"}, 400)
-                mode = (prefs.get(name) or {}).get("sign") or "ask"
-                if mode == "deny":
-                    return self._json({"error": f"{name}'s settings say Claude does not sign its builds "
-                                                "(Agents may: Sign a build); a person presses Look for unsigned "
-                                                "APKs now in the Signing view"}, 403)
+                mode = self._dialed(name, "sign", "; a person presses Look for unsigned APKs now in the Signing view")
+                if not mode:
+                    return None
                 if mode == "auto":
                     return self._json(*_release_signer(name))
                 r = phone.ask_release_sign(field(req, "why"), name, owner,
@@ -11765,10 +11765,9 @@ class Handler(BaseHTTPRequestHandler):
                 # Manage signing keys (R106 step 6): which keys there are
                 # (names and fingerprints, never a secret), and a new key or
                 # a package's key proposed, under its own dial.
-                kmode = (prefs.get(name) or {}).get("keys") or "ask"
-                if kmode == "deny":
-                    return self._json({"error": f"{name}'s settings say Claude does not manage its signing "
-                                                "keys (Agents may: Manage signing keys)"}, 403)
+                kmode = self._dialed(name, "keys")
+                if not kmode:
+                    return None
                 if act == "keys":
                     return self._json(*signing.listing(name))
                 # Said before anybody is asked to allow a key that could not
@@ -11784,11 +11783,9 @@ class Handler(BaseHTTPRequestHandler):
                                    membership.owner_name(name) or "the space's owner",
                                    asker_name=str(acct.get("name") or ""))
                 return self._result(r)
-            mode = (prefs.get(name) or {}).get("sign") or "ask"
-            if mode == "deny":
-                return self._json({"error": f"{name}'s settings say Claude does not sign its builds "
-                                            "(Agents may: Sign a build); a person signs from the "
-                                            "Artifacts view"}, 403)
+            mode = self._dialed(name, "sign", "; a person signs from the Artifacts view")
+            if not mode:
+                return None
             file, route, key = field(req, "file"), field(req, "route"), field(req, "key")
             no = signing.refusal(name, file, route, key)
             if no:
