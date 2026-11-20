@@ -41,13 +41,10 @@ function openJob(id){
 }
 
 function loadJobs(){
-  return reading("jobs", async () => {
-    try{
-      const j = await getJSON("/api/v1/jobs?n=100");
-      // One that never landed keeps what the page had (the poll says the
-      // controller is away), as a read that threw always did.
-      if (j.unreached) throw new Error(j.error);
-      jobsErr = j.error || "";
+  return readKept("jobs", "/api/v1/jobs?n=100", {
+    err: said => { jobsErr = said; },
+    keep: () => { jobsList = jobsList || []; },
+    land: async j => {
       jobsList = j.jobs || [];
       jobsNodes = j.nodes || {};
       // An unfolded log follows its job: refetched with the list, so a running
@@ -67,10 +64,7 @@ function loadJobs(){
         // job wrote nothing)" (B658, the operator, 11 Oct).
         if (r.id) jobsLogs[id] = r.log || "";
       }));
-    }catch(e){
-      jobsErr = failWords(e);
-      jobsList = jobsList || [];
-    }
+    },
   });
 }
 

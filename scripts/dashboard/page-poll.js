@@ -110,6 +110,28 @@ const readRev = key => readings.get(key)?.rev || 0;
 // Whether a read of this kind is out now (a page that says it is reading).
 const readBusy = key => !!readings.get(key)?.busy;
 function readMoved(key){ readingOf(key).rev++; }
+// A page's read of one address that keeps what the page had when the
+// controller could not be reached: the poll says the controller is away, and
+// the page goes on showing its last answer under it. An answer, a refusal
+// among them, tells `err` what it refused with ("" for nothing) and is
+// handed to `land`; one that never landed, and a landing that threw, tells
+// `err` why in words and calls `keep`, which leaves the old data standing
+// or puts the page's empty shape where there was none. `after`, where a page
+// has one, runs either way.
+function readKept(key, url, {land, keep, err, after}){
+  return reading(key, async () => {
+    try{
+      const j = await getJSON(url);
+      if (j.unreached) throw new Error(j.error);
+      err(j.error || "");
+      await land(j);
+    }catch(e){
+      err(failWords(e));
+      keep();
+    }
+    after?.();
+  });
+}
 
 // Terminal tabs whose session we have actually watched running.
 //

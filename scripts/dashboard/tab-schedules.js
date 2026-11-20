@@ -20,18 +20,10 @@ function openSchedulesTab(){
 }
 
 function loadSchedules(){
-  return reading("schedules", async () => {
-    try{
-      const j = await getJSON("/api/schedules");
-      // One that never landed keeps what the page had (the poll says the
-      // controller is away), as a read that threw always did.
-      if (j.unreached) throw new Error(j.error);
-      schedErr = j.error || "";
-      schedData = j.error ? {schedules: [], nodes: [], may: false} : j;
-    }catch(e){
-      schedErr = failWords(e);
-      schedData = schedData || {schedules: [], nodes: [], may: false};
-    }
+  return readKept("schedules", "/api/schedules", {
+    err: said => { schedErr = said; },
+    keep: () => { schedData = schedData || {schedules: [], nodes: [], may: false}; },
+    land: j => { schedData = j.error ? {schedules: [], nodes: [], may: false} : j; },
   });
 }
 

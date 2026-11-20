@@ -26,20 +26,11 @@ function openVmsTab(){
 }
 
 function loadVms(){
-  return reading("vms", async () => {
-    try{
-      const j = await getJSON("/api/vms");
-      // One that never landed keeps what the page had (the poll says the
-      // controller is away), as a read that threw always did.
-      if (j.unreached) throw new Error(j.error);
-      vmsErr = j.error || "";
-      vmsData = j;
-    }catch(e){
-      vmsErr = failWords(e);
-      vmsData = vmsData || {vms: [], images: [], hosts: [], can: {}};
-    }
-    vmReapConsoles();
-    if (shown("vms")) drawPanes();
+  return readKept("vms", "/api/vms", {
+    err: said => { vmsErr = said; },
+    keep: () => { vmsData = vmsData || {vms: [], images: [], hosts: [], can: {}}; },
+    land: j => { vmsData = j; },
+    after: () => { vmReapConsoles(); if (shown("vms")) drawPanes(); },
   });
 }
 // A console tab is the account's and outlives the page, so one whose VM was

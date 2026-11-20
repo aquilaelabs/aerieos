@@ -28,18 +28,10 @@ function openRolesTab(){
 }
 
 function loadRoles(){
-  return reading("roles", async () => {
-    try{
-      const j = await getJSON("/api/roles");
-      // One that never landed keeps what the page had (the poll says the
-      // controller is away), as a read that threw always did.
-      if (j.unreached) throw new Error(j.error);
-      rolesErr = j.error || "";
-      rolesData = j.error ? {roles: {}, areas: [], people: [], projects: [], admin: false} : j;
-    }catch(e){
-      rolesErr = failWords(e);
-      rolesData = rolesData || {roles: {}, areas: [], people: [], projects: [], admin: false};
-    }
+  return readKept("roles", "/api/roles", {
+    err: said => { rolesErr = said; },
+    keep: () => { rolesData = rolesData || {roles: {}, areas: [], people: [], projects: [], admin: false}; },
+    land: j => { rolesData = j.error ? {roles: {}, areas: [], people: [], projects: [], admin: false} : j; },
   });
 }
 

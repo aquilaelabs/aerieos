@@ -27,19 +27,10 @@ function openStorageTab(node){
 }
 
 function loadStorage(){
-  return reading("storage", async () => {
-    try{
-      const j = await getJSON("/api/storage");
-      // One that never landed keeps what the page had (the poll says the
-      // controller is away), as a read that threw always did.
-      if (j.unreached) throw new Error(j.error);
-      storageErr = j.error || "";
-      storageList = j.nodes || [];
-      storageMay = !!j.may_measure;
-    }catch(e){
-      storageErr = failWords(e);
-      storageList = storageList || [];
-    }
+  return readKept("storage", "/api/storage", {
+    err: said => { storageErr = said; },
+    keep: () => { storageList = storageList || []; },
+    land: j => { storageList = j.nodes || []; storageMay = !!j.may_measure; },
   });
 }
 

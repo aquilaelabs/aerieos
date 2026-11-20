@@ -102,7 +102,7 @@ const SURFACE = [ 'adoptLayout', 'adoptMode', 'adoptMotion', 'applyMotion', 'ado
   'bootMoreMenus', 'bootMotion', 'bootPickers', 'bootNewProject', 'bootNotebooks', 'bootNotices', 'bootPanes',
   'bootProjectSettings', 'bootShell', 'bootTabs', 'bootTermWindow', 'bootWaits', 'bootWatches', 'bootWelcome',
   'chipsBack', 'dockerImagesRead', 'dockerStatsRead', 'drawHTML', 'drawn', 'getJSON', 'phLanded', 'phRead', 'phSend',
-  'nodesKnown', 'postFile', 'pressHook', 'pressOf', 'pressQuiet', 'pressRun', 'pressTie', 'readFor', 'readMoved', 'readSettle',
+  'nodesKnown', 'postFile', 'pressHook', 'pressOf', 'pressQuiet', 'pressRun', 'pressTie', 'readFor', 'readKept', 'readMoved', 'readSettle',
   'reading', 'readingOf', 'sayUnheard', 'wireRead',
   // The Users tab (roadmap #22 step 3). Functions only: a top-level `let`
   // is not a window property, so usersList and friends are not listed here.
