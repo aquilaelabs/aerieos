@@ -125,33 +125,29 @@ jobs:
         # The container the runner lives in can lag this repo: the PR that
         # first ADDS a tool to the image lints before any image carrying the
         # tool exists, and a stale container may not have updated yet. Fetch
-        # whatever is missing into the job's temp dir. Never skip a check
-        # because the tool is absent; that is a pass by omission.
+        # whatever is missing into the job's temp dir, each as the image
+        # takes it: the release config/image-tools.json pins, held to its
+        # sha256 by scripts/lib/pin-fetch, so the verdict is the same
+        # tools' on every run. Never skip a check because the tool is
+        # absent; that is a pass by omission.
         run: |
           mkdir -p "$RUNNER_TEMP/bin"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
           export PATH="$RUNNER_TEMP/bin:$PATH"
-          command -v shellcheck >/dev/null || \
-            curl -fsSL https://github.com/koalaman/shellcheck/releases/download/stable/shellcheck-stable.linux.x86_64.tar.xz \
-              | tar -xJ --strip-components=1 -C "$RUNNER_TEMP/bin" shellcheck-stable/shellcheck
+          pins=config/image-tools.json
+          # The distribution's own package of shellcheck, as the image has it.
+          command -v shellcheck >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck; }
           command -v hadolint >/dev/null || {
-            curl -fsSL -o "$RUNNER_TEMP/bin/hadolint" \
-              https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64
+            bash scripts/lib/pin-fetch "$pins" hadolint linux/amd64 "$RUNNER_TEMP/bin/hadolint"
             chmod +x "$RUNNER_TEMP/bin/hadolint"
           }
           command -v actionlint >/dev/null || {
-            # Tag via the /releases/latest redirect, not api.github.com:
-            # anonymous API calls rate-limit per IP.
-            tag="$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/rhysd/actionlint/releases/latest)"
-            tag="${tag##*/}"
-            curl -fsSL "https://github.com/rhysd/actionlint/releases/download/${tag}/actionlint_${tag#v}_linux_amd64.tar.gz" \
-              | tar -xz -C "$RUNNER_TEMP/bin" actionlint
+            bash scripts/lib/pin-fetch "$pins" actionlint linux/amd64 "$RUNNER_TEMP/actionlint.tar.gz"
+            tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP/bin" actionlint
           }
           command -v ruff >/dev/null || {
-            tag="$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/astral-sh/ruff/releases/latest)"
-            tag="${tag##*/}"
-            curl -fsSL "https://github.com/astral-sh/ruff/releases/download/${tag}/ruff-x86_64-unknown-linux-gnu.tar.gz" \
-              | tar -xz --strip-components=1 -C "$RUNNER_TEMP/bin" "ruff-x86_64-unknown-linux-gnu/ruff"
+            bash scripts/lib/pin-fetch "$pins" ruff linux/amd64 "$RUNNER_TEMP/ruff.tar.gz"
+            tar -xzf "$RUNNER_TEMP/ruff.tar.gz" --strip-components=1 -C "$RUNNER_TEMP/bin" "ruff-x86_64-unknown-linux-gnu/ruff"
           }
           shellcheck --version | sed -n 2p
           hadolint --version

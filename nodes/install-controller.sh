@@ -388,14 +388,10 @@ extras() {
             && chmod +x /usr/local/bin/yq || miss+=(yq)
         { bash "$pf" "$pins" actionlint "$plat" "$t/actionlint.tar.gz" >/dev/null \
             && tar -xzf "$t/actionlint.tar.gz" -C /usr/local/bin actionlint; } || miss+=(actionlint)
+        { bash "$pf" "$pins" ruff "$plat" "$t/ruff.tar.gz" >/dev/null \
+            && tar -xzf "$t/ruff.tar.gz" -C /usr/local/bin --strip-components=1 ruff-x86_64-unknown-linux-gnu/ruff; } || miss+=(ruff)
     else
-        miss+=(hadolint yq actionlint)
-    fi
-    if command -v pipx >/dev/null 2>&1; then
-        PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install ruff >/dev/null 2>&1 \
-            || command -v ruff >/dev/null 2>&1 || miss+=(ruff)
-    else
-        miss+=(ruff)
+        miss+=(hadolint yq actionlint ruff)
     fi
     local uvarch
     uvarch="$([ "$arch" = x86_64 ] && echo x86_64 || echo aarch64)"

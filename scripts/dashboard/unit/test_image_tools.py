@@ -150,7 +150,7 @@ class ShippedTable(unittest.TestCase):
         self.assertEqual(json.dumps(self.doc, indent=2, ensure_ascii=False) + "\n", self.text, "a move's diff is then the lines that changed")
 
     def test_every_row_is_a_whole_pin_for_every_platform_it_offers(self):
-        self.assertEqual(sorted(self.rows), ["actionlint", "cloudflared", "hadolint", "mise", "uv", "yq"])
+        self.assertEqual(sorted(self.rows), ["actionlint", "cloudflared", "hadolint", "mise", "ruff", "uv", "yq"])
         for name, row in self.rows.items():
             src = row["source"]
             ck = src["checksum"]
@@ -175,7 +175,7 @@ class ShippedTable(unittest.TestCase):
         with mock.patch.dict(pins.VERBS, {"check": lambda doc, names, opts, out: out(",".join(r["name"] for r in pins.chosen(doc, names))) or 0}):
             said = []
             self.assertEqual(pins.main(["check", "--file", SHIPPED], out=said.append), 0, said)
-        self.assertEqual(said, ["hadolint,yq,actionlint,uv,mise,cloudflared"])
+        self.assertEqual(said, ["hadolint,yq,actionlint,ruff,uv,mise,cloudflared"])
 
     def test_pin_fetch_names_the_address_the_tool_verifies(self):
         # What pin-fetch downloads for a row is what tools/pins.py verify holds to the pin.
@@ -200,9 +200,10 @@ class WhatReadsIt(unittest.TestCase):
         self.assertIn("COPY config/image-tools.json /opt/aerieos/config/image-tools.json\n", src)
         self.assertIn("COPY scripts/lib/pin-fetch /usr/local/bin/bb-pin-fetch\n", src)
         asked = self.asks(src, "bb-pin-fetch")
-        self.assertEqual(asked, [("hadolint", "linux/amd64"), ("yq", "linux/amd64"), ("actionlint", "linux/amd64"),
+        self.assertEqual(asked, [("hadolint", "linux/amd64"), ("yq", "linux/amd64"), ("actionlint", "linux/amd64"), ("ruff", "linux/amd64"),
                                  ("uv", "linux/amd64"), ("mise", "linux/amd64"), ("cloudflared", "linux/${arch}")])
-        self.assertEqual(len(re.findall(r"\bbb-pin-fetch \S", src)), 6, "every fetch is one the table names")
+        self.assertEqual(len(re.findall(r"\bbb-pin-fetch \S", src)), 7, "every fetch is one the table names")
+        self.assertNotIn("pipx install", src, "nothing is whatever a package index serves that day")
         rows = {r["name"]: r for r in json.loads(text("config", "image-tools.json"))["tools"]}
         for name, plat in asked:
             for p in (["linux/amd64", "linux/arm64"] if "${arch}" in plat else [plat]):
@@ -210,13 +211,34 @@ class WhatReadsIt(unittest.TestCase):
         # The table is copied before the first fetch reads it.
         self.assertLess(src.index("COPY config/image-tools.json"), src.index("bb-pin-fetch \"$pins\" hadolint"))
 
+    def test_the_image_fetches_no_key_and_no_newest_release_as_it_is_built(self):
+        # Each package source is held to its publisher's key as the tree
+        # carries it, and what npm installs is named at one version.
+        src = text("Dockerfile")
+        code = "\n".join(ln for ln in src.splitlines() if not ln.lstrip().startswith("#"))
+        self.assertNotRegex(code, r"curl[^\n]*(gpg|keyring|\.asc|\.key)", "no key is fetched at build time")
+        self.assertNotRegex(code, r"curl[^\n|]*\|\s*(ba)?sh\b", "nothing fetched is piped to a shell")
+        self.assertIn("COPY config/apt-keys/ /tmp/apt-keys/\n", src)
+        for name in ("nodesource", "github-cli", "docker"):
+            key = text("config", "apt-keys", f"{name}.asc")
+            self.assertEqual((key.count("-----BEGIN PGP PUBLIC KEY BLOCK-----"), key.count("-----END PGP PUBLIC KEY BLOCK-----")), (1, 1), name)
+            self.assertIn(f"< /tmp/apt-keys/{name}.asc", src, name)
+        # Docker's is the one key, here and where a node is set up.
+        prov = re.search(r"deb\) cat <<'DOCKERKEY'\n(.*?)\nDOCKERKEY", text("nodes", "provision-linux.sh"), re.S)
+        self.assertEqual(prov.group(1).strip(), text("config", "apt-keys", "docker.asc").strip())
+        for m in re.finditer(r"npm install -g[^\n;]*", code):
+            self.assertRegex(m.group(0), r'"[a-z-]+@\$\{[A-Z_]+_VERSION\}"', m.group(0))
+        for arg in ("PLAYWRIGHT_VERSION", "WEB_EXT_VERSION"):
+            self.assertRegex(src, rf"(?m)^ARG {arg}=\d+\.\d+\.\d+$")
+
     def test_the_installer_takes_the_same_pins(self):
         src = text("nodes", "install-controller.sh")
         self.assertNotIn("gh-fetch", src)
         self.assertNotIn(" latest ", src[src.index("extras() {"):src.index("# ---- the account and its folders")])
         self.assertIn('local pf="$TREE/scripts/lib/pin-fetch" pins="$TREE/config/image-tools.json"', src)
         asked = [n for n, _p in self.asks(src, 'bash "\\$pf"')]
-        self.assertEqual(asked, ["hadolint", "yq", "actionlint", "uv", "mise", "cloudflared"])
+        self.assertEqual(asked, ["hadolint", "yq", "actionlint", "ruff", "uv", "mise", "cloudflared"])
+        self.assertNotIn("pipx install", src)
         rows = {r["name"]: r for r in json.loads(text("config", "image-tools.json"))["tools"]}
         # On arm64 it takes what the image would: uv, mise and cloudflared are pinned there too.
         for name in ("uv", "mise", "cloudflared"):

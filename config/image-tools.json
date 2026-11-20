@@ -80,6 +80,31 @@
       "rev": 1
     },
     {
+      "name": "ruff",
+      "source": {
+        "kind": "tarball",
+        "url": {
+          "linux/amd64": "https://github.com/astral-sh/ruff/releases/download/{version}/ruff-x86_64-unknown-linux-gnu.tar.gz"
+        },
+        "version": {
+          "resolver": "github-release",
+          "repo": "astral-sh/ruff",
+          "numeric": true
+        },
+        "checksum": {
+          "from": "pin",
+          "version": "0.17.6",
+          "sha256": {
+            "linux/amd64": "94b33791f48cd54ab35ad673a443a5c001d3e6d87effeaba9899070b700d45f3"
+          },
+          "found": {
+            "from": "github-asset"
+          }
+        }
+      },
+      "rev": 1
+    },
+    {
       "name": "uv",
       "source": {
         "kind": "tarball",

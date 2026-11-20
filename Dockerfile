@@ -29,6 +29,12 @@ ARG NODE_MAJOR=22
 # noVNC draws a VM's screen in the dock (R99): pinned, and checked by digest.
 ARG NOVNC_VERSION=1.7.0
 ARG NOVNC_SHA256=b1003a11b6e6e8d8f7f5e5586daae7f8ca651d8aee0aa155ff9ac841c48f52c6
+# The two programs the image takes from npm, each at one version: an image
+# built again holds the same release until the number here moves. (Their
+# own dependencies are npm's to resolve: Playwright names its one exactly,
+# web-ext names ranges.)
+ARG PLAYWRIGHT_VERSION=1.65.1
+ARG WEB_EXT_VERSION=10.8.0
 ARG TARGETARCH
 
 # --- Playwright build knob -------------------------------------------------
@@ -91,25 +97,29 @@ RUN set -eux; \
 #   The Docker CLI talks to the host daemon through a mounted
 #   /var/run/docker.sock; no daemon runs inside this container. Which
 #   packages: the list's vendor and docker rows (config/controller-packages.tsv).
+#
+#   Each of the three package sources is held to its publisher's key as the
+#   tree carries it (config/apt-keys), never to a key fetched as the image
+#   is built: apt then takes only packages signed under it. A publisher that
+#   replaces its key fails the build here until the carried one is replaced.
 # ---------------------------------------------------------------------------
+COPY config/apt-keys/ /tmp/apt-keys/
 # hadolint ignore=SC2046
 RUN set -eux; \
     pkgs="$(bash /opt/aerieos/scripts/lib/controller-packages.sh deb vendor docker)"; \
     [ "$(printf '%s\n' "$pkgs" | wc -l)" -ge 5 ]; \
     install -m 0755 -d /etc/apt/keyrings; \
-    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
-        | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg; \
+    gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg < /tmp/apt-keys/nodesource.asc; \
     echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_${NODE_MAJOR}.x nodistro main" \
         > /etc/apt/sources.list.d/nodesource.list; \
-    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
-        -o /etc/apt/keyrings/githubcli.gpg; \
-    chmod 0644 /etc/apt/keyrings/githubcli.gpg; \
+    gpg --dearmor -o /etc/apt/keyrings/githubcli.gpg < /tmp/apt-keys/github-cli.asc; \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli.gpg] https://cli.github.com/packages stable main" \
         > /etc/apt/sources.list.d/github-cli.list; \
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
-        | gpg --dearmor -o /etc/apt/keyrings/docker.gpg; \
+    gpg --dearmor -o /etc/apt/keyrings/docker.gpg < /tmp/apt-keys/docker.asc; \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
         > /etc/apt/sources.list.d/docker.list; \
+    chmod 0644 /etc/apt/keyrings/nodesource.gpg /etc/apt/keyrings/githubcli.gpg /etc/apt/keyrings/docker.gpg; \
+    rm -rf /tmp/apt-keys; \
     apt-get update; \
     apt-get install -y --no-install-recommends $(printf '%s\n' "$pkgs"); \
     rm -rf /var/lib/apt/lists/*
@@ -117,11 +127,11 @@ RUN set -eux; \
 # ---------------------------------------------------------------------------
 # Linters for the file types every project here carries: Dockerfiles, GitHub
 # workflows, YAML, Python. shellcheck came from apt above; these three are
-# static single binaries with no Ubuntu package worth having. `ruff`
-# installs via pipx so it is isolated from both the system Python and any
-# project venv.
+# static single binaries with no Ubuntu package worth having, and so is
+# `ruff`, taken as its own release's binary so it needs neither the system
+# Python nor a project venv.
 #
-# Each of the three is the release its row in config/image-tools.json pins:
+# Each of the four is the release its row in config/image-tools.json pins:
 # a version, and the sha256 of the exact file, which scripts/lib/pin-fetch
 # holds the download to before it is kept. Nothing is asked what is newest,
 # so an image built again holds the same files until a pin moves, and
@@ -141,7 +151,9 @@ RUN set -eux; \
     bb-pin-fetch "$pins" actionlint linux/amd64 /tmp/actionlint.tar.gz; \
     tar -xzf /tmp/actionlint.tar.gz -C /usr/local/bin actionlint; \
     rm -f /tmp/actionlint.tar.gz; \
-    PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install ruff; \
+    bb-pin-fetch "$pins" ruff linux/amd64 /tmp/ruff.tar.gz; \
+    tar -xzf /tmp/ruff.tar.gz -C /usr/local/bin --strip-components=1 ruff-x86_64-unknown-linux-gnu/ruff; \
+    rm -f /tmp/ruff.tar.gz; \
     hadolint --version; \
     actionlint --version >/dev/null; \
     yq --version; \
@@ -193,7 +205,7 @@ ENV PLAYWRIGHT_SKIP_BROWSER_GC=1
 #trivy:ignore:AVD-DS-0017
 RUN set -eux; \
     if [ "${INSTALL_PLAYWRIGHT}" != "true" ]; then echo "skipping Playwright"; exit 0; fi; \
-    npm install -g --foreground-scripts playwright; \
+    npm install -g --foreground-scripts "playwright@${PLAYWRIGHT_VERSION}"; \
     apt-get update; \
     playwright install-deps chromium firefox webkit; \
     npm cache clean --force; \
@@ -242,7 +254,7 @@ RUN set -eux; \
 # everything else is a toolchain installed on a node).
 # ---------------------------------------------------------------------------
 RUN set -eux; \
-    npm install -g --foreground-scripts web-ext; \
+    npm install -g --foreground-scripts "web-ext@${WEB_EXT_VERSION}"; \
     corepack enable; \
     npm cache clean --force
 
