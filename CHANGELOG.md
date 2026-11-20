@@ -50,6 +50,8 @@
 - `aerie phone status` says whether the phone is lent to the space it is run in, and by whom; those lines never printed (4dcc590)
 - Changing your password while the controller cannot be reached says the controller did not answer, where the form said nothing (b09deca)
 - A bug's Reported by and a roadmap item's Added by name the coding agent that did it, where they always said Claude (89cd7a2)
+- A second session on a space (another slot, or another coding agent) is no longer mistaken for the first when its rule checks report in, which could clear the first one's working-with-no-word mark (944df11)
+- aerie browser finds the store's Firefox where PLAYWRIGHT_BROWSERS_PATH names a folder that is not there or holds none, as it finds Chromium (3e5727d)
 
 ## 0.9.0-dev.5641: 2026-11-18
 
