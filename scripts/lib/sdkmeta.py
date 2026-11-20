@@ -223,6 +223,42 @@ def declared(tc):
     return [f for f in rows if isinstance(f, dict) and f.get("url") and on_platform(f.get("platform"))] if isinstance(rows, list) else []
 
 
+# What separates the fields of a line of declared_plan: a character no
+# address, file name or sentence holds, and not white space, so the shell's
+# read keeps a field that is empty.
+PLAN_SEP = "\x1f"
+
+
+def declared_plan(tc):
+    """What an entry declares of its own install, as the lines sdk.sh reads
+    in one call (sdk_declared), or [] for an entry that declares nothing
+    (no download, and neither offline nor online). The first line says what
+    its steps run with, then a line a download, each field after a
+    separator:
+
+        net    cut | online, the entry's sentence
+        fetch  url, sha256, to, signed.sig, signed.keys   (this machine's)
+        skip   to, platform                               (another's)
+    """
+    src = tc.get("source") or {}
+    rows = [f for f in src.get("fetch") or [] if isinstance(f, dict) and f.get("url")] if isinstance(src.get("fetch"), list) else []
+    online = " ".join(str(src.get("online") or "").split())
+    if not (rows or online or src.get("offline")):
+        return []
+
+    def said(*fields):
+        return PLAN_SEP.join(" ".join(str(v or "").replace(PLAN_SEP, "").split()) for v in fields)
+
+    out = [said("net", "online" if online else "cut", online)]
+    for f in rows:
+        signed = f.get("signed") if isinstance(f.get("signed"), dict) else {}
+        if on_platform(f.get("platform")):
+            out.append(said("fetch", f["url"], f.get("sha256"), f.get("to"), signed.get("sig"), signed.get("keys")))
+        else:
+            out.append(said("skip", f.get("to"), f.get("platform")))
+    return out
+
+
 # Documents fetched while resolving, kept briefly on disk.
 #
 # A check asks about thirteen toolchains in thirteen separate processes, and
@@ -936,10 +972,6 @@ def main(argv):
         print(keyring(argv[1] if len(argv) > 1 else "", toolchain(argv[2]) if len(argv) > 2 else None))
         return
 
-    if op == "on-platform":
-        # on-platform PLATFORM: exit 0 where this machine is one a declared
-        # download names (as for_platform matches a key), 1 where it is not.
-        raise SystemExit(0 if on_platform(argv[1] if len(argv) > 1 else "") else 1)
 
     if op == "images":
         for pid, api, flavor, size in available_images():
@@ -985,6 +1017,12 @@ def main(argv):
     elif op == "resolve":
         version, url = resolve(tc)
         print(f"{version}\t{url}")
+
+    elif op == "declared":
+        # What the entry declares of its own install, for sdk.sh's
+        # sdk_declared: nothing at all for one that declares nothing.
+        for line in declared_plan(tc):
+            print(line)
 
     elif op == "offer":
         # The version and the digest a pinned row has on offer, or nothing

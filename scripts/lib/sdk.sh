@@ -1535,19 +1535,21 @@ sdk_install_git() {
 #   script    after its installer is fetched and checked, before it runs
 #   git       after the checkout, before its warm-up
 #   command   before its command
+#
+# The entry is asked once (sdkmeta.py declared): nothing for one that
+# declares nothing, else a line for what its steps run with and a line a
+# download, this machine's and the ones left out for another's.
 SDK_DECLARED=""
 sdk_declared() {
-    local what="$1" d="$2" online
+    local what="$1" d="$2" plan tag net online
     SDK_CUT=()
     SDK_DECLARED=""
-    online="$(sdk_meta field "$what" source.online)"
-    if [ -z "$online" ] && [ -z "$(sdk_meta field "$what" source.offline)" ] \
-            && [ -z "$(sdk_meta field "$what" source.fetch.0.url)" ]; then
-        return 0
-    fi
+    plan="$(sdk_meta declared "$what")"
+    [ -n "$plan" ] || return 0
     SDK_DECLARED=1
-    sdk_fetch_declared "$what" "$d"
-    if [ -n "$online" ]; then
+    sdk_fetch_declared "$what" "$d" "$plan"
+    IFS=$'\037' read -r tag net online <<< "${plan%%$'\n'*}"
+    if [ "$tag" = net ] && [ "$net" = online ]; then
         log "${what} keeps the network for its steps, as its entry says: ${online}"
         printf 'online\n%s\n' "$online" > "$d/.bb-net" 2>/dev/null || true
     else
@@ -1580,30 +1582,28 @@ sdk_https_only() {
     esac
 }
 
-# sdk_fetch_declared WHAT DIR: each download an entry declares
+# sdk_fetch_declared WHAT DIR [PLAN]: each download an entry declares
 # (source.fetch, a pack's install.fetch: an address, the file inside the
 # entry's directory it is kept as, and what holds it), fetched into DIR and
 # held before anything uses it: to the sha256 the entry names, or, where
 # it names `signed` in the sha256's place, to its publisher's detached
 # signature (signed.sig) under the keys the entry carries (signed.keys:
 # sdkmeta.py keyring). One that names a platform is fetched on that
-# platform alone. One that answers anything else installs nothing: the
-# directory is the partial install the caller takes off again.
+# platform alone, which sdkmeta.py decides as it does for a row's address.
+# One that answers anything else installs nothing: the directory is the
+# partial install the caller takes off again. PLAN is what the entry
+# declares as sdk_declared read it; left out, the entry is asked here.
 sdk_fetch_declared() {
-    local what="$1" d="$2" i=0 url want to tmp got plat sig keys sigf keyring signer
-    while :; do
-        url="$(sdk_meta field "$what" "source.fetch.${i}.url")"
-        [ -n "$url" ] || break
-        want="$(sdk_meta field "$what" "source.fetch.${i}.sha256")"
-        to="$(sdk_meta field "$what" "source.fetch.${i}.to")"
-        plat="$(sdk_meta field "$what" "source.fetch.${i}.platform")"
-        sig="$(sdk_meta field "$what" "source.fetch.${i}.signed.sig")"
-        keys="$(sdk_meta field "$what" "source.fetch.${i}.signed.keys")"
-        i=$((i + 1))
-        if [ -n "$plat" ] && ! sdk_meta on-platform "$plat"; then
-            log "leaving out ${to}: it is for ${plat}"
-            continue
-        fi
+    local what="$1" d="$2" plan tag url want to tmp got sig keys sigf keyring signer
+    if [ "$#" -ge 3 ]; then plan="$3"; else plan="$(sdk_meta declared "$what")"; fi
+    # On a descriptor of its own: nothing a line runs can read the rest.
+    while IFS=$'\037' read -r tag url want to sig keys <&3; do
+        case "$tag" in
+            fetch) ;;
+            # One for another machine: url and want are its file and its platform.
+            skip) log "leaving out ${url}: it is for ${want}"; continue ;;
+            *) continue ;;
+        esac
         sdk_https_only "$what" "$url"
         case "/${to}/" in *"/../"*|"//"*) die "${what}: a declared download is kept inside the pack, and ${to} is not" ;; esac
         [ -n "$want" ] || [ -n "$sig" ] \
@@ -1647,7 +1647,7 @@ sdk_fetch_declared() {
         fi
         mkdir -p "$(dirname "${d}/${to}")"
         mv -f "$tmp" "${d}/${to}"
-    done
+    done 3<<< "$plan"
 }
 
 # sdk_net_cut WHAT DIR: SDK_CUT becomes the words that run a command with no

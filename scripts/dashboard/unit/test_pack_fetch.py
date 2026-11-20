@@ -7,6 +7,7 @@ runs the install steps with no network where it can cut it, saying which."""
 import hashlib
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -95,10 +96,15 @@ class Node(unittest.TestCase):
             f.write(b"the archive")
 
     def run_sh(self, fields, body, unshare=None, env=None):
-        """`fields` answers `sdk_meta field hexkit PATH`; `unshare`, where
-        given, stands in for the node's own: "no" refuses every namespace.
-        No helper of the machine's own is reached for: `env` names one."""
+        """`fields` answers `sdk_meta field hexkit PATH`, and its download
+        `sdk_meta declared hexkit` as sdkmeta.py writes one (a line of
+        fields, each after a unit separator); `unshare`, where given,
+        stands in for the node's own: "no" refuses every namespace. No
+        helper of the machine's own is reached for: `env` names one."""
         table = "\n".join(f"        {k!r}) printf '%s\\n' {v!r} ;;" for k, v in fields.items())
+        plan = ""
+        if "source.fetch.0.url" in fields:
+            plan = "\x1f".join(("fetch", *(fields[f"source.fetch.0.{k}"] for k in ("url", "sha256", "to")), "", ""))
         fake = ""
         if unshare == "no":
             fake = 'unshare() { return 1; }\n'
@@ -106,6 +112,7 @@ class Node(unittest.TestCase):
 source {LIB}/common.sh
 source {LIB}/sdk.sh
 sdk_meta() {{
+    if [ "$1" = declared ]; then printf '%s\\n' {shlex.quote(plan)}; return 0; fi
     [ "$1" = field ] || return 0
     case "$3" in
 {table}

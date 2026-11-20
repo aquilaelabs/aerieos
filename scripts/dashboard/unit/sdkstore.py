@@ -2,14 +2,19 @@
 the installer: `aerie toolchains` itself (scripts/lib/sdk.sh under aerie's
 own set -e, with sdkmeta.py reading the rows), run against files on disk
 through BB_TOOLCHAINS_JSON, so a whole install is proved with no network
-and nowhere near the real store. Not a test: the tests import it."""
+and nowhere near the real store; and the case the declared-download tests
+share, a script row whose installer needs a file it declares. Not a test:
+the tests import it."""
 import hashlib
 import io
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tarfile
+import tempfile
+import unittest
 
 REPO = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))
 sys.path.insert(0, os.path.join(REPO, "scripts", "lib"))
@@ -109,3 +114,40 @@ class Store:
         p = subprocess.run([sys.executable, os.path.join(REPO, "scripts", "lib", "sdkmeta.py"), *args],
                            capture_output=True, text=True, check=False, env=self.env(**env), timeout=60)
         return p.returncode, p.stdout, p.stderr
+
+
+# An installer that needs the declared file to be there already, and says
+# whether it ran behind the cut.
+INSTALLER = """#!/bin/sh
+touch "{mark}"
+[ -f "$1/dl/data.bin" ] || {{ echo "the declared file is not here yet"; exit 9; }}
+mkdir -p "$1/bin"
+printf '#!/bin/sh\\necho kit holds %s\\n' "$(cat "$1/dl/data.bin")" > "$1/bin/kit"
+chmod +x "$1/bin/kit"
+echo "run=${{CUT:-no}}" >> "$1/ran-how"
+"""
+
+
+class KitCase(unittest.TestCase):
+    """A store, a file to declare (data.bin) and a script row, kit, whose
+    installer needs that file there before it runs."""
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.root, True)
+        self.s = Store(self.root)
+        self.mark = os.path.join(self.root, "installer-ran")
+        self.data_url, self.data_sha = self.s.file("data.bin", "forty-two")
+
+    def kit(self, **source):
+        """A script row whose installer needs dl/data.bin, which it declares."""
+        url, sha = self.s.file("kit-install.sh", INSTALLER.format(mark=self.mark))
+        src = {"kind": "script", "url": url, "run": ["sh", "{script}", "{dir}"], "checksum": {"from": "pin", "sha256": sha},
+               "fetch": [{"url": self.data_url, "sha256": self.data_sha, "to": "dl/data.bin"}],
+               "then": [{"run": ["sh", "-c", "echo then=${CUT:-no} >> {dir}/ran-how"]}],
+               "verify": ["sh", "-c", "echo verify=${CUT:-no} >> {dir}/ran-how; {dir}/bin/kit"], **source}
+        self.s.row("kit", {k: v for k, v in src.items() if v is not None})
+        return sha
+
+    def receipt(self, name):
+        return self.s.read(name, ".bb-receipt").splitlines()[0].split("\t")
