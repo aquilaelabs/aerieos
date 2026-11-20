@@ -505,6 +505,21 @@ function attRow(a){
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
           <a href="#" data-bnginx="${esc(a.id)}">nginx page</a></span></div></div>`;
   }
+  // A node that refused this controller's bundle (R267 step 6): it pinned
+  // a release key and the files it was sent are not ones a key it trusts
+  // signed. In the note's own voice, as a node held for a signed build is:
+  // nobody chose it, and its terminals and jobs go on with the aerie it
+  // had. The node's first sentence on the row, the rest of what it said
+  // (which keys it takes, what its console can do) folded under it.
+  if (a.kind === "bundle-refused"){
+    return `<div class="bnote att">
+      <div class="bt">${esc(a.node)} keeps the bundle it had</div>
+      <div class="bsum">it refused this controller's: ${esc(a.why || "its files are not ones a key that node trusts signed")}</div>
+      ${a.more ? `<details class="bdetail chev"${sectAttr("bell:bundle:" + a.id)}><summary>what that node takes</summary><pre>${esc(a.more)}</pre></details>` : ""}
+      <div class="bfoot"><span>its terminals and jobs run the aerie it had</span>
+        <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
+          <a href="#" data-bnode="${esc(a.id)}" data-bwhat="sessions">Nodes page</a></span></div></div>`;
+  }
   return `<div class="bnote att${a.window ? " bad" : ""}">
     <div class="bt">${a.window ? `${esc(a.node)}'s agent is out of window` : `Agent update on ${esc(a.node)}`}</div>
     <div class="bsum">runs agent ${esc(a.from)} and this controller ships ${esc(a.to)}${a.window

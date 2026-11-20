@@ -119,6 +119,12 @@ def filter_rows(uid, rows):
             if r.get("key") in gone:
                 hidden += 1
                 continue
+        elif r.get("kind") == "bundle-refused":
+            # To the bundle it refused (R267 step 6): put away until the
+            # controller serves another and the node refuses that one.
+            if r.get("key") in gone:
+                hidden += 1
+                continue
         elif r.get("kind") == "node-refused":
             # To when it began: put away until a new refusal begins.
             r["key"] = f"noderefused:{r['id']}@{r.get('since') or 0}"

@@ -1782,6 +1782,8 @@ def _att_words(a):
     if k == "agent":
         return (f"{node}'s agent is out of window" if a.get("window") else f"Agent update on {node}",
                 f"runs agent {a.get('from', '')} and this controller ships {a.get('to', '')}")
+    if k == "bundle-refused":
+        return (f"{node} keeps the bundle it had", f"it refused this controller's: {a.get('why', '')}")
     if k == "held":
         return (f"A session in {label} stopped for the update", f"on {node}")
     if k == "relocate":
@@ -2194,7 +2196,9 @@ def _attention(who):
     # ...then a session working with no word from its hooks (B1009): nothing
     # AerieOS refuses is being refused there.
     rows = (_held_rows(who) + _unguarded_rows(who)
-            + ([] if users.may(who, "node") else nodes.attention(where) + _token_rows()
+            + ([] if users.may(who, "node") else nodes.attention(where)
+               # ...and a node that refused this controller's bundle (R267 step 6).
+               + nodes.bundle_attention() + _token_rows()
                # ...and a newer release for a bare-metal install (R90 step 5).
                + releasecheck.attention(_own_node_id())
                # ...and a disk failing or hot, a pool not online, an array
@@ -2628,22 +2632,18 @@ def ctr_target(name, instance):
     # update, which may not know what this one asks of them (B746): asked to
     # check in now, it takes the new ones within a poll, waited for here
     # rather than refusing with "try again in a minute".
-    if (not nodes.host_only(n) and n.get("state") == "online" and n.get("live") is not False and isinstance(se, dict)
-            and se.get("up") and se.get("bundle") and nodes.bundle_digest() and se["bundle"] != nodes.bundle_digest()):
-        _ask_hello(nid)
-        deadline = time.time() + 45
-        while time.time() < deadline:
-            time.sleep(0.5)
-            se = ((nodes.node(nid) or {}).get("reported") or {}).get("session")
-            if not isinstance(se, dict) or se.get("bundle") == nodes.bundle_digest():
-                break
+    # A node that refused this controller's bundle is not waited for (R267
+    # step 6): its terminals stay on the bundle it has, the shell opens from
+    # that one, and the bell says why it keeps it.
+    n = nodes.session_bundle_wait(nid, _ask_hello) or n
+    se = (n.get("reported") or {}).get("session")
     if nodes.host_only(n):
         why = f"{nm} hosts containers only and runs no terminal, so a shell in this one opens on a node that runs sessions"
     elif n.get("state") != "online" or n.get("live") is False:
         why = f"{nm}, where this container runs, is not answering now"
     elif not isinstance(se, dict) or not se.get("up"):
         why = f"{nm} runs no terminal server yet" + (f": {se['why']}" if isinstance(se, dict) and se.get("why") else "")
-    elif se.get("bundle") and nodes.bundle_digest() and se["bundle"] != nodes.bundle_digest():
+    elif nodes.session_bundle_due(n):
         why = (f"{nm} has not taken this controller's update within 45 seconds of being asked: "
                "its agent may be busy restarting; its row on the Nodes page says when it is back")
     elif not se.get("ctr"):

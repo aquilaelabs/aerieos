@@ -2696,6 +2696,40 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
   ok(/takes only agent updates a release signed/.test(heldRow.held) && /not sent by itself: it waits for a signed build/.test(heldRow.held)
      && !/updates itself once the node is idle/.test(heldRow.held) && !heldRow.bad && /updates itself once the node is idle/.test(heldRow.plain),
      `a node held for a signed build says so on its bell row, not in red, and is not promised an update (${heldRow.held.slice(0, 200)})`);
+  // A node that refused this controller's bundle keeps the one it had, and
+  // that is said (R267 step 6): a row of its own in the same voice, the
+  // node's first sentence on it, what its console can do folded under it
+  // and said once, and a link to that node's Sessions section.
+  const refusedRow = await page.evaluate(() => { const d = document.createElement('div');
+    const a = { kind: 'bundle-refused', node: 'box', id: 'n_refused', key: 'bundle:n_refused@abababababababab',
+      why: "this bundle's files are not ones signed by a key this node trusts (scripts/aerie is changed), so this node keeps the bundle it has",
+      more: "This node takes only what is signed by the release key it pinned. At this machine's own console: sudo aerieos-agent unsigned on allows unsigned builds" };
+    const html = attRow(a); d.innerHTML = html;
+    const got = { text: d.textContent.replace(/\s+/g, ' '), bad: /class="bnote att bad"|class="bsum bad"/.test(html),
+      folded: d.querySelector('details.bdetail pre')?.textContent || '',
+      what: d.querySelector('[data-bnode]')?.dataset.bwhat || '', node: d.querySelector('[data-bnode]')?.dataset.bnode || '',
+      dismiss: d.querySelector('[data-bdismiss]')?.dataset.bdismiss || '',
+      verbs: (d.textContent.match(/unsigned on/g) || []).length };
+    d.innerHTML = attRow({ ...a, more: '' });
+    return { ...got, bare: !d.querySelector('details') && /keeps the bundle it had/.test(d.textContent) }; });
+  ok(/box keeps the bundle it had/.test(refusedRow.text) && /it refused this controller's: this bundle's files are not ones signed/.test(refusedRow.text)
+     && /scripts\/aerie is changed/.test(refusedRow.text) && !/Agent update on/.test(refusedRow.text) && !refusedRow.bad,
+     `a node that refused this controller's bundle has a bell row saying it keeps the one it had and why, not in red (${refusedRow.text.slice(0, 200)})`);
+  ok(/unsigned on allows unsigned builds/.test(refusedRow.folded) && refusedRow.verbs === 1 && refusedRow.bare
+     && refusedRow.node === 'n_refused' && refusedRow.what === 'sessions' && refusedRow.dismiss === 'bundle:n_refused@abababababababab',
+     `...with what its console can do folded under it and said once, a way to that node's Sessions section, and Dismiss by the bundle refused (${refusedRow.what}, ${refusedRow.dismiss}, ${refusedRow.verbs})`);
+  // ...and its page says the same under Sessions, in the note's voice, only
+  // while its row carries the refusal.
+  const heldNote = await page.evaluate(id => { const n = nodesList.find(x => x.id === id); if (!n) return null;
+    const on = { ...n, config: { ...(n.config || {}), host_only: false } };
+    const d = document.createElement('div');
+    d.innerHTML = nodeSessionsSection({ ...on, bundle_held: 'its files are not ones a release signed (scripts/aerie is changed)' });
+    const note = [...d.querySelectorAll('.sub.warn')].map(e => e.textContent).find(t => /Keeps the bundle it had/.test(t)) || '';
+    d.innerHTML = nodeSessionsSection(on);
+    return { note, plain: /Keeps the bundle it had/.test(d.textContent) }; }, minted.id);
+  ok(heldNote && /^Keeps the bundle it had, not this controller's: its files are not ones a release signed \(scripts\/aerie is changed\)\.$/.test(heldNote.note)
+     && !heldNote.plain,
+     `the node's Sessions section says it keeps the bundle it had, in its own words, and says nothing without the refusal (${heldNote?.note})`);
   // Its link goes to THIS node, whichever the tab was on, with Update agent
   // brought into view (the operator, 4 Oct).
   const other = await page.evaluate(id => nodesList.find(n => n.id !== id && n.kind === 'agent' && n.state !== 'retired')?.id, minted.id);

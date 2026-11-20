@@ -2175,6 +2175,16 @@ def _c_release(c, out):
     out["release_unpinned"] = c.get("release_unpinned") is True
 
 
+def _c_bundle_refused(c, out):
+    # The bundle it refused and keeps refusing (the agent's
+    # release.may_keep_bundle, R267 step 6): which one, by its digest, and
+    # why in the node's own words, kept to what prints. Absent while it
+    # refuses none, and whenever what it sent names no digest.
+    b = c.get("bundle_refused")
+    if isinstance(b, dict) and re.fullmatch(r"sha256:[0-9a-f]{64}", str(b.get("digest") or "")):
+        out["bundle_refused"] = {"digest": b["digest"], "why": re.sub(r"[^ -~\u2026]", " ", str(b.get("why") or ""))[:600]}
+
+
 def _c_root_off(c, out):
     # Root commands switched off at its own console (R227 step 2).
     out["root_off"] = c.get("root_off") is True
@@ -2534,6 +2544,7 @@ CENSUS = (
     (("vm_isos",), _c_vm_isos),
     (("sandbox",), _c_sandbox),
     (("release_key", "release_spare", "release_also", "unsigned_ok", "release_unpinned"), _c_release),
+    (("bundle_refused",), _c_bundle_refused),
     (("root_off",), _c_root_off),
     (("gpu_card", "gpu_display", "gpu_amd"), _c_gpu),
     (("gpu_driver", "gpu_card"), _c_gpu_driver),
@@ -3468,6 +3479,79 @@ def agent_stale(n):
     return (f"{n['name']} runs agent {mine} and this controller ships {ours['version']}: "
             "press Update agent on its row first. A job this version sends could name "
             "something that agent does not know")
+
+
+def bundle_refused(n, serving=None):
+    """Why this node keeps the bundle it had, in its own words, where it
+    reports that it refused the bundle this controller serves now (a node
+    that pinned a release key, sent files no key it trusts signed: the
+    agent's release.may_keep_bundle). "" where it refused none, or one this
+    controller no longer serves: that refusal is of another bundle, and the
+    node fetches this one at its next hello. `serving` is the bundle's
+    digest where the caller has it already."""
+    b = ((n or {}).get("reported") or {}).get("bundle_refused")
+    if not isinstance(b, dict) or not b.get("digest"):
+        return ""
+    if b["digest"] != (serving or bundle_digest()):
+        return ""
+    return b.get("why") or "its files are not ones a key that node trusts signed"
+
+
+def bundle_attention():
+    """The bell's rows for the nodes that refused the bundle this controller
+    serves: one a node, for as long as the node reports it and the bundle
+    is the same one, so it leaves when the node takes a bundle or the
+    bundle moves. The row is the node's first sentence, with the rest of
+    what it said (which keys it takes, what its console can do) folded
+    under it. A node that is away is skipped, as for an agent behind."""
+    out, serving = [], None
+    for n in node_list():
+        if n["kind"] != "agent" or not n.get("live") or not ((n.get("reported") or {}).get("bundle_refused") or {}).get("digest"):
+            continue
+        # Asked once, and only when some node reports a refusal: the digest
+        # is a look at every file of the bundle.
+        serving = serving or bundle_digest()
+        why = bundle_refused(n, serving)
+        if not why:
+            continue
+        first, _, more = why.partition(". ")
+        out.append({"kind": "bundle-refused", "node": n["name"], "id": n["id"], "why": first, "more": more,
+                    "key": f"bundle:{n['id']}@{serving[7:23]}"})
+    return out
+
+
+def session_bundle_due(n):
+    """Whether this node's terminals are still to take the bundle this
+    controller serves: it runs sessions and is answering, they run another
+    bundle, and the node has not refused this one. One that refused it
+    goes on with the bundle it has, and waiting changes nothing."""
+    if not n or host_only(n) or n.get("state") != "online" or n.get("live") is False:
+        return False
+    se = (n.get("reported") or {}).get("session")
+    serving = bundle_digest()
+    return bool(isinstance(se, dict) and se.get("up") and se.get("bundle") and serving and se["bundle"] != serving
+                and not bundle_refused(n, serving))
+
+
+def session_bundle_wait(nid, ask=None, limit=45, nap=time.sleep):
+    """The node, once its terminals run the bundle this controller serves
+    or it is plain they will not: asked to check in now (`ask`), it takes
+    the new one within a poll, waited for here up to `limit` seconds rather
+    than refusing with "try again in a minute" (B746). No wait at all for a
+    node that is not due one (session_bundle_due), and the wait ends the
+    moment it reports that it refused this bundle."""
+    n = node(nid)
+    if not session_bundle_due(n):
+        return n
+    if ask:
+        ask(nid)
+    deadline = time.time() + limit
+    while time.time() < deadline:
+        nap(0.5)
+        n = node(nid)
+        if not session_bundle_due(n):
+            break
+    return n
 
 
 def agent_gap(n):
@@ -8717,8 +8801,16 @@ def tab_view(rows, admin):
     node the Containers page opens on and New project offers (node_for). Not a
     default that work falls to: a project with no node has nowhere to send,
     and the dialogs make the person pick."""
+    serving = None
     for n in rows:
         if n.get("kind") == "agent":
+            # The controller's bundle it refused, in its own words (R267
+            # step 6): its Sessions section says it keeps the one it had.
+            if ((n.get("reported") or {}).get("bundle_refused") or {}).get("digest"):
+                serving = serving or bundle_digest()
+                held = bundle_refused(n, serving)
+                if held:
+                    n["bundle_held"] = held
             n["turns"] = turns_of(n)
             # Its last hour, for the charts on its page (R218 step 9).
             n["spark"] = spark_of(n["id"])
