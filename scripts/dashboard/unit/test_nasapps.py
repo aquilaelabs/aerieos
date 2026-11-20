@@ -65,6 +65,33 @@ class Check(unittest.TestCase):
         self.assertFalse(seen["media"])
         self.assertEqual(seen["services"][0]["image"], "ghcr.io/example/notes:2.4.1")
 
+    def test_an_image_may_carry_the_digest_it_is_pulled_by(self):
+        d = "sha256:" + "4f" * 32
+
+        def said(image):
+            return nasapps.check(f"services:\n  a:\n    image: {image}\n    ports: ['${{PORT}}:1']\n")
+        for held in (f"ghcr.io/example/notes:2.4.1@{d}", f"notes@{d}", f"notes:latest@{d}", f'"lscr.io/example/notes:2.4.1@{d}"'):
+            seen = said(held)
+            self.assertNotIn("error", seen, held)
+            self.assertEqual(seen["services"][0]["image"], held.strip('"'), "the reference is kept whole: its digest is what is pulled")
+        for loose, why in ((f"notes:1@sha256:{'4f' * 31}", "no image reference"), (f"notes:1@md5:{'4f' * 32}", "no image reference"),
+                           (f"notes:1@sha256:{'4F' * 32}", "no image reference"), (f"notes:1@{d}@{d}", "no image reference"),
+                           ("notes:1 extra", "no image reference"), ("notes:latest", "not pinned"), ("notes", "not pinned")):
+            self.assertIn(why, said(loose).get("error", ""), loose)
+
+    def test_a_format_5_app_names_every_image_by_digest_and_an_earlier_one_means_what_it_meant(self):
+        d = "sha256:" + "4f" * 32
+        both = f"services:\n  web:\n    image: ex/web:2@{d}\n    ports: ['${{PORT}}:1']\n  db:\n    image: ex/db:16\n"
+        seen = nasapps.check_app({"format": 5}, both)
+        self.assertIn("service db: ex/db:16 names no digest", seen["error"], "refused, with the image named")
+        self.assertNotIn("error", nasapps.check_app({"format": 5}, both.replace("ex/db:16", f"ex/db:16@{d}")))
+        for earlier in ({}, {"format": 4}, {"format": 3}):
+            self.assertNotIn("error", nasapps.check_app(earlier, both), earlier)
+        self.assertEqual(nasapps.held_of({"compose": both})["word"], "open", "an app reads pinned only when every image has a digest")
+        self.assertIn("ex/db:16", nasapps.held_of({"compose": both})["why"])
+        self.assertEqual(nasapps.held_of({"compose": both.replace("ex/db:16", f"ex/db:16@{d}")}),
+                         {"word": "pinned", "why": "every image it runs is named by the digest its entry carries"})
+
 
 class Fields(unittest.TestCase):
     """An app's own fields (pack format 4): declared in bbapp.json, each

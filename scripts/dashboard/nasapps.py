@@ -367,7 +367,7 @@ def _all():
 def catalog():
     """The list the dialog and the Library show: [{id, name, what, port,
     media, secrets, tier, by, at, icon, fields, own, network, going,
-    commit, compose}], `icon` the address of its own picture when it has
+    commit, compose, held}], `icon` the address of its own picture when it has
     one (R182), `fields` what its panel asks for and `own` which of
     AerieOS's own it asks for too (R238)."""
     out = []
@@ -380,7 +380,9 @@ def catalog():
                     "maker": str(v.get("maker") or ""), "credits": list(v.get("credits") or []),
                     "icon": f"/api/pack-icon?app={k}&v={v.get('at', 0)}" if icon_of(k) else "",
                     "fields": mine, "own": own, "network": v.get("network", ""), "going": v.get("going", ""),
-                    "commit": str((v.get("pin") or {}).get("commit") or ""), "compose": v["compose"]})
+                    "commit": str((v.get("pin") or {}).get("commit") or ""), "compose": v["compose"],
+                    # What its images are held to: pinned when every one has its digest.
+                    "held": held_of(v)})
     return out
 
 
@@ -558,15 +560,32 @@ def check_app(meta, compose):
     seen = check(compose, fields, network)
     if seen.get("error"):
         return seen
+    # From format 5 an app names every image by its digest: what a node
+    # pulls is then what its entry carries, whatever the tag serves later.
+    # An app of an earlier format means what it meant, held to its tags.
+    if fmt >= packformat.HELD_FORMAT:
+        loose = next((s for s in seen["services"] if not packformat.image_digest(s["image"])), None)
+        if loose:
+            return {"error": f"service {loose['name']}: {loose['image']} names no digest: a pack format {packformat.HELD_FORMAT} app names every image "
+                             "as name:tag@sha256: and the 64 hex digits of its digest"}
     return {**seen, **({"fields": fields} if fields is not None else {}), **({"network": network} if network else {}),
             **({"going": going} if going else {})}
+
+
+def held_of(a):
+    """What an app's images are held to, as an API answers it: {word,
+    why}, pinned only when every image its compose names carries its
+    digest (packformat.images_held)."""
+    word, why = packformat.images_held(packformat.compose_images(a.get("compose") if isinstance(a, dict) else ""))
+    return {"word": word, "why": why}
 
 
 def check(compose, fields=None, network=""):
     """What a compose file of a person's own would run, before it is kept
     (the Look): {services: [{name, image, ports, volumes}], blanks, media}
     or {error}. Held to what the shipped ones are held to: a services
-    mapping, every image pinned to a tag that is not latest, and no blank
+    mapping, every image held by its digest or pinned to a tag that is not
+    latest, and no blank
     but the ones New container fills: the six every app shared, or, for an
     app that declares its own `fields` (pack format 4), those and AerieOS's
     own, each declared one read. `network` "host" is an app on the
@@ -591,8 +610,11 @@ def check(compose, fields=None, network=""):
         image = str(svc.get("image") or "")
         if not image:
             return {"error": f"service {name} names an image"}
-        if not re.fullmatch(r"[\w./-]+:[\w.-]+", image) or image.endswith(":latest"):
-            return {"error": f"service {name}: {image} is not pinned to a tag (never latest), so an update could change it under you"}
+        # Held by its digest (name:tag@sha256:...), which is then what is
+        # pulled and run, or by a tag that is not latest.
+        why = packformat.image_refused(image)
+        if why:
+            return {"error": f"service {name}: {image} {why}"}
         if "build" in svc or "privileged" in svc:
             return {"error": f"service {name}: an app from the catalog is a pulled image, never built here, and never privileged"}
         ports = svc.get("ports") if isinstance(svc.get("ports"), list) else []

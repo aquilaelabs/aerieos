@@ -86,7 +86,9 @@ FORMATS = {
        "and what a package manager installs held the same way: what the entry asks pip or npm for (lock), resolved by that "
        "tool to exact files that are each a declared download, with the small files an install of them reads carried by a "
        "shipped row itself (files); and a coding agent's install held the same way (agent.install's fetch, keyring, online and "
-       "steps in the place of script): its downloads declared, and its steps run from them, never a line a shell reads",
+       "steps in the place of script): its downloads declared, and its steps run from them, never a line a shell reads; "
+       "and a container image held the same way: every image a Docker app's compose names carrying the digest of what is "
+       "pulled (name:tag@sha256:...), and the images one of AerieOS's own services runs named so in its entry (images)",
 }
 
 
@@ -440,6 +442,108 @@ def online_checked(raw, what="install.online"):
     return text, []
 
 
+# ---- an image a container runs ------------------------------------------------
+# A container image is held as a download is, by the digest of what is
+# pulled: `name[:tag][@sha256:<64 hex>]`. With a digest, that manifest is
+# what a node pulls and runs (a list's digest covers every platform the
+# list names), and the tag beside it is what a person reads and what the
+# tool that proposes a newer pin asks the registry about. With none, the
+# tag is all there is, and the registry may serve another image under it
+# tomorrow. From format 5 a Docker app names every image by digest
+# (nasapps.check_app), and each of AerieOS's own services does in its
+# entry's `images` (images_checked).
+IMAGE_REF = re.compile(r"(?P<name>[\w./-]+)(?::(?P<tag>[\w.-]+))?(?:@(?P<digest>sha256:[0-9a-f]{64}))?")
+IMAGE_KEY = re.compile(r"^[a-z][a-z0-9-]{0,31}$")
+IMAGES_MOST = 12
+
+
+def image_parts(ref):
+    """{name, tag, digest} of an image reference, "" for the part it does
+    not say, or None for what is no reference."""
+    m = IMAGE_REF.fullmatch(ref) if isinstance(ref, str) else None
+    return {k: m.group(k) or "" for k in ("name", "tag", "digest")} if m else None
+
+
+def image_digest(ref):
+    """The digest an image reference carries, or ""."""
+    return (image_parts(ref) or {}).get("digest", "")
+
+
+def image_refused(ref):
+    """Why an image reference is held to nothing, or "": it carries the
+    digest of what is pulled, or names a tag that is not latest, which is
+    what an app from before format 5 and a person's own compose file are
+    held to."""
+    parts = image_parts(ref)
+    if not parts:
+        return "is no image reference: name:tag, with @sha256: and the 64 hex digits of its digest where it is held by one"
+    if not parts["digest"] and parts["tag"] in ("", "latest"):
+        return "is not pinned to a tag (never latest), so an update could change it under you"
+    return ""
+
+
+def image_said(ref):
+    """An image reference as a person reads it: its name and tag, and the
+    first twelve digits of the digest it is held by."""
+    parts = image_parts(ref)
+    if not parts:
+        return str(ref or "")[:200]
+    return parts["name"] + (f":{parts['tag']}" if parts["tag"] else "") + (f" ({parts['digest'][7:19]})" if parts["digest"] else "")
+
+
+def images_checked(raw, what="images"):
+    """The images an entry of AerieOS's own runs, held to their shape:
+    (clean, errors). {key: reference}: each under the name its entry's
+    module reads it by, and each with its tag and its digest."""
+    said_ = (f"{what} maps up to {IMAGES_MOST} names to the image each is, as name:tag@sha256: and the 64 hex digits "
+             "of its digest: the tag is what a person reads, the digest what is pulled")
+    if not isinstance(raw, dict) or not 1 <= len(raw) <= IMAGES_MOST:
+        return {}, [said_]
+    for key, ref in raw.items():
+        parts = image_parts(ref)
+        if not (isinstance(key, str) and IMAGE_KEY.fullmatch(key) and parts and parts["tag"] and parts["digest"]):
+            return {}, [said_]
+    return dict(raw), []
+
+
+IMAGES_SAID = "every image it runs is named by the digest its entry carries"
+
+
+def images_held(refs):
+    """(word, why) for the images an entry runs, as held() answers: pinned
+    only when every one carries its digest, open with the first that does
+    not."""
+    refs = list(refs) if isinstance(refs, (list, tuple)) else []
+    if not refs:
+        return "open", "its entry names no image"
+    for ref in refs:
+        if not image_digest(ref):
+            return "open", f"{str(ref)[:120]} is named by its tag alone: the registry may serve another image under it"
+    return "pinned", IMAGES_SAID
+
+
+# A compose file's image lines, read and written as text so the file keeps
+# its layout and its comments: each `image:` line's value, bare or quoted.
+COMPOSE_IMAGE = re.compile(r"^(?P<head>[ \t]+image:[ \t]*)(?P<q>[\"']?)(?P<ref>[^\s\"'#]+)(?P=q)(?P<tail>[ \t]*(?:#.*)?)$", re.M)
+
+
+def compose_images(text):
+    """The image references a compose file's `image:` lines name, in the
+    file's order, each once."""
+    out = []
+    for m in COMPOSE_IMAGE.finditer(str(text or "")):
+        if m.group("ref") not in out:
+            out.append(m.group("ref"))
+    return out
+
+
+def compose_repinned(text, moved):
+    """A compose file with each image reference in `moved` ({old: new})
+    written as its new one, on its own line and nowhere else."""
+    return COMPOSE_IMAGE.sub(lambda m: m.group("head") + m.group("q") + moved.get(m.group("ref"), m.group("ref")) + m.group("q") + m.group("tail"),
+                             str(text or ""))
+
+
 # ---- what a package manager installs ----------------------------------------
 # An install step that runs `pip install` or `npm install` downloads what
 # the manager resolves that day, which is held to nothing. So an entry says
@@ -683,6 +787,10 @@ def held(doc):
     held to, one of HELD_WORDS, and the sentence that says why: for open,
     which part is held to nothing; for installer, the entry's own sentence."""
     got = _entry_source(doc) if isinstance(doc, dict) and doc else None
+    # A deployed thing of AerieOS's installs nothing: what it runs is the
+    # images its entry names.
+    if got is None and isinstance(doc, dict) and doc.get("service") is not None and isinstance(doc.get("images"), dict):
+        return images_held(list(doc["images"].values()))
     if got is None:
         return "open", "how it is installed is not in its entry"
     src, pack = got

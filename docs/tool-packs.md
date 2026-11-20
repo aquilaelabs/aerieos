@@ -523,6 +523,23 @@ The cut stops an install step from fetching what the manifest does not
 name. It is not a sandbox: a step still runs as the job account, with that
 account's files.
 
+### Images by digest
+
+A container image is held as a download is: by the digest of what is
+pulled. An image reference may carry it, `name:tag@sha256:` and the 64 hex
+digits of the manifest's digest. A node then pulls and runs that manifest,
+whatever the registry serves under the tag later; the tag beside it is what
+a person reads. For an image built for several platforms the digest is the
+manifest list's, which covers every platform the list names, so one
+reference serves an amd64 node and an arm64 one.
+
+From pack format 5 a Docker app names every image in its `compose.yml`
+this way, and one that does not is refused with the image named. An app
+written in an earlier format means what it meant: each image pinned to a
+tag that is not `latest`. A compose file of your own is held to the same
+two: a digest, or a tag that is not `latest`. An app whose every image has
+its digest reads **pinned**, as a tool whose every download is held does.
+
 ## Official packs and agent packs
 
 Everything AerieOS ships is a pack in this same format too (R169): under
@@ -956,9 +973,11 @@ An entry of `"kind": "app"` is a Docker app: its folder holds `bbapp.json`
 optional `icon`, a PNG, WebP or SVG file in the folder held to a pack's
 rules, and from pack format 4 its own `fields`, `network` and `going`,
 [A Docker app](submitting.md#a-docker-app)) and `compose.yml` beside it,
-the compose held to what an app of your own is held to (every image pinned
-to a tag that is not latest, never built or privileged, and every blank one
-it declares or one of AerieOS's own). The Library lists it as an **Apps**
+the compose held to what an app of your own is held to (every image held
+by its digest or pinned to a tag that is not latest, never built or
+privileged, and every blank one it declares or one of AerieOS's own), and
+from pack format 5 every image named by its digest
+([Images by digest](#images-by-digest)). The Library lists it as an **Apps**
 card with its tier and what it asks for. **Install** fetches the folder at
 the commit the signed index pins, checks its archive's sha256, keeps the
 app and opens New container on its panel, on the Library's node when that

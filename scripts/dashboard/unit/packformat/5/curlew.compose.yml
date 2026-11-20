@@ -1,0 +1,18 @@
+services:
+  curlew:
+    image: ghcr.io/example/curlew:3.2.0@sha256:0a28e796fca2c33a0107989411f2de207e53aced562ea7e728be15ce6590f9ec
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ}
+      DB_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "${PORT}:8044"
+    volumes:
+      - ${SHELF}:/shelf
+    depends_on:
+      - db
+  db:
+    image: "postgres:16-alpine@sha256:e2271932180506b1ef1d51a9fcd1eb097db4773b8ebbdd017c649f9e0a5fc067"
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}

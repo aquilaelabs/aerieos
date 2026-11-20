@@ -166,6 +166,13 @@ what it asks for, and a `compose.yml` held to a few rules (every image
 pinned to a tag that is not `latest`, nothing built, nothing privileged,
 and every `${VARIABLE}` one the app declares or one of AerieOS's own).
 
+From pack format 5 every image is named by its digest,
+`name:tag@sha256:` and the digest's 64 hex digits: the digest of the
+manifest list where the image is built for several platforms, so one
+reference serves each of them. A node pulls and runs that digest, and the
+tag beside it is what a person reads. An app that names an image by its
+tag alone is refused at format 5, with the image named.
+
 From pack format 4 an app declares its own `fields`, which New container
 draws as the app's panel, in their order: each the variable it fills
 (`var`), what the panel calls it (`label`), its `kind`, a `default`, an

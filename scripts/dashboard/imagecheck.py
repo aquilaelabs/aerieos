@@ -24,23 +24,20 @@ that is said plainly on the row, and no update is offered from the tag.
 Where no release says (none signed, none naming its image yet), the row is
 as any other image's.
 
-The registry is asked over its v2 API with an anonymous token, which is
-what a public image on Docker Hub, ghcr.io or quay.io answers; a private
-one says it could not be read, on the row, rather than guessing. The
-harness points BB_IMAGE_DIGESTS_FILE at {ref: digest} instead.
+The registry is asked over its v2 API with an anonymous token
+(imageregistry.py, the one client for that protocol), which is what a
+public image answers on any host that speaks it; a private one says it
+could not be read, on the row, rather than guessing. The harness points
+BB_IMAGE_DIGESTS_FILE at {ref: digest} instead.
 """
 import hashlib
-import http.client
 import json
 import os
-import re
 import threading
 import time
-import urllib.error
-import urllib.parse
-import urllib.request
 from pathlib import Path
 
+import imageregistry
 import releasecheck
 
 STATE = None
@@ -52,11 +49,6 @@ _checking = {"on": False}
 CHECK_DELAY = float(os.environ.get("BB_IMAGE_CHECK_DELAY") or 300)
 AUTOCHECK = os.environ.get("BB_IMAGE_AUTOCHECK", "1") != "0"
 DIGESTS_FILE = os.environ.get("BB_IMAGE_DIGESTS_FILE") or ""
-ACCEPT = ", ".join(["application/vnd.oci.image.index.v1+json",
-                    "application/vnd.docker.distribution.manifest.list.v2+json",
-                    "application/vnd.docker.distribution.manifest.v2+json",
-                    "application/vnd.oci.image.manifest.v1+json"])
-_DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
 
 
 def configure(*, state, write_json, devapp_module):
@@ -78,18 +70,8 @@ def _load():
 def parse_ref(ref):
     """(registry, repository, tag) of an image reference, or None for one
     pinned by digest. `mariadb:11` is Docker Hub's library/mariadb."""
-    ref = str(ref or "").strip()
-    if not ref or "@" in ref:
-        return None
-    first, _, rest = ref.partition("/")
-    if rest and ("." in first or ":" in first or first == "localhost"):
-        registry, path = first, rest
-    else:
-        registry, path = "registry-1.docker.io", ref
-    name, _, tag = path.rpartition(":") if ":" in path.rsplit("/", 1)[-1] else (path, "", "latest")
-    if registry == "registry-1.docker.io" and "/" not in name:
-        name = "library/" + name
-    return registry, name, tag or "latest"
+    parts = imageregistry.parse(ref)
+    return None if not parts or parts[3] else parts[:3]
 
 
 def _stub(ref):
@@ -100,42 +82,15 @@ def _stub(ref):
 
 
 def remote_digest(ref):
-    """(digest, error): what the registry serves for this tag now."""
+    """(digest, error): what the registry serves for this tag now
+    (imageregistry.digest_of); ("", "") for a reference with no tag to ask
+    about."""
     if DIGESTS_FILE:
         got = _stub(ref)
         return (got, "") if got else ("", f"the registry has no {ref}")
-    parts = parse_ref(ref)
-    if not parts:
+    if not parse_ref(ref):
         return "", ""
-    registry, name, tag = parts
-    url = f"https://{registry}/v2/{name}/manifests/{tag}"
-
-    def head(token=""):
-        req = urllib.request.Request(url, method="HEAD", headers={"Accept": ACCEPT}
-                                     | ({"Authorization": f"Bearer {token}"} if token else {}))
-        with urllib.request.urlopen(req, timeout=20) as r:   # noqa: S310 (https to the registry the image names)  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
-            return r.headers.get("Docker-Content-Digest") or ""
-    try:
-        try:
-            got = head()
-        except urllib.error.HTTPError as e:
-            if e.code != 401:
-                raise
-            # The anonymous token the challenge names: realm, service, scope.
-            ch = dict(re.findall(r'(\w+)="([^"]*)"', e.headers.get("WWW-Authenticate") or ""))
-            if not ch.get("realm", "").startswith("https://"):
-                return "", f"{registry} asks for a sign-in this check does not have"
-            q = urllib.parse.urlencode({k: v for k, v in (("service", ch.get("service")),
-                                        ("scope", ch.get("scope") or f"repository:{name}:pull")) if v})
-            with urllib.request.urlopen(f"{ch['realm']}?{q}", timeout=20) as r:   # noqa: S310 (the realm the registry named, https)  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
-                tok = json.loads(r.read(200_000).decode("utf-8", "replace"))
-            got = head(tok.get("token") or tok.get("access_token") or "")
-    except urllib.error.HTTPError as e:
-        return "", (f"{registry} has no {name}:{tag}" if e.code == 404
-                    else f"{registry} would not say ({e.code}): a private image needs a sign-in this check does not have")
-    except (OSError, http.client.HTTPException, ValueError) as e:
-        return "", f"could not reach {registry}: {e}"[:200]
-    return (got, "") if _DIGEST.fullmatch(got or "") else ("", f"{registry} gave no digest for {name}:{tag}")
+    return imageregistry.digest_of(ref)
 
 
 def registry_images(project, instance):

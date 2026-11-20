@@ -243,5 +243,57 @@ class Index(unittest.TestCase):
         self.assertIsNone(row(self.index(dict(ENTRY, name="otter", format=n)))["repin"])
 
 
+class Images(unittest.TestCase):
+    """An image a container runs is held as a download is, by the digest of
+    what is pulled: name[:tag][@sha256:<64 hex>]."""
+    D = "sha256:" + "4f" * 32
+
+    def test_a_reference_is_its_name_its_tag_and_its_digest(self):
+        self.assertEqual(packformat.image_parts("nginx:1.31-alpine"), {"name": "nginx", "tag": "1.31-alpine", "digest": ""})
+        self.assertEqual(packformat.image_parts(f"ghcr.io/example/web:2@{self.D}"), {"name": "ghcr.io/example/web", "tag": "2", "digest": self.D})
+        self.assertEqual(packformat.image_parts(f"web@{self.D}"), {"name": "web", "tag": "", "digest": self.D})
+        for bad in ("", None, 7, "web:1@sha256:abc", f"web:1@{self.D}0", f"web:1@{self.D.upper()}", "web: 1", f"web:1@{self.D} x", "web:1:2"):
+            self.assertIsNone(packformat.image_parts(bad), repr(bad))
+        self.assertEqual(packformat.image_digest(f"web:2@{self.D}"), self.D)
+        self.assertEqual(packformat.image_digest("web:2"), "")
+
+    def test_one_with_no_digest_is_held_by_a_tag_that_is_not_latest(self):
+        for ok in ("web:2", f"web:2@{self.D}", f"web@{self.D}", f"web:latest@{self.D}"):
+            self.assertEqual(packformat.image_refused(ok), "", ok)
+        self.assertIn("not pinned", packformat.image_refused("web"))
+        self.assertIn("not pinned", packformat.image_refused("web:latest"))
+        self.assertIn("no image reference", packformat.image_refused("web:1@sha256:abc"))
+
+    def test_a_person_reads_the_tag_and_a_short_prefix_of_the_digest(self):
+        self.assertEqual(packformat.image_said(f"ghcr.io/example/web:2@{self.D}"), "ghcr.io/example/web:2 (4f4f4f4f4f4f)")
+        self.assertEqual(packformat.image_said("web:2"), "web:2")
+
+    def test_an_entry_s_images_are_each_a_tag_and_a_digest_under_a_plain_name(self):
+        ok = {"web": f"ex/web:2@{self.D}", "db": f"postgres:16-alpine@{self.D}"}
+        self.assertEqual(packformat.images_checked(ok), (ok, []))
+        for bad in ({}, [], {"web": "ex/web:2"}, {"web": f"ex/web@{self.D}"}, {"Web": ok["web"]}, {"web": 7}, {f"k{i}": ok["web"] for i in range(13)}):
+            self.assertTrue(packformat.images_checked(bad)[1], repr(bad)[:60])
+
+    def test_the_word_is_pinned_only_when_every_image_has_its_digest(self):
+        self.assertEqual(packformat.images_held([f"ex/web:2@{self.D}", f"ex/db:1@{self.D}"]), ("pinned", packformat.IMAGES_SAID))
+        word, why = packformat.images_held([f"ex/web:2@{self.D}", "ex/db:1"])
+        self.assertEqual(word, "open")
+        self.assertIn("ex/db:1 is named by its tag alone", why)
+        self.assertEqual(packformat.images_held([])[0], "open")
+        service = {"tier": "official", "service": {"kind": "nginx"}, "images": {"nginx": f"nginx:1.31-alpine@{self.D}"}}
+        self.assertEqual(packformat.held(service)[0], "pinned", "a deployed thing is held by the images its entry names")
+        self.assertEqual(packformat.held({"tier": "official", "service": {"kind": "nginx"}})[0], "open")
+
+    def test_a_compose_file_s_image_lines_are_read_and_written_as_text(self):
+        text = (f"# held\nservices:\n  web:\n    image: ex/web:2@{self.D}   # the app\n    environment:\n      NOTE: 'image: ex/web:2'\n"
+                f"  db:\n    image: \"ex/db:1\"\n  again:\n    image: ex/web:2@{self.D}\n")
+        self.assertEqual(packformat.compose_images(text), [f"ex/web:2@{self.D}", "ex/db:1"], "each once, in the file's order")
+        new = "sha256:" + "a0" * 32
+        moved = packformat.compose_repinned(text, {f"ex/web:2@{self.D}": f"ex/web:2@{new}", "ex/db:1": f"ex/db:1@{new}"})
+        self.assertEqual(moved, text.replace(f"ex/web:2@{self.D}", f"ex/web:2@{new}").replace('"ex/db:1"', f'"ex/db:1@{new}"'),
+                         "its comments, its quotes and every other line as they were")
+        self.assertIn("NOTE: 'image: ex/web:2'", moved)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -201,6 +201,8 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
                     # ...what its panel asks for, its network and whether it is going (R238).
                     "fields": a.get("fields") or [], "own": a.get("own") or [], "network": a.get("network") or "", "going": a.get("going") or "",
                     "icon": a.get("icon") or "",
+                    # What its images are held to (pack format 5): {word, why}, pinned when every one has its digest.
+                    "held": a.get("held"),
                     "installed": False, "version": "", "latest": "", "update": False, "running": False, "verb": "install"})
     # The shipped rows by the names the catalog gives them (a toolchain's
     # colon as a hyphen, an agent by its id): an official entry naming one is
