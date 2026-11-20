@@ -48,6 +48,14 @@ SESSION_BIND = os.environ.get("BUILDERBOT_SESSION_BIND", "")
 # the census is a function of the machine, and the session's state is the
 # one part of the machine this process itself is holding.
 SESSION = {}
+# The bundle this node refused and still refuses (release.may_keep_bundle,
+# R267 step 6), as the census reports it: {"digest", "why"}, the digest the
+# controller named and the reason in this node's words, REFUSED_MOST
+# characters at most; empty while none is refused. Kept by the Agent's
+# bundle() and read by census(), as SESSION is: a refusal said only in this
+# node's log left its row on the controller saying nothing.
+REFUSED = {}
+REFUSED_MOST = 600
 # What the screen relay says of itself in the hello (census, R243): its
 # certificate's sha256 once it has one, which the controller pins, and that
 # it takes a signed request once. Set by screen.py.

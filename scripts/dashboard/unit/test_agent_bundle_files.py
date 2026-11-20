@@ -10,7 +10,8 @@ signature is under a key it trusts and every file is the one listed, with
 nothing beside them but what a controller adds of its own. Refused, none of
 it is unpacked anywhere, the node goes on with the bundle it has, and the
 same bundle is not fetched again until the console's trust or the
-controller's bundle moves."""
+controller's bundle moves. While the refusal stands the node says it in its
+census, so its controller can say it where a person looks."""
 import hashlib
 import io
 import json
@@ -514,6 +515,63 @@ class Fetched(Case):
         self.assertEqual(self.a.session_bundle, "sha256:" + good[7:23], "known by its folder, and not the controller's digest")
         self.assertNotEqual(self.a.session_bundle, bad)
 
+    def test_the_refusal_is_reported_while_it_stands(self):
+        refused = self.agent.REFUSED
+        self.assertIs(self.agent.module("census").REFUSED, refused, "the census reads what bundle() keeps")
+        self.assertIs(self.agent.module("workspace").REFUSED, refused)
+        self.serve(FILES)
+        self.a.bundle(None, None)
+        self.assertEqual(refused, {}, "nothing refused: nothing said")
+        bad = self.tampered()
+        self.a.hello_at = 5
+        self.a.bundle(None, None)
+        self.assertEqual(refused["digest"], bad, "the digest it refused")
+        self.assertTrue(refused["why"].startswith("this bundle's files are not ones signed by a key this node trusts "
+                                                  "(scripts/lib/login-list.py is changed"), refused["why"])
+        self.assertRegex(refused["why"], r"unsigned on allows unsigned builds$", "with what a person at its console can do")
+        self.assertLessEqual(len(refused["why"]), self.agent.REFUSED_MOST)
+        self.assertEqual(self.a.hello_at, 0, "told with a hello now, not at the next one")
+        # Answered from memory, it still stands, and no hello is asked for again.
+        self.a.bundle_named, self.a.hello_at = bad, 5
+        self.a.bundle(None, None)
+        self.assertEqual((refused["digest"], self.a.hello_at), (bad, 5))
+        # A bundle taken clears it, and that is told at once too.
+        self.serve(FILES)
+        self.a.bundle_named = "sha256:" + sha(self.serving)
+        self.assertTrue(self.a.bundle(None, None))
+        self.assertEqual((refused, self.a.hello_at), ({}, 0))
+
+    def test_the_report_is_cleared_when_the_trust_changes_and_the_bundle_is_then_taken(self):
+        refused = self.agent.REFUSED
+        self.serve(FILES)
+        self.a.bundle(None, None)
+        bad = self.tampered()
+        self.a.bundle_named = bad
+        self.a.bundle(None, None)
+        self.assertEqual(refused["digest"], bad)
+        self.trust["unsigned_ok"] = True
+        self.assertEqual(refused["digest"], bad, "the console's press alone changes nothing said")
+        self.assertEqual(self.a.bundle(None, None), os.path.join(self.bb, bad[7:23]))
+        self.assertEqual(refused, {}, "taken under the new trust: no longer said")
+
+    def test_a_refusal_the_controller_came_back_to_is_said_again(self):
+        # The controller named another bundle in between (the hello drops
+        # what is said of one it no longer serves), then this one again.
+        refused = self.agent.REFUSED
+        bad = self.tampered()
+        self.a.bundle_named = bad
+        self.a.bundle(None, None)
+        refused.clear()
+        self.a.bundle(None, None)
+        self.assertEqual(self.fetches, 1, "answered from memory")
+        self.assertEqual(refused["digest"], bad)
+
+    def test_the_words_reported_are_bounded(self):
+        self.a._refusal_reported("sha256:" + "ab" * 32, "refused: " + "a file name that goes on " * 60)
+        why = self.agent.REFUSED["why"]
+        self.assertEqual(len(why), self.agent.REFUSED_MOST)
+        self.assertTrue(why.endswith("\u2026") and not why.startswith("refused"))
+
     def test_a_node_with_no_bundle_to_run_says_why_it_has_no_terminals(self):
         bad = self.tampered()
         self.a.session_refresh(bad)
@@ -527,6 +585,49 @@ class Fetched(Case):
         into = self.a.bundle(None, None)
         self.assertEqual(into, os.path.join(self.bb, bad[7:23]))
         self.assertFalse([ln for ln in self.logged if "refused" in ln or "signed" in ln or "checked" in ln], self.logged)
+
+
+class Hello(Case):
+    """What a hello does with a refusal that is being said."""
+
+    def test_a_refusal_of_a_bundle_the_controller_no_longer_serves_is_no_longer_said(self):
+        m = self.agent
+        m.log = lambda *a, **k: None
+        m.share_images = lambda *a, **k: None
+        m.census = lambda state: {}
+        m.own_digest = lambda: "sha256:agent"
+        m.save_state = lambda s: None
+        a = object.__new__(m.Agent)
+        a.state, a.warned_caps, a.session_bundle = {}, True, "sha256:kept"
+        named, tried = [], []
+
+        class Ctl:
+            def call(self, verb, body=None, timeout=30):
+                return 200, {"bundle": named[-1], "node": {"id": "n1", "name": "n", "state": "online"}}
+
+        a.ctl = Ctl()
+        a.running_ids = lambda: []
+        a.keep_session_tokens = lambda rows: None
+        a.runner_env_sync = lambda: None
+        a.refresh_session_tool = lambda: None
+        # The fetch that follows is the session half's: here it only notes
+        # what was being said when it was reached.
+        a.session_try = lambda digest: tried.append((digest, dict(m.REFUSED)))
+        refused, other = "sha256:" + "ab" * 32, "sha256:" + "cd" * 32
+        m.REFUSED.update(digest=refused, why="scripts/aerie is changed")
+        named.append(refused)
+        a.hello()
+        self.assertEqual(a.bundle_named, refused)
+        self.assertEqual(tried[-1], (refused, {"digest": refused, "why": "scripts/aerie is changed"}), "still served: still said")
+        named.append(other)
+        a.hello()
+        self.assertEqual(tried[-1], (other, {}), "another bundle is served: the refusal of the one before is dropped")
+        self.assertEqual(m.REFUSED, {})
+        # A controller that names no bundle (a hosting-only node's hello) drops nothing.
+        m.REFUSED.update(digest=refused, why="x")
+        named.append("")
+        a.hello()
+        self.assertEqual(m.REFUSED["digest"], refused)
 
 
 if __name__ == "__main__":

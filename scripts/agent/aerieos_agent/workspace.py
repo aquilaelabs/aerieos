@@ -10,7 +10,8 @@ import tarfile
 import threading
 import time
 from . import release
-from .base import BUNDLE_LIST, BUNDLE_SIG, LIST_MOST, ROOT_BUNDLE_DIR, ROOT_TOOLS, TOOLS_DIR, TOOLS_SIG, fs_holds, log
+from .base import (BUNDLE_LIST, BUNDLE_SIG, LIST_MOST, REFUSED, REFUSED_MOST, ROOT_BUNDLE_DIR, ROOT_TOOLS, TOOLS_DIR, TOOLS_SIG,
+                   fs_holds, hello_again, log)
 from .stores import dir_bytes, load_state, tc_root
 
 
@@ -253,7 +254,9 @@ class WorkspaceMixin:
         directory `.bb/current` points at, or '' with none. The refusal is
         remembered with the digest and with what this node trusted, so the
         same bundle under the same trust is not fetched again: a job's log
-        is told why each time, this process's log once."""
+        is told why each time, this process's log once. The controller is
+        told too, in the census (REFUSED), for as long as the refusal
+        stands, so the node's row and the bell say it."""
         say = job.say if job else (lambda t: log(t.rstrip("\n")))
         store = tc_root(self.state)
         if not store:
@@ -274,6 +277,9 @@ class WorkspaceMixin:
         # A press at the console, or another bundle named, fetches again.
         was, named = getattr(self, "bundle_refused", None), getattr(self, "bundle_named", "")
         if was and named and was["digest"] == named and was["trust"] == trusts:
+            # Still said to the controller, which may have named another
+            # bundle in between and come back to this one.
+            self._refusal_reported(was["digest"], was["why"])
             if job:
                 job.say(was["why"] + "\n")
             return self._bundle_before(bbdir, job.say if job else None)
@@ -312,6 +318,7 @@ class WorkspaceMixin:
                 os.unlink(part)
             say(said + "\n")
             self.bundle_refused = {"digest": digest, "trust": trusts, "why": said}
+            self._refusal_reported(digest, said)
             before = self._bundle_before(bbdir, say)
             if before and not self.session_digest:
                 # What the terminals run is said to the controller by its
@@ -321,6 +328,7 @@ class WorkspaceMixin:
                 self.session_digest = digest if before == into else "sha256:" + os.path.basename(before)
             return before
         self.bundle_refused = None
+        self._refusal_reported("", "")
         with _UNPACK:
             os.replace(part, tar_path)
             # A download a stopped agent left half done, an hour on.
@@ -371,6 +379,24 @@ class WorkspaceMixin:
             self.session_stale = into
         self.session_digest = digest
         return into
+
+    def _refusal_reported(self, digest, said):
+        """What the census says of a refused bundle (REFUSED), kept in step:
+        the digest and the reason in this node's words without their
+        leading "refused: ", bounded; nothing once a bundle is taken. A
+        change is told with a hello now and not at the next one, up to ten
+        minutes on: the controller says it to a person from the census."""
+        why = said[len("refused: "):] if said.startswith("refused: ") else said
+        if len(why) > REFUSED_MOST:
+            why = why[:REFUSED_MOST - 1].rstrip() + "…"
+        now = {"digest": digest, "why": why} if digest else {}
+        if now == REFUSED:
+            return
+        if now:
+            REFUSED.update(now)
+        else:
+            REFUSED.clear()
+        hello_again(self, "the controller's bundle was refused here" if now else "the controller's bundle is taken now")
 
     @staticmethod
     def _bundle_before(bbdir, say=None):

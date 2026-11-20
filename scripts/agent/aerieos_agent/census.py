@@ -20,6 +20,7 @@ from .base import (
     CLAUDE_DIR,
     OS_RELEASE,
     SANDBOX_BIN,
+    REFUSED,
     RELAY,
     SCREEN_PORT,
     SESSION,
@@ -415,6 +416,10 @@ def census(state):
         "release_unpinned": console_said().get("release_unpinned") is True,
         # ...and whether its console switched root commands off (R227 step 2).
         "root_off": console_said().get("root_off") is True,
+        # ...and the controller's bundle this node refused and keeps
+        # refusing, with why (bundle(), R267 step 6): named only while one
+        # is, so the controller can say it where a person looks.
+        **({"bundle_refused": dict(REFUSED)} if REFUSED.get("digest") else {}),
         # ...and whether this agent may install the machine's own packages
         # here: the stamp AND root, which is what administers() asks. The
         # stamp alone said yes for an agent that could not, and the

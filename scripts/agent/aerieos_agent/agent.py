@@ -13,7 +13,7 @@ import time
 import traceback
 from . import AGENT_VERSION
 from .coverage import _COV_OUT, _cov_write
-from .base import BEAT_S, RUNNER_DIAG_KEEP, SESSION_WALL, TRIAL_S, cap_file, fs_holds, log, log_once, own_digest, own_path, prune_dir
+from .base import BEAT_S, REFUSED, RUNNER_DIAG_KEEP, SESSION_WALL, TRIAL_S, cap_file, fs_holds, log, log_once, own_digest, own_path, prune_dir
 from .base import back_note, selfcheck, test_lock_ready, trial_begin, trial_give_way, trial_note, trial_passed
 from .controller import Controller
 from .stores import console_said, load_state, pin_release, save_state, use_scope
@@ -659,6 +659,11 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             # ...and a bundle this node refused is not fetched again while
             # this still names the same one (bundle()).
             self.bundle_named = r.get("bundle") or ""
+            # ...and one refused that the controller no longer serves is no
+            # longer said: the bundle named now is fetched below, and
+            # refused or taken on its own.
+            if REFUSED.get("digest") and self.bundle_named and REFUSED["digest"] != self.bundle_named:
+                REFUSED.clear()
             self.session_try(r.get("bundle") or "")
             # The helper the new bundle carries goes in with the bundle. The
             # loop refreshes it before its hello and the bundle arrives after,
