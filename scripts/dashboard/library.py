@@ -163,6 +163,8 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
                     "needs_missing": i.get("needs_missing") or [], "path": i.get("path") or "", "verified": i.get("verified"), "receipt": i.get("receipt"), "reopen": i.get("reopen") or 0,
                     # What its downloads are held to (pack format 5): {word, why}, word one of pinned, installer and open.
                     "held": i.get("held"),
+                    # ...and each download it declares, as a page reads one: {to, url, held, sha256, keys, sig, platform}.
+                    "downloads": i.get("downloads") or [],
                     "pack": {k: pack.get(k) for k in ("url", "commit", "path", "by", "at", "tier", "verbs", "here", "disabled")} if pack else None,
                     # What it asks for per node, and what it has been given here (R172).
                     "config": i.get("config") or [], "values": pack_values.get(i["name"]) if i.get("config") else None,

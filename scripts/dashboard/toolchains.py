@@ -189,13 +189,26 @@ def load_toolchains(packs=()):
                                     for v, x in list((r.get("verbs") or {}).items())[:40] if isinstance(x, dict)},
                            "steps": [[str(w) for w in (t.get("run") or [])][:40]
                                      for t in ((r.get("source") or {}).get("then") or [])[:20] if isinstance(t, dict)],
-                           # ...and the downloads it declares (pack format 3).
-                           "fetch": [{k: str(f.get(k) or "")[:2000] for k in ("url", "sha256", "to")}
+                           # ...and the downloads it declares (pack format 3),
+                           # each as its manifest is kept: the three keys,
+                           # then the platform and the signature of one that
+                           # names them (format 5), so what Look reads of a
+                           # newer manifest compares with it key for key.
+                           "fetch": [{**{k: str(f.get(k) or "")[:2000] for k in ("url", "sha256", "to")},
+                                      **({"platform": str(f["platform"])[:40]} if f.get("platform") else {}),
+                                      **({"signed": {k: str(f["signed"].get(k) or "")[:2000] for k in ("sig", "keys")}}
+                                         if isinstance(f.get("signed"), dict) else {})}
                                      for f in ((r.get("source") or {}).get("fetch") or [])[:32] if isinstance(f, dict)]}
+            # ...and the same downloads as a page reads them (below).
+            row["pack"]["downloads"] = packformat.downloads_said((r.get("source") or {}).get("fetch"))
         # What its downloads are held to (pack format 5), worked out here
         # from the whole row, which is not kept: one of pinned, installer
         # and open, with the sentence that says why (packformat.held).
         row["held"] = packformat.held_of(r)
+        # Each download it declares, as a page reads one: how it is held
+        # (its sha256, or its publisher's signature and the keys' name) and
+        # the platform it is for (packformat.downloads_said).
+        row["downloads"] = packformat.downloads_said((r.get("source") or {}).get("fetch"))
         out.append(row)
     # Sorted here rather than trusted from the file, so a toolchain added at the
     # end of the catalog still lands where somebody would look for it. Leading
@@ -546,8 +559,9 @@ def payload():
                       # Whether a newer version can be fetched in place, or
                       # whether getting one means removing this first.
                       "updatable": bool(p.get("updatable")),
-                      # What its downloads are held to: {word, why}.
-                      "held": p.get("held"),
+                      # What its downloads are held to: {word, why}; and
+                      # each download it declares, as a page reads one.
+                      "held": p.get("held"), "downloads": p.get("downloads") or [],
                       # What it needs, and what needs it, so a toolchain that
                       # exists to serve another says so rather than looking
                       # like an unexplained independent choice.
@@ -1270,15 +1284,17 @@ def pin_rows(nid, rep):
     return rows
 
 
-def receipt_of(nid, rep, name, p):
+def receipt_of(nid, rep, name, p, plat=""):
     """An installed pack's receipt as its row says it (R234): what the node
     reported (commit, tree, files, bytes, at, and what its steps ran with:
     net, and why where the entry kept the network), with `stale` naming the
     commit kept now when the copy there came from an earlier manifest,
     `before` the tree the same manifest made there the last time where it
-    was another, and `differs` each other node whose copy of the same
-    manifest is another set of files. None for one installed before
-    receipts, or by an agent from before them."""
+    was another, `differs` each other node whose copy of the same
+    manifest is another set of files, and `downloads` each download its
+    entry declares that a machine of `plat` fetches, with how it is held.
+    None for one installed before receipts, or by an agent from before
+    them."""
     rc = (rep.get("toolchain_receipts") or {}).get(name) if isinstance(rep.get("toolchain_receipts"), dict) else None
     if not isinstance(rc, dict) or not rc.get("tree"):
         return None
@@ -1289,6 +1305,11 @@ def receipt_of(nid, rep, name, p):
     # entry's own sentence as `why` ("" for the other two).
     out["net"] = rc.get("net") or ""
     out["why"] = str(rc.get("why") or "") if out["net"] == "online" else ""
+    # The downloads its entry declares that a machine of this platform
+    # fetches, each with how it is held (its sha256, or its publisher's
+    # signature and the keys' name) and the platform it names: from the
+    # entry as kept now, which is the one installed unless `stale` says not.
+    out["downloads"] = [d for d in p.get("downloads") or [] if packformat.fits_machine(d.get("platform"), plat)]
     kept = str(((p.get("source") or {}).get("commit")) or "")
     out["stale"] = kept if kept and rc.get("commit") and kept != rc["commit"] else ""
     out["before"] = rc.get("before") or ""
@@ -1363,8 +1384,10 @@ def payload_for_node(nid):
                       "updatable": bool(p.get("updatable")),
                       # What its downloads are held to (pack format 5):
                       # {word: pinned, installer or open, why}, from its
-                      # entry alone, whether or not it is installed here.
-                      "held": p.get("held"),
+                      # entry alone, whether or not it is installed here;
+                      # and each download it declares, as a page reads one
+                      # (packformat.downloads_said), for every platform.
+                      "held": p.get("held"), "downloads": p.get("downloads") or [],
                       # Said on the row, so a toolchain this node cannot have
                       # reads that way rather than offering an install that
                       # is refused at the press.
@@ -1379,7 +1402,7 @@ def payload_for_node(nid):
                       # for one installed before that.
                       "verified": ver.get(name) if here else None,
                       # What a pinned install left behind (R234): its receipt.
-                      "receipt": receipt_of(nid, rep, name, p) if here else None,
+                      "receipt": receipt_of(nid, rep, name, p, plat) if here else None,
                       "latest": "", "state": ""})
     # The versions this node's projects pin (B712), beside the catalog's rows.
     items.extend(pin_rows(nid, rep))

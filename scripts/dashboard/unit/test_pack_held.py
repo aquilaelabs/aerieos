@@ -337,10 +337,88 @@ class Said(unittest.TestCase):
         self.assertEqual(rows["tern"]["held"], items["tern"]["held"])
         self.assertEqual((rows["tern"]["kind"], rows["go"]["kind"], rows["go"]["held"]["word"]), ("pack", "toolchain", "open"))
 
+    def test_each_declared_download_says_how_it_is_held_and_the_platform_it_is_for(self):
+        tern, quill = kept(5, "tern"), kept(5, "quill")
+        signed = {"to": "dl/tern.tar.xz", "url": "https://downloads.tern.example.org/2.4.0/tern-2.4.0-linux.tar.xz", "held": "signed", "sha256": "",
+                  "keys": "tern.asc", "sig": "https://downloads.tern.example.org/2.4.0/tern-2.4.0-linux.tar.xz.sig", "platform": ""}
+        # The same from the manifest as written, as the validator keeps it, and from the row a node is handed.
+        clean, _ = toolpacks.validate(tern)
+        row = toolpacks.recipe({"manifest": clean, "url": "https://example.com/t", "commit": "c" * 40})
+        for fetch in (tern["install"]["fetch"], clean["fetch"], row["source"]["fetch"]):
+            self.assertEqual(packformat.downloads_said(fetch), [signed])
+        got = packformat.downloads_said(quill["install"]["fetch"])
+        self.assertEqual([(d["to"], d["held"], d["sha256"][:8], d["keys"], d["sig"], d["platform"]) for d in got],
+                         [("dl/quill.tar.gz", "sha256", "2c26b46b", "", "", "linux/amd64"), ("dl/quill.tar.gz", "sha256", "fcde2b2e", "", "", "linux/arm64"),
+                          ("dl/rules.tar.gz", "sha256", "9f86d081", "", "", "")])
+        self.assertTrue(all(sorted(d) == ["held", "keys", "platform", "sha256", "sig", "to", "url"] and all(isinstance(v, str) for v in d.values()) for d in got))
+        # For one machine: its own, and the ones for every platform.
+        self.assertEqual([(d["to"], d["platform"]) for d in packformat.downloads_said(quill["install"]["fetch"], "linux/arm64")],
+                         [("dl/quill.tar.gz", "linux/arm64"), ("dl/rules.tar.gz", "")])
+        self.assertTrue(packformat.fits_machine("linux/*", "linux/arm64") and packformat.fits_machine("", "linux/arm64") and packformat.fits_machine("darwin/arm64", ""))
+        self.assertFalse(packformat.fits_machine("darwin/*", "linux/arm64") or packformat.fits_machine("linux/amd64", "linux/arm64"))
+        # One held to nothing says so by saying neither; what is no download is left out.
+        self.assertEqual(packformat.downloads_said([{"url": "https://example.com/x", "to": "x"}, "junk", {"to": "no address"}]),
+                         [{"to": "x", "url": "https://example.com/x", "held": "", "sha256": "", "keys": "", "sig": "", "platform": ""}])
+        self.assertEqual(packformat.downloads_said(None), [])
+
+    def test_a_row_and_a_receipt_list_them_and_what_look_reads_compares_key_for_key(self):
+        import library  # noqa: PLC0415
+        import toolchains  # noqa: PLC0415
+        recs = []
+        for name in ("tern", "quill"):
+            clean, _ = toolpacks.validate(kept(5, name))
+            recs.append(toolpacks.recipe({"manifest": clean, "url": f"https://example.com/{name}", "commit": "c" * 40}))
+            # What the row keeps of its downloads is what Look reads of the
+            # same manifest, byte for byte: the page marks a difference as changed.
+            row = next(r for r in toolchains.load_toolchains(recs) if r["name"] == name)
+            self.assertEqual(json.dumps(row["pack"]["fetch"]), json.dumps(clean["fetch"]), name)
+            self.assertEqual(row["pack"]["downloads"], packformat.downloads_said(clean["fetch"]), name)
+            self.assertEqual(row["downloads"], row["pack"]["downloads"], name)
+        # A pack from before format 5 keeps the three keys it had.
+        old, _ = toolpacks.validate(kept(3, "hexkit"))
+        row = next(r for r in toolchains.load_toolchains([toolpacks.recipe({"manifest": old, "url": "https://example.com/h", "commit": "c" * 40})]) if r["name"] == "hexkit")
+        self.assertEqual([sorted(f) for f in row["pack"]["fetch"]], [["sha256", "to", "url"]])
+        self.assertEqual([d["held"] for d in row["downloads"]], ["sha256"])
+
+        tree = "1" * 64
+        reported = {"store_dirs": {"top": ["quill", "tern"], "android": []},
+                    "toolchain_receipts": {n: {"commit": "c" * 40, "tree": tree, "files": 3, "bytes": 9, "at": 5, "before": "", "net": "cut"} for n in ("quill", "tern")}}
+
+        class Nodes:
+            @staticmethod
+            def node(nid):
+                return {"id": nid, "name": "box", "live": True, "os": "linux", "arch": "aarch64", "reported": reported}
+
+            @staticmethod
+            def node_list():
+                return []
+
+            @staticmethod
+            def jobs_for(**_kw):
+                return []
+
+        with mock.patch.object(toolchains, "nodes", Nodes), mock.patch.object(toolchains, "TOOLCHAINS", toolchains.load_toolchains(recs)):
+            payload = toolchains.payload_for_node("n_1")
+        items = {i["name"]: i for i in payload["items"]}
+        # The row lists every platform's; its receipt on this node, the ones this node fetched.
+        self.assertEqual([d["platform"] for d in items["quill"]["downloads"]], ["linux/amd64", "linux/arm64", ""])
+        self.assertEqual([(d["to"], d["held"], d["platform"]) for d in items["quill"]["receipt"]["downloads"]],
+                         [("dl/quill.tar.gz", "sha256", "linux/arm64"), ("dl/rules.tar.gz", "sha256", "")])
+        self.assertEqual([(d["to"], d["held"], d["keys"], d["sha256"]) for d in items["tern"]["receipt"]["downloads"]], [("dl/tern.tar.xz", "signed", "tern.asc", "")])
+        self.assertEqual(items["go"]["downloads"], [])
+        rows = {r["name"]: r for r in library.rows(payload, [], [], {"packs": []}, {})}
+        self.assertEqual(rows["tern"]["downloads"], items["tern"]["downloads"])
+        self.assertEqual(rows["quill"]["receipt"]["downloads"], items["quill"]["receipt"]["downloads"])
+
     def test_look_says_it_before_a_pack_is_added(self):
         read = lambda name: lambda rel, cap: json.dumps(kept(5, name)).encode() if rel == toolpacks.MANIFEST else None  # noqa: E731
         self.assertEqual(toolpacks._examine(read("quill"), (), "none")["held"], {"word": "pinned", "why": packformat.PINNED_SAID})
         self.assertEqual(toolpacks._examine(read("kestrel"), (), "none")["held"]["word"], "installer")
+        # ...and each download with how it is held, beside the manifest the page reads today.
+        seen = toolpacks._examine(read("tern"), (), "none")
+        self.assertEqual([(d["to"], d["held"], d["keys"]) for d in seen["downloads"]], [("dl/tern.tar.xz", "signed", "tern.asc")])
+        self.assertEqual(seen["manifest"]["fetch"][0]["sha256"], "", "a signed one keeps an empty sha256, which the page reads")
+        self.assertEqual([d["platform"] for d in toolpacks._examine(read("quill"), (), "none")["downloads"]], ["linux/amd64", "linux/arm64", ""])
         got = toolpacks._examine(lambda rel, cap: json.dumps(kept(1, "hexkit")).encode() if rel == toolpacks.MANIFEST else b"its guidance", (), "none")
         self.assertEqual((got["held"]["word"], got["held"]["why"]), ("open", "its install steps run with the network, and its entry does not say what they fetch"))
 

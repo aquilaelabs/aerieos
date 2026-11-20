@@ -297,6 +297,38 @@ def fetch_checked(raw, what="install.fetch", reserved=()):
     return clean, errors, new
 
 
+def fits_machine(plat, machine):
+    """Whether a download named for `plat` is one a machine that is
+    `machine` ("<os>/<arch>") fetches: one that names none is everybody's,
+    and a machine that has not said what it is is not judged."""
+    return not plat or not machine or plat == machine or plat == machine.partition("/")[0] + "/*"
+
+
+def downloads_said(fetch, machine=""):
+    """An entry's declared downloads as a page reads them, each the same
+    seven keys, all strings: `to` (the file it is kept as), `url`, `held`
+    (how it is held: "sha256" or "signed"), `sha256` (the digest, "" on a
+    signed one), `keys` and `sig` (the name of the keys a signed one is
+    checked with and its signature's address, "" otherwise) and `platform`
+    (the one it is for, "" for every one). `fetch` is the list as a
+    manifest, the validator or a row's source has it; with `machine`, the
+    downloads that machine fetches alone."""
+    out = []
+    for f in fetch if isinstance(fetch, list) else []:
+        if not isinstance(f, dict) or not f.get("url"):
+            continue
+        signed = f.get("signed") if isinstance(f.get("signed"), dict) else {}
+        sha = f["sha256"] if isinstance(f.get("sha256"), str) and SHA256.fullmatch(f["sha256"]) else ""
+        plat = f["platform"] if isinstance(f.get("platform"), str) else ""
+        if not fits_machine(plat, machine):
+            continue
+        how = "sha256" if sha else "signed" if signed.get("keys") else ""
+        out.append({"to": str(f.get("to") or "")[:200], "url": str(f["url"])[:2000], "held": how, "sha256": sha,
+                    "keys": str(signed.get("keys") or "")[:64] if how == "signed" else "",
+                    "sig": str(signed.get("sig") or "")[:2000] if how == "signed" else "", "platform": plat[:40]})
+    return out[:FETCH_MAX]
+
+
 def keyring_checked(raw, what="install.keyring"):
     """The publisher's keys an entry carries, held to their shape: (clean,
     errors). {name: an armored public key}: a few, each under a plain file

@@ -230,7 +230,13 @@ toolchain, an official pack, a vetted one and one you sideload:
 
 `/api/toolchains` answers it for every row as `held` (`word` and `why`),
 the Library's rows pass it on, and **Look** answers it for a pack before it
-is added.
+is added. Beside it each answers the entry's declared downloads as
+`downloads`, a row a download: the file it is kept as (`to`), its address
+(`url`), how it is held (`held`: `sha256` with the digest in `sha256`, or
+`signed` with the keys' name in `keys` and the signature's address in
+`sig`) and the `platform` it is for, empty for every one. An installed
+row's receipt lists the ones its node fetched, and what its steps ran with
+(`net`: `cut`, `open`, or `online` with the entry's sentence as `why`).
 
 **A toolchain AerieOS ships** says the same things in its row's `source`
 (`config/toolchains.json`), whatever its kind: `fetch`, `keyring` and
