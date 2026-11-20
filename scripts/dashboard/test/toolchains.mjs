@@ -75,7 +75,7 @@ ok(String(tc.root || '').includes(`${DIR}/sdk`), `the store says which root thin
 // NODE_PATH pointing at it, and the tools aerie lint runs.
 const pw = catalog.toolchains.find(p => p.name === 'playwright');
 const lt = catalog.toolchains.find(p => p.name === 'lint-tools');
-ok(pw?.layout?.env?.NODE_PATH === 'node_modules' && /npm install/.test(pw?.source?.run?.join(' '))
+ok(pw?.layout?.env?.NODE_PATH === 'node_modules' && /npm ci --offline/.test(pw?.source?.run?.join(' '))
    // ...and its command on PATH (B534): which playwright found nothing, and
    // a session hard-coded the module's path into its own scripts.
    && pw?.layout?.bin?.includes('node_modules/.bin')

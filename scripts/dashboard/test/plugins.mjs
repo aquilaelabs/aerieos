@@ -134,10 +134,17 @@ await section("aerie diag names every account", async () => {
 await section("what the language-server plugins run", async () => {
   const cat = JSON.parse(readFileSync(join(HERE, '..', '..', 'config', 'toolchains.json'), 'utf8')).toolchains;
   const ls = cat.find(p => p.name === 'language-servers'), kt = cat.find(p => p.name === 'kotlin-lsp');
+  // What it installs is a lock the row carries (pack format 5): the names
+  // it asks for, each package's tarball a declared download held to its
+  // sha256, and npm run with no network over what landed.
   const run = ls?.source?.run?.join(' ') || '';
+  const asks = (ls?.source?.lock || []).flatMap(l => l.kind === 'npm' ? l.requirements : []);
+  const got = (ls?.source?.fetch || []).filter(f => /^[0-9a-f]{64}$/.test(f.sha256 || '')).map(f => f.url);
   ok(ls && ls.layout.bin.includes('node_modules/.bin') && ls.requires.includes('node')
-     && /pyright@/.test(run) && /typescript-language-server@/.test(run) && /typescript@5/.test(run),
-     'the language-servers recipe puts pyright and typescript-language-server on PATH from the store, beside node');
+     && ['pyright', 'typescript-language-server', 'typescript@5'].every(n => asks.includes(n))
+     && [/\/pyright\/-\/pyright-[0-9.]+\.tgz$/, /\/typescript-language-server-[0-9.]+\.tgz$/, /\/typescript-5\.[0-9.]+\.tgz$/].every(re => got.some(u => re.test(u)))
+     && /npm ci --offline/.test(run) && /--ignore-scripts/.test(run) && !/npm install/.test(run),
+     `the language-servers recipe puts pyright and typescript-language-server on PATH from the store, beside node, each package pinned (${got.length} tarballs)`);
   ok(kt && kt.layout.tool === 'bin/kotlin-lsp' && /ln -sfn \.\.\/server\/bin\/intellij-server/.test(kt.source.run.join(' ')),
      'kotlin-lsp is JetBrains\' server under the name the plugin runs');
   // The server's archive is pinned in the row: the version and the sha256
@@ -151,7 +158,7 @@ await section("what the language-server plugins run", async () => {
      && ktPlan.includes(`/kotlin-server/${pin.version}/kotlin-server-${pin.version}`),
      '...and its plan names that version and the address made from it, with nobody asked');
   const plan = execFileSync('bash', [BB, 'toolchains', 'plan', 'language-servers'], { encoding: 'utf8' });
-  ok(/kind\s+command/.test(plan) && /npm install --prefix/.test(plan), 'aerie toolchains plan shows what an install would run');
+  ok(/kind\s+command/.test(plan) && /npm ci --offline/.test(plan), 'aerie toolchains plan shows what an install would run');
 });
 
 await done();
