@@ -5,6 +5,7 @@ the shipped file of that name; the same keys hold a row's own signed
 download and a signed checksum file. Whole installs from files on disk,
 with a throwaway key in a private gpg home standing in for the publisher's
 and a second for a stranger's."""
+import json
 import os
 import shutil
 import subprocess
@@ -121,6 +122,25 @@ class Signed(sdkstore.KitCase):
         rc, out = self.s.sh("sdk_install tool")
         self.assertTrue(rc != 0 and "does not carry its publisher's signature" in out, out)
         self.assertFalse(os.path.exists(self.s.dir("tool")))
+
+    def test_swift_s_recipe_runs_its_verify_behind_the_cut(self):
+        # The shipped row's own source: its address and its signature's
+        # files on disk, its version not asked for, and the publisher's
+        # keys it names carried by the row, as a row may.
+        with open(os.path.join(sdkstore.REPO, "config", "toolchains.json")) as f:
+            src = next(r for r in json.load(f)["toolchains"] if r["name"] == "swift")["source"]
+        self.assertEqual((src["checksum"]["from"], src["checksum"]["keys"]), ("signature", "swift.asc"))
+        url, _ = self.s.tarball("swift-9.9-RELEASE.tar.gz", {"swift-9.9-RELEASE/usr/bin/swift": "#!/bin/sh\necho \"Swift version 9.9 cut=${CUT:-no}\"\n"})
+        sig = self.sign("swift-9.9-RELEASE.tar.gz")
+        self.s.row("swift", {**{k: v for k, v in src.items() if k != "version"}, "url": url,
+                             "checksum": {**src["checksum"], "sig": sig}, "keyring": {"swift.asc": self.pub_asc}})
+        rc, out = self.s.sh("sdk_install swift", PATH=self.s.can_cut())
+        self.assertEqual(rc, 0, out)
+        self.assertIn("Swift version 9.9 cut=yes", out, "swift --version runs with no network, and runs")
+        self.assertEqual(self.s.read("swift", ".bb-verified"), "gpg\t\tsigned by Kit Publisher <kit@example.com>\n")
+        self.assertEqual(self.s.read("swift", ".bb-net"), "cut\n")
+        head = self.receipt("swift")
+        self.assertEqual((head[1], head[7]), ("", "cut"), "it now leaves a receipt, with no digest to file it under")
 
 
 if __name__ == "__main__":

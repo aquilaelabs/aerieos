@@ -229,12 +229,28 @@ def declared(tc):
 PLAN_SEP = "\x1f"
 
 
+def held_by_entry(tc):
+    """Whether a row's own download is held to something its entry carries:
+    a pin, or its publisher's signature under keys the entry names (the
+    download's own, or the one over the checksum file it is read from).
+    Such a row has said what arrives, so what it runs afterwards runs with
+    no network unless it says online; a row whose download is checked
+    against its own origin, or not at all, has said nothing of the kind."""
+    src = tc.get("source") or {}
+    ck = src.get("checksum") if isinstance(src.get("checksum"), dict) else {}
+    signed = ck.get("signed") if isinstance(ck.get("signed"), dict) else {}
+    how = ck.get("from")
+    return src.get("kind") in ("tarball", "script") and (
+        how == "pin" or (how == "signature" and bool(ck.get("sig") and ck.get("keys")))
+        or (how == "file" and bool(signed.get("sig") and signed.get("keys"))))
+
+
 def declared_plan(tc):
     """What an entry declares of its own install, as the lines sdk.sh reads
-    in one call (sdk_declared), or [] for an entry that declares nothing
-    (no download, and neither offline nor online). The first line says what
-    its steps run with, then a line a download, each field after a
-    separator:
+    in one call (sdk_declared), or [] for an entry that declares nothing:
+    no download, neither offline nor online, and its own download held to
+    nothing it carries (held_by_entry). The first line says what its steps
+    run with, then a line a download, each field after a separator:
 
         net    cut | online, the entry's sentence
         fetch  url, sha256, to, signed.sig, signed.keys   (this machine's)
@@ -243,7 +259,7 @@ def declared_plan(tc):
     src = tc.get("source") or {}
     rows = [f for f in src.get("fetch") or [] if isinstance(f, dict) and f.get("url")] if isinstance(src.get("fetch"), list) else []
     online = " ".join(str(src.get("online") or "").split())
-    if not (rows or online or src.get("offline")):
+    if not (rows or online or src.get("offline") or held_by_entry(tc)):
         return []
 
     def said(*fields):

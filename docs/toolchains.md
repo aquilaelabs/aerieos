@@ -274,7 +274,10 @@ answer whole, as a **pin**: the version and the sha256 of the exact file,
 which the signed release or the signed catalog then holds, so the file is
 held to something its own origin cannot change. A pinned row installs that
 version and asks nobody what is newest; a check offers the pinned version,
-and a newer one is the pin moving in the row. A download that is not what
+and a newer one is the pin moving in the row. What a row held by a pin or
+by a signature runs after its download (its installer, its follow-up
+steps, its verify) runs with no network, unless the row says in a sentence
+that its installer downloads the rest. A download that is not what
 its row says is removed and the install stops, naming both digests, with
 nothing left installed. The Installed page says under each toolchain how
 its download was checked. What a row downloads besides its own source it

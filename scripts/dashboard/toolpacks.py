@@ -919,6 +919,11 @@ def validate(m, shipped=(), official=False):
         mine = {u.split("/")[2].split(":")[0].lower() for f in fetch for u in (f["url"], (f.get("signed") or {}).get("sig")) if u}
         out["touches"]["hosts"] = hosts + sorted(mine - set(hosts))
     out["fetch"] = fetch
+    # An empty list is a declaration from format 5 on: this pack downloads
+    # nothing, so its steps run with no network (packformat.declares_none).
+    # Before it an empty list declared nothing, and is kept as it was.
+    if packformat.declares_none(m):
+        out["offline"] = True
     # Kept only where the manifest says them, so a pack from before them is
     # kept as it was.
     if inst.get("keyring") is not None:
@@ -1651,9 +1656,11 @@ def recipe(rec):
         src["fetch"] = m["fetch"]
     if m.get("keyring"):
         src["keyring"] = m["keyring"]
+    # One that declares it downloads nothing (an empty list, format 5) is
+    # cut as one that declares downloads is.
     if m.get("online"):
         src["online"] = m["online"]
-    elif m.get("fetch"):
+    elif m.get("fetch") or m.get("offline"):
         src["offline"] = True
     if m["steps"]:
         src["then"] = [{"run": s} for s in m["steps"]]

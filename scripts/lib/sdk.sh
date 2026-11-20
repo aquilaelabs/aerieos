@@ -1522,7 +1522,12 @@ sdk_install_git() {
 #                   and from where. Its declared downloads are fetched and
 #                   checked all the same, and its steps keep the network.
 #
-# An entry that says none of the three is installed as it always was. For
+# A row whose own download is held to something it carries (a pin, or its
+# publisher's signature under keys it names) has declared by that alone:
+# its steps run with no network without saying offline, and online is the
+# one way to keep it (sdkmeta.py held_by_entry).
+#
+# An entry that says none of these is installed as it always was. For
 # one that does, SDK_CUT is afterwards the words that run a command with no
 # network (sdk_net_cut), or nothing where it says online or this node
 # cannot cut, and everything of the entry that runs from here on runs

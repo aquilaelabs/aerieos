@@ -118,6 +118,35 @@ class Manifest(unittest.TestCase):
         got, _ = toolpacks.validate(manifest(online="  Its installer\n downloads   the rest from example.org.  "))
         self.assertEqual(got["online"], "Its installer downloads the rest from example.org.", "kept as one line")
 
+    def test_an_empty_list_declares_that_it_downloads_nothing_from_format_5(self):
+        wren = kept(5, "wren")
+        self.assertEqual(wren["install"]["fetch"], [])
+        got, errors = toolpacks.validate(wren)
+        self.assertEqual((errors, got["fetch"], got["offline"]), ([], [], True))
+        row = toolpacks.recipe({"manifest": got, "url": "https://example.com/wren", "commit": "c" * 40})
+        self.assertTrue(row["source"]["offline"] is True and "fetch" not in row["source"], "its steps are cut, with nothing to fetch first")
+        for doc in (wren, got, row):
+            self.assertEqual(packformat.held(doc), ("pinned", packformat.PINNED_SAID))
+        # Before format 5 an empty list declared nothing, and means what it meant.
+        for n in (3, 4):
+            old = dict(wren, format=n, framework=f"{n}.2")
+            got, errors = toolpacks.validate(old)
+            self.assertEqual((errors, "offline" in got), ([], False), n)
+            row = toolpacks.recipe({"manifest": got, "url": "https://example.com/wren", "commit": "c" * 40})
+            self.assertNotIn("offline", row["source"], n)
+            for doc in (old, got, row):
+                self.assertEqual(packformat.held(doc)[0], "open", n)
+        # One that says nothing of its downloads at format 5 is as it was too.
+        plain = copy.deepcopy(wren)
+        del plain["install"]["fetch"]
+        self.assertEqual((packformat.declares_none(plain), packformat.held(plain)[0], "offline" in toolpacks.validate(plain)[0]), (False, "open", False))
+        # ...and an installer that downloads the rest keeps the network, whatever else it declares.
+        both = copy.deepcopy(wren)
+        both["install"]["online"] = SENTENCE
+        got, errors = toolpacks.validate(both)
+        src = toolpacks.recipe({"manifest": got, "url": "https://example.com/wren", "commit": "c" * 40})["source"]
+        self.assertEqual((errors, src["online"], "offline" in src, packformat.held(both)), ([], SENTENCE, False, ("installer", SENTENCE)))
+
     def test_the_recipe_a_node_is_handed_carries_them(self):
         rec = lambda name: {"manifest": toolpacks.validate(kept(5, name))[0], "url": "https://example.com/p", "commit": "c" * 40}  # noqa: E731
         src = toolpacks.recipe(rec("tern"))["source"]
@@ -197,12 +226,16 @@ class Held(unittest.TestCase):
         pin = {"from": "pin", "version": "1.2.3", "sha256": {"linux/amd64": H}}
         tar = {"kind": "tarball", "url": "https://example.com/{version}.tgz", "checksum": pin}
         self.word({"name": "t", "source": tar}, "pinned", "every download it makes is held")
+        # What it runs afterwards is cut by the pin alone: offline need not be said, and may be.
+        self.word({"name": "t", "source": {**tar, "verify": ["{dir}/bin/t"], "then": [{"run": ["{dir}/bin/t", "setup"]}]}}, "pinned")
         self.word({"name": "t", "source": {**tar, "offline": True, "verify": ["{dir}/bin/t"]}}, "pinned")
+        self.word({"name": "i", "source": {"kind": "script", "url": "https://example.com/i.sh", "run": ["sh", "{script}"], "checksum": pin}}, "pinned")
         self.word({"name": "t", "source": {"kind": "script", "url": "https://example.com/i.sh", "run": ["sh", "{script}"], "checksum": pin,
                                            "fetch": [{"url": "https://example.com/a", "sha256": H, "to": "a"}]}}, "pinned")
         # A publisher's signature under a key the entry names holds a download as a pin does.
-        self.word({"name": "s", "source": {"kind": "tarball", "url": "https://example.com/s.tgz", "checksum": {"from": "signature", "sig": "{url}.sig", "keys": "swift.asc"}}}, "pinned")
-        self.word({"name": "n", "source": {"kind": "tarball", "url": "https://example.com/n.tgz", "offline": True, "verify": ["x"],
+        self.word({"name": "s", "source": {"kind": "tarball", "url": "https://example.com/s.tgz", "verify": ["x"],
+                                           "checksum": {"from": "signature", "sig": "{url}.sig", "keys": "swift.asc"}}}, "pinned")
+        self.word({"name": "n", "source": {"kind": "tarball", "url": "https://example.com/n.tgz", "verify": ["x"],
                                            "checksum": {"from": "file", "url": "{base}/SUMS", "signed": {"sig": "{base}/SUMS.sig", "keys": "node.asc"}}}}, "pinned")
         # A pack is fetched at a commit; what it declares is held, and its steps are cut.
         self.word(kept(3, "hexkit"), "pinned")
@@ -233,8 +266,7 @@ class Held(unittest.TestCase):
                          ({"kind": "git", "url": "https://x.example/r", "branch": "stable"}, "at a branch, with no commit"),
                          ({"kind": "sdkmanager", "package": "ndk"}, "its own package manager downloads it"),
                          ({"kind": "command", "run": ["tool", "install"]}, "its install steps run with the network"),
-                         ({"kind": "script", "url": "https://x.example/i.sh", "run": ["sh", "{script}"], "checksum": pin}, "its install steps run with the network"),
-                         ({"kind": "tarball", "url": "https://x.example/a", "checksum": pin, "verify": ["{dir}/bin/a"]}, "its install steps run with the network"),
+                         ({"kind": "git", "url": "https://x.example/r", "commit": "c" * 40, "then": [{"run": ["{dir}/setup"]}]}, "its install steps run with the network"),
                          ({"kind": "tarball", "url": "https://x.example/a", "checksum": pin, "fetch": [{"url": "https://x.example/b", "to": "dl/b"}]}, "dl/b is held to nothing its entry carries")):
             self.word({"name": "x", "source": src}, "open", why)
         # A pack with steps that declares nothing: what they fetch is anybody's guess.
@@ -254,9 +286,10 @@ class Held(unittest.TestCase):
         words = {r["name"]: packformat.held(r) for r in rows}
         self.assertTrue(all(w in packformat.HELD_WORDS and why for w, why in words.values()))
         # Swift's download carries its publisher's signature, and Node's
-        # checksum list does; the rest wait for their pins.
-        self.assertEqual(words["flutter"][0], "open")
-        self.assertEqual(words["go"][0], "open")
+        # checksum list does: held, and what they run is cut by that. The
+        # rest wait for their pins.
+        self.assertEqual(sorted(n for n, (w, _why) in words.items() if w != "open"), ["node", "swift"])
+        self.assertEqual((words["node"][0], words["swift"][0], words["flutter"][0], words["go"][0]), ("pinned", "pinned", "open", "open"))
 
 
 class Said(unittest.TestCase):

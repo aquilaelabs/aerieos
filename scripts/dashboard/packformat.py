@@ -78,8 +78,9 @@ FORMATS = {
        "network (network: host), and one marked as going (going: what to install in its place)",
     5: "every download held to something its entry carries: a shipped toolchain's download pinned (checksum pin: the version "
        "and the sha256 of the exact file), declared downloads for every kind of source, one named for a platform (platform) "
-       "or held by its publisher's signature (signed) under a key the entry carries (keyring), and an installer that keeps "
-       "the network, with the sentence that says what it downloads by itself (online)",
+       "or held by its publisher's signature (signed) under a key the entry carries (keyring), an installer that keeps "
+       "the network, with the sentence that says what it downloads by itself (online), and a pack's word that it "
+       "downloads nothing (an empty install.fetch), which cuts its steps from the network",
 }
 
 
@@ -387,11 +388,25 @@ def _entry_source(doc):
         return sh["source"], False
     if doc.get("service") is not None or (doc.get("agent") is not None and doc.get("tier") == "official"):
         return None
-    inst = doc["install"] if isinstance(doc.get("install"), dict) else doc
+    raw = isinstance(doc.get("install"), dict)
+    inst = doc["install"] if raw else doc
     fetch, online = inst.get("fetch") or [], inst.get("online") or ""
+    # What it declares cuts its steps: a download, or, from format 5, that
+    # it downloads nothing (declares_none; the validator keeps that as
+    # `offline`).
+    cut = bool(fetch) or (declares_none(doc) if raw else bool(doc.get("offline")))
     return {"kind": "git", "commit": "the commit it is kept at", "fetch": fetch, "keyring": inst.get("keyring") or {},
-            "online": online, "offline": bool(fetch) and not online, "then": inst.get("steps") or [],
+            "online": online, "offline": cut and not online, "then": inst.get("steps") or [],
             "verify": inst.get("verify")}, True
+
+
+def declares_none(doc):
+    """Whether a pack's manifest declares that its install downloads
+    nothing: `"fetch": []` under install, from pack format 5. Its steps
+    then run with no network, as those of one that declares downloads do.
+    Before format 5 an empty list declared nothing, and still does."""
+    inst = doc.get("install") if isinstance(doc, dict) else None
+    return isinstance(inst, dict) and isinstance(inst.get("fetch"), list) and not inst["fetch"] and (of(doc) or 1) >= HELD_FORMAT
 
 
 def held(doc):
@@ -440,8 +455,11 @@ def held(doc):
     online = src.get("online")
     if isinstance(online, str) and online.strip():
         return "installer", " ".join(online.split())
+    # A row whose own download is a pin or its publisher's signature (every
+    # tarball and script that came this far) has its steps cut by that
+    # alone; a repository or a command by what it declares, or by offline.
     runs = kind in ("script", "command") or any(src.get(k) for k in ("run", "then", "warm", "verify"))
-    if runs and not (src.get("offline") or fetch):
+    if runs and not (src.get("offline") or fetch or kind in ("tarball", "script")):
         return "open", "its install steps run with the network, and its entry does not say what they fetch"
     return "pinned", PINNED_SAID
 

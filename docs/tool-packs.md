@@ -177,7 +177,24 @@ With `online`, what the pack declares is still fetched and checked first,
 and its steps then keep the network; the job, the receipt (`.bb-receipt`,
 and `.bb-net` beside it) and the pack's entry say so in the pack's own
 sentence. Without it, a pack that declares its downloads runs its steps
-with no network.
+with no network. `online` is the one way to keep it.
+
+**A pack that downloads nothing.** A pack whose steps only build from what
+its repository carries says so with an empty list, and its steps and its
+verify then run with no network like any other declared pack's:
+
+```json
+"format": 5,
+"install": {
+  "fetch": [],
+  "steps": [["sh", "{dir}/build.sh"]]
+}
+```
+
+That is pack format 5's. Before it an empty list declared nothing, and a
+manifest of an earlier format that has one means what it meant: its steps
+run with the network. A pack that leaves `fetch` out says nothing of what
+its steps download.
 
 **What a node does with them.** AerieOS fetches each download itself, over
 `https` alone, before anything of the pack runs, and holds it to its sha256
@@ -206,7 +223,7 @@ toolchain, an official pack, a vetted one and one you sideload:
   download checked only against what its own origin says that day or not
   checked at all, a repository at a branch with no commit, or steps that
   run with the network and no declared reason (a pack with install steps
-  and no `install.fetch`).
+  that leaves `install.fetch` out).
 
 `/api/toolchains` answers it for every row as `held` (`word` and `why`),
 the Library's rows pass it on, and **Look** answers it for a pack before it
@@ -214,9 +231,7 @@ is added.
 
 **A toolchain AerieOS ships** says the same things in its row's `source`
 (`config/toolchains.json`), whatever its kind: `fetch`, `keyring` and
-`online` as above, `offline: true` for a row that downloads nothing more
-and whose steps are to run with no network, and for its own download a
-checksum of kind `pin`:
+`online` as above, and for its own download a checksum of kind `pin`:
 
 ```json
 "source": {
@@ -228,10 +243,19 @@ checksum of kind `pin`:
                "sha256": {"linux/amd64": "2c624232cdd221771294dfbb310aca000a0df6ac8b66b696d90ef06fdefb64a3",
                           "linux/arm64": "19581e27de7ced00ff1ce50b2047e7a567c76b1cbaebabe5ef03f7c3017bb5b7"}},
   "strip": 1,
-  "offline": true,
   "verify": ["{dir}/bin/osprey", "--version"]
 }
 ```
+
+A row whose own download is held to something it carries, a pin as here or
+its publisher's signature (the `signature` checksum kind, or `file` with
+`signed`), has said by that alone what arrives: everything it runs after
+its download, its installer's run, its follow-up steps, a warm-up and its
+verify, runs with no network, and `online` is the one way to keep it. It
+need not say `offline: true`; a row that does, or a command or a
+repository that downloads nothing more and says it, is cut the same way. A
+row whose download is checked only against what its own origin says that
+day, or not at all, is installed as it always was, and reads `open`.
 
 A pinned row installs the pinned version from the address made from it and
 asks nobody what is newest: `version` stays in the row as how a newer one
@@ -504,7 +528,7 @@ on its Details what that install leaves out.
 | 2.2 | A sign-in whose program ends itself once signed in (`signin.flow.ends`), whose link may start in more than one way (`signin.flow.url` as a list), that says where who is signed in is read (`signin.flow.who`), and whose sign-out takes keys out of a settings file (`signin.flow.forget`). | Takes the entry and leaves such a flow out: the agent signs in in its session's terminal. | the releases after 0.9.0-dev.5284 |
 | 3.2 | Declared downloads (`install.fetch`): every file an install takes from somewhere else, with its address and its sha256, fetched and checked by AerieOS before the install steps run, which then run with no network. | Hides the entry: needs the first AerieOS that reads pack format 3. | the releases after 0.9.0-dev.5341 |
 | 4.2 | A Docker app that declares its own fields (`fields`: each the variable it fills, its label, its kind, a default, a line of help and whether it is required), drawn by New container as the app's panel; one on the machine's own network (`network`); one being replaced, with what to install in its place (`going`). | Hides the entry: needs the first AerieOS that reads pack format 4. | the releases after 0.9.0-dev.5341 |
-| 5.2 | Every download held to something its entry carries ([Declared downloads](#declared-downloads)): a shipped toolchain's download pinned to the version and the sha256 of the exact file (`checksum` kind `pin`); declared downloads for every kind of source; one named for a platform (`platform`) or held by its publisher's signature (`signed`) under a key the entry carries (`keyring`); an installer that keeps the network, with the sentence that says what it downloads by itself (`online`). | Hides the entry: needs the first AerieOS that reads pack format 5. A shipped toolchain's newer row that uses them is refused there, and its own row stays. | the releases after 0.9.0-dev.5641 |
+| 5.2 | Every download held to something its entry carries ([Declared downloads](#declared-downloads)): a shipped toolchain's download pinned to the version and the sha256 of the exact file (`checksum` kind `pin`); declared downloads for every kind of source; one named for a platform (`platform`) or held by its publisher's signature (`signed`) under a key the entry carries (`keyring`); an installer that keeps the network, with the sentence that says what it downloads by itself (`online`); a pack's word that it downloads nothing (an empty `install.fetch`), which cuts its steps from the network. | Hides the entry: needs the first AerieOS that reads pack format 5. A shipped toolchain's newer row that uses them is refused there, and its own row stays. | the releases after 0.9.0-dev.5641 |
 
 ### What stays AerieOS's own
 

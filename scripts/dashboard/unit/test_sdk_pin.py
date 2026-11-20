@@ -198,6 +198,38 @@ class Installs(unittest.TestCase):
         rc, out = self.s.sh("sdk_update go")
         self.assertTrue(rc != 0 and "go is not installed" in out, out)
 
+    def test_what_a_pinned_row_runs_is_cut_by_the_pin_alone_and_online_is_the_way_out(self):
+        url, sha = self.s.tarball("tool-1.0.tar.gz", {"tool-1.0/bin/tool": "#!/bin/sh\necho tool one\n"})
+        src = {"kind": "tarball", "url": url, "strip": 1, "checksum": {"from": "pin", "version": "1.0", "sha256": sha},
+               "then": [{"run": ["sh", "-c", "echo then=${CUT:-no} >> {dir}/ran-how"]}],
+               "verify": ["sh", "-c", "echo verify=${CUT:-no} >> {dir}/ran-how; {dir}/bin/tool"]}
+        how = lambda: (self.s.read("tool", "ran-how").split(),  # noqa: E731
+                       self.s.read("tool", ".bb-net") if os.path.exists(os.path.join(self.s.dir("tool"), ".bb-net")) else None)
+        # No offline said: the pin is the declaration.
+        self.s.row("tool", src)
+        rc, out = self.s.sh("sdk_install tool", PATH=self.s.can_cut())
+        self.assertEqual(rc, 0, out)
+        self.assertEqual(how(), (["then=yes", "verify=yes"], "cut\n"))
+        head = self.s.read("tool", ".bb-receipt").splitlines()[0].split("\t")
+        self.assertEqual((head[1], head[7]), (sha, "cut"), "and what landed is written down under the pin's digest")
+        # offline said as well means what it meant.
+        self.s.sh("sdk_remove tool")
+        self.s.row("tool", {**src, "offline": True})
+        rc, out = self.s.sh("sdk_install tool", PATH=self.s.can_cut())
+        self.assertEqual((rc, how()), (0, (["then=yes", "verify=yes"], "cut\n")), out)
+        # Its installer downloads the rest: the one way to keep the network.
+        self.s.sh("sdk_remove tool")
+        self.s.row("tool", {**src, "online": "Its first run downloads its plugins from plugins.example.org."})
+        rc, out = self.s.sh("sdk_install tool", PATH=self.s.can_cut())
+        self.assertEqual((rc, how()), (0, (["then=no", "verify=no"], "online\nIts first run downloads its plugins from plugins.example.org.\n")), out)
+        # A row checked against nothing its entry carries says nothing of
+        # the kind, and is installed as it always was.
+        self.s.sh("sdk_remove tool")
+        self.s.row("tool", {**src, "checksum": {"from": "none", "why": "its publisher states no checksum"}})
+        rc, out = self.s.sh("sdk_install tool", PATH=self.s.can_cut())
+        self.assertEqual((rc, how()), (0, (["then=no", "verify=no"], None)), out)
+        self.assertFalse(os.path.exists(os.path.join(self.s.dir("tool"), ".bb-receipt")))
+
     def test_a_pinned_installer_is_fetched_at_its_version_and_held_before_it_runs(self):
         text = "#!/bin/sh\nmkdir -p \"$1/bin\"\nprintf '#!/bin/sh\\necho kit %s\\n' \"$2\" > \"$1/bin/kit\"\nchmod +x \"$1/bin/kit\"\n"
         _, sha = self.s.file("kit-install-2.5.sh", text)
