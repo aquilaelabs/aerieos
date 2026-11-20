@@ -536,8 +536,10 @@ Controller settings' **Vetted catalog** imports it with **Import a mirror**.
 The import is refused when the index is not the maintainers', when a pinned
 repository is missing, or when the mirror was made before the one held.
 Once imported, the Library reads the mirror's index whenever the catalog
-does not answer, and a pack or app the mirror holds is fetched from its
-bundle with nothing going to the network. A pack kept this way is kept as a
+does not answer, and whenever the catalog answers an index made before the
+mirror's: both are signed, a signature does not say which is the newest,
+and what the mirror's had withdrawn does not come back. A pack or app the
+mirror holds is fetched from its bundle with nothing going to the network. A pack kept this way is kept as a
 pack made here, so the nodes take it from the controller too. **Forget**
 drops the mirror; what was kept from it stays. The same group holds the
 catalog's address. A USB stick can carry one from the start: the stick

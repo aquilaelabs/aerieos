@@ -145,6 +145,37 @@ class Index(unittest.TestCase):
             got = catalogindex.fetch(url, opener=down)["index"]
             self.assertEqual(bool(got.get("mirror")), answers, mirror_made)
 
+    def test_an_imported_mirror_is_a_floor_under_what_the_catalog_answers(self):
+        # Two signed indexes and no word in either on which is the newest:
+        # a mirror a person imported after the catalog's own was made
+        # answers in its place, on the read that fetched, the reads after it
+        # and the one a press makes without asking; what is kept for the
+        # address stays the catalog's own, and a catalog that moves past the
+        # mirror answers again.
+        url = "https://catalog.example/"
+        self.addCleanup(setattr, catalogindex, "mirror_index", None)
+        catalogindex.mirror_index = lambda: {"generated": "2026-11-01T00:00:00Z", "packs": [], "mirror": True}
+        got = catalogindex.fetch(url, self.served([ENTRY], "2026-10-28T00:00:00Z"))
+        self.assertTrue(got["index"].get("mirror"), got)
+        self.assertEqual(self.on_disk()["generated"], "2026-10-28T00:00:00Z")
+        self.assertTrue(catalogindex.index(url)["index"].get("mirror"))
+        self.assertTrue(catalogindex.known(url).get("mirror"))
+        # ...and from the copy kept on disk, after a restart.
+        catalogindex._cache.update(at=0.0, index=None, error="")
+        self.assertTrue(catalogindex.index(url)["index"].get("mirror"))
+        # The catalog's own, once it is the newer; one of the same moment as
+        # the mirror is the catalog's too.
+        for made in ("2026-11-01T00:00:00Z", "2026-11-02T00:00:00Z"):
+            got = catalogindex.fetch(url, self.served([ENTRY], made))
+            self.assertFalse(got["index"].get("mirror"), made)
+            self.assertEqual(got["index"]["generated"], made)
+        self.assertFalse(catalogindex.known(url).get("mirror"))
+        # A mirror that says no date, or none imported, is no floor.
+        catalogindex.mirror_index = lambda: {"packs": [], "mirror": True}
+        self.assertFalse(catalogindex.index(url)["index"].get("mirror"))
+        catalogindex.mirror_index = lambda: None
+        self.assertFalse(catalogindex.index(url)["index"].get("mirror"))
+
     def test_a_signed_index_is_read_and_a_tampered_one_refused_with_the_last_kept(self):
         data, sig = self.signed([ENTRY, {"name": "Bad Name", "url": "https://x", "commit": "c" * 40, "sha256": "d" * 64}])
         files = {"index.json": data, "index.sig": sig.encode()}

@@ -211,9 +211,9 @@ def older(new, held, what="the index kept here"):
     updates. So one made before the one held is refused. One that does not
     say when it was made is refused too wherever the one held does, or
     leaving the date out would be the way round. One made at the same
-    moment is taken, the same bytes or not: the catalog's signing does not
-    stamp the index yet, so two different ones can carry one date, and an
-    install that refused the second would be kept from the catalog's
+    moment is taken, the same bytes or not: an index signed before the
+    catalog's signing stamped each one can share its date with another, and
+    an install that refused the second would be kept from the catalog's
     newest. Nothing held, or a held one with no date of its own, refuses
     nothing: there is nothing to be older than."""
     was = made(held)
@@ -240,6 +240,18 @@ def _fallback(base):
     if m and not older(m, k):
         return m
     return k
+
+
+def _newest(idx):
+    """The index a read answers: `idx`, the catalog's own, or the imported
+    mirror's where that was made after it. Both carry the maintainers'
+    signature, and a signature never says which is the newest, so a mirror
+    a person imported is a floor under what the network answers: a catalog
+    that answers an index from before it (an old copy served again, a cache
+    behind the mirror) does not bring back what the mirror's had withdrawn.
+    What is kept and compared for the address stays the catalog's own."""
+    m = mirror_index() if mirror_index and idx else None
+    return m if m and older(idx, m) else idx
 
 
 def _kept(base=None):
@@ -289,7 +301,7 @@ def fetch(url=None, opener=None):
             os.makedirs(STATE, exist_ok=True)
             (write_json or _write)(_path(), idx)
         _cache.update(at=time.time(), index=idx, error="")
-    return {"index": idx}
+    return {"index": _newest(idx)}
 
 
 def _write(path, data):
@@ -307,11 +319,11 @@ def index(url=None, fresh=False, opener=None):
     base = (url or DEFAULT_URL).rstrip("/") + "/"
     with _lock:
         if not fresh and _cache["index"] and _cache["index"].get("url", base) == base and time.time() - _cache["at"] < KEEP_S:
-            return {"index": _cache["index"], "error": ""}
+            return {"index": _newest(_cache["index"]), "error": ""}
         kept = _kept(base)
         if not fresh and kept and time.time() - int(kept.get("fetched_at") or 0) < KEEP_S:
             _cache.update(at=float(kept.get("fetched_at") or 0), index=kept)
-            return {"index": kept, "error": ""}
+            return {"index": _newest(kept), "error": ""}
         # A catalog that did not answer is asked again after five minutes,
         # not on every read: a box with no network reads its mirror at once.
         miss = _cache.get("missed") or {}
@@ -330,7 +342,7 @@ def known(url=None):
     base = (url or DEFAULT_URL).rstrip("/") + "/"
     with _lock:
         if _cache["index"] and _cache["index"].get("url", base) == base:
-            return _cache["index"]
+            return _newest(_cache["index"])
     return _fallback(base)
 
 
