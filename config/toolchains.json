@@ -297,7 +297,11 @@
           "bytes": 150000000
         },
         "checksum": {
-          "from": "android-repo"
+          "from": "pin",
+          "sha256": "2d2d50857e4eb553af5a6dc3ad507a17adf43d115264b1afc116f95c92e5e258",
+          "found": {
+            "from": "android-repo"
+          }
         }
       },
       "terms": [
@@ -306,7 +310,8 @@
           "url": "https://developer.android.com/studio/terms",
           "accept": true
         }
-      ]
+      ],
+      "rev": 2
     },
     {
       "name": "android:cmake",
@@ -333,7 +338,8 @@
           "xml": [
             "https://dl.google.com/android/repository/repository2-3.xml"
           ]
-        }
+        },
+        "online": "sdkmanager, the program of the Android command-line tools, downloads this package from dl.google.com by itself and holds it to the sha1 Google's repository listing states."
       },
       "updatable": true,
       "terms": [
@@ -342,7 +348,8 @@
           "url": "https://developer.android.com/studio/terms",
           "accept": true
         }
-      ]
+      ],
+      "rev": 2
     },
     {
       "name": "android:emulator",
@@ -414,7 +421,8 @@
           "xml": [
             "https://dl.google.com/android/repository/repository2-3.xml"
           ]
-        }
+        },
+        "online": "sdkmanager, the program of the Android command-line tools, downloads this package from dl.google.com by itself and holds it to the sha1 Google's repository listing states."
       },
       "updatable": true,
       "terms": [
@@ -423,7 +431,8 @@
           "url": "https://developer.android.com/studio/terms",
           "accept": true
         }
-      ]
+      ],
+      "rev": 2
     },
     {
       "name": "android:platform-tools",
@@ -453,7 +462,8 @@
           "xml": [
             "https://dl.google.com/android/repository/repository2-3.xml"
           ]
-        }
+        },
+        "online": "sdkmanager, the program of the Android command-line tools, downloads this package from dl.google.com by itself and holds it to the sha1 Google's repository listing states."
       },
       "updatable": true,
       "terms": [
@@ -462,7 +472,8 @@
           "url": "https://developer.android.com/studio/terms",
           "accept": true
         }
-      ]
+      ],
+      "rev": 2
     },
     {
       "name": "android:platforms",
@@ -489,7 +500,8 @@
           "xml": [
             "https://dl.google.com/android/repository/repository2-3.xml"
           ]
-        }
+        },
+        "online": "sdkmanager, the program of the Android command-line tools, downloads this package from dl.google.com by itself and holds it to the sha1 Google's repository listing states."
       },
       "updatable": true,
       "terms": [
@@ -498,7 +510,8 @@
           "url": "https://developer.android.com/studio/terms",
           "accept": true
         }
-      ]
+      ],
+      "rev": 2
     },
     {
       "name": "android:build-tools",
@@ -525,7 +538,8 @@
           "xml": [
             "https://dl.google.com/android/repository/repository2-3.xml"
           ]
-        }
+        },
+        "online": "sdkmanager, the program of the Android command-line tools, downloads this package from dl.google.com by itself and holds it to the sha1 Google's repository listing states."
       },
       "updatable": true,
       "terms": [
@@ -534,7 +548,8 @@
           "url": "https://developer.android.com/studio/terms",
           "accept": true
         }
-      ]
+      ],
+      "rev": 2
     },
     {
       "name": "android:ndk",
@@ -561,7 +576,8 @@
           "xml": [
             "https://dl.google.com/android/repository/repository2-3.xml"
           ]
-        }
+        },
+        "online": "sdkmanager, the program of the Android command-line tools, downloads this package from dl.google.com by itself and holds it to the sha1 Google's repository listing states."
       },
       "updatable": true,
       "terms": [
@@ -570,7 +586,8 @@
           "url": "https://developer.android.com/studio/terms",
           "accept": true
         }
-      ]
+      ],
+      "rev": 2
     },
     {
       "name": "flutter",
@@ -594,6 +611,10 @@
         "kind": "git",
         "url": "https://github.com/flutter/flutter.git",
         "branch": "stable",
+        "track": {
+          "resolver": "git-tag",
+          "match": "^\\d+\\.\\d+\\.\\d+$"
+        },
         "depth": 1,
         "safe_directory": true,
         "fresh_only": true,
@@ -605,7 +626,10 @@
         "download": {
           "resolver": "approximate",
           "bytes": 520000000
-        }
+        },
+        "online": "Its first run downloads the Dart SDK and the engine's artifacts for this machine from storage.googleapis.com, and its own tool's packages from pub.dev.",
+        "commit": "ae9b586f34a8443573f82ef57c3bf914a908cbf7",
+        "tag": "3.50.1"
       },
       "updatable": true,
       "terms": [
@@ -613,7 +637,8 @@
           "label": "Flutter's BSD license",
           "url": "https://github.com/flutter/flutter/blob/master/LICENSE"
         }
-      ]
+      ],
+      "rev": 2
     },
     {
       "name": "go",

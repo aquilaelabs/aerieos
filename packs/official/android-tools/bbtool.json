@@ -1,6 +1,7 @@
 {
  "about": "sdkmanager and avdmanager, through which every other Android toolchain installs. Sets this node's ANDROID_HOME.",
- "framework": "2.1",
+ "format": 5,
+ "framework": "5.1",
  "label": "Android command-line tools",
  "layout": {
   "bin": [
@@ -20,12 +21,17 @@
   "requires": [
    "jdk"
   ],
+  "rev": 2,
   "source": {
    "after": [
     "system images and the emulator install through it: aerie toolchains install android:emulator, aerie emu image add ID"
    ],
    "checksum": {
-    "from": "android-repo"
+    "found": {
+     "from": "android-repo"
+    },
+    "from": "pin",
+    "sha256": "2d2d50857e4eb553af5a6dc3ad507a17adf43d115264b1afc116f95c92e5e258"
    },
    "download": {
     "bytes": 150000000,

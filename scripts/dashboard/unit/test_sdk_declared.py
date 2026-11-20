@@ -205,15 +205,20 @@ class Shipped(sdkstore.KitCase):
             # Nothing of it runs after its download but a look at what was unpacked.
             self.assertEqual((src["kind"], src["verify"], [k for k in ("run", "then", "warm", "fetch", "online") if k in src]),
                              ("tarball", verify, []), name)
-        # A row that says online keeps the network, in its own sentence; one
-        # that declares nothing is installed as it always was.
+        # A row that says online keeps the network, in its own sentence; any
+        # other whose own download its entry holds is cut by that alone, its
+        # installer's run included; and one that declares nothing is
+        # installed as it always was.
         for name, r in rows.items():
             plan, online = sdkmeta.declared_plan(r), " ".join(str(r["source"].get("online") or "").split())
             if online:
                 self.assertEqual(plan[0], f"net\x1fonline\x1f{online}", name)
-            elif name not in self.UNPACKED:
-                self.assertEqual((plan, sdkmeta.held_by_entry(r)), ([], False), name)
+            else:
+                self.assertEqual(plan, ["net\x1fcut\x1f"] if sdkmeta.held_by_entry(r) else [], name)
         self.assertEqual((sdkmeta.declared_plan(rows["playwright"]), sdkmeta.held_by_entry(rows["playwright"])), ([], False))
+        tools = rows["android-tools"]
+        self.assertEqual((sdkmeta.held_by_entry(tools), tools["source"]["kind"], "online" in tools["source"]), (True, "script", False),
+                         "the program that installs every Android package is itself a pinned file, unpacked with no network")
 
     def test_node_s_recipe_runs_its_verify_behind_the_cut(self):
         # The shipped row's own source, its address a file on disk and its

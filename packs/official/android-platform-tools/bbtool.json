@@ -1,6 +1,7 @@
 {
  "about": "adb and the other tools that talk to a phone or an emulator; the emulator and the Phone tab need it. Google ships it for x86_64 Linux only.",
- "framework": "2.1",
+ "format": 5,
+ "framework": "5.1",
  "label": "Android platform tools",
  "layout": {
   "bin": [
@@ -19,6 +20,7 @@
   "requires": [
    "android-tools"
   ],
+  "rev": 2,
   "source": {
    "download": {
     "resolver": "android-repo",
@@ -27,6 +29,7 @@
     ]
    },
    "kind": "sdkmanager",
+   "online": "sdkmanager, the program of the Android command-line tools, downloads this package from dl.google.com by itself and holds it to the sha1 Google's repository listing states.",
    "package": "platform-tools"
   },
   "updatable": true

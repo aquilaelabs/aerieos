@@ -1,6 +1,7 @@
 {
  "about": "The android.jar a build compiles against (compileSdk), at the newest level Google publishes. Update adds the next level beside it, so older projects keep building. Removing this removes every level.",
- "framework": "2.1",
+ "format": 5,
+ "framework": "5.1",
  "label": "Android SDK Platform (newest level)",
  "layout": {
   "bin": [],
@@ -16,6 +17,7 @@
   "requires": [
    "android-tools"
   ],
+  "rev": 2,
   "source": {
    "download": {
     "resolver": "android-repo",
@@ -24,6 +26,7 @@
     ]
    },
    "kind": "sdkmanager",
+   "online": "sdkmanager, the program of the Android command-line tools, downloads this package from dl.google.com by itself and holds it to the sha1 Google's repository listing states.",
    "package": "platforms;android",
    "versioned": true
   },
