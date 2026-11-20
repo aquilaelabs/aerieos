@@ -120,7 +120,8 @@ await section("A node's Updates line names the release key it pinned and its spa
               ndUpdatesFact(n({ release_key: 'a'.repeat(16), release_also: [c] })),
               ndUpdatesFact(n({ release_key: 'a'.repeat(16), release_also: [c, d], unsigned_ok: true })),
               ndUpdatesFact(n({ release_also: [c, d] })),
-              ndUpdatesFact(n({ release_key: 'a'.repeat(16), release_also: [] }))];
+              ndUpdatesFact(n({ release_key: 'a'.repeat(16), release_also: [] })),
+              ndUpdatesFact(n({}))];
     } finally { nodesAgent = was; }
   });
   ok(said[0] === 'signed releases only (key aaaaaaaa…, spare bbbbbbbb…)'
@@ -132,6 +133,8 @@ await section("A node's Updates line names the release key it pinned and its spa
      && said[5] === 'signed builds only (2 keys added at its console); no release key pinned (Enroll script pins it)'
      && said[6] === said[2],
      `...and how many keys were added at its console, beside the release key or with none pinned (${JSON.stringify(said.slice(3))})`);
+  ok(said[7] === "taken on this controller's word: no release key pinned (its first signed update pins it, or the Enroll script)",
+     `...and a node with no key says what pins one: its first signed update, or the Enroll script (${said[7]})`);
 });
 ok(await page.evaluate(() => !document.querySelector('.nodestab [data-cap], .nodestab [data-encap]')),
    'no capability toggles anywhere: a node does everything for the spaces bound to it');

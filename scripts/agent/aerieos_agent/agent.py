@@ -16,7 +16,7 @@ from .coverage import _COV_OUT, _cov_write
 from .base import BEAT_S, RUNNER_DIAG_KEEP, SESSION_WALL, TRIAL_S, cap_file, fs_holds, log, log_once, own_digest, own_path, prune_dir
 from .base import back_note, selfcheck, test_lock_ready, trial_begin, trial_give_way, trial_note, trial_passed
 from .controller import Controller
-from .stores import console_said, load_state, save_state, use_scope
+from .stores import console_said, load_state, pin_release, save_state, use_scope
 from .toolchains import share_images
 from .sessnet import SessionNet
 from .runners import RunnersMixin, runner_dirs
@@ -191,6 +191,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         self.census_stale = False         # ...and was asked for once more meanwhile
         self.controller_digest = ""
         self.controller_sig = ""          # the release's signature over that digest, where the build has one
+        self.controller_keys = []         # the release keys the controller's build names (release.first_pin)
         self.warned_caps = False
         # The session half (roadmap #24): whether its terminals are set up,
         # the bundle they run bb-tty from, and when the last start was tried.
@@ -491,6 +492,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             self.poll = int(r.get("poll") or 25)
             self.controller_digest = (r.get("agent") or {}).get("digest") or ""
             self.controller_sig = (r.get("agent") or {}).get("sig") or ""
+            self.controller_keys = (r.get("agent") or {}).get("release_keys") or []
             # Where toolchains land, from the controller's catalog. Kept on the
             # record so a job started before the next hello still has it, and
             # only replaced when the controller has one: none (a catalog that
@@ -1183,12 +1185,18 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             trust = load_state()
         except SystemExit:
             trust = self.state
-        ok, said = release.may_install(trust, got, spec.get("sig") or getattr(self, "controller_sig", ""))
+        sig = spec.get("sig") or getattr(self, "controller_sig", "")
+        # The release keys the controller's build carries, named beside the
+        # update: read only by a node that trusts no key, which pins them
+        # when this update's signature is under one (release.first_pin).
+        named = spec.get("release_keys") or getattr(self, "controller_keys", None)
+        ok, said = release.may_install(trust, got, sig, named)
         if said:
             job.say(said + "\n")
         if not ok:
             job.why = said
             return "failed", 77
+        pin = release.first_pin(trust, got, sig, named)
         # One this node already went back from is not taken again by itself
         # (the operator, 13 Nov): Update agent, a person's press, asks again.
         went = back_note()
@@ -1227,6 +1235,39 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             job.say(job.why + "\n")
             return "failed", 73
         job.say((said + "\n") if ok else "this build is from before the start check: installed without it\n")
+        # A node that trusted no key pins the release's on this, its first
+        # signed update, as the last thing before the file is the one it
+        # runs: a pin that cannot be written installs nothing, and takes
+        # the trial's note with it, since the agent here is still the old one.
+        if pin:
+            def undo(why, code):
+                for x in (tmp,) + ((me + ".trial",) if ok else ()):
+                    with contextlib.suppress(OSError):
+                        os.unlink(x)
+                job.why = why
+                job.say(why + "\n")
+                return "failed", code
+            try:
+                pinned = pin_release(pin)
+            except (OSError, ValueError) as e:
+                return undo(f"AerieOS's release key could not be pinned here ({e}), so nothing was installed", 73)
+            if pinned:
+                said = (f"pinned AerieOS's release key on this first signed update ({pin[0][:16]}…)"
+                        + (f" and its spare ({pin[1][:16]}…)" if len(pin) > 1 else "")
+                        + ": from here this node takes only agent updates signed by " + ("one of them" if len(pin) > 1 else "it"))
+                job.say(said + "\n")
+                log(said)
+            else:
+                # A person pinned or added a key at the console while this
+                # was checked: theirs stands, and the update is theirs to judge.
+                try:
+                    trust = load_state()
+                except SystemExit:
+                    trust = self.state
+                allowed, said = release.may_install(trust, got, sig, named)
+                if not allowed:
+                    return undo(said, 77)
+                job.say(said + "\n")
         os.replace(tmp, me)
         # Only a file actually installed restarts the agent: "already current"
         # above did too, and a second update queued behind the first ended

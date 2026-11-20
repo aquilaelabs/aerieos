@@ -84,9 +84,11 @@ class Verify(unittest.TestCase):
         for bad in ("", "nope", f"{a},nope", f"{a},{b},{c}"):
             self.assertEqual(release.clean_keys(bad), [], bad)
 
-    def test_a_node_that_pinned_nothing_updates_as_before(self):
-        self.assertEqual(release.may_install({}, DIGEST, ""), (True, ""))
-        self.assertEqual(release.may_install({"release_key": "not a key"}, DIGEST, ""), (True, ""))
+    def test_a_node_that_pinned_nothing_updates_as_before_and_says_nothing_was_checked(self):
+        for state in ({}, {"release_key": "not a key"}):
+            ok, said = release.may_install(state, DIGEST, "")
+            self.assertTrue(ok)
+            self.assertIn("not checked: no release key is pinned here", said)
 
 
 class Console(unittest.TestCase):

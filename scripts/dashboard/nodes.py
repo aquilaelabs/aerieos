@@ -3756,7 +3756,8 @@ def node_update_agent(principal, node_id):
                 {"digest": ours["digest"], "version": ours["version"], "timeout": 300,
                  # A person's press sends again a build the node went back from.
                  **({"again": True} if principal != "system:auto-update" else {}),
-                 **({"sig": agent_sig(ours["digest"])} if agent_sig(ours["digest"]) else {})})
+                 **({"sig": agent_sig(ours["digest"])} if agent_sig(ours["digest"]) else {}),
+                 **agent_release_keys()})
     if r.get("ok"):
         audit(principal, "node-update-agent", node_id, {"to": ours["digest"]})
     return r
@@ -3767,6 +3768,17 @@ def agent_shipped():
     version only; the body is the download verb's."""
     f = agent_file()
     return {"digest": f["digest"], "version": f["version"]}
+
+
+def agent_release_keys():
+    """The release keys this build carries, named beside every agent update
+    it sends (the spec's release_keys, and the hello's): a node that has
+    pinned no key pins them on the first update whose signature is under
+    one of them (the agent's release.first_pin), and a node that has any
+    key reads none of this. {} while the build names none. Named and not
+    vouched for: this side checks nothing here either."""
+    keys = enrollscript.release_keys()
+    return {"release_keys": keys} if keys else {}
 
 
 def agent_sig(digest=None):
@@ -5698,7 +5710,8 @@ def hello(nid, census, addr, version="", digest="", running=None, keep=None, rot
                                      "capabilities": n["capabilities"],
                                      "concurrency": n["concurrency"]},
             "agent": {"digest": ours["digest"], "version": ours["version"],
-                      **({"sig": agent_sig(ours["digest"])} if agent_sig(ours["digest"]) else {})},
+                      **({"sig": agent_sig(ours["digest"])} if agent_sig(ours["digest"]) else {}),
+                      **agent_release_keys()},
             # Where every toolchain lands, from the catalog: the node has no
             # catalog of its own, and this is what stops it keeping a second
             # copy of the answer that drifts from ours.

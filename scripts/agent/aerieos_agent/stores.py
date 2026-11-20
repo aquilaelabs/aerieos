@@ -9,6 +9,7 @@ import tempfile
 import threading
 import time
 from . import names
+from . import release
 from .base import NODE_JSON, STORE_DENY_EXACT, STORE_DENY_UNDER, StatTimeout, _run, log, statvfs_within
 
 
@@ -493,6 +494,34 @@ def save_state(state, console=False):
     with _save_lock, open(os.path.join(d, ".node.json.lock"), "a") as held:
         fcntl.flock(held.fileno(), fcntl.LOCK_EX)
         _save(state, console, d)
+
+
+def pin_release(keys):
+    """AerieOS's release key pinned by the agent itself, at the one moment
+    it may (release.first_pin: a node that trusts no key, installing its
+    first update a release signed): the key, and its spare after it, set in
+    node.json as the console's own save would write them, under the same
+    lock and through the same whole-file write. The record is read here,
+    under the lock, and not taken from the agent's copy: a key a person
+    pinned or added at the console in the meantime stands, and nothing is
+    written. Whether these were pinned; an error where the record could not
+    be read or written, which leaves it as it was."""
+    keys = release.clean_keys(",".join(keys))
+    d = os.path.dirname(NODE_JSON)
+    with _save_lock, open(os.path.join(d, ".node.json.lock"), "a") as held:
+        fcntl.flock(held.fileno(), fcntl.LOCK_EX)
+        with open(NODE_JSON) as f:
+            cur = json.load(f)
+        if not isinstance(cur, dict):
+            raise ValueError(f"{NODE_JSON} does not hold a node's record")
+        if not keys or release.trusted(cur):
+            return False
+        cur["release_key"] = keys[0]
+        cur.pop("release_spare", None)
+        if len(keys) > 1:
+            cur["release_spare"] = keys[1]
+        _save(cur, True, d)
+    return True
 
 
 def _save(state, console, d):

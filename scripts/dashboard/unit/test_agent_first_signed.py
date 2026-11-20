@@ -1,0 +1,352 @@
+"""A node with no key pins AerieOS's release key on its first signed update
+(release.first_pin). Its controller names the release keys its own build
+carries beside every update; when the update's signature is under one of
+them, the node installs it and pins them, the first as its release key and
+a second as its spare, and the job says so. An update with no signature, or
+one under another key, is taken as it was and said as unchecked, and pins
+nothing. A node that has any key is unchanged: what a controller names is
+never read there. The pin is written into node.json whole, as the console
+writes it, and one that cannot be written installs nothing."""
+import hashlib
+import json
+import os
+import sys
+import tempfile
+import threading
+import unittest
+from unittest import mock
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.join(HERE, ".."))
+import agentpkg  # noqa: E402
+import enrollscript  # noqa: E402
+import nodes  # noqa: E402
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey  # noqa: E402
+
+DIGEST = "sha256:" + "ab" * 32
+NEW = b"#!/bin/sh\n# an agent build from before the start check\n"
+RECORD = {"node_id": "n_1", "token": "bbn_1", "controller": "http://127.0.0.1:1", "stores": {"data": "/srv/data"}}
+
+
+def pair():
+    k = Ed25519PrivateKey.generate()
+    return k, k.public_key().public_bytes_raw().hex()
+
+
+def digest(body):
+    return "sha256:" + hashlib.sha256(body).hexdigest()
+
+
+class Case(unittest.TestCase):
+    def setUp(self):
+        self.agent = agentpkg.load("aerieos_agent_first_signed")
+        self.agent.log = lambda *a, **k: None
+        self.release, self.stores = self.agent.module("release"), self.agent.module("stores")
+        self.d = tempfile.mkdtemp()
+        self.nj = os.path.join(self.d, "node.json")
+        self.agent.NODE_JSON = self.nj
+        self.k, self.pub = pair()
+        self.s, self.spare = pair()
+
+    def sign(self, key, of=DIGEST):
+        return key.sign(self.release.MESSAGE + of.encode()).hex()
+
+    def write(self, state):
+        with open(self.nj, "w") as f:
+            json.dump(state, f)
+
+    def read(self):
+        with open(self.nj) as f:
+            return json.load(f)
+
+
+class Decided(Case):
+    def test_a_first_update_under_a_named_key_is_taken_and_names_what_to_pin(self):
+        named = [self.pub, self.spare]
+        for signer in (self.k, self.s):
+            sig = self.sign(signer)
+            ok, said = self.release.may_install({}, DIGEST, sig, named)
+            self.assertTrue(ok)
+            key = signer.public_key().public_bytes_raw().hex()
+            self.assertEqual(said, f"signed by a release key this node's controller names ({key[:16]}…), with none pinned here yet")
+            self.assertEqual(self.release.first_pin({}, DIGEST, sig, named), named, "both, the first one first, whichever signed")
+        self.assertEqual(self.release.first_pin({}, DIGEST, self.sign(self.k), [self.pub]), [self.pub])
+
+    def test_an_unsigned_or_wrongly_signed_first_update_is_taken_said_and_pins_nothing(self):
+        other, _ = pair()
+        named = [self.pub, self.spare]
+        for sig, why in (("", "the controller sent no signature with it"),
+                         (self.sign(other), "its signature is not under a release key the controller named"),
+                         (self.sign(self.k, "sha256:" + "cd" * 32), "its signature is not under a release key the controller named"),
+                         (self.k.sign(self.release.TOOLS_MESSAGE + DIGEST.encode()).hex(), "its signature is not under a release key")):
+            ok, said = self.release.may_install({}, DIGEST, sig, named)
+            self.assertTrue(ok)
+            self.assertIn("not checked: no release key is pinned here", said)
+            self.assertIn(why, said)
+            self.assertEqual(self.release.first_pin({}, DIGEST, sig, named), [])
+
+    def test_a_controller_that_names_no_keys_is_taken_as_before_and_said(self):
+        # A controller from before the naming, or a build that carries none.
+        sig = self.sign(self.k)
+        for named in (None, [], "", [self.pub, "nope"], [self.pub, self.spare, pair()[1]], [5], {"a": self.pub}, self.pub):
+            ok, said = self.release.may_install({}, DIGEST, sig, named)
+            self.assertTrue(ok)
+            self.assertEqual(said, "not checked: no release key is pinned here, and no release key was named to check its signature against")
+            self.assertEqual(self.release.first_pin({}, DIGEST, sig, named), [], named)
+        self.assertEqual(self.release.may_install({}, DIGEST, ""),
+                         (True, "not checked: no release key is pinned here, and the controller sent no signature with it"))
+
+    def test_a_node_that_has_any_key_is_unchanged_by_what_a_controller_names(self):
+        t, theirs = pair()
+        _, mine = pair()
+        sig = self.sign(t)
+        for state in ({"release_key": self.pub}, {"release_key": self.pub, "release_spare": self.spare}, {"release_spare": self.spare},
+                      {"release_also": [mine]}, {"release_key": self.pub, "unsigned_ok": True}):
+            self.assertEqual(self.release.first_pin(state, DIGEST, sig, [theirs]), [], state)
+            self.assertEqual(self.release.may_install(state, DIGEST, sig, [theirs]), self.release.may_install(state, DIGEST, sig), state)
+            self.assertNotIn(theirs[:16], self.release.may_install(state, DIGEST, sig, [theirs])[1])
+        self.assertFalse(self.release.may_install({"release_key": self.pub}, DIGEST, sig, [theirs])[0])
+
+
+class Written(Case):
+    def test_the_pin_is_written_into_the_record_as_the_console_writes_it(self):
+        self.write(RECORD)
+        self.assertTrue(self.stores.pin_release([self.pub, self.spare]))
+        self.assertEqual(self.read(), dict(RECORD, release_key=self.pub, release_spare=self.spare))
+        self.assertEqual(os.stat(self.nj).st_mode & 0o777, 0o600)
+        self.assertEqual([n for n in os.listdir(self.d) if n not in ("node.json", ".node.json.lock")], [], "no half-written file is left")
+        # The agent's own save, from a copy made before, keeps it.
+        self.stores.save_state(dict(RECORD, token="bbn_2"))
+        self.assertEqual(self.read(), dict(RECORD, token="bbn_2", release_key=self.pub, release_spare=self.spare))
+
+    def test_a_key_already_there_is_never_replaced_or_joined(self):
+        _, theirs = pair()
+        _, mine = pair()
+        for held in ({"release_key": self.pub}, {"release_spare": self.spare}, {"release_also": [mine]}):
+            self.write(dict(RECORD, **held))
+            self.assertFalse(self.stores.pin_release([theirs]))
+            self.assertEqual(self.read(), dict(RECORD, **held))
+        # What is not a key, or more than a key and its spare, pins nothing.
+        self.write(RECORD)
+        for bad in ([], ["nope"], [self.pub, "nope"], [self.pub, self.spare, theirs]):
+            self.assertFalse(self.stores.pin_release(bad))
+        self.assertEqual(self.read(), RECORD)
+
+    def test_a_record_that_cannot_be_read_or_written_is_an_error_and_stays_as_it_was(self):
+        with self.assertRaises(OSError):
+            self.stores.pin_release([self.pub])
+        self.assertFalse(os.path.exists(self.nj))
+        with open(self.nj, "w") as f:
+            f.write("not json")
+        with self.assertRaises(ValueError):
+            self.stores.pin_release([self.pub])
+        self.write(RECORD)
+        with mock.patch.object(self.stores.os, "replace", side_effect=OSError(28, "No space left on device")), self.assertRaises(OSError):
+            self.stores.pin_release([self.pub])
+        self.assertEqual(self.read(), RECORD)
+        self.assertEqual([n for n in os.listdir(self.d) if n not in ("node.json", ".node.json.lock")], [])
+
+
+class Update(Case):
+    """The self-update itself, on a node whose agent is a file in a folder
+    of the test's own."""
+
+    def setUp(self):
+        super().setUp()
+        self.me = os.path.join(self.d, "aerieos-agent")
+        with open(self.me, "wb") as f:
+            f.write(b"OLD")
+        self.agent.own_path = lambda: self.me
+        self.agent.own_digest = lambda: digest(b"OLD")
+        self.write(RECORD)
+
+    def update(self, body=NEW, hello=None, **spec):
+        a = object.__new__(self.agent.Agent)
+        a.state, a.jobs, a.lock, a.controller_digest, a.controller_sig = dict(RECORD), {}, threading.Lock(), "", ""
+        if hello is not None:
+            a.controller_sig, a.controller_keys = hello.get("sig", ""), hello.get("release_keys", [])
+
+        class Ctl:
+            @staticmethod
+            def call(*args, **kw):
+                return 200, body
+
+        class Job:
+            job, why, installed, said = {"id": "j_up"}, "", False, ""
+
+            def say(self, text):
+                self.said += text
+
+        a.ctl, job = Ctl(), Job()
+        return a.self_update(job, spec), job
+
+    def installed(self):
+        with open(self.me, "rb") as f:
+            return f.read()
+
+    def beside(self):
+        return sorted(n for n in os.listdir(self.d) if n not in ("aerieos-agent", "node.json", ".node.json.lock"))
+
+    def test_the_first_signed_update_is_installed_and_pins_the_named_keys(self):
+        (state, code), job = self.update(sig=self.sign(self.k, digest(NEW)), release_keys=[self.pub, self.spare])
+        self.assertEqual((state, code, job.installed), ("succeeded", 0, True), job.said)
+        self.assertEqual(self.installed(), NEW)
+        self.assertEqual(self.read(), dict(RECORD, release_key=self.pub, release_spare=self.spare))
+        self.assertIn(f"pinned AerieOS's release key on this first signed update ({self.pub[:16]}…) and its spare ({self.spare[:16]}…)", job.said)
+        self.assertIn("takes only agent updates signed by one of them", job.said)
+        # From here it is a pinned node: the next one is checked.
+        with open(self.me, "wb") as f:
+            f.write(b"OLD")
+        other = b"#!/bin/sh\n# another build\n"
+        (state, code), job = self.update(other)
+        self.assertEqual((state, code), ("failed", 77))
+        self.assertEqual(self.installed(), b"OLD")
+        (state, code), job = self.update(other, sig=self.sign(self.s, digest(other)))
+        self.assertEqual((state, code), ("succeeded", 0), job.said)
+        self.assertIn("signed by the spare release key this node pinned", job.said)
+        self.assertNotIn("first signed update", job.said)
+
+    def test_one_named_key_pins_no_spare_and_the_spares_signature_pins_both(self):
+        (state, code), job = self.update(sig=self.sign(self.k, digest(NEW)), release_keys=[self.pub])
+        self.assertEqual((state, code), ("succeeded", 0), job.said)
+        self.assertEqual(self.read(), dict(RECORD, release_key=self.pub))
+        self.assertIn(f"pinned AerieOS's release key on this first signed update ({self.pub[:16]}…): from here", job.said)
+        self.write(RECORD)
+        with open(self.me, "wb") as f:
+            f.write(b"OLD")
+        (state, code), job = self.update(sig=self.sign(self.s, digest(NEW)), release_keys=[self.pub, self.spare])
+        self.assertEqual((state, code), ("succeeded", 0), job.said)
+        self.assertEqual(self.read(), dict(RECORD, release_key=self.pub, release_spare=self.spare))
+
+    def test_the_keys_and_the_signature_the_hello_named_serve_a_spec_that_names_none(self):
+        (state, code), job = self.update(hello={"sig": self.sign(self.k, digest(NEW)), "release_keys": [self.pub, self.spare]})
+        self.assertEqual((state, code), ("succeeded", 0), job.said)
+        self.assertEqual(self.read(), dict(RECORD, release_key=self.pub, release_spare=self.spare))
+
+    def test_an_unsigned_or_wrongly_signed_first_update_is_installed_said_and_pins_nothing(self):
+        other, _ = pair()
+        for spec in ({}, {"release_keys": [self.pub, self.spare]},
+                     {"sig": self.sign(other, digest(NEW)), "release_keys": [self.pub, self.spare]},
+                     {"sig": self.sign(self.k, digest(NEW))},
+                     {"sig": self.sign(self.k, digest(NEW)), "release_keys": [self.pub, "nope"]}):
+            with open(self.me, "wb") as f:
+                f.write(b"OLD")
+            (state, code), job = self.update(**spec)
+            self.assertEqual((state, code, job.installed), ("succeeded", 0, True), (spec, job.said))
+            self.assertEqual(self.installed(), NEW)
+            self.assertIn("not checked: no release key is pinned here", job.said)
+            self.assertNotIn("pinned AerieOS's release key", job.said)
+            self.assertEqual(self.read(), RECORD, spec)
+
+    def test_a_pinned_node_is_unchanged_by_the_keys_a_controller_names(self):
+        t, theirs = pair()
+        _, mine = pair()
+        for held in ({"release_key": self.pub}, {"release_also": [mine]}):
+            self.write(dict(RECORD, **held))
+            (state, code), job = self.update(sig=self.sign(t, digest(NEW)), release_keys=[theirs])
+            self.assertEqual((state, code, job.installed), ("failed", 77, False), job.said)
+            self.assertIn("refused", job.why)
+            self.assertEqual(self.installed(), b"OLD")
+            self.assertEqual(self.read(), dict(RECORD, **held))
+            self.assertEqual(self.beside(), [])
+
+    def test_nothing_a_spec_carries_changes_what_the_console_decides(self):
+        _, theirs = pair()
+        _, mine = pair()
+        self.write(dict(RECORD, release_also=[mine], unsigned_ok=True))
+        m = Ed25519PrivateKey.generate()
+        (state, code), job = self.update(sig=self.sign(m, digest(NEW)), release_keys=[theirs], release_also=[theirs],
+                                         release_key=theirs, release_spare=theirs, unsigned_ok=False, root_off=True)
+        self.assertEqual((state, code), ("succeeded", 0), job.said)
+        self.assertIn("console allows unsigned builds", job.said)
+        self.assertEqual(self.read(), dict(RECORD, release_also=[mine], unsigned_ok=True))
+        # ...and on a node with no key, the first pin sets the two release
+        # fields and no other: no list, no switch.
+        self.write(RECORD)
+        with open(self.me, "wb") as f:
+            f.write(b"OLD")
+        (state, code), job = self.update(sig=self.sign(self.k, digest(NEW)), release_keys=[self.pub], release_also=[theirs],
+                                         unsigned_ok=True, root_off=True)
+        self.assertEqual((state, code), ("succeeded", 0), job.said)
+        self.assertEqual(self.read(), dict(RECORD, release_key=self.pub))
+
+    def test_a_pin_that_cannot_be_written_installs_nothing(self):
+        mod = self.agent.module("agent")
+        spec = {"sig": self.sign(self.k, digest(NEW)), "release_keys": [self.pub, self.spare]}
+        # A build that passed its start check, so its trial had begun.
+        with mock.patch.object(mod, "selfcheck", lambda path: (True, "selfcheck ok")), \
+                mock.patch.object(self.stores, "_save", side_effect=OSError(28, "No space left on device")):
+            (state, code), job = self.update(**spec)
+        self.assertEqual((state, code, job.installed), ("failed", 73, False), job.said)
+        self.assertIn("could not be pinned here", job.why)
+        self.assertIn("so nothing was installed", job.why)
+        self.assertEqual(self.installed(), b"OLD")
+        self.assertEqual(self.read(), RECORD)
+        # The old agent kept beside itself is all that is left: no new file
+        # waiting, and no note of a trial for an agent that was not installed.
+        self.assertEqual(self.beside(), ["aerieos-agent.prev"])
+        # The same update, once the record can be written, is the first signed one.
+        (state, code), job = self.update(**spec)
+        self.assertEqual((state, code), ("succeeded", 0), job.said)
+        self.assertEqual(self.read(), dict(RECORD, release_key=self.pub, release_spare=self.spare))
+
+    def test_a_key_pinned_at_the_console_meanwhile_stands_and_judges_the_update(self):
+        mod = self.agent.module("agent")
+        _, theirs = pair()
+        spec = {"sig": self.sign(self.k, digest(NEW)), "release_keys": [self.pub]}
+
+        def console_pins(key):
+            def check(path):
+                self.write(dict(RECORD, release_key=key))
+                return True, "selfcheck ok"
+            return check
+        # Another key, pinned while the new file was being checked: refused.
+        with mock.patch.object(mod, "selfcheck", console_pins(theirs)):
+            (state, code), job = self.update(**spec)
+        self.assertEqual((state, code, job.installed), ("failed", 77, False), job.said)
+        self.assertEqual(self.installed(), b"OLD")
+        self.assertEqual(self.read(), dict(RECORD, release_key=theirs))
+        self.assertEqual(self.beside(), ["aerieos-agent.prev"])
+        # The same key, pinned there by a person: taken, and theirs is what stands.
+        self.write(RECORD)
+        with mock.patch.object(mod, "selfcheck", console_pins(self.pub)):
+            (state, code), job = self.update(**spec)
+        self.assertEqual((state, code), ("succeeded", 0), job.said)
+        self.assertIn("signed by the release key this node pinned", job.said)
+        self.assertNotIn("first signed update", job.said)
+        self.assertEqual(self.read(), dict(RECORD, release_key=self.pub))
+
+
+class Controller(unittest.TestCase):
+    """The controller's half: the keys its build carries, named beside every
+    agent update and in every hello."""
+
+    def setUp(self):
+        nodes.configure(state=tempfile.mkdtemp())
+        nodes._auto_tried.clear()
+        mint = nodes.enroll_mint("user:test", "box")
+        self.census = {"cpu": 2, "mem_mb": 4096, "arch": "x86_64", "system": "linux", "session": {"up": True, "user": "b"}}
+        nodes.enroll(nodes.authenticate(mint["token"]), self.census, "box.lan", user="bb")
+        self.nid = mint["id"]
+
+    def spec(self):
+        nodes._exec("UPDATE nodes SET agent = json_set(agent, '$.digest', ?) WHERE id = ?", ("sha256:" + "0" * 64, self.nid))
+        r = nodes.node_update_agent("user:test", self.nid)
+        self.assertTrue(r.get("job"), r)
+        return next(j for j in nodes.jobs_for(node_id=self.nid, n=10, active=True) if j["id"] == r["job"])["spec"]
+
+    def test_the_update_and_the_hello_name_the_keys_this_build_carries(self):
+        keys = enrollscript.release_keys()
+        self.assertEqual(len(keys), 2, "the repository names the release key and its spare")
+        self.assertEqual(self.spec()["release_keys"], keys)
+        self.assertEqual(nodes.hello(self.nid, self.census, "box.lan")["agent"]["release_keys"], keys)
+
+    def test_a_build_that_names_no_key_names_none(self):
+        with mock.patch.object(enrollscript, "release_keys", lambda: []):
+            self.assertNotIn("release_keys", self.spec())
+            self.assertNotIn("release_keys", nodes.hello(self.nid, self.census, "box.lan")["agent"])
+
+
+if __name__ == "__main__":
+    unittest.main()

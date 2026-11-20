@@ -328,6 +328,18 @@ job and on the node's row. A node's row says which it
 is under Updates. While the repository names no key, no node pins one and
 updates are taken as before.
 
+A node that has no key, one enrolled before there was one or by a script
+that named none, takes what its controller sends, and the update's job says
+that nothing was checked. It pins on its first signed update: the
+controller names the release keys its own build carries beside every
+update, and when the update's signature is under one of them the node
+installs it and pins them, saying so on the job. That is trust on first
+use, of a controller the node already took everything from, and it closes
+the door behind a release rather than waiting for a person to run the
+Enroll script again. An update with no signature, or one under another
+key, is taken as before and pins nothing; a node that has any key, the
+release's or one added at its console, is never offered one this way.
+
 **The tools root installs from the bundle, it does not either.** The
 provisioner with the machine's own helper in it, the helper that builds a
 session's view and the one that cuts a pack's install off the network reach

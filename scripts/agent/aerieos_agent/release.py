@@ -11,10 +11,19 @@ the Enroll script carries it) or at the machine's own console afterwards
 (`aerieos-agent release-key HEX`), and is never taken from the
 controller's word on a running node. A spare may be pinned with it, after a
 comma (R232): an update signed by either is taken, so the key the builds
-sign with can be replaced by the spare with no node cut off. A node with no key pinned updates as
-before. A build from a branch carries no signature: a node its owner uses
-for those says so at its console (`aerieos-agent unsigned on`), which is
-kept in node.json like the key.
+sign with can be replaced by the spare with no node cut off. A build from a
+branch carries no signature: a node its owner uses for those says so at its
+console (`aerieos-agent unsigned on`), which is kept in node.json like the
+key.
+
+A node with no key takes what its controller sends, and says in the update's
+job that nothing was checked. It pins at one more moment: its controller
+names the release keys its own build carries beside every update
+(`release_keys`), and the first update whose signature is under one of them
+pins them here as that update is installed (first_pin). That is trust on
+first use, of a controller this node already took everything from; an
+update with no signature, or one under another key, pins nothing, and a node
+that has any key is never offered one this way.
 
 Ed25519, by the `cryptography` library the nodes are provisioned with
 (tokenseal.py's): nothing here is hand-built, and a node that pinned a key
@@ -182,14 +191,52 @@ def verify(key, digest, sig, message=MESSAGE):
     return ""
 
 
-def may_install(state, digest, sig):
+def named_keys(named):
+    """The release keys a controller names beside an update, the ones its
+    own build carries: a list of one or two keys, [] for anything else."""
+    if not isinstance(named, (list, tuple)) or not all(isinstance(k, str) for k in named):
+        return []
+    return clean_keys(",".join(named))
+
+
+def first_pin(state, digest, sig, named):
+    """The keys a node that trusts none pins on this update: the ones its
+    controller named, the first as the release key and a second as its
+    spare, when the update's signature is under one of them. [] otherwise,
+    and always [] for a node that trusts a key already: what a controller
+    names never replaces or joins a key that is here."""
+    if trusted(state):
+        return []
+    cand = named_keys(named)
+    return cand if any(not verify(k, digest, sig) for k in cand) else []
+
+
+def _unpinned(digest, sig, named):
+    """What a node with no key says of the update it takes: which named
+    release key signed it, or that nothing was checked and why not."""
+    cand, why = named_keys(named), ""
+    for key in cand:
+        said = verify(key, digest, sig)
+        if not said:
+            return f"signed by a release key this node's controller names ({key[:16]}…), with none pinned here yet"
+        why = why or said
+    if not cand:
+        why = ("no release key was named to check its signature against" if SIG_RE.fullmatch(str(sig or "").strip().lower())
+               else "the controller sent no signature with it")
+    why = why.replace("its signature is not the pinned release key's", "its signature is not under a release key the controller named")
+    return f"not checked: no release key is pinned here, and {why}"
+
+
+def may_install(state, digest, sig, named=None):
     """(ok, words) for an update of `digest` carrying `sig`: taken with no
-    key trusted here, taken when the signature is under a key this node
-    trusts (the release key, its spare, or one added at its console, said as
-    which), taken unsigned only where this node's console said so, refused
-    otherwise."""
+    key trusted here and said as unchecked, or as signed by a release key
+    the controller named with it (`named`, which first_pin then pins);
+    taken when the signature is under a key this node trusts (the release
+    key, its spare, or one added at its console, said as which), taken
+    unsigned only where this node's console said so, refused otherwise.
+    `named` is read only by a node that trusts no key."""
     if not trusted(state):
-        return True, ""
+        return True, _unpinned(digest, sig, named)
     who, why = _signer(state, digest, sig, MESSAGE)
     if who:
         return True, f"signed by {who}"

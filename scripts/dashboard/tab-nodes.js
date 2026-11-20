@@ -1948,7 +1948,8 @@ const ND_FACTS = ["Reached", "Has", "Seen", "Agent", "Updates", "Jobs run as", "
 // and those signed by a key a person added at its console (a controller
 // somebody built themselves, signed with their own key), said by how many;
 // an unsigned build too where its own console said so; else this
-// controller's word, as every node did before.
+// controller's word, until the first update a release signed pins the key
+// this build names (the agent's release.first_pin).
 function ndUpdatesFact(n){
   if (n.kind !== "agent" || !n.reported) return "";
   const key = n.reported.release_key || "";
@@ -1963,7 +1964,7 @@ function ndUpdatesFact(n){
       : (n.reported.unsigned_ok ? `signed builds (${added}), and unsigned builds, allowed at its console` : `signed builds only (${added})`)
         + (nodesAgent?.release_key ? "; no release key pinned (Enroll script pins it)" : "");
     // Before AerieOS names a release key, no node can pin one: nothing to say.
-    return nodesAgent?.release_key ? "taken on this controller's word: no release key pinned (Enroll script pins it)" : "";
+    return nodesAgent?.release_key ? "taken on this controller's word: no release key pinned (its first signed update pins it, or the Enroll script)" : "";
   }
   if (refused)
     return `signed releases only (key ${key.slice(0, 8)}…): this controller's build is unsigned, so its update is refused there`;

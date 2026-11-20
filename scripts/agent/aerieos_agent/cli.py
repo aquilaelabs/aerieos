@@ -276,7 +276,8 @@ def cmd_release_key(args):
     if not args:
         key, spare, added = release.pinned(state), release.spare(state), release.also(state)
         print(f"release key: {key}" if key else "release key: none pinned"
-              + ("" if added else "; agent updates are taken on the controller's word"))
+              + ("" if added else "; agent updates are taken on the controller's word, and the first one signed by a "
+                 "release key it names pins that key"))
         if spare:
             print(f"spare key:   {spare}")
         for k in added:
@@ -293,7 +294,8 @@ def cmd_release_key(args):
         state.pop("release_spare", None)
         save_state(state, console=True)
         added = release.also(state)
-        print("no release key pinned: agent updates are taken on the controller's word again" if not added else
+        print("no release key pinned: agent updates are taken on the controller's word again, until the first one "
+              "signed by a release key it names, which pins that key" if not added else
               "no release key pinned: this node still takes only agent updates signed by "
               + ("the key" if len(added) == 1 else f"one of the {len(added)} keys") + " added here")
         return
