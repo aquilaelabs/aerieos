@@ -13,6 +13,17 @@ What is not asked: a service whose image is pinned by digest (nginx's,
 which its own tab moves, nginxproxy.py), a service built from code, and an
 image the node has never pulled (Up pulls it; there is nothing to compare).
 
+AerieOS's own image is held to more than its registry (R199): a registry's
+tag is whatever was last pushed under it, and each AerieOS release names the
+image its tag pushed by digest, in the release's signed list of its files.
+So for a container that follows `:dev` or `:latest` of AerieOS's image, the
+digest the tag serves is compared with the one the newest signed release
+names (releasecheck.signed_image). Where they agree, the update is said by
+that digest and whose release it is; where the tag serves another image,
+that is said plainly on the row, and no update is offered from the tag.
+Where no release says (none signed, none naming its image yet), the row is
+as any other image's.
+
 The registry is asked over its v2 API with an anonymous token, which is
 what a public image on Docker Hub, ghcr.io or quay.io answers; a private
 one says it could not be read, on the row, rather than guessing. The
@@ -29,6 +40,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
+
+import releasecheck
 
 STATE = None
 write_json = None
@@ -150,21 +163,49 @@ def local_digests(image):
     return {d.partition("@")[2] for d in got or [] if "@" in d}
 
 
-def check_instance(project, instance):
-    """{"at", "behind": [{service, image, to}], "error"} for one instance,
-    asked on its node."""
-    behind, errors = [], []
+def release_image(image, memo=None):
+    """What the newest signed release names for `image`, when it is AerieOS's
+    own followed by a tag a publication moves (:dev, :latest):
+    releasecheck.signed_image's answer, asked once a check (`memo`). {} for
+    any other image, and where the release names another repository's."""
+    parts = parse_ref(image)
+    if not parts or f"{parts[0]}/{parts[1]}" != releasecheck.IMAGE or parts[2] not in releasecheck.FOLLOWED:
+        return {}
+    memo = memo if memo is not None else {}
+    if parts[2] not in memo:
+        try:
+            memo[parts[2]] = releasecheck.signed_image(parts[2])
+        except Exception as e:   # noqa: BLE001 (what the release says is an extra; the registry's answer stands)
+            memo[parts[2]] = {"why": f"{type(e).__name__}: {e}"}
+    own = memo[parts[2]]
+    return own if own.get("image") == releasecheck.IMAGE else {}
+
+
+def check_instance(project, instance, memo=None):
+    """{"at", "behind": [{service, image, to}], "said": [sentence], "error"}
+    for one instance, asked on its node. A behind row of AerieOS's own image
+    carries `signed`, the image by the digest its release names and whose
+    release it is; `said` is what a person must be told that is no update:
+    a tag that serves another image than the newest signed release names."""
+    behind, errors, said = [], [], []
     with devapp.on_node(devapp._instance_node(project, instance)):
         for service, image in registry_images(project, instance):
             have = local_digests(image)
             if not have:
                 continue
             want, err = remote_digest(image)
+            own = {} if err else release_image(image, memo)
             if err:
                 errors.append(f"{image}: {err}")
+            elif own and want != own["digest"]:
+                said.append(f"{image} serves {want} now, which is not the image the newest signed release names "
+                            f"({own['tag']}: {own['ref']}, {own['signed']}). The registry's tag was moved by something "
+                            "other than that release's publication, or a newer release is not signed yet, so no update "
+                            "is offered from the tag; the signed image is pulled by its digest")
             elif want and want not in have:
-                behind.append({"service": service, "image": image, "to": want})
-    return {"at": int(time.time()), "behind": behind, "error": "; ".join(errors)[:400]}
+                behind.append({"service": service, "image": image, "to": want}
+                              | ({"signed": f"{own['ref']}, {own['tag']}'s own image, {own['signed']}"} if own else {}))
+    return {"at": int(time.time()), "behind": behind, "said": said, "error": "; ".join(errors)[:400]}
 
 
 def check(node=None):
@@ -178,6 +219,8 @@ def check(node=None):
                 break
         time.sleep(0.5)
     out = {}
+    # What the newest signed release names, asked once a check.
+    memo = {}
     try:
         for project, insts in devapp._load().items():
             for inst in insts:
@@ -186,7 +229,7 @@ def check(node=None):
                 if node and (devapp._instance_node(project, inst) or "") != node:
                     continue
                 try:
-                    out[devapp._pname(project, inst)] = check_instance(project, inst) | {
+                    out[devapp._pname(project, inst)] = check_instance(project, inst, memo) | {
                         "node": devapp._instance_node(project, inst) or "",
                         "project": devapp.owner_of(project, inst) or project}
                 except Exception as e:   # noqa: BLE001 (one container's trouble is not the check's)

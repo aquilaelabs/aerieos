@@ -2203,6 +2203,7 @@ function dmRowsHtml(ins, job, blind){
           : dockerList?.ports_local && d.open_from && !d.exists ? `<div class="sub warn dmopen">${dmOpenSoon(d)}</div>` : ""}
         ${dmUnrouted(d)}
         ${(d.images_behind || []).length ? `<div class="sub warn dmimages">a newer ${esc(d.images_behind.join(", "))} is out: Update pulls it and starts it again</div>` : ""}
+        ${(d.images_said || []).map(s => `<div class="sub warn" data-imagesaid>${esc(s)}</div>`).join("")}
         ${
         // Its settings, read as pills; Edit settings, behind ⋯, opens them
         // in a dialog with Cancel and Apply (the operator, 17 Oct); a row

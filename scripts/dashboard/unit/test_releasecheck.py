@@ -2,13 +2,18 @@
 the newest published release read, said as newer than the build running
 only when it is, on the bell only on a bare-metal install, and nothing of
 it on a container install."""
+import hashlib
 import json
 import os
+import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+import apps  # noqa: E402
 import releasecheck  # noqa: E402
 
 
@@ -118,6 +123,105 @@ class ReleaseCheck(unittest.TestCase):
         self.assertGreater(releasecheck.rank("0.9.0-rc.14"), releasecheck.rank("0.9.0-dev.13"))
         self.assertLess(releasecheck.rank("0.9.0-rc.14"), releasecheck.rank("0.9.0"))
         self.assertIsNone(releasecheck.rank("0.9.0-RC 1"))
+
+
+@unittest.skipUnless(shutil.which("ssh-keygen"), "no ssh-keygen here")
+class SignedImage(unittest.TestCase):
+    """The container image a release names as its own (R199): one line in
+    the release, in its signed list of files, read from the newest release
+    whose list this install takes. Real keys and ssh-keygen; the releases
+    and their files are a folder's."""
+    A, B = "sha256:" + "a" * 64, "sha256:" + "b" * 64
+    OWN = "ghcr.io/aquilaelabs/aerieos"
+
+    def setUp(self):
+        self.d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.d, True)
+        self.key = os.path.join(self.d, "key")
+        subprocess.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", self.key], check=True,
+                       stdin=subprocess.DEVNULL, timeout=30)
+        with open(self.key + ".pub") as f:
+            pub = " ".join(f.read().split()[:2])
+        signers = os.path.join(self.d, "release-signers")
+        with open(signers, "w") as f:
+            f.write(f'aerieos-dev namespaces="aerieos-dev" {pub}\n')
+        for p in (mock.patch.object(apps, "SIGNERS", signers),
+                  mock.patch.object(releasecheck, "RELEASES_URL", "file://" + os.path.join(self.d, "releases.json"))):
+            p.start()
+            self.addCleanup(p.stop)
+        self.rows = []
+
+    def release(self, tag, digest=None, sign=True, **row):
+        """A published release: its image's line when `digest`, another
+        file, and the list of both, signed for dev builds unless not."""
+        folder = os.path.join(self.d, tag)
+        os.makedirs(folder)
+        ver = tag.lstrip("v")
+        files = {f"aerieos-controller-{ver}.tar.gz": b"a bundle"}
+        if digest:
+            files[f"aerieos-image-{ver}.digest"] = f"{self.OWN}@{digest}\n".encode()
+        files["SHA256SUMS"] = "".join(f"{hashlib.sha256(b).hexdigest()}  {n}\n" for n, b in files.items()).encode()
+        for n, b in files.items():
+            with open(os.path.join(folder, n), "wb") as f:
+                f.write(b)
+        names = list(files)
+        if sign:
+            subprocess.run(["ssh-keygen", "-q", "-Y", "sign", "-f", self.key, "-n", "aerieos-dev", os.path.join(folder, "SHA256SUMS")],
+                           check=True, stdin=subprocess.DEVNULL, capture_output=True, timeout=30)
+            names.append("SHA256SUMS.sig")
+        self.rows.append({"tag_name": tag, "prerelease": "-" in tag,
+                          "assets": [{"name": n, "browser_download_url": "file://" + os.path.join(folder, n)} for n in names]} | row)
+        with open(os.path.join(self.d, "releases.json"), "w") as f:
+            json.dump(self.rows, f)
+        return folder
+
+    def test_the_newest_signed_release_names_its_image_by_digest(self):
+        self.release("v0.9.1-dev.4400", self.A)
+        self.release("v0.9.1-dev.4500", self.B)
+        self.release("v0.9.1-dev.4600", self.A, draft=True)
+        self.assertEqual(releasecheck.signed_image("dev"),
+                         {"tag": "v0.9.1-dev.4500", "image": self.OWN, "digest": self.B, "ref": f"{self.OWN}@{self.B}",
+                          "signed": "signed by the key AerieOS's dev builds are signed with"},
+                         "the newest published, never a draft")
+        # :latest follows the stable releases, and none is published.
+        self.assertEqual(releasecheck.signed_image("latest"), {"why": "there is no published release"})
+
+    def test_a_release_whose_list_is_not_taken_is_passed_over_for_the_one_before(self):
+        self.release("v0.9.1-dev.4500", self.A)
+        self.release("v0.9.1-dev.4600", self.B, sign=False)
+        got = releasecheck.signed_image("dev")
+        self.assertEqual((got["tag"], got["digest"]), ("v0.9.1-dev.4500", self.A), "an unsigned release's word is nobody's")
+        # With none signed, why not is said and no image is named.
+        self.rows.clear()
+        self.release("v0.9.1-dev.4700", self.B, sign=False)
+        got = releasecheck.signed_image("dev")
+        self.assertNotIn("digest", got)
+        self.assertIn("carries no signed list of its files", got["why"])
+
+    def test_a_signed_release_that_names_no_image_ends_the_look(self):
+        # Never the image of the release before it in its place: the tag
+        # people follow serves the newest release's.
+        self.release("v0.9.1-dev.4500", self.A)
+        self.release("v0.9.1-dev.4600")
+        got = releasecheck.signed_image("dev")
+        self.assertEqual(got["tag"], "v0.9.1-dev.4600")
+        self.assertNotIn("digest", got)
+        self.assertIn("is signed and names no image", got["why"])
+
+    def test_an_image_file_that_is_not_the_one_the_list_names_is_said(self):
+        folder = self.release("v0.9.1-dev.4500", self.A)
+        with open(os.path.join(folder, "aerieos-image-0.9.1-dev.4500.digest"), "w") as f:
+            f.write(f"{self.OWN}@{self.B}\n")
+        got = releasecheck.signed_image("dev")
+        self.assertNotIn("digest", got)
+        self.assertIn("is not the file its signed list names", got["why"])
+        # ...and so is a line that is no image by digest, signed or not.
+        self.rows.clear()
+        folder = self.release("v0.9.1-dev.4800", "latest")
+        self.assertIn("is not the file its signed list names", releasecheck.signed_image("dev")["why"])
+        # The releases not answering is said too.
+        with mock.patch.object(releasecheck, "RELEASES_URL", "file:///nonexistent/releases.json"):
+            self.assertIn("the releases did not answer", releasecheck.signed_image("dev")["why"])
 
 
 if __name__ == "__main__":

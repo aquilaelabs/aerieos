@@ -118,5 +118,80 @@ class ImageCheck(unittest.TestCase):
         self.assertEqual(imagecheck.of("site")["error"], "", "never pulled: nothing asked")
 
 
+class OwnImage(unittest.TestCase):
+    """AerieOS's own image, followed by a tag, is held to the digest the
+    newest signed release names (R199): said by that digest where the tag
+    serves it, and said plainly where the tag serves another."""
+    OWN = "ghcr.io/aquilaelabs/aerieos"
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.OLD, self.NEW, self.ODD = ("sha256:" + c * 64 for c in "abc")
+        self.dv = FakeDevapp({"workshop": {"services": {"app": {"image": self.OWN + ":dev"}}},
+                              "radarr": {"services": {"app": {"image": "lscr.io/linuxserver/radarr:latest"}}}},
+                             {self.OWN + ":dev": self.OLD, "lscr.io/linuxserver/radarr:latest": self.OLD})
+        imagecheck.configure(state=self.tmp, write_json=write_json, devapp_module=self.dv)
+        self.addCleanup(setattr, imagecheck, "DIGESTS_FILE", imagecheck.DIGESTS_FILE)
+        imagecheck.DIGESTS_FILE = f"{self.tmp}/digests.json"
+        self.serves(self.NEW)
+        self.asked = []
+        self.names = {"tag": "v0.9.0-dev.5300", "image": self.OWN, "digest": self.NEW, "ref": f"{self.OWN}@{self.NEW}",
+                      "signed": "signed by the key AerieOS's dev builds are signed with"}
+
+        def signed_image(follow):
+            self.asked.append(follow)
+            if isinstance(self.names, Exception):
+                raise self.names
+            return self.names
+        self.addCleanup(setattr, imagecheck.releasecheck, "signed_image", imagecheck.releasecheck.signed_image)
+        imagecheck.releasecheck.signed_image = signed_image
+
+    def serves(self, digest):
+        write_json(imagecheck.DIGESTS_FILE, {self.OWN + ":dev": digest, "lscr.io/linuxserver/radarr:latest": self.NEW})
+
+    def test_an_update_the_newest_signed_release_names_is_said_by_its_digest(self):
+        got = imagecheck.check_instance("workshop", "main")
+        self.assertEqual(got["behind"], [{"service": "app", "image": self.OWN + ":dev", "to": self.NEW,
+                                          "signed": f"{self.OWN}@{self.NEW}, v0.9.0-dev.5300's own image, signed by the key "
+                                                    "AerieOS's dev builds are signed with"}])
+        self.assertEqual((got["said"], got["error"], self.asked), ([], "", ["dev"]))
+        # Up to date with what the release names: nothing behind, nothing said.
+        self.dv.pulled[self.OWN + ":dev"] = self.NEW
+        got = imagecheck.check_instance("workshop", "main")
+        self.assertEqual((got["behind"], got["said"]), ([], []))
+
+    def test_a_tag_that_serves_another_image_than_the_signed_release_names_is_said_and_offers_no_update(self):
+        self.serves(self.ODD)
+        got = imagecheck.check_instance("workshop", "main")
+        self.assertEqual(got["behind"], [], "no update is offered from the tag")
+        self.assertEqual(got["said"], [
+            f"{self.OWN}:dev serves {self.ODD} now, which is not the image the newest signed release names "
+            f"(v0.9.0-dev.5300: {self.OWN}@{self.NEW}, signed by the key AerieOS's dev builds are signed with). "
+            "The registry's tag was moved by something other than that release's publication, or a newer release is "
+            "not signed yet, so no update is offered from the tag; the signed image is pulled by its digest"])
+        # ...whatever the container runs, the one the tag serves included.
+        self.dv.pulled[self.OWN + ":dev"] = self.ODD
+        self.assertEqual(len(imagecheck.check_instance("workshop", "main")["said"]), 1)
+
+    def test_where_no_release_says_the_row_is_as_any_other_images(self):
+        for names in ({"why": "v0.9.0-dev.5200 carries no signed list of its files"}, RuntimeError("no network"),
+                      # A release that names another repository's image says nothing of this one.
+                      {"tag": "v1", "image": "ghcr.io/somebody/else", "digest": self.ODD, "ref": "x", "signed": "y"}):
+            self.names = names
+            got = imagecheck.check_instance("workshop", "main")
+            self.assertEqual((got["behind"], got["said"]), ([{"service": "app", "image": self.OWN + ":dev", "to": self.NEW}], []))
+
+    def test_no_other_image_asks_the_releases_and_one_check_asks_once(self):
+        imagecheck.check_instance("radarr", "main")
+        self.assertEqual(self.asked, [])
+        self.assertEqual(imagecheck.release_image(self.OWN + ":0.9.0"), {}, "a version's own tag is no tag a publication moves")
+        self.assertEqual(imagecheck.release_image("ghcr.io/somebody/aerieos:dev"), {})
+        memo = {}
+        for _ in range(3):
+            imagecheck.check_instance("workshop", "main", memo)
+        self.assertEqual(self.asked, ["dev"])
+
+
 if __name__ == "__main__":
     unittest.main()

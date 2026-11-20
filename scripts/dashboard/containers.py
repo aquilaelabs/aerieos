@@ -974,8 +974,13 @@ def manager_view(nid, seen):
             i["nginx_to"] = nginxproxy.behind_named(i.get("project", ""))
         # ...and any other's registry images behind what the registry serves
         # (imagecheck, R195): the row says which, with Update.
+        # AerieOS's own image is said by the digest its release's signed
+        # list names, and a tag that serves another image than the newest
+        # signed release names is said in a line of its own (R199).
         else:
-            i["images_behind"] = [b["image"] for b in imagecheck.of(i.get("name", "")).get("behind") or []]
+            checked = imagecheck.of(i.get("name", ""))
+            i["images_behind"] = [b["image"] + (f" ({b['signed']})" if b.get("signed") else "") for b in checked.get("behind") or []]
+            i["images_said"] = [str(s) for s in checked.get("said") or []]
     if seen is not None:
         was = len(got.get("instances") or []) + len(got.get("containers") or [])
         got["instances"] = [i for i in got.get("instances") or []
