@@ -140,7 +140,7 @@ TIERS = ("official", "vetted", "url")
 CONFIG_KINDS = ("secret", "text", "choice", "list", "switch", "projects")
 # Declared downloads (install.fetch): how many a pack may name, and the
 # pack format that brought them.
-FETCH_MAX, FETCH_FORMAT = 32, 3
+FETCH_MAX, FETCH_FORMAT = packformat.FETCH_MAX, 3
 CONFIG_NAME = re.compile(r"^[a-z][a-z0-9_-]{0,39}$")
 ENV_NAME = re.compile(r"^[A-Z][A-Z0-9_]{0,40}$")
 # A deployed thing an official pack stands for (R172): the model router,
@@ -797,6 +797,15 @@ def validate(m, shipped=(), official=False):
            "about": str(m.get("about") or "")[:400]}
     if official and isinstance(m.get("shipped"), dict):
         out["shipped"] = m["shipped"]
+        # What its recipe says of its downloads (a pin, declared downloads,
+        # the keys it carries, steps that keep the network) is the format's
+        # as a pack's is: held to its shape, and to the number it says.
+        src = m["shipped"].get("source")
+        if isinstance(src, dict) and packformat.source_refused(src):
+            errors.append(f"shipped.source: {packformat.source_refused(src)}")
+        if packformat.source_format(src) > fmt:
+            errors.append(f'what shipped.source says of its downloads is pack format {packformat.source_format(src)}\'s: '
+                          f'the manifest says "format": {packformat.source_format(src)}')
     elif m.get("shipped") is not None:
         errors.append("shipped (a toolchain's recipe) is an official pack's alone")
     if m.get("agent") is not None:
@@ -889,27 +898,47 @@ def validate(m, shipped=(), official=False):
     # and where inside the pack it is kept. AerieOS fetches and checks each
     # before the steps run, and the steps then run with no network, so what
     # is not declared cannot arrive.
-    fetch, raw = [], inst.get("fetch")
+    #
+    # From pack format 5 (the operator, 20 Nov: everything an install takes
+    # from somewhere else is held to something its entry carries, by one
+    # mechanism): a download may name the platform it is for, and may be
+    # held by its publisher's signature in the sha256's place (signed),
+    # under a key the pack carries (install.keyring); and a pack whose
+    # installer downloads the rest by itself says so in a sentence
+    # (install.online), which keeps the network for its steps. The shapes
+    # are the format's (packformat), the same a shipped row's source takes.
+    fetch, raw, new = [], inst.get("fetch"), []
     if raw is not None:
-        if not isinstance(raw, list) or len(raw) > FETCH_MAX:
-            errors.append(f"install.fetch lists up to {FETCH_MAX} downloads, each {{url, sha256, to}}")
-            raw = []
-        kept_as = set()
-        for i, f in enumerate(raw):
-            url, sha, to = (str(f.get(k) or "") for k in ("url", "sha256", "to")) if isinstance(f, dict) else ("", "", "")
-            if not (re.fullmatch(r"https://[A-Za-z0-9.-]{1,253}(:\d{1,5})?/[\x21-\x7e]{0,1900}", url) and re.fullmatch(r"[0-9a-f]{64}", sha)
-                    and REL.fullmatch(to) and to != MANIFEST and to not in kept_as and set(f) <= {"url", "sha256", "to"}):
-                errors.append(f"install.fetch {i + 1} is {{url, sha256, to}}: an https address, the sha256 of what it answers (64 hex digits), "
-                              "and the file inside the pack it is kept as, each named once")
-                continue
-            kept_as.add(to)
-            fetch.append({"url": url, "sha256": sha, "to": to})
+        fetch, said, parts = packformat.fetch_checked(raw, "install.fetch", reserved=(MANIFEST,))
+        errors.extend(said)
+        new += [f"install.fetch's {p}" for p in sorted(parts)]
         if fmt < FETCH_FORMAT:
             errors.append(f'install.fetch (declared downloads) is pack format {FETCH_FORMAT}\'s: the manifest says "format": {FETCH_FORMAT}')
         # The hosts it fetches from are its touches too, said or not.
         hosts = out["touches"]["hosts"]
-        out["touches"]["hosts"] = hosts + sorted({f["url"].split("/")[2].split(":")[0].lower() for f in fetch} - set(hosts))
+        mine = {u.split("/")[2].split(":")[0].lower() for f in fetch for u in (f["url"], (f.get("signed") or {}).get("sig")) if u}
+        out["touches"]["hosts"] = hosts + sorted(mine - set(hosts))
     out["fetch"] = fetch
+    # Kept only where the manifest says them, so a pack from before them is
+    # kept as it was.
+    if inst.get("keyring") is not None:
+        out["keyring"], said = packformat.keyring_checked(inst["keyring"], "install.keyring")
+        errors.extend(said)
+        new.append("install.keyring")
+    if inst.get("online") is not None:
+        out["online"], said = packformat.online_checked(inst["online"], "install.online")
+        errors.extend(said)
+        new.append("install.online")
+    if new and fmt < packformat.HELD_FORMAT:
+        errors.append(f'{", ".join(new)} {"is" if len(new) == 1 else "are"} pack format {packformat.HELD_FORMAT}\'s: '
+                      f'the manifest says "format": {packformat.HELD_FORMAT}')
+    # A pack carries the key its downloads are checked with: the release's
+    # own publishers' keys (config/release-keys) are a shipped row's to name.
+    for f in fetch:
+        keys = (f.get("signed") or {}).get("keys")
+        if keys and not official and keys not in (out.get("keyring") or {}):
+            errors.append(f"install.fetch's {f['to']} is signed under {keys}, which install.keyring does not carry: "
+                          "a pack carries the public key its download is checked with")
     lay = m.get("layout") or {}
     if not isinstance(lay, dict):
         errors.append("layout is an object: bin, env and tool")
@@ -1612,9 +1641,17 @@ def recipe(rec):
     src = {"kind": "git", "url": url, "commit": _bundle_commit(rec), "fresh_only": True}
     # Its declared downloads (pack format 3), fetched and checked on the
     # node before its steps, which then run with no network where the node
-    # can cut it (sdk.sh sdk_fetch_declared, sdk_net_cut).
+    # can cut it (sdk.sh sdk_declared, sdk_net_cut); the keys it carries
+    # for the ones its publisher signs; and, for one whose installer
+    # downloads the rest by itself, the sentence that keeps the network for
+    # its steps in the cut's place (pack format 5).
     if m.get("fetch"):
         src["fetch"] = m["fetch"]
+    if m.get("keyring"):
+        src["keyring"] = m["keyring"]
+    if m.get("online"):
+        src["online"] = m["online"]
+    elif m.get("fetch"):
         src["offline"] = True
     if m["steps"]:
         src["then"] = [{"run": s} for s in m["steps"]]

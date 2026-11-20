@@ -1,0 +1,35 @@
+{
+  "name": "osprey",
+  "label": "Osprey",
+  "about": "The Osprey build tool: one static program that builds, tests and packages.",
+  "format": 5,
+  "framework": "5.2",
+  "maker": "Osprey Build Authors",
+  "tier": "official",
+  "platforms": ["linux/amd64", "linux/arm64"],
+  "terms": [{"label": "Osprey (MIT)", "url": "https://github.com/osprey-build/osprey/blob/main/LICENSE"}],
+  "layout": {"bin": ["bin"], "env": {}, "tool": "bin/osprey"},
+  "shipped": {
+    "probe": "osprey",
+    "source": {
+      "kind": "tarball",
+      "url": {
+        "linux/amd64": "https://github.com/osprey-build/osprey/releases/download/{version}/osprey-{version}-linux-x64.tar.gz",
+        "linux/arm64": "https://github.com/osprey-build/osprey/releases/download/{version}/osprey-{version}-linux-arm64.tar.gz"
+      },
+      "version": {"resolver": "github-release", "repo": "osprey-build/osprey"},
+      "checksum": {
+        "from": "pin",
+        "version": "v4.2.0",
+        "sha256": {
+          "linux/amd64": "2c624232cdd221771294dfbb310aca000a0df6ac8b66b696d90ef06fdefb64a3",
+          "linux/arm64": "19581e27de7ced00ff1ce50b2047e7a567c76b1cbaebabe5ef03f7c3017bb5b7"
+        }
+      },
+      "strip": 1,
+      "fresh_only": true,
+      "offline": true,
+      "verify": ["{dir}/bin/osprey", "--version"]
+    }
+  }
+}

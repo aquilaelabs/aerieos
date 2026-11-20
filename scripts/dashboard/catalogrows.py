@@ -73,11 +73,17 @@ def manifest_of(row):
             shipped[k] = lay[k]
     if rev_of(row) > 1:
         shipped["rev"] = rev_of(row)
+    # The format its recipe needs, where what it says of its downloads is
+    # past format 1 (packformat.source_format): an install that does not
+    # read it then leaves the entry, and its own shipped row stays.
+    fmt = packformat.source_format(row.get("source"))
+    numbered = {**row, "format": fmt} if fmt > 1 else row
     return {"name": row["name"], "label": row["label"], "about": row.get("about", ""), "tier": "official",
+            **({"format": fmt} if fmt > 1 else {}),
             # Who the tool is by, and each of them where it carries several
             # makers' (packformat.maker_of), where the row says.
             **{k: row[k] for k in ("maker", "credits") if row.get(k)},
-            **({"framework": packformat.least(row)} if packformat.least(row) else {}),
+            **({"framework": packformat.least(numbered)} if packformat.least(numbered) else {}),
             "platforms": row.get("platforms") or ["linux/amd64"], "terms": row.get("terms") or [],
             "layout": {k: v for k, v in lay.items() if k in ("bin", "env", "tool")},
             "shipped": shipped}
@@ -134,10 +140,12 @@ def checked(row, shipped):
     ck = src.get("checksum")
     if isinstance(ck, dict) and ck.get("from") not in (None, *CHECKSUMS):
         return None, f"it checks a download by {ck.get('from')}, which this AerieOS does not carry: a newer AerieOS reads it"
-    # A pin is the row's own word for what its download is, so its shape is
-    # held here: a malformed one would refuse every install of the row.
-    if isinstance(ck, dict) and ck.get("from") == "pin" and packformat.pin_refused(ck):
-        return None, packformat.pin_refused(ck)
+    # What it says of its downloads is the row's own word for what they
+    # are (its pin, the downloads it declares, the keys it carries, whether
+    # its steps keep the network), so its shape is held here: said wrong, an
+    # install of the row would be refused on every node.
+    if packformat.source_refused(src):
+        return None, packformat.source_refused(src)
     if not isinstance(row.get("layout"), dict):
         return None, "it has no layout"
     if rev_of(row) <= rev_of(shipped):

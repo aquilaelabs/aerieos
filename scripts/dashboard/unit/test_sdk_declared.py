@@ -232,7 +232,8 @@ class Signed(Base):
 
     def signed_kit(self, keyring):
         sig = self.sign("data.bin")
-        self.kit(fetch=[{"url": self.data_url, "to": "dl/data.bin", "signed": {"sig": sig, "keys": "kit.asc"}}], keyring=keyring)
+        # As a pack's recipe hands it over: the sha256 a signed one has none of is empty.
+        self.kit(fetch=[{"url": self.data_url, "sha256": "", "to": "dl/data.bin", "signed": {"sig": sig, "keys": "kit.asc"}}], keyring=keyring)
 
     def test_the_right_key_in_the_entry_s_keyring_passes(self):
         self.signed_kit({"kit.asc": self.pub_asc})

@@ -1,0 +1,31 @@
+{
+  "name": "quill",
+  "label": "Quill",
+  "about": "Checks prose: Markdown, plain text and commit messages, against a style a project keeps.",
+  "format": 5,
+  "framework": "5.2",
+  "maker": "Quill Project",
+  "platforms": ["linux/amd64", "linux/arm64"],
+  "terms": [{"label": "Apache-2.0", "url": "https://www.apache.org/licenses/LICENSE-2.0"}],
+  "install": {
+    "fetch": [
+      {"url": "https://github.com/quill-prose/quill/releases/download/v3.1.0/quill-3.1.0-linux-x64.tar.gz",
+       "sha256": "2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae",
+       "to": "dl/quill.tar.gz",
+       "platform": "linux/amd64"},
+      {"url": "https://github.com/quill-prose/quill/releases/download/v3.1.0/quill-3.1.0-linux-arm64.tar.gz",
+       "sha256": "fcde2b2edba56bf408601fb721fe9b5c338d10ee429ea04fae5511b68fbf8fb9",
+       "to": "dl/quill.tar.gz",
+       "platform": "linux/arm64"},
+      {"url": "https://github.com/quill-prose/quill-rules/archive/refs/tags/2026.11.tar.gz",
+       "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+       "to": "dl/rules.tar.gz"}
+    ],
+    "steps": [["sh", "{dir}/install.sh"]],
+    "verify": ["{dir}/bin/quill", "--version"]
+  },
+  "layout": {"bin": ["bin"], "tool": "bin/quill"},
+  "verbs": {
+    "check": {"about": "What a file's prose breaks of the project's style.", "usage": "FILE", "run": ["{dir}/bin/quill", "check", "{args}"]}
+  }
+}
