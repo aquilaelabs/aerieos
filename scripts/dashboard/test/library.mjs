@@ -283,6 +283,15 @@ await section("the whole description", async () => {
     ok(await page.$eval(ENTRY(app), r => /image:/.test(r.querySelector('.libcompose')?.textContent || '')
        && /Asks for /.test(r.querySelector('.ldetail').textContent) && /New container opens the Containers page/.test(r.querySelector('.ldetail').textContent)),
        `an app's page holds its compose file, what its panel asks for and how New container makes it one (${app})`);
+    // ...and whether every image it runs is named by its digest, in one
+    // line: the fixture's apps are written in pack format 5, so they are.
+    const held = await page.$eval(ENTRY(app), r => r.querySelector('.ldetail .tcheld')?.textContent || '');
+    const drawn = await page.evaluate(() => { const d = document.createElement('div');
+      const row = h => { d.innerHTML = libDetail({ kind: 'app', name: 'x', label: 'X', port: 1, fields: [], held: h }); return d.querySelector('.tcheld')?.textContent || ''; };
+      return [row({ word: 'pinned', why: '' }), row({ word: 'open', why: 'web names its image by a tag alone' }), row(null)]; });
+    ok(held === 'Every image it runs is named by its digest.' && drawn[0] === held
+       && drawn[1] === 'Its images are named by tag alone: a tag is whatever was last pushed under it.' && drawn[2] === '',
+       `...and says in one line whether its images are named by digest (${held} | ${drawn[1]})`);
   } else ok(true, 'no app rows here (the account may not make containers)');
   const tcRow = ALL.find(x => x.kind === 'toolchain' && (x.tool || x.terms?.length));
   const tc = tcRow ? `toolchain:${tcRow.name}` : '';

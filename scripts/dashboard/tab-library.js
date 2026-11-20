@@ -344,6 +344,11 @@ function libDetail(r){
     lines.push(`<span class="sub">${a?.product ? `${esc(a.product)}, installed` : "Installed"} once per node for its session account${a?.provider ? `; each person signs in with ${/^(?:[AEIOU]|x(?=[A-Z]))/.test(a.provider) ? "an" : "a"} ${esc(a.provider)} account on the Installed page` : ""}.${r.latest ? ` The latest is ${esc(r.latest)}.` : ""}</span>`);
   }
   if (r.kind === "app"){
+    // Whether every image it runs is named by its digest (pack format 5),
+    // in one line, as a toolchain's Details says of its downloads.
+    if (r.held?.word) lines.push(`<span class="sub tcheld">${r.held.word === "pinned"
+      ? "Every image it runs is named by its digest."
+      : "Its images are named by tag alone: a tag is whatever was last pushed under it."}</span>`);
     if (r.tier === "sideloaded") lines.push(`<span class="sub">Added${r.by ? ` by ${esc(r.by)}` : ""}${r.at ? ` ${ago(r.at)}` : ""}, kept as sideloaded: Edit changes it, and Remove in there takes it off the catalog.</span>`);
     if (r.going) lines.push(`<span class="sub warn">${esc(r.going)}</span>`);
     lines.push(`<span class="sub">New container opens the Containers page's dialog on ${esc(r.label)}'s panel, and Create makes it a container there${
