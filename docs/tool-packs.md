@@ -994,6 +994,14 @@ node runs Docker (the card says when it does not); from then on New
 container offers it to everyone, and each Create makes another container
 of it, which keeps beside its compose file which app it was made from.
 
+An app is fixed or re-pinned by a commit to the catalog. When the signed
+index pins another commit of an app kept here, the Library takes that
+definition the next time it reads the index, fetched and checked as the
+first was. A container already made from the app keeps running what it
+has: its Configure offers the newer definition, and where that names
+another image its row offers Update, which moves the image and nothing
+else ([containers.md](containers.md#image-updates)).
+
 ### A session asking for one
 
 A session looks through the catalog with `aerie tool search WORDS`: each

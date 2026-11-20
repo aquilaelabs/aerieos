@@ -25,6 +25,9 @@ this file asks of it:
                              page's own words
   service_row(nid)           where it has more to say on its row than
                              whether it is deployed: the keys it sets
+  service_update(nid, by)    where its Update is its Containers row's:
+                             its compose file written again with the images
+                             its entry names now, and rebuilt
 
 The modules are imported when first asked for and never as this one loads:
 toolpacks reads the table while it loads, and each service's module reads
@@ -124,6 +127,17 @@ def install(kind, nid, by=""):
 
 def remove(kind, nid, by=""):
     return module(kind).service_remove(nid, by)
+
+
+def updates(kind):
+    """Whether a service's Update is the Containers row's own (its compose
+    file written again from its entry and rebuilt, service_update), which
+    it is where its module has no pin and no Update of its own."""
+    return callable(getattr(module(kind), "service_update", None))
+
+
+def update(kind, nid, by=""):
+    return module(kind).service_update(nid, by) if kind in TABLE and updates(kind) else {"error": "it has no update of its own here"}
 
 
 def container_names(nid):

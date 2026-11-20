@@ -747,6 +747,45 @@ def add_catalog(entry, by="", fetch=None):
     return {"app": app, **seen}
 
 
+# A kept app's newer definition (R238): an app is fixed or re-pinned by a
+# commit to the catalog, and the signed index then pins that commit. One
+# kept here from the same repository and folder takes it, fetched and held
+# as its first keep was, so a container made from it is offered the images
+# its entry names now (containers.entry_moved).
+RETRY_S = 3600
+_trying = {}           # {(app, commit): when it was last tried}, so one that fails is asked again in an hour, not on every read
+
+
+def wanted(index):
+    """[(app, entry)] for the kept apps the signed index pins another
+    commit of: an app entry of the same repository and folder, not
+    withdrawn, in a format this build reads."""
+    mine, out = _load(), []
+    for e in (index or {}).get("packs") or []:
+        pin = (mine.get(e.get("name")) or {}).get("pin") or {}
+        if e.get("kind") != "app" or e.get("withdrawn") or not pin or pin.get("commit") == e.get("commit"):
+            continue
+        if (pin.get("url"), pin.get("path", "")) != (e.get("url"), e.get("path", "")) or packformat.too_new(packformat.of(e) or 1):
+            continue
+        out.append((e["name"], e))
+    return out
+
+
+def refresh(index, fetch):
+    """Take the catalog's newer definition of each kept app the index pins
+    another commit of: [(app, "" or why it was not taken)], nothing when
+    nothing was wanted. Who kept it stays who kept it."""
+    said = []
+    for app, e in wanted(index):
+        key = (app, e["commit"])
+        if time.time() - _trying.get(key, 0) < RETRY_S:
+            continue
+        _trying[key] = time.time()
+        r = add_catalog(e, by=str((_load().get(app) or {}).get("by") or ""), fetch=fetch)
+        said.append((app, r.get("error", "")))
+    return said
+
+
 def remove(app):
     """Drop an added app: {ok} or {error}. A container made from it stays
     what it is, its own compose file kept with it."""

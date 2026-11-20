@@ -9,9 +9,12 @@ RepoDigests) against the one the registry serves for that tag now. One that
 differs is behind: its row says so with Update (pull, then up), and the bell
 carries a note per node.
 
-What is not asked: a service whose image is pinned by digest (nginx's,
-which its own tab moves, nginxproxy.py), a service built from code, and an
-image the node has never pulled (Up pulls it; there is nothing to compare).
+What is not asked: a service whose image is named by its digest, a service
+built from code, and an image the node has never pulled (Up pulls it; there
+is nothing to compare). The tag beside a digest is not what runs, so a
+newer build of it is no update: such an image moves when its entry names
+another digest (containers.entry_moved: the app a container was made from,
+a service of AerieOS's), and the row's Update writes that one first.
 
 AerieOS's own image is held to more than its registry (R199): a registry's
 tag is whatever was last pushed under it, and each AerieOS release names the

@@ -4453,6 +4453,25 @@ def _catalog_rows_refresh(index):
             print(f"[dashboard] catalog rows: {name}: " + (why or "the catalog's newer recipe is in use"), flush=True)
         toolchains.refresh_packs()
     threading.Thread(target=run, name="catalog-rows", daemon=True).start()
+def _catalog_apps_refresh(index):
+    """Take a kept Docker app's newer definition from the vetted catalog
+    (R238), off the request that read the index, as a shipped toolchain's
+    newer recipe is taken: an app is fixed or re-pinned by a catalog commit,
+    and a container made from it is then offered the images it names."""
+    if not nasapps.wanted(index):
+        return
+
+    def run():
+        try:
+            said = nasapps.refresh(index, toolpacks.fetch_folder)
+        except Exception as e:                                         # noqa: BLE001 (a catalog's app is never worth a page)
+            print(f"[dashboard] catalog apps: {type(e).__name__}: {e}", flush=True)
+            return
+        for name, why in said:
+            print(f"[dashboard] catalog apps: {name}: " + (why or "the catalog's newer definition is kept"), flush=True)
+    threading.Thread(target=run, name="catalog-apps", daemon=True).start()
+
+
 # The coding agents installed packs bring, beside the table's (R169 step 9).
 agents.pack_source = toolpacks.offered_agents
 workspace.packs_files = toolpacks.hosted_files
@@ -12985,6 +13004,7 @@ class Handler(BaseHTTPRequestHandler):
         cat = catalogindex.index(settings.get("catalog_url") or None) if may_install or may_apps else {}
         if cat.get("index"):
             _catalog_rows_refresh(cat["index"])
+            _catalog_apps_refresh(cat["index"])
         # A newer install recipe the catalog pins for a coding agent is read
         # now, behind the page, so a press on Update finds it (R169 step 13).
         if may_install and not NODES_OK:

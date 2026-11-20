@@ -389,6 +389,13 @@ def service_remove(nid, by=""):
     return remove(nid, devactions, devapp)
 
 
+def service_update(nid, by=""):
+    """Update on its Containers row: its compose file written again, with
+    the images its entry names now, and rebuilt."""
+    containers, devactions, devapp = syscontainer.hands()
+    return apply(nid, containers, devactions, devapp, bool(node_gpu(nid)) if node_gpu else False)
+
+
 def service_row(nid):
     """What the router's row carries beyond the others': its status whole
     (the card draws its configuration from it), what it still needs before

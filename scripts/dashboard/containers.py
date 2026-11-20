@@ -476,6 +476,84 @@ def app_view(name, env_text):
             "newer": {"commit": now.get("commit") or "", "fields": now["fields"], "own": now["own"], "compose": now["compose"]} if newer and now else None}
 
 
+# ---- an image its entry names by another digest ------------------------------
+# Update, for a container that runs an image by digest, means that its
+# entry names another: the app it was made from, as the Library holds it
+# now, or the service of AerieOS's it is. The registry is not asked: the tag
+# beside a digest is not what is run. An image the container still runs by
+# its tag alone moves the same way once its entry names a digest for it.
+def images_moved(mine, entry):
+    """{reference: the entry's} for each image reference of `mine` (a
+    compose file's) that the entry names otherwise: the same image, by its
+    name, under a digest that is not the one it runs. An image the entry
+    names twice, or not at all, or with no digest, is left alone."""
+    import packformat
+    by_name = {}
+    for ref in entry:
+        parts = packformat.image_parts(ref)
+        if parts and parts["digest"]:
+            by_name.setdefault(parts["name"], []).append(ref)
+    out = {}
+    for ref in mine:
+        parts = packformat.image_parts(ref)
+        to = by_name.get(parts["name"]) if parts else None
+        if to and len(to) == 1 and to[0] != ref:
+            out[ref] = to[0]
+    return out
+
+
+def entry_images(name, kept=None):
+    """The images the entry a written container came from names now: the
+    Library's kept app it was made from, or, for one of AerieOS's own, its
+    service's. `kept` is nasapps._all(), read here when not handed in.
+    [] for a container that came from neither (a space's own,
+    one written by hand), and for a service whose own page moves its image."""
+    import packformat
+    import services
+    if not name or not devapp.is_file_source(name):
+        return []
+    if devapp.owner_of(name, devapp.MAIN) == devapp.SYSTEM:
+        nid = devapp._instance_node(name, devapp.MAIN) or ""
+        kind = services.container_names(nid).get(name, "") if nid else ""
+        if not kind or not services.updates(kind):
+            return []
+        return list(services.images(services.module(kind).pack().get("name", "")).values())
+    snap = app_of(name)
+    if not snap:
+        return []
+    import nasapps
+    now = (nasapps._all() if kept is None else kept).get(snap["id"])
+    return packformat.compose_images(now.get("compose")) if now else []
+
+
+def entry_moved(name, kept=None):
+    """images_moved for the container `name`: what its Update would write.
+    `kept` is the Library's apps where the caller has read them already
+    (a page of rows reads them once)."""
+    import packformat
+    entry = entry_images(name, kept)
+    return images_moved(packformat.compose_images(_compose_of(name)), entry) if entry else {}
+
+
+def repin(name):
+    """The first half of Update on a row whose entry names another image:
+    its compose file's image lines moved to the entry's, the rest of the
+    file as it was. {} where nothing moved or it is written and the pull
+    is still to run, {"done": ...} where its service wrote and rebuilt it
+    itself, {"error"} where the file was refused."""
+    import packformat
+    import services
+    moved = entry_moved(name)
+    if not moved:
+        return {}
+    if devapp.owner_of(name, devapp.MAIN) == devapp.SYSTEM:
+        nid = devapp._instance_node(name, devapp.MAIN) or ""
+        r = services.update(services.container_names(nid).get(name, ""), nid)
+        return r if r.get("error") else {"done": r}
+    r = update_container(name, packformat.compose_repinned(_compose_of(name), moved), devapp.read_env(name, devapp.MAIN))
+    return {"error": r["error"]} if r.get("error") else {}
+
+
 def _compose_of(name):
     try:
         return (devapp.containers_dir(name) / "docker-compose.yml").read_text(encoding="utf-8", errors="replace")
@@ -926,6 +1004,7 @@ def manager_view(nid, seen):
     # (relocate.py): the row's line while the jobs pass it between nodes.
     import imagecheck
     import nginxproxy
+    import packformat
     import relocate
     got["images_at"] = imagecheck.last_at()
     # A node whose ports stay on it: a row still publishing on every address
@@ -953,8 +1032,11 @@ def manager_view(nid, seen):
     # opens that one's page. The scanners are a compose job of their own on
     # the node, never an instance, so their containers are put under
     # System here by their compose project's name.
+    import nasapps
     import services
     ours = services.container_names(got["node"]) if got.get("node") else {}
+    # The Library's apps, read once for the rows made from one.
+    kept = nasapps._all()
     for c in got.get("containers") or []:
         if c.get("project") and ours.get(c["project"]) == "scanners":
             c["owner"], c["system"] = devapp.SYSTEM, "scanners"
@@ -972,14 +1054,21 @@ def manager_view(nid, seen):
         # Update (R192); "" for every other row.
         if i.get("owner") == devapp.SYSTEM:
             i["nginx_to"] = nginxproxy.behind_named(i.get("project", ""))
+            # ...and another of AerieOS's own whose entry names another
+            # image than its file runs, with Update as on every row.
+            i["images_behind"] = [packformat.image_said(to) for to in entry_moved(i.get("project", ""), kept).values()]
         # ...and any other's registry images behind what the registry serves
         # (imagecheck, R195): the row says which, with Update.
         # AerieOS's own image is said by the digest its release's signed
         # list names, and a tag that serves another image than the newest
         # signed release names is said in a line of its own (R199).
+        # A container made from an app whose entry names another digest
+        # says that one, short, and the registry is not asked about it.
         else:
             checked = imagecheck.of(i.get("name", ""))
-            i["images_behind"] = [b["image"] + (f" ({b['signed']})" if b.get("signed") else "") for b in checked.get("behind") or []]
+            moved = entry_moved(i.get("project", ""), kept) if (i.get("instance") or devapp.MAIN) == devapp.MAIN else {}
+            i["images_behind"] = [b["image"] + (f" ({b['signed']})" if b.get("signed") else "") for b in checked.get("behind") or []
+                                  if b["image"] not in moved] + [packformat.image_said(to) for to in moved.values()]
             i["images_said"] = [str(s) for s in checked.get("said") or []]
     if seen is not None:
         was = len(got.get("instances") or []) + len(got.get("containers") or [])

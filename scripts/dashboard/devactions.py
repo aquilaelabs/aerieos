@@ -1638,7 +1638,13 @@ def act(project, instance, action, req, *, test_cmd="", gate=True):
     elif action == "down":
         r = down(project, instance)
     elif action == "update":
-        r = update(project, instance)
+        # One whose entry names another image than its file runs has its
+        # image lines moved to the entry's first (containers.repin): the
+        # pull is then of that digest. A service of AerieOS's writes and
+        # rebuilds its own.
+        import containers
+        pinned = containers.repin(project) if instance == devapp.MAIN and devapp.is_file_source(project) else {}
+        r = pinned if pinned.get("error") else pinned["done"] if "done" in pinned else update(project, instance)
     elif action == "test":
         r = test(project, instance, test_cmd,
                  [str(a) for a in (req.get("args") or [])][:32])

@@ -198,7 +198,8 @@ and the ports after the ones the containers already made from apps hold
 on that node, counted even while one is still starting. Its row's
 **Configure** opens the same panel with each value read back
 from its environment, offering a newer definition the Library has kept
-since; the registry update check says when an image's tag moves. Home
+since; its row offers Update when that definition names another image
+([Image updates](#image-updates)). Home
 Assistant runs on the machine's own network and answers on its own port.
 The
 app answers on its port on the node; a hostname and a certificate for it
@@ -531,8 +532,20 @@ anonymous token (imagecheck.py). One that differs says so on its row with
 Update, which pulls (`compose pull --ignore-buildable`) and starts it again;
 the bell carries one note per node. What is built from code is not asked:
 Rebuild is what moves that, and it is ghosted until the code has moved. An
-image pinned by digest (nginx's) is its own page's, an image never pulled is
-pulled by Up, and a private one says the registry would not answer. A
+image never pulled is pulled by Up, and a private one says the registry
+would not answer.
+
+An image run by its digest (`name:tag@sha256:...`) is not asked about
+either: the tag beside a digest is not what runs, so a newer build of that
+tag is no update. For such a container Update means that its entry names
+another image: the app it was made from, once the catalog pins a newer
+definition of it and the Library has kept that, or, for the model router,
+the image this AerieOS names. Its row then says the image with the first
+digits of the digest it would move to, and Update writes that reference
+into its compose file's image line, leaving the rest of the file and its
+environment as they were, then pulls and starts it again. nginx's is its
+own page's and row's, and the scanners' their page's. A container you wrote
+by hand with a bare tag keeps the registry's check. A
 space's container is named whatever its owner wants: Send to Docker
 offers the space's name and the compose file's folder or variant, and the
 Edit dialog renames it while it is down, its record carrying the name while

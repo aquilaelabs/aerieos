@@ -258,7 +258,7 @@ scripts/
     devactions.py                the layer that runs and reports an instance: up, down, rebuild, test, remove, state and act, the compose plan and job runners, on the base devapp.py keeps
     relocate.py                  copying or moving a dev instance to another node, its volumes and data directory with it: three jobs, packed on the old node, unpacked on the new, then its rebuild
     containers.py                containers AerieOS did not build: the daemon's list and controls, ones written from a compose file, and whose each is; the Docker manager's view and verbs
-    imagecheck.py                every container's registry images against what their registries serve (R195): a weekly check, Check for updates on the Containers page, Update on a row
+    imagecheck.py                every container's registry images against what their registries serve (R195): a weekly check, Check for updates on the Containers page, Update on a row; an image named by its digest is not asked about, and moves when its entry names another
     imageregistry.py             a container registry asked what it serves, one client for the protocol whatever the host: the digest a tag serves now, a manifest held to its digest and the platforms a list names, with the anonymous token a host's challenge names; read by imagecheck.py and tools/pins.py
     vms.py                       the VM manager (R91): each project's VMs on the nodes with VM host, the OS catalog matched by name, the limits, and the vm jobs
     gitcreds.py                  who gave a project a token, a line per person in /config/gitcreds naming their key store's entry, and the credential git work is handed: theirs while they are signed in (R135, R159)
