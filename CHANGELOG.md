@@ -52,6 +52,9 @@
 - A bug's Reported by and a roadmap item's Added by name the coding agent that did it, where they always said Claude (89cd7a2)
 - A second session on a space (another slot, or another coding agent) is no longer mistaken for the first when its rule checks report in, which could clear the first one's working-with-no-word mark (944df11)
 - aerie browser finds the store's Firefox where PLAYWRIGHT_BROWSERS_PATH names a folder that is not there or holds none, as it finds Chromium (3e5727d)
+- Edit on a tool pack you added yourself opens that pack's dialog from the Installed page, where it opened Add your own with an empty address whenever Installed was opened by itself (741954c)
+- A git host permission picked under Permissions and not applied yet is unsaved work: leaving the view or closing the notebook asks first, where the pick was dropped with no word (a3e8cba)
+- A node's Enable or Disable that the controller refuses says so once, where it said it twice (bdce886)
 
 ## 0.9.0-dev.5641: 2026-11-18
 
