@@ -3867,7 +3867,7 @@ def node_update_agent(principal, node_id):
                  # A person's press sends again a build the node went back from.
                  **({"again": True} if principal != "system:auto-update" else {}),
                  **({"sig": agent_sig(ours["digest"])} if agent_sig(ours["digest"]) else {}),
-                 **agent_release_keys()})
+                 **agent_release_keys(), **agent_spare_said()})
     if r.get("ok"):
         audit(principal, "node-update-agent", node_id, {"to": ours["digest"]})
     return r
@@ -3889,6 +3889,28 @@ def agent_release_keys():
     vouched for: this side checks nothing here either."""
     keys = enrollscript.release_keys()
     return {"release_keys": keys} if keys else {}
+
+
+def agent_spare_said():
+    """The release key's signed word for its spare, where this build's
+    agent.sig carries one (tools/sign-agent.py writes it when the release
+    key itself signs the build), passed on beside every agent update and in
+    every hello as release_spare_sig: {"key": the spare, "sig": the
+    signature}. A node that pinned the release key and no spare pins the
+    spare on it, when the signature is the key's it pinned (the agent's
+    release.spare_pin); every other node reads none of it. {} for a build
+    with none. Passed on as it is: this side holds no key and checks
+    nothing, and its own word adds no key anywhere."""
+    try:
+        said = json.loads((AGENT_DIR / "agent.sig").read_text()).get("spare")
+    except (OSError, ValueError, AttributeError):
+        return {}
+    if not isinstance(said, dict):
+        return {}
+    key, sig = str(said.get("key") or "").lower(), str(said.get("sig") or "").lower()
+    if not re.fullmatch(r"[0-9a-f]{64}", key) or not re.fullmatch(r"[0-9a-f]{128}", sig):
+        return {}
+    return {"release_spare_sig": {"key": key, "sig": sig}}
 
 
 def agent_carried():
@@ -5888,7 +5910,7 @@ def hello(nid, census, addr, version="", digest="", running=None, keep=None, rot
                                      "concurrency": n["concurrency"]},
             "agent": {"digest": ours["digest"], "version": ours["version"],
                       **({"sig": agent_sig(ours["digest"])} if agent_sig(ours["digest"]) else {}),
-                      **agent_release_keys()},
+                      **agent_release_keys(), **agent_spare_said()},
             # Where every toolchain lands, from the catalog: the node has no
             # catalog of its own, and this is what stops it keeping a second
             # copy of the answer that drifts from ours.
@@ -8899,6 +8921,9 @@ def tab_view(rows, admin):
     listed, list_signed = bundle_files() if admin else ("", False)
     return {"nodes": rows, "agent": (agent_shipped() | {"release_key": enrollscript.release_key()[:16],
                                                         "release_spare": (enrollscript.release_keys()[1:] or [""])[0][:16],
+                                                        # ...and whether this build carries the release key's
+                                                        # word for that spare, which a node pins it from.
+                                                        "spare_said": bool(agent_spare_said()),
                                                         "signed": bool(agent_sig()),
                                                         "files": listed.split(":", 1)[-1][:16],
                                                         "files_signed": bool(list_signed)}) if admin else {},

@@ -525,6 +525,30 @@ def pin_release(keys):
     return True
 
 
+def pin_spare(first, key):
+    """The release key's spare pinned by the agent itself, on the release
+    key's own signed word for it (release.spare_pin): set in node.json
+    beside the key, under the lock and through the whole-file write the
+    console's own save uses. The record is read here, under the lock: it is
+    written only while it still holds `first` as its release key and no
+    spare, and no choice to pin none, so what a person did at the console
+    in the meantime stands. Whether the spare was pinned; an error where
+    the record could not be read or written, which leaves it as it was."""
+    first, key = release.clean_key(first), release.clean_key(key)
+    d = os.path.dirname(NODE_JSON)
+    with _save_lock, open(os.path.join(d, ".node.json.lock"), "a") as held:
+        fcntl.flock(held.fileno(), fcntl.LOCK_EX)
+        with open(NODE_JSON) as f:
+            cur = json.load(f)
+        if not isinstance(cur, dict):
+            raise ValueError(f"{NODE_JSON} does not hold a node's record")
+        if not first or not key or key == first or release.pinned(cur) != first or release.spare(cur) or release.unpinned(cur):
+            return False
+        cur["release_spare"] = key
+        _save(cur, True, d)
+    return True
+
+
 def _save(state, console, d):
     if not console:
         try:

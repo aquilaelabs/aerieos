@@ -13,19 +13,29 @@ root installs from the bundle, and over the list of every file the bundle
 ships (scripts/lib/bundleparts.py: aerie, its library, the shipped catalog,
 the publishers' keys, root's tools, the hooks).
 
+A build the release key itself signs carries a fourth thing, where
+config/aerieos-release.pub names a spare: the release key's own statement
+that the second key is its spare, under a fourth line (release.SPARE_MESSAGE).
+A node that pinned the release key before the spare was named pins the
+spare from it, with nobody at its console (release.spare_pin). A build the
+spare signs makes none, and neither does a builder's: only the first key
+says what its spare is.
+
     tools/sign-agent.py --keygen
         a new key pair, printed once: the private half for the build's
         secret (AERIEOS_RELEASE_KEY), the public half for
         config/aerieos-release.pub, which is committed.
     AERIEOS_RELEASE_KEY=... tools/sign-agent.py
         writes scripts/agent/agent.sig for the agent, root's tools and the
-        bundle's files as this tree holds them. With no key in the
-        environment it writes nothing and says so: a build from a branch
-        ships unsigned.
+        bundle's files as this tree holds them, and the release key's
+        statement of its spare when the key is the file's first and the
+        file names a spare. With no key in the environment it writes
+        nothing and says so: a build from a branch ships unsigned.
     tools/sign-agent.py --check
         whether scripts/agent/agent.sig is the committed public key's
         signature over this tree's agent, root's tools and the bundle's
-        files, all three: exit 0 when it is, 1 when not.
+        files, all three, and whether a build the release key signed names
+        the file's spare under that key: exit 0 when it is, 1 when not.
     tools/sign-agent.py --digests
         the three digests this tree would be signed as, one a line with its
         name, and nothing written: for comparing a build with a checkout
@@ -125,10 +135,11 @@ def public_key():
     return (public_keys() or [""])[0]
 
 
-def _write(key, path):
+def _write(key, path, spare=""):
     """The signature file for this tree's agent, root's tools and the
     bundle's files under `key`, written to `path`: what was signed, in
-    words (each digest shortened)."""
+    words (each digest shortened). `spare` is the key `key` states to be
+    its spare, where it is the release key and the file names one."""
     release = _load("release")
     d, t, b = digest(), tools_digest(), bundle_digest()
     out = {"digest": d, "sig": key.sign(release.MESSAGE + d.encode()).hex(), "key": key.public_key().public_bytes_raw().hex(),
@@ -138,10 +149,33 @@ def _write(key, path):
            # ...and the list of every file a release ships in that bundle,
            # under a third line: the controller passes it on beside the list.
            "bundle": {"digest": b, "sig": key.sign(release.BUNDLE_MESSAGE + b.encode()).hex()}}
+    if spare:
+        # The release key's word for its spare, under a fourth line: what a
+        # node that pinned this key alone pins the spare from. Of the keys
+        # and nothing in the tree, so every build this key signs says it.
+        out["spare"] = {"key": spare, "sig": key.sign(release.SPARE_MESSAGE + spare.encode()).hex()}
     with open(path, "w", encoding="utf-8") as f:
         json.dump(out, f)
         f.write("\n")
     return f"the agent {d[:19]}…, root's tools {t[:19]}… and the bundle's files {b[:19]}…"
+
+
+def _spare_why(got, by):
+    """Why agent.sig's statement of the spare is not what a build signed by
+    `by` carries, or "": a build the file's first key signed names the
+    file's spare under that key, where the file names one; any other build
+    names none, and one that does all the same is held to the same words."""
+    release = _load("release")
+    keys, said = public_keys(), got.get("spare")
+    if said is None:
+        return "it does not name the release key's spare, which a build signed by the release key does" \
+            if len(keys) > 1 and by == keys[0] else ""
+    if len(keys) < 2:
+        return f"it names a spare and {os.path.relpath(PUB)} names none"
+    named = release.spare_said(keys[0], said)
+    if not named:
+        return "its statement of the spare is not signed by the release key"
+    return "" if named == keys[1] else f"it names another spare than {os.path.relpath(PUB)} does"
 
 
 def _console(pub):
@@ -278,7 +312,12 @@ def main(argv):
             "it is for other files than this tree's bundle ships" if part.get("digest") != bundle_digest() else \
             release.verify(by or public_key(), part.get("digest"), part.get("sig"), release.BUNDLE_MESSAGE)
         print(f"{os.path.relpath(SIG)}: the bundle's files: " + (bwhy or f"signed by {(by or public_key())[:16]}… for {bundle_digest()[:19]}…"))
-        return 1 if why or twhy or bwhy else 0
+        # ...and the release key's statement of its spare, under the fourth
+        # line: there in a build that key signed, and nowhere else.
+        swhy = _spare_why(got, by)
+        if swhy or got.get("spare") is not None:
+            print(f"{os.path.relpath(SIG)}: the spare: " + (swhy or f"named by {public_key()[:16]}… as {public_keys()[1][:16]}…"))
+        return 1 if why or twhy or bwhy or swhy else 0
     if argv[:1] == ["--builder-keygen"]:
         return _builder_keygen(argv[1:], Ed25519PrivateKey)
     if argv[:1] == ["--builder"]:
@@ -303,8 +342,11 @@ def main(argv):
               + ", ".join(k[:16] + "…" for k in public_keys()) + "): nodes pinned to those would refuse this build, "
               "so nothing is signed", file=sys.stderr)
         return 2
-    print(f"signed {_write(key, SIG)} with the "
-          + ("spare release key" if pub in public_keys()[1:] else "release key") + f" {pub[:16]}…")
+    # The first key says what its spare is; the spare says nothing of the kind.
+    spare = public_keys()[1] if pub == public_keys()[0] and len(public_keys()) > 1 else ""
+    print(f"signed {_write(key, SIG, spare)} with the "
+          + ("spare release key" if pub in public_keys()[1:] else "release key") + f" {pub[:16]}…"
+          + (f", and named its spare {spare[:16]}…" if spare else ""))
     return 0
 
 

@@ -16,7 +16,7 @@ from .coverage import _COV_OUT, _cov_write
 from .base import BEAT_S, REFUSED, RUNNER_DIAG_KEEP, SESSION_WALL, TRIAL_S, cap_file, fs_holds, log, log_once, own_digest, own_path, prune_dir
 from .base import back_note, selfcheck, test_lock_ready, trial_begin, trial_give_way, trial_note, trial_passed
 from .controller import Controller
-from .stores import console_said, load_state, pin_release, save_state, use_scope
+from .stores import console_said, load_state, pin_release, pin_spare, save_state, use_scope
 from .toolchains import share_images
 from .sessnet import SessionNet
 from .runners import RunnersMixin, runner_dirs
@@ -192,6 +192,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         self.controller_digest = ""
         self.controller_sig = ""          # the release's signature over that digest, where the build has one
         self.controller_keys = []         # the release keys the controller's build names (release.first_pin)
+        self.controller_spare = None      # the release key's signed word for its spare (release.spare_pin)
         self.warned_caps = False
         # The session half (roadmap #24): whether its terminals are set up,
         # the bundle they run bb-tty from, and when the last start was tried.
@@ -492,9 +493,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             self.hello_at = time.monotonic()
             self.hello_said = True           # the first is said on the loop; the rest beside it
             self.poll = int(r.get("poll") or 25)
-            self.controller_digest = (r.get("agent") or {}).get("digest") or ""
-            self.controller_sig = (r.get("agent") or {}).get("sig") or ""
-            self.controller_keys = (r.get("agent") or {}).get("release_keys") or []
+            self.shipped_named(r.get("agent"))
             # Where toolchains land, from the controller's catalog. Kept on the
             # record so a job started before the next hello still has it, and
             # only replaced when the controller has one: none (a catalog that
@@ -1153,6 +1152,55 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             f"{' '.join((job.get('spec') or {}).get('argv') or [])[:80]}")
         j.start()
 
+    def shipped_named(self, named):
+        """What a hello's answer says of the agent its controller ships,
+        kept for the update that follows: its digest, the release's
+        signature over it, the release keys the build names, and the
+        release key's own word for its spare where the build carries one.
+        A node that holds that key and no spare pins the spare here, on
+        the hello itself, and says hello again so its row reads it."""
+        named = named if isinstance(named, dict) else {}
+        self.controller_digest = named.get("digest") or ""
+        self.controller_sig = named.get("sig") or ""
+        self.controller_keys = named.get("release_keys") or []
+        self.controller_spare = named.get("release_spare_sig")
+        if self.take_spare(self.controller_spare):
+            self.hello_again("the release key's spare was pinned")
+
+    def take_spare(self, said, job=None):
+        """The release key's spare pinned here on the release key's own
+        word for it (release.spare_pin): `said` is the statement a release's
+        build signed with the key this node pinned, as the controller's
+        hello or an update's spec carries it. Read against the file, which
+        the console writes, and written under its lock (pin_spare). Said
+        once, in this node's log and in `job`'s where one asked; whether
+        the spare was pinned. A statement that pins nothing says nothing: a
+        build with none, a node that has a spare, one that pinned no key or
+        chose to pin none, and a statement under any other key."""
+        from . import release
+        if not isinstance(said, dict):
+            return False
+        try:
+            trust = load_state()
+        except SystemExit:
+            return False
+        key = release.spare_pin(trust, said)
+        if not key:
+            return False
+        first = release.pinned(trust)
+        try:
+            if not pin_spare(first, key):
+                return False
+        except (OSError, ValueError) as e:
+            log_once("spare-pin", f"the release key's spare could not be pinned here ({e}); it is tried again at the next hello")
+            return False
+        words = (f"pinned the release key's spare ({key[:16]}…), named by the release key this node pinned ({first[:16]}…): "
+                 "from here this node takes updates signed by either")
+        log(words)
+        if job is not None:
+            job.say(words + "\n")
+        return True
+
     # -- self-update (door 4) ------------------------------------------------
     def self_update(self, job, spec):
         want = spec.get("digest") or self.controller_digest
@@ -1201,6 +1249,9 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         # the digest above is the controller's word, the signature is not.
         # Read from the file, which the console writes, not this process's copy.
         from . import release
+        # The spare first, where the update names it under the key pinned
+        # here: the update is then judged by both.
+        self.take_spare(spec.get("release_spare_sig") or getattr(self, "controller_spare", None), job)
         try:
             trust = load_state()
         except SystemExit:

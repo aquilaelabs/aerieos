@@ -552,8 +552,16 @@ both takes an update signed by either. When the first key is lost or has
 to go, the spare signs in its place and nothing is cut off; the next
 release then names the spare as its first key and a new spare beside it.
 Two is the most either file names: every key held is one more that can
-sign. A node enrolled before a spare was named pins it the next time its
-Enroll script is run, and its row says so under Updates until then.
+sign. A node enrolled before a spare was named pins it by itself: a build
+the release key signed carries that key's own statement of which key is
+its spare (`tools/sign-agent.py` writes it into `scripts/agent/agent.sig`
+under a line of its own, and the controller passes it on with its hello and
+with an update), and a node that holds the release key and no spare pins
+the one named when the statement is signed by the key it pinned. A
+controller's word alone adds no key, a statement under any other key pins
+nothing (a key added at the console among them), and a node that has a
+spare, or whose console chose to pin no key, is left as it is. Its row
+says no spare is pinned under Updates until then.
 `config/release-signers` was a list from the start, and its dev lines are
 written from the release key and its spare (`tools/release-signers.py`,
 held by `aerie lint`), so a build signed by either is taken.

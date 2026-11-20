@@ -65,6 +65,17 @@ node.json as release_also): an update or a list of root's tools signed by an
 added key, or a bundle whose list one signed, is taken as one the release
 signed, and said as what it is. Nothing a controller sends adds, changes or
 drops one.
+
+A node enrolled before the release named a spare holds the first key alone.
+It pins the spare on the release key's own word: a release's build signs,
+with the first key, a statement that names the spare, under a line of its
+own (tools/sign-agent.py writes it into agent.sig, and the controller hands
+it on with its hello and with an update). A node that holds the first key
+and no spare, on a statement whose signature holds under the key it pinned,
+pins the spare named (spare_pin). The statement is the pinned key's and not
+the controller's: one under any other key pins nothing, a key added at the
+console among them, and so does one on a node that has a spare already or
+whose console chose to pin no key.
 """
 import hashlib
 import re
@@ -83,6 +94,10 @@ TOOLS_MESSAGE = b"aerieos root tools v1\n"
 # line, then the digest of that list as the bundle carries it. A third line,
 # so no signature passes as another.
 BUNDLE_MESSAGE = b"aerieos bundle v1\n"
+# ...and for the release key's word that another key is its spare: this
+# line, then the spare as 64 hex characters. A fourth line, so a signature
+# over an agent, root's tools or a bundle's list never names a spare.
+SPARE_MESSAGE = b"aerieos release spare v1\n"
 # What a controller adds to the bundle beside the files a release ships, so
 # what a release's list never names and a pinned node lets ride: a person's
 # tool packs and the packs made on that install, which are theirs and differ
@@ -265,6 +280,43 @@ def verify(key, digest, sig, message=MESSAGE):
     except ValueError as e:
         return f"the pinned key or the signature is not usable ({e})"
     return ""
+
+
+def spare_said(key, said):
+    """The spare `said` names, where it is `key`'s own word for it: `said`
+    is {"key": the spare, "sig": the signature} as a release's build writes
+    it (tools/sign-agent.py), signed by `key` over SPARE_MESSAGE and the
+    spare's 64 hex characters. "" for anything else: no statement, one in
+    another shape, one that names `key` itself, one whose signature is not
+    `key`'s, and any where this node has no library to check it with."""
+    if not isinstance(said, dict) or not isinstance(said.get("key"), str) or not isinstance(said.get("sig"), str):
+        return ""
+    key, second, sig = clean_key(key), clean_key(said["key"]), said["sig"].strip().lower()
+    if not key or not second or second == key or not SIG_RE.fullmatch(sig):
+        return ""
+    try:
+        from cryptography.exceptions import InvalidSignature
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+    except ImportError:
+        return ""
+    try:
+        Ed25519PublicKey.from_public_bytes(bytes.fromhex(key)).verify(bytes.fromhex(sig), SPARE_MESSAGE + second.encode())
+    except (InvalidSignature, ValueError):
+        return ""
+    return second
+
+
+def spare_pin(state, said):
+    """The spare a node pins by itself on the statement `said`, or "": the
+    key the statement names, for a node that holds the release key and no
+    spare, when the statement is signed by the release key it pinned
+    (spare_said). Always "" for a node that has a spare (the one there is
+    kept, whatever is named), for one that pinned no release key, and for
+    one whose console chose to pin none. A key added at the console signs
+    for a build and never for this: a statement under one names nothing."""
+    if unpinned(state) or spare(state) or not pinned(state):
+        return ""
+    return spare_said(pinned(state), said)
 
 
 def named_keys(named):

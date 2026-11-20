@@ -112,6 +112,10 @@ await section("A node's Updates line names the release key it pinned and its spa
       nodesAgent = { release_key: 'a'.repeat(16), release_spare: 'b'.repeat(16), signed: true };
       const both = ndUpdatesFact(n({ release_key: 'a'.repeat(16), release_spare: 'b'.repeat(16) }));
       const owed = ndUpdatesFact(n({ release_key: 'a'.repeat(16) }));
+      // A build that carries the release key's word for its spare: the
+      // node pins it by itself, so no Enroll script is named.
+      nodesAgent = { release_key: 'a'.repeat(16), release_spare: 'b'.repeat(16), spare_said: true, signed: true };
+      const coming = ndUpdatesFact(n({ release_key: 'a'.repeat(16) }));
       nodesAgent = { release_key: 'a'.repeat(16), release_spare: '', signed: true };
       // Keys a person added at the node's console, for a controller somebody
       // built themselves: counted, beside the release key or with none pinned.
@@ -124,7 +128,7 @@ await section("A node's Updates line names the release key it pinned and its spa
               ndUpdatesFact(n({})),
               ndUpdatesFact(n({ release_unpinned: true })),
               ndUpdatesFact(n({ release_unpinned: true, release_also: [c] })),
-              ndUpdatesFact(n({ release_unpinned: true, release_key: 'a'.repeat(16) }))];
+              ndUpdatesFact(n({ release_unpinned: true, release_key: 'a'.repeat(16) })), coming];
     } finally { nodesAgent = was; }
   });
   ok(said[0] === 'signed releases only (key aaaaaaaa…, spare bbbbbbbb…)'
@@ -142,6 +146,8 @@ await section("A node's Updates line names the release key it pinned and its spa
      && said[9] === "signed builds only (1 key added at its console); no release key, by its console's choice"
      && said[10] === said[2],
      `...and one whose console dropped the release key says that it was its choice (${JSON.stringify(said.slice(8))})`);
+  ok(said[11] === 'signed releases only (key aaaaaaaa…); no spare key pinned yet',
+     `...and a spare this build's release key vouches for is one the node pins by itself: no Enroll script named (${said[11]})`);
 });
 ok(await page.evaluate(() => !document.querySelector('.nodestab [data-cap], .nodestab [data-encap]')),
    'no capability toggles anywhere: a node does everything for the spaces bound to it');

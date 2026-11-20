@@ -1976,11 +1976,12 @@ function ndUpdatesFact(n){
   if (refused)
     return `signed releases only (key ${key.slice(0, 8)}…): this controller's build is unsigned, so its update is refused there`;
   // The spare (R232): pinned with the key, or named by this build and not
-  // pinned there yet, which the Enroll script puts right.
+  // pinned there yet. The node pins it by itself where this build carries
+  // the release key's word for it (spare_said); else the Enroll script does.
   const spare = n.reported.release_spare || "";
   const keys = (spare ? `key ${key.slice(0, 8)}…, spare ${spare.slice(0, 8)}…` : `key ${key.slice(0, 8)}…`)
     + (also ? `; ${also} more ${also === 1 ? "key" : "keys"} added at its console` : "");
-  const owed = !spare && nodesAgent?.release_spare ? "; no spare key pinned (Enroll script pins it)" : "";
+  const owed = !spare && nodesAgent?.release_spare ? (nodesAgent.spare_said ? "; no spare key pinned yet" : "; no spare key pinned (Enroll script pins it)") : "";
   return (n.reported.unsigned_ok
     ? `signed releases (${keys}), and unsigned builds, allowed at its console`
     : `signed releases only (${keys})`) + owed;
