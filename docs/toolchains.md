@@ -433,13 +433,17 @@ tools/pins.py verify --all       # download every pinned file and hold it to its
   (`tools/packs-export.py --write`). A row that moved has its `rev` raised
   by one, which is what lets the catalog carry it to installs with no
   release. A row moves whole: when one platform's file cannot be learned
-  the row is left as it was, said by name, and the others still move.
+  the row is left as it was, said by name, and the others still move. A row
+  that declares several tools' downloads asks each by its own `track`, so
+  the ones with a newer release move and the others stay where they are.
   `--version V` with one row names the version in the resolver's place, for
   a release whose files are not out for every platform yet.
 - **pin** turns a row whose download is checked against its own origin
   into a pinned one, and keeps the old checksum as the pin's `found`. For a
   repository it writes `source.commit`, and `source.tag` where its track is
-  by tag.
+  by tag. A download the row declares with no digest yet, written with its
+  address and its `track`, is given the version its track finds now and its
+  digest: that is how a row gains a declared download.
 - **verify** is a release's check. It streams each pinned file, hashes it
   and never keeps it; `--platform linux/arm64` asks for one platform and
   `--all` for every one. For a repository it says whether the tag the row

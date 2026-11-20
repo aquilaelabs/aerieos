@@ -22,7 +22,10 @@ here knows a vendor.
                                       tools/packs-export.py --write. Prints what moved, old to new.
     tools/pins.py pin NAME            a row not pinned yet: its origin-checked download becomes a pin
                                       at the version its resolver finds now, the old checksum kept as
-                                      found; a repository's commit is pinned by its source.track.
+                                      found; a repository's commit is pinned by its source.track; and
+                                      each download it declares with no digest yet (a row written with
+                                      its address, its track and no sha256) is given the version its
+                                      track finds now and its digest.
     tools/pins.py verify [NAME...]    downloads each pinned file and holds it to its pin, for this
                                       machine's platform; --platform P for another, --all for every
                                       one. A file is streamed and hashed, never kept. Exit 1 naming
@@ -247,6 +250,31 @@ def fetch_rows(row):
     return [f for f in rows if isinstance(f, dict) and f.get("url")] if isinstance(rows, list) else []
 
 
+def fetch_said(f):
+    """A declared download as a line names it: the file it is kept as, and
+    the platform it is for."""
+    return f"{f.get('to')}{' for ' + f['platform'] if f.get('platform') else ''}"
+
+
+def fetch_held(f):
+    """Whether a declared download is held to something yet: a sha256, or
+    its publisher's signature. One written with neither is waiting for its
+    first pin."""
+    return bool(f.get("sha256")) or isinstance(f.get("signed"), dict)
+
+
+def unheld(row):
+    """The downloads a row declares that are held to nothing yet."""
+    return [f for f in fetch_rows(row) if not fetch_held(f)]
+
+
+def fetch_of(row, to, plat):
+    """The declared download of `row` kept as `to` for `plat`: a part is
+    written into a copy of the row by what it is, not by where it stands in
+    the list, since the rows beside it may have moved."""
+    return next(f for f in fetch_rows(row) if f.get("to") == to and str(f.get("platform") or "") == plat)
+
+
 def fetch_learned(row, f, cache):
     """What a declared download would be now: {"version", "url", "sha256",
     "how"}. One that says track is asked for its newest version, once for
@@ -260,8 +288,11 @@ def fetch_learned(row, f, cache):
         if track:
             key = json.dumps(track, sort_keys=True) + "\0" + plat
             if key not in cache:
-                git = track.get("resolver") in packformat.GIT_RESOLVERS
-                cache[key] = (sdkmeta.git_newest({**row, "source": {"url": track.get("url")}}, track)[0], "") if git else sdkmeta.newest(row, track)
+                if track.get("resolver") in packformat.GIT_RESOLVERS:
+                    # A repository's tag as the version in a file's name.
+                    cache[key] = (sdkmeta.trimmed(sdkmeta.git_newest({**row, "source": {"url": track.get("url")}}, track)[0], track), "")
+                else:
+                    cache[key] = sdkmeta.newest(row, track)
             version, url = cache[key]
         url = url or sdkmeta.declared_address({**f, "version": version})
         if isinstance(f.get("signed"), dict):
@@ -272,8 +303,11 @@ def fetch_learned(row, f, cache):
 
 # ---- what a row is, and what would move ---------------------------------------
 def is_pinned(row):
+    """Whether a row has anything pinned for check and move to ask about. A
+    row with a download still waiting for its first pin is `pin`'s."""
     src = row.get("source") or {}
-    return bool(sdkmeta.pin_of(row) or (src.get("kind") == "git" and src.get("commit")) or fetch_rows(row))
+    held = bool(sdkmeta.pin_of(row) or (src.get("kind") == "git" and src.get("commit")) or any(fetch_held(f) for f in fetch_rows(row)))
+    return held and not unheld(row)
 
 
 def plan(row, version=""):
@@ -349,21 +383,33 @@ def plan(row, version=""):
             parts.append(part)
         else:
             parts.append({"what": "its commit", "old": str(src["commit"])[:12], "new": str(src["commit"])[:12], "note": "it says no source.track: nothing to ask"})
-    cache = {}
-    for i, f in enumerate(fetch_rows(row)):
-        what = f"{f.get('to')}{' for ' + f['platform'] if f.get('platform') else ''}"
+    return parts + declared_parts(row)
+
+
+def declared_parts(row, waiting=False):
+    """plan's parts for what a row declares, a part a download. Each is
+    asked by its own track, so a row of several tools moves the ones that
+    have a newer release and leaves the others, and downloads that say one
+    track move together. With `waiting`, only the downloads held to
+    nothing yet: what a first pin fills in."""
+    parts, cache = [], {}
+    for f in fetch_rows(row):
+        if waiting and fetch_held(f):
+            continue
+        what = fetch_said(f)
         try:
             got = fetch_learned(row, f, cache)
         except ERRORS as e:
             raise Refused(f"{what} could not be learned ({said(e)})") from e
-        old = f"{f.get('version') or ''} {str(f.get('sha256') or '')[:12]}".strip()
+        old = f"{f.get('version') or ''} {str(f.get('sha256') or '')[:12]}".strip() if fetch_held(f) else ""
         new = f"{got['version']} {got['sha256'][:12]}".strip()
         part = {"what": what, "old": old, "new": new, "note": got["how"]}
         changed = {k: got[k] for k in ("version", "sha256") if got[k] and got[k] != f.get(k)}
         if got["url"] != sdkmeta.declared_address({**f, "version": got["version"]}):
             changed["url"] = got["url"]
         if changed:
-            part["apply"] = lambda r, i=i, changed=changed: fetch_rows(r)[i].update(changed)
+            key = (f.get("to"), str(f.get("platform") or ""))
+            part["apply"] = lambda r, key=key, changed=changed: fetch_of(r, *key).update(changed)
         else:
             part["new"] = old
         parts.append(part)
@@ -497,21 +543,32 @@ def cmd_pin(doc, names, opts, out):
 def pin_row(doc, row, opts, out):
     name, src = row["name"], row.get("source") or {}
     new = copy.deepcopy(row)
-    if src.get("kind") == "git":
-        if src.get("commit"):
+    # Its own source, where that is not pinned yet: a repository's commit,
+    # a tarball's or a script's file.
+    kind = src.get("kind")
+    own = (kind == "git" and not src.get("commit")) or (kind in ("tarball", "script") and not sdkmeta.pin_of(row))
+    waiting = unheld(row)
+    if not own and not waiting:
+        if kind in ("git", "tarball", "script") or fetch_rows(row):
             raise Refused(f"it is pinned already: tools/pins.py move {name} moves it")
+        raise Refused(f"it has no download of its own to pin, and declares none: its source is of kind {kind}")
+    if own and kind == "git":
         got = git_learned(row)
         new["source"].update({"commit": got["commit"], **({"tag": got["tag"]} if got["tag"] else {})})
         out(f"{name}: its commit pinned at {got['tag']} {got['commit']}".replace("  ", " "))
-    elif src.get("kind") in ("tarball", "script"):
-        if sdkmeta.pin_of(row):
-            raise Refused(f"it is pinned already: tools/pins.py move {name} moves it")
+    elif own:
         got = learned(row, opts.get("version", ""))
         write_pin(new, got, src.get("checksum"))
         for line in lines(name, [{"what": "its download", "old": "", "new": got["version"], "files": got["files"], "apply": True}]):
             out(line)
-    else:
-        raise Refused(f"it has no download of its own to pin: its source is of kind {src.get('kind')}")
+    # What it declares and holds to nothing yet: every one of them, or the
+    # row is left as it was.
+    if waiting:
+        parts = declared_parts(row, waiting=True)
+        for p in parts:
+            p["apply"](new)
+        for line in lines(name, parts):
+            out(line)
     new["rev"] = catalogrows.rev_of(row) + 1
     why = packformat.source_refused(new["source"])
     if why:

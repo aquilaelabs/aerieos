@@ -82,6 +82,13 @@ class Resolvers(unittest.TestCase):
             sdkmeta.newest(self.row(spec))
         self.assertEqual(die.call_args[0][0], "kit: its resolver names no asset for darwin/arm64")
 
+    def test_an_asset_alone_is_looked_for_in_the_release_called_latest_asked_for_by_itself(self):
+        # A publisher with a thousand files a release: its list of releases is never asked for.
+        pages = {"https://api.github.com/repos/a/a/releases/latest": self.releases()[2]}
+        spec = {"resolver": "github-release", "repo": "a/a", "asset": "^kit-N-\\d+-linux64\\.tar\\.xz$"}
+        with answers(pages):
+            self.assertEqual(sdkmeta.newest(self.row(spec)), ("build-8", "https://github.com/a/a/releases/download/build-8/kit-N-8-linux64.tar.xz"))
+
     def test_a_repository_s_commit_is_found_at_its_newest_tag_or_a_branch_s_head(self):
         listing = "\n".join(f"{c * 40}\trefs/tags/{t}" for c, t in (("1", "3.9.0"), ("2", "3.10.0"), ("3", "3.10.1"), ("4", "3.11.0-0.1.pre"),
                                                                      ("5", "v1.0.0"), ("6", "3.10.2"), ("7", "3.10.2^{}"))) + "\n"

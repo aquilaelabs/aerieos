@@ -494,11 +494,17 @@ def _github_release(tc, spec):
     first whose tag `tag` matches and that has been out `settled` days (a
     publisher that keeps only some of its builds for good), and, with
     `asset`, the address of the file whose name that pattern matches, one
-    pattern per platform."""
+    pattern per platform. With `asset` alone the release is the one GitHub
+    calls latest, asked for by itself: a publisher with a thousand files a
+    release has a list of releases too large to ask for."""
     import calendar  # noqa: PLC0415
     repo = spec["repo"]
     before = time.time() - 86400 * float(spec.get("settled") or 0)
-    for rel in json.loads(get(f"https://api.github.com/repos/{repo}/releases?per_page=100")):
+    if spec.get("tag") or spec.get("settled"):
+        listed = json.loads(get(f"https://api.github.com/repos/{repo}/releases?per_page=100"))
+    else:
+        listed = [json.loads(get(f"https://api.github.com/repos/{repo}/releases/latest"))]
+    for rel in listed:
         tag = str(rel.get("tag_name") or "")
         if rel.get("draft") or rel.get("prerelease") or (spec.get("tag") and not re.search(spec["tag"], tag)):
             continue
@@ -519,6 +525,15 @@ def _github_release(tc, spec):
                 return tag, str(a.get("browser_download_url") or "")
         die(f"{tc['name']}: {repo}'s release {tag} has no asset matching {want!r}")
     die(f"{tc['name']}: {repo} lists no release its resolver takes")
+
+
+def trimmed(tag, spec):
+    """A tag as the version it names: with the resolver's `trim_prefix`
+    and `trim_suffix` taken off (v1.2.3 for the 1.2.3 in a file's name)."""
+    for k, cut in (("trim_prefix", str.removeprefix), ("trim_suffix", str.removesuffix)):
+        if spec.get(k):
+            tag = cut(tag, spec[k])
+    return tag
 
 
 def newest(tc, spec=None):
@@ -548,10 +563,7 @@ def newest(tc, spec=None):
             # the last part is taken, and with a plus sign.
             tag = final_url(f"https://github.com/{spec['repo']}/releases/latest").rstrip("/")
             tag = urllib.parse.unquote(tag.rsplit("/", 1)[-1])
-        version = tag
-        for k, cut in (("trim_prefix", str.removeprefix), ("trim_suffix", str.removesuffix)):
-            if spec.get(k):
-                version = cut(version, spec[k])
+        version = trimmed(tag, spec)
         if spec.get("numeric") and not version.replace(".", "").isdigit():
             die(f"{tc['name']}: could not read a version out of the tag {tag!r}")
 

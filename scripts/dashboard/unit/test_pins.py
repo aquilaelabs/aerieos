@@ -348,6 +348,60 @@ class Declared(Case):
         self.assertEqual(rc, 3, out)
         self.assertIn(f"set: dl/logo.svg {sha('a logo')[:12]} to {sha('another logo')[:12]}", out)
 
+    def tools_row(self):
+        """A row of two tools, each a declared download with a track of its
+        own, written as a person writes one before its first pin: the
+        address, the track, and no digest."""
+        self.pages["https://lint.example.org/VERSION"] = "3.1\n"
+        lint = "https://lint.example.org/{version}/lint.tar.gz"
+        self.files[lint.replace("{version}", "3.1")] = "lint 3.1"
+        self.pages[lint.replace("{version}", "3.1") + ".sha256"] = sha("lint 3.1") + "\n"
+        fetch = [{"url": GO.replace("{plat}", "linux-amd64"), "version": "go1.0", "to": "dl/go.tar.gz", "platform": "linux/amd64",
+                  "track": {"resolver": "text", "url": "https://dl.example.org/VERSION"}, "found": {"from": "file", "url": "{url}.sha256"}},
+                 {"url": lint, "version": "0", "to": "dl/lint.tar.gz", "track": {"resolver": "text", "url": "https://lint.example.org/VERSION"},
+                  "found": {"from": "file", "url": "{url}.sha256"}}]
+        self.rows.append({"name": "tools", "label": "Tools", "probe": "tools", "about": "Two tools.", "platforms": ["linux/amd64"], "layout": {"bin": ["bin"], "env": {}},
+                          "source": {"kind": "command", "run": ["sh", "-c", "tar -xzf {dir}/dl/go.tar.gz -C {dir}"], "fetch": fetch}})
+        self.write()
+        return lint
+
+    def test_pin_fills_in_the_downloads_a_row_declares_with_no_digest_yet(self):
+        self.tools_row()
+        # Until then it is nobody's to check or move, and reads as it is.
+        rc, out = self.run_tool("check", "tools")
+        self.assertEqual((rc, out.splitlines()[0]), (0, "tools: not pinned (dl/go.tar.gz is held to nothing its entry carries: no sha256, and no signature under a key in it)"), out)
+        self.assertEqual(self.run_tool("move", "tools")[0], 1)
+        rc, out = self.run_tool("pin", "tools")
+        self.assertEqual(rc, 0, out)
+        got = self.row("tools")["source"]["fetch"]
+        self.assertEqual([(f["version"], f["sha256"]) for f in got], [("go1.99.0", sha("go1.99.0 for linux/amd64")), ("3.1", sha("lint 3.1"))])
+        self.assertIn(f"tools: dl/go.tar.gz for linux/amd64 pinned at go1.99.0 {sha('go1.99.0 for linux/amd64')[:12]} (stated by ", out)
+        self.assertIn("tools: rev 1 to 2; it reads pinned", out)
+        self.assertEqual(self.fetched, [], "each digest is its publisher's own statement: nothing was downloaded")
+        # Pinned, it is moved and not pinned again.
+        self.assertEqual(self.run_tool("pin", "tools"), (1, "pins: tools is left as it was: it is pinned already: tools/pins.py move tools moves it"))
+
+    def test_each_track_moves_by_itself_and_one_that_cannot_be_learned_leaves_the_row(self):
+        lint = self.tools_row()
+        self.assertEqual(self.run_tool("pin", "tools")[0], 0)
+        # One tool has a newer release: it moves, and the other stays.
+        self.pages["https://lint.example.org/VERSION"] = "3.2\n"
+        self.files[lint.replace("{version}", "3.2")] = "lint 3.2"
+        self.pages[lint.replace("{version}", "3.2") + ".sha256"] = sha("lint 3.2") + "\n"
+        rc, out = self.run_tool("move", "tools")
+        self.assertEqual(rc, 0, out)
+        got = self.row("tools")["source"]["fetch"]
+        self.assertEqual([(f["version"], f["sha256"]) for f in got], [("go1.99.0", sha("go1.99.0 for linux/amd64")), ("3.2", sha("lint 3.2"))])
+        self.assertIn(f"tools: dl/lint.tar.gz 3.1 {sha('lint 3.1')[:12]} to 3.2 {sha('lint 3.2')[:12]}", out)
+        self.assertNotIn("dl/go.tar.gz", out, "what did not move is not said to have")
+        # Both have one, and one's file is not out: the row moves whole or not at all, and says which.
+        self.release("go1.100.0")
+        self.pages["https://lint.example.org/VERSION"] = "3.3\n"
+        before = self.row("tools")
+        rc, out = self.run_tool("move", "tools")
+        self.assertEqual((rc, self.row("tools")), (1, before), out)
+        self.assertIn("tools: left as it was: dl/lint.tar.gz could not be learned (https://lint.example.org/3.3/lint.tar.gz.sha256 answered 404)", out)
+
 
 class Verify(Case):
     def test_each_pinned_file_is_downloaded_and_held_to_its_pin(self):

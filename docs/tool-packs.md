@@ -336,7 +336,8 @@ version), `match` (a document and a pattern whose first group is the
 version), `github-release` (the release GitHub calls latest, or, with
 `tag`, `settled` and `asset`, the newest whose tag matches, that has been
 out that many days, and the file in it whose name matches, one pattern per
-platform), `node-index`, `zig-index`, `git-tag` and `git-branch`. A
+platform; with `asset` alone, the file in the latest release whose name
+matches), `node-index`, `zig-index`, `git-tag` and `git-branch`. A
 resolver that supplies the file's address itself (`zig-index`, a
 `github-release` with `asset`) has the tool write that address into the row
 beside the digest.
