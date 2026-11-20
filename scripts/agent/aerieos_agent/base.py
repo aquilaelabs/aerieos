@@ -650,15 +650,13 @@ WICKED_BIN = os.environ.get("BUILDERBOT_WICKED_BIN", "wicked")
 SYSCONFIG_NET_DIR = os.environ.get("BUILDERBOT_SYSCONFIG_NET_DIR", "/etc/sysconfig/network")
 DHCPCD_CONF = os.environ.get("BUILDERBOT_DHCPCD_CONF", "/etc/dhcpcd.conf")
 OS_RELEASE = os.environ.get("BUILDERBOT_OS_RELEASE", "/etc/os-release")
+# A runner's download is the file the controller's pin names (runners.py);
+# a tarball or a program named here stands in for it, for the suite.
 RUNNER_TARBALL = os.environ.get("BUILDERBOT_RUNNER_TARBALL", "")
-RUNNER_RELEASES = "https://api.github.com/repos/actions/runner/releases/latest"
-# Gitea's runner: one static binary, fetched from gitea.com's releases, or a
-# prebuilt one named here for the suite.
+# Gitea's runner: one static binary. gitea/act_runner became gitea/runner
+# upstream (its files are gitea-runner-<ver>-<os>-<arch>); the binary keeps
+# the act_runner command set, and keeps its name here.
 ACT_RUNNER_BIN = os.environ.get("BUILDERBOT_ACT_RUNNER_BIN", "")
-# gitea/act_runner became gitea/runner upstream (the old address answers
-# 301, the assets are gitea-runner-<ver>-<os>-<arch>); the binary keeps the
-# act_runner command set, and keeps its name here.
-ACT_RUNNER_RELEASES = "https://gitea.com/api/v1/repos/gitea/runner/releases/latest"
 
 
 # Tailscale, for Funnel (docs/nodes.md §7, phase 8): a seam so the tests can

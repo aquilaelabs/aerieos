@@ -147,7 +147,16 @@ the controller): GitHub's runner and Gitea's `act_runner` (published as gitea-ru
 each registered with labels `builderbot, self-hosted, linux, <arch>, <node
 name>` plus any extra, so a workflow's `runs-on` names the node it should
 land on whichever host its repository is on. Each row says whether its
-runner is listening or busy; Remove deregisters it first. `aerie ci-labels` lists every label the registry knows
+runner is listening or busy; Remove deregisters it first. A runner's
+program is the version this build of AerieOS pins, with the sha256 of the
+exact file for the node's platform (`scripts/dashboard/runner-pins.json`,
+for 64-bit Intel and ARM): the controller hands the node the pin with the
+install, the node downloads that file and unpacks or runs nothing unless
+it is those bytes, and a file that is not says both digests and leaves
+nothing behind. GitHub's runner then updates itself from GitHub once it
+runs, which is its own channel and not one AerieOS holds. The runner
+Gitea and Forgejo share does not update itself: it moves when a newer
+AerieOS pins a newer one and the runner is installed again. `aerie ci-labels` lists every label the registry knows
 and `--write` regenerates `.github/actionlint.yaml` from them, so the lint
 checks `runs-on` against runners that exist. This container runs no runner
 of its own.

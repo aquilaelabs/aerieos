@@ -467,7 +467,11 @@ of git host a runner registers with (`github`, GitHub's Actions runner;
 toolchain's is, with the version and the sha256 of the file for every
 platform it is offered on. `--file` with that path reads it, and the four
 verbs do there what they do for a toolchain; nothing else is written
-beside it, since a runner is not a pack.
+beside it, since a runner is not a pack. The controller hands a node its
+row with the job that installs a runner, and the node takes the file only
+where it is the pinned bytes
+([building.md](building.md#ci-runners)); a moved pin reaches a runner
+when it is installed again.
 
 ```bash
 tools/pins.py --file scripts/dashboard/runner-pins.json check          # what each runner is pinned to, and what its resolver finds now

@@ -1,5 +1,5 @@
 {
-  "_comment": "The CI runners a node installs, each with its pin: the version and the sha256 of the exact file for every platform it is offered on. The one copy, which tools/pins.py --file moves (check, move, pin, verify). A row's name is the kind of git host its runner registers with, and its source is written as a toolchain's is: tarball for an archive that is unpacked, script for a file that is itself the program.",
+  "_comment": "The CI runners a node installs, each with its pin: the version and the sha256 of the exact file for every platform it is offered on. The one copy: runners.py reads it and hands a node its row with the job that installs a runner, the agent unpacks or makes executable nothing unless the file is those bytes, and tools/pins.py --file moves it (check, move, pin, verify). A row's name is the kind of git host its runner registers with, and its source is written as a toolchain's is: tarball for an archive that is unpacked, script for a file that is itself the program.",
   "runners": [
     {
       "name": "github",

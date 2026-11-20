@@ -3243,13 +3243,16 @@ def node_runner_forget(principal, node_id, slot):
     return {"ok": True}
 
 
-def node_runner(principal, node_id, slot, want, labels=None, token=False):
+def node_runner(principal, node_id, slot, want, labels=None, token=False, pins=None):
     """Install or remove one of a node's runners, as a system job (phase
     7). The desired state per runner (wanted or not, with which labels)
     lives in the node's services column under its slot; the census reports
     what is there. `token` is the server's word that a token is stored for
     that runner, which an install cannot do without; the URL and forge are
-    the record's, written with it."""
+    the record's, written with it. `pins` is what each runner's download is
+    held to (runners.pins): the row for this runner's kind of git host
+    goes with the job, and the agent takes a file only where it is those
+    bytes. An install of a runner nothing pins is refused here."""
     n = node(node_id)
     if not n:
         return {"error": "no such node"}
@@ -3277,6 +3280,10 @@ def node_runner(principal, node_id, slot, want, labels=None, token=False):
                  or (forge == "github" and not url.startswith("https://github.com/"))):
         return {"error": "the address is the https repository or organization the runner "
                          "registers with (http is accepted for a forge on your own network)"}
+    pin = (pins or {}).get(forge) if want else None
+    if want and not pin:
+        return {"error": "this build names no pin for that runner's download, so there is nothing to hold "
+                         "the file to and it is not fetched: scripts/dashboard/runner-pins.json is where one is kept"}
     # The runner's own labels unless new ones are typed with this press.
     labs = runner_labels_for(n, labels if isinstance(labels, list) else ar.get("labels")) if want else []
     services = dict(n.get("services") or {})
@@ -3286,7 +3293,7 @@ def node_runner(principal, node_id, slot, want, labels=None, token=False):
     _exec("UPDATE nodes SET services = ? WHERE id = ?", (json.dumps(services), node_id))
     _touch(node_id, principal, "node-runner", {"slot": slot, "want": bool(want), "labels": labs})
     cfg = {"want": bool(want), "labels": labs, "url": str(url or ""), "name": n["name"],
-           "forge": forge, "slot": slot}
+           "forge": forge, "slot": slot, **({"pin": pin} if pin else {})}
     return job_add(principal, {"node": node_id}, "system",
                    {"apply": "runner", "config": cfg, "timeout": 1800})
 
@@ -8417,7 +8424,8 @@ def verb(principal, req):
         slot = re.sub(r"[^a-z0-9.-]", "", field(req, "slot"))[:60]
         return node_runner(principal, nid, slot, bool(req.get("want", True)),
                            req.get("labels"),
-                           token=slot in runner_store.tokens().get(nid, set()))
+                           token=slot in runner_store.tokens().get(nid, set()),
+                           pins=runner_store.pins())
 
     def runner_token():
         # The node's runner token: forge and URL onto the record, the

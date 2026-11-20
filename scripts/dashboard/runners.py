@@ -6,6 +6,7 @@ ever sees a token: store hands one in on stdin, every other verb prints a
 derived answer, and --list says only which runners have one.
 """
 import json
+import os
 import re
 import subprocess
 import threading
@@ -23,6 +24,42 @@ HELPER = "/opt/aerieos/scripts/mint-runner-token"
 
 def configure(*, run, nodes):
     globals().update(run=run, nodes=nodes)
+
+
+# What each runner's download is held to: the one table that pins them,
+# which tools/pins.py --file moves (docs/toolchains.md, Moving a pin).
+PINS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "runner-pins.json")
+_SHA256 = re.compile(r"[0-9a-f]{64}")
+
+
+def pins(path=None):
+    """The runners' pins as a node is handed one, by the kind of git host a
+    runner registers with: {forge: {"version", "files": {platform: {"url",
+    "sha256"}}}}, each address the table's own with the version filled in.
+    A node gets its row with the job that installs a runner and takes a
+    file only where it is those bytes. A row that is not a whole pin, or a
+    table that cannot be read, answers nothing for that runner, so its
+    install is refused by name here and is never sent off to fetch what
+    nothing holds."""
+    try:
+        with open(path or PINS, encoding="utf-8") as f:
+            rows = json.load(f).get("runners")
+    except (OSError, ValueError, AttributeError):
+        return {}
+    out = {}
+    for row in rows if isinstance(rows, list) else []:
+        src = row.get("source") if isinstance(row, dict) else None
+        ck = src.get("checksum") if isinstance(src, dict) else None
+        if not isinstance(ck, dict) or ck.get("from") != "pin":
+            continue
+        version, urls, sums = ck.get("version"), src.get("url"), ck.get("sha256")
+        if not (isinstance(version, str) and version and isinstance(urls, dict) and isinstance(sums, dict)):
+            continue
+        files = {plat: {"url": url.replace("{version}", version), "sha256": sums[plat]} for plat, url in urls.items()
+                 if isinstance(url, str) and url.startswith("https://") and isinstance(sums.get(plat), str) and _SHA256.fullmatch(sums[plat])}
+        if files and isinstance(row.get("name"), str):
+            out[row["name"]] = {"version": version, "files": files}
+    return out
 
 
 def _why(r):

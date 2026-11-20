@@ -469,6 +469,21 @@ is. Cloudflare signs its rpm repository's index with an older key than
 the one it publishes, so there each package is held to the key and the
 index is not.
 
+**A CI runner's program is held to a pin.** The runner a node installs
+(GitHub's Actions runner, or the one Gitea and Forgejo share) is a
+version this build names, with the sha256 of the exact file for each
+platform, in one table the release ships
+(`scripts/dashboard/runner-pins.json`). The controller hands the pin to
+the node with the job that installs the runner; the agent downloads the
+address it names and unpacks or makes executable nothing unless the file
+is those bytes, saying both digests when it is not, and an install handed
+no pin is refused, not fetched unchecked. So the pin is as good as the
+controller that hands it, as a recipe is: a pinned node's own release
+key does not cover it. What it does not hold: GitHub's runner updates
+itself from GitHub once it runs, which is that runner's own channel, and
+a runner's folder is the jobs account's, so a CI job run there can change
+the runner it ran under.
+
 **The rest, it still does, unless its console says otherwise.** The agent
 runs as root; a root command an administrator approves is run as given
 (which, on a node provisioned as a sandbox, could also undo the pin); and

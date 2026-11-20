@@ -2112,8 +2112,11 @@ installed/removed from the Nodes screen.
 
 *Where phase 7 landed it:* the fold on a sandbox node's row grows a *CI
 runner* section. Install is a `system` job with `apply: runner`: the agent
-fetches GitHub's latest runner release for the node's architecture into
-`/var/lib/aerieos/runner`, asks the controller for a registration token
+fetches GitHub's runner for the node's architecture into
+`/var/lib/aerieos/runner` (the release the controller's pin names, since
+20 Nov 2026, and unpacked only where the file is the pinned bytes; the
+newest release as GitHub named it that day, before), asks the controller
+for a registration token
 through the new `runner-token` agent verb: minted on request from the
 root-only stash by the same helper the container's runner uses, audited,
 never stored; the PAT stays here: registers as the enrolled account with

@@ -1,6 +1,7 @@
 """The CI runners a node keeps: their slots and state, and the configuration plane's runner verbs."""
 import contextlib
 import errno
+import hashlib
 import json
 import os
 import platform
@@ -15,9 +16,7 @@ import time
 import urllib.request
 from .base import (
     ACT_RUNNER_BIN,
-    ACT_RUNNER_RELEASES,
     RUNNER_DIR,
-    RUNNER_RELEASES,
     RUNNER_TARBALL,
     _run,
     as_root,
@@ -199,6 +198,81 @@ def _runner_state(d, rec):
             "busy": runner_busy(d)}
 
 
+# ---- what a runner's download is held to ------------------------------------
+# The controller hands the pin with the job that installs a runner: the
+# version, and for each platform the address of the file and its sha256
+# (scripts/dashboard/runner-pins.json, which tools/pins.py moves). Nothing
+# here asks a publisher what is newest, and nothing is unpacked or made
+# executable unless it is the pinned bytes.
+_PIN_ARCH = {"x86_64": "amd64", "amd64": "amd64", "aarch64": "arm64", "arm64": "arm64"}
+
+
+def pin_platform():
+    """This machine as a pin keys one: "<os>/<arch>", the way an entry of
+    the catalog spells a platform (linux/amd64, darwin/arm64)."""
+    m = platform.machine().lower()
+    return f"{platform.system().lower()}/{_PIN_ARCH.get(m, m)}"
+
+
+def pinned_file(pin):
+    """((address, sha256), "") for the file a runner's pin names for this
+    machine, or (None, why): no pin handed, none for this platform, or one
+    that names no https address with a digest. A job with no pin is one a
+    controller from before the pins sent, and what it would have fetched,
+    held to nothing, is not fetched."""
+    files = pin.get("files") if isinstance(pin, dict) else None
+    if not isinstance(files, dict) or not files:
+        return None, ("the controller handed no pin for the runner's download, and a file held to nothing is not fetched: "
+                      "a controller of this agent's build hands one")
+    f = files.get(pin_platform())
+    if not isinstance(f, dict):
+        return None, f"no runner is pinned for {pin_platform()}: the pin names {', '.join(sorted(map(str, files)))}"
+    url, digest = str(f.get("url") or ""), str(f.get("sha256") or "")
+    # Only a web address is followed: urlopen would open file:// as readily.
+    if not url.lower().startswith("https://") or not re.fullmatch(r"[0-9a-f]{64}", digest):
+        return None, f"the pin names no https address with a sha256 for {pin_platform()}"
+    return (url, digest), ""
+
+
+def sha256_of(path):
+    """The sha256 of a file, read in pieces."""
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def fetch_pinned(url, digest, dest, say):
+    """What `url` answers, kept as `dest` only where its sha256 is `digest`:
+    written beside it under another name, hashed as it arrives, and moved
+    into place once it is the pinned bytes. Anything else is removed with
+    both digests said, and `dest` is as it was. Whether it was taken."""
+    part = dest + ".fetching"
+    h = hashlib.sha256()
+    try:
+        with contextlib.suppress(FileNotFoundError):
+            os.remove(part)
+        fd = os.open(part, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(fd, "wb") as f, urllib.request.urlopen(url, timeout=600) as r:  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected (https checked by pinned_file)
+            for chunk in iter(lambda: r.read(1 << 20), b""):
+                h.update(chunk)
+                f.write(chunk)
+    except (OSError, ValueError) as e:
+        with contextlib.suppress(OSError):
+            os.remove(part)
+        say(f"download failed: {url}: {e}\n")
+        return False
+    got = h.hexdigest()
+    if got != digest:
+        with contextlib.suppress(OSError):
+            os.remove(part)
+        say(f"refused: {url} answered a file whose sha256 is {got}, and its pin is {digest}: nothing of it was kept\n")
+        return False
+    os.replace(part, dest)
+    return True
+
+
 class RunnersMixin:
     """Agent's runner methods: one of the parts class Agent (agent.py) is made of."""
 
@@ -309,8 +383,11 @@ class RunnersMixin:
         self._sh(job, [SYSTEMCTL, "daemon-reload"])
 
     def _apply_runner(self, job, cfg):
-        """The Actions runner as a service on this node (phase 7): fetched
-        from GitHub's releases, registered with a token the controller mints
+        """The Actions runner as a service on this node (phase 7): the file
+        the controller's pin names, fetched from GitHub's releases and
+        unpacked only where it is the pinned bytes (the runner updates
+        itself from GitHub once it runs, which is its own channel),
+        registered with a token the controller mints
         on request (the PAT stays in the controller's root-only stash and
         the token lives for an hour), and run under systemd as the enrolled
         account by the runner's own svc.sh. Removal deregisters first, so
@@ -357,45 +434,29 @@ class RunnersMixin:
         os.makedirs(d, exist_ok=True)
         self.own_dir(d, who)
         if not os.path.isfile(os.path.join(d, "config.sh")):
-            # Fetched and unpacked as the jobs account, into its own folder.
+            # Fetched and unpacked as the jobs account, into its own folder:
+            # the file the pin names for this machine, and nothing unpacked
+            # unless it is those bytes. One line, reason last, on a refusal.
+            tar_path = os.path.join(d, "runner.tar.gz")
+            code = 0
             with fs_holds(who):
-                tar_path = os.path.join(d, "runner.tar.gz")
                 if RUNNER_TARBALL:
                     shutil.copyfile(RUNNER_TARBALL, tar_path)
                     job.say(f"using the runner tarball at {RUNNER_TARBALL}\n")
                 else:
-                    arch = {"x86_64": "x64", "aarch64": "arm64", "arm64": "arm64", "armv7l": "arm"}.get(platform.machine(), "x64")
-                    osname = "osx" if platform.system() == "Darwin" else "linux"
-                    job.say("asking GitHub for the latest runner release…\n")
-                    try:
-                        # nosemgrep: dynamic-urllib-use-detected (RUNNER_RELEASES is a literal at the top of this file)
-                        with urllib.request.urlopen(RUNNER_RELEASES, timeout=30) as r:  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected (a literal URL)
-                            rel = json.load(r)
-                        asset = next(a["browser_download_url"] for a in rel.get("assets", [])
-                                     if a.get("name", "").startswith(f"actions-runner-{osname}-{arch}-")
-                                     and a["name"].endswith(".tar.gz"))
-                    except (OSError, ValueError, StopIteration, KeyError) as e:
-                        job.say(f"could not find the runner release: {e}\n")
-                        return "failed", 69
-                    job.say(f"downloading {asset}\n")
-                    with as_root():
-                        job.flush()
-                    try:
-                        # The release API named it; only a web address is followed,
-                        # since urlopen would open file:// as readily.
-                        if not str(asset).lower().startswith("https://"):
-                            raise ValueError(f"the release names a non-https asset: {str(asset)[:60]}")
-                        with urllib.request.urlopen(asset, timeout=600) as r, open(tar_path, "wb") as f:  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected (https checked above)
-                            shutil.copyfileobj(r, f)
-                    except OSError as e:
-                        job.say(f"download failed: {e}\n")
-                        return "failed", 69
-                with tarfile.open(tar_path) as tar:
-                    if hasattr(tarfile, "data_filter"):
-                        tar.extractall(d, filter="data")
-                    else:
-                        tar.extractall(d)
-                os.remove(tar_path)
+                    code = self._runner_fetch(job, cfg.get("pin"), tar_path, "GitHub's runner")
+                if not code:
+                    with tarfile.open(tar_path) as tar:
+                        if hasattr(tarfile, "data_filter"):
+                            tar.extractall(d, filter="data")
+                        else:
+                            tar.extractall(d)
+                    os.remove(tar_path)
+            if code:
+                # Nothing was taken: the folder made for it goes too.
+                with contextlib.suppress(OSError):
+                    os.rmdir(d)
+                return "failed", code
         self._runner_claim(d, who)
         # A runner that is already configured locally refuses to be
         # configured again: `--replace` is about taking a NAME back on
@@ -472,6 +533,26 @@ class RunnersMixin:
         return "succeeded", 0
 
     @staticmethod
+    def _runner_fetch(job, pin, dest, what):
+        """A runner's download as its pin names it for this machine, kept as
+        `dest` where it is the pinned bytes: 0, or the exit code of an
+        install that took nothing (65 where no file is named for this
+        machine, 69 where the one named was not taken), its reason said in
+        one line, last."""
+        named, why = pinned_file(pin)
+        if not named:
+            job.say(f"refused: {why}\n")
+            return 65
+        url, digest = named
+        job.say(f"downloading {what} {str(pin.get('version') or '')[:40]}, pinned: {url}\n")
+        with as_root():
+            job.flush()
+        if not fetch_pinned(url, digest, dest, job.say):
+            return 69
+        job.say(f"it is the pinned file (sha256 {digest})\n")
+        return 0
+
+    @staticmethod
     def _runner_dir_for(slot, url=""):
         """Where a runner for this address lives, or would: the directory
         already registered for it, else RUNNER_DIR/<slot>."""
@@ -484,6 +565,8 @@ class RunnersMixin:
 
     def _apply_act_runner(self, job, cfg, want, who, d, installed, slot):
         """Gitea's or Forgejo's runner (R53): act_runner, one static binary,
+        the file the controller's pin names and made executable only where
+        it is the pinned bytes,
         registered with a token the controller fetches from the host's API
         with the node's own credential, and run as `act_runner daemon` in
         the foreground under this agent, which supervises it the way it
@@ -516,46 +599,33 @@ class RunnersMixin:
         name = re.sub(r"[^A-Za-z0-9._-]", "-", str(cfg.get("name") or socket.gethostname()))[:64]
         os.makedirs(d, exist_ok=True)
         self.own_dir(d, who)
-        if not os.path.isfile(exe):
-            # Fetched as the jobs account, into its own folder.
-            with fs_holds(who):
-                if ACT_RUNNER_BIN:
+        have = os.path.isfile(exe)
+        code = 0
+        # Fetched as the jobs account, into its own folder.
+        with fs_holds(who):
+            if ACT_RUNNER_BIN:
+                if not have:
                     shutil.copyfile(ACT_RUNNER_BIN, exe)
                     job.say(f"using the act_runner at {ACT_RUNNER_BIN}\n")
-                else:
-                    arch = {"x86_64": "amd64", "aarch64": "arm64", "arm64": "arm64", "armv7l": "arm-7"}.get(platform.machine(), "amd64")
-                    job.say("asking gitea.com for the latest act_runner release…\n")
-                    rel = {}
-                    try:
-                        # nosemgrep: dynamic-urllib-use-detected (ACT_RUNNER_RELEASES is a literal at the top of this file)
-                        with urllib.request.urlopen(ACT_RUNNER_RELEASES, timeout=30) as r:  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected (a literal URL)
-                            rel = json.load(r)
-                        asset = next(a["browser_download_url"] for a in rel.get("assets", [])
-                                     if re.fullmatch(rf"(gitea-runner|act_runner)-[0-9.]+-linux-{arch}", a.get("name", "")))
-                    except (OSError, ValueError, KeyError) as e:
-                        job.say(f"could not fetch the act_runner release from {ACT_RUNNER_RELEASES}: {e}\n")
-                        return "failed", 69
-                    except StopIteration:
-                        # The reason that was missing when the assets were renamed
-                        # under us (B130): what the release holds, so the next
-                        # rename is a one-line fix rather than a round trip.
-                        names = [str(a.get("name") or "") for a in rel.get("assets", [])]
-                        job.say(f"could not find the act_runner release: {rel.get('tag_name') or 'the latest release'} "
-                                f"has no asset named gitea-runner-<version>-linux-{arch} or "
-                                f"act_runner-<version>-linux-{arch}; it has {', '.join(names[:12]) or 'no assets'}\n")
-                        return "failed", 69
-                    job.say(f"downloading {asset}\n")
-                    with as_root():
-                        job.flush()
-                    try:
-                        if not str(asset).lower().startswith("https://"):   # as for the GitHub runner above
-                            raise ValueError(f"the release names a non-https asset: {str(asset)[:60]}")
-                        with urllib.request.urlopen(asset, timeout=600) as r, open(exe, "wb") as f:  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected (https checked above)
-                            shutil.copyfileobj(r, f)
-                    except OSError as e:
-                        job.say(f"download failed: {e}\n")
-                        return "failed", 69
-                os.chmod(exe, 0o755)
+            else:
+                # The program already here is kept where it is the pinned
+                # one, or where this machine is handed no pin to hold
+                # another to (nothing is fetched then). One an earlier
+                # agent fetched, or one from before the pin moved, is
+                # replaced by the pinned file: a reinstall is how a runner
+                # that does not update itself moves.
+                named, _why = pinned_file(cfg.get("pin"))
+                if have and named and sha256_of(exe) != named[1]:
+                    job.say("the act_runner here is not the pinned file; fetching the pinned one in its place\n")
+                    have = False
+                if not have:
+                    code = self._runner_fetch(job, cfg.get("pin"), exe, "the runner")
+        if code:
+            if not installed:
+                with contextlib.suppress(OSError):
+                    os.rmdir(d)
+            return "failed", code
+        os.chmod(exe, 0o755)
         # The registration token first, so a token that cannot mint leaves
         # a runner already standing as it was.
         st, r = self.ctl.call("runner-token", {"kind": "registration", "slot": slot}, timeout=60)
