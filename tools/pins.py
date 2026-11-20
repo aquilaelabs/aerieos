@@ -40,8 +40,16 @@ replaces the lock's set whole, leaving the row's other downloads alone.
                                       one. A file is streamed and hashed, never kept. Exit 1 naming
                                       each file that is not its pin.
 
+The coding agents' install recipes are held the same way and are rows here too, each under the
+name its row in the Library has. A recipe's declared downloads are read from the one file that holds them
+(scripts/dashboard/agent-recipes.json, which the agent table reads), and a move writes the new
+version and digest back there and raises the recipe's rev: an installer with a version in its
+address moves with its track, a program a platform moves as one set, and a vendor's one moving
+script, which has nothing to track, is asked for the bytes it answers today.
+
     --file PATH     another table than config/toolchains.json. The official packs are written only
-                    for the shipped one.
+                    for the shipped one, and the coding agents' recipes are read beside it alone.
+    --agents PATH   another file of the coding agents' recipes than the shipped one.
     --version V     with pin or move and one NAME: that version, not the one the resolver finds (a
                     release whose files for every platform are not out yet).
 
@@ -69,11 +77,14 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(ROOT, "scripts", "lib"))
 sys.path.insert(0, os.path.join(ROOT, "scripts", "dashboard"))
+import agents  # noqa: E402
 import catalogrows  # noqa: E402
 import packformat  # noqa: E402
 import sdkmeta  # noqa: E402
 
 TABLE = os.path.join(ROOT, "config", "toolchains.json")
+# The coding agents' install recipes, the one copy of them (agents.py RECIPES).
+AGENTS = os.path.join(ROOT, "scripts", "dashboard", "agent-recipes.json")
 # A digest its publisher states that is no sha256 is checked while the file
 # is hashed, by these.
 ALSO = ("sha1", "sha512")
@@ -793,13 +804,58 @@ def save(path, doc):
         f.write(json.dumps(doc, indent=2, ensure_ascii=False) + "\n")
 
 
+# ---- the coding agents' recipes --------------------------------------------------
+# A coding agent's install recipe declares its downloads in the shape a
+# row's source does, so it is read here as a row: its name the one its row
+# in the Library has, its source the recipe as the format reads one
+# (packformat.agent_source). The rows are kept beside the table's, never in
+# it, and a row that moved is written back into the recipes' own file.
+def agent_rows(recipes):
+    """[row] for the recipes of a recipes file's document, in its order.
+    One of the older form, a vendor's installer handed to a shell, declares
+    nothing: it is a row with nothing pinned, which check says by name."""
+    names = {a.id: a.tool or a.id for a in agents.TABLE}
+    # A source says only what the recipe says: no keys, no sentence, where it has none.
+    return [{"name": names.get(aid, aid), "agent": aid, "rev": catalogrows.rev_of(r),
+             "source": {k: v for k, v in packformat.agent_source(r).items() if v not in ({}, "", False)}}
+            for aid, r in recipes.items() if isinstance(r, dict)]
+
+
+# What this tool keeps in the table's document beside the table: the
+# agents' rows, the file they came from, and which of the two files moved.
+BESIDE = ("_agents", "_recipes", "_moved")
+
+
+def agents_written(doc):
+    """The recipes file's document with what each agent's row holds now
+    written into its recipe: the downloads and the rev, the rest as it was.
+    Refused where a recipe would no longer be one."""
+    out = copy.deepcopy(doc["_recipes"])
+    for row in doc["_agents"]:
+        r = out["recipes"][row["agent"]]
+        if isinstance(r.get("fetch"), list):
+            r["fetch"], r["rev"] = row["source"]["fetch"], row["rev"]
+            why = agents.install_checked(r)[1]
+            if why:
+                raise Refused(f"{row['name']}: what its recipe would become is refused: {why}")
+    return out
+
+
+def put(doc, row, new):
+    """`new` in `row`'s place, in the table or among the agents' rows."""
+    rows = doc["_agents"] if row.get("agent") else doc["toolchains"]
+    rows[rows.index(row)] = new
+    doc.setdefault("_moved", set()).add("agents" if row.get("agent") else "table")
+
+
 def chosen(doc, names):
-    """The rows named, in the table's order; every one with none named."""
-    rows = doc["toolchains"]
+    """The rows named, in the table's order and then the coding agents';
+    every one with none named."""
+    rows = doc["toolchains"] + doc.get("_agents", [])
     have = {r.get("name") for r in rows}
     missing = [n for n in names if n not in have]
     if missing:
-        raise Refused(f"no toolchain named {', '.join(missing)} in the table")
+        raise Refused(f"no toolchain{' or coding agent' if doc.get('_agents') else ''} named {', '.join(missing)} in the table")
     return [r for r in rows if not names or r.get("name") in names]
 
 
@@ -832,7 +888,6 @@ def cmd_check(doc, names, opts, out):
 
 def cmd_move(doc, names, opts, out):
     changed, failed = 0, 0
-    rows = doc["toolchains"]
     for row in chosen(doc, names):
         name = row["name"]
         if not is_pinned(row):
@@ -857,7 +912,7 @@ def cmd_move(doc, names, opts, out):
         for line in lines(name, [p for p in parts if p.get("apply")]):
             out(line)
         out(f"{name}: rev {catalogrows.rev_of(row)} to {new['rev']}")
-        rows[rows.index(row)] = new
+        put(doc, row, new)
         changed += 1
     return finish(doc, opts, out, changed, failed)
 
@@ -906,18 +961,29 @@ def pin_row(doc, row, opts, out):
     why = packformat.source_refused(new["source"])
     if why:
         raise Refused(f"what it would become is refused: {why}")
-    doc["toolchains"][doc["toolchains"].index(row)] = new
+    put(doc, row, new)
     word, why = packformat.held(new)
     out(f"{name}: rev {catalogrows.rev_of(row)} to {new['rev']}; it reads {word}" + (f" ({why})" if word == "open" else ""))
     return finish(doc, opts, out, 1, 0)
 
 
 def finish(doc, opts, out, changed, failed):
-    """Write the table where something changed, and the official packs
-    from it where it is the shipped one."""
+    """Write the table where a row of it changed, the coding agents'
+    recipes where one of theirs did, and the official packs from them where
+    either is the shipped one."""
     if changed:
-        save(opts["file"], doc)
-        if os.path.abspath(opts["file"]) == os.path.abspath(TABLE):
+        shipped = False
+        if "agents" in doc.get("_moved", ()):
+            try:
+                save(opts["agents"], agents_written(doc))
+                shipped = os.path.abspath(opts["agents"]) == os.path.abspath(AGENTS)
+            except Refused as e:
+                out(f"the coding agents' recipes are left as they were: {e}")
+                failed += 1
+        if "table" in doc.get("_moved", ("table",)):
+            save(opts["file"], {k: v for k, v in doc.items() if k not in BESIDE})
+            shipped = shipped or os.path.abspath(opts["file"]) == os.path.abspath(TABLE)
+        if shipped:
             p = subprocess.run([sys.executable, os.path.join(HERE, "packs-export.py"), "--write"], capture_output=True, text=True, check=False)
             out((p.stdout + p.stderr).strip())
             failed += bool(p.returncode)
@@ -990,7 +1056,7 @@ def main(argv, out=print):
     args = list(argv)
     while args:
         a = args.pop(0)
-        if a in ("--file", "--version", "--platform"):
+        if a in ("--file", "--version", "--platform", "--agents"):
             if not args:
                 out(f"{a} takes a value")
                 return 1
@@ -1019,6 +1085,20 @@ def main(argv, out=print):
     except (OSError, ValueError, AttributeError) as e:
         out(f"pins: cannot read {opts['file']}: {said(e)}")
         return 1
+    # The coding agents' recipes beside the table: the shipped ones beside
+    # the shipped table, or the file named. Another table alone has none.
+    doc.update(_agents=[], _recipes={"recipes": {}}, _moved=set())
+    if "agents" not in opts and os.path.abspath(opts["file"]) == os.path.abspath(TABLE):
+        opts["agents"] = AGENTS
+    if opts.get("agents"):
+        try:
+            doc["_recipes"] = load(opts["agents"])
+            if not isinstance(doc["_recipes"].get("recipes"), dict):
+                raise ValueError("it has no recipes")
+            doc["_agents"] = agent_rows(doc["_recipes"]["recipes"])
+        except (OSError, ValueError, AttributeError) as e:
+            out(f"pins: cannot read {opts['agents']}: {said(e)}")
+            return 1
     try:
         return VERBS[verb](doc, names, opts, out)
     except ERRORS as e:

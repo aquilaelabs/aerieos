@@ -1,0 +1,212 @@
+{
+  "recipes": {
+    "claude": {
+      "rev": 2,
+      "fetch": [
+        {
+          "url": "https://claude.ai/install.sh",
+          "sha256": "2c5506d110560bf618bbe88f678f2c2a0047c86a9c6585fc84976120b1de0b44",
+          "to": "dl/install.sh"
+        }
+      ],
+      "online": "Its installer downloads the Claude Code program for this machine from downloads.claude.ai and checks it against the sha256 that release's manifest states; the program then sets up its own launcher.",
+      "steps": [
+        [
+          "bash",
+          "{dir}/dl/install.sh"
+        ]
+      ],
+      "pin": null,
+      "env": {},
+      "bin": ".local/bin/claude",
+      "also": [
+        ".local/share/claude"
+      ],
+      "fresh": ".local/share/claude/versions/{v}"
+    },
+    "codex": {
+      "rev": 2,
+      "fetch": [
+        {
+          "url": "https://github.com/openai/codex/releases/download/rust-v{version}/install.sh",
+          "version": "0.171.0",
+          "sha256": "b698d8eb50c0fbe0214ea57b5bf2af439054108404c6d2b872989db02f4bd574",
+          "to": "dl/install.sh",
+          "track": {
+            "resolver": "github-release",
+            "repo": "openai/codex",
+            "trim_prefix": "rust-v"
+          },
+          "found": {
+            "from": "github-asset"
+          }
+        }
+      ],
+      "online": "Its installer downloads the Codex CLI package for this machine from releases.openai.com or github.com/openai/codex's releases, and checks it against the sha256 GitHub states for that release.",
+      "steps": [
+        [
+          "sh",
+          "{dir}/dl/install.sh"
+        ]
+      ],
+      "pin": [
+        "CODEX_RELEASE",
+        "{v}"
+      ],
+      "env": {
+        "CODEX_INSTALL_DIR": "{home}/.local/bin"
+      },
+      "bin": ".local/bin/codex",
+      "also": [],
+      "fresh": ""
+    },
+    "copilot": {
+      "rev": 2,
+      "fetch": [
+        {
+          "url": "https://github.com/github/copilot-cli/releases/download/v{version}/copilot-linux-x64.tar.gz",
+          "version": "1.0.114",
+          "sha256": "b91a96f2257297cfb67ed6784a2a658609a6b8c2ee2ded18af9c9abe8cc790ae",
+          "to": "dl/copilot.tar.gz",
+          "platform": "linux/amd64",
+          "track": {
+            "resolver": "github-release",
+            "repo": "github/copilot-cli",
+            "trim_prefix": "v"
+          },
+          "found": {
+            "from": "github-asset"
+          }
+        },
+        {
+          "url": "https://github.com/github/copilot-cli/releases/download/v{version}/copilot-linux-arm64.tar.gz",
+          "version": "1.0.114",
+          "sha256": "a204154d4522a7c3aa73a65ba598e432f6aafe37d5fa31cf853163a27d98018e",
+          "to": "dl/copilot.tar.gz",
+          "platform": "linux/arm64",
+          "track": {
+            "resolver": "github-release",
+            "repo": "github/copilot-cli",
+            "trim_prefix": "v"
+          },
+          "found": {
+            "from": "github-asset"
+          }
+        }
+      ],
+      "steps": [
+        [
+          "mkdir",
+          "-p",
+          "{home}/.local/bin"
+        ],
+        [
+          "tar",
+          "-xzf",
+          "{dir}/dl/copilot.tar.gz",
+          "-C",
+          "{home}/.local/bin"
+        ],
+        [
+          "chmod",
+          "755",
+          "{home}/.local/bin/copilot"
+        ]
+      ],
+      "pin": null,
+      "env": {},
+      "bin": ".local/bin/copilot",
+      "also": [],
+      "fresh": ""
+    },
+    "grok": {
+      "rev": 2,
+      "fetch": [
+        {
+          "url": "https://x.ai/cli/grok-{version}-linux-x86_64",
+          "version": "1.0.89",
+          "sha256": "a3dface51d9bdc71fd121e0481dd02d9b46a721f7a6b892f756480e9666eba1f",
+          "to": "dl/grok",
+          "platform": "linux/amd64",
+          "track": {
+            "resolver": "text",
+            "url": "https://x.ai/cli/stable"
+          }
+        },
+        {
+          "url": "https://x.ai/cli/grok-{version}-linux-aarch64",
+          "version": "1.0.89",
+          "sha256": "641b3e500d6420d3b07117a2c857cceeb82b33f4b53d23a95895bd76a4773f96",
+          "to": "dl/grok",
+          "platform": "linux/arm64",
+          "track": {
+            "resolver": "text",
+            "url": "https://x.ai/cli/stable"
+          }
+        }
+      ],
+      "steps": [
+        [
+          "mkdir",
+          "-p",
+          "{home}/.grok/downloads",
+          "{home}/.local/bin"
+        ],
+        [
+          "install",
+          "-m",
+          "755",
+          "{dir}/dl/grok",
+          "{home}/.grok/downloads/grok"
+        ],
+        [
+          "ln",
+          "-sfn",
+          "{home}/.grok/downloads/grok",
+          "{home}/.local/bin/grok"
+        ]
+      ],
+      "pin": null,
+      "env": {},
+      "bin": ".local/bin/grok",
+      "also": [
+        ".grok/downloads/grok"
+      ],
+      "fresh": ""
+    },
+    "open": {
+      "rev": 2,
+      "fetch": [
+        {
+          "url": "https://raw.githubusercontent.com/anomalyco/opencode/v{version}/install",
+          "version": "1.19.6",
+          "sha256": "a2dd59522b9a091b6cdb2e4870c0f2135f7da09807cd5a7e04222d4316925b72",
+          "to": "dl/install",
+          "track": {
+            "resolver": "github-release",
+            "repo": "anomalyco/opencode",
+            "trim_prefix": "v"
+          }
+        }
+      ],
+      "online": "Its installer downloads the OpenCode build for this machine from github.com/anomalyco/opencode's releases, and checks it against nothing.",
+      "steps": [
+        [
+          "bash",
+          "{dir}/dl/install",
+          "--no-modify-path"
+        ]
+      ],
+      "pin": [
+        "VERSION",
+        "{v}"
+      ],
+      "env": {},
+      "bin": ".opencode/bin/opencode",
+      "also": [
+        ".local/bin/opencode"
+      ],
+      "fresh": ""
+    }
+  }
+}

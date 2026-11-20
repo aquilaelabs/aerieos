@@ -19,6 +19,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, ".."))
 sys.path.insert(0, os.path.join(HERE, "..", "..", "agent"))
 import agents  # noqa: E402
+import packformat  # noqa: E402
 import toolpacks  # noqa: E402
 from aerieos_agent import base, tokens, tokenwatch  # noqa: E402
 
@@ -131,8 +132,12 @@ class TheTablesData(unittest.TestCase):
             self.assertEqual(errors, [], a.id)
             if a.signin:
                 self.assertEqual(got["agent"]["signin"]["flow"]["kept"], a.signin["flow"]["kept"])
-                # The least that holds what it uses, whatever this build reads now.
-                self.assertEqual(m.get("framework"), "2.2", f"{a.id}: who is signed in read from a named file is 2.2's")
+                # The least that holds what it uses, whatever this build
+                # reads now: its second number is 2.2's, and its first the
+                # format its recipe is written in (5, since it holds what
+                # it fetches).
+                self.assertEqual(m.get("framework"), f"{packformat.of(m)}.2", f"{a.id}: who is signed in read from a named file is 2.2's")
+                self.assertEqual(packformat.of(m), packformat.HELD_FORMAT if "steps" in a.install else 1, a.id)
 
     def test_who_and_forget_are_held_to_plain_keys(self):
         base = {"login": ["foo", "login"], "flow": {"url": "https://auth.example.com/", "code_after": "enter code", "kept": ".foo/auth.json"}}

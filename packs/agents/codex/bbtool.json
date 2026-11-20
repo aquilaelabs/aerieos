@@ -15,13 +15,35 @@
    "env": {
     "CODEX_INSTALL_DIR": "{home}/.local/bin"
    },
+   "fetch": [
+    {
+     "found": {
+      "from": "github-asset"
+     },
+     "sha256": "b698d8eb50c0fbe0214ea57b5bf2af439054108404c6d2b872989db02f4bd574",
+     "to": "dl/install.sh",
+     "track": {
+      "repo": "openai/codex",
+      "resolver": "github-release",
+      "trim_prefix": "rust-v"
+     },
+     "url": "https://github.com/openai/codex/releases/download/rust-v{version}/install.sh",
+     "version": "0.171.0"
+    }
+   ],
    "fresh": "",
+   "online": "Its installer downloads the Codex CLI package for this machine from releases.openai.com or github.com/openai/codex's releases, and checks it against the sha256 GitHub states for that release.",
    "pin": [
     "CODEX_RELEASE",
     "{v}"
    ],
-   "rev": 1,
-   "script": "curl -fsSL https://chatgpt.com/codex/install.sh | sh"
+   "rev": 2,
+   "steps": [
+    [
+     "sh",
+     "{dir}/dl/install.sh"
+    ]
+   ]
   },
   "latest_url": "https://registry.npmjs.org/@openai/codex/latest",
   "login_job": "codex-login",
@@ -68,7 +90,8 @@
   "transcripts": ".codex/sessions",
   "update_job": "codex-update"
  },
- "framework": "2.2",
+ "format": 5,
+ "framework": "5.2",
  "label": "ChatGPT",
  "maker": "OpenAI",
  "name": "codex",

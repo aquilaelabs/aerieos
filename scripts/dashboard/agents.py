@@ -23,6 +23,7 @@ page-agents.js, held to this one by unit/test_agents.py; the node agent's
 prefixes (aerieos_agent/sessions.py AGENT_PREFIXES) by the same test.
 """
 import json
+import os
 import re
 from dataclasses import dataclass, field
 
@@ -76,6 +77,25 @@ class Agent:
 # (Claude's --append-system-prompt-file), or an instructions file in the
 # session's view that the agent reads the way it reads a project's own.
 BRIEFING = {"system-prompt-file", "instructions-file"}
+
+
+def _recipes():
+    """Each shipped agent's install recipe (install_checked, below), by its
+    id: kept as data beside this file (agent-recipes.json), since a recipe
+    carries pins that move. The tool that proposes a newer pin
+    (tools/pins.py) writes it there, the packs are written from it
+    (tools/packs-export.py), and nothing holds a second copy. A reader
+    with no such file beside it (the node's bundle carries this table
+    alone, and is handed each recipe with its job) has none."""
+    try:
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "agent-recipes.json"), encoding="utf-8") as f:
+            got = json.load(f).get("recipes")
+    except (OSError, ValueError, AttributeError):
+        return {}
+    return got if isinstance(got, dict) else {}
+
+
+RECIPES = _recipes()
 # What holds the guards: the agent's own hooks (Claude's seven), or its
 # approval policy and sandbox with the bb-session view and the bb wrapper
 # holding what it has no hook for.
@@ -102,11 +122,12 @@ TABLE = (
                            "prompt": "Paste code", "refused": "Invalid code", "ends": "exit", "kept": ".claude/.credentials.json",
                            "logout": ["claude", "auth", "logout"],
                            "who": {"file": ".claude.json", "email": ["oauthAccount", "emailAddress"]}}},
-          # Its installer is handed no version: the one asked for is read
-          # from the versions folder it leaves (fresh).
-          install={"rev": 1, "script": "curl -fsSL https://claude.ai/install.sh | bash", "pin": None, "env": {},
-                   "bin": ".local/bin/claude", "also": [".local/share/claude"],
-                   "fresh": ".local/share/claude/versions/{v}"}),
+          # Its vendor's installer, held to its sha256 and run from the file:
+          # it has no version in its address, so the day its vendor edits
+          # it an install is refused until the pin moves. It is handed no
+          # version: the one asked for is read from the versions folder it
+          # leaves (fresh).
+          install=RECIPES.get("claude")),
     Agent(id="codex", name="ChatGPT", product="Codex CLI", command="codex",
           provider="OpenAI", reported="codex", update_job="codex-update",
           login_job="codex-login", logout_job="codex-logout",
@@ -125,9 +146,11 @@ TABLE = (
                            "who": {"email": ["tokens", "id_token", "email"],
                                    "plan": ["tokens", "id_token", "https://api.openai.com/auth", "chatgpt_plan_type"],
                                    "key": ["OPENAI_API_KEY"], "key_named": "an OpenAI API key"}}},
-          install={"rev": 1, "script": "curl -fsSL https://chatgpt.com/codex/install.sh | sh",
-                   "pin": ["CODEX_RELEASE", "{v}"], "env": {"CODEX_INSTALL_DIR": "{home}/.local/bin"},
-                   "bin": ".local/bin/codex", "also": [], "fresh": ""}),
+          # Its vendor's installer as each release carries it, held to the
+          # sha256 GitHub states for it: it lays a package out under
+          # ~/.codex with links into it, which no step here could stand in
+          # for, and downloads that package by itself.
+          install=RECIPES.get("codex")),
     Agent(id="copilot", name="Copilot", product="Copilot CLI", command="copilot",
           provider="GitHub", reported="copilot", update_job="copilot-update",
           login_job="copilot-login", logout_job="copilot-logout",
@@ -147,9 +170,10 @@ TABLE = (
                            "kept": ".copilot/config.json",
                            "forget": {"keys": ["lastLoggedInUser", "loggedInUsers"], "like": "token"},
                            "who": {"email": ["lastLoggedInUser", "login"]}}},
-          install={"rev": 1, "script": "curl -fsSL https://gh.io/copilot-install | bash",
-                   "pin": ["VERSION", "v{v}"], "env": {"PREFIX": "{home}/.local"},
-                   "bin": ".local/bin/copilot", "also": [], "fresh": ""}),
+          # The program itself, pinned: its release's tarball for each
+          # platform, held to the sha256 GitHub states and unpacked into
+          # ~/.local/bin, which is all its vendor's installer does with it.
+          install=RECIPES.get("copilot")),
     # Grok Build (R95 step 21): xAI's coding agent, checked against its user
     # guide on 25 Oct (xai-org/grok-build, Apache-2.0). Its hooks are
     # Claude's events (PreToolUse, UserPromptSubmit, Stop), its sign-in a
@@ -168,11 +192,12 @@ TABLE = (
                   "flow": {"url": ["https://accounts.x.ai/", "https://auth.x.ai/", "https://x.ai/", "https://grok.com/"],
                            "code_after": "Confirm this code in your browser", "ends": "exit", "kept": ".grok/auth.json",
                            "logout": ["grok", "logout"], "who": {"named": "an xAI account"}}},
-          # Its installer takes the version as its argument, not from its
-          # environment: handed over through BB_PIN, empty for the newest.
-          install={"rev": 1, "script": "curl -fsSL https://x.ai/cli/install.sh | bash -s -- ${BB_PIN:-}",
-                   "pin": ["BB_PIN", "{v}"], "env": {"GROK_BIN_DIR": "{home}/.local/bin"},
-                   "bin": ".local/bin/grok", "also": [], "fresh": ""}),
+          # The program itself, pinned: its vendor publishes one binary a
+          # platform at each version and states no digest for it, and its
+          # installer checks none, so the pin is the sha256 of the file as
+          # it was when the pin was made. Put where the installer keeps it
+          # (~/.grok/downloads) with the command a link to it.
+          install=RECIPES.get("grok")),
     # Any model (R144 step 2): OpenCode, the open agent, pointed at a node's
     # model router (router.py) rather than signed in to anybody: its keys
     # are the router's, handed to a session at its start with the models
@@ -187,12 +212,13 @@ TABLE = (
           briefing="instructions-file", guards="plugin", state="plugin",
           transcripts=".local/share/opencode", tool="opencode", live=True,
           latest_url="https://registry.npmjs.org/opencode-ai/latest",
-          # Its installer puts the program in ~/.opencode/bin whatever it is
-          # told (read off the script on 11 Nov), and is asked not to write
-          # the account's shell files; the old place goes with a removal.
-          install={"rev": 1, "script": "curl -fsSL https://opencode.ai/install | bash -s -- --no-modify-path",
-                   "pin": ["VERSION", "{v}"], "env": {},
-                   "bin": ".opencode/bin/opencode", "also": [".local/bin/opencode"], "fresh": ""}),
+          # Its vendor's installer as its repository has it at each release's
+          # tag, held to its sha256. It picks the build for the machine (one
+          # for a processor without AVX2, which a platform's name cannot
+          # say), puts the program in ~/.opencode/bin whatever it is told
+          # (read off the script on 11 Nov), and is asked not to write the
+          # account's shell files; the old place goes with a removal.
+          install=RECIPES.get("open")),
 )
 
 _BY_ID = {a.id: a for a in TABLE}
@@ -666,7 +692,6 @@ def asked_by():
     id, or "" when it is none of the table's. For what a record names as
     its asker, never for whether it may: every gate holds for every agent's
     session alike."""
-    import os
     a = get(os.environ.get("BB_AGENT", ""))
     return a.id if a else ""
 

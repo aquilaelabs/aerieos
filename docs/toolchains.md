@@ -415,6 +415,17 @@ declared download's `track`) and how the new file's digest is learned
 (`found`) are the row's own data, read with the same resolvers an install
 of an unpinned row uses.
 
+The five coding agents' install recipes are rows of the tool too, each
+under the name its row in the Library has (`tools/pins.py check codex-cli`).
+A recipe's downloads are declared in the same shape a row's are, in the one
+file that holds the recipes (`scripts/dashboard/agent-recipes.json`), and a
+move writes the new version and digest there, raises the recipe's `rev` and
+rewrites `packs/agents`. An installer with a version in its address moves
+with its track; a vendor's one moving installer has nothing to track, so
+`check` asks its address for the bytes it answers today and says when they
+are no longer the pinned ones, which is the day an install of it starts to
+be refused ([agents.md](agents.md#where-an-agent-s-install-recipe-comes-from)).
+
 ```bash
 tools/pins.py check              # what each pinned row is pinned to, and what its resolver finds now
 tools/pins.py move go zig        # write the new version and digests for those rows, every platform

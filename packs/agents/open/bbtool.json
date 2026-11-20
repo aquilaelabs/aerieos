@@ -10,13 +10,33 @@
    ],
    "bin": ".opencode/bin/opencode",
    "env": {},
+   "fetch": [
+    {
+     "sha256": "a2dd59522b9a091b6cdb2e4870c0f2135f7da09807cd5a7e04222d4316925b72",
+     "to": "dl/install",
+     "track": {
+      "repo": "anomalyco/opencode",
+      "resolver": "github-release",
+      "trim_prefix": "v"
+     },
+     "url": "https://raw.githubusercontent.com/anomalyco/opencode/v{version}/install",
+     "version": "1.19.6"
+    }
+   ],
    "fresh": "",
+   "online": "Its installer downloads the OpenCode build for this machine from github.com/anomalyco/opencode's releases, and checks it against nothing.",
    "pin": [
     "VERSION",
     "{v}"
    ],
-   "rev": 1,
-   "script": "curl -fsSL https://opencode.ai/install | bash -s -- --no-modify-path"
+   "rev": 2,
+   "steps": [
+    [
+     "bash",
+     "{dir}/dl/install",
+     "--no-modify-path"
+    ]
+   ]
   },
   "latest_url": "https://registry.npmjs.org/opencode-ai/latest",
   "login_job": "",
@@ -29,7 +49,8 @@
   "transcripts": ".local/share/opencode",
   "update_job": "opencode-update"
  },
- "framework": "2.1",
+ "format": 5,
+ "framework": "5.1",
  "label": "Any model",
  "maker": "Anomaly",
  "name": "open",

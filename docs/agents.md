@@ -116,13 +116,13 @@ your sign-in, what you added to the agent and Remove.
 - **Install, Software update, Remove.** Install and Software update on the Library's card,
   Remove on the Installed page's row; an administrator's, or whoever may install
   toolchains on that node. Each ends that agent's sessions on the node
-  first, then runs the vendor's own installer as the session account
-  (`claude.ai/install.sh`, `chatgpt.com/codex/install.sh`,
-  `gh.io/copilot-install`, `x.ai/cli/install.sh`, `opencode.ai/install`), and where the node's agent is root copies the
+  first, then runs the agent's install recipe as the session account
+  ([below](#where-an-agent-s-install-recipe-comes-from)): what the recipe
+  downloads is fetched and held to a sha256 the recipe carries before
+  anything of it runs. Where the node's agent is root it then copies the
   binary somewhere the account cannot write, so an update typed in a
   session changes nothing that runs. Nothing installs or updates by itself:
-  Copilot's and Grok's own updaters are switched off in a session. Grok's
-  installer checks its download against nothing published.
+  Copilot's and Grok's own updaters are switched off in a session.
 - **Your sign-in on that node.** A sign-in is one account's on one node and
   never travels to another. Claude's flow prints a link and waits for the
   code the page gives back. Codex's, Copilot's and Grok's are device flows: the
@@ -150,12 +150,24 @@ sign-in there.
 
 How each of the five is installed is a recipe in its pack's manifest
 (`packs/agents/NAME/bbtool.json`, the `agent.install` block), which the
-controller hands to the node with every install, update and removal:
+controller hands to the node with every install, update and removal. A
+recipe is held like any entry's install
+([Declared downloads](tool-packs.md#declared-downloads)): whatever it
+fetches is held to something the recipe itself carries, and nothing reaches
+a shell from the network as it arrives.
 
 ```json
 "install": {
-  "rev": 1,
-  "script": "curl -fsSL https://opencode.ai/install | bash -s -- --no-modify-path",
+  "rev": 2,
+  "fetch": [
+    {"url": "https://raw.githubusercontent.com/anomalyco/opencode/v{version}/install",
+     "version": "1.19.6",
+     "sha256": "a2dd59522b9a091b6cdb2e4870c0f2135f7da09807cd5a7e04222d4316925b72",
+     "to": "dl/install",
+     "track": {"resolver": "github-release", "repo": "anomalyco/opencode", "trim_prefix": "v"}}
+  ],
+  "online": "Its installer downloads the OpenCode build for this machine from github.com/anomalyco/opencode's releases, and checks it against nothing.",
+  "steps": [["bash", "{dir}/dl/install", "--no-modify-path"]],
   "pin": ["VERSION", "{v}"],
   "env": {},
   "bin": ".opencode/bin/opencode",
@@ -167,12 +179,56 @@ controller hands to the node with every install, update and removal:
 | Key | What it says |
 |---|---|
 | `rev` | A whole number, one more with each change to the recipe. |
-| `script` | The vendor's installer over https handed to `sh` or `bash`, with plain arguments after `-s --` if it takes any. Nothing else a shell would run is accepted. |
-| `pin` | The variable a version is handed through and how it is written (`["VERSION", "v{v}"]`), or `null` for an installer that takes none. |
+| `fetch` | What it downloads, each a declared download as every entry writes one: its `https` address, the file it is kept as, its `sha256` (or `signed`, its publisher's signature under a key in `keyring`), the `platform` it is for, the `version` it is, and for the tool that moves pins how a newer one is found (`track`, `found`). |
+| `keyring` | The publisher's armored public keys a `signed` download is checked with, by name. |
+| `online` | One sentence, where its pinned installer downloads the rest by itself: what, from where, and what it checks. With it the steps keep the network; without it they run with none. |
+| `steps` | What runs once the downloads are held, each a list of plain words and never a line a shell reads: a file the recipe fetched (`{dir}/...`), `sh` or `bash` on one, or one of `mkdir`, `tar`, `unzip`, `install`, `ln` and `chmod`. `{dir}` is where the downloads landed, `{home}` the account's home, `{version}` the version the downloads say. |
+| `pin` | The variable a version is handed to an installer through and how it is written (`["VERSION", "v{v}"]`), or `null` for a recipe that takes none. |
 | `env` | Up to eight of the installer's own variables, with `{home}` for the account's home. Never `PATH`, `HOME`, the account's name or an `LD_` name. |
-| `bin` | Where the installer leaves the program, under the account's home. |
-| `also` | Older places a removal clears, under the account's home. |
+| `bin` | Where the program is left, under the account's home. |
+| `also` | Other places a removal clears, under the account's home. |
 | `fresh` | The folder a named version is read from, with `{v}` (Claude Code's `versions` folder), or empty. |
+
+**What a node does with one.** It fetches each download over `https`,
+holds it to its sha256 or its signature, and only then runs the steps, as
+the session account. The fetching, the holding and the cut are the ones a
+toolchain's install goes through (`scripts/lib/held-run.sh` in the node's
+bundle runs them), so there is one mechanism and one place to read it. A
+file that is not the pinned bytes runs nothing and leaves nothing behind:
+the job names both digests and says the vendor changed the file since
+AerieOS pinned it, and an install is refused until the pin moves. Without
+`online` the steps run with no network, where the node can cut it; with
+it, the job says the recipe's sentence.
+
+**What each of the five is held to.** The Library's card says it in one
+word, from the recipe alone (`held` on the agent's row, with its
+`downloads`):
+
+| Agent | Word | What is pinned | What a person notices |
+|---|---|---|---|
+| Copilot CLI | pinned | The program: its release's tarball for each platform, at the sha256 GitHub states for it, unpacked into `~/.local/bin` with no network. | It installs the pinned version, which may be one behind its vendor's until the pin moves. |
+| Grok Build | pinned | The program: its vendor's binary for each platform, at the sha256 of the file as it was when the pin was made (its vendor states none, and its installer checks none), put in `~/.grok/downloads` with the command a link to it. | The same. Its vendor's installer is not run, so its shell completions and its `agent` command are not there. |
+| Codex CLI | installer | Its vendor's installer as each release carries it, at the sha256 GitHub states. It downloads the package itself and checks it against GitHub's digest. | Software update brings the newest version; the installer is the one of the pinned release. |
+| Any model (OpenCode) | installer | Its vendor's installer as its repository has it at the release's tag. It downloads the build for the machine and checks it against nothing. | The same. |
+| Claude Code | installer | Its vendor's installer, a file with no version in its address. It downloads the program and checks it against the sha256 its release's manifest states. | The day its vendor edits that file, an install is refused until the pin moves. |
+
+A pinned row's `latest` is the version its recipe pins (`pinned`), since
+that is what an install brings; `vendor_latest` is the newest its vendor
+names. A node is behind, and Software update is offered, against the
+first.
+
+**How a pin moves.** `tools/pins.py` reads the five recipes as it reads
+the toolchains' rows ([Moving a pin](toolchains.md#moving-a-pin)), each
+under its Library name: `check` says what would move, `move` writes the
+new version and digest into `scripts/dashboard/agent-recipes.json`, the
+one file that holds the recipes, raises the recipe's `rev` and rewrites
+the packs. The agent table reads that file, so nothing is copied.
+
+A recipe written before pack format 5 says `script` in the place of `fetch`
+and `steps`: a vendor's installer over https handed to `sh` or `bash` as it
+arrives. It is still valid and still runs as it did, for an older catalog's
+row; its job says in one line that nothing held what it fetched, and its
+card reads `open`.
 
 A release carries each recipe, so an install with no network works as
 before. The catalog's signed index says each agent's recipe `rev` beside
@@ -183,12 +239,14 @@ instead: the job's first line then says `by the catalog's recipe (rev N)`.
 It is read once per commit, behind the Library as the page opens, so a
 press on Software update does not wait for it; where nothing is newer, which is
 nearly always, nothing is fetched at all. So when a vendor changes its
-installer, the answer is a catalog commit and a maintainer's signature,
-and no install waits for a release. A catalog that does not answer, a
-pack that is refused, or one no newer than the release leaves the
-release's recipe in place. The node holds what it is handed to the same
-shape and refuses anything else without running it; a node whose agent is
-older than 0.9.426 ignores the recipe and uses the one it shipped with.
+installer, or a pin should move, the answer is a catalog commit and a
+maintainer's signature, and no install waits for a release. A catalog that
+does not answer, a pack that is refused, or one no newer than the release
+leaves the release's recipe in place. The node holds what it is handed to
+the same shape and refuses anything else without running it. Its agent
+keeps no installer of its own: every controller that ships agent 0.9.479
+or newer hands the recipe over, and an install asked for with none is
+refused.
 
 ## The guards
 

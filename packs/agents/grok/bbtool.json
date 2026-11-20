@@ -10,18 +10,59 @@
   "command": "grok",
   "guards": "hooks",
   "install": {
-   "also": [],
-   "bin": ".local/bin/grok",
-   "env": {
-    "GROK_BIN_DIR": "{home}/.local/bin"
-   },
-   "fresh": "",
-   "pin": [
-    "BB_PIN",
-    "{v}"
+   "also": [
+    ".grok/downloads/grok"
    ],
-   "rev": 1,
-   "script": "curl -fsSL https://x.ai/cli/install.sh | bash -s -- ${BB_PIN:-}"
+   "bin": ".local/bin/grok",
+   "env": {},
+   "fetch": [
+    {
+     "platform": "linux/amd64",
+     "sha256": "a3dface51d9bdc71fd121e0481dd02d9b46a721f7a6b892f756480e9666eba1f",
+     "to": "dl/grok",
+     "track": {
+      "resolver": "text",
+      "url": "https://x.ai/cli/stable"
+     },
+     "url": "https://x.ai/cli/grok-{version}-linux-x86_64",
+     "version": "1.0.89"
+    },
+    {
+     "platform": "linux/arm64",
+     "sha256": "641b3e500d6420d3b07117a2c857cceeb82b33f4b53d23a95895bd76a4773f96",
+     "to": "dl/grok",
+     "track": {
+      "resolver": "text",
+      "url": "https://x.ai/cli/stable"
+     },
+     "url": "https://x.ai/cli/grok-{version}-linux-aarch64",
+     "version": "1.0.89"
+    }
+   ],
+   "fresh": "",
+   "pin": null,
+   "rev": 2,
+   "steps": [
+    [
+     "mkdir",
+     "-p",
+     "{home}/.grok/downloads",
+     "{home}/.local/bin"
+    ],
+    [
+     "install",
+     "-m",
+     "755",
+     "{dir}/dl/grok",
+     "{home}/.grok/downloads/grok"
+    ],
+    [
+     "ln",
+     "-sfn",
+     "{home}/.grok/downloads/grok",
+     "{home}/.local/bin/grok"
+    ]
+   ]
   },
   "latest_url": "https://x.ai/cli/stable",
   "login_job": "grok-login",
@@ -62,7 +103,8 @@
   "transcripts": ".grok/sessions",
   "update_job": "grok-update"
  },
- "framework": "2.2",
+ "format": 5,
+ "framework": "5.2",
  "label": "Grok",
  "maker": "xAI",
  "name": "grok",

@@ -14,10 +14,23 @@
    ],
    "bin": ".local/bin/claude",
    "env": {},
+   "fetch": [
+    {
+     "sha256": "2c5506d110560bf618bbe88f678f2c2a0047c86a9c6585fc84976120b1de0b44",
+     "to": "dl/install.sh",
+     "url": "https://claude.ai/install.sh"
+    }
+   ],
    "fresh": ".local/share/claude/versions/{v}",
+   "online": "Its installer downloads the Claude Code program for this machine from downloads.claude.ai and checks it against the sha256 that release's manifest states; the program then sets up its own launcher.",
    "pin": null,
-   "rev": 1,
-   "script": "curl -fsSL https://claude.ai/install.sh | bash"
+   "rev": 2,
+   "steps": [
+    [
+     "bash",
+     "{dir}/dl/install.sh"
+    ]
+   ]
   },
   "latest_url": "",
   "login_job": "claude-login",
@@ -60,7 +73,8 @@
   "transcripts": ".claude/projects",
   "update_job": "claude-update"
  },
- "framework": "2.2",
+ "format": 5,
+ "framework": "5.2",
  "label": "Claude",
  "maker": "Anthropic",
  "name": "claude",

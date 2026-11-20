@@ -68,6 +68,10 @@ def agent_packs():
                       # ...and how it signs in (R234 step 6), in the words a
                       # pack's agent says its own: the one driver runs both.
                       | ({"signin": a.signin} if a.signin else {})}
+        # A recipe that holds what it fetches (its downloads declared, its
+        # steps run from them) is pack format 5's, and the manifest says so.
+        if (a.install or {}).get("steps"):
+            m["format"] = packformat.HELD_FORMAT
         # The framework version it needs: the least that holds what it uses.
         m["framework"] = packformat.least(m, toolpacks._agent_uses({"signin": a.signin or {}})) or m["framework"]
         out.append((os.path.join(PACKS, "agents", a.id, "bbtool.json"), m))

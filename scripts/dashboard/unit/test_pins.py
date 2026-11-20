@@ -636,6 +636,136 @@ class Verify(Case):
         self.assertIn(f"go: NOT VERIFIED: its download for linux/arm64, {url}: {url} answered 404", out)
 
 
+class Agents(Case):
+    """The coding agents' install recipes are rows of the tool too, read
+    from the one file that holds them and written back there: an installer
+    with a version in its address, a program a platform, a vendor's one
+    moving script, and a recipe of the older form, which pins nothing."""
+
+    INSTALL = "https://dl.example.org/{version}/install.sh"
+    PROG = "https://dl.example.org/{version}/kite-{plat}.tar.gz"
+    SCRIPT = "https://get.example.org/kite/install.sh"
+    TRACK = {"resolver": "text", "url": "https://dl.example.org/KITE"}
+
+    def setUp(self):
+        super().setUp()
+        self.recipes = os.path.join(self.d, "agent-recipes.json")
+        self.out("1.4.0")
+        self.files[self.SCRIPT] = "a moving installer, as first pinned"
+        rest = {"pin": None, "env": {}, "bin": ".local/bin/kite", "also": [], "fresh": ""}
+        pins.save(self.recipes, {"recipes": {
+            # Its vendor's installer as each release carries it, its sha256 stated beside it.
+            "kite": {"rev": 2, "fetch": [{"url": self.INSTALL, "version": "1.4.0", "sha256": sha(self.files[self.INSTALL.format(version="1.4.0")]), "to": "dl/install.sh",
+                                          "track": self.TRACK, "found": {"from": "file", "url": "{url}.sha256"}}],
+                     "online": "Its installer downloads the build for this machine from dl.example.org.", "steps": [["sh", "{dir}/dl/install.sh"]],
+                     **rest, "pin": ["KITE_VERSION", "{v}"]},
+            # The program itself, a file a platform, its vendor stating no digest.
+            "wren": {"rev": 5, "fetch": [{"url": self.PROG.replace("{plat}", PLATS[p]), "version": "1.4.0", "sha256": sha(self.files[self.prog("1.4.0", p)]),
+                                          "to": "dl/kite.tar.gz", "platform": p, "track": self.TRACK} for p in PLATS],
+                     "steps": [["mkdir", "-p", "{home}/.local/bin"], ["tar", "-xzf", "{dir}/dl/kite.tar.gz", "-C", "{home}/.local/bin"]], **rest},
+            # A vendor's one moving script: no version, nothing to track.
+            "lark": {"rev": 1, "fetch": [{"url": self.SCRIPT, "sha256": sha(self.files[self.SCRIPT]), "to": "dl/install.sh"}],
+                     "online": "Its installer downloads the rest from get.example.org.", "steps": [["bash", "{dir}/dl/install.sh"]], **rest},
+            # The older form: a vendor's installer handed to a shell as it arrives.
+            "pipit": {"rev": 1, "script": "curl -fsSL https://get.example.org/pipit | bash", **rest},
+        }})
+
+    def prog(self, version, plat):
+        return self.PROG.format(version=version, plat=PLATS[plat])
+
+    def out(self, version):
+        """The vendor publishes `version`: its installer with its sha256
+        beside it, and its program for each platform."""
+        self.pages[self.TRACK["url"]] = version + "\n"
+        url = self.INSTALL.format(version=version)
+        self.files[url] = f"the installer of {version}"
+        self.pages[url + ".sha256"] = f"{sha(self.files[url])}  install.sh\n"
+        for plat in PLATS:
+            self.files[self.prog(version, plat)] = f"kite {version} for {plat}"
+
+    def run_tool(self, *argv):
+        said = []
+        rc = pins.main([*argv, "--file", self.table, "--agents", self.recipes], out=said.append)
+        return rc, "\n".join(said)
+
+    def recipe(self, name):
+        with open(self.recipes, encoding="utf-8") as f:
+            return json.load(f)["recipes"][name]
+
+    def test_check_asks_each_recipe_by_its_own_data_and_writes_nothing(self):
+        with open(self.recipes, encoding="utf-8") as f:
+            before = f.read()
+        rc, out = self.run_tool("check")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("kite: dl/install.sh is at 1.4.0 " + sha(self.files[self.INSTALL.format(version="1.4.0")])[:12] + " (its track finds the version it is pinned to)", out)
+        self.assertIn("wren: dl/kite.tar.gz for linux/arm64 is at 1.4.0", out)
+        self.assertIn("lark: dl/install.sh is at " + sha(self.files[self.SCRIPT])[:12], out)
+        self.assertNotIn("pipit", out, "a recipe that pins nothing is not asked about, unless it is named")
+        # A file with a version is not downloaded to be checked; the moving script is asked for its bytes.
+        self.assertEqual([u for u in self.fetched if "kite" in u], [self.SCRIPT])
+        with open(self.recipes, encoding="utf-8") as f:
+            self.assertEqual(f.read(), before)
+        rc, out = self.run_tool("check", "pipit")
+        self.assertEqual((rc, out.splitlines()[0]), (0, f"pipit: not pinned ({packformat.PIPED_SAID})"))
+        # The table's rows are asked beside them, as before.
+        self.assertIn("go: its download is at go1.99.0", self.run_tool("check")[1])
+
+    def test_move_writes_the_new_pin_into_the_recipes_and_leaves_the_table(self):
+        table = self.read()
+        self.out("1.5.0")
+        rc, out = self.run_tool("check", "kite", "wren", "lark")
+        self.assertEqual(rc, 3, out)
+        self.assertIn("2 row(s) would move", out)
+        rc, out = self.run_tool("move", "kite", "wren")
+        self.assertEqual(rc, 0, out)
+        kite, wren = self.recipe("kite"), self.recipe("wren")
+        new = self.INSTALL.format(version="1.5.0")
+        self.assertEqual((kite["rev"], kite["fetch"][0]["version"], kite["fetch"][0]["sha256"]), (3, "1.5.0", sha(self.files[new])))
+        self.assertIn(f"stated by {new}.sha256", out, "its publisher's own statement, with nothing downloaded")
+        self.assertNotIn(new, self.fetched)
+        # The address keeps its {version}, and everything a node reads beside the pin is as it was.
+        self.assertEqual((kite["fetch"][0]["url"], kite["steps"], kite["online"][:13], kite["pin"]), (self.INSTALL, [["sh", "{dir}/dl/install.sh"]], "Its installer", ["KITE_VERSION", "{v}"]))
+        # A program a platform moves as one set: its vendor states no digest, so each file is hashed here.
+        self.assertEqual((wren["rev"], [(f["platform"], f["version"], f["sha256"]) for f in wren["fetch"]]),
+                         (6, [(p, "1.5.0", sha(self.files[self.prog("1.5.0", p)])) for p in PLATS]))
+        self.assertIn("downloaded and hashed here", out)
+        self.assertEqual(self.recipe("lark")["rev"], 1, "a recipe that was not named is left alone")
+        self.assertEqual(self.read(), table, "no row of the table moved, so the table is not written")
+        self.assertEqual(self.run_tool("check")[0], 0)
+
+    def test_a_moving_script_that_changed_is_said_and_re_pinned(self):
+        self.files[self.SCRIPT] = "a moving installer, edited by its vendor"
+        rc, out = self.run_tool("check", "lark")
+        self.assertEqual(rc, 3, out)
+        self.assertIn("lark: dl/install.sh " + sha("a moving installer, as first pinned")[:12] + " to " + sha(self.files[self.SCRIPT])[:12], out)
+        rc, out = self.run_tool("verify", "lark")
+        self.assertEqual(rc, 1, out)
+        self.assertIn(f"lark: NOT ITS PIN: dl/install.sh, {self.SCRIPT} answers sha256 {sha(self.files[self.SCRIPT])}", out)
+        rc, out = self.run_tool("move", "lark")
+        self.assertEqual(rc, 0, out)
+        self.assertEqual((self.recipe("lark")["rev"], self.recipe("lark")["fetch"][0]["sha256"]), (2, sha(self.files[self.SCRIPT])))
+        self.assertEqual(self.run_tool("verify", "lark")[0], 0)
+
+    def test_verify_holds_each_recipe_s_file_for_a_platform_to_its_pin(self):
+        rc, out = self.run_tool("verify", "kite", "wren", "--platform", "linux/arm64")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("kite: dl/install.sh is its pin", out)
+        self.assertIn("wren: dl/kite.tar.gz for linux/arm64 is its pin", out)
+        self.assertNotIn("linux/amd64", out)
+        self.assertIn("every one of the 2 pinned file(s) asked for is its pin", out)
+
+    def test_the_shipped_recipes_are_the_rows_beside_the_shipped_table(self):
+        # With no file named: the one copy the agent table reads, each
+        # under the name its row in the Library has.
+        import agents  # noqa: PLC0415
+        doc = pins.load(pins.AGENTS)
+        self.assertEqual(doc["recipes"], {a.id: a.install for a in agents.TABLE})
+        rows = pins.agent_rows(doc["recipes"])
+        self.assertEqual([r["name"] for r in rows], [a.tool for a in agents.TABLE])
+        self.assertTrue(all(pins.is_pinned(r) for r in rows), "every shipped recipe holds what it fetches")
+        self.assertEqual(sorted(packformat.held(r)[0] for r in rows), sorted(packformat.agent_held(a.install)["word"] for a in agents.TABLE))
+
+
 class Asks(unittest.TestCase):
     def test_it_names_no_vendor_and_leaves_sdkmeta_as_it_found_it(self):
         with open(os.path.join(REPO, "tools", "pins.py"), encoding="utf-8") as f:

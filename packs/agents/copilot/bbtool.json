@@ -12,16 +12,61 @@
   "install": {
    "also": [],
    "bin": ".local/bin/copilot",
-   "env": {
-    "PREFIX": "{home}/.local"
-   },
-   "fresh": "",
-   "pin": [
-    "VERSION",
-    "v{v}"
+   "env": {},
+   "fetch": [
+    {
+     "found": {
+      "from": "github-asset"
+     },
+     "platform": "linux/amd64",
+     "sha256": "b91a96f2257297cfb67ed6784a2a658609a6b8c2ee2ded18af9c9abe8cc790ae",
+     "to": "dl/copilot.tar.gz",
+     "track": {
+      "repo": "github/copilot-cli",
+      "resolver": "github-release",
+      "trim_prefix": "v"
+     },
+     "url": "https://github.com/github/copilot-cli/releases/download/v{version}/copilot-linux-x64.tar.gz",
+     "version": "1.0.114"
+    },
+    {
+     "found": {
+      "from": "github-asset"
+     },
+     "platform": "linux/arm64",
+     "sha256": "a204154d4522a7c3aa73a65ba598e432f6aafe37d5fa31cf853163a27d98018e",
+     "to": "dl/copilot.tar.gz",
+     "track": {
+      "repo": "github/copilot-cli",
+      "resolver": "github-release",
+      "trim_prefix": "v"
+     },
+     "url": "https://github.com/github/copilot-cli/releases/download/v{version}/copilot-linux-arm64.tar.gz",
+     "version": "1.0.114"
+    }
    ],
-   "rev": 1,
-   "script": "curl -fsSL https://gh.io/copilot-install | bash"
+   "fresh": "",
+   "pin": null,
+   "rev": 2,
+   "steps": [
+    [
+     "mkdir",
+     "-p",
+     "{home}/.local/bin"
+    ],
+    [
+     "tar",
+     "-xzf",
+     "{dir}/dl/copilot.tar.gz",
+     "-C",
+     "{home}/.local/bin"
+    ],
+    [
+     "chmod",
+     "755",
+     "{home}/.local/bin/copilot"
+    ]
+   ]
   },
   "latest_url": "https://registry.npmjs.org/@github/copilot/latest",
   "login_job": "copilot-login",
@@ -69,7 +114,8 @@
   "transcripts": ".copilot/session-state",
   "update_job": "copilot-update"
  },
- "framework": "2.2",
+ "format": 5,
+ "framework": "5.2",
  "label": "Copilot",
  "maker": "GitHub",
  "name": "copilot",

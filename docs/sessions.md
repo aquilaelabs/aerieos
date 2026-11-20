@@ -119,7 +119,8 @@ signed in there, with a button to the Installed page.
 
 **ChatGPT's Codex CLI and Copilot CLI are installed the same way**, each
 from its own card on the Library and its row on the Installed page: Install, Update and Remove run the
-vendor's installer as the session account and pin the binary on a managed
+agent's install recipe as the session account, what it downloads held to
+a sha256 the recipe carries, and pin the binary on a managed
 node, and an agent's update holds its starts there until it ends. A space
 whose agent is missing on its node offers Install for that agent in place
 of Start agent.

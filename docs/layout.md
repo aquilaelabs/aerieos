@@ -215,6 +215,7 @@ scripts/
     wiki.py                      the notebook's Wiki view: a project's wiki kept as a forge-shaped git repository of its own, exported as a zip and pushed to or pulled from the repository's wiki
     names.py                     what things are called: a project, a tmux session, a project's agent sessions
     agents.py                    the coding agents a session may run, one adapter each (R95): how each installs, signs in, is launched, briefed, guarded and read; page-agents.js is the page's copy
+    agent-recipes.json           each shipped coding agent's install recipe, by its id: what it fetches with the sha256 that holds each download, its steps, and where the program lands; the one copy, read by agents.py, written by tools/pins.py when a pin moves, and what packs/agents is written from
     projects.py                  new project / link and unlink a remote, the worker that clones and pushes, the locks and the pins Home shows
     forges.py                    which git host a remote is on, and the two things a host can be asked that git cannot
     forgeaccess.py               what an agent may do on a project's git host: the abilities, the token measured without changing anything, the project's Allow or Deny, and aerie forge's verbs on GitHub, GitLab and Gitea
