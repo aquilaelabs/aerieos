@@ -522,7 +522,13 @@ is. Cloudflare signs its rpm repository's index with an older key than
 the one it publishes, so there each package is held to the key and the
 index is not. The NVIDIA container toolkit's source on a node is held the
 same way: its key is the provisioner's own copy (`nvct_key`), and its one
-source line is written there, with nothing fetched until apt reads it.
+source line is written there, with nothing fetched until apt reads it. So
+is Docker's own package source, on the systems that take Docker from it
+(Debian and Ubuntu by apt, the RHEL family by dnf): the key each is held
+to is the provisioner's copy (`docker_key`, one key for Docker's apt
+repositories and another for its rpm ones), and the RHEL family's
+repository file is written there with its `gpgkey` naming that copy,
+where Docker's own file names an address to fetch the key from.
 
 **A CI runner's program is held to a pin.** The runner a node installs
 (GitHub's Actions runner, or the one Gitea and Forgejo share) is a

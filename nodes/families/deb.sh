@@ -79,7 +79,10 @@ pkg_names() {
         docker) echo "docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin" ;;
     esac
 }
-# docker_install: docker, where this family gets it from.
+# docker_install: docker, where this family gets it from. DOCKER_KEYS and
+# DOCKER_SOURCES are the directories apt's keys and sources are kept in.
+DOCKER_KEYS=/etc/apt/keyrings
+DOCKER_SOURCES=/etc/apt/sources.list.d
 docker_install() {
             # An image's packages were settled when it was built, and its root
             # takes no repository: a missing docker is a build of the image to fix.
@@ -105,13 +108,17 @@ docker_install() {
             }
             [ "$suite" = "$code" ] \
                 || echo "note: docker has no ${code:-$ID} suite; using ${suite}, which is the same build"
-            install -m 0755 -d /etc/apt/keyrings
-            curl -fsSL "https://download.docker.com/linux/${DOCKER_DEB}/gpg" \
-                | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-            chmod a+r /etc/apt/keyrings/docker.gpg
-            echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg]" \
+            # Held to Docker's key as the core carries it (docker_key), and
+            # never one fetched here: armored, which apt reads as it is where
+            # signed-by names an .asc, so nothing here needs gpg. The keyring
+            # an earlier run fetched is taken away with the line that named it.
+            install -m 0755 -d "$DOCKER_KEYS"
+            docker_key deb > "$DOCKER_KEYS/docker.asc" || { rm -f "$DOCKER_KEYS/docker.asc"; echo "could not write Docker's signing key to ${DOCKER_KEYS}/docker.asc" >&2; return 1; }
+            chmod 0644 "$DOCKER_KEYS/docker.asc"
+            rm -f "$DOCKER_KEYS/docker.gpg"
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=${DOCKER_KEYS}/docker.asc]" \
                  "https://download.docker.com/linux/${DOCKER_DEB} ${suite} stable" \
-                > /etc/apt/sources.list.d/docker.list
+                > "$DOCKER_SOURCES/docker.list"
             apt_waiting apt-get update -qq
             # shellcheck disable=SC2046
             pkg $(pkg_names docker)
