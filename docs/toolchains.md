@@ -98,7 +98,9 @@ machine with no driver it is refused by name, and ticked with the driver
 the two are one job, the driver first; removed together, the toolkit comes
 off first. Neither Ubuntu nor Debian carries it, so installing it adds
 NVIDIA's own package source and its signing key to the machine
-(`bb-sandbox gpu-container install`), which the press asks about first,
+(`bb-sandbox gpu-container install`; the key is the copy the provisioner
+carries, never one fetched while installing, so apt holds what the source
+serves to it), which the press asks about first,
 and tells Docker about the runtime; Docker reloads its configuration for
 it, so running containers keep running (a restart, which leaves a container
 with no restart policy down, is the fallback only where a reload did not

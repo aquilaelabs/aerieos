@@ -467,7 +467,9 @@ says a package is its vendor's, not which version it is, so a door is the
 version its repository offers that day, as any package of the system's
 is. Cloudflare signs its rpm repository's index with an older key than
 the one it publishes, so there each package is held to the key and the
-index is not.
+index is not. The NVIDIA container toolkit's source on a node is held the
+same way: its key is the provisioner's own copy (`nvct_key`), and its one
+source line is written there, with nothing fetched until apt reads it.
 
 **A CI runner's program is held to a pin.** The runner a node installs
 (GitHub's Actions runner, or the one Gitea and Forgejo share) is a

@@ -5,6 +5,8 @@ install without a word on the dev node (30 Sep): the lookup of the installed
 branch asked dpkg for packages that were not there. This runs the helper
 extracted from the provisioner, with apt, dpkg, modinfo, ubuntu-drivers and
 id stood in for, and reads what it ran and what it said."""
+import base64
+import hashlib
 import json
 import os
 import re
@@ -94,12 +96,9 @@ case "$2" in nvidia:610) echo "610.57.04 nvidia-driver-610" > "{self.state}" ;; 
             os.symlink(real, os.path.join(self.bin, "python3"))
         with open(self.helper, "w", encoding="utf-8") as f:
             f.write(text)
-        self.tool("curl", f'''echo "curl $*" >> "{self.log}"
-case "$*" in
-  *gpgkey*) echo "-----BEGIN PGP PUBLIC KEY BLOCK-----" ;;
-  *.list*) echo "deb https://nvidia.github.io/libnvidia-container/stable/deb/\\$(ARCH) /" ;;
-  *) exit 22 ;;
-esac''')
+        # Nothing of the source is fetched: the key is the helper's own, and
+        # its one line is written here. A curl that ran would be on the record.
+        self.tool("curl", f'echo "curl $*" >> "{self.log}"; exit 22')
         # Docker lists the runtime once it has been told (configured) and has
         # read its configuration again: on a reload, or only on a restart
         # where the test takes self.reloads away.
@@ -126,6 +125,40 @@ echo "docker-ce ii "; exit 0''')
         with open(self.state, "w") as f:
             f.write("610.57.04 nvidia-driver-610\n")
 
+    def carried_key(self):
+        """NVIDIA's key as the helper carries it (nvct_key)."""
+        with open(self.helper, encoding="utf-8") as f:
+            return re.search(r"^    cat <<'NVCTKEY'\n(.*?\n)NVCTKEY$", f.read(), re.S | re.M).group(1)
+
+    def test_the_carried_key_is_the_one_its_comment_names(self):
+        """The version 4 fingerprint of the key in the script, worked out
+        here (the SHA-1 of its public key packet, as RFC 4880 hashes it),
+        is the one written beside it, with where it was read and when."""
+        key = self.carried_key()
+        self.assertTrue(key.startswith("-----BEGIN PGP PUBLIC KEY BLOCK-----\n"))
+        raw = base64.b64decode("".join(key.split("\n\n", 1)[1].split("\n=", 1)[0].split()))
+        self.assertEqual((raw[0], raw[3]), (0x99, 4))
+        n = int.from_bytes(raw[1:3], "big")
+        got = hashlib.sha1(b"\x99" + raw[1:3] + raw[3:3 + n]).hexdigest().upper()  # noqa: S324 (a fingerprint is SHA-1 by definition)
+        self.assertEqual(got, "C95B321B61E88C1809C4F759DDCAE044F796ECB0")
+        with open(self.helper, encoding="utf-8") as f:
+            said = f.read()
+        said = said[said.index("# nvct_key:"):said.index("nvct_key() {")]
+        self.assertIn("C95B 321B 61E8 8C18 09C4  F759 DDCA E044 F796 ECB0", said)
+        self.assertIn("https://nvidia.github.io/libnvidia-container/gpgkey", said)
+        self.assertIn("20 Nov 2026", said)
+        # One key, in the two places that hold NVIDIA's source to it: a
+        # provisioned machine's, and the AerieOS image's build.
+        image = os.path.join(os.path.dirname(PROVISIONER), "..", "image", "mkosi.sandbox", "etc", "apt", "keyrings", "nvidia-container-toolkit.asc")
+        with open(image, encoding="utf-8") as f:
+            self.assertEqual(f.read(), key)
+
+    def test_nothing_of_the_source_is_fetched_while_installing(self):
+        with open(self.helper, encoding="utf-8") as f:
+            text = f.read()
+        body = text[text.index("cmd_gpu_container() {"):text.index("# --- features (R91)")]
+        self.assertNotRegex(body, r"\b(?:curl|wget)\b")
+
     def test_the_toolkit_adds_nvidias_source_installs_and_reloads_docker(self):
         self.toolkit()
         self.driver_on()
@@ -133,8 +166,12 @@ echo "docker-ce ii "; exit 0''')
         self.assertEqual(rc, 0, said)
         with open(self.list) as f:
             src = f.read()
-        self.assertIn(f"deb [signed-by={self.key}] https://nvidia.github.io/libnvidia-container", src)
-        self.assertTrue(os.path.getsize(self.key))
+        self.assertEqual(src, f"deb [signed-by={self.key}] https://nvidia.github.io/libnvidia-container/stable/deb/$(ARCH) /\n")
+        # The key is the one the helper carries, whole, and nobody was asked for one.
+        with open(self.key) as f:
+            key = f.read()
+        self.assertEqual(key, self.carried_key())
+        self.assertNotIn("curl", ran)
         lines = ran.splitlines()
         install = next(i for i, ln in enumerate(lines) if " install " in ln and "nvidia-container-toolkit" in ln)
         self.assertIn("DPkg::Lock::Timeout", lines[install])
@@ -162,26 +199,24 @@ echo "docker-ce ii "; exit 0''')
         self.assertEqual(ran, "")
         self.assertFalse(os.path.exists(self.list))
 
-    def test_a_source_that_does_not_answer_leaves_nothing_behind(self):
+    def test_a_source_that_does_not_answer_is_apts_to_say(self):
+        """Nothing is fetched to add the source, so nothing that answers in
+        NVIDIA's place can hand over a key or a list: a source that does not
+        answer, or answers with what the carried key did not sign, is met
+        by apt, and the install ends on what apt said."""
         self.toolkit()
         self.driver_on()
-        self.tool("curl", "exit 22")
+        self.tool("curl", f'echo "curl $*" >> "{self.log}"; echo "<html>moved</html>"')
+        self.tool("apt-get", f'''echo "apt-get $*" >> "{self.log}"
+case "$*" in *install*) echo "E: Unable to locate package nvidia-container-toolkit" >&2; exit 100 ;; esac; exit 0''')
         rc, said, ran = self.run_helper("gpu-container", "install")
         self.assertNotEqual(rc, 0)
-        self.assertIn("could not fetch", said)
-        self.assertFalse(os.path.exists(self.list))
-        self.assertFalse(os.path.exists(self.key))
-        self.assertNotIn("apt-get", ran)
-
-    def test_an_answer_that_is_not_a_key_is_not_kept(self):
-        self.toolkit()
-        self.driver_on()
-        self.tool("curl", 'echo "<html>moved</html>"')
-        rc, said, ran = self.run_helper("gpu-container", "install")
-        self.assertNotEqual(rc, 0)
-        self.assertIn("not a signing key", said)
-        self.assertFalse(os.path.exists(self.key) or os.path.exists(self.list))
-        self.assertNotIn("apt-get", ran)
+        self.assertIn("E: Unable to locate package nvidia-container-toolkit", said)
+        self.assertIn("apt could not install it", said)
+        self.assertNotIn("curl", ran)
+        self.assertNotIn("nvidia-ctk", ran)
+        with open(self.key) as f:
+            self.assertEqual(f.read(), self.carried_key(), "the key on the machine is the carried one whatever answered")
 
     def test_removing_the_toolkit_takes_its_source_with_it(self):
         self.toolkit()

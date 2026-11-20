@@ -153,7 +153,7 @@ class Error(unittest.TestCase):
     LOG = ("== bb-sandbox gpu-driver install \n== installing the NVIDIA driver\nE: Unable to locate package nvidia-driver-999\n"
            "!! apt could not install it\n"
            "== bb-sandbox gpu-container install \n== adding NVIDIA's package source for the container toolkit\n"
-           "!! could not fetch the package source's signing key from https://nvidia.github.io/libnvidia-container\n")
+           "!! could not write the package source's signing key to /usr/share/keyrings/nvidia-container-toolkit-keyring.asc\n")
 
     def why(self, name, log=None):
         class Nodes:
