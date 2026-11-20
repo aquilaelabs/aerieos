@@ -3667,11 +3667,12 @@ bb_token_dead() {
 # and the project the environment's token names, or "" when there is none.
 bb_token_kept() {
     local t="${BB_TOKEN:-}" ft=""
-    local dir="${XDG_CACHE_HOME:-${HOME:+$HOME/.cache}}"
-    # Per account (B159): the cache folder is shared between accounts on a node.
     bb_token_fields "$t"
-    local own="$_bbt_p" uid="${BB_ACCOUNT_UID:-_none}"
-    local f="${dir:-/tmp/bb-scope-${UID:-$(id -u)}}/builderbot/u/${uid}/project/${own:-${BB_PROJECT:-}}/token"
+    # The account's own folder for the space (B159): the cache folder is
+    # shared between accounts on a node.
+    bb_scope_dir "${_bbt_p:-${BB_PROJECT:-}}"
+    # shellcheck disable=SC2154 # _bb_scope is bb_scope_dir's answer (common.sh)
+    local f="$_bb_scope/token"
     [ -r "$f" ] && { IFS= read -r ft < "$f" || true; }
     printf '%s' "$ft"
 }

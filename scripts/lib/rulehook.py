@@ -1,7 +1,7 @@
 """What a session's hooks keep between calls about the house rules (R200).
 
-Two small records, on the machine the session runs on, under the account's
-own cache beside bb-check-relay's stamp:
+Two small records, on the machine the session runs on, in the account's
+own folder for the space (scopedir.scope_dir) beside bb-check-relay's stamp:
 
   fired/<conversation id>  the named rules this conversation was told,
                            one name a line, so the SessionStart hook can
@@ -22,26 +22,21 @@ import os
 import re
 import time
 
-import cmdmatch
+from scopedir import scope_dir
+
+# cmdmatch, the shell reader, is loaded by the two functions that read a
+# command (refused, search_patterns): four hooks load this module, and one
+# of them reads a command.
 
 GUARDS_FOR = 60                 # seconds a node's copy of the guards is used
 FIRED_FOR = 14 * 86400          # a conversation's record kept this long after its last write
 _ID = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
 
 
-def _uid():
-    return os.environ.get("BB_ACCOUNT_UID") or "_none"
-
-
-def project_dir(project):
-    base = os.environ.get("XDG_CACHE_HOME") or os.path.join(os.environ.get("HOME", "/tmp"), ".cache")
-    return os.path.join(base, "builderbot", "u", _uid(), "project", project)
-
-
 def _fired_file(project, conversation):
     if not _ID.match(str(conversation or "")) or not project:
         return ""
-    return os.path.join(project_dir(project), "fired", conversation)
+    return scope_dir(project, "fired", conversation)
 
 
 def remember(project, conversation, names):
@@ -86,7 +81,7 @@ def _prune(d):
 def cached_guards(project, stale=False):
     """The guards as last fetched, or None when there is no fresh copy;
     `stale` takes any copy, for when the controller does not answer."""
-    f = os.path.join(project_dir(project), "guards.json")
+    f = scope_dir(project, "guards.json")
     try:
         if not stale and time.time() - os.stat(f).st_mtime > GUARDS_FOR:
             return None
@@ -98,7 +93,7 @@ def cached_guards(project, stale=False):
 
 
 def keep_guards(project, guards):
-    f = os.path.join(project_dir(project), "guards.json")
+    f = scope_dir(project, "guards.json")
     try:
         os.makedirs(os.path.dirname(f), exist_ok=True)
         with open(f + ".new", "w") as out:
@@ -113,6 +108,7 @@ def refused(guards, command, background=False):
     None. `guards` is rules.guards()'s list, from the store or the
     controller; one marked `foreground` refuses only a call that is not run
     in the background."""
+    import cmdmatch
     for g in guards or []:
         if background and g.get("foreground"):
             continue
@@ -189,6 +185,7 @@ def symbols(pattern):
 def search_patterns(command):
     """The patterns of the code searches a shell line runs: grep -r, rg and
     git grep, each's first pattern (or its -e ones)."""
+    import cmdmatch
     out = []
     for w in cmdmatch.commands(command):
         if w[:2] == ["git", "grep"]:
@@ -211,7 +208,7 @@ def search_patterns(command):
 # process, and once it ends its exit and output; bb-prompt-relay says a
 # failure on the next prompt, once.
 def _run_file(project):
-    return os.path.join(project_dir(project), "checked.run")
+    return scope_dir(project, "checked.run")
 
 
 def check_run(project):
@@ -227,7 +224,7 @@ def check_run(project):
 
 def _write_run(project, rec):
     try:
-        os.makedirs(project_dir(project), exist_ok=True)
+        os.makedirs(scope_dir(project), exist_ok=True)
         tmp = _run_file(project) + ".tmp"
         with open(tmp, "w") as f:
             json.dump(rec, f)

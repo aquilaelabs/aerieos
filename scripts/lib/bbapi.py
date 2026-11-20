@@ -36,6 +36,8 @@ import sys
 import time
 import urllib.parse
 
+import scopedir
+
 
 def keep_token(tok):
     """A renewed session token, written where bb_token_now reads: the same
@@ -51,13 +53,8 @@ def keep_token(tok):
         project = base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)).decode().split("|")[0]
         if not project or "/" in project:
             return "the token names no space"
-        home = os.environ.get("HOME", "")
-        d = os.environ.get("XDG_CACHE_HOME") or (home and os.path.join(home, ".cache")) \
-            or f"/tmp/bb-scope-{os.getuid()}"
-        # Per account (B159): on a node the cache folder is shared, so without
-        # the uid this writes over another account's token.
-        d = os.path.join(d, "builderbot", "u",
-                         os.environ.get("BB_ACCOUNT_UID") or "_none", "project", project)
+        # The account's own folder for the space (B159).
+        d = scopedir.scope_dir(project)
         os.makedirs(d, mode=0o700, exist_ok=True)
         # A unique temporary name, not a fixed one: the agent refreshes this
         # file for a session that is idle (R27) while the session's own bb may
@@ -141,10 +138,7 @@ def _gate_down():
     project = os.environ.get("BB_PROJECT", "")
     if not project or "/" in project:
         return
-    home = os.environ.get("HOME", "")
-    d = os.environ.get("XDG_CACHE_HOME") or (home and os.path.join(home, ".cache")) \
-        or f"/tmp/bb-scope-{os.getuid()}"
-    sf = os.path.join(d, "builderbot", "u", os.environ.get("BB_ACCOUNT_UID") or "_none", "project", project, "gate")
+    sf = scopedir.scope_dir(project, "gate")
     try:
         os.makedirs(os.path.dirname(sf), mode=0o700, exist_ok=True)
         with open(sf, "w") as f:

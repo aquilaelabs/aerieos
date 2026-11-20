@@ -445,11 +445,24 @@ tree_slug() {
 # session on one project shared a token file and the last to start owned it,
 # which is another account's identity for anything that reads it back.
 cache_project_dir() {
-    local dir="${XDG_CACHE_HOME:-${HOME:+$HOME/.cache}}"
-    dir="${dir:-/tmp/bb-scope-$(id -u)}/builderbot/u/${account:-_none}/project/$1"
-    mkdir -p "$dir" 2>/dev/null || { dir="/tmp/bb-scope-$(id -u)/u/${account:-_none}/project/$1"; mkdir -p "$dir"; }
+    local dir
+    bb_scope_dir "$1" "${account:-}"
+    # shellcheck disable=SC2154 # _bb_scope is bb_scope_dir's answer (common.sh)
+    dir="$_bb_scope"
+    # A cache that cannot be written: the folder a machine with no home
+    # has, in /tmp.
+    mkdir -p "$dir" 2>/dev/null || { HOME='' XDG_CACHE_HOME='' bb_scope_dir "$1" "${account:-}"; dir="$_bb_scope"; mkdir -p "$dir"; }
     chmod 700 "$dir" 2>/dev/null || true
     printf '%s' "$dir"
+}
+
+# home_project_dir PROJECT - that folder by its name under the account's
+# home, whatever XDG_CACHE_HOME says, and not made here: a space's Gradle
+# home and its build folders on a node, which the node's agent counts and
+# clears under the home (storage.py, work.py).
+home_project_dir() {
+    XDG_CACHE_HOME='' bb_scope_dir "$1" "${account:-}"
+    printf '%s' "$_bb_scope"
 }
 
 # THE SESSION'S VIEW (R35). Every session on a node runs as one account and
@@ -502,7 +515,7 @@ in_view() {
     # session built in the account's ~/.gradle, where another project's idle
     # daemon held the journal lock (report #54).
     if [ -n "${GRADLE_USER_HOME:-}" ] && [ -n "$account" ]; then
-        export GRADLE_USER_HOME="$HOME/.cache/builderbot/u/$account/project/$proj/gradle-home"
+        GRADLE_USER_HOME="$(home_project_dir "$proj")/gradle-home"; export GRADLE_USER_HOME
     fi
     gradle_local_build
     envf="$(cache_project_dir "$proj")/session.env"
@@ -1386,7 +1399,7 @@ gradle_local_build() {
     local src; src="$(dirname "$(readlink -f "$0")")/../lib/gradle-local-build.gradle"
     if [ "${BB_BUILD_LOCAL:-on}" = on ] && [ -r "$src" ]; then
         mkdir -p "$GRADLE_USER_HOME/init.d" 2>/dev/null && cp -f "$src" "$init" 2>/dev/null || true
-        export BB_LOCAL_BUILD="$HOME/.cache/builderbot/u/$account/project/$p/build"
+        BB_LOCAL_BUILD="$(home_project_dir "$p")/build"; export BB_LOCAL_BUILD
     else
         rm -f "$init" 2>/dev/null || true
         unset BB_LOCAL_BUILD
@@ -1420,7 +1433,7 @@ start_gradle_home() {
     # session's view trims to this project (bb-session), so one project's
     # session cannot read another's Gradle cache or its daemon's logs.
     if on_node && [ -n "${GRADLE_USER_HOME:-}" ] && [ -n "${BB_PROJECT:-}" ] && [ -n "$account" ]; then
-        GRADLE_USER_HOME="$HOME/.cache/builderbot/u/$account/project/$BB_PROJECT/gradle-home"
+        GRADLE_USER_HOME="$(home_project_dir "$BB_PROJECT")/gradle-home"
     fi
     gradle_local_build
 }

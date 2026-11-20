@@ -74,19 +74,19 @@ CHECK_EVERY = 20
 # How often a working session's gate says which session it is.
 ALIVE_EVERY = 60
 
-def _uid():
-    """This account's id, which is what separates one account's cache from
-    another's: on a node every account's ~/.cache is a symlink to the base
-    home's, so the uid in the path is the whole separation (B159)."""
-    return os.environ.get("BB_ACCOUNT_UID") or "_none"
+def scope_dir(project, *parts):
+    """A path in this account's folder for the space, as scopedir builds it
+    for every hook, for bbapi and for this. Loaded when a path is first
+    asked for, so a gate with no library beside it ends as any failure of
+    its own does, saying nothing."""
+    import scopedir                                                 # noqa: PLC0415
+    return scopedir.scope_dir(project, *parts)
+
 
 def token(project):
     t = os.environ.get("BB_TOKEN", "")
-    home = os.environ.get("HOME", "")
-    d = os.environ.get("XDG_CACHE_HOME") or (home and os.path.join(home, ".cache")) \
-        or f"/tmp/bb-scope-{os.getuid()}"
     try:
-        with open(os.path.join(d, "builderbot", "u", _uid(), "project", project, "token")) as f:
+        with open(scope_dir(project, "token")) as f:
             t = f.read().strip() or t
     except OSError:
         pass
@@ -94,10 +94,7 @@ def token(project):
 
 
 def stamp_file(project):
-    home = os.environ.get("HOME", "")
-    d = os.environ.get("XDG_CACHE_HOME") or (home and os.path.join(home, ".cache")) \
-        or f"/tmp/bb-scope-{os.getuid()}"
-    return os.path.join(d, "builderbot", "u", _uid(), "project", project, "gate")
+    return scope_dir(project, "gate")
 
 
 def controller_answers(project):

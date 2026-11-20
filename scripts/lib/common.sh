@@ -50,6 +50,22 @@ on_node() {
     return 1
 }
 
+# bb_scope_dir PROJECT [ACCOUNT]: this account's AerieOS cache folder for
+# one space on this machine, into _bb_scope: where bb-tty keeps a session's
+# launcher, its scope and its token, and where aerie and the hooks read
+# them back. The one place the shell builds the path, as scopedir.scope_dir
+# is Python's, since a reader has to look where the writer wrote. The
+# account is BB_ACCOUNT_UID unless one is named, and it is in the path on
+# purpose (B159): on a node every account's ~/.cache is a link to the base
+# home's, so the id is all that separates two accounts' files. With no home
+# to keep it under, a folder of this user's own in /tmp. Set rather than
+# printed, so aerie's token read, made by every verb that signs in, starts
+# no process for it.
+bb_scope_dir() {
+    local base="${XDG_CACHE_HOME:-${HOME:+$HOME/.cache}}" who="${2-${BB_ACCOUNT_UID:-}}"
+    _bb_scope="${base:-/tmp/bb-scope-${UID:-$(id -u)}}/builderbot/u/${who:-_none}/project/$1"
+}
+
 log()  { printf '[builderbot] %s\n'      "$*"; }
 warn() { printf '[builderbot] WARN: %s\n' "$*" >&2; }
 die()  { printf '[builderbot] ERROR: %s\n' "$*" >&2; exit 1; }
