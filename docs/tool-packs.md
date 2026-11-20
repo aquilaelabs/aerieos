@@ -446,7 +446,9 @@ is what reads it. An entry may name a `path`, the folder of its repository
 the pack lives in (the catalog's own packs do; a repository of several
 packs may): its sha256 is then of that folder's archive at the commit,
 Look reads the manifest there, and an install keeps the folder's files as
-a pack made here, so a node fetches the folder and nothing else.
+a pack made here, so a node fetches the folder and nothing else. The files
+kept are fetched again after the look, and that fetch is held to the same
+commit and the same sha256 before anything is kept.
 
 ### Installing from the catalog
 

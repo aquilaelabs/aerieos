@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import statefile  # noqa: E402
@@ -223,6 +224,67 @@ class Repository(unittest.TestCase):
         rec = dict(r["pack"])
         del rec["kept_at"]
         self.assertEqual(toolpacks.recipe(rec)["source"]["commit"], heads[0])
+
+    def test_the_second_fetch_of_a_pin_is_held_to_the_index_as_the_first_is(self):
+        # A pack in a folder is fetched twice: for the look add makes, held
+        # to the index's commit and sha256, and again for the files that are
+        # kept. What the second brings is what the nodes install, so it is
+        # held to the same pin by the same check.
+        import hashlib
+        folder = os.path.join(self.repo, "packs", "hexkit")
+        os.makedirs(folder)
+        for name in ("bbtool.json", "GUIDE.md"):
+            os.rename(os.path.join(self.repo, name), os.path.join(folder, name))
+        git("add", "-A", cwd=self.repo)
+        git("commit", "-q", "-m", "a folder", cwd=self.repo)
+        commit = subprocess.run(["git", "rev-parse", "HEAD"], cwd=self.repo, capture_output=True, text=True, check=True).stdout.strip()
+        tar = subprocess.run(["git", "archive", "--format=tar", "HEAD", "packs/hexkit"], cwd=self.repo, capture_output=True, check=True).stdout
+        good = hashlib.sha256(tar).hexdigest()
+        staged = os.path.join(self.tmp.name, "toolpacks", "staging")
+        # Another repository answers the second fetch: the same folder, its
+        # verb running another program.
+        other = os.path.join(self.tmp.name, "other")
+        os.makedirs(os.path.join(other, "packs", "hexkit"))
+        swapped = json.loads(json.dumps(GOOD))
+        swapped["verbs"]["dump"]["run"] = ["{dir}/bin/other", "{args}"]
+        with open(os.path.join(other, "packs", "hexkit", "bbtool.json"), "w") as f:
+            json.dump(swapped, f)
+        with open(os.path.join(other, "packs", "hexkit", "GUIDE.md"), "w") as f:
+            f.write("Not what was looked at.")
+        git("init", "-q", cwd=other)
+        git("add", "-A", cwd=other)
+        git("commit", "-q", "-m", "another", cwd=other)
+        real, asked = toolpacks._source, []
+
+        def source(url, c):
+            asked.append(c)
+            return real(url, c) if len(asked) == 1 else ["--depth", "1", "file://" + other, "HEAD"]
+        with mock.patch.object(toolpacks, "_source", source):
+            r = toolpacks.add(self.url, commit, "operator", sha256=good, tier="vetted", path="packs/hexkit")
+        self.assertEqual(len(asked), 2, "the look, then the files that are kept")
+        self.assertRegex(r.get("error", ""), rf"answered [0-9a-f]{{12}} where {commit[:12]} was asked")
+        self.assertEqual((toolpacks.packs(), os.listdir(staged)), ({}, []), "nothing is kept, and nothing refused is left staged")
+        # The same commit id and other bytes, which a commit id alone does
+        # not rule out: the look stood in for, the second fetch finds an
+        # archive whose sha256 is not the index's.
+        looked = toolpacks.fetch(self.url, commit, sha256=good, path="packs/hexkit")
+        self.assertNotIn("error", looked, looked)
+        with mock.patch.object(toolpacks, "fetch", lambda *a, **k: looked):
+            r = toolpacks.add(self.url, commit, "operator", sha256="0" * 64, tier="vetted", path="packs/hexkit")
+        self.assertEqual(r.get("error"), f"{self.url} at {commit[:12]} is not what the catalog vetted: its archive's sha256 differs, so it is refused")
+        self.assertEqual((toolpacks.packs(), os.listdir(staged)), ({}, []))
+        # ...a whole repository's as a folder's (one kept from the mirror).
+        self.assertIn("is not what the catalog vetted", toolpacks._add_folder(self.url, commit, "", "operator", (), "0" * 64, "vetted").get("error", ""))
+        self.assertEqual(os.listdir(staged), [])
+        # Under the index's own sha256 it is kept, and a folder a person
+        # adds by its address, which no index pins, is kept as it was.
+        r = toolpacks.add(self.url, commit, "operator", sha256=good, tier="vetted", path="packs/hexkit")
+        self.assertTrue(r.get("ok"), r)
+        self.assertEqual((r["pack"]["tier"], r["pack"]["sha256"], r["pack"]["manifest"]["verbs"]["dump"]["run"][0]), ("vetted", good, "{dir}/bin/hexkit"))
+        self.assertTrue(toolpacks.remove("hexkit").get("ok"))
+        r = toolpacks.add(self.url, commit, "operator", path="packs/hexkit")
+        self.assertTrue(r.get("ok"), r)
+        self.assertEqual((r["pack"]["tier"], r["pack"]["sha256"]), ("url", ""))
 
     def test_what_is_kept_is_what_was_shown(self):
         shown = toolpacks.fetch(self.url)["commit"]

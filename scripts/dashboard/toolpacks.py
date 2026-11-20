@@ -28,6 +28,7 @@ beside config/toolpacks.json, and install it with the same pinned fetch.
     add(url, commit, by) / add_staged(staged, by) / remove(name) / source(name)
     packs() / recipes() / hosted_files()
 """
+import hashlib
 import json
 import os
 import re
@@ -1012,6 +1013,21 @@ def _source(url, commit):
     return ["--depth", "1", url, commit or "HEAD"]
 
 
+def _unvetted(tmp, url, commit, sha256, path=""):
+    """Why what was fetched into `tmp` is not what the catalog vetted, or
+    "": the sha256 of the archive of FETCH_HEAD (of `path` alone, for a
+    pack in a folder) against the index's. Git's own hashes pin the commit;
+    this pins the bytes the maintainers saw, and every fetch of a pin is
+    held to it by this one function: the look (fetch), a folder's files
+    (fetch_folder) and the second fetch that keeps a pack here
+    (_add_folder), so what is kept is what was checked and not only what
+    answers to the same commit id."""
+    r = subprocess.run(["git", "-C", tmp, "archive", "--format=tar", "FETCH_HEAD", *([path] if path else [])], capture_output=True, timeout=120, check=False)
+    if r.returncode != 0 or hashlib.sha256(r.stdout).hexdigest() != sha256:
+        return f"{url} at {commit[:12]} is not what the catalog vetted: its archive's sha256 differs, so it is refused"
+    return ""
+
+
 def fetch(url, commit="", shipped=(), sha256="", path="", official=False):
     """The repository at `commit` (its default branch's head when none):
     {commit, manifest, guidance} with the manifest validated, or {error}.
@@ -1052,10 +1068,9 @@ def fetch(url, commit="", shipped=(), sha256="", path="", official=False):
         if sha256:
             if not re.fullmatch(r"[0-9a-f]{64}", sha256):
                 return {"error": "the catalog's sha256 is 64 hex digits"}
-            import hashlib  # noqa: PLC0415
-            r = subprocess.run(["git", "-C", tmp, "archive", "--format=tar", "FETCH_HEAD", *([path] if path else [])], capture_output=True, timeout=120, check=False)
-            if r.returncode != 0 or hashlib.sha256(r.stdout).hexdigest() != sha256:
-                return {"error": f"{url} at {got[:12]} is not what the catalog vetted: its archive's sha256 differs, so it is refused"}
+            why = _unvetted(tmp, url, got, sha256, path)
+            if why:
+                return {"error": why}
 
         def read(rel, cap):
             r = subprocess.run(["git", "-C", tmp, "show", f"FETCH_HEAD:{at}{rel}"], capture_output=True,
@@ -1097,10 +1112,9 @@ def fetch_folder(url, commit, sha256, path, files, cap=256 << 10):
                 return {"error": f"could not fetch {url}: {said[-1] if said else 'git failed'}"}
         if _git(["-C", tmp, "rev-parse", "FETCH_HEAD"]).stdout.strip() != commit:
             return {"error": f"{url} did not answer with {commit[:12]}"}
-        import hashlib  # noqa: PLC0415
-        r = subprocess.run(["git", "-C", tmp, "archive", "--format=tar", "FETCH_HEAD", path], capture_output=True, timeout=120, check=False)
-        if r.returncode != 0 or hashlib.sha256(r.stdout).hexdigest() != sha256:
-            return {"error": f"{url} at {commit[:12]} is not what the catalog vetted: its archive's sha256 differs, so it is refused"}
+        why = _unvetted(tmp, url, commit, sha256, path)
+        if why:
+            return {"error": why}
         out = {}
         for name in files:
             g = subprocess.run(["git", "-C", tmp, "show", f"FETCH_HEAD:{path}/{name}"], capture_output=True, timeout=30, check=False)
@@ -1470,33 +1484,54 @@ def add(url, commit, by, shipped=(), sha256="", tier="url", path="", may_root=Fa
     return {"ok": True, "pack": rec, "replaced": bool(was)}
 
 
-def _add_folder(url, commit, path, by, shipped, sha256, tier):
-    """A folder of a repository at a commit, staged as a pack made here and
-    kept, its record naming where it came from (R170 step 6)."""
-    _staging().mkdir(parents=True, exist_ok=True)
-    tok = secrets.token_hex(8)
-    d = _staging() / tok
-    d.mkdir()
+def _folder_into(d, url, commit, path, sha256):
+    """The files of a repository's folder at a commit, fetched and put in
+    `d`: "" or why not. This is a second fetch of what add's look already
+    checked, and what it brings is what is kept, so it is held to the pin
+    again: the commit that answered is the one asked for, and under the
+    catalog's sha256 the archive is the one the index vetted (_unvetted,
+    as the look's)."""
+    import io  # noqa: PLC0415
+    import tarfile  # noqa: PLC0415
     tmp = tempfile.mkdtemp(prefix="toolpack-")
     try:
         for args in (["init", "-q", tmp], ["-C", tmp, "fetch", "-q", *_source(url, commit)]):
             r = _git(args)
             if r.returncode != 0:
-                return {"error": f"could not fetch {url}: {(r.stderr or r.stdout).strip().splitlines()[-1:] or 'git failed'}"}
+                return f"could not fetch {url}: {(r.stderr or r.stdout).strip().splitlines()[-1:] or 'git failed'}"
+        got = _git(["-C", tmp, "rev-parse", "FETCH_HEAD"]).stdout.strip()
+        if got != commit:
+            return f"{url} answered {got[:12]} where {commit[:12]} was asked"
+        why = _unvetted(tmp, url, commit, sha256, path) if sha256 else ""
+        if why:
+            return why
         arc = subprocess.run(["git", "-C", tmp, "archive", "--format=tar", f"FETCH_HEAD:{path}"], capture_output=True, timeout=120, check=False)
         if arc.returncode != 0:
-            return {"error": f"{url} at {commit[:12]} has no folder {path}"}
-        import io  # noqa: PLC0415
-        import tarfile  # noqa: PLC0415
+            return f"{url} at {commit[:12]} has no folder {path}"
         with tarfile.open(fileobj=io.BytesIO(arc.stdout), mode="r:") as tar:
             for ti in tar.getmembers():
                 if not (ti.isfile() or ti.isdir()) or ti.name.startswith(("/", "..")) or ".." in ti.name.split("/"):
-                    return {"error": f"{path} holds something a pack cannot: {ti.name}"}
+                    return f"{path} holds something a pack cannot: {ti.name}"
             tar.extractall(d, filter="data")
     except (subprocess.TimeoutExpired, OSError, tarfile.TarError) as e:
-        return {"error": f"could not take {path} from {url}: {e}"}
+        return f"could not take {path} from {url}: {e}"
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+    return ""
+
+
+def _add_folder(url, commit, path, by, shipped, sha256, tier):
+    """A folder of a repository at a commit, staged as a pack made here and
+    kept, its record naming where it came from (R170 step 6). Nothing
+    refused is left staged."""
+    _staging().mkdir(parents=True, exist_ok=True)
+    tok = secrets.token_hex(8)
+    d = _staging() / tok
+    d.mkdir()
+    why = _folder_into(d, url, commit, path, sha256)
+    if why:
+        shutil.rmtree(d, ignore_errors=True)
+        return {"error": why}
     out = add_staged(tok, by, shipped)
     shutil.rmtree(d, ignore_errors=True)
     if out.get("error"):
