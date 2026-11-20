@@ -344,6 +344,20 @@ def may_keep_tools(state, digest, sig):
                    f"root keeps the copy it has. This node takes only what is signed by {_named(state)}. {_console_can()}")
 
 
+class Refusal(str):
+    """A refusal's words as a job's log and this node's own log say them,
+    whole: what was wrong, which keys this node takes and what its console
+    can do. `cause` is the first of those alone, a phrase: what a page says
+    of it, where the rest is a paragraph nobody reads on a bell."""
+    cause = ""
+
+
+def _refusal(cause, words):
+    said = Refusal(words)
+    said.cause = cause
+    return said
+
+
 def may_keep_bundle(state, text, sig, members):
     """(ok, words) for a bundle the controller sent, before any of it is
     unpacked: `text` is the list of its files the tar carries (bytes, or ""
@@ -359,7 +373,8 @@ def may_keep_bundle(state, text, sig, members):
     this node's console allows unsigned builds, and said; refused otherwise,
     with the first file that is wrong named. A member that is no plain file
     is refused on any node that trusts a key, whatever its console allows:
-    no controller packs one."""
+    no controller packs one. A refusal's words are a Refusal: the whole of
+    it for a log, and its cause alone for what is told to the controller."""
     if not trusted(state):
         return True, ""
     tail = (f"so this node keeps the bundle it has. This node takes only what is signed by {_named(state)}. "
@@ -367,7 +382,8 @@ def may_keep_bundle(state, text, sig, members):
     # A plain file is here by its sha256; anything else by what it is.
     odd = next((name for name in sorted(members) if not re.fullmatch(r"[0-9a-f]{64}", str(members[name]))), None)
     if odd is not None:
-        return False, f"refused: this bundle holds {odd}, which is {members[odd]}, and a bundle carries plain files alone, {tail}"
+        return False, _refusal(f"it holds {odd}, which is {members[odd]}",
+                               f"refused: this bundle holds {odd}, which is {members[odd]}, and a bundle carries plain files alone, {tail}")
     raw = text if isinstance(text, bytes) else str(text or "").encode("utf-8")
     digest = "sha256:" + hashlib.sha256(raw).hexdigest() if raw else ""
     who, why = _signer(state, digest, sig, BUNDLE_MESSAGE)
@@ -378,4 +394,4 @@ def may_keep_bundle(state, text, sig, members):
     why = why.replace("the update names no digest to check", "the bundle carries no list of its files")
     if unsigned_ok(state):
         return True, f"the bundle's files not checked ({why}): this node's console allows unsigned builds"
-    return False, f"refused: this bundle's files are not ones signed by a key this node trusts ({why}), {tail}"
+    return False, _refusal(why, f"refused: this bundle's files are not ones signed by a key this node trusts ({why}), {tail}")

@@ -3482,7 +3482,7 @@ def agent_stale(n):
 
 
 def bundle_refused(n, serving=None):
-    """Why this node keeps the bundle it had, in its own words, where it
+    """What was wrong with the bundle, as the node's own phrase, where it
     reports that it refused the bundle this controller serves now (a node
     that pinned a release key, sent files no key it trusts signed: the
     agent's release.may_keep_bundle). "" where it refused none, or one this
@@ -3494,16 +3494,23 @@ def bundle_refused(n, serving=None):
         return ""
     if b["digest"] != (serving or bundle_digest()):
         return ""
-    return b.get("why") or "its files are not ones a key that node trusts signed"
+    # One phrase on a page (the operator, 20 Nov: the row was a paragraph,
+    # with the first characters of the keys the node takes): an agent that
+    # sent its whole refusal is read up to where that phrase ended.
+    why = str(b.get("why") or "")
+    m = re.search(r"\(([^()]{1,200})\), so this node keeps", why)
+    why = m.group(1) if m else why.split(", so this node keeps")[0].split(". ")[0]
+    return why[:200] or "it is not signed by a key that node trusts"
 
 
 def bundle_attention():
     """The bell's rows for the nodes that refused the bundle this controller
     serves: one a node, for as long as the node reports it and the bundle
     is the same one, so it leaves when the node takes a bundle or the
-    bundle moves. The row is the node's first sentence, with the rest of
-    what it said (which keys it takes, what its console can do) folded
-    under it. A node that is away is skipped, as for an agent behind."""
+    bundle moves. The row says what was wrong in the node's one phrase; the
+    whole of what the node said (which keys it takes, what its console can
+    do) is in its own log and the job's. A node that is away is skipped, as
+    for an agent behind."""
     out, serving = [], None
     for n in node_list():
         if n["kind"] != "agent" or not n.get("live") or not ((n.get("reported") or {}).get("bundle_refused") or {}).get("digest"):
@@ -3514,8 +3521,7 @@ def bundle_attention():
         why = bundle_refused(n, serving)
         if not why:
             continue
-        first, _, more = why.partition(". ")
-        out.append({"kind": "bundle-refused", "node": n["name"], "id": n["id"], "why": first, "more": more,
+        out.append({"kind": "bundle-refused", "node": n["name"], "id": n["id"], "why": why,
                     "key": f"bundle:{n['id']}@{serving[7:23]}"})
     return out
 
@@ -8804,8 +8810,8 @@ def tab_view(rows, admin):
     serving = None
     for n in rows:
         if n.get("kind") == "agent":
-            # The controller's bundle it refused, in its own words (R267
-            # step 6): its Sessions section says it keeps the one it had.
+            # The controller's bundle it refused, and what was wrong with
+            # it as one phrase (R267 step 6), for its Sessions section.
             if ((n.get("reported") or {}).get("bundle_refused") or {}).get("digest"):
                 serving = serving or bundle_digest()
                 held = bundle_refused(n, serving)

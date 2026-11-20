@@ -509,13 +509,12 @@ function attRow(a){
   // a release key and the files it was sent are not ones a key it trusts
   // signed. In the note's own voice, as a node held for a signed build is:
   // nobody chose it, and its terminals and jobs go on with the aerie it
-  // had. The node's first sentence on the row, the rest of what it said
-  // (which keys it takes, what its console can do) folded under it.
+  // had. One phrase for what was wrong, and nothing of the keys that node
+  // takes: its log says the rest (the operator, 20 Nov).
   if (a.kind === "bundle-refused"){
     return `<div class="bnote att">
       <div class="bt">${esc(a.node)} refused this controller's bundle</div>
-      <div class="bsum">${esc(a.why || "its files are not ones a key that node trusts signed")}</div>
-      ${a.more ? `<details class="bdetail chev"${sectAttr("bell:bundle:" + a.id)}><summary>what that node takes</summary><pre>${esc(a.more)}</pre></details>` : ""}
+      <div class="bsum">${esc(a.why || "it is not signed by a key that node trusts")}</div>
       <div class="bfoot"><span>its terminals and jobs run the aerie it had</span>
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
           <a href="#" data-bnode="${esc(a.id)}" data-bwhat="sessions">Nodes page</a></span></div></div>`;

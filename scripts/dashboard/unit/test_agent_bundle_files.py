@@ -526,9 +526,11 @@ class Fetched(Case):
         self.a.hello_at = 5
         self.a.bundle(None, None)
         self.assertEqual(refused["digest"], bad, "the digest it refused")
-        self.assertTrue(refused["why"].startswith("this bundle's files are not ones signed by a key this node trusts "
-                                                  "(scripts/lib/login-list.py is changed"), refused["why"])
-        self.assertRegex(refused["why"], r"unsigned on allows unsigned builds$", "with what a person at its console can do")
+        # What was wrong, as one phrase: which keys this node takes and
+        # what its console can do stay in the job's log and this node's.
+        self.assertEqual(refused["why"], "scripts/lib/login-list.py is changed: its bytes are not the ones the release signed")
+        self.assertNotIn("release-key", refused["why"])
+        self.assertNotIn(self.pinned["release_key"][:16], refused["why"])
         self.assertLessEqual(len(refused["why"]), self.agent.REFUSED_MOST)
         self.assertEqual(self.a.hello_at, 0, "told with a hello now, not at the next one")
         # Answered from memory, it still stands, and no hello is asked for again.

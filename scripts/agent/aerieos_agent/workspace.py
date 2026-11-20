@@ -279,7 +279,7 @@ class WorkspaceMixin:
         if was and named and was["digest"] == named and was["trust"] == trusts:
             # Still said to the controller, which may have named another
             # bundle in between and come back to this one.
-            self._refusal_reported(was["digest"], was["why"])
+            self._refusal_reported(was["digest"], was.get("cause") or was["why"])
             if job:
                 job.say(was["why"] + "\n")
             return self._bundle_before(bbdir, job.say if job else None)
@@ -317,8 +317,11 @@ class WorkspaceMixin:
             with contextlib.suppress(OSError):
                 os.unlink(part)
             say(said + "\n")
-            self.bundle_refused = {"digest": digest, "trust": trusts, "why": said}
-            self._refusal_reported(digest, said)
+            # The census carries the cause alone: the whole of it is in
+            # this job's log and this node's own.
+            cause = getattr(said, "cause", "") or said
+            self.bundle_refused = {"digest": digest, "trust": trusts, "why": str(said), "cause": cause}
+            self._refusal_reported(digest, cause)
             before = self._bundle_before(bbdir, say)
             if before and not self.session_digest:
                 # What the terminals run is said to the controller by its
@@ -382,10 +385,12 @@ class WorkspaceMixin:
 
     def _refusal_reported(self, digest, said):
         """What the census says of a refused bundle (REFUSED), kept in step:
-        the digest and the reason in this node's words without their
-        leading "refused: ", bounded; nothing once a bundle is taken. A
-        change is told with a hello now and not at the next one, up to ten
-        minutes on: the controller says it to a person from the census."""
+        the digest and what was wrong with it as one phrase (a Refusal's
+        cause; any other words without their leading "refused: "), bounded,
+        with nothing of which keys this node takes; nothing once a bundle
+        is taken. A change is told with a hello now and not at the next
+        one, up to ten minutes on: the controller says it to a person from
+        the census."""
         why = said[len("refused: "):] if said.startswith("refused: ") else said
         if len(why) > REFUSED_MOST:
             why = why[:REFUSED_MOST - 1].rstrip() + "…"

@@ -30,6 +30,16 @@ WHY = ("this bundle's files are not ones signed by a key this node trusts (scrip
        "that builder's key, sudo aerieos-agent unsigned on allows unsigned builds")
 
 
+# What was wrong, as one phrase: what a current agent reports, and what is
+# read out of an earlier one's whole refusal.
+CAUSE = "scripts/aerie is changed: its bytes are not the ones the release signed"
+# A whole refusal as an agent from before the phrase sent it, key and all.
+PINNED = ("this bundle's files are not ones signed by a key this node trusts (the controller sent no signature with it), so this "
+          "node keeps the bundle it has. This node takes only what is signed by the release key it pinned (2eb9add8c0659634…) "
+          "or its spare (5999f8948f031093…). At this machine's own console: sudo aerieos-agent release-key add HEX trusts that "
+          "builder's key, sudo aerieos-agent unsigned on allows unsigned builds")
+
+
 def box(nid="n_1", name="box", refused=NOW, runs=BEFORE, live=True, why=WHY, **more):
     """A node as the registry hands it: its terminals up on `runs`, saying
     it refused `refused` (None for a node that says nothing of the kind)."""
@@ -69,11 +79,19 @@ class Said(unittest.TestCase):
     def test_the_bell_has_a_row_for_a_node_that_refused_the_bundle_served_now(self):
         row, = self.rows(box())
         self.assertEqual((row["kind"], row["node"], row["id"]), ("bundle-refused", "box", "n_1"))
-        self.assertEqual(row["why"], WHY.split(". ")[0], "the node's first sentence, with the file it named")
-        self.assertIn("scripts/aerie is changed", row["why"])
-        # What a person can do is the node's own words, said once, under the row.
-        self.assertTrue(row["more"].endswith("unsigned on allows unsigned builds"))
-        self.assertEqual((row["why"] + ". " + row["more"]).count("unsigned on"), 1)
+        # One phrase: what was wrong, with the file the node named. An agent
+        # that sent its whole refusal (this WHY) is read down to that phrase,
+        # and one that sends the phrase alone is said as it is.
+        self.assertEqual(row["why"], CAUSE)
+        self.assertEqual(self.rows(box(why=CAUSE))[0]["why"], CAUSE)
+        # Nothing of which keys the node takes, and no paragraph under the row.
+        self.assertNotIn("more", row)
+        for said in (row["why"], self.rows(box(why=PINNED))[0]["why"]):
+            self.assertNotIn("…", said)
+            self.assertNotIn("release-key", said)
+        self.assertEqual(self.rows(box(why=PINNED))[0]["why"], "the controller sent no signature with it")
+        self.assertEqual(self.rows(box(why="it holds scripts/x, which is a link"))[0]["why"], "it holds scripts/x, which is a link")
+        self.assertLessEqual(len(self.rows(box(why="x" * 900))[0]["why"]), 200)
         self.assertEqual(row["key"], "bundle:n_1@" + "ab" * 8)
 
     def test_only_while_the_digest_refused_is_the_one_served(self):
@@ -95,8 +113,7 @@ class Said(unittest.TestCase):
 
     def test_a_node_that_gave_no_words_still_has_a_reason(self):
         row, = self.rows(box(why=""))
-        self.assertIn("not ones a key that node trusts signed", row["why"])
-        self.assertEqual(row["more"], "")
+        self.assertEqual(row["why"], "it is not signed by a key that node trusts")
 
     def test_put_away_it_stays_away_until_the_bundle_moves(self):
         tmp = tempfile.mkdtemp()
@@ -112,12 +129,12 @@ class Said(unittest.TestCase):
             again = self.rows(box(refused=BEFORE))
         self.assertEqual(len(bellseen.filter_rows("u1", again)[0]), 1, "another bundle refused is said again")
 
-    def test_the_nodes_page_row_carries_the_nodes_words(self):
+    def test_the_nodes_page_row_carries_what_was_wrong(self):
         nodes.configure(state=tempfile.mkdtemp())
         rows = [box(), box("n_2", "tower", refused=BEFORE), box("n_3", "quiet", refused=None)]
         with mock.patch.object(nodes, "turns_of", lambda n: []), mock.patch.object(nodes, "spark_of", lambda nid: []):
             got = nodes.tab_view(rows, False)["nodes"]
-        self.assertEqual(got[0]["bundle_held"], WHY)
+        self.assertEqual(got[0]["bundle_held"], CAUSE)
         self.assertNotIn("bundle_held", got[1])
         self.assertNotIn("bundle_held", got[2])
 

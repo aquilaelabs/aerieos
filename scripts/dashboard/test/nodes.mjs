@@ -2697,39 +2697,39 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
      && !/updates itself once the node is idle/.test(heldRow.held) && !heldRow.bad && /updates itself once the node is idle/.test(heldRow.plain),
      `a node held for a signed build says so on its bell row, not in red, and is not promised an update (${heldRow.held.slice(0, 200)})`);
   // A node that refused this controller's bundle keeps the one it had, and
-  // that is said (R267 step 6): a row of its own in the same voice, the
-  // node's first sentence on it, what its console can do folded under it
-  // and said once, and a link to that node's Sessions section.
+  // that is said (R267 step 6): a row of its own in the same voice, with
+  // what was wrong as one phrase and nothing of the keys that node takes
+  // (the operator, 20 Nov: the row was a paragraph with the keys' first
+  // characters in it), and a link to that node's Sessions section.
   const refusedRow = await page.evaluate(() => { const d = document.createElement('div');
     const a = { kind: 'bundle-refused', node: 'box', id: 'n_refused', key: 'bundle:n_refused@abababababababab',
-      why: "this bundle's files are not ones signed by a key this node trusts (scripts/aerie is changed), so this node keeps the bundle it has",
-      more: "This node takes only what is signed by the release key it pinned. At this machine's own console: sudo aerieos-agent unsigned on allows unsigned builds" };
+      why: 'scripts/aerie is changed: its bytes are not the ones the release signed' };
     const html = attRow(a); d.innerHTML = html;
-    const got = { text: d.textContent.replace(/\s+/g, ' '), bad: /class="bnote att bad"|class="bsum bad"/.test(html),
-      folded: d.querySelector('details.bdetail pre')?.textContent || '',
+    const got = { text: d.textContent.replace(/\s+/g, ' ').trim(), bad: /class="bnote att bad"|class="bsum bad"/.test(html),
+      sum: d.querySelector('.bsum')?.textContent || '', folds: d.querySelectorAll('details, pre').length,
       what: d.querySelector('[data-bnode]')?.dataset.bwhat || '', node: d.querySelector('[data-bnode]')?.dataset.bnode || '',
-      dismiss: d.querySelector('[data-bdismiss]')?.dataset.bdismiss || '',
-      verbs: (d.textContent.match(/unsigned on/g) || []).length };
-    d.innerHTML = attRow({ ...a, more: '' });
-    return { ...got, bare: !d.querySelector('details') && /refused this controller's bundle/.test(d.textContent) }; });
-  ok(/box refused this controller's bundle/.test(refusedRow.text) && /this bundle's files are not ones signed/.test(refusedRow.text)
-     && /scripts\/aerie is changed/.test(refusedRow.text) && !/Agent update on/.test(refusedRow.text) && !refusedRow.bad,
-     `a node that refused this controller's bundle has a bell row saying it keeps the one it had and why, not in red (${refusedRow.text.slice(0, 200)})`);
-  ok(/unsigned on allows unsigned builds/.test(refusedRow.folded) && refusedRow.verbs === 1 && refusedRow.bare
+      dismiss: d.querySelector('[data-bdismiss]')?.dataset.bdismiss || '' };
+    d.innerHTML = attRow({ ...a, why: '' });
+    return { ...got, bare: d.querySelector('.bsum')?.textContent || '' }; });
+  ok(/^box refused this controller's bundle/.test(refusedRow.text) && refusedRow.sum === 'scripts/aerie is changed: its bytes are not the ones the release signed'
+     && !/Agent update on/.test(refusedRow.text) && !refusedRow.bad,
+     `a node that refused this controller's bundle has a bell row saying so and what was wrong, not in red (${refusedRow.text.slice(0, 200)})`);
+  ok(refusedRow.folds === 0 && !/release-key|unsigned on|…/.test(refusedRow.text) && refusedRow.text.length < 220
+     && refusedRow.bare === 'it is not signed by a key that node trusts'
      && refusedRow.node === 'n_refused' && refusedRow.what === 'sessions' && refusedRow.dismiss === 'bundle:n_refused@abababababababab',
-     `...with what its console can do folded under it and said once, a way to that node's Sessions section, and Dismiss by the bundle refused (${refusedRow.what}, ${refusedRow.dismiss}, ${refusedRow.verbs})`);
+     `...in one phrase, with no paragraph under it and nothing of that node's keys, a way to that node's Sessions section, and Dismiss by the bundle refused (${refusedRow.text.length}, ${refusedRow.what}, ${refusedRow.dismiss}, ${refusedRow.bare})`);
   // ...and its page says the same under Sessions, in the note's voice, only
   // while its row carries the refusal.
   const heldNote = await page.evaluate(id => { const n = nodesList.find(x => x.id === id); if (!n) return null;
     const on = { ...n, config: { ...(n.config || {}), host_only: false } };
     const d = document.createElement('div');
-    d.innerHTML = nodeSessionsSection({ ...on, bundle_held: 'its files are not ones a release signed (scripts/aerie is changed)' });
+    d.innerHTML = nodeSessionsSection({ ...on, bundle_held: 'scripts/aerie is changed: its bytes are not the ones the release signed' });
     const note = [...d.querySelectorAll('.sub.warn')].map(e => e.textContent).find(t => /Refused this controller's bundle/.test(t)) || '';
     d.innerHTML = nodeSessionsSection(on);
     return { note, plain: /Refused this controller's bundle/.test(d.textContent) }; }, minted.id);
-  ok(heldNote && /^Refused this controller's bundle: its files are not ones a release signed \(scripts\/aerie is changed\)\.$/.test(heldNote.note)
+  ok(heldNote && heldNote.note === "Refused this controller's bundle: scripts/aerie is changed: its bytes are not the ones the release signed. Its terminals and jobs run the one it had."
      && !heldNote.plain,
-     `the node's Sessions section says it keeps the bundle it had, in its own words, and says nothing without the refusal (${heldNote?.note})`);
+     `the node's Sessions section says it refused the bundle, what was wrong, and that it runs the one it had, and says nothing without the refusal (${heldNote?.note})`);
   // Its link goes to THIS node, whichever the tab was on, with Update agent
   // brought into view (the operator, 4 Oct).
   const other = await page.evaluate(id => nodesList.find(n => n.id !== id && n.kind === 'agent' && n.state !== 'retired')?.id, minted.id);

@@ -200,7 +200,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         self.session_bundle = ""          # the digest the terminals run from
         self.session_digest = ""          # the digest bundle() last fetched
         self.bundle_named = ""            # the digest the controller's last hello named for its bundle
-        self.bundle_refused = None        # a bundle refused (release.may_keep_bundle): {digest, trust, why}
+        self.bundle_refused = None        # a bundle refused (release.may_keep_bundle): {digest, trust, why, cause}
         self.session_tried = 0
         self.session_stale = ""           # a newer bundle's directory, for the loop to restart onto
         self.session_bound = ""           # the address the relay was bound to, to notice it moving

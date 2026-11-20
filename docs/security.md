@@ -414,10 +414,12 @@ the node goes on with the bundle it has, names the first file that was
 wrong in the job's log and its own, and does not fetch that bundle again
 until its console's trust changes or the controller offers another. While
 the refusal stands the node reports it with its hello, and whoever manages
-nodes sees it: a row on the bell for that node, saying it keeps the bundle
-it had with the node's own reason and what its console can do, and the same
-words under Sessions on the node's page; both leave when the node takes a
-bundle or the controller serves another. A container's shell on such a node
+nodes sees it: a row on the bell for that node, saying it refused this
+controller's bundle and what was wrong in one phrase, and the same under
+Sessions on the node's page; both leave when the node takes a bundle or the
+controller serves another. Which keys the node takes, and the two commands
+its console has for that (`release-key add`, `unsigned on`), are in the
+job's log and the node's own, not on the page. A container's shell on such a node
 opens from the bundle it kept, with no wait for one it will not take. A
 machine whose console allows unsigned builds takes a branch's bundle as it
 takes that build's agent, and a key added at the console counts as it does
