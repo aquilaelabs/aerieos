@@ -48,6 +48,15 @@ TOKEN=""
 # AerieOS's release key, as the Enroll script carries it: pinned by the agent
 # at enrollment, after which the node takes only agent updates signed by it.
 RELEASE_KEY=""
+# What the controller's https is held to, as the Enroll script carries it:
+# the pin of the controller's own key (sha256// and base64, curl's
+# --pinnedpubkey form), or `ca` for a hostname whose certificate the
+# system's authorities vouch for. CTL_KEY is the first kind alone: every
+# fetch from the controller below is made under it (-k leaves the
+# authorities out, which a certificate the controller made itself would
+# fail, and the pinned key is still held), and the agent pins the same.
+CONTROLLER_PIN=""
+CTL_KEY=""
 # What the agent that arrives is held to before any of it runs, as the Enroll
 # script carries them too: the digest of the agent the controller shipped
 # when the script was made, and the release's signature over that digest
@@ -182,6 +191,12 @@ it, which is a paste rather than a questionnaire.
                        --release-key. Enroll node puts all three in; without
                        them the agent is held to the digest the controller
                        sends with it, and this says what was not checked.
+  --controller-pin PIN   what an https controller is held to: the pin of its
+                       own key (sha256// and base64, as Enroll node gives
+                       it), under which everything here is fetched from it
+                       and which the node pins as it enrolls; or `ca`, for a
+                       hostname whose certificate the system's authorities
+                       vouch for.
   --wg-conf FILE       reach the controller through WireGuard: the config
                        (from the Nodes page's enroll script, which carries
                        it) goes in as wg-quick@bb before anything else, the
@@ -305,6 +320,7 @@ while [ $# -gt 0 ]; do
         --release-key) RELEASE_KEY="$2"; shift 2 ;;
         --agent-digest) AGENT_DIGEST="$2"; shift 2 ;;
         --agent-sig) AGENT_SIG="$2"; shift 2 ;;
+        --controller-pin) CONTROLLER_PIN="$2"; shift 2 ;;
         --wg-conf) WG_CONF="$2"; shift 2 ;;
         --reach) REACH="$2"; shift 2 ;;
         --door) DOOR="$2"; shift 2 ;;
@@ -397,6 +413,15 @@ if [ -n "$AGENT_SIG" ] && ! [[ "$AGENT_SIG" =~ ^[0-9a-f]{128}$ ]]; then
 fi
 if [ -n "$RELEASE_KEY" ] && ! [[ "$RELEASE_KEY" =~ $RELEASE_KEYS_RE ]]; then
     echo "--release-key takes the release key as 64 hex characters, and its spare after a comma" >&2; exit 1
+fi
+# The controller's pin: a key's, or the word for the system's authorities;
+# either way of an https controller, since plain http has nothing to hold.
+if [ -n "$CONTROLLER_PIN" ]; then
+    case "$CONTROLLER" in https://*) ;; *) echo "--controller-pin is what an https controller is held to, and --controller is ${CONTROLLER:-not given}" >&2; exit 1 ;; esac
+    if [[ "$CONTROLLER_PIN" =~ ^sha256//[A-Za-z0-9+/]{43}=$ ]]; then CTL_KEY="$CONTROLLER_PIN"
+    elif [ "$CONTROLLER_PIN" != ca ]; then
+        echo "--controller-pin takes the controller's key as sha256// and 44 base64 characters, as the Nodes page's Enroll node gives it, or ca" >&2; exit 1
+    fi
 fi
 fi   # the options, when run rather than sourced
 
@@ -737,7 +762,7 @@ guest_run() {
     hdr="$(mktemp)"
     # Tried again on a transient answer: a stick's first boot asks its own
     # dashboard the moment it answers at all, and once got a 500 (B747).
-    curl -fsSL --retry 6 --retry-delay 3 --retry-connrefused -D "$hdr" -H @<(printf 'Authorization: Bearer %s\n' "${TOKEN}") \
+    curl -fsSL ${CTL_KEY:+-k --pinnedpubkey "$CTL_KEY"} --retry 6 --retry-delay 3 --retry-connrefused -D "$hdr" -H @<(printf 'Authorization: Bearer %s\n' "${TOKEN}") \
          "${CONTROLLER%/}/api/v1/agent/download" -o "${agent}.new" \
         || { warn "could not download the agent from ${CONTROLLER}: is that the dashboard's address, and is the token unused?"
              rm -f "$hdr" "${agent}.new"; exit 1; }
@@ -755,7 +780,7 @@ guest_run() {
     systemctl --user stop "$GUEST_UNIT_NAME" 2>/dev/null || true
     BUILDERBOT_NODE_JSON="$node_json" python3 "$agent" enroll \
         --controller "$CONTROLLER" --token "$TOKEN" --user "$(id -un)" \
-        ${RELEASE_KEY:+--release-key "$RELEASE_KEY"} \
+        ${RELEASE_KEY:+--release-key "$RELEASE_KEY"} ${CONTROLLER_PIN:+--pin "$CONTROLLER_PIN"} \
         --store "data=$s_data" --store "toolchains=$toolchains" \
         --store "cache=$s_cache" --store "artifacts=$s_art" \
         --store "appdata=$s_app" \
@@ -1227,10 +1252,10 @@ if command -v curl >/dev/null 2>&1; then
         # closed port 22 for a door and then could not enroll, and the
         # person came back in through the KVM. Nothing below is worth doing
         # when the controller cannot be reached.
-        if curl -fsk --max-time 10 -o /dev/null "${CONTROLLER%/}/api/v1/agent/download" 2>/dev/null \
-           || curl -sk --max-time 10 -o /dev/null -w '%{http_code}' "${CONTROLLER%/}/" 2>/dev/null | grep -q '^[234]'; then
+        if curl -fsk ${CTL_KEY:+--pinnedpubkey "$CTL_KEY"} --max-time 10 -o /dev/null "${CONTROLLER%/}/api/v1/agent/download" 2>/dev/null \
+           || curl -sk ${CTL_KEY:+--pinnedpubkey "$CTL_KEY"} --max-time 10 -o /dev/null -w '%{http_code}' "${CONTROLLER%/}/" 2>/dev/null | grep -q '^[234]'; then
             chk ok "controller: ${CONTROLLER} answers"
-        else chk fail "controller ${CONTROLLER} does not answer from here, so enrollment would fail: check the address and that the dashboard is up"; fi
+        else chk fail "controller ${CONTROLLER} does not answer from here${CTL_KEY:+ under the key this enrollment carries}, so enrollment would fail: check the address and that the dashboard is up"; fi
     fi
 else
     chk warn "no curl yet; it is installed below, and the network is untested until then"
@@ -1336,7 +1361,7 @@ if [ -n "$WG_CONF" ]; then
     # answering. A handshake can take a few seconds after the interface.
     reached=""
     for _ in $(seq 1 15); do
-        code="$(curl -s -o /dev/null -m 4 -w '%{http_code}' "${CONTROLLER%/}/api/v1/agent/download" || true)"
+        code="$(curl -s ${CTL_KEY:+-k --pinnedpubkey "$CTL_KEY"} -o /dev/null -m 4 -w '%{http_code}' "${CONTROLLER%/}/api/v1/agent/download" || true)"
         case "$code" in 000|"") sleep 2 ;; *) reached=1; break ;; esac
     done
     if [ -z "$reached" ]; then
@@ -1947,6 +1972,7 @@ case "\$(id -un)" in
         export BUILDERBOT_ROLE=node WORKSPACE=/workspace
         export BB_NODE="\$(hostname)"
         ${CONTROLLER:+export BB_CONTROLLER="${CONTROLLER%/}"}
+        ${CTL_KEY:+export BB_CONTROLLER_PIN="${CTL_KEY}"}
         [ -d "${STORE_TOOLCHAINS}/.bb/current/scripts" ] \\
             && PATH="${STORE_TOOLCHAINS}/.bb/current/scripts:\$PATH"
         PATH="\$HOME/.local/bin:\$PATH"
@@ -4081,7 +4107,7 @@ if [ -n "$CONTROLLER" ]; then
     pkg $(pkg_names pycrypto)
     hdr="$(mktemp)"
     # Tried again on a transient answer (B747), as the own node's download is.
-    curl -fsSL --retry 6 --retry-delay 3 --retry-connrefused -D "$hdr" -H @<(printf 'Authorization: Bearer %s\n' "${TOKEN}") \
+    curl -fsSL ${CTL_KEY:+-k --pinnedpubkey "$CTL_KEY"} --retry 6 --retry-delay 3 --retry-connrefused -D "$hdr" -H @<(printf 'Authorization: Bearer %s\n' "${TOKEN}") \
          "${CONTROLLER%/}/api/v1/agent/download" -o "${AGENT}.new" \
         || { warn "could not download the agent from ${CONTROLLER}. Is that the dashboard's address, and is the token unused?"; rm -f "$hdr" "${AGENT}.new"; exit 1; }
     # Held to what the Enroll script carries, before any of it runs as root
@@ -4100,7 +4126,7 @@ if [ -n "$CONTROLLER" ]; then
     "$AGENT" enroll --controller "$CONTROLLER" --token "$TOKEN" --user "$USER_NAME" \
         ${SESSION_NAME:+--session-user "$SESSION_NAME"} ${REACH:+--reach "$REACH"} \
         ${DOOR:+--door "$DOOR"} ${DOOR_HOST:+--door-host "$DOOR_HOST"} \
-        ${RELEASE_KEY:+--release-key "$RELEASE_KEY"} \
+        ${RELEASE_KEY:+--release-key "$RELEASE_KEY"} ${CONTROLLER_PIN:+--pin "$CONTROLLER_PIN"} \
         --store "data=${STORE_DATA}" --store "toolchains=${STORE_TOOLCHAINS}" \
         --store "cache=${STORE_CACHE}" --store "artifacts=${STORE_ARTIFACTS}" \
         --store "appdata=${STORE_APPDATA}"

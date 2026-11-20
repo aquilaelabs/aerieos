@@ -114,6 +114,19 @@ def pins(agent=None):
     return out
 
 
+def reach_words(url, pin):
+    """What each of the Nodes page's token-only commands carries for an
+    https controller held to `pin` (tls.node_reach's: the controller's own
+    key, or `ca`), as the Enroll script carries it: `url` the address to
+    name, `curl` the options its fetch takes, `provisioner` and `agent` the
+    words that follow the command's own. A key's pin is of base64's
+    characters, so each word stands unquoted in a shell."""
+    if not pin or not re.fullmatch(r"ca|sha256//[A-Za-z0-9+/]{43}=", pin):
+        return {"url": url, "curl": "", "provisioner": "", "agent": ""}
+    return {"url": url, "curl": f"-k --pinnedpubkey {pin}" if pin != "ca" else "",
+            "provisioner": f"--controller-pin {pin}", "agent": f"--pin {pin}"}
+
+
 def controller_host(url):
     """The host part of the controller's URL, '' when it is not a URL."""
     u = urllib.parse.urlparse((url or "").strip())
@@ -319,8 +332,12 @@ def build(ans, *, name, user, token, expires, provisioner, family=b"", again=Fal
     stores where they are rather than coming back on the defaults.
     `agent` ({digest, sig}: the agent this controller ships and the
     release's signature over it) rides as what the provisioner holds the
-    agent it fetches to (pins)."""
+    agent it fetches to (pins). `ans["controller_pin"]`, where the caller
+    found one for the address (tls.node_reach), is what the controller's
+    https is held to: the provisioner fetches under it and the node pins it."""
     flags = [f"--controller {_q(ans['controller'])}", f"--token {_q(token)}"]
+    if ans.get("controller_pin"):
+        flags.append(f"--controller-pin {_q(ans['controller_pin'])}")
     if machine:
         flags.append(f"--machine {_q(machine)}")
     if user and user != "bb":

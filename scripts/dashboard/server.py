@@ -4738,6 +4738,7 @@ try:
     # ...and the pin of this controller's own TLS key, which a hello names
     # and an enrollment carries (R267 step 15).
     nodes.tls_pin = tls.key_pin
+    nodes.tls_reach = tls.node_reach
     # ...and a toolchain or image job pressed while another writes the
     # store waits behind it rather than being refused.
     nodes.store_gate = toolchains.store_gate

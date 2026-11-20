@@ -529,7 +529,8 @@ class EveryWayPins(Bash):
         nodes.agent_sig = lambda digest=None: ""
         self.assertEqual(nodes.enroll_pins()["provisioner"], f"--release-key {keys} --agent-digest {self.digest}")
         # Just a token answers with them, and the page ends each command with them.
-        self.assertIn('m | {"pins": enroll_pins()}', text(os.path.join(HERE, "..", "nodes.py")))
+        # (with the address the page reached the controller by, for what its https is held to: test_enroll_tls.py).
+        self.assertIn('m | {"pins": enroll_pins(field(req, "controller"))}', text(os.path.join(HERE, "..", "nodes.py")))
         page = text(os.path.join(HERE, "..", "tab-nodes.js"))
         self.assertIn("pins: r.pins || {}", page)
         shown = between(page, "  const mintToken = (m) => {", '    body.querySelector("#ndTokDone").onclick = shut;')

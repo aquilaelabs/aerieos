@@ -23,7 +23,7 @@ controller can; nobody else reads anything whole.
 | **Root on a node** | the machine: every session there, every token file on it | the controller: a node has no credential to the controller beyond its own enrollment, which reaches its own space's work and nothing of another node's |
 | **Root on the controller** | everything the controller can read, the install key included | nothing is kept from root on the running controller; this is the host's own trust (`docker exec`, the machine's console) |
 | **A copy of a disk** (a backup, a stolen drive, a copy of `/config`) | nothing | the sealed stores open without the install key (kept outside `/config`), the node's sealed sign-ins open without the controller, the signing keys and git tokens are ciphertext |
-| **Someone on the LAN** | nothing | changing what the agent channel carries, or opening a terminal, a file request or a VM's screen on a node: each is signed with that node's own key, and a request to a node's relay is taken once. Reading what the relay carries (a shell's keys and output, a file, a VM's screen): it crosses in TLS to a certificate the node made for itself and reported over its channel, the only one the controller takes there; a node that could not make one (it has neither Python's cryptography library nor `openssl`) is served unencrypted and its page says so. The page's own traffic is theirs to read where the dashboard is served over http (step 2 below) |
+| **Someone on the LAN** | nothing | changing what the agent channel carries, or opening a terminal, a file request or a VM's screen on a node: each is signed with that node's own key, and a request to a node's relay is taken once. Reading what the relay carries (a shell's keys and output, a file, a VM's screen): it crosses in TLS to a certificate the node made for itself and reported over its channel, the only one the controller takes there; a node that could not make one (it has neither Python's cryptography library nor `openssl`) is served unencrypted and its page says so. The page's own traffic is theirs to read where the dashboard is served over http (step 2 below), and so is the channel of a node whose row says it is over plain http ([a node's channel](#a-nodes-channel-to-its-controller)) |
 | **The page's own code** | drawing what the controller answers and asking it to act | holding a key: the page never holds a key (a key of a person's own is a passkey's or a companion's, R157), keeps no secret in local or session storage, and under the CSP of step 4 runs no script it did not ship |
 
 ## What each store protects, and what it does not
@@ -232,7 +232,7 @@ nothing.
 
 | Step of R158 | The line it closes |
 |---|---|
-| 2, TLS | someone on the LAN reading the page's traffic, a session cookie or a token typed into a form; http stays a choice for an install with no CA, said on the page with what then crosses in the clear |
+| 2, TLS | someone on the LAN reading the page's traffic, a session cookie or a token typed into a form; http stays a choice for an install with no CA, said on the page with what then crosses in the clear. A node's channel is over TLS whatever that choice ([a node's channel](#a-nodes-channel-to-its-controller)) |
 | 3, vetted cryptography | the hand-built seal and key exchange, replaced with a library somebody else has reviewed |
 | 4, the page hardened | a tampered or injected script on the page, a secret parked in the browser's storage, a cookie sent cross-site, a change posted with the cookie from another origin of the same site (an app this install routes): a cookie's POST is taken only from the dashboard's own page |
 | 5, an unlock that gives up less | the controller holding a person's whole store open while they are signed in |
@@ -295,6 +295,59 @@ here or at a proxy in front that says so.
 session's token only for a space that works on that node and an account
 that may work on that space; it is handed nothing for a session it merely
 names.
+
+## A node's channel to its controller
+
+**Over TLS, under the controller's own key, from enrollment on.** The
+controller holds a certificate of its own in every Connection mode, http
+among them, and its one port answers a TLS handshake under it while
+serving plain http to whoever speaks that (`scripts/dashboard/tls.py`).
+What a node pins is the key and not the certificate: the sha256 of the
+key's public half, the form `curl --pinnedpubkey` takes. The Enroll script
+and the Nodes page's token-only commands name the controller as https at
+the address given and carry that pin, for a node on the LAN or behind
+WireGuard: the provisioner makes every fetch from the controller under it,
+so the enroll token and the first agent go to nobody else, and the agent
+pins it as it enrolls (`--pin`) and refuses any other key before it sends
+anything. The controller checks first that its own port answers a
+handshake at that address; where it does not (a proxy in front that
+speaks only http to the controller) the words are the plain http ones. A
+node reached through a public hostname is unchanged: the name's
+certificate, by the system's authorities.
+
+**A node enrolled over plain http moves by itself.** The controller's
+hello names the pin; the agent asks the same address over https under it,
+with its own token, and once that answers it keeps https and the pin in
+`node.json`, hands them to what its sessions dial with, and never writes
+http back. That first naming is trust on first use, of a controller the
+node already took everything from over the same network. Where the
+address does not answer over TLS the node stays as it is, and its row
+says `over plain http` after where it dials in from. An agent from before
+this keeps working over http until it has updated, and the update does not
+wait for the move.
+
+**What plain http exposes.** On a node whose row says so, whoever can read
+that network reads the node's token and everything the channel carries
+(the jobs and their logs, a session's token on its way to a terminal),
+and whoever can change traffic there can answer as the controller. Two
+things hold even then: an agent update, root's tools and the bundle's
+files are taken only under the release key the node pinned (below), and a
+terminal, a file request or a VM's screen on the node's relay is signed
+and crosses in TLS of the node's own. A browser at `http://` is what the
+Connection section says, and is not changed by any of this.
+
+**A renewed certificate, and a replaced key.** The controller remakes its
+own certificate a month before it ends, and when a name is added, over the
+same key, so a node that pinned the key sees nothing. A node that pinned
+the certificate itself (enrolled over https before this, on first use)
+moves its pin to the key at its next hello, when the certificate it just
+met is over the key named. In the `acme` mode the name's certificate
+answers a handshake that asks for the name and the install's own answers
+every other, so a hostname added later cuts off no node that dials an
+address. The key is sealed under the install key and sealed again when
+that changes. It is made anew in one case, a key that can no longer be
+opened (an install key lost): every node that pinned it then refuses the
+controller, and comes back when its Enroll script is run on it again.
 
 ## What a node takes on its controller's word
 

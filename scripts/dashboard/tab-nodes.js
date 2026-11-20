@@ -2551,15 +2551,17 @@ function ndDialogs(){
       const kept = keep(), a = answers();
       busy(tok, "Minting");
       const r = await nodeAct({action: "enroll", ...a, host_only: $b("#ndEnHost").checked, nginx: ngx.checked,
-                               ...(again ? {node: again.id} : {})});
+                               controller: location.origin, ...(again ? {node: again.id} : {})});
       if (r.error){ mintForm(kept, again); return; }
       // The URL the node should dial: this page's origin, which is the only
-      // address the browser knows the controller by. A proxy in front is the
-      // operator's to substitute.
+      // address the browser knows the controller by, as the controller names
+      // it back (pins.url: https at the same address, with what each fetch
+      // and the node hold it to, where its own port answers there). A proxy
+      // in front is the operator's to substitute.
       // ...and what each command carries beside the token, as the Enroll
       // script does (nodes.enroll_pins): the release key the node pins, and
       // what the agent it fetches is held to before it runs.
-      mintToken({name: a.name || "node", token: r.token, url: location.origin, user: a.user, pins: r.pins || {}});
+      mintToken({name: a.name || "node", token: r.token, url: r.pins?.url || location.origin, user: a.user, pins: r.pins || {}});
       readMoved("nodes"); drawPanes();
     });
     $b("#ndEnName").onkeydown = e => {
@@ -2595,15 +2597,15 @@ function ndDialogs(){
     boxWidth(true);
     drawHTML(body, `<div class="field ndtoken">
         <div class="hint">Shown once. On a fresh Linux machine, as root:</div>
-        <pre class="ndcmd">curl -fsSL -H 'Authorization: Bearer ${esc(m.token)}' '${esc(m.url)}/api/v1/agent/download?what=provisioner' -o provision-linux.sh
+        <pre class="ndcmd">curl -fsSL${m.pins.curl ? ` ${esc(m.pins.curl)}` : ""} -H 'Authorization: Bearer ${esc(m.token)}' '${esc(m.url)}/api/v1/agent/download?what=provisioner' -o provision-linux.sh
 sudo bash provision-linux.sh --controller ${esc(m.url)} --token ${esc(m.token)}${
           m.user && m.user !== "bb" ? ` --user ${esc(m.user)}` : ""}${m.pins.provisioner ? ` ${esc(m.pins.provisioner)}` : ""}</pre>
 ${state?.settings?.settings?.offer_unvetted?.value ? `
         <div class="hint">On a Mac, as yourself <span class="pill">dev</span>:</div>
-        <pre class="ndcmd">curl -fsSL -H 'Authorization: Bearer ${esc(m.token)}' '${esc(m.url)}/api/v1/agent/download?what=provisioner-macos' -o provision-macos.sh
+        <pre class="ndcmd">curl -fsSL${m.pins.curl ? ` ${esc(m.pins.curl)}` : ""} -H 'Authorization: Bearer ${esc(m.token)}' '${esc(m.url)}/api/v1/agent/download?what=provisioner-macos' -o provision-macos.sh
 bash provision-macos.sh --controller ${esc(m.url)} --token ${esc(m.token)}${m.pins.provisioner ? ` ${esc(m.pins.provisioner)}` : ""}</pre>` : ""}
         <div class="hint">Or the agent alone, where python3 exists:</div>
-        <pre class="ndcmd">curl -fsSL -H 'Authorization: Bearer ${esc(m.token)}' ${esc(m.url)}/api/v1/agent/download -o /usr/local/sbin/aerieos-agent
+        <pre class="ndcmd">curl -fsSL${m.pins.curl ? ` ${esc(m.pins.curl)}` : ""} -H 'Authorization: Bearer ${esc(m.token)}' ${esc(m.url)}/api/v1/agent/download -o /usr/local/sbin/aerieos-agent
 chmod 755 /usr/local/sbin/aerieos-agent
 aerieos-agent enroll --controller ${esc(m.url)} --token ${esc(m.token)}${
           m.user && m.user !== "bb" ? ` --user ${esc(m.user)}` : ""}${m.pins.agent ? ` ${esc(m.pins.agent)}` : ""}</pre>

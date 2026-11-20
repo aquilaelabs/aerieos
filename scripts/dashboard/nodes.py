@@ -1333,6 +1333,13 @@ def enroll_script(principal, req):
     ans = enrollscript.check(req | ({"sessions": False} if ho else {}), again=enrolled)
     if ans.get("error"):
         return ans
+    # On the LAN or behind WireGuard the node dials this controller's own
+    # port: named as https with the pin of its key where that port answers
+    # a handshake under it at the address given (R267 step 15). A public
+    # hostname is the name's certificate, by the system's authorities.
+    if ans["reach"] != "public":
+        url, pin = tls_reach(ans["controller"])
+        ans = ans | {"controller": url, "controller_pin": pin}
     # No walk on record yet (R48): reaching the controller through WireGuard
     # and a Tailscale SSH door are dev features until each is proved and
     # written down. A public hostname and the cloudflared door are in daily
@@ -3945,7 +3952,7 @@ def agent_carried():
     return {"digest": digest, "sig": agent_sig(digest) if digest else ""}
 
 
-def enroll_pins():
+def enroll_pins(controller=""):
     """What a token-only enrollment carries beside the token, as the Enroll
     script does (enrollscript.pins): the words each of the Nodes page's
     commands ends with. `provisioner` is for provision-linux.sh and
@@ -3953,10 +3960,25 @@ def enroll_pins():
     the signature the agent it fetches is held to. `agent` is for the agent
     fetched and enrolled by hand, which pins the key; nothing holds that
     file to anything but the person who fetched it. `words` is the first,
-    a word each, for a shell (aerie nodes enroll-token --pins)."""
+    a word each, for a shell (aerie nodes enroll-token --pins).
+
+    With `controller`, the address the page reached this controller by,
+    the commands name it as the Enroll script would (tls_reach): `url` is
+    the address to name, https where this controller's own port answers a
+    handshake there, `curl` the options each fetch takes to hold it to the
+    controller's key, and the pin joins the provisioner's and the agent's
+    words. `words` stays as it was: a shell that names its own address
+    (the controller's own node, over the loopback) gets no pin for it."""
     words = enrollscript.pins(agent_carried())
-    return {"provisioner": " ".join(words), "words": words,
-            "agent": " ".join(words[:2]) if words[:1] == ["--release-key"] else ""}
+    out = {"provisioner": " ".join(words), "words": words,
+           "agent": " ".join(words[:2]) if words[:1] == ["--release-key"] else ""}
+    if controller:
+        url, pin = tls_reach(controller)
+        reach = enrollscript.reach_words(url, pin)
+        out.update({"url": reach["url"], "curl": reach["curl"],
+                    "provisioner": " ".join(x for x in (out["provisioner"], reach["provisioner"]) if x),
+                    "agent": " ".join(x for x in (out["agent"], reach["agent"]) if x)})
+    return out
 
 
 def agent_sig_key():
@@ -5830,6 +5852,9 @@ def token_attention():
 # The pin of the controller's own TLS key (tls.key_pin), set by the server;
 # "" while no certificate is loaded, and wherever nothing set it.
 tls_pin = lambda: ""  # noqa: E731
+# ...and what an enrollment names the controller as, and holds its https to,
+# for the address a node is to dial (tls.node_reach): (address, pin).
+tls_reach = lambda url: (url, "")  # noqa: E731
 # A move prepared, per node (move.for_node), set by the server; {} when none.
 move_for_node = lambda nid: {}  # noqa: E731
 # ...and the node's hello on the controller a move landed on (R175 step 3).
@@ -8441,7 +8466,7 @@ def verb(principal, req):
                         field(req, "user") or "bb", host_only=req.get("host_only") is True,
                         nginx=req.get("nginx") is True, existing=field(req, "node") or None)
         # ...with what the commands the page then shows carry beside it.
-        return m if m.get("error") else m | {"pins": enroll_pins()}
+        return m if m.get("error") else m | {"pins": enroll_pins(field(req, "controller"))}
 
     def power():
         return node_power(principal, nid, act)

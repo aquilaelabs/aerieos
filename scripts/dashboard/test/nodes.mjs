@@ -3129,12 +3129,22 @@ ok(await page.$eval('#ndBody .ndtoken', el => /--user joe/.test(el.textContent))
 // agent it fetches is held to (the signature too, on a build that has one).
 ok(await page.$eval('#ndBody .ndtoken', el =>
      /provision-linux\.sh --controller \S+ --token bbe_\S+ --user joe --release-key [0-9a-f]{64}(,[0-9a-f]{64})? --agent-digest sha256:[0-9a-f]{64}/.test(el.textContent)
-     && /aerieos-agent enroll --controller \S+ --token bbe_\S+ --user joe --release-key [0-9a-f]{64}(,[0-9a-f]{64})?\s*$/.test(el.textContent)),
+     && /aerieos-agent enroll --controller \S+ --token bbe_\S+ --user joe --release-key [0-9a-f]{64}(,[0-9a-f]{64})?( --pin sha256\/\/[A-Za-z0-9+\/]{43}=)?\s*$/.test(el.textContent)),
    '...and after it the release key the node pins, with the digest the provisioner holds the agent to');
 // Where the provisioner comes from (B133): the dialog's first line fetches
 // it from this controller with the same token, and that route serves it.
-ok(await page.$eval('#ndBody .ndtoken', el => /curl -fsSL -H 'Authorization: Bearer bbe_[^']+' '[^']*\/api\/v1\/agent\/download\?what=provisioner' -o provision-linux\.sh/.test(el.textContent)),
+ok(await page.$eval('#ndBody .ndtoken', el => /curl -fsSL( -k --pinnedpubkey sha256\/\/[A-Za-z0-9+\/]{43}=)? -H 'Authorization: Bearer bbe_[^']+' '[^']*\/api\/v1\/agent\/download\?what=provisioner' -o provision-linux\.sh/.test(el.textContent)),
    '...after a curl that fetches the provisioner from this controller with the token');
+// Held to the controller's own key where its port answers a handshake at the
+// page's address (R267 step 15): the address named is https, each fetch
+// carries the pin, and the provisioner and the agent are handed the same one.
+ok(await page.$eval('#ndBody .ndtoken', el => {
+     const t = el.textContent, pin = t.match(/--pinnedpubkey (sha256\/\/[A-Za-z0-9+\/]{43}=)/)?.[1];
+     if (!pin) return !/https:\/\//.test(t) && !/--controller-pin|--pin /.test(t);
+     return t.split(pin).length >= 5 && !/http:\/\//.test(t)
+       && t.includes(`--controller-pin ${pin}`) && t.includes(`--pin ${pin}`);
+   }),
+   '...and where the controller answers TLS there, every command names https and carries the pin of its key');
 await section("and the route hands the enroll token the provisioner itself", async () => {
   const tok = (await page.$eval('#ndBody .ndtoken', el => el.textContent)).match(/Bearer (bbe_[A-Za-z0-9_-]+)/)?.[1];
   const r = await fetch(URL.replace(/\/$/, '') + '/api/v1/agent/download?what=provisioner', { headers: { Authorization: 'Bearer ' + tok } });

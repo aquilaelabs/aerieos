@@ -471,8 +471,19 @@ refreshes them itself.)
    and receives its **node id** and a **node token** (32 random bytes), both
    written to `/etc/aerieos/node.json`, mode 0600.
 3. Every later request carries the node token as a bearer credential over TLS.
-   TLS is not optional: the token is a bearer credential. On a LAN that can be
-   a self-signed certificate pinned by the agent at enrollment.
+   TLS is not optional: the token is a bearer credential. On a LAN it is the
+   controller's own certificate, which its port answers a handshake with in
+   every Connection mode, and what the agent pins at enrollment is that
+   certificate's key (`--pin sha256//…`, the form `curl --pinnedpubkey`
+   takes), so the controller's renewals pass and no other key does. The
+   Enroll script and the token-only commands carry the pin and name the
+   controller as https at the same address; the provisioner fetches under
+   it (`--controller-pin`). A node enrolled over plain http before this
+   moves by itself at its controller's next hello, and one that cannot (a
+   proxy in front that speaks only http to the controller) stays, its row
+   saying `over plain http`. What that exposes, and what a renewed
+   certificate or a replaced key does, is in
+   [security.md](security.md#a-nodes-channel-to-its-controller).
 4. Rotation and revocation are rows: revoke a token and the node's next call
    fails closed with "credential revoked". The node's row says it is turned
    away and why, in place of quiet, and the bell carries a row for it until
@@ -2522,7 +2533,7 @@ above, in order:
    emulator, in **no docker group**, no sudo. Jobs stay `aerie`; the agent stays
    root and drops to each. The node token lives in `/etc/aerieos`
    (0700 root) and never enters a session's environment: the sessions get
-   the controller's URL and certificate pin, and nothing else of the agent's.
+   the controller's URL and the pin its https is held to, and nothing else of the agent's.
 
 Phase 10b is built too: `server.session_target` decides per space:
 local, the node (`reported.session.up` and `/workspace` mounted), or

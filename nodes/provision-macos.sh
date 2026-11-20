@@ -30,6 +30,13 @@ CONTROLLER=""; TOKEN=""; TOOLCHAINS=""; REMOVE=0; CHECK_ONLY=0
 # them: the digest of the agent the controller shipped when the command was
 # made, and the release's signature over it where its build has one.
 RELEASE_KEY=""; AGENT_DIGEST=""; AGENT_SIG=""
+# What an https controller is held to, as the command carries it: the pin of
+# the controller's own key (sha256// and base64, curl's --pinnedpubkey form),
+# or `ca` for a hostname the system's authorities vouch for. CTL_KEY is the
+# first kind alone: each fetch from the controller is made under it, and the
+# agent pins the same.
+CONTROLLER_PIN=""; CTL_KEY=""
+CONTROLLER_PIN_RE='^sha256//[A-Za-z0-9+/]{43}=$'
 # A release key, or the key and its spare after a comma: in a variable, since
 # the bash a Mac ships reads a pattern with parentheses only from one.
 RELEASE_KEYS_RE='^[0-9a-f]{64}(,[0-9a-f]{64})?$'
@@ -38,6 +45,7 @@ usage() {
     cat <<'EOF'
 usage: bash provision-macos.sh --controller URL --token bbe_… [--toolchains PATH]
             [--release-key KEY[,SPARE]] [--agent-digest sha256:…] [--agent-sig HEX]
+            [--controller-pin PIN]
        bash provision-macos.sh --check
        bash provision-macos.sh --remove
 
@@ -63,6 +71,11 @@ token and prints this line with the address and the token in it.
                        Nodes page puts all three in the command; without them
                        the agent is held to the digest the controller sends
                        with it, and this says what was not checked.
+  --controller-pin PIN   what an https controller is held to: the pin of its
+                       own key (sha256// and base64, as the Nodes page gives
+                       it), under which the agent is fetched and which it
+                       pins as it enrolls; or `ca`, for a hostname the
+                       system's authorities vouch for.
   --check              only the pre-flight: say whether this Mac can be a
                        node, change nothing, exit 0 or 1.
   --remove             take the footprint away: the launchd agent, the
@@ -89,6 +102,7 @@ while [ $# -gt 0 ]; do
         --release-key) RELEASE_KEY="$2"; shift 2 ;;
         --agent-digest) AGENT_DIGEST="$2"; shift 2 ;;
         --agent-sig) AGENT_SIG="$2"; shift 2 ;;
+        --controller-pin) CONTROLLER_PIN="$2"; shift 2 ;;
         --check) CHECK_ONLY=1; shift ;;
         --remove) REMOVE=1; shift ;;
         -h|--help) usage; exit 0 ;;
@@ -106,6 +120,13 @@ if [ -n "$AGENT_SIG" ] && ! [[ "$AGENT_SIG" =~ ^[0-9a-f]{128}$ ]]; then
 fi
 if [ -n "$RELEASE_KEY" ] && ! [[ "$RELEASE_KEY" =~ $RELEASE_KEYS_RE ]]; then
     echo "--release-key takes the release key as 64 hex characters, and its spare after a comma" >&2; exit 1
+fi
+if [ -n "$CONTROLLER_PIN" ]; then
+    case "$CONTROLLER" in https://*) ;; *) echo "--controller-pin is what an https controller is held to, and --controller is ${CONTROLLER:-not given}" >&2; exit 1 ;; esac
+    if [[ "$CONTROLLER_PIN" =~ $CONTROLLER_PIN_RE ]]; then CTL_KEY="$CONTROLLER_PIN"
+    elif [ "$CONTROLLER_PIN" != ca ]; then
+        echo "--controller-pin takes the controller's key as sha256// and 44 base64 characters, as the Nodes page gives it, or ca" >&2; exit 1
+    fi
 fi
 
 say()  { printf '\n== %s\n' "$1"; }
@@ -363,7 +384,7 @@ if [ -n "$avail" ]; then
     else chk warn "only ${avail}G free in $HOME; Xcode alone wants 15"; fi
 fi
 if [ -n "$CONTROLLER" ]; then
-    if curl -fsk --max-time 10 -o /dev/null "${CONTROLLER%/}/" 2>/dev/null; then chk ok "controller ${CONTROLLER} answers"
+    if curl -fsk ${CTL_KEY:+--pinnedpubkey "$CTL_KEY"} --max-time 10 -o /dev/null "${CONTROLLER%/}/" 2>/dev/null; then chk ok "controller ${CONTROLLER} answers"
     else chk warn "${CONTROLLER} does not answer from here, so enrollment will fail until it does"; fi
 fi
 if [ "$FAILED" = 1 ]; then
@@ -384,7 +405,7 @@ NODE_JSON="$FOOT/node.json"
 
 say "the agent, from ${CONTROLLER}"
 hdr="$(mktemp)"
-curl -fsSL -D "$hdr" -H "Authorization: Bearer ${TOKEN}" \
+curl -fsSL ${CTL_KEY:+-k --pinnedpubkey "$CTL_KEY"} -D "$hdr" -H "Authorization: Bearer ${TOKEN}" \
      "${CONTROLLER%/}/api/v1/agent/download" -o "${AGENT}.new" \
     || { warn "could not download the agent from ${CONTROLLER}. Is that the dashboard's address, and is the token unused?"; rm -f "$hdr" "${AGENT}.new"; exit 1; }
 # Held to what the command carries before any of it runs (agent_proved); an
@@ -402,7 +423,7 @@ chmod 755 "${AGENT}.new"; mv -f "${AGENT}.new" "$AGENT"
 say "enrolling as $(id -un)"
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 BUILDERBOT_NODE_JSON="$NODE_JSON" "$AGENT" enroll --controller "$CONTROLLER" --token "$TOKEN" \
-    --user "$(id -un)" ${RELEASE_KEY:+--release-key "$RELEASE_KEY"} \
+    --user "$(id -un)" ${RELEASE_KEY:+--release-key "$RELEASE_KEY"} ${CONTROLLER_PIN:+--pin "$CONTROLLER_PIN"} \
     --store "data=$FOOT/data" --store "toolchains=$TOOLCHAINS" \
     --store "cache=$FOOT/cache" --store "artifacts=$FOOT/artifacts"
 

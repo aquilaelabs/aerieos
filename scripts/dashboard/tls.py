@@ -217,6 +217,66 @@ def key_pin():
     return ""
 
 
+def _presented(host, port, verify, timeout):
+    """The certificate `host:port` answers a handshake with, DER, asked for
+    by name where `host` is one: unchecked, or with `verify` by the
+    system's authorities and the name. None where no handshake is answered."""
+    import ipaddress                                        # noqa: PLC0415
+    ctx = ssl.create_default_context()
+    if not verify:
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+    name = host
+    with contextlib.suppress(ValueError):
+        ipaddress.ip_address(host)
+        name = None
+    if verify and name is None:
+        return None
+    try:
+        with socket.create_connection((host, port), timeout=timeout) as raw, ctx.wrap_socket(raw, server_hostname=name) as c:
+            return c.getpeercert(binary_form=True)
+    except (OSError, ValueError):
+        return None
+
+
+REACH_TIMEOUT = 2.0
+
+
+def node_reach(url):
+    """(address, pin): what an enrollment names the controller as for a
+    node on the LAN or behind WireGuard, where `url` is the address the
+    node is to dial. This controller asks that address for a handshake
+    itself, now: answered under its own key, the enrollment names https at
+    the same host and port with the key's pin (key_pin), whatever scheme
+    `url` had; answered under another certificate that the system's
+    authorities take for the name, an https `url` stays and the pin is the
+    word `ca`; anything else (no handshake there: a proxy in front that
+    speaks only http to this controller, an address this controller cannot
+    reach from where it runs) leaves `url` as it is with no pin, and the
+    node then moves by itself once it is enrolled, where it can."""
+    import urllib.parse                                     # noqa: PLC0415
+    u = urllib.parse.urlsplit(str(url or "").strip())
+    own = key_pin()
+    try:
+        port = u.port or (443 if u.scheme == "https" else 80)
+    except ValueError:
+        return url, ""
+    if u.scheme not in ("http", "https") or not u.hostname or not own:
+        return url, ""
+    der = _presented(u.hostname, port, False, REACH_TIMEOUT)
+    if der is None:
+        return url, ""
+    seen = ""
+    with contextlib.suppress(Exception):                    # noqa: BLE001 (not a certificate: no pin)
+        seen = key_pin_of(ssl.DER_cert_to_PEM_cert(der))
+    if seen == own:
+        host = f"[{u.hostname}]" if ":" in u.hostname else u.hostname
+        return f"https://{host}{'' if port == 443 else f':{port}'}{u.path.rstrip('/')}", own
+    if u.scheme == "https" and _presented(u.hostname, port, True, REACH_TIMEOUT) is not None:
+        return url, "ca"
+    return url, ""
+
+
 def _cert_facts(pem):
     from cryptography import x509                           # noqa: PLC0415
     first = pem.split("-----END CERTIFICATE-----")[0] + "-----END CERTIFICATE-----\n"

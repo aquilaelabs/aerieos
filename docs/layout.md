@@ -203,7 +203,7 @@ scripts/
     packformat.py                the catalog's format number (R234): the number this build reads, what each added, and the sentence an entry past it is refused with; what an entry's downloads are held to (a pin, a declared download, the keys it carries, an installer that keeps the network, what it asks a package manager for and the files a row carries) and the word for it, pinned, installer or open; an image reference with the digest it is pulled by, and a compose file's image lines read and written as text; the pins an index entry carries, its newest and the older ones it keeps for earlier formats, the entry as a build takes it, and the word an entry says of its downloads; unit/packformat/N keeps manifests of each
     catalogmirror.py             the vetted catalog's mirror (R169 step 6): an archive tools/catalog-mirror.py made, imported under Controller settings once its index is the maintainers', answering when the catalog does not and holding each pinned repository as a git bundle
     emulator.py                  everything behind the Emulator page: a node's Android system images
-    enrollscript.py              Enroll node as one script: the answers, the token and a WireGuard tunnel inside the provisioner
+    enrollscript.py              Enroll node as one script: the answers, the token, what the controller's https is held to and a WireGuard tunnel inside the provisioner
     memory.py                    everything behind the memory book: what Claude remembers per project
     rules.py                     house rules: what has been decided about working on a project
     preamble.py                  what every session on a project starts with, assembled once
@@ -288,7 +288,7 @@ scripts/
     hardening.py                 the dashboard's process kept from core files and swap, not dumpable, and wipe() for a key let go (R158 step 6)
     csp.py                       the page's Content-Security-Policy, its inline blocks allowed by hash and its scripts by integrity, and what a browser refused under it, kept for the Doctor (R158 step 4)
     leanpage.py                  the page as it is served, without its comments: a tokenizer for its scripts, stylesheets and page, which keep theirs in the tree (R228 step 15)
-    tls.py                       the dashboard's own TLS: one port serving https and http by the first byte, the install's own certificate or Let's Encrypt's, its key sealed under the install key (R158 step 2)
+    tls.py                       the dashboard's own TLS: one port serving https and http by the first byte, the install's own certificate in every mode (its key kept through each remake, which is what a node pins) and Let's Encrypt's for a name, each key sealed under the install key (R158 step 2, R267 step 15)
     phone.py                     a paired handset on a node: install, push, and the asking
     phonelease.py                a phone lent to a project (R113): the lease, and what its sessions may do on the phone without asking
     db.py                        the controller's store: the SQLite connection, the migrations, ids and the audit trail
