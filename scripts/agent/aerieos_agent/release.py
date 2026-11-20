@@ -23,7 +23,10 @@ names the release keys its own build carries beside every update
 pins them here as that update is installed (first_pin). That is trust on
 first use, of a controller this node already took everything from; an
 update with no signature, or one under another key, pins nothing, and a node
-that has any key is never offered one this way.
+that has any key is never offered one this way. Nor is a node whose console
+dropped the release key (`aerieos-agent release-key none`, kept in node.json
+as release_unpinned): that is a person's choice, and it stands until a
+person pins a key there again.
 
 Ed25519, by the `cryptography` library the nodes are provisioned with
 (tokenseal.py's): nothing here is hand-built, and a node that pinned a key
@@ -116,6 +119,12 @@ def unsigned_ok(state):
     return (state or {}).get("unsigned_ok") is True
 
 
+def unpinned(state):
+    """Whether this node's console chose to pin no release key (release-key
+    none): such a node pins none by itself, whatever its controller names."""
+    return (state or {}).get("release_unpinned") is True
+
+
 def _kind(state, key):
     """What a key trusted here is, in the words a job's log says it by."""
     pins = keys(state)
@@ -203,17 +212,21 @@ def first_pin(state, digest, sig, named):
     """The keys a node that trusts none pins on this update: the ones its
     controller named, the first as the release key and a second as its
     spare, when the update's signature is under one of them. [] otherwise,
-    and always [] for a node that trusts a key already: what a controller
-    names never replaces or joins a key that is here."""
-    if trusted(state):
+    and always [] for a node that trusts a key already (what a controller
+    names never replaces or joins a key that is here) and for one whose
+    console chose to pin none."""
+    if trusted(state) or unpinned(state):
         return []
     cand = named_keys(named)
     return cand if any(not verify(k, digest, sig) for k in cand) else []
 
 
-def _unpinned(digest, sig, named):
-    """What a node with no key says of the update it takes: which named
-    release key signed it, or that nothing was checked and why not."""
+def _no_key(state, digest, sig, named):
+    """What a node with no key says of the update it takes: that its console
+    chose to pin none, or which named release key signed it, or that
+    nothing was checked and why not."""
+    if unpinned(state):
+        return "not checked: this node's console chose to pin no release key"
     cand, why = named_keys(named), ""
     for key in cand:
         said = verify(key, digest, sig)
@@ -229,14 +242,15 @@ def _unpinned(digest, sig, named):
 
 def may_install(state, digest, sig, named=None):
     """(ok, words) for an update of `digest` carrying `sig`: taken with no
-    key trusted here and said as unchecked, or as signed by a release key
+    key trusted here and said as unchecked (for want of a signature, or
+    because the console chose to pin no key), or as signed by a release key
     the controller named with it (`named`, which first_pin then pins);
     taken when the signature is under a key this node trusts (the release
     key, its spare, or one added at its console, said as which), taken
     unsigned only where this node's console said so, refused otherwise.
     `named` is read only by a node that trusts no key."""
     if not trusted(state):
-        return True, _unpinned(digest, sig, named)
+        return True, _no_key(state, digest, sig, named)
     who, why = _signer(state, digest, sig, MESSAGE)
     if who:
         return True, f"signed by {who}"

@@ -1259,7 +1259,8 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
                 log(said)
             else:
                 # A person pinned or added a key at the console while this
-                # was checked: theirs stands, and the update is theirs to judge.
+                # was checked, or chose there to pin none: theirs stands,
+                # and the update is theirs to judge.
                 try:
                     trust = load_state()
                 except SystemExit:

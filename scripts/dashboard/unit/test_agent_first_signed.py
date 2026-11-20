@@ -5,8 +5,11 @@ them, the node installs it and pins them, the first as its release key and
 a second as its spare, and the job says so. An update with no signature, or
 one under another key, is taken as it was and said as unchecked, and pins
 nothing. A node that has any key is unchanged: what a controller names is
-never read there. The pin is written into node.json whole, as the console
-writes it, and one that cannot be written installs nothing."""
+never read there, and neither is a node whose console chose to pin no key
+(release-key none, node.json's release_unpinned): it takes the update, says
+whose choice that was, and pins nothing until a person pins a key there
+again. The pin is written into node.json whole, as the console writes it,
+and one that cannot be written installs nothing."""
 import hashlib
 import json
 import os
@@ -109,7 +112,40 @@ class Decided(Case):
         self.assertFalse(self.release.may_install({"release_key": self.pub}, DIGEST, sig, [theirs])[0])
 
 
+    def test_a_node_whose_console_chose_no_key_pins_none_and_says_whose_choice(self):
+        named = [self.pub, self.spare]
+        chose = {"release_unpinned": True}
+        for sig in (self.sign(self.k), self.sign(self.s), ""):
+            self.assertEqual(self.release.may_install(chose, DIGEST, sig, named),
+                             (True, "not checked: this node's console chose to pin no release key"))
+            self.assertEqual(self.release.first_pin(chose, DIGEST, sig, named), [])
+        self.assertTrue(self.release.unpinned(chose))
+        # Only the console's own word is the choice: a record from before
+        # the field, or one that holds anything else there, pins as built.
+        for state in ({}, {"release_unpinned": False}, {"release_unpinned": "yes"}, {"release_unpinned": 1}, {"unsigned_ok": True}):
+            self.assertFalse(self.release.unpinned(state), state)
+            self.assertEqual(self.release.first_pin(state, DIGEST, self.sign(self.k), named), named, state)
+        # A key trusted here is checked as ever, whatever was chosen before it.
+        _, mine = pair()
+        self.assertFalse(self.release.may_install({"release_unpinned": True, "release_also": [mine]}, DIGEST, self.sign(self.k), named)[0])
+
+
 class Written(Case):
+    def test_the_choice_to_pin_none_is_kept_and_nothing_is_written_over_it(self):
+        chose = dict(RECORD, release_unpinned=True)
+        self.write(chose)
+        self.assertFalse(self.stores.pin_release([self.pub, self.spare]))
+        self.assertEqual(self.read(), chose)
+        # The agent's own saves keep the file's word for it: a copy from
+        # before the choice does not take it away, and one cannot make it.
+        self.assertIn("release_unpinned", self.stores.CONSOLE_KEYS)
+        self.stores.save_state(dict(RECORD, token="bbn_2"))
+        self.assertEqual(self.read(), dict(chose, token="bbn_2"))
+        self.assertEqual(self.stores.console_said(), {"release_unpinned": True})
+        self.write(RECORD)
+        self.stores.save_state(dict(RECORD, token="bbn_3", release_unpinned=True))
+        self.assertEqual(self.read(), dict(RECORD, token="bbn_3"))
+
     def test_the_pin_is_written_into_the_record_as_the_console_writes_it(self):
         self.write(RECORD)
         self.assertTrue(self.stores.pin_release([self.pub, self.spare]))
@@ -238,6 +274,45 @@ class Update(Case):
             self.assertIn("not checked: no release key is pinned here", job.said)
             self.assertNotIn("pinned AerieOS's release key", job.said)
             self.assertEqual(self.read(), RECORD, spec)
+
+    def test_a_signed_update_pins_nothing_where_the_console_chose_no_key(self):
+        chose = dict(RECORD, release_unpinned=True)
+        self.write(chose)
+        for spec in ({"sig": self.sign(self.k, digest(NEW)), "release_keys": [self.pub, self.spare]}, {}):
+            with open(self.me, "wb") as f:
+                f.write(b"OLD")
+            (state, code), job = self.update(**spec)
+            self.assertEqual((state, code, job.installed), ("succeeded", 0, True), job.said)
+            self.assertEqual(self.installed(), NEW)
+            self.assertIn("not checked: this node's console chose to pin no release key", job.said)
+            self.assertNotIn("pinned AerieOS's release key", job.said)
+            self.assertEqual(self.read(), chose)
+        # The hello's names pin nothing there either.
+        with open(self.me, "wb") as f:
+            f.write(b"OLD")
+        (state, code), job = self.update(hello={"sig": self.sign(self.k, digest(NEW)), "release_keys": [self.pub]})
+        self.assertEqual((state, code), ("succeeded", 0), job.said)
+        self.assertEqual(self.read(), chose)
+        # A record from before the choice was kept, the same update: pinned.
+        self.write(RECORD)
+        with open(self.me, "wb") as f:
+            f.write(b"OLD")
+        (state, code), job = self.update(sig=self.sign(self.k, digest(NEW)), release_keys=[self.pub, self.spare])
+        self.assertEqual((state, code), ("succeeded", 0), job.said)
+        self.assertEqual(self.read(), dict(RECORD, release_key=self.pub, release_spare=self.spare))
+
+    def test_a_choice_made_at_the_console_meanwhile_stands(self):
+        mod = self.agent.module("agent")
+
+        def console_says_none(path):
+            self.write(dict(RECORD, release_unpinned=True))
+            return True, "selfcheck ok"
+        with mock.patch.object(mod, "selfcheck", console_says_none):
+            (state, code), job = self.update(sig=self.sign(self.k, digest(NEW)), release_keys=[self.pub])
+        self.assertEqual((state, code), ("succeeded", 0), job.said)
+        self.assertIn("this node's console chose to pin no release key", job.said)
+        self.assertNotIn("pinned AerieOS's release key", job.said)
+        self.assertEqual(self.read(), dict(RECORD, release_unpinned=True))
 
     def test_a_pinned_node_is_unchanged_by_the_keys_a_controller_names(self):
         t, theirs = pair()

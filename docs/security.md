@@ -338,7 +338,12 @@ use, of a controller the node already took everything from, and it closes
 the door behind a release rather than waiting for a person to run the
 Enroll script again. An update with no signature, or one under another
 key, is taken as before and pins nothing; a node that has any key, the
-release's or one added at its console, is never offered one this way.
+release's or one added at its console, is never offered one this way. Nor
+is a node where a person dropped the release key (`sudo aerieos-agent
+release-key none`): that choice is kept as the console's word, the node
+takes what its controller sends and its updates' jobs say it was the
+console's choice, and it pins no key by itself until a person pins one
+there again (`release-key HEX`, or the Enroll script).
 
 `aerieos-agent check-update FILE [SIG]` is the same rule, for whatever
 replaces an agent from outside it (a provisioner run on a machine that has

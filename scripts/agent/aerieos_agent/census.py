@@ -406,11 +406,13 @@ def census(state):
         "sandbox": os.access(SANDBOX_BIN, os.X_OK),
         # Whose agent updates this node takes (release.py): the release key
         # it pinned, shortened, the keys added at its console the same way,
-        # and whether its console allows unsigned ones.
+        # whether its console allows unsigned ones, and whether it chose
+        # to pin no release key.
         "release_key": str(console_said().get("release_key") or "")[:16],
         "release_spare": str(console_said().get("release_spare") or "")[:16],
         "release_also": [k[:16] for k in release.also(console_said())],
         "unsigned_ok": console_said().get("unsigned_ok") is True,
+        "release_unpinned": console_said().get("release_unpinned") is True,
         # ...and whether its console switched root commands off (R227 step 2).
         "root_off": console_said().get("root_off") is True,
         # ...and whether this agent may install the machine's own packages

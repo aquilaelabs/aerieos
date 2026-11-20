@@ -56,6 +56,7 @@ Runs anywhere Python 3.8+ is, with nothing installed:
                             [--pin sha256:…]
     aerieos-agent follow URL EXPECT   # after a controller moved while this node was off
     aerieos-agent release-key [HEX[,HEX]]   # show or pin AerieOS's release key and its spare (release.py)
+    aerieos-agent release-key none          # pin no release key, and have this node pin none by itself
     aerieos-agent release-key add|drop HEX  # trust, or stop trusting, the key a build of your own is signed with
     aerieos-agent unsigned on|off     # take an agent no release signed, or not
     aerieos-agent check-update FILE [SIG]   # would this node take FILE as its agent: exit 0, or 77 refused
@@ -79,4 +80,4 @@ Runs anywhere Python 3.8+ is, with nothing installed:
 # that "which of these two is newer" always has an answer. A reset would put
 # the same number on two different agents, and a number that cannot say which
 # is newer is the reason the flat protocol number this replaced was useless.
-AGENT_VERSION = "0.9.470"
+AGENT_VERSION = "0.9.471"

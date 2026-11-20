@@ -114,6 +114,7 @@ def cmd_enroll(args):
     pins = release.clean_keys(opts["--release-key"]) or release.keys(was)
     unsigned = release.unsigned_ok(was)
     added = release.also(was)
+    unpinned = release.unpinned(was)
     root_off = was.get("root_off") is True
     # The account sessions run as (roadmap #24), when this agent runs as
     # root. Recorded even when empty, so `status` shows the decision.
@@ -145,6 +146,7 @@ def cmd_enroll(args):
     state.pop("release_key", None)
     state.pop("release_spare", None)
     state.pop("release_also", None)
+    state.pop("release_unpinned", None)
     state.pop("unsigned_ok", None)
     state.pop("root_off", None)
     if root_off:
@@ -161,6 +163,10 @@ def cmd_enroll(args):
             state["release_spare"] = pins[1]
         print(f"pinned AerieOS's release key {pins[0][:16]}…" + (f" and its spare {pins[1][:16]}…" if len(pins) > 1 else "")
               + ": this node takes only agent updates signed by " + ("one of them" if len(pins) > 1 else "it"))
+    elif unpinned:
+        # A person chose here to pin no key (release-key none): a script
+        # that names none leaves that standing, as it leaves a pin.
+        state["release_unpinned"] = True
     if unsigned:
         state["unsigned_ok"] = True
     save_state(state, console=True)
@@ -268,16 +274,20 @@ def _at_console(what):
 
 def cmd_release_key(args):
     """release-key [HEX[,HEX]|none]: show, pin or drop AerieOS's release
-    key here, with its spare after a comma. release-key add HEX and
+    key here, with its spare after a comma. Dropping it is a choice this
+    machine keeps (release_unpinned): it pins no key by itself afterwards,
+    until one is pinned here again. release-key add HEX and
     release-key drop HEX: trust, or stop trusting, one more key beside
     them, the one a controller somebody built themselves is signed with."""
     from . import release
     state = load_state()
     if not args:
         key, spare, added = release.pinned(state), release.spare(state), release.also(state)
-        print(f"release key: {key}" if key else "release key: none pinned"
-              + ("" if added else "; agent updates are taken on the controller's word, and the first one signed by a "
-                 "release key it names pins that key"))
+        chose = ", by this console's choice" if release.unpinned(state) else ""
+        print(f"release key: {key}" if key else f"release key: none pinned{chose}"
+              + ("" if added else "; agent updates are taken on the controller's word, "
+                 + ("checked against nothing, and this node pins no key by itself" if chose else
+                    "and the first one signed by a release key it names pins that key")))
         if spare:
             print(f"spare key:   {spare}")
         for k in added:
@@ -292,12 +302,15 @@ def cmd_release_key(args):
     if args[0] == "none":
         state.pop("release_key", None)
         state.pop("release_spare", None)
+        # A person's choice, kept: the first signed update pins no key on
+        # a node that was told to have none (release.first_pin).
+        state["release_unpinned"] = True
         save_state(state, console=True)
         added = release.also(state)
-        print("no release key pinned: agent updates are taken on the controller's word again, until the first one "
-              "signed by a release key it names, which pins that key" if not added else
-              "no release key pinned: this node still takes only agent updates signed by "
-              + ("the key" if len(added) == 1 else f"one of the {len(added)} keys") + " added here")
+        print(("no release key pinned: this node takes what its controller sends, checked against nothing" if not added else
+               "no release key pinned: this node still takes only agent updates signed by "
+               + ("the key" if len(added) == 1 else f"one of the {len(added)} keys") + " added here")
+              + ", and will not pin a release key by itself until one is pinned here again")
         return
     pins = release.clean_keys(",".join(args))
     if not pins:
@@ -305,6 +318,7 @@ def cmd_release_key(args):
                          "and its spare after a comma")
     state["release_key"] = pins[0]
     state.pop("release_spare", None)
+    state.pop("release_unpinned", None)
     if len(pins) > 1:
         state["release_spare"] = pins[1]
     save_state(state, console=True)

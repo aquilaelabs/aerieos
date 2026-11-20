@@ -2163,13 +2163,15 @@ def _c_release(c, out):
     # Whose agent updates it takes (the agent's release.py): the release key
     # it pinned, shortened, the keys added at its console beside it (four at
     # most, shortened the same way; the row counts them, so what is not a
-    # key's hex is left out) and whether its console allows unsigned builds.
+    # key's hex is left out), whether its console allows unsigned builds,
+    # and whether a person there chose to pin no release key.
     out["release_key"] = re.sub(r"[^0-9a-f]", "", str(c.get("release_key") or ""))[:16]
     out["release_spare"] = re.sub(r"[^0-9a-f]", "", str(c.get("release_spare") or ""))[:16]
     also = c.get("release_also")
     out["release_also"] = [x[:16] for x in (also if isinstance(also, list) else [])
                            if isinstance(x, str) and re.fullmatch(r"[0-9a-f]{16,64}", x)][:4]
     out["unsigned_ok"] = c.get("unsigned_ok") is True
+    out["release_unpinned"] = c.get("release_unpinned") is True
 
 
 def _c_root_off(c, out):
@@ -2530,7 +2532,7 @@ CENSUS = (
     (("vm_host",), _c_vm_host),
     (("vm_isos",), _c_vm_isos),
     (("sandbox",), _c_sandbox),
-    (("release_key", "release_spare", "release_also", "unsigned_ok"), _c_release),
+    (("release_key", "release_spare", "release_also", "unsigned_ok", "release_unpinned"), _c_release),
     (("root_off",), _c_root_off),
     (("gpu_card", "gpu_display", "gpu_amd"), _c_gpu),
     (("gpu_driver", "gpu_card"), _c_gpu_driver),

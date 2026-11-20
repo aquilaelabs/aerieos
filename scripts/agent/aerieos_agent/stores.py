@@ -445,13 +445,13 @@ def load_state():
 
 
 # What this machine's console alone decides: the release key pinned here,
-# the keys added beside it and whether an unsigned agent is taken
-# (release.py), and whether a root
+# the keys added beside it, whether an unsigned agent is taken and whether
+# a person chose to pin no key (release.py), and whether a root
 # command the controller sends is run at all (root_off, R227 step 2). A running agent holds
 # node.json in memory and writes it whole at every token it is handed, so
 # what the console wrote is read back from the file and kept, never the
 # agent's older copy of it.
-CONSOLE_KEYS = ("release_key", "release_spare", "release_also", "unsigned_ok", "root_off")
+CONSOLE_KEYS = ("release_key", "release_spare", "release_also", "release_unpinned", "unsigned_ok", "root_off")
 
 
 def console_said():
@@ -503,9 +503,10 @@ def pin_release(keys):
     node.json as the console's own save would write them, under the same
     lock and through the same whole-file write. The record is read here,
     under the lock, and not taken from the agent's copy: a key a person
-    pinned or added at the console in the meantime stands, and nothing is
-    written. Whether these were pinned; an error where the record could not
-    be read or written, which leaves it as it was."""
+    pinned or added at the console in the meantime stands, as does their
+    choice to pin none (release-key none), and nothing is written. Whether
+    these were pinned; an error where the record could not be read or
+    written, which leaves it as it was."""
     keys = release.clean_keys(",".join(keys))
     d = os.path.dirname(NODE_JSON)
     with _save_lock, open(os.path.join(d, ".node.json.lock"), "a") as held:
@@ -514,7 +515,7 @@ def pin_release(keys):
             cur = json.load(f)
         if not isinstance(cur, dict):
             raise ValueError(f"{NODE_JSON} does not hold a node's record")
-        if not keys or release.trusted(cur):
+        if not keys or release.trusted(cur) or release.unpinned(cur):
             return False
         cur["release_key"] = keys[0]
         cur.pop("release_spare", None)

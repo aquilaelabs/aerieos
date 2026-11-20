@@ -177,13 +177,62 @@ class Console(Case):
         self.console("release-key", f"{self.pub},{self.spare}")
         self.assertEqual(self.read()["release_also"], [self.mine])
         self.assertIn("still takes only agent updates signed by the key added here", self.console("release-key", "none"))
-        self.assertEqual(self.read(), {"node_id": "n_1", "token": "bbn_1", "release_also": [self.mine]})
-        self.assertIn("release key: none pinned\n", self.console("release-key"))
+        self.assertEqual(self.read(), {"node_id": "n_1", "token": "bbn_1", "release_also": [self.mine], "release_unpinned": True})
+        self.assertIn("release key: none pinned, by this console's choice\n", self.console("release-key"))
         self.assertIn("unsigned builds: refused", self.console("release-key"))
         said = self.console("release-key", "drop", self.mine)
         self.assertIn(f"dropped {self.mine[:16]}…", said)
-        self.assertEqual(self.read(), {"node_id": "n_1", "token": "bbn_1"})
+        self.assertEqual(self.read(), {"node_id": "n_1", "token": "bbn_1", "release_unpinned": True})
         self.assertIn("taken on the controller's word", self.console("release-key"))
+
+    def test_dropping_the_release_key_is_a_choice_kept_until_one_is_pinned_again(self):
+        self.write({"node_id": "n_1", "token": "bbn_1", "release_key": self.pub, "release_spare": self.spare})
+        said = self.console("release-key", "none")
+        self.assertIn("takes what its controller sends, checked against nothing", said)
+        self.assertIn("will not pin a release key by itself until one is pinned here again", said)
+        self.assertEqual(self.read(), {"node_id": "n_1", "token": "bbn_1", "release_unpinned": True})
+        shown = self.console("release-key")
+        self.assertIn("release key: none pinned, by this console's choice", shown)
+        self.assertIn("this node pins no key by itself", shown)
+        self.assertNotIn("pins that key", shown)
+        # Adding a builder's key leaves the choice as it is: the node trusts a key again all the same.
+        self.console("release-key", "add", self.mine)
+        self.assertEqual(self.read(), {"node_id": "n_1", "token": "bbn_1", "release_unpinned": True, "release_also": [self.mine]})
+        self.console("release-key", "drop", self.mine)
+        # Pinning one again at the console ends it.
+        self.console("release-key", f"{self.pub},{self.spare}")
+        self.assertEqual(self.read(), {"node_id": "n_1", "token": "bbn_1", "release_key": self.pub, "release_spare": self.spare})
+        # A node that never chose says what will pin one.
+        self.write({"node_id": "n_1", "token": "bbn_1"})
+        self.assertIn("the first one signed by a release key it names pins that key", self.console("release-key"))
+
+    def test_an_enrollment_keeps_the_choice_unless_it_names_a_key(self):
+        cli = self.cli
+
+        class Ctl:
+            CA = "ca"
+
+            def __init__(self, url, token, pin):
+                self.url, self.host, self.scheme = url, "h", "http"
+
+            def call(self, verb, body, timeout=30):
+                return 200, {"node_id": "n_1", "token": "bbn_x", "name": "box", "capabilities": []}
+
+        def enroll(*more):
+            with mock.patch.object(cli, "Controller", Ctl), mock.patch.object(cli, "census", lambda state: {}), \
+                    mock.patch.object(cli, "make_store", lambda p: {}), mock.patch.object(cli, "store_path_ok", lambda p: ""), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                cli.cmd_enroll(["--controller", "http://c", "--token", "bbe_t", *more])
+            return self.read()
+        self.write({"node_id": "n_1", "token": "bbn_old", "stores": {}, "release_unpinned": True})
+        got = enroll()
+        self.assertEqual((got["token"], got.get("release_unpinned"), got.get("release_key")), ("bbn_x", True, None))
+        got = enroll("--release-key", f"{self.pub},{self.spare}")
+        self.assertEqual((got.get("release_key"), got.get("release_spare")), (self.pub, self.spare))
+        self.assertNotIn("release_unpinned", got)
+        # A record from before the choice was kept gains none by enrolling.
+        self.write({"node_id": "n_1", "token": "bbn_old", "stores": {}})
+        self.assertNotIn("release_unpinned", enroll())
 
     def test_a_fifth_key_a_malformed_one_and_one_not_there_are_refused(self):
         four = [pair()[1] for _ in range(4)]
@@ -267,6 +316,12 @@ class NotTheControllers(Case):
             self.assertEqual(out["release_also"], [], junk)
         nodes._c_release({"release_also": [pair()[1] for _ in range(9)]}, out)
         self.assertEqual(len(out["release_also"]), 4)
+        # ...and the console's choice to pin no key, as it keeps unsigned_ok: its own word only.
+        self.assertFalse(out["release_unpinned"])
+        for said, kept in ((True, True), (1, False), ("yes", False), (None, False)):
+            nodes._c_release({"release_unpinned": said}, out)
+            self.assertIs(out["release_unpinned"], kept, said)
+        self.assertIn("release_unpinned", next(keys for keys, fn in nodes.CENSUS if fn is nodes._c_release))
         self.assertIn("release_also", next(keys for keys, fn in nodes.CENSUS if fn is nodes._c_release))
 
 
@@ -278,6 +333,7 @@ class FromBefore(Case):
         state = self.stores.load_state()
         self.assertEqual(state, before)
         self.assertEqual(self.release.also(state), [])
+        self.assertFalse(self.release.unpinned(state))
         self.assertEqual(self.release.trusted(state), self.release.keys(state))
         self.assertEqual(self.release.may_install(state, DIGEST, self.sign(self.k)),
                          (True, f"signed by the release key this node pinned ({self.pub[:16]}…)"))

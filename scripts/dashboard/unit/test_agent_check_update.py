@@ -113,6 +113,11 @@ class CheckUpdate(unittest.TestCase):
         with open(self.nj) as f:
             self.assertEqual(json.load(f), RECORD)
 
+    def test_a_node_whose_console_chose_no_key_takes_it_and_says_whose_choice(self):
+        self.write(dict(RECORD, release_unpinned=True))
+        for args in ((self.new,), (self.new, self.sign(self.k))):
+            self.assertEqual(self.check(*args), (0, "not checked: this node's console chose to pin no release key"))
+
     def test_a_machine_with_no_record_has_pinned_nothing(self):
         code, said = self.check(self.new, self.sign(self.k))
         self.assertEqual(code, 0)
