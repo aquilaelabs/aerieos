@@ -13152,7 +13152,10 @@ class Handler(BaseHTTPRequestHandler):
         if self.path.split("?")[0].rstrip("/") == "/api/catalog/search":
             idx = catalogindex.index(settings.get("catalog_url") or None)
             words = [w for w in str((q.get("q") or [""])[0]).lower().split() if w][:8]
-            have = set(toolpacks.packs())
+            # Added here is said of a pack kept here, never of a toolchain
+            # AerieOS ships, which is no pack to add whatever is kept under
+            # its name.
+            have = set(toolpacks.packs()) - toolchains.shipped_names()
             rows = [{"name": e["name"], "kind": e.get("kind", "pack"), "tier": e.get("tier"), "about": e.get("about", ""),
                      "platforms": e.get("platforms") or [], "added": e["name"] in have}
                     for e in ((idx.get("index") or {}).get("packs") or [])

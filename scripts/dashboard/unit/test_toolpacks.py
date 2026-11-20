@@ -180,6 +180,41 @@ class Repository(unittest.TestCase):
         self.assertIn(OFFICIAL_REFUSED, toolpacks.add(self.url, commit, "operator", path="packs/hexkit").get("error", ""))
         self.assertEqual(toolpacks.packs(), {})
 
+    def test_no_add_keeps_a_pack_under_a_name_aerieos_ships(self):
+        # A toolchain AerieOS ships is no pack to add, by whichever way it
+        # comes: a record kept under a shipped name read as the toolchain
+        # added here, and could not be removed while a node's store held the
+        # toolchain. The catalog lists every shipped toolchain as a pack at
+        # tier official too, so its Install and a session's ask allowed are
+        # two of the ways, the manifest saying the tier of itself or not.
+        import hashlib
+        refused = "hexkit is a toolchain AerieOS ships; a pack takes a name of its own"
+        shipped = ("hexkit",)
+
+        def sha(*path):
+            tar = subprocess.run(["git", "archive", "--format=tar", "HEAD", *path], cwd=self.repo, capture_output=True, check=True).stdout
+            return hashlib.sha256(tar).hexdigest()
+        for claim in (GOOD, dict(GOOD, tier="official")):
+            commit = self.commit(claim, f"Take my name, {claim.get('tier', 'as a pack')}.")
+            self.assertIn(refused, toolpacks.fetch(self.url, commit, shipped).get("error", ""))
+            self.assertIn(refused, toolpacks.add(self.url, commit, "operator", shipped).get("error", ""))
+            for tier in ("vetted", "official"):
+                got = toolpacks.add(self.url, commit, "session:alpha (allowed by ann)", shipped, sha256=sha(), tier=tier, may_root=True)
+                self.assertIn(refused, got.get("error", ""), (claim.get("tier"), tier))
+        # In a folder of a repository, as the catalog keeps its own packs.
+        folder = os.path.join(self.repo, "packs", "hexkit")
+        os.makedirs(folder)
+        for name in ("bbtool.json", "GUIDE.md"):
+            os.rename(os.path.join(self.repo, name), os.path.join(folder, name))
+        git("add", "-A", cwd=self.repo)
+        git("commit", "-q", "-m", "a folder", cwd=self.repo)
+        commit = subprocess.run(["git", "rev-parse", "HEAD"], cwd=self.repo, capture_output=True, text=True, check=True).stdout.strip()
+        got = toolpacks.add(self.url, commit, "operator", shipped, sha256=sha("packs/hexkit"), tier="official", path="packs/hexkit")
+        self.assertIn(refused, got.get("error", ""))
+        self.assertEqual(toolpacks.packs(), {})
+        # Refused at the look, before anything of it is staged or kept.
+        self.assertFalse(os.path.exists(os.path.join(self.tmp.name, "toolpacks")))
+
     def test_a_pack_in_a_folder_of_the_repository(self):
         # R170 step 6: a pack kept in a folder (the catalog's own packs/):
         # fetched with its path, the sha256 over that folder's archive, and
@@ -344,6 +379,23 @@ class MadeHere(unittest.TestCase):
 
     def paste(self, manifest):
         return toolpacks.stage(json.dumps(manifest))
+
+    def test_no_pasted_or_uploaded_pack_takes_a_name_aerieos_ships(self):
+        # The other ways a pack is kept (pasted, uploaded, and the add of
+        # what was staged) refuse a shipped toolchain's name as the add by
+        # address does: no path keeps a pack beside the toolchain it names.
+        refused = "hexkit is a toolchain AerieOS ships; a pack takes a name of its own"
+        m = json.loads(json.dumps(GOOD))
+        m.pop("guidance")
+        self.assertIn(refused, toolpacks.stage(json.dumps(m), shipped=("hexkit",)).get("error", ""))
+        self.uploads["e" * 16] = {"bbtool.json": json.dumps(GOOD), "GUIDE.md": "Read me first.", "bin/hexkit": "#!/bin/sh\n"}
+        self.assertIn(refused, toolpacks.stage(archive="e" * 16, shipped=("hexkit",)).get("error", ""))
+        # Add reads the staged files against the shipped names again, so
+        # one looked at before the name was a shipped one is still held.
+        seen = self.paste(m)
+        self.assertIn(refused, toolpacks.add_staged(seen["staged"], "operator", ("hexkit",)).get("error", ""))
+        self.assertEqual(toolpacks.packs(), {})
+        self.assertEqual(os.listdir(os.path.join(self.tmp.name, "toolpacks", "staging")), [], "nothing refused is left staged")
 
     def test_a_pasted_manifest_is_kept_as_a_commit_made_here(self):
         m = json.loads(json.dumps(GOOD))
