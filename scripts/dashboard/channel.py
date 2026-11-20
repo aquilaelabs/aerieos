@@ -11,6 +11,7 @@ answer) and calls one function here, which says what the verb means. Each
 answers (payload, status), a file as {path or body, ctype, headers}.
 """
 import base64
+import functools
 import re
 
 import adoptapps
@@ -53,73 +54,92 @@ def _answer(r):
     return r, (400 if r.get("error") else 200)
 
 
-def _node_only(auth):
-    """The refusal for a verb only a node's token may use, or None."""
-    if auth.get("error") or auth.get("kind") != "node":
-        return {"error": auth.get("error") or "a node's token"}, 401
-    return None
+def node_only(verb):
+    """A verb only a node's own token may use. Whoever else asks (with no
+    token, one nobody issued, a retired node's, an enrollment token) is
+    answered here, before the verb reads anything of the request."""
+    @functools.wraps(verb)
+    def asked(auth, *args, **kw):
+        if auth.get("error") or auth.get("kind") != "node":
+            return {"error": auth.get("error") or "a node's token"}, 401
+        return verb(auth, *args, **kw)
+    return asked
+
+
+def _file(path, ctype="application/octet-stream"):
+    """A file's answer: where it is and its type, with no header of its own."""
+    return {"path": path, "ctype": ctype, "headers": {}}, 200
 
 
 # ---- the verbs that serve or take a FILE, on any method ---------------------------
 
+@node_only
+def _source(auth, q):
+    """A job's workspace snapshot, by digest (docs/nodes.md §6). The digest
+    is the file name, so nothing else is reachable here."""
+    path = workspace.path_for(q.get("digest", [""])[0])
+    if path is None:
+        return {"error": "no such snapshot: the tree has "
+                         "moved on; queue the job again"}, 404
+    return _file(path, "application/x-tar")
+
+
+@node_only
+def _job_file(auth, q):
+    """A job input from the project's dist/, such as the APK an emulator job
+    installs (docs/nodes.md phase 9). Only the job's own node, only while it
+    runs, only dist/."""
+    j = nodes.job(q.get("job", [""])[0], with_log=False)
+    if not j or j["node"] != auth["node"] or j["state"] not in nodes.JOB_ACTIVE:
+        return {"error": "not this node's running job"}, 403
+    if j.get("type") == "sign-key":
+        # A release's unsigned APK, handed to the sign-key job signing
+        # it (R106) from the controller's own fetch, never dist/.
+        path = signing.handover_file((j.get("spec") or {}).get("handover"), j["id"])
+        if path is None:
+            return {"error": "this job was handed no file"}, 404
+        return _file(path)
+    path = workspace.file_path(j.get("project") or "", q.get("path", [""])[0])
+    if path is None:
+        return {"error": "no such file in the space's dist/"}, 404
+    return _file(path)
+
+
+@node_only
+def _iso(auth, q):
+    """An installer's ISO uploaded on the VMs page (R99), for the node whose
+    running vm job was queued to fetch it, and nobody else."""
+    j = nodes.job(q.get("job", [""])[0], with_log=False)
+    up = str(q.get("upload", [""])[0])
+    if not j or j["node"] != auth["node"] or j["state"] not in nodes.JOB_ACTIVE \
+            or ((j.get("spec") or {}).get("iso") or {}).get("upload") != up:
+        return {"error": "not this node's running ISO job"}, 403
+    path = vms.upload_path(up)
+    if path is None:
+        return {"error": "no such upload"}, 404
+    return _file(str(path))
+
+
+@node_only
+def _bundle(auth, q):
+    """bb, its library and the catalog, for a node installing a toolchain
+    into its own store (docs/nodes.md §6)."""
+    b = workspace.bundle()
+    return {"body": b["body"], "ctype": "application/x-tar",
+            "headers": {"X-Bundle-Digest": b["digest"]}}, 200
+
+
 def fetch(verb, auth, q, authed):
-    """A file the agent fetches: a job's workspace snapshot (source), a job
-    input from the project's dist/ (file), or the agent, the bb bundle or a
-    provisioner (download). `authed()` is whether the request also carries
-    the operator's own login."""
-    if verb == "source":
-        # A job's workspace snapshot, by digest (docs/nodes.md §6). The
-        # digest is the file name, so nothing else is reachable here.
-        if (no := _node_only(auth)):
-            return no
-        path = workspace.path_for(q.get("digest", [""])[0])
-        if path is None:
-            return {"error": "no such snapshot: the tree has "
-                             "moved on; queue the job again"}, 404
-        return {"path": path, "ctype": "application/x-tar", "headers": {}}, 200
-    if verb == "file":
-        # A job input from the project's dist/, such as the APK an emulator
-        # job installs (docs/nodes.md phase 9). Only the job's own node,
-        # only while it runs, only dist/.
-        if (no := _node_only(auth)):
-            return no
-        j = nodes.job(q.get("job", [""])[0], with_log=False)
-        if not j or j["node"] != auth["node"] or j["state"] not in nodes.JOB_ACTIVE:
-            return {"error": "not this node's running job"}, 403
-        if j.get("type") == "sign-key":
-            # A release's unsigned APK, handed to the sign-key job signing
-            # it (R106) from the controller's own fetch, never dist/.
-            path = signing.handover_file((j.get("spec") or {}).get("handover"), j["id"])
-            if path is None:
-                return {"error": "this job was handed no file"}, 404
-            return {"path": path, "ctype": "application/octet-stream", "headers": {}}, 200
-        path = workspace.file_path(j.get("project") or "", q.get("path", [""])[0])
-        if path is None:
-            return {"error": "no such file in the space's dist/"}, 404
-        return {"path": path, "ctype": "application/octet-stream", "headers": {}}, 200
-    if verb == "iso":
-        # An installer's ISO uploaded on the VMs page (R99), for the node
-        # whose running vm job was queued to fetch it, and nobody else.
-        if (no := _node_only(auth)):
-            return no
-        j = nodes.job(q.get("job", [""])[0], with_log=False)
-        up = str(q.get("upload", [""])[0])
-        if not j or j["node"] != auth["node"] or j["state"] not in nodes.JOB_ACTIVE \
-                or ((j.get("spec") or {}).get("iso") or {}).get("upload") != up:
-            return {"error": "not this node's running ISO job"}, 403
-        path = vms.upload_path(up)
-        if path is None:
-            return {"error": "no such upload"}, 404
-        return {"path": str(path), "ctype": "application/octet-stream", "headers": {}}, 200
+    """A file the agent fetches: one of FILES by its verb (a job's workspace
+    snapshot, a job input from the project's dist/, an ISO, a synced copy's
+    files), or the agent, the bb bundle or a provisioner (download).
+    `authed()` is whether the request also carries the operator's own
+    login."""
+    if verb in FILES:
+        return FILES[verb](auth, q)
     what = q.get("what", [""])[0]
     if what == "bundle":
-        # bb, its library and the catalog, for a node installing a
-        # toolchain into its own store (docs/nodes.md §6).
-        if (no := _node_only(auth)):
-            return no
-        b = workspace.bundle()
-        return {"body": b["body"], "ctype": "application/x-tar",
-                "headers": {"X-Bundle-Digest": b["digest"]}}, 200
+        return _bundle(auth, q)
     # The file itself. Any token gets it: the provisioner fetches
     # it with the enroll token before there is a node, and so does
     # the operator's own login, for reading it in a browser.
@@ -155,24 +175,22 @@ def _sign_key_job(auth, jid):
     return j if ok else None
 
 
+@node_only
 def signing_put(auth, q, stream, length):
     """The APK a sign-key job signed, raw in the body, for the caller
     waiting on it (signing.put_signed): only the job's own node, while it
     runs, and never into a project."""
-    if (no := _node_only(auth)):
-        return no
     j = _sign_key_job(auth, q.get("job", [""])[0])
     if not j:
         return {"error": "not this node's running sign-key job"}, 403
     return signing.put_signed((j.get("spec") or {}).get("handover"), j["id"], stream, length)
 
 
+@node_only
 def artifact(auth, q, stream, length):
     """A file a job produced, raw in the body: into the project's dist/ with
     its provenance beside it. Only the job's own node, only while the job
     runs; a result already posted closes it."""
-    if (no := _node_only(auth)):
-        return no
     j = nodes.job(q.get("job", [""])[0], with_log=False)
     if not j or j["node"] != auth["node"]:
         return {"error": "not this node's job"}, 403
@@ -206,30 +224,27 @@ def artifact(auth, q, stream, length):
 
 # ---- a node's projects as a synced copy (R162, wssync.py) -------------------------
 
+@node_only
 def sync_file(auth, q):
     """One file of a synced project, for the node's copy."""
-    if (no := _node_only(auth)):
-        return no
     path, no = wssync.file_path(auth["node"], q.get("project", [""])[0], q.get("path", [""])[0])
     if no:
         return no
-    return {"path": path, "ctype": "application/octet-stream", "headers": {}}, 200
+    return _file(path)
 
 
+@node_only
 def sync_tar(auth, q):
     """A synced project whole, as a tar stream, for a node's first copy."""
-    if (no := _node_only(auth)):
-        return no
     write, no = wssync.tar_writer(auth["node"], q.get("project", [""])[0])
     if no:
         return no
     return {"stream": write, "ctype": "application/x-tar", "headers": {}}, 200
 
 
+@node_only
 def sync_put(auth, q, stream, length):
     """One file the node changed, raw in the body."""
-    if (no := _node_only(auth)):
-        return no
     return wssync.put(auth["node"], q.get("project", [""])[0], q, stream, length)
 
 
@@ -237,20 +252,18 @@ def sync_put(auth, q, stream, length):
 moved_answer = lambda nid: {"answer": ""}  # noqa: E731
 
 
+@node_only
 def scan_put(auth, q, stream, length):
     """One SARIF from a node's scan run (R145), raw in the body, kept as that
     node's for the scanner named."""
-    if (no := _node_only(auth)):
-        return no
     return scanners.take_report(auth["node"], q.get("scanner", [""])[0], stream, length, q.get("projects", [""])[0][:4000])
 
 
+@node_only
 def oldapps_put(auth, q, stream, length):
     """The old system's containers' settings, from the read that found them
     on the controller's own machine (adoptapps.py writes their compose
     files): only that machine's running read-apps job, while it runs."""
-    if (no := _node_only(auth)):
-        return no
     j = nodes.job(q.get("job", [""])[0], with_log=False)
     if not j or j["node"] != auth["node"] or j["state"] not in nodes.JOB_ACTIVE:
         return {"error": "not this node's running job"}, 403
@@ -263,61 +276,68 @@ def oldapps_put(auth, q, stream, length):
 
 # ---- a synced node's Claude conversations (B613, claudesync.py) -----------------
 
+@node_only
 def claude_file(auth, q):
     """One of an account's transcript files, for a synced node's copy."""
-    if (no := _node_only(auth)):
-        return no
     path, no = claudesync.file_path(auth["node"], q.get("uid", [""])[0], q.get("path", [""])[0])
     if no:
         return no
-    return {"path": path, "ctype": "application/octet-stream", "headers": {}}, 200
+    return _file(path)
 
 
+@node_only
 def claude_put(auth, q, stream, length):
     """One transcript file the node wrote: whole, its new tail, or gone."""
-    if (no := _node_only(auth)):
-        return no
     return claudesync.put(auth["node"], q, stream, length)
 
 
 # ---- an image shipped between two nodes (R166, devactions.py) -------------------
 
+@node_only
 def devimage_put(auth, q, stream, length):
     """The build node's saved image, raw in the body, for its shipping job."""
-    if (no := _node_only(auth)):
-        return no
     import devactions
     return devactions.image_put(auth["node"], q, stream, length)
 
 
+@node_only
 def devdata_put(auth, q, stream, length):
     """A copied or moved instance's packed data, from its old node's job."""
-    if (no := _node_only(auth)):
-        return no
     import relocate
     return relocate.data_put(auth["node"], q, stream, length)
 
 
+@node_only
 def devdata_file(auth, q):
     """That data, for the new node's unpacking job."""
-    if (no := _node_only(auth)):
-        return no
     import relocate
     path, no = relocate.data_path(auth["node"], q)
     if no:
         return no
-    return {"path": path, "ctype": "application/x-tar", "headers": {}}, 200
+    return _file(path, "application/x-tar")
 
 
+@node_only
 def devimage_file(auth, q):
     """That image, for the instance node's loading job."""
-    if (no := _node_only(auth)):
-        return no
     import devactions
     path, no = devactions.image_path(auth["node"], q)
     if no:
         return no
-    return {"path": path, "ctype": "application/x-tar", "headers": {}}, 200
+    return _file(path, "application/x-tar")
+
+
+# The agent's verbs that answer a file and the ones that take one raw in the
+# body, each by the last part of its path under /api/v1/agent/: the server
+# sends what a FILES verb answers (fetch) and hands a PUTS verb the body's
+# stream and length. download is fetch's own and in neither: the agent and
+# the provisioners are the files a machine not enrolled yet may have.
+FILES = {"source": _source, "file": _job_file, "iso": _iso,
+         "sync-file": sync_file, "sync-tar": sync_tar, "claude-file": claude_file,
+         "devimage": devimage_file, "devdata": devdata_file}
+PUTS = {"artifact": artifact, "sync-put": sync_put, "claude-put": claude_put,
+        "devimage-put": devimage_put, "devdata-put": devdata_put, "signing-put": signing_put,
+        "scan-put": scan_put, "oldapps-put": oldapps_put}
 
 
 def _sync(nid, req):

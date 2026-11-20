@@ -10709,36 +10709,16 @@ class Handler(BaseHTTPRequestHandler):
                 self.connection.settimeout(120)
                 if verb == "hello" and not nodes.host_hello_allowed(auth["node"], time.monotonic()):
                     return self._json({"error": "too many hellos: one in a while is enough"}, 429)
-        # The verbs that serve or take a FILE, on any method.
-        if verb in ("source", "file", "download", "iso"):
+        # The verbs that serve or take a FILE, on any method: channel.py's
+        # FILES and PUTS, and download, which is in neither table because a
+        # machine not enrolled yet may have the agent and its provisioner.
+        if verb in channel.FILES or verb == "download":
             got, status = channel.fetch(verb, auth, q, authed=self._authed)
             if status != 200:
                 return self._json(got, status)
             return self._send_file(got)
-        if verb in ("artifact", "sync-put", "claude-put", "devimage-put", "devdata-put", "signing-put", "scan-put", "oldapps-put"):
-            length = self._content_length(bad=0)
-            if verb == "sync-put":
-                return self._json(*channel.sync_put(auth, q, self.rfile, length))
-            if verb == "claude-put":
-                return self._json(*channel.claude_put(auth, q, self.rfile, length))
-            if verb == "devimage-put":
-                return self._json(*channel.devimage_put(auth, q, self.rfile, length))
-            if verb == "devdata-put":
-                return self._json(*channel.devdata_put(auth, q, self.rfile, length))
-            if verb == "signing-put":
-                return self._json(*channel.signing_put(auth, q, self.rfile, length))
-            if verb == "scan-put":
-                return self._json(*channel.scan_put(auth, q, self.rfile, length))
-            if verb == "oldapps-put":
-                return self._json(*channel.oldapps_put(auth, q, self.rfile, length))
-            return self._json(*channel.artifact(auth, q, self.rfile, length))
-        if verb in ("sync-file", "sync-tar", "claude-file", "devimage", "devdata"):
-            got, status = {"sync-file": channel.sync_file, "sync-tar": channel.sync_tar,
-                           "claude-file": channel.claude_file, "devimage": channel.devimage_file,
-                           "devdata": channel.devdata_file}[verb](auth, q)
-            if status != 200:
-                return self._json(got, status)
-            return self._send_file(got)
+        if verb in channel.PUTS:
+            return self._json(*channel.PUTS[verb](auth, q, self.rfile, self._content_length(bad=0)))
         if self.command != "POST":
             return self._json({"error": "POST"}, 405)
         req = self._read_json()
