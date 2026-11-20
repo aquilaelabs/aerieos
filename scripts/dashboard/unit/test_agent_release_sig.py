@@ -184,11 +184,28 @@ class Enrolling(unittest.TestCase):
         self.assertEqual(len(saved), 1)
 
 
+def alone_with(test, sig):
+    """The tree's own agent.sig held by this test alone until it ends. The
+    signer writes that one file and the two tests below read it back, so two
+    runs of this tier in one tree (a gate beside a helper's run) crossed: one
+    put the file back as it was while the other stood between signing and
+    packing the bundle, which then carried no signature. A lock beside the
+    system's temporary files, named for the file, is taken before the file
+    is read and let go after it is put back."""
+    import fcntl
+    import hashlib
+    name = "aerieos-agent-sig-" + hashlib.sha256(os.path.realpath(sig).encode()).hexdigest()[:16] + ".lock"
+    lock = open(os.path.join(tempfile.gettempdir(), name), "w")
+    fcntl.flock(lock, fcntl.LOCK_EX)
+    test.addCleanup(lock.close)
+
+
 class Signer(unittest.TestCase):
     """tools/sign-agent.py signs this tree's agent, and what it writes passes."""
     def test_what_the_build_signs_is_what_a_node_checks(self):
         tool = os.path.join(HERE, "..", "..", "..", "tools", "sign-agent.py")
         sig = os.path.join(HERE, "..", "..", "agent", "agent.sig")
+        alone_with(self, sig)
         had = open(sig).read() if os.path.exists(sig) else None
         self.addCleanup(lambda: open(sig, "w").write(had) if had is not None else (os.path.exists(sig) and os.unlink(sig)))
         k, pub = pair()
@@ -268,6 +285,7 @@ class FromTheBuildToTheNode(unittest.TestCase):
         import workspace as controller_bundle  # the dashboard's, which builds the bundle
         root = os.path.normpath(os.path.join(HERE, "..", "..", ".."))
         tool, sig = os.path.join(root, "tools", "sign-agent.py"), os.path.join(root, "scripts", "agent", "agent.sig")
+        alone_with(self, sig)
         had = open(sig).read() if os.path.exists(sig) else None
         self.addCleanup(lambda: open(sig, "w").write(had) if had is not None else (os.path.exists(sig) and os.unlink(sig)))
         k, pub = pair()
