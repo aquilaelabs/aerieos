@@ -439,6 +439,20 @@ same with `aerie sign status [TAG]` and asks for the look again with `aerie sign
 release --why "..."`, under **Agents may: Sign a build**. GitHub only: a Gitea
 or GitLab workflow's artifacts are not fetched.
 
+**A workflow that waits for the signed APK is started once it is attached.**
+A release whose files are listed and signed can have that list made only
+when the APK is on it, which is after the tag's own run has ended. So once
+the controller has attached a release's signed APK, it starts each workflow
+in the space's tree that can be started by hand (`workflow_dispatch`) and
+names `bb-release-seal-` outside a comment, the way AerieOS's own
+`seal-release.yml` names its concurrency group
+(`group: bb-release-seal-${{ inputs.tag }}`): on the tag's ref, with the tag
+as its `tag` input, using the space's token, which needs to be allowed to
+start workflows. The look's row says which were started. One that could not
+be started is said there and is a red bell row, with what to do instead:
+start it by hand from the repository's Actions page, from the tag, with the
+tag as its input. A space with no such workflow is unaffected.
+
 **Several apps, several keys.** A space keeps as many named keys as it needs,
 each with both slots; the first is **default**, which is where keys from
 before there were names went. **Generate** makes one on the space's node

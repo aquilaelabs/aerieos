@@ -112,16 +112,41 @@ def _sign_failed(project, tag):
     return str(f.get("why") or "") if isinstance(f, dict) else ""
 
 
-def _why(project, tag, name, failed=()):
+def _app(name):
+    return name.endswith((".apk", ".apk.sha256"))
+
+
+def _after_app(project, gone, failed=()):
+    """Whether what is still missing comes after the tag's own runs, on the
+    controller's clock: the app it signs, and, with the app missing too and
+    no run of the tag's failed, what a workflow it starts once the app is
+    attached makes (a signed list of the release's files,
+    releasesign.sealing)."""
+    app = [n for n in gone if _app(n)]
+    return bool(app) and (len(app) == len(gone) or (not failed and bool(releasesign.sealing(project))))
+
+
+def _why(project, tag, name, failed=(), gone=()):
     """Why one file is not there, as far as the controller can tell;
-    `failed` the tag's runs that ended any way but passed."""
-    if name.endswith((".apk", ".apk.sha256")):
+    `failed` the tag's runs that ended any way but passed, `gone` every
+    file the release is short of."""
+    if _app(name):
         if why := _sign_failed(project, tag):
             return f"the controller could not sign it: {why}"
         # Said to a person on the bell: where they look, not a session's verb.
         return "the controller has not signed it yet: the space's Signing view says why and looks again"
     if failed:
         return f"CI did not attach it: {failed[0]['name']} {failed[0]['how']} ({failed[0]['url']})"
+    # A file no run of the tag's failed to attach, in a space with a
+    # workflow the controller starts once the signed app is on the release:
+    # that workflow's to make, after the app, or not started (said in the
+    # signing's own words, with what a person does instead).
+    flows = releasesign.sealing(project)
+    if flows and any(_app(n) for n in gone):
+        return f"it is made once the signed app is on the release: the controller starts {' and '.join(flows)} then"
+    f = ((releasesign._load().get(project) or {}).get("failed") or {}).get(tag)
+    if flows and isinstance(f, dict) and f.get("sealing") is True:
+        return str(f.get("why") or "")
     return "CI did not attach it: the release's run on the git host says why"
 
 
@@ -207,17 +232,17 @@ def check(project, now=None):
             if late:
                 # Still there: its row stands as it was last read.
                 rec.update(asked=now)
-            elif (ended and gone and all(n.endswith((".apk", ".apk.sha256")) for n in gone)
+            elif (ended and gone and _after_app(project, gone, failed)
                   and not _sign_failed(project, tag) and now - int(rec["ended"]) < SIGN_GRACE_S):
                 # Whole but for the app the controller signs, which is on
-                # its way: looked at again at the next tick, said only if it
-                # does not come.
+                # its way, and what is made once it is attached: looked at
+                # again at the next tick, said only if it does not come.
                 rec.update(checked=now, url=url)
                 _keep(project, tag, rec)
                 continue
             else:
-                rec.update(checked=now, url=url, gone=[{"name": n, "why": _why(project, tag, n, failed)} for n in gone],
-                           error="")
+                rec.update(checked=now, url=url, error="",
+                           gone=[{"name": n, "why": _why(project, tag, n, failed, gone)} for n in gone])
         except forgerelease.NoRelease as e:
             if rec.get("url"):
                 # Read before, and not there now: deleted on the git host,

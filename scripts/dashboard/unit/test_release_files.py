@@ -184,6 +184,42 @@ class AsCiEnds(unittest.TestCase):
         self.assertEqual(self.at(60), [])
         self.assertEqual(len(self.said), 1)
 
+    def test_what_is_made_once_the_app_is_attached_is_waited_for_with_it_and_said_as_what_it_is(self):
+        # A space whose list of files is signed by a workflow the controller
+        # starts once the signed app is on the release (R199): the list and
+        # the app both come after the tag's own runs.
+        d = self.ws / "app"
+        (d / ".github" / "workflows").mkdir(parents=True)
+        (d / ".github" / "workflows" / "seal.yml").write_text(
+            "on:\n  workflow_dispatch:\nconcurrency:\n  group: bb-release-seal-${{ inputs.tag }}\njobs: {}\n")
+        (d / ".release-files").write_text("app-@VER@.tar.gz\napp-@VER@.apk\napp-@VER@-*.iso\nSHA256SUMS\n")
+        git(d, "commit", "-q", "-am", "a signed list")
+        git(d, "tag", "-f", self.TAG)
+        self.runs, self.have = [self.run_("passed")], ["app-1.0.0-dev.5.tar.gz", "app-1.0.0-dev.5-x.iso"]
+        self.assertEqual(self.at(10), [], "the app and the list are on their way")
+        rows = self.at(10 + releasefiles.SIGN_GRACE_S // 60 + 1)
+        self.assertEqual([r["files"] for r in rows], [["app-1.0.0-dev.5.apk", "SHA256SUMS"]])
+        self.assertIn("SHA256SUMS: it is made once the signed app is on the release: the controller starts seal.yml then", rows[0]["why"])
+        # The app attached and the workflow not started: the signing's own
+        # words, which say what to do instead.
+        self.have.append("app-1.0.0-dev.5.apk")
+        (self.state / "release-signing.json").write_text(json.dumps(
+            {"app": {"failed": {self.TAG: {"why": "seal.yml could not be started: start it by hand", "at": 1, "run": 2, "sealing": True}}}}))
+        rows = self.at(60)
+        self.assertEqual([r["files"] for r in rows], [["SHA256SUMS"]])
+        self.assertIn("seal.yml could not be started: start it by hand", rows[0]["why"])
+        # Its run going is CI going: nothing is said; and whole, complete.
+        self.runs = [self.run_("passed"), self.run_(name="seal release")]
+        self.at(70)
+        self.runs, self.have = [self.run_("passed"), self.run_("passed", "seal release")], self.have + ["SHA256SUMS"]
+        self.assertEqual(self.at(80), [])
+        self.assertEqual(len(self.said), 1)
+        # A run that failed explains a file CI did not attach, app or no app.
+        self.assertEqual(releasefiles._why("app", self.TAG, "x.iso", [self.run_("failed")], ["x.iso", "a.apk"]),
+                         "CI did not attach it: build and push image failed (https://h/run/1)")
+        self.assertFalse(releasefiles._after_app("app", ["x.iso", "a.apk"], [self.run_("failed")]))
+        self.assertTrue(releasefiles._after_app("app", ["a.apk"], [self.run_("failed")]))
+
     def test_a_signing_that_failed_is_said_at_once(self):
         self.runs, self.have = [self.run_("passed")], ["app-1.0.0-dev.5.tar.gz", "app-1.0.0-dev.5-x.iso"]
         (self.state / "release-signing.json").write_text(json.dumps(

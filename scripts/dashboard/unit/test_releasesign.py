@@ -10,7 +10,10 @@ branch's, one by hand, one of another workflow and one on another commit
 are each refused with the reason), and a release that carries its signed
 APK is signed again only for a tag a person names. What would stop a
 release is said before it: no key, an app mapped
-to none of several, the project's node offline or without its tools. Where
+to none of several, the project's node offline or without its tools. Once
+an APK is attached, the project's workflows that sign the release's list of
+files are started for the tag, and one that could not be is said with what
+a person does instead. Where
 a toolchain store with the jdk and build-tools is here, a real APK is signed
 end to end by the real agent's side of the job (signnode.py)."""
 import glob
@@ -349,6 +352,104 @@ class Signs(Base):
         releasesign.check("app")
         self.assertFalse([p for m, p, a in SEEN if "/runs/19/" in p])
         self.assertNotIn("v0.6.0", [r["tag"] for r in releasesign.status("app").get("last", {}).get("runs", [])])
+
+
+# A workflow that signs a release's list of its files: started by hand, and
+# named for by its concurrency group, as AerieOS's seal-release.yml is.
+SEALFLOW = """name: seal release
+on:
+  workflow_dispatch:
+    inputs:
+      tag: {required: true}
+concurrency:
+  group: bb-release-seal-${{ inputs.tag }}
+jobs:
+  seal:
+    runs-on: ubuntu-24.04
+    steps: [{run: "true"}]
+"""
+
+
+class Seals(Base):
+    """Once a release's signed APK is attached, the workflows in the
+    project's tree that sign its list of files are started for the tag."""
+
+    def setUp(self):
+        super().setUp()
+        self.flows = self.tmp / "ws" / "app" / ".github" / "workflows"
+        (self.flows / "seal.yml").write_text(SEALFLOW)
+        self.started, self.answer = [], ({"dispatched": "seal.yml"}, 200)
+
+        def dispatch(project, wf, ref, inputs):
+            # Where the release stood when it was asked: the APK is on it.
+            self.started.append((project, wf, ref, inputs, sorted(a["name"] for a in REL["v0.7.0"]["assets"])))
+            return self.answer
+        self.addCleanup(setattr, releasesign, "dispatch_fn", releasesign.dispatch_fn)
+        releasesign.dispatch_fn = dispatch
+
+    def test_the_sealing_workflow_is_started_for_the_tag_once_the_apk_is_attached(self):
+        self.assertEqual(releasesign.sealing("app"), ["seal.yml"])
+        self.assertEqual(releasesign.check("app")["signed"], ["v0.7.0"])
+        self.assertEqual(self.started, [("app", "seal.yml", "v0.7.0", {"tag": "v0.7.0"}, ["app-0.7.0.apk", "app-0.7.0.apk.sha256"])])
+        row = next(x for x in releasesign.status("app")["last"]["runs"] if x["tag"] == "v0.7.0")
+        self.assertEqual((row["state"], row["why"]), ("signed", "seal.yml started to sign the release's list of files"))
+        self.assertFalse(releasesign.status("app")["failed"])
+        self.assertFalse([a for a in releasesign.attention(["app"]) if a["bad"]])
+        # A look that signs nothing starts nothing.
+        releasesign.check("app")
+        self.assertEqual(len(self.started), 1)
+
+    def test_one_that_could_not_be_started_is_said_with_what_a_person_does_instead(self):
+        self.answer = ({"error": "the host said 403: Resource not accessible by personal access token"}, 400)
+        self.assertEqual(releasesign.check("app")["signed"], ["v0.7.0"], "the APK is signed and attached all the same")
+        st = releasesign.status("app")
+        self.assertEqual(st["signed"][0]["tag"], "v0.7.0")
+        want = ("v0.7.0's signed APK is attached, and its list of files is not signed yet: seal.yml (the host said 403: "
+                "Resource not accessible by personal access token) could not be started for it. Start it by hand from the "
+                "repository's Actions page: Run workflow, from the tag v0.7.0, with v0.7.0 as its tag")
+        self.assertEqual(next(x for x in st["last"]["runs"] if x["tag"] == "v0.7.0")["why"], want)
+        self.assertEqual([(f["tag"], f["why"]) for f in st["failed"]], [("v0.7.0", want)])
+        rows = [a for a in releasesign.attention(["app"]) if a["bad"]]
+        self.assertEqual([(a["tag"], a["sealing"], a["why"]) for a in rows], [("v0.7.0", True, want)])
+        # Not started again by a later look, which signs nothing; the APK
+        # signed again for the tag, with the workflow started, clears it.
+        releasesign.check("app")
+        self.assertEqual(len(self.started), 1)
+        self.answer = ({"dispatched": "seal.yml"}, 200)
+        self.assertEqual(releasesign.check("app", again="v0.7.0")["signed"], ["v0.7.0"])
+        self.assertEqual(len(self.started), 2)
+        self.assertFalse([a for a in releasesign.attention(["app"]) if a["bad"]])
+        # A dispatch that raises is a row too, never the look's end.
+        releasesign.dispatch_fn = lambda *a: 1 / 0
+        self.assertEqual(releasesign.check("app", again="v0.7.0")["signed"], ["v0.7.0"])
+        self.assertIn("seal.yml (ZeroDivisionError", releasesign.attention(["app"])[-1]["why"])
+
+    def test_a_signing_that_failed_starts_nothing_and_is_a_plain_failure(self):
+        self.fail_why = "app-0.7.0-unsigned.apk: no key"
+        self.assertEqual(releasesign.check("app")["failed"], ["v0.7.0"])
+        self.assertEqual(self.started, [])
+        self.assertEqual([a["sealing"] for a in releasesign.attention(["app"]) if a["bad"]], [False])
+
+    def test_only_a_workflow_that_names_the_group_and_is_started_by_hand_is_one(self):
+        (self.flows / "seal.yml").write_text(SEALFLOW.replace("  workflow_dispatch:\n    inputs:\n      tag: {required: true}\n",
+                                                              "  push: {tags: ['v*']}\n"))
+        (self.flows / "notes.yml").write_text("# this one only mentions bb-release-seal-TAG and workflow_dispatch:\n"
+                                              "on:\n  workflow_dispatch:\njobs: {}\n")
+        self.assertEqual(releasesign.sealing("app"), [])
+        self.assertEqual(releasesign.check("app")["signed"], ["v0.7.0"])
+        self.assertEqual(self.started, [])
+        row = next(x for x in releasesign.status("app")["last"]["runs"] if x["tag"] == "v0.7.0")
+        self.assertEqual((row["state"], row["why"]), ("signed", ""), "a space with no such workflow is as it was")
+        # ...and the one that hands over the APK is no sealing workflow, nor
+        # the sealing one a workflow that hands one over.
+        (self.flows / "seal.yml").write_text(SEALFLOW)
+        self.assertEqual(releasesign.sealing("app"), ["seal.yml"])
+        self.assertEqual(releasesign.handing("app"), {BUILDS, RELEASES})
+
+    def test_a_release_that_keeps_its_apk_starts_nothing(self):
+        REL["v0.7.0"]["body"] = "notes\n\nSigned by AerieOS: app-0.7.0.apk with the sideload key default, certificate SHA-256 AB:CD"
+        self.assertEqual(releasesign.check("app")["signed"], [])
+        self.assertEqual(self.started, [])
 
 
 class Own(Base):

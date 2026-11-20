@@ -278,9 +278,12 @@ function attRow(a){
   }
   // A release's APK signed on its project's node (R106): what would stop it, said
   // before the release in amber, and a signing that failed after one in red.
+  // `sealing`: the APK is signed, and the workflow that signs the release's
+  // list of files could not be started (R199); the row says what to do.
   if (a.kind === "release-sign"){
     return `<div class="bnote att${a.bad ? " bad" : ""}">
-      <div class="bt">${a.bad ? `${esc(a.tag)}'s APK in ${esc(projLabel(a.project))} is not signed`
+      <div class="bt">${a.sealing ? `${esc(a.tag)}'s list of files in ${esc(projLabel(a.project))} is not signed`
+        : a.bad ? `${esc(a.tag)}'s APK in ${esc(projLabel(a.project))} is not signed`
         : `${esc(projLabel(a.project))}'s next release cannot be signed`}</div>
       <div class="bsum">${esc(a.why)}</div>
       <div class="bfoot"><span>${a.bad ? (a.at ? esc(ago(a.at)) : "after the release") : "before its release"}</span>

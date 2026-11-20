@@ -35,6 +35,17 @@ for that tag again (check's `again`, aerie sign release --again TAG, the
 owner's answer whatever the dial). Each run left alone is a line of what the
 look says, with the reason.
 
+A signed APK changes what the release carries, and a release whose files
+are listed and signed (AerieOS's own SHA256SUMS, R199) can have that list
+made only once the APK is on it. So after an attach the controller starts
+the workflows in the project's tree that make it: each one that can be
+started by hand and names `bb-release-seal-` outside a comment (its
+concurrency group, in AerieOS's seal-release.yml), with the tag as its
+`tag` input, on the tag's ref (sealing, _seal). A project with no such
+workflow is left as it was and nothing is said. One that could not be
+started is said on the look's row and on the bell, with what a person does
+instead: start it by hand from the repository's Actions page, from the tag.
+
 What would stop a release's signing is said on the bell before the release
 (attention(): no sideload key, an app mapped to none of several, the
 project's node offline or without the jdk and build-tools), and a signing
@@ -42,9 +53,10 @@ that failed after one is said there too, red,
 until it succeeds or is put away. The Signing view names which key signs
 the releases (status()).
 
-    configure(state=, workspace=, write_json_fn=, projects=)
+    configure(state=, workspace=, write_json_fn=, projects=, dispatch=)
     wants(project)        whether its workflows hand over an unsigned APK
     handing(project)      which workflow files' runs can: the uploader, its callers
+    sealing(project)      which workflow files are started once an APK is attached
     readiness(project)    {wanted, packages, keys, why}
     status(project)       readiness and the newest results, for the view
     expect(project, tag)  a release just made: look for its APK soon
@@ -78,9 +90,18 @@ STATE = Path("/config")
 WORKSPACE = Path("/workspace")
 write_json = None
 projects_fn = None
+# Starts a workflow on the project's forge with its token: (project, the
+# workflow's file name, the ref, {input: value}) -> (payload, status), the
+# request `aerie forge run dispatch` and aerie version rehearse make
+# (forgeaccess.dispatch, handed over by the server).
+dispatch_fn = None
 
 # The artifact's name, a tag after it: what a workflow writes to be signed.
 MARK = "bb-release-apk-"
+# What a workflow that signs a release's list of files names, a tag after
+# it (its concurrency group): started once that release's APK is attached.
+SEAL = "bb-release-seal-"
+BY_HAND = re.compile(r"^\s*workflow_dispatch\s*:", re.M)
 TAG = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,79}")
 # What starts a release's own run: the push of its tag, or its release
 # published (a workflow `on: release`). Neither can be started from a fork,
@@ -105,9 +126,9 @@ _bare = set()        # (project, run id): finished runs that handed over no APK
 _rev = [0]           # moved when a look starts or ends: the revisions poll's "releasesign"
 
 
-def configure(*, state, workspace, write_json_fn, projects=None):
+def configure(*, state, workspace, write_json_fn, projects=None, dispatch=None):
     globals().update(STATE=Path(state), WORKSPACE=Path(workspace), write_json=write_json_fn,
-                     projects_fn=projects)
+                     projects_fn=projects, dispatch_fn=dispatch)
     _cache.clear()
     _bare.clear()
 
@@ -189,6 +210,42 @@ def handing(project):
         if not more:
             return out
         out |= more
+
+
+def sealing(project):
+    """The workflow files, by name, that sign a release's list of its files
+    and are started once its signed APK is attached: each one that names
+    SEAL and can be started by hand, both outside a comment, so a workflow
+    that only mentions the name starts nothing."""
+    out = []
+    for path, text in sorted(_workflows(project).items()):
+        live = "\n".join(ln for ln in text.splitlines() if not ln.lstrip().startswith("#"))
+        if SEAL in live and BY_HAND.search(live):
+            out.append(path.rsplit("/", 1)[1])
+    return out
+
+
+def _seal(project, tag):
+    """Start each of the project's sealing workflows for `tag`, on the tag,
+    with the tag as its input: ([the ones started], "" or what to say of the
+    ones that were not, with what a person does instead). Nothing of either
+    for a project with no such workflow."""
+    started, not_started = [], []
+    for wf in sealing(project):
+        try:
+            body, code = (dispatch_fn(project, wf, tag, {"tag": tag}) if dispatch_fn
+                          else ({"error": "this controller was given no way to start a workflow"}, 400))
+        except Exception as e:                                      # noqa: BLE001 (said on the row, never the look's end)
+            body, code = {"error": f"{type(e).__name__}: {e}"}, 500
+        if code == 200:
+            started.append(wf)
+        else:
+            not_started.append(f"{wf} ({str((body or {}).get('error') or 'no reason given')[:300]})")
+    if not not_started:
+        return started, ""
+    return started, (f"{tag}'s signed APK is attached, and its list of files is not signed yet: {' and '.join(not_started)} "
+                     f"could not be started for it. Start it by hand from the repository's Actions page: Run workflow, "
+                     f"from the tag {tag}, with {tag} as its tag")
 
 
 APP_ID = re.compile(r"""applicationId\s*(?:=\s*)?["']([A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+)["']""")
@@ -608,8 +665,14 @@ def check(project, force=False, again=""):
                                         f"only when a person asks: aerie sign release --again {tag} --why \"...\""})
             continue
         redone = redone or redo
+        # The APK is on the release: the workflows that sign the release's
+        # list of files are started for it, and one that could not be is
+        # said with the signing.
+        started, unsealed = ([], "") if r.get("error") else _seal(project, tag)
         last["runs"].append({"run": rid, "tag": tag, "state": "failed" if r.get("error") else "signed",
-                             "why": r.get("error") or "", "url": r.get("url") or ""})
+                             "why": r.get("error") or unsealed
+                                    or (f"{' and '.join(started)} started to sign the release's list of files" if started else ""),
+                             "url": r.get("url") or ""})
         if r.get("error"):
             rec["runs"][str(rid)] = {"state": "failed", "at": now, "tag": tag}
             rec["failed"][tag] = {"why": r["error"], "at": now, "run": rid}
@@ -621,6 +684,12 @@ def check(project, force=False, again=""):
             rec["failed"].pop(tag, None)
             rec["expect"].pop(tag, None)
             done["signed"].append(tag)
+            if unsealed:
+                # Red on the bell and in the Signing view until it is put
+                # away: the APK is signed, the release is not whole, and
+                # nothing here tries again. `sealing` is what the bell
+                # titles the row by.
+                rec["failed"][tag] = {"why": unsealed, "at": now, "run": rid, "sealing": True}
     if not redone:
         # The tag a person named had no run to sign again: said, with the
         # runs above when one was refused.
@@ -732,7 +801,9 @@ def start():
 def attention(projects):
     """The bell's rows, kind release-sign: what would keep a release's APK
     from being signed, said before the release (amber), and a signing that
-    failed after one (red, `bad`), each keyed for bellseen on what it says."""
+    failed after one (red, `bad`), each keyed for bellseen on what it says.
+    `sealing` marks the one whose APK is signed and whose list of files
+    could not be started."""
     out, whole = [], _load()
     for p in projects:
         r = readiness(p)
@@ -744,5 +815,6 @@ def attention(projects):
             if isinstance(f, dict):
                 out.append({"kind": "release-sign", "id": f"{p}|{tag}", "project": p, "tag": tag,
                             "why": str(f.get("why") or ""), "at": int(f.get("at") or 0), "bad": True,
+                            "sealing": f.get("sealing") is True,
                             "key": f"rsign:{p}|{tag}@{int(f.get('at') or 0)}"})
     return out

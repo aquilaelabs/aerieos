@@ -5391,7 +5391,10 @@ forgerelease.configure(state=STATE, workspace=WORKSPACE, write_json_fn=write_jso
 import releasesign                                               # noqa: E402
 releasesign.configure(state=STATE, workspace=WORKSPACE, write_json_fn=write_json,
                       projects=lambda: sorted(d.name for d in WORKSPACE.iterdir()
-                                              if d.is_dir() and not d.name.startswith(".")))
+                                              if d.is_dir() and not d.name.startswith(".")),
+                      # The workflow that signs a release's list of files, started once its APK
+                      # is attached: the dispatch a rehearsal's start makes (forgeaccess, below).
+                      dispatch=lambda project, wf, ref, inputs: forgeaccess.dispatch(project, wf, ref, inputs))
 
 
 # The files a release must carry (R190 step 4), checked as its CI ends, a
