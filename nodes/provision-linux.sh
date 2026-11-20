@@ -211,7 +211,12 @@ it, which is a paste rather than a questionnaire.
                        ssh), with no public name. --door-close22 drops
                        port 22 from anywhere but the loopback afterwards:
                        off unless asked, since the person running this is
-                       usually on that port.
+                       usually on that port. Either program is installed by
+                       this machine's package manager from a source it
+                       verifies (the vendor's signed repository, or the
+                       distribution's own package), one already installed
+                       is left as it is, and a system with no such source
+                       is told so.
   --firewall           for a hosting-only node (--session-user none): drop
                        everything coming in but 80 and 443, a container's
                        published port included (Docker's ports pass the
@@ -1380,16 +1385,163 @@ fi
 # never into node.json; a re-run without the secret file leaves a door that
 # is already installed as it is.
 door_secret() { [ -n "$DOOR_SECRET" ] && [ -r "$DOOR_SECRET" ] && tr -d '\r\n' < "$DOOR_SECRET"; }
+# door_key NAME: the key a door's vendor signs its packages with, armored, as
+# this file carries it. A family that installs a door from its vendor's own
+# repository (door_install, in the family's file) hands the package manager
+# this copy and never one fetched while installing: a key that arrives with
+# the packages it is to check holds them to nothing. A vendor that changes
+# its key is a change to this file. Each as its vendor served it over https
+# on 20 Nov 2026:
+#   cloudflared  CloudFlare Software Packaging 2025 <help@cloudflare.com>
+#                CC94 B39C 77AE 7342 A68B  8962 8A68 2D30 8D4E 5E73
+#                https://pkg.cloudflare.com/cloudflare-ascii-pubkey.gpg, the
+#                armored form of the cloudflare-public-v2.gpg its apt
+#                instructions name
+#   tailscale    Tailscale Inc. (Package repository signing key) <info@tailscale.com>
+#                2596 A99E AAB3 3821 893C  0A79 458C A832 957F 5868
+#                https://pkgs.tailscale.com/stable/fedora/repo.gpg, the file
+#                its repositories for every distribution name
+door_key() {
+    case "$1" in
+        cloudflared) cat <<'DOORKEY'
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+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
+K7vjJOTAR+ty9S7V8cnajnIWAlcTDg4=
+=Gm8h
+-----END PGP PUBLIC KEY BLOCK-----
+DOORKEY
+            ;;
+        tailscale) cat <<'DOORKEY'
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+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
+=AIVM
+-----END PGP PUBLIC KEY BLOCK-----
+DOORKEY
+            ;;
+        *) return 1 ;;
+    esac
+}
+# door_fetch NAME: a door's program, from a source this machine's package
+# manager verifies. Which source is the family's to say (door_install, in
+# its file): the vendor's own repository held to door_key, or the
+# distribution's own package. A system with neither is told so and nothing
+# is downloaded: there is no unchecked copy to fall back to, and a door a
+# person installed themselves is left as it is by the callers below.
+door_fetch() {
+    local rc=0
+    DOOR_WHY=""
+    door_install "$1" || rc=$?
+    [ "$rc" != 0 ] || return 0
+    if [ "$rc" = 2 ]; then
+        warn "this system has no verified source for ${1}${DOOR_WHY:+ (${DOOR_WHY})}: install ${1} yourself and run this script again, which leaves an installed door as it is"
+    else
+        warn "${1} did not install from the package source this system verifies it by; what the package manager said is above"
+    fi
+    exit 1
+}
 if [ "$DOOR" = cloudflared ]; then
     say "door: cloudflared, publishing port 22 at ${DOOR_HOST}"
     [ "$INIT" = systemd ] || { warn "cloudflared's service is systemd's, and this machine runs ${INIT:-no init this knows}"; exit 1; }
+    # Installed by the package manager, which is what moves it from here on,
+    # when the machine's packages are updated: the client's own update is
+    # off (--no-autoupdate, below), so no copy sits where nothing moves it.
     if ! command -v cloudflared >/dev/null 2>&1 && [ ! -x /usr/local/bin/cloudflared ]; then
-        case "$(uname -m)" in x86_64) cfarch=amd64 ;; aarch64|arm64) cfarch=arm64 ;; armv7l) cfarch=arm ;; *) warn "no cloudflared build for $(uname -m)"; exit 1 ;; esac
-        # Cloudflare's own release, the latest: the client updates itself
-        # from there too, so pinning here would be the one copy left behind.
-        curl -fsSL -o /usr/local/bin/cloudflared.new "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${cfarch}" \
-            || { warn "could not download cloudflared from its release"; rm -f /usr/local/bin/cloudflared.new; exit 1; }
-        chmod 755 /usr/local/bin/cloudflared.new; mv -f /usr/local/bin/cloudflared.new /usr/local/bin/cloudflared
+        door_fetch cloudflared
     fi
     cfbin="$(command -v cloudflared || echo /usr/local/bin/cloudflared)"
     install -d -m 0700 /etc/cloudflared
@@ -1413,7 +1565,7 @@ if [ "$DOOR" = cloudflared ]; then
 elif [ "$DOOR" = tailscale ]; then
     say "door: Tailscale, this machine on your tailnet with ssh"
     if ! command -v tailscale >/dev/null 2>&1; then
-        curl -fsSL https://tailscale.com/install.sh | sh || { warn "Tailscale did not install"; exit 1; }
+        door_fetch tailscale
     fi
     if [ -n "$(door_secret)" ]; then
         tailscale up --ssh --auth-key="$(door_secret)" || { warn "tailscale up did not join the tailnet: is the auth key still valid?"; exit 1; }
@@ -2511,7 +2663,10 @@ cmd_uninstall() {
         say "shutting the doors and the proxy"
         have systemctl && { systemctl disable --now cloudflared >/dev/null 2>&1 || true; rm -f /etc/systemd/system/cloudflared.service; }
         rm -rf /etc/cloudflared
-        [ -x /usr/local/bin/cloudflared ] && rm -f /usr/local/bin/cloudflared
+        # The copy a build before the doors came from packages downloaded
+        # there. A package's cloudflared stays the package manager's, as
+        # Tailscale's does: a link at that path is the package's own.
+        [ -f /usr/local/bin/cloudflared ] && [ ! -L /usr/local/bin/cloudflared ] && rm -f /usr/local/bin/cloudflared
         have tailscale && tailscale logout >/dev/null 2>&1 || true
         have systemctl && { systemctl disable --now builderbot-door-22 >/dev/null 2>&1 || true; rm -f /etc/systemd/system/builderbot-door-22.service; }
         have nft && nft delete table inet builderbot_door >/dev/null 2>&1 || true

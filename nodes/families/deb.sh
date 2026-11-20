@@ -116,3 +116,69 @@ docker_install() {
             # shellcheck disable=SC2046
             pkg $(pkg_names docker)
 }
+# apt_suite BASE SUITE...: the first of the suites named that the apt
+# repository at BASE publishes, for a vendor whose repository lags a new
+# release or has never heard of a derivative's codename. It settles only
+# which suite to ask for: what the suite holds is checked by apt against
+# the key its source line names, whichever suite it is.
+apt_suite() {
+    local base="$1" try
+    shift
+    for try in "$@"; do
+        [ -n "$try" ] || continue
+        if curl -fs -o /dev/null --max-time 15 "${base}/dists/${try}/InRelease"; then
+            printf '%s' "$try"
+            return 0
+        fi
+    done
+    return 1
+}
+# door_install NAME: a door's program (cloudflared, tailscale) from its
+# vendor's own apt repository, whose index apt holds to the vendor's key
+# and whose packages it holds to the index. The key is the copy the core
+# carries (door_key), written where the source line's signed-by names it,
+# and never one fetched here. 2 where this system has no verified source
+# for it, DOOR_WHY saying why. DOOR_KEYS and DOOR_SOURCES are apt's own
+# directories for a key and a source.
+DOOR_KEYS=/etc/apt/keyrings
+DOOR_SOURCES=/etc/apt/sources.list.d
+door_install() {
+    local arch dist code fall suite
+    case "$1" in cloudflared|tailscale) ;; *) return 2 ;; esac
+    if on_os_image; then
+        DOOR_WHY="an AerieOS disk's packages are its image's, which carries no $1"
+        return 2
+    fi
+    arch="$(dpkg --print-architecture)"
+    install -m 0755 -d "$DOOR_KEYS" || return 1
+    case "$1" in
+        cloudflared)
+            # One suite, any, serves every release of every distribution.
+            door_key cloudflared > "$DOOR_KEYS/cloudflared.asc" || return 1
+            echo "deb [arch=${arch} signed-by=${DOOR_KEYS}/cloudflared.asc] https://pkg.cloudflare.com/cloudflared any main" \
+                > "$DOOR_SOURCES/cloudflared.list" ;;
+        tailscale)
+            # A repository a distribution and a suite a release, a
+            # derivative asking for its parent's as it does of Docker's;
+            # the packages are the same build under every suite.
+            case " ${ID} ${ID_LIKE:-} " in
+                *" ubuntu "*)   dist=ubuntu; code="${UBUNTU_CODENAME:-${VERSION_CODENAME:-}}"; fall="noble jammy" ;;
+                " raspbian "*)  dist=raspbian; code="${VERSION_CODENAME:-}"; fall="bookworm" ;;
+                *)              dist=debian; code="${DEBIAN_CODENAME:-${VERSION_CODENAME:-}}"; fall="trixie bookworm" ;;
+            esac
+            # shellcheck disable=SC2086  # the fallbacks are meant to split
+            suite="$(apt_suite "https://pkgs.tailscale.com/stable/${dist}" "$code" $fall)" || true
+            [ -n "${suite:-}" ] || {
+                echo "Tailscale's repository answers for none of the suites tried (${code:-no codename}, ${fall})" >&2
+                return 1
+            }
+            door_key tailscale > "$DOOR_KEYS/tailscale.asc" || return 1
+            echo "deb [arch=${arch} signed-by=${DOOR_KEYS}/tailscale.asc] https://pkgs.tailscale.com/stable/${dist} ${suite} main" \
+                > "$DOOR_SOURCES/tailscale.list" ;;
+    esac
+    chmod 0644 "$DOOR_KEYS/$1.asc" "$DOOR_SOURCES/$1.list"
+    apt_waiting apt-get update -qq || return 1
+    pkg "$1" || return 1
+    # The package starts its own daemon where systemd runs: said again, a no-op.
+    [ "$1" != tailscale ] || svc_enable tailscaled
+}

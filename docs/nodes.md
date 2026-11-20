@@ -1193,6 +1193,32 @@ the pieces stack:
    rather than all being `localhost:22`, and says MobaXterm's way in: its
    own SSH sessions read no ssh config, so a Shell session that runs `ssh
    NAME` (R179).
+
+   The door's program is installed by the machine's package manager, from
+   a source it verifies, and one already on the machine is left as it is.
+   Where the vendor publishes a repository for that package manager it is
+   the vendor's, held to the vendor's signing key the provisioner carries
+   (`door_key` in `nodes/provision-linux.sh`, never a key fetched while
+   installing); otherwise it is the distribution's own package:
+
+   | System | cloudflared | Tailscale |
+   |---|---|---|
+   | Debian, Ubuntu | Cloudflare's apt repository | Tailscale's apt repository |
+   | RHEL and its rebuilds, CentOS Stream, Fedora | Cloudflare's rpm repository | Tailscale's rpm repository |
+   | openSUSE, SLES | the distribution's package where it carries one (Tumbleweed), else Cloudflare's rpm repository | the distribution's package where it carries one (Tumbleweed), else Tailscale's rpm repository |
+   | Arch | Arch's package | Arch's package |
+   | Alpine | none, and the script says so | Alpine's package (community) |
+   | Void | Void's package | Void's package |
+   | Gentoo | Gentoo's package | Gentoo's package |
+
+   A system with no verified source for a door is told so in one line and
+   nothing is downloaded: install the program yourself and run the script
+   again. An AerieOS disk is one, since its packages are its image's.
+   cloudflared's own self-update stays off (`--no-autoupdate`), so it moves
+   when the machine's packages are updated. A node given a cloudflared
+   door by an earlier version keeps the copy that version downloaded to
+   `/usr/local/bin/cloudflared`, which nothing updates: remove it and run
+   the enroll script again for the packaged one.
 5. *Put nginx in front of them* (R171, the nginx page): one reverse proxy
    per node, AerieOS's own, listed for every node on the nginx page,
    which Configure on a node's nginx row opens (the Containers page's

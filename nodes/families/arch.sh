@@ -53,3 +53,15 @@ docker_install() {
             pkg $(pkg_names docker) \
                 || warn "docker did not install from the distribution's packages, so this machine is not a Docker host until it does"
 }
+# door_install NAME: a door's program (cloudflared, tailscale) from Arch's
+# own repositories, which carry both and whose packages pacman holds to the
+# distribution's keys. 2 where this system has no verified source for it,
+# DOOR_WHY saying why.
+door_install() {
+    case "$1" in
+        cloudflared) pkg cloudflared || return 1 ;;
+        tailscale)   pkg tailscale || return 1
+                     svc_enable tailscaled ;;
+        *) return 2 ;;
+    esac
+}

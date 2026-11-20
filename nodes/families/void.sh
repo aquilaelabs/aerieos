@@ -46,3 +46,15 @@ docker_install() {
             pkg $(pkg_names docker) \
                 || warn "docker did not install from the distribution's packages, so this machine is not a Docker host until it does"
 }
+# door_install NAME: a door's program (cloudflared, tailscale) from Void's
+# own repository, which carries both and whose packages xbps holds to the
+# distribution's key. 2 where this system has no verified source for it,
+# DOOR_WHY saying why.
+door_install() {
+    case "$1" in
+        cloudflared) pkg cloudflared || return 1 ;;
+        tailscale)   pkg tailscale || return 1
+                     svc_enable tailscaled ;;
+        *) return 2 ;;
+    esac
+}

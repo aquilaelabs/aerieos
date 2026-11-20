@@ -454,6 +454,21 @@ which: pinned, installer (its pinned installer downloads the rest, and
 says from where) or open
 ([Declared downloads](tool-packs.md#declared-downloads)).
 
+**A door's program comes from a source the machine's package manager
+verifies.** A node enrolled with a door in for SSH has cloudflared or
+Tailscale installed by root. It comes from its vendor's own package
+repository, held to the vendor's signing key the provisioner itself
+carries (`door_key` in `nodes/provision-linux.sh`, which a release signs
+with root's other tools) and never to a key fetched while installing, or
+from the distribution's own package where its repositories carry one;
+which, on each system, is in [nodes.md](nodes.md). A system with neither
+is told so and nothing is downloaded. What this does not hold: the key
+says a package is its vendor's, not which version it is, so a door is the
+version its repository offers that day, as any package of the system's
+is. Cloudflare signs its rpm repository's index with an older key than
+the one it publishes, so there each package is held to the key and the
+index is not.
+
 **The rest, it still does, unless its console says otherwise.** The agent
 runs as root; a root command an administrator approves is run as given
 (which, on a node provisioned as a sandbox, could also undo the pin); and
