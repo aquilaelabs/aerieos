@@ -89,6 +89,13 @@ function nbPermsView({$, nb, project, root}){
   // staged until Apply as Pushing is. The token sets what is possible; a
   // Deny here takes an ability away whatever the token allows.
   let host = null, hostDraft = {}, hostFor = "";
+  // What is picked and not applied is unsaved work, as anything staged in
+  // the notebook is: the leave and close questions count it, and answering
+  // them drops it. Showing the view again reads the host's facts afresh and
+  // keeps it, so nothing but that answer, Apply or the pick put back ends it.
+  nb.stage("permissions:githost", {
+    count: () => Object.keys(hostDraft).length,
+    revert: () => { if (!Object.keys(hostDraft).length) return; hostDraft = {}; if (host) drawHost(); }});
   function loadHost(measure){
     return reading(`${project}:host`, async () => {
       try{
@@ -103,7 +110,7 @@ function nbPermsView({$, nb, project, root}){
   function drawHost(){
     const el = view()?.querySelector(".permhost");
     if (!el) return;
-    if (hostFor !== project){ host = null; hostDraft = {}; loadHost(false); }
+    if (hostFor !== project){ host = null; loadHost(false); }
     const p = (state?.projects || []).find(x => x.name === project);
     const locked = !!p?.locked_me || !!projWriteWhy(project);
     const m = host?.measure || null, rows = host?.rows || [];

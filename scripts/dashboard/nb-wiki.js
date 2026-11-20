@@ -188,8 +188,9 @@ function nbWikiView({$, nb, project}){
 
   // Whether something typed would be lost by a redraw from the server.
   const wikiDirty = () => !!nb.wkEdit || !!(nb.wkAdding && (nb.wkAdding.name || nb.wkAdding.text));
-  nb.wikiDirty = wikiDirty;
-  nb.wikiClear = () => { nb.wkEdit = null; nb.wkAdding = null; };
+  const wikiClear = () => { nb.wkEdit = null; nb.wkAdding = null; };
+  // For the notebook's leave and close questions.
+  nb.stage("wiki", {count: () => (wikiDirty() ? 1 : 0), revert: wikiClear});
 
   const pages = () => nb.wkData?.pages || [];
   const articles = () => pages().filter(p => !SPECIAL.includes(p.name));
@@ -225,7 +226,7 @@ function nbWikiView({$, nb, project}){
     const p = byName(name);
     if (!p){ notify(`no page called ${name} yet: New page makes it`); return; }
     if (wikiDirty() && !await askYes("Leave the page you are editing? What you typed is not saved.")) return;
-    nb.wikiClear();
+    wikiClear();
     // A history entry (R256 step 3): the address names the page, and Back
     // returns to the one before.
     navPush(() => { nb.wkCur = p.name; shellSync(); });
@@ -459,5 +460,5 @@ function nbWikiView({$, nb, project}){
   // the notebook's watch asks this while the view is on screen.
   const wikiNews = k => !!nb.wkData && revs[k] !== nb.wkRev && !wikiDirty();
 
-  return {loadWiki, wikiDirty, wikiNews};
+  return {loadWiki, wikiNews};
 }

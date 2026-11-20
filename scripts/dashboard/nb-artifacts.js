@@ -615,7 +615,6 @@ function nbArtDrawVersion(av){
   nbArtVerByRole(av, box);
   nbArtWireRelease(av, box, all);
   nbArtWireUnbump(av, box, all);
-  nbArtVerBridges(av);
   nbArtWireChangelog(av, box);
   nbArtWireBump(av, box, all);
   nbArtWireInit(av, box);
@@ -626,7 +625,9 @@ function nbArtDrawVersion(av){
 }
 
 // Each VERSION file's section saves and reverts its own staged bump, the
-// project's also its Claude access (the operator, 5 Oct).
+// project's also its Claude access (the operator, 5 Oct); and every staged
+// bump together is the view's own stager, for the notebook's leave and close
+// questions.
 function nbArtVerStages(av, all){
   const {nb} = av;
   all.forEach(v => {
@@ -634,9 +635,12 @@ function nbArtVerStages(av, all){
     nb.stage(`artifacts:version${comp ? ":" + comp : ""}`, {
       count: () => (comp in av.verPending ? 1 : 0) + (!comp && av.verPolicyPending != null ? 1 : 0),
       what: () => comp ? `the staged bump of ${comp}` : "the staged version change",
-      save: () => nb.verCommitStaged(comp),
-      revert: () => nb.verClearStaged(comp)});
+      save: () => nbArtVerCommit(av, comp),
+      revert: () => nbArtVerClear(av, comp)});
   });
+  nb.stage("artifacts", {
+    count: () => Object.keys(av.verPending).length + (av.verPolicyPending != null ? 1 : 0),
+    revert: () => nbArtVerClear(av)});
 }
 
 // The block for one VERSION file. Its NAME is not in here: the section
@@ -946,47 +950,44 @@ function nbArtWireUnbump(av, box, all){
   });
 }
 
-// Published to the panel-level Save/Revert, which live outside this
-// closure. Rebound on every draw so they always close over this
-// notebook's own state rather than whichever one drew last.
-function nbArtVerBridges(av){
-  const {nb} = av;
-  nb.verStagedCount = () => Object.keys(av.verPending).length + (av.verPolicyPending != null ? 1 : 0);
-  // With a component, that section's alone (its bump, and for the
-  // project's own section its Claude access too); without, all of them.
-  nb.verClearStaged = only => {
-    if (only === undefined){ av.verPending = {}; av.verPolicyPending = null; }
-    else { delete av.verPending[only]; if (!only) av.verPolicyPending = null; }
-    nbArtDrawVersion(av);
-  };
-  nb.verCommitStaged = async only => {
-    const parts = Object.entries(av.verPending).filter(([comp]) => only === undefined || comp === only);
-    const policy = only === undefined || only === "" ? av.verPolicyPending : null;
-    if (!parts.length && policy == null) return "";
-    // A window move is the one thing on this tab that reaches other
-    // projects: it ends their sessions. Asked here as well as said on the
-    // staged line, because the line can be scrolled past and this cannot
-    // (B92). Anything else saves without a question, as it always has.
-    const cost = av.ver?.window_cost;
-    const moves = parts.find(([comp, part]) => !comp && windowMove(part, cost));
-    if (moves && !await askYes(
-          `Bump the ${moves[1]}? This moves the compatibility window.\n\n`
-          + `Sessions on ${cost.projects.length} space${cost.projects.length === 1 ? "" : "s"} `
-          + `(${cost.projects.join(", ")}) end until each node's agent is updated on the Nodes page.`)) return null;
-    for (const [comp] of parts) delete av.verPending[comp];
-    if (policy != null) av.verPolicyPending = null;
-    const done = [];
-    if (policy != null){
-      const j = await nbArtPostVersion(av, {action: "policy", policy}, true);
-      if (j && !j.error) done.push(`Agent access: ${POLICY_LABEL[policy] || policy}`);
-    }
-    for (const [comp, part] of parts){
-      const j = await nbArtPostVersion(av, {action: "bump", part, component: comp},
-                                       true);
-      if (j?.bumped) done.push(`${comp || "version"} ${j.bumped.was} → ${j.bumped.target}`);
-    }
-    return done.join(" · ");
-  };
+// What is staged dropped. With a component, that section's alone (its
+// bump, and for the project's own section its Claude access too); without,
+// all of them.
+function nbArtVerClear(av, only){
+  if (only === undefined){ av.verPending = {}; av.verPolicyPending = null; }
+  else { delete av.verPending[only]; if (!only) av.verPolicyPending = null; }
+  nbArtDrawVersion(av);
+}
+// What is staged written, one section's or all of them as above: what the
+// notebook says once it is, "" when there was nothing to write, null when
+// the question was answered no.
+async function nbArtVerCommit(av, only){
+  const parts = Object.entries(av.verPending).filter(([comp]) => only === undefined || comp === only);
+  const policy = only === undefined || only === "" ? av.verPolicyPending : null;
+  if (!parts.length && policy == null) return "";
+  // A window move is the one thing on this tab that reaches other
+  // projects: it ends their sessions. Asked here as well as said on the
+  // staged line, because the line can be scrolled past and this cannot
+  // (B92). Anything else saves without a question, as it always has.
+  const cost = av.ver?.window_cost;
+  const moves = parts.find(([comp, part]) => !comp && windowMove(part, cost));
+  if (moves && !await askYes(
+        `Bump the ${moves[1]}? This moves the compatibility window.\n\n`
+        + `Sessions on ${cost.projects.length} space${cost.projects.length === 1 ? "" : "s"} `
+        + `(${cost.projects.join(", ")}) end until each node's agent is updated on the Nodes page.`)) return null;
+  for (const [comp] of parts) delete av.verPending[comp];
+  if (policy != null) av.verPolicyPending = null;
+  const done = [];
+  if (policy != null){
+    const j = await nbArtPostVersion(av, {action: "policy", policy}, true);
+    if (j && !j.error) done.push(`Agent access: ${POLICY_LABEL[policy] || policy}`);
+  }
+  for (const [comp, part] of parts){
+    const j = await nbArtPostVersion(av, {action: "bump", part, component: comp},
+                                     true);
+    if (j?.bumped) done.push(`${comp || "version"} ${j.bumped.was} → ${j.bumped.target}`);
+  }
+  return done.join(" · ");
 }
 
 // Patch, Minor and Major stage a bump for Save; the staged one pressed

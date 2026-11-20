@@ -106,27 +106,13 @@ function openNotebook(name, view){
 //   nbUnsaved           what is unsaved here, in words, or ""; nbCorePublish
 //   noteBatch           takes the batch the poll reports; nbCorePublish
 //   syncSave            brings every section's Save and Revert up to date; nbCorePublish
-//   stagers             each section's stager (count, what, save, revert) by key; nbCoreViews, nbCoreStage
+//   stagers             what is staged, by key: each section's stager (count, what, save, revert) and each
+//                       kind of unsaved work's (count, revert), which the leave and close questions
+//                       read (NB_UNSAVED); nbCoreViews, nbCoreStage
 //   sectBar             a section's Save and Revert bar, as markup; nbCoreViews
-//   stage               registers a section's stager; nbCoreViews
+//   stage               registers a stager; nbCoreViews
 //   watch               takes a watch on a revision token that destroy puts down; nbCoreWatchState
 //   writing             runs one of this panel's writes so the poll does not take it for news; makeNotebook
-//
-// What a section has staged, for the leave and close questions and the
-// panel's Save and Revert: a default here, rebound by the view on its draw
-//   ruleStagedCount     how many rule edits are staged; nbCoreStagedDefaults, nb-rules.js
-//   ruleCommitStaged    saves the staged rules; nbCoreStagedDefaults, nb-rules.js
-//   ruleClearStaged     drops the staged rules; nbCoreStagedDefaults, nb-rules.js
-//   verStagedCount      how many version bumps are staged; nbCoreStagedDefaults, nb-artifacts.js
-//   verCommitStaged     writes the staged bumps; nbCoreStagedDefaults, nb-artifacts.js
-//   verClearStaged      drops the staged bumps; nbCoreStagedDefaults, nb-artifacts.js
-//   designStagedCount   how many design parts are edited; nb-design.js
-//   designCommitStaged  saves the edited design; nb-design.js
-//   designClearStaged   drops the edited design; nb-design.js
-//   signStagedCount     how many signing changes are staged; nbSigningView's return
-//   signClearStaged     drops the staged signing changes; nbSigningView's return
-//   wikiDirty           whether a wiki page is being edited or added; nb-wiki.js, nbWikiView's return
-//   wikiClear           drops the wiki page being edited or added; nb-wiki.js
 //
 // The views' functions, handed back by each factory and put on nb by
 // nbCoreViews unless a file is named
@@ -194,7 +180,7 @@ function openNotebook(name, view){
 //                       nb-roadmap.js
 //   roadmapStaged       moves on every staged change, so a read can tell it raced one; nb-roadmap.js
 //   roadmapOrdering     the rows show move controls; reset on open, nbCoreRereadRoadmap, nbCoreLeaving,
-//                       nbCoreWireSections, nbCoreLeaveView, nb-roadmap.js, nb-history.js
+//                       nbCoreWireSections, nb-roadmap.js, nb-history.js
 //   roadmapOpen         the rows open to their workings and actions, as id:step; nb-roadmap.js
 //   roadmapSel          the step whose send box is armed; reset on open, nb-roadmap.js, nb-bugs.js
 //   sendNoteText        the note typed in the open send box; nb-roadmap.js, nb-bugs.js
@@ -302,7 +288,6 @@ function makeNotebook(project){
   nbCoreWireSheet(nb);
   nbCoreOpenState(nb);
   nbCorePresenceState(nb);
-  nbCoreStagedDefaults(nb);
   nbCoreWireSections(nb);
   nbCoreWireStrip(nb);
   nbCoreWireBugs(nb);
@@ -440,12 +425,12 @@ function nbCoreWireSheet(nb){
 // where this file's functions and the other views call them.
 function nbCoreViews(nb){
   const {$, project, root, sheet} = nb;
-  Object.assign(nb, nbGitView({$, nb, project}));
-  Object.assign(nb, nbPermsView({$, nb, project, root}));
-  Object.assign(nb, nbSessionsView({$, nb, project, root}));
   // Each section's Save and Revert (see sectBar): published before the views
   // are made, since they register their sections as they are.
   nb.stagers = {}; nb.sectBar = key => nbCoreSectBar(nb, key); nb.stage = (key, st) => nbCoreStage(nb, key, st);
+  Object.assign(nb, nbGitView({$, nb, project}));
+  Object.assign(nb, nbPermsView({$, nb, project, root}));
+  Object.assign(nb, nbSessionsView({$, nb, project, root}));
   Object.assign(nb, nbArtifactsView({$, nb, project, root, sheet}));
   Object.assign(nb, nbSigningView({$, nb, project}));
   Object.assign(nb, nbAnalysisView({$, nb, project}));
@@ -617,6 +602,11 @@ async function nbCoreRereadRoadmap(nb){
 // registers: how many changes it holds, what they are in words, how to
 // write them (a message, or null when a clash stopped it part-way) and how
 // to throw them away.
+//
+// The same registry holds each kind of unsaved work the leave and close
+// questions name (NB_UNSAVED), under the kind's own key: where that is not
+// one section's stager already, a view registers how many changes the kind
+// holds and how to throw them all away, with no bar and so no words or save.
 function nbCoreStage(nb, key, st){ nb.stagers[key] = st; }
 // The bar, drawn by whichever view draws the section; dead rather than
 // absent while there is nothing to save, so it does not move under a thumb.
@@ -668,7 +658,9 @@ function nbCoreSyncSave(nb){
   // after one finishes; that is the list's own business, so it holds only
   // the roadmap's Save. Reverting is allowed either way: throwing away your
   // own unsaved work never depends on what anybody else is doing.
-  if (![...Object.keys(nb.stagers)].some(k => nb.stagers[k].count() > 0)) nb.movedUnder = false;
+  // Nothing has moved under anybody once no bar's Save has anything to
+  // write: a stager with no save has no bar to say it on.
+  if (![...Object.keys(nb.stagers)].some(k => nb.stagers[k].save && nb.stagers[k].count() > 0)) nb.movedUnder = false;
   root.querySelectorAll(".sectbar[data-bar]").forEach(bar => {
     const key = bar.dataset.bar, st = nb.stagers[key];
     const save = bar.querySelector("[data-ssave]"), rv = bar.querySelector("[data-srevert]");
@@ -740,6 +732,12 @@ function nbCoreWireSections(nb){
     what: () => "the edited memories",
     save: async () => { if (nb.memDirty()) await nb.saveMemory(true); await nb.loadMemory(nb.memGen); return ""; },
     revert: async () => { nb.memEditing.clear(); await nb.loadMemory(nb.memGen); }});
+  // The space's settings, while their form is in this notebook's Settings
+  // view: another view picked, the form went back to the dialog and was
+  // filled again from what is saved, without a word (the audit of 13 Nov).
+  // The dialog's own door asks the same. Leaving the view is what throws
+  // them away (nbCoreSetView), so there is nothing for a revert to do.
+  nbCoreStage(nb, "settings", {count: () => nbCoreSettingsEdited(nb) ? 1 : 0, revert: () => {}});
 }
 
 // ---- who else is in here ---------------------------------------------------
@@ -793,37 +791,29 @@ function nbCoreDrawHere(nb){
 
 // What is unsaved here, in the words the buttons use. Both halves, because
 // both Saves write both and a Revert that left one behind would be a trap.
+// Every kind of unsaved work, by the key its stager is registered under,
+// with its words from how many changes it holds, in the order a sentence
+// names them. A view that stages something registers it (nb.stage) and has
+// its line here; nothing else asks a view what it holds.
+const NB_UNSAVED = [
+  ["roadmap", n => `${n} change${n === 1 ? "" : "s"} to the list`],
+  ["briefing:memories", () => "an edited memory"],
+  ["briefing:rules", () => "an edited rule"],
+  ["design", () => "an unsaved design"],
+  ["wiki", () => "a wiki page being edited"],
+  ["settings", () => "settings being edited"],
+  ["signing", () => "a staged signing key change"],
+  ["artifacts", n => `${n} staged version bump${n === 1 ? "" : "s"}`],
+  ["permissions:githost", () => "a staged git host permission"],
+];
 function nbCoreSettingsEdited(nb){
   const {root} = nb;
   if (!rnHost || !root.contains(rnHost)) return false;
   try { return rnDirty().length > 0; } catch { return false; }
 }
 function nbCoreUnsaved(nb){
-  const n = nb.roadmapPending.length;
-  const v = nb.verStagedCount();
-  return [n ? `${n} change${n === 1 ? "" : "s"} to the list` : "",
-          nb.memDirty() ? "an edited memory" : "",
-          nb.ruleStagedCount() ? "an edited rule" : "",
-          nb.designStagedCount() ? "an unsaved design" : "",
-          nb.wikiDirty() ? "a wiki page being edited" : "",
-          // The space's settings, while their form is in this notebook's
-          // Settings view: another view picked, the form went back to the
-          // dialog and was filled again from what is saved, without a word
-          // (the audit of 13 Nov). The dialog's own door asks the same.
-          nbCoreSettingsEdited(nb) ? "settings being edited" : "",
-          nb.signStagedCount() ? "a staged signing key change" : "",
-          v ? `${v} staged version bump${v === 1 ? "" : "s"}` : ""]
+  return NB_UNSAVED.map(([key, says]) => { const n = nb.stagers[key]?.count() || 0; return n ? says(n) : ""; })
     .filter(Boolean).join(" and ");
-}
-// Set by the notebook's version block and its rules; the panel-level Save and
-// Revert are outside those closures and need a way to ask.
-function nbCoreStagedDefaults(nb){
-  nb.ruleStagedCount = () => 0;
-  nb.ruleCommitStaged = async () => {};
-  nb.ruleClearStaged = () => {};
-  nb.verStagedCount = () => 0;
-  nb.verCommitStaged = async () => {};
-  nb.verClearStaged = () => {};
 }
 
 // A notebook tab going away takes whatever is unsaved in it with it, so it is
@@ -943,16 +933,11 @@ async function nbCoreLeaveView(nb, v){
   if (!await askYes(`Leave this tab? ${what} would be thrown away.\n\n`
                + "Unsaved work does not carry across the tabs: Save it "
                + "first if you want to keep it.")) return false;
-  nb.revertPending();
-  nb.verClearStaged();
-  nb.ruleClearStaged();
-  nb.designClearStaged();
-  nb.wikiClear();
-  nb.signClearStaged();
-  nb.roadmapOrdering = false;
-  nb.redrawRoadmap();
-  nb.memEditing.clear();
-  await nb.loadMemory(nb.memGen);     // drops whatever the editors were holding
+  // Every kind's revert in one turn, the last named first: the list's
+  // redraw reads what else is unsaved (nbRmCanSend), so it follows the
+  // rest, and the memories' read, which drops whatever the editors were
+  // holding, is the one thing waited on.
+  await Promise.all(NB_UNSAVED.map(([key]) => nb.stagers[key]).reverse().map(st => st?.revert()));
   return true;
 }
 // A view's own button opens it; a group's opens the view it was last on,

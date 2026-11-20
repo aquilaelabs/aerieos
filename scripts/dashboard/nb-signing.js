@@ -432,9 +432,11 @@ function nbSigningView({$, nb, project}){
     await loadSigning();
     return `${projLabel(project)}: app mappings`;
   }
-  // For the notebook's leave and close questions.
-  const signStagedCount = () => Object.values(draft).filter(d => d.remove || d.file).length + mapCount();
-  function signClearStaged(){ draft = {}; mapDraft = {}; fresh = []; adding = false; drawSigning(); }
+  // For the notebook's leave and close questions: every staged change to
+  // a key or a mapping, and the way to drop them all.
+  nb.stage("signing", {
+    count: () => Object.values(draft).filter(d => d.remove || d.file).length + mapCount(),
+    revert: () => { draft = {}; mapDraft = {}; fresh = []; adding = false; drawSigning(); }});
 
-  return {loadSigning, signStagedCount, signClearStaged};
+  return {loadSigning};
 }

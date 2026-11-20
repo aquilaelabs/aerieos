@@ -262,7 +262,8 @@ function nbRulesView({$, nb, project}){
       count: () => (ruleDirty() ? 1 : 0),
       what: () => "the edited rules",
       save: async () => { await saveRules(); return ""; },
-      revert: () => nb.ruleClearStaged()});
+      revert: () => { nb.rulePending = null; nb.globalOffPending = null; nb.globalEditing = null;
+                      nb.ruleEditing.clear(); nb.ruleOpen.clear(); nb.ruleWas.clear(); drawRules(); }});
     drawHTML(box, nb.codebaseSection()
       + nb.briefSection()
       + docSection("briefing", "rules", briefTitle("rules"),
@@ -283,10 +284,6 @@ function nbRulesView({$, nb, project}){
     const rl = box.querySelector("#rlList");
     pageReach(rl, "rlList", Math.max(0, ...[...nb.ruleEditing].map(i => i + 1)));
     paginate(rl, ":scope > .rulerow", {key: "rlList", noun: "rules"});
-    nb.ruleStagedCount = () => (ruleDirty() ? 1 : 0);
-    nb.ruleClearStaged = () => { nb.rulePending = null; nb.globalOffPending = null; nb.globalEditing = null;
-                                 nb.ruleEditing.clear(); nb.ruleOpen.clear(); nb.ruleWas.clear(); drawRules(); };
-    nb.ruleCommitStaged = saveRules;
     box.querySelectorAll(".rulerow").forEach(row => {
       const i = Number(row.dataset.i);
       const put = (k, sel) => {

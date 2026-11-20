@@ -1114,15 +1114,15 @@ async function nbDsCommitStaged(ds, part){
   await nbDsLoadDesign(ds);
   return part === "themes" ? "the design's themes saved" : part === "pages" ? "the design's pages saved" : "design saved";
 }
-// What the notebook reads of the two sections: how many have edits, the
-// Save and Revert of either or both, and each one's stager.
+// What the notebook reads of the two sections: each one's stager, and the
+// design's own for the leave and close questions, which counts the sections
+// with edits and reverts both.
 function nbDsStageSections(ds){
   const {nb} = ds;
-  nb.designStagedCount = () => (nbDsLangDirty(ds) ? 1 : 0) + (nbDsPagesDirty(ds) ? 1 : 0);
-  nb.designClearStaged = part => nbDsClearStaged(ds, part);
-  nb.designCommitStaged = part => nbDsCommitStaged(ds, part);
   nb.stage("design:themes", {count: () => (nbDsLangDirty(ds) ? 1 : 0), what: () => "the edited themes",
-                             save: () => nb.designCommitStaged("themes"), revert: () => nb.designClearStaged("themes")});
+                             save: () => nbDsCommitStaged(ds, "themes"), revert: () => nbDsClearStaged(ds, "themes")});
   nb.stage("design:pages", {count: () => (nbDsPagesDirty(ds) ? 1 : 0), what: () => "the edited pages",
-                            save: () => nb.designCommitStaged("pages"), revert: () => nb.designClearStaged("pages")});
+                            save: () => nbDsCommitStaged(ds, "pages"), revert: () => nbDsClearStaged(ds, "pages")});
+  nb.stage("design", {count: () => (nbDsLangDirty(ds) ? 1 : 0) + (nbDsPagesDirty(ds) ? 1 : 0),
+                      revert: () => nbDsClearStaged(ds)});
 }
