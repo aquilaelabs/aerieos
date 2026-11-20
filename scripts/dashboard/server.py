@@ -4761,6 +4761,9 @@ try:
     # ...and the digest of the bb bundle, so a node can tell from hello alone
     # whether the bb its sessions run is the one this controller ships.
     nodes.bundle_digest = lambda: workspace.bundle()["digest"]
+    # ...and the list of the files a release ships in it, for the Nodes
+    # page's status: what this install holds, and whether its build signed it.
+    nodes.bundle_files = lambda: (lambda b: (b["files"], b["files_signed"]))(workspace.bundle())
     nodes.idle_minutes = idle.minutes
     nodes.session_tokens_for = session_tokens_for
     # A project born with a starting version commits it the way the

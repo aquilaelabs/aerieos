@@ -5498,6 +5498,10 @@ def node_sync_clean(principal, node_id):
 # open) simply means the node keeps its built-in answer.
 layout_of = lambda: []
 bundle_digest = lambda: ""
+# (the digest of the list of the files a release ships in that bundle, as
+# this install holds them; whether this build's signature names that list):
+# workspace.bundle()'s `files` and `files_signed`, set by server.py.
+bundle_files = lambda: ("", False)   # noqa: E731
 idle_minutes = lambda: 0            # noqa: E731  (idle.minutes, injected by server.py)
 # {"on", "own"} for a node's agent (R79): whether its sessions are kept to
 # their own project's network, and what each project owns there
@@ -8725,10 +8729,17 @@ def tab_view(rows, admin):
                 n["tokseal_stale"] = token_stale(n["id"], tk)
     import systems
     # ...with the release key this build names and whether its agent is
-    # signed, for the row's Updates fact (the agent's release.py).
+    # signed, for the row's Updates fact (the agent's release.py), and the
+    # list of the files its bundle ships (the first 16 of its digest's hex,
+    # which tools/sign-agent.py --digests prints for a checkout) with
+    # whether the build signed that same list: what a node that pinned a
+    # release key holds the bundle to.
+    listed, list_signed = bundle_files() if admin else ("", False)
     return {"nodes": rows, "agent": (agent_shipped() | {"release_key": enrollscript.release_key()[:16],
                                                         "release_spare": (enrollscript.release_keys()[1:] or [""])[0][:16],
-                                                        "signed": bool(agent_sig())}) if admin else {},
+                                                        "signed": bool(agent_sig()),
+                                                        "files": listed.split(":", 1)[-1][:16],
+                                                        "files_signed": bool(list_signed)}) if admin else {},
             "default": node_for() if admin else "",
             # What Enroll node's System pulldown offers (R204).
             "systems": systems.offered() if admin else []}

@@ -177,5 +177,24 @@ class TheControllersBundle(unittest.TestCase):
         self.assertEqual(got["config/toolchains.json"], (root / "config" / "toolchains.json").read_bytes())
 
 
+class TheNodesStatus(unittest.TestCase):
+    """An administrator's read of the Nodes page says which list of files
+    this install's bundle ships and whether its build signed it, so an
+    install can be held against a checkout (tools/sign-agent.py --digests)."""
+
+    def test_it_names_the_list_and_whether_the_build_signed_it(self):
+        import nodes
+        nodes.configure(state=tempfile.mkdtemp())
+        listed = bundleparts.listing(pathlib.Path(HERE).parents[2])[1]
+        with mock.patch.object(nodes, "bundle_files", lambda: (listed, True)):
+            got = nodes.tab_view([], True)["agent"]
+            self.assertEqual((got["files"], got["files_signed"]), (listed[7:23], True))
+            self.assertEqual(len(got["files"]), 16)
+            self.assertEqual(nodes.tab_view([], False)["agent"], {}, "an administrator's alone")
+        with mock.patch.object(nodes, "bundle_files", lambda: ("", False)):
+            got = nodes.tab_view([], True)["agent"]
+            self.assertEqual((got["files"], got["files_signed"]), ("", False))
+
+
 if __name__ == "__main__":
     unittest.main()
