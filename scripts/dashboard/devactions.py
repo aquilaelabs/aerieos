@@ -470,10 +470,8 @@ def _ship_submit(project, instance, target):
                         + ". Use a named volume, or the instance's data directory"))
                     return
                 if devapp.queue.job_release(r["job"], _ship_build_spec(project, instance, r["job"])):
-                    with devapp._lock:
-                        d = devapp._load()
-                        devapp._rec(d, project, instance)["building_since"] = int(time.time())
-                        devapp.write_json(devapp.FILE, d)
+                    with devapp.edit_rec(project, instance, create=True) as rec:
+                        rec["building_since"] = int(time.time())
         except Exception as e:                                       # noqa: BLE001
             print(f"[devapp] preparing the shipped build of {project}/{instance}: {type(e).__name__}: {e}",
                   flush=True)
@@ -705,25 +703,17 @@ def _compose_done(job, state):
     # Up to the operator. The row below would clear the flag, so this returns.
     if sp.get("gate"):
         devapp._gate_env(project, instance)
-        with devapp._lock:
-            d = devapp._load()
-            row = _kept(d, project, instance)
-            if row is not None:
-                row["await_env"] = True
-                devapp.write_json(devapp.FILE, d)
+        devapp.set_field(project, instance, "await_env", True)
         _clear_marker(project, instance)
         devapp._bump()
         return
     if action in ("up", "rebuild"):
-        with devapp._lock:
-            d = devapp._load()
-            # A record Remove forgot meanwhile is not made again (B633).
-            row = _kept(d, project, instance)
+        # A record Remove forgot meanwhile is not made again (B633).
+        with devapp.edit_rec(project, instance) as row:
             if row is not None:
                 row.pop("await_env", None)
                 if not row.get("rev") or row.get("daemon") != devapp.daemon_id():
                     _stamp(row, project, instance)
-                devapp.write_json(devapp.FILE, d)
     if action == "remove":
         _remove_records(project, instance)
     _clear_marker(project, instance)
@@ -745,28 +735,14 @@ def _stamp(row, project, instance):
                daemon=devapp.daemon_id(), daemon_uid=devapp._uid())
 
 
-def _kept(d, project, instance):
-    """The instance's record if it is still there, None once Remove forgot
-    it: what a result that lands after the removal writes to (B633), where
-    devapp._rec would make the row again. Only whether it is there: a
-    record new made with nothing set is empty, and reading one with nothing
-    but a marker as a ghost (B633's second way, closed since every marker
-    goes through here too) left a first build unstamped, the row saying
-    Build over a running container (B646)."""
-    return (d.get(project) or {}).get(instance)
-
-
 def _record_build(project, instance):
-    with devapp._lock:
-        d = devapp._load()
-        rec = _kept(d, project, instance)
+    with devapp.edit_rec(project, instance) as rec:
         # An instance removed while its rebuild was still running has no
         # record to stamp: making one here brought a Removed row back with
         # only rev, at and daemon on it (B633, 11 Oct). False says so.
         if rec is None:
             return False
         _stamp(rec, project, instance)
-        devapp.write_json(devapp.FILE, d)
     return True
 
 
@@ -830,12 +806,9 @@ def _submit(project, instance, action, extra=None, check=None):
                     # there: a Remove racing this thread had the marker make
                     # the record again, empty but for it, and the build then
                     # stamped that into a ghost row (B633, the second way).
-                    with devapp._lock:
-                        d = devapp._load()
-                        row = _kept(d, project, instance)
+                    with devapp.edit_rec(project, instance) as row:
                         if row is not None:
                             row["building_since"] = int(time.time())
-                            devapp.write_json(devapp.FILE, d)
         except Exception as e:                                       # noqa: BLE001
             # A fault preparing is the job's failure, said on its row,
             # never a thread dying quietly with the job held forever.
@@ -885,10 +858,8 @@ def route_set(project, instance, mode, port=None):
         if r.get("error"):
             return r
         job = r.get("job")
-    with devapp._lock:
-        d = devapp._load()
-        devapp._rec(d, project, instance)["route"] = {"mode": mode, "port": port}
-        devapp.write_json(devapp.FILE, d)
+    with devapp.edit_rec(project, instance, create=True) as rec:
+        rec["route"] = {"mode": mode, "port": port}
     devapp._bump()
     return {"ok": True, "job": job}
 
@@ -1239,10 +1210,8 @@ def _job_up(project, instance, run):
         # On the JOB, which is what the row reads: without this a failed Up
         # left a row that said "stopped" with no account of why.
         return {"state": "failed", "error": "up failed:\n" + r["out"][-400:]}
-    with devapp._lock:
-        d = devapp._load()
-        # ...unless Remove forgot the record while this ran (B633).
-        row = _kept(d, project, instance)
+    # ...unless Remove forgot the record while this ran (B633).
+    with devapp.edit_rec(project, instance) as row:
         if row is not None:
             row.pop("await_env", None)
             # An implicit build is still a build, so the row stops claiming the
@@ -1252,7 +1221,6 @@ def _job_up(project, instance, run):
             # would go on saying so with the instance up in front of it.
             if not row.get("rev") or row.get("daemon") != devapp.daemon_id():
                 _stamp(row, project, instance)
-            devapp.write_json(devapp.FILE, d)
     devapp._bump()
     return {"state": "succeeded"}
 
@@ -1435,12 +1403,9 @@ def run_compose_job(job, run):
 
 def _clear_marker(project, instance=devapp.MAIN):
     """Drop the started-marker: the build reached an end, whichever end."""
-    with devapp._lock:
-        d = devapp._load()
-        rec = (d.get(project) or {}).get(instance)
+    with devapp.edit_rec(project, instance) as rec:
         if rec is not None:
             rec.pop("building_since", None)
-            devapp.write_json(devapp.FILE, d)
 
 
 def _job_rebuild(project, instance, run):
@@ -1508,10 +1473,7 @@ def _job_rebuild(project, instance, run):
             # Rewrite the env with the old values in comments and leave Up
             # to the operator; see the module docstring.
             devapp._gate_env(project, instance)
-            with devapp._lock:
-                d = devapp._load()
-                devapp._rec(d, project, instance)["await_env"] = True
-                devapp.write_json(devapp.FILE, d)
+            devapp.set_field(project, instance, "await_env", True, create=True)
             return {"state": "succeeded"}
         run.step("starting")
         devapp.ensure_dirs(project, instance, sink=run.line)

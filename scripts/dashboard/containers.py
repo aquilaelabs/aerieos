@@ -328,9 +328,7 @@ def create_container(name, compose_text, env_text="", node="", for_project="", a
     # Registered before the check, because the check goes through _compose()
     # and that reads the record to know where the file is. Removed again if
     # the file turns out not to parse, so a refusal leaves nothing behind.
-    with devapp._lock:
-        d2 = devapp._load()
-        rec = devapp._rec(d2, slug, devapp.MAIN)
+    with devapp.edit_rec(slug, devapp.MAIN, create=True) as rec:
         rec["source"] = "file"
         # Not listed while compose reads it: a manager listing that landed
         # in this window drew a row for a container that was then refused
@@ -344,7 +342,6 @@ def create_container(name, compose_text, env_text="", node="", for_project="", a
         # by its sessions. None when not given, which is the default here.
         if for_project:
             rec["for"] = str(for_project)[:100]
-        devapp.write_json(devapp.FILE, d2)
     if (env_text or "").strip():
         devapp.write_env(slug, env_text, devapp.MAIN)
     with devapp.on_node(devapp._instance_node(slug, devapp.MAIN)):

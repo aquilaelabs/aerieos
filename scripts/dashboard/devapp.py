@@ -2112,14 +2112,7 @@ def set_gpu(project, instance, kind):
     kind = str(kind or "").strip()
     if kind and kind not in GPU_KINDS:
         return {"error": f"a container's GPU is nvidia or amd, not {kind}"}
-    with _lock:
-        store = _load()
-        rec = _rec(store, project, instance)
-        if kind:
-            rec["gpu"] = kind
-        else:
-            rec.pop("gpu", None)
-        write_json(FILE, store)
+    set_field(project, instance, "gpu", kind, create=True)
     _bump()
     return {"ok": True, "gpu": kind}
 
@@ -2170,14 +2163,7 @@ def set_override(project, instance, rel):
     why = override_ok(project, rel, instance)
     if why:
         return {"error": why}
-    with _lock:
-        store = _load()
-        rec = _rec(store, project, instance)
-        if rel:
-            rec["override"] = rel
-        else:
-            rec.pop("override", None)
-        write_json(FILE, store)
+    set_field(project, instance, "override", rel, create=True)
     _bump()
     return {"ok": True, "override": rel}
 
@@ -3375,14 +3361,7 @@ def set_ref(project, instance, ref):
                   "--quiet", ref + "^{commit}"], timeout=15)
         if r["code"] != 0:
             return {"error": f"{project} has no branch or commit called {ref}"}
-    with _lock:
-        d = _load()
-        rec = _rec(d, project, instance)
-        if ref:
-            rec["ref"] = ref
-        else:
-            rec.pop("ref", None)
-        write_json(FILE, d)
+    set_field(project, instance, "ref", ref, create=True)
     _bump()
     return {"ok": True, "ref": ref}
 
@@ -3545,16 +3524,13 @@ def set_owner(project, instance, owner):
         if own and here and here not in own:
             return {"error": f"{_pname(project, instance)} is on {node_name(here)} and {owner} works on "
                              f"{', '.join(node_name(n) for n in own)}: its sessions could not reach it"}
-    with _lock:
-        d = _load()
-        if instance not in (d.get(project) or {}):
+    with edit_rec(project, instance) as rec:
+        if rec is None:
             return {"error": f"{project} has no instance called {instance}"}
-        rec = _rec(d, project, instance)
         if owner == ("" if rec.get("source") == "file" else project):
             rec.pop("for", None)
         else:
             rec["for"] = owner
-        write_json(FILE, d)
     _bump()
     return {"ok": True, "owner": owner}
 
@@ -3845,6 +3821,42 @@ def _read_rec(project, instance):
     return (_load().get(project) or {}).get(instance) or {}
 
 
+@contextlib.contextmanager
+def edit_rec(project, instance, create=False):
+    """One instance's record to change: the block is handed the record under
+    the store's lock, and the store is written when the block ends without
+    an exception.
+
+    With `create` a record that is not there is made, as _rec makes it.
+    Without, the block is handed None for an instance the store does not
+    have and nothing is written: a result that lands after Remove forgot the
+    instance must not make its row again (B633). Only whether it is there is
+    asked: a record new made with nothing set is empty, and reading that as
+    gone left a first build unstamped (B646).
+
+    The lock is not reentrant, so the block calls nothing that takes it."""
+    with _lock:
+        d = _load()
+        rec = _rec(d, project, instance) if create else (d.get(project) or {}).get(instance)
+        yield rec
+        if rec is not None:
+            write_json(FILE, d)
+
+
+def set_field(project, instance, key, value, create=False):
+    """One field of an instance's record set to `value`, or taken off it
+    when the value is empty. False when the instance is not in the store
+    and `create` did not make it, so nothing was written."""
+    with edit_rec(project, instance, create=create) as rec:
+        if rec is None:
+            return False
+        if value:
+            rec[key] = value
+        else:
+            rec.pop(key, None)
+    return True
+
+
 def _load():
     """The store: {project: {instance: record}}."""
     try:
@@ -4094,11 +4106,8 @@ def make_dirs(project, instance=MAIN):
         else:
             failed.extend(f"{p}: the daemon could not make it" for p in paths)
     if remote and made:
-        with _lock:
-            d = _load()
-            rec = _rec(d, project, instance)
+        with edit_rec(project, instance, create=True) as rec:
             rec["made_dirs"] = sorted(set(rec.get("made_dirs") or []) | set(made))
-            write_json(FILE, d)
     _bump()
     return {"ok": True, "made": made, "failed": failed, "unreachable": cannot}
 
@@ -4577,10 +4586,8 @@ def _risk_gate(project, instance=MAIN, ack=""):
     if _read_rec(project, instance).get("risks_ack") == d:
         return ""
     if ack and ack == d:
-        with _lock:
-            store = _load()
-            _rec(store, project, instance)["risks_ack"] = d
-            write_json(FILE, store)
+        with edit_rec(project, instance, create=True) as rec:
+            rec["risks_ack"] = d
         return ""
     # With the way past it: a person acknowledges the list where it is
     # shown, once, and it holds until the compose asks for more. Taking the
@@ -4653,10 +4660,8 @@ def beside_digest(new):
 
 
 def _set_beside(project, instance, names):
-    with _lock:
-        store = _load()
-        _rec(store, project, instance)["beside"] = sorted(names)
-        write_json(FILE, store)
+    with edit_rec(project, instance, create=True) as rec:
+        rec["beside"] = sorted(names)
 
 
 def _beside_gate(project, instance=MAIN, yes=""):
