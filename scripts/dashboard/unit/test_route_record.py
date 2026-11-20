@@ -2,22 +2,18 @@
 once, with everything the dispatcher holds about it, and the tables read off
 it. Held here without a server: the record agrees with itself, each route
 names a gate and a handler there is, no route is taken by an earlier prefix,
-and the tables are the ones commit 9508970 wrote out by hand, one table to a
-fact, wherever that commit is in the repository to be read."""
+and each table is what the record says."""
 import ast
 import collections
 import os
 import re
-import subprocess
 import sys
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.normpath(os.path.join(HERE, "..", "..", ".."))
 SERVER = open(os.path.join(HERE, "..", "server.py"), encoding="utf-8").read()
 TABLES = ("GET_ROUTES", "POST_ROUTES", "ROUTE_GATES", "SESSION_ROUTES", "SESSION_ACTIONS", "SESSION_INSTEAD",
           "STREAMED_POSTS", "MAX_BODY_FOR", "OWN_WRITE_ROUTES", "WORK_REFUSED", "QUIET_POSTS")
-BEFORE = "9508970"
 
 
 def tables(source):
@@ -103,59 +99,6 @@ class Record(unittest.TestCase):
         self.assertEqual(NOW["SESSION_ROUTES"], {r.handler for r in MATCHED if r.session})
         self.assertEqual(set(NOW["SESSION_ACTIONS"]) | set(NOW["SESSION_INSTEAD"]), {r.handler for r in MATCHED if r.instead})
         self.assertEqual(sorted(NOW["STREAMED_POSTS"]), sorted(r.path for r in ROUTES if r.how == "door"))
-
-
-def before():
-    """Commit BEFORE's server.py, or "" where the repository does not hold it
-    (a shallow clone, an image with no .git)."""
-    try:
-        r = subprocess.run(["git", "-C", ROOT, "show", f"{BEFORE}:scripts/dashboard/server.py"],
-                           capture_output=True, text=True, timeout=60)
-    except (OSError, subprocess.SubprocessError):
-        return ""
-    return r.stdout if r.returncode == 0 else ""
-
-
-class AsWrittenByHand(unittest.TestCase):
-    """The tables read off the record against the eleven that commit BEFORE
-    wrote out one by one. This holds the record to that commit, so it is the
-    proof of one change: a route added, moved or regated since is a
-    difference here by design, and this class goes with the first one."""
-
-    @classmethod
-    def setUpClass(cls):
-        src = before()
-        if not src:
-            raise unittest.SkipTest(f"commit {BEFORE} is not in this repository's objects")
-        cls.old = tables(src)
-
-    def test_the_routes_in_their_order(self):
-        for name in ("GET_ROUTES", "POST_ROUTES", "STREAMED_POSTS"):
-            self.assertIsInstance(NOW[name], tuple, name)
-            self.assertEqual(list(NOW[name]), list(self.old[name]), name)
-
-    def test_who_may_reach_each(self):
-        for name in ("ROUTE_GATES", "SESSION_ROUTES", "SESSION_ACTIONS", "SESSION_INSTEAD"):
-            self.assertIs(type(NOW[name]), type(self.old[name]), name)
-            self.assertEqual(NOW[name], self.old[name], name)
-        for name, (acts, said) in NOW["SESSION_ACTIONS"].items():
-            self.assertEqual((type(acts), type(said)), (tuple, str), name)
-
-    def test_what_is_held_about_a_body_and_the_audit(self):
-        for name in ("MAX_BODY_FOR", "QUIET_POSTS"):
-            self.assertIs(type(NOW[name]), type(self.old[name]), name)
-            self.assertEqual(NOW[name], self.old[name], name)
-        self.assertIs(type(NOW["QUIET_POSTS"]["/api/v1/hook"]), set)
-        # Read with any(), so the same paths in the routes' own order.
-        self.assertIsInstance(NOW["OWN_WRITE_ROUTES"], tuple)
-        self.assertEqual(sorted(NOW["OWN_WRITE_ROUTES"]), sorted(self.old["OWN_WRITE_ROUTES"]))
-
-    def test_what_a_space_with_no_repository_is_refused(self):
-        # "/api/files" was in the table and was never a route's path, so it
-        # refused nothing: the one entry the record does not carry.
-        self.assertNotIn("/api/files", {p for _, p, _ in self.old["GET_ROUTES"] + self.old["POST_ROUTES"]})
-        self.assertIs(type(NOW["WORK_REFUSED"]), set)
-        self.assertEqual(NOW["WORK_REFUSED"], self.old["WORK_REFUSED"] - {"/api/files"})
 
 
 if __name__ == "__main__":
