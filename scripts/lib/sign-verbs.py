@@ -59,14 +59,19 @@ def status_verb(rest):
         print("  aerie sign release --why \"...\" asks for the look again once what stopped it is fixed")
 
 
-def release_verb(why):
+def release_verb(why, rest):
     """aerie sign release --why (R134 step 5): the Signing view's Look for
-    unsigned APKs now, under the Sign a build dial."""
+    unsigned APKs now, under the Sign a build dial. --again TAG names a
+    release whose signed APK is replaced by its own run's, signed again:
+    the owner's answer whatever the dial."""
+    if rest and (len(rest) != 2 or rest[0] != "--again"):
+        sys.exit("[builderbot] ERROR: aerie sign release [--again TAG] --why \"...\"")
+    again = {"tag": rest[1]} if rest else {}
     # The look before this one, so its end is told by the controller's own
     # clock, never this machine's.
     before = int(((bbapi.call("/api/signing", {"action": "release", "project": project})
                    .get("release") or {}).get("last") or {}).get("at") or 0)
-    r = bbapi.call("/api/signing", {"action": "release-sign", "project": project, "why": why})
+    r = bbapi.call("/api/signing", {"action": "release-sign", "project": project, "why": why} | again)
     need(r)
     if r.get("id") and not r.get("ok"):
         print(f"[builderbot] asked {r.get('to') or 'the space owner'} (#{r['id']}), waiting up to "
@@ -98,7 +103,9 @@ def said_look(last, expect):
     for x in last.get("runs") or []:
         print(f"  run {x.get('run')} for {x.get('tag')}: {x.get('state')}"
               + (f": {x['why']}" if x.get("why") else "") + (f"  {x['url']}" if x.get("url") else ""))
-    if not last.get("runs") and not last.get("error"):
+    for line in last.get("said") or []:
+        print(f"  {line}")
+    if not last.get("runs") and not last.get("error") and not last.get("said"):
         print(f"  no unsigned APK waiting: {last.get('asked', 0)} recent run(s) that passed were asked and "
               f"none handed one over, {last.get('known_bare', 0)} more are known to hand over none")
         print("  the Android workflow's run for the release may still be going, or it failed: "
@@ -147,7 +154,7 @@ if sys.argv[1] == "--status":
     status_verb(sys.argv[4:])
     sys.exit(0)
 if sys.argv[1] == "--release":
-    release_verb(sys.argv[3])
+    release_verb(sys.argv[3], sys.argv[4:])
     sys.exit(0)
 if sys.argv[1].startswith("--"):
     keys_verb(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4:])

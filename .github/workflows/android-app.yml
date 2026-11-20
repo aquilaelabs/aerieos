@@ -29,12 +29,15 @@ on:
   # ...and for each release, handed to the controller to sign and attach
   # under the release's version with its sha256, for every controller on
   # that version to fetch and offer (R272 step 2, apps.py).
-  # A release whose APK did not land (v0.5.0's, B117) is built again from
-  # its tag and handed over by naming the tag here; left empty, a plain build.
+  # A release's tag named here builds its tree again, for dist/ and aerie
+  # sign; left empty, a plain build. The controller signs a release's APK
+  # only from the tag's own run (releasesign.py), so a release whose APK
+  # did not land (v0.5.0's, B117) gets it by that run's Re-run all jobs,
+  # and what a run by hand uploads is refused there, saying so.
   workflow_dispatch:
     inputs:
       tag:
-        description: "a release to build from its tag and hand to the controller to sign (empty: a plain build)"
+        description: "a release to build again from its tag, for dist/ (empty: a plain build); the controller signs only the tag's own run"
         required: false
         default: ""
   # Called by a tag's run (build-image.yml, R206 step 1) with the tag, as a

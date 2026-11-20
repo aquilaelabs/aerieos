@@ -467,12 +467,17 @@ aerie sign status [TAG]
                    node with its tools) and how the newest went: handed over,
                    signed and attached with the key's fingerprint, or what
                    stopped it, in the bell's words
-aerie sign release --why "..."
+aerie sign release [--again TAG] --why "..."
                    look for unsigned release APKs now and sign a failed one
                    again, as the Signing view's Look for unsigned APKs now,
                    under Sign a build: auto starts it, ask waits for the owner;
                    then waits for the look and says what it found, run by run,
-                   or why it found nothing
+                   or why it found nothing. Only a release's own run is signed
+                   from (the one its tag started, on the tag's commit, in the
+                   repository itself; any other is refused, saying why), and
+                   a release is signed once: --again TAG replaces the signed
+                   APK on TAG's release with its own run's, signed again,
+                   which waits for the owner whatever the setting
 aerie emu create API  build the AVD for an API level, installing its image if missing
 aerie emu install APK install an APK on the running emulator
 aerie emu shot [FILE] screenshot the emulator into dist/emu/

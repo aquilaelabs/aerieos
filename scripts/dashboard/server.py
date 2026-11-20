@@ -5286,12 +5286,18 @@ def _keymaker(action, project, args, by=""):
 phone.keymaker = _keymaker
 
 
-def _release_signer(project):
+def _release_signer(project, tag=""):
     """A release's APKs looked for and signed again now (R134 step 5): a
-    session's auto dial, and Allow on its ask."""
-    started = releasesign.check_soon(project, force=True)
+    session's auto dial, and Allow on its ask. `tag` is a release whose
+    signed APK is to be replaced by its own run's, signed again, which only
+    a person's answer starts."""
+    started = releasesign.check_soon(project, force=True, again=tag)
+    if tag and not started:
+        # The look going on was not asked for the tag, and would leave it.
+        return {"error": f"a look is already going, so {tag} was not signed again: ask again once it ends"}, 409
     return {"ok": True, "started": started,
-            "said": "looking for unsigned release APKs to sign" if started else "a look is already going"}, 200
+            "said": (f"looking for {tag}'s own run to sign its APK again" if tag else
+                     "looking for unsigned release APKs to sign" if started else "a look is already going")}, 200
 
 
 phone.release_signer = _release_signer
@@ -11732,14 +11738,19 @@ class Handler(BaseHTTPRequestHandler):
                 if not releasesign.wants(name):
                     return self._json({"error": f"{name}'s workflows hand over no unsigned APK to sign "
                                                 f"(an artifact named {releasesign.MARK}TAG)"}, 400)
+                # --again TAG: a release that carries its signed APK has it
+                # replaced, which is the owner's answer whatever the dial.
+                tag = field(req, "tag")
+                if tag and not releasesign.TAG.fullmatch(tag):
+                    return self._json({"error": "--again needs a release's tag after it, as aerie sign status lists them"}, 400)
                 mode = self._dialed(name, "sign", "; a person presses Look for unsigned APKs now in the Signing view")
                 if not mode:
                     return None
-                if mode == "auto":
+                if mode == "auto" and not tag:
                     return self._json(*_release_signer(name))
                 r = phone.ask_release_sign(field(req, "why"), name, owner,
                                            membership.owner_name(name) or "the space's owner",
-                                           asker_name=str(acct.get("name") or ""))
+                                           asker_name=str(acct.get("name") or ""), tag=tag)
                 return self._result(r)
             if act in ("keys", "generate", "map", "rotate"):
                 # Manage signing keys (R106 step 6): which keys there are
@@ -11802,8 +11813,13 @@ class Handler(BaseHTTPRequestHandler):
             if not releasesign.wants(name):
                 return self._json({"error": f"{name}'s workflows hand over no unsigned APK to sign "
                                             f"(an artifact named {releasesign.MARK}TAG)"}, 400)
-            started = releasesign.check_soon(name, force=True)
-            return self._json({"ok": True, "started": started, "release": releasesign.status(name)})
+            # With a tag, that release's signed APK is replaced by its own
+            # run's, signed again: a person's press alone, never a look's.
+            tag = field(req, "tag")
+            if tag and not releasesign.TAG.fullmatch(tag):
+                return self._json({"error": "not a release's tag"}, 400)
+            got, status = _release_signer(name, tag)
+            return self._json(got | {"release": releasesign.status(name)}, status)
         got, status = signing.verb(req, by=str(who.get("name") or ""))
         # Whether this person may take a backup, so the dialog offers it only
         # where it would be handed over.

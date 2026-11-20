@@ -118,6 +118,32 @@ class Clients(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("4 recent run(s) that passed were asked and none handed one over, 2 more", r.stdout)
 
+    def test_a_refused_run_is_said_with_its_reason(self):
+        ANSWER["release-sign"] = (200, {"ok": True, "started": True, "said": "looking"})
+        ANSWER["release"] = lambda: (200, {"release": {"looking": False, "last": {
+            "at": len(GOT), "asked": 4, "known_bare": 2,
+            "runs": [{"run": 41, "tag": "v1.0.0", "state": "refused", "why": "a pull request started it"}]}}})
+        r = self.sign("--release", "", "again")
+        self.assertIn("run 41 for v1.0.0: refused: a pull request started it", r.stdout)
+
+    def test_release_again_names_the_tag_and_says_when_it_had_no_run(self):
+        ANSWER["release-sign"] = (200, {"ok": True, "started": True, "said": "looking"})
+        ANSWER["release"] = lambda: (200, {"release": {"looking": False, "last": {
+            "at": len(GOT), "asked": 4, "known_bare": 2, "runs": [],
+            "said": ["v1.0.0 was not signed again: no run of the last 3 days still holds an unsigned APK for it"]}}})
+        r = self.sign("--release", "", "the key was rotated", "--again", "v1.0.0")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(GOT[1][1], {"action": "release-sign", "project": "app", "why": "the key was rotated",
+                                     "tag": "v1.0.0"})
+        self.assertIn("v1.0.0 was not signed again: no run of the last 3 days", r.stdout)
+        self.assertNotIn("no unsigned APK waiting", r.stdout)
+        # Anything else after the verb is refused before the controller is asked.
+        n = len(GOT)
+        r = self.sign("--release", "", "again", "v1.0.0")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("aerie sign release [--again TAG]", r.stderr)
+        self.assertEqual(len(GOT), n)
+
     def test_release_refused_says_why(self):
         ANSWER["release-sign"] = (403, {"error": "app's settings say Claude does not sign its builds"})
         r = self.sign("--release", "", "again")
@@ -147,7 +173,7 @@ class Ask(unittest.TestCase):
     def setUp(self):
         self.ran = []
         self.was = phone.release_signer
-        phone.release_signer = lambda p: (self.ran.append(p) or ({"ok": True, "said": "looking"}, 200))
+        phone.release_signer = lambda p, tag="": (self.ran.append((p, tag)) or ({"ok": True, "said": "looking"}, 200))
         self.addCleanup(setattr, phone, "release_signer", self.was)
 
     def test_it_waits_on_the_owner_and_allow_starts_the_look(self):
@@ -158,9 +184,16 @@ class Ask(unittest.TestCase):
         self.assertFalse([x for x in phone.requests_open("u_00000009", True) if x["id"] == r["id"]],
                          "the owner's to answer, not an administrator's")
         self.assertTrue(phone.decide(r["id"], True, "u_00000001", name="ada").get("ok"))
-        self.assertEqual(self.ran, ["app"])
+        self.assertEqual(self.ran, [("app", "")])
         o = phone.outcome(r["id"], "app")
         self.assertEqual((o["state"], o["code"], o["out"]), ("done", 0, "looking"))
+
+    def test_a_tag_to_sign_again_is_named_in_the_ask_and_handed_to_the_look(self):
+        r = phone.ask_release_sign("the key was rotated", "app", "u_00000001", "ada", asker_name="bob", tag="v0.7.0")
+        mine = [x for x in phone.requests_open("u_00000001", False) if x["id"] == r["id"]]
+        self.assertEqual(mine[0]["cmd"], ["sign", "release", "--again", "v0.7.0"])
+        self.assertTrue(phone.decide(r["id"], True, "u_00000001", name="ada").get("ok"))
+        self.assertEqual(self.ran, [("app", "v0.7.0")])
 
 
 if __name__ == "__main__":

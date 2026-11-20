@@ -408,7 +408,18 @@ looks for that artifact every few minutes for twelve hours, and once an hour
 otherwise, in the runs that passed and in the ones still going: a workflow
 that builds the APK and makes the release in one run hands the APK over
 long before its release exists, and it is left until the release is there,
-which is not a failure. It fetches it with the space's GitHub token and hands each APK
+which is not a failure. Only the release's own run is signed from: the one
+the tag itself started (its push, or its release published), on that tag and
+on the commit the tag names on GitHub, a run of a workflow in the space's
+tree that uploads the artifact or calls the one that does, with its commit
+from the repository itself. A pull request's run, a fork's, a branch's, a run
+started by hand, one of another workflow and one on another commit are each
+refused with the reason, which `aerie sign release` says run by run, and a
+release the controller waits for whose only APK came from such a run is a
+red bell row. And a release is signed once: a later run for a tag whose
+release carries its signed APK is left alone, until `aerie sign release
+--again TAG --why "..."` asks the space's owner to have it signed again and
+replaced. It fetches it with the space's GitHub token and hands each APK
 in it to a job on the space's node, which reads its package, is handed the
 sideload key that package maps to, and signs it with its own tools (the same
 steps a sign job takes: `zipalign`, `apksigner` with the proof of a rotation,
