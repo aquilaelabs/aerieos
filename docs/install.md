@@ -314,9 +314,15 @@ sudo bash /opt/aerieos/nodes/install-controller.sh --update --release v0.7.0
 An update fetches the release's controller bundle
 (`aerieos-controller-X.Y.Z.tar.gz`, published by the release workflow
 with its sha256 beside it and a build attestation), checks the archive
-against the sha256 and, where `gh` is installed, against the attestation
-(a release from before the bundle falls back to its source archive, said
-as unverified), asks its own state check whether it would start on this
+against the sha256, where `gh` is installed against the attestation (held
+to the release workflow on a version's tag), and against the release's
+signed list of its files: `SHA256SUMS`, whose signature must verify
+against the install's own `config/release-signers`, in `aerieos-dev` or
+`aerieos-release` for a pre-release and in `aerieos-release` alone for a
+stable release, which so waits for its key holder's signature
+([image.md](image.md), The release keys). A release with no bundle or no
+signed list, every one made before releases were signed among them, is
+not taken, and the reason is said. It then asks its own state check whether it would start on this
 install's state (and changes nothing when it would not), lays it out beside
 the one in use, switches to it and restarts; the release before is kept.
 A new release that does not answer on its port within two minutes is

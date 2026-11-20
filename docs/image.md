@@ -522,10 +522,13 @@ now** under Controller settings, Updates, and said on the bell). It follows
 the release line the install is on (`BB_RELEASE_LINE`, which the stick
 maker's `--set` writes) and the releases as published; the dev builds'
 channel is in [versions.md](versions.md#two-channels). On AerieOS **Update** does not run the installer: the own
-node's root agent fetches the release's ISO, checks it against the sha256
-the release carries and against its build attestation (`gh attestation
-verify`; an image that does not verify, or a machine without `gh`, writes
-nothing), opens it read-only and takes the root, the kernel, the initrd and
+node's root agent reads the release's signed list of its files (below, The
+release keys; a release it may not take is refused before the image is
+fetched), fetches the release's ISO, checks it against the sha256
+the release carries, against its build attestation (`gh attestation
+verify`, held to the release workflow on a version's tag; an image that
+does not verify, or a machine without `gh`, writes nothing) and against
+the signed list, opens it read-only and takes the root, the kernel, the initrd and
 the stamp out of its `live/` folder as plain files, points the next boot
 back at the slot running now, writes the slot not in use, puts the kernel
 beside it on the ESP, and only then names that slot for the next boot, on
@@ -539,29 +542,51 @@ and which boots next.
 
 An offline machine takes the same files from a folder on it (a stick, a
 share): **Update from the folder** under Updates, the folder holding the
-release's ISO with its `.sha256` and its `.attestation.jsonl` beside it,
-all three from the release. The ISO is checked against both with no
-network: the attestation against the trusted root the running image was
+release's ISO with its `.sha256`, its `.attestation.jsonl`, `SHA256SUMS`
+and `SHA256SUMS.sig` beside it, all five from the release. The ISO is
+checked against each with no network: the attestation against the trusted root the running image was
 built with, so a folder on a share others can write cannot hand over an
 image AerieOS's release workflow did not build. A release's attestation
 is read from GitHub's public API, and neither way asks for a sign-in.
 
-**The release key.** The sha256 and the attestation prove a file is the one
-AerieOS's release workflow built, which is not enough when the workflow
-or the repository itself is changed by someone else: they would build and
-attest a release of their own. So a release also carries `SHA256SUMS` and
-`SHA256SUMS.sig`, the list of its files' sha256 signed with an Ed25519 key
-that lives offline on the release key holder's own machine
-(`tools/release-sign.py sign TAG`), never in CI, the repository or a
-controller. The keys a signature must verify against are the install's own
-copy of `config/release-signers`, read from the image it is running, never
-from the release: an update that no key this install already held signed
-is refused, by the OS updater, the stick maker (`write` checks the image it
-fetched against the list) and the installer alike. Each checks with
-OpenSSH's `ssh-keygen -Y verify`. While `config/release-signers` holds no
-key the check is skipped and said so, which is how a build before the first
-key behaves; once it holds one, an unsigned release is refused. The key's
-fingerprint is published on aerieos.org to check the file against.
+**The release keys.** The sha256 beside a file is the release's word for
+itself, and whoever can replace a file on a release can replace that too;
+the attestation proves which workflow built a file, which is not enough
+when the workflow or the repository itself is changed by someone else. So
+a release also carries `SHA256SUMS` and `SHA256SUMS.sig`: the list of its
+files with the sha256 of each one's own bytes, signed with an Ed25519 key.
+The keys a signature must verify against are the install's own copy of
+`config/release-signers`, which the image carries at
+`/opt/aerieos/config/release-signers` and a bare-metal release is laid out
+with, never the release's: a file is taken only when it is in a list a key
+this install already held signed. Four things check it, each with OpenSSH's
+`ssh-keygen -Y verify`, and each hashes the file it took and holds those
+bytes to the list: the OS updater, the installer's `--update`, the stick
+maker (`write`, which carries the same lines in itself) and the Library's
+downloads of the apps.
+
+Who may have signed follows the release's tag, and the namespace a signer
+is named for says the channel. Dev builds publish by themselves, so their
+list is signed in CI, in the namespace `aerieos-dev`, with the release
+build's key (`tools/release-sign.py seal TAG`): the key and its spare of
+`config/aerieos-release.pub`, written into `config/release-signers` as
+OpenSSH keys by `tools/release-signers.py` and held there by `aerie lint`.
+A stable release is signed in `aerieos-release` by its key's holder, on
+their own machine (`tools/release-sign.py sign TAG`), with a key that is
+never in CI, the repository or a controller, so a stable release waits for
+its holder's signature. A pre-release tag (`vX.Y.Z-dev.N`, `-rc.N`) takes a
+list signed in either namespace; a stable tag (`vX.Y.Z`) takes
+`aerieos-release` alone, so the key CI holds can never sign a stable
+release. A release whose list is missing (every release made before
+releases were signed, and a stable one its holder has not signed yet),
+signed by no key the install names, or signed in a namespace its tag may
+not use is refused with the reason, and so is a stable release while
+`config/release-signers` names no stable signer yet. Only an install whose
+file holds no key at all skips the check, and says so, which is how a
+build from before the file reached an install behaves. Both signing modes
+make the list from the files themselves, downloaded and hashed, never from
+the sha256 files the release carries. The stable key's fingerprint is
+published on aerieos.org to check the file against.
 
 **On trial.** The slot an update wrote boots on trial: GRUB counts each
 boot of it in its environment, and the health check

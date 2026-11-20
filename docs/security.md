@@ -419,14 +419,28 @@ the switch closes the free-form command, which is the widest of them.
 
 ## The signing keys, and replacing one
 
-Three things an install takes from outside are checked against a key it
-already holds, never one that arrives with the thing itself:
+What an install takes from outside is checked against a key it already
+holds, never one that arrives with the thing itself:
 
 | What is checked | The public half an install holds | Where the private half is |
 |---|---|---|
 | The catalog's index | `config/catalog.pub`, shipped in the release | the catalog repository's secret `CATALOG_SIGNING_KEY`, used by its `sign` workflow |
 | A node's agent update | `config/aerieos-release.pub`, pinned by the node when it enrolls | the release build's secret `AERIEOS_RELEASE_KEY` |
-| An OS update's file list | `config/release-signers`, read from the running image | offline, on the release key holder's own machine |
+| A release's list of its files (`SHA256SUMS`), for a dev build | `config/release-signers`, its `aerieos-dev` lines: the release key and its spare again, as OpenSSH keys | the release build's secret `AERIEOS_RELEASE_KEY` |
+| A release's list of its files, for a stable release | `config/release-signers`, its `aerieos-release` line | offline, on the stable key holder's own machine |
+
+The third and fourth rows are one file, which the image carries and a
+bare-metal release is laid out with, and one rule: every file an install
+takes from a release (the controller's bundle, AerieOS's image, a stick's
+image, the apps the Library offers) is held to the release's signed list,
+and the release's tag says who may have signed it. A pre-release
+(`vX.Y.Z-dev.N`, `-rc.N`) takes a list signed in either namespace; a stable
+release (`vX.Y.Z`) takes `aerieos-release` alone, so the key CI holds, which
+signs dev builds as they publish themselves, can never sign a stable
+release, and a stable release waits for its holder's signature. A release
+with no signed list, or one signed by somebody its tag may not have, is
+refused with the reason; until a stable signer's line is in the file, a
+stable release is refused in those words.
 
 **What a changed key costs.** An install trusts only what a key it holds
 signed, so a new key cuts off whatever still holds the old one. For the
@@ -448,6 +462,8 @@ to go, the spare signs in its place and nothing is cut off; the next
 release then names the spare as its first key and a new spare beside it.
 Two is the most either file names: every key held is one more that can
 sign. A node enrolled before a spare was named pins it the next time its
-Enroll script is run, and its row says so under Updates until then. The
-OS update's list was a list from the start.
+Enroll script is run, and its row says so under Updates until then.
+`config/release-signers` was a list from the start, and its dev lines are
+written from the release key and its spare (`tools/release-signers.py`,
+held by `aerie lint`), so a build signed by either is taken.
 
