@@ -89,6 +89,25 @@ class Platform(sdkstore.KitCase):
         self.assertIn(f"leaving out dl/theirs.bin: it is for {OTHER}", out)
         self.assertEqual(sorted(os.listdir(os.path.join(self.s.dir("kit"), "dl"))), ["data.bin"])
 
+    def test_a_musl_machine_takes_its_own_build_of_a_shared_file_and_not_the_glibc_one(self):
+        # Two rows may share a `to` where one is glibc's and one musl's
+        # (packformat.platforms_meet): a musl machine fetches its own alone,
+        # and a file with no musl build is still the glibc row's.
+        rows = [{"url": "https://example.com/g", "to": "tool.tgz", "platform": "linux/amd64"},
+                {"url": "https://example.com/m", "to": "tool.tgz", "platform": "linux-musl/amd64"},
+                {"url": "https://example.com/d", "to": "data.bin", "platform": "linux/amd64"},
+                {"url": "https://example.com/a", "to": "tool.tgz", "platform": "linux/arm64"}]
+        row = {"source": {"fetch": rows}}
+        was = sdkmeta.AS_PLATFORM
+        self.addCleanup(setattr, sdkmeta, "AS_PLATFORM", was)
+        sdkmeta.AS_PLATFORM = "linux-musl/amd64"
+        self.assertEqual([f["url"][-1] for f in sdkmeta.declared(row)], ["m", "d"])
+        plan = [ln.split(sdkmeta.PLAN_SEP) for ln in sdkmeta.declared_plan(row)]
+        self.assertEqual([(ln[0], ln[1][-1] if ln[0] == "fetch" else ln[2]) for ln in plan[1:]],
+                         [("skip", "linux/amd64"), ("fetch", "m"), ("fetch", "d"), ("skip", "linux/arm64")])
+        sdkmeta.AS_PLATFORM = "linux/amd64"
+        self.assertEqual([f["url"][-1] for f in sdkmeta.declared(row)], ["g", "d"])
+
     def test_the_lookup_is_the_one_a_row_s_address_takes(self):
         system, arch = PLATFORM.split("/")
         self.assertTrue(sdkmeta.on_platform(PLATFORM) and sdkmeta.on_platform(f"{system}/*") and sdkmeta.on_platform(""))

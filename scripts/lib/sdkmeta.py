@@ -223,12 +223,25 @@ def on_platform(plat):
     return True if not plat else bool(for_platform({str(plat): True}))
 
 
+def declared_mine(rows):
+    """The rows of a declared list that are this machine's. A musl system
+    takes its own build of a file where a row names one (linux-musl/<arch>),
+    and the glibc row for the same `to` is then another machine's, as
+    for_platform tries a musl key first: two such rows may share a `to`
+    (packformat.platforms_meet), and only one of them is ever fetched."""
+    def musl(f):
+        return str(f.get("platform") or "").startswith("linux-musl/")
+    mine = [f for f in rows if on_platform(f.get("platform"))]
+    own = {f.get("to") for f in mine if musl(f)}
+    return [f for f in mine if musl(f) or f.get("to") not in own]
+
+
 def declared(tc):
     """The downloads an entry declares that are this machine's
     (source.fetch, a pack's install.fetch): each {url, to} with the sha256
     it is held to, or `signed` where its publisher's signature holds it."""
     rows = (tc.get("source") or {}).get("fetch")
-    return [f for f in rows if isinstance(f, dict) and f.get("url") and on_platform(f.get("platform"))] if isinstance(rows, list) else []
+    return declared_mine([f for f in rows if isinstance(f, dict) and f.get("url")]) if isinstance(rows, list) else []
 
 
 def declared_address(f, key="url"):
@@ -316,9 +329,10 @@ def declared_plan(tc):
         return PLAN_SEP.join(" ".join(str(v or "").replace(PLAN_SEP, "").split()) for v in fields)
 
     out = [said("net", "online" if online else "cut", online)]
+    mine = {id(f) for f in declared_mine(rows)}
     for f in rows:
         signed = f.get("signed") if isinstance(f.get("signed"), dict) else {}
-        if on_platform(f.get("platform")):
+        if id(f) in mine:
             out.append(said("fetch", declared_address(f), f.get("sha256"), f.get("to"), declared_address(f, "sig"), signed.get("keys")))
         else:
             out.append(said("skip", f.get("to"), f.get("platform")))

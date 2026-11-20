@@ -72,6 +72,10 @@ class Parse(unittest.TestCase):
         self.assertEqual(p("linuxserver/radarr"), (imageregistry.DEFAULT_HOST, "linuxserver/radarr", "latest", ""))
         self.assertEqual(p("reg.example/app/web:1.2"), ("reg.example", "app/web", "1.2", ""))
         self.assertEqual(p("localhost:5000/app:1"), ("localhost:5000", "app", "1", ""))
+        # docker.io/NAME is the default registry said by name, not a host to ask.
+        self.assertEqual(p("docker.io/valkey/valkey:8"), (imageregistry.DEFAULT_HOST, "valkey/valkey", "8", ""))
+        self.assertEqual(p("docker.io/nginx:1"), (imageregistry.DEFAULT_HOST, "library/nginx", "1", ""))
+        self.assertEqual(p("index.docker.io/library/nginx:1"), (imageregistry.DEFAULT_HOST, "library/nginx", "1", ""))
         self.assertEqual(p(f"reg.example/app/web:1.2@{d}"), ("reg.example", "app/web", "1.2", d))
         self.assertEqual(p(f"nginx@{d}"), (imageregistry.DEFAULT_HOST, "library/nginx", "", d), "a digest with no tag: nothing to ask a registry about")
         for bad in ("", "a b:1", "nginx:1@sha256:abc", "nginx:1@md5:" + "c" * 64, "reg.example/../x:1", "reg.example/App:1", "nginx:-1"):

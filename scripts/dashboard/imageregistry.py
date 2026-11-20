@@ -33,6 +33,9 @@ import urllib.request
 # there: the reference grammar's defaults.
 DEFAULT_HOST = "registry-1.docker.io"
 DEFAULT_NAMESPACE = "library"
+# The names a reference may say the default registry by: docker writes
+# docker.io/NAME, and neither name answers a registry's own questions.
+DEFAULT_SAID = frozenset(("docker.io", "index.docker.io"))
 # The kinds of manifest asked for: a list of several platforms' first.
 INDEXES = ("application/vnd.oci.image.index.v1+json", "application/vnd.docker.distribution.manifest.list.v2+json")
 ACCEPT = ", ".join([*INDEXES, "application/vnd.docker.distribution.manifest.v2+json", "application/vnd.oci.image.manifest.v1+json"])
@@ -57,7 +60,9 @@ def parse(ref):
     if not ref or any(c.isspace() for c in ref) or (at and not DIGEST.fullmatch(digest)):
         return None
     first, _, rest = ref.partition("/")
-    if rest and ("." in first or ":" in first or first == "localhost"):
+    if rest and first in DEFAULT_SAID:
+        host, path = DEFAULT_HOST, rest
+    elif rest and ("." in first or ":" in first or first == "localhost"):
         host, path = first, rest
     else:
         host, path = DEFAULT_HOST, ref
