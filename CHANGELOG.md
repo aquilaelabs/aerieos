@@ -61,6 +61,7 @@
 - A node that takes only signed agent updates is left alone by a controller whose build is unsigned, and its row on the bell says it waits for a signed build, where the update was sent and refused every two minutes (81e1355)
 - `aerie toolchains status` and `aerie status` say a toolchain's folder with no program in it is an install that did not finish, where they listed it as installed (552b028)
 - `aerie tool install NAME` installs the tool on the node the session runs on once a person allows it (or at once where the space's setting is auto), as the person who allowed it, and the request on the bell names the node; it only added the pack to the catalog, so Allow installed nothing and nobody was told. A toolchain AerieOS ships is asked for as the toolchain, and answers at once when the node has it. Upgrading: this release moves /config from state 26 to state 27, so once it has started on a /config, an earlier build no longer starts on that one (7906bf6, 4fd4fea, 6e112a3)
+- Your coding agent's sign-in on a node is no longer lost when a terminal is opened for you while a session of yours is running: the open put the sealed copy back over a sign-in the session had just refreshed, and the next session started signed out, most likely right after a controller update (b7b4aed)
 
 ### Security
 
