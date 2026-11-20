@@ -885,6 +885,10 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         # fetch and the hello alike, and the hello that eventually succeeds
         # starts the sessions then.
         self.refresh_session_tool()
+        # The sign-ins' pass before anything here waits on the controller
+        # (B1043): a refresh written while the agent before this one was
+        # giving way is sealed now, not after the bundle and the first hello.
+        turn_part({}, "tokens", self.token_pass_early)
         self.quiet_distro_ttyd()
         self.keep_sessions_through_restart()
         self.session_try()
@@ -922,6 +926,12 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             def timed(name, fn, *a, _turn=turn):
                 return turn_part(_turn, name, fn, *a)
             turn_t0 = time.monotonic()
+            # The sign-ins' pass ahead of a hello (B1043): the first one's
+            # census is taken on the loop, a minute on a busy node, and a
+            # controller that does not answer one sends the turn round again
+            # before any pass below is reached. It keeps its own ten seconds,
+            # so the one below runs only after a hello that took longer.
+            timed("tokens", self.token_pass_early)
             if self.console_moved():
                 self.hello_at = 0
             # The monotonic clock: a clock step killed a running job as timed
