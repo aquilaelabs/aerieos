@@ -71,11 +71,15 @@ def symbol_for(path, old):
     return ""
 
 
-def write_json(p, d):
-    tmp = f"{p}.new"
-    with open(tmp, "w") as f:
-        json.dump(d, f, indent=2)
-    os.replace(tmp, p)
+def hooklib():
+    """rulehook, where what the hooks share is kept (the node test, the word
+    to the controller, the rules a conversation was told), from the lib
+    folder beside this one: loaded when it is first asked for."""
+    lib = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib")
+    if lib not in sys.path:
+        sys.path.insert(0, lib)
+    import rulehook                                          # noqa: E402
+    return rulehook
 
 
 def house_rules(project, rel, told=()):
@@ -91,7 +95,7 @@ def house_rules(project, rel, told=()):
             sys.path.insert(0, here)
         import rules                                          # noqa: E402
         rules.configure(state=os.environ.get("DASHBOARD_STATE", "/config"),
-                        write_json=write_json)
+                        write_json=hooklib().write_json)
         hit = [r for r in rules.matching(project, path=rel) if r["name"] not in set(told)]
         return rules.said(hit, path=rel), [r["name"] for r in hit]
     except Exception:                     # noqa: BLE001  (never take an edit with it)
@@ -115,24 +119,14 @@ def main():
     root = os.environ.get("BB_TREE") or ""
     rel = os.path.relpath(path, root) if root and path.startswith(root) else path
     symbol = symbol_for(path, spec.get("old_string"))
-    if os.environ.get("BUILDERBOT_ROLE", "").lower() in ("node", "worker", "agent"):
+    rulehook = hooklib()
+    if rulehook.on_node():
         # On a node the notes live on the controller (roadmap #24): the
         # same record, posted with the session's own token, and the
         # answer is who else has the file, as names, since the
         # controller has the store this script does not.
-        sys.path.insert(0, os.path.join(here, "..", "lib"))
-        # A hook runs under a timeout of its own: a call here never waits out a
-        # restarting controller (bbapi.request, R251), it says so at once.
-        os.environ["BB_CONTROLLER_WAIT"] = "0"
-        import bbapi                                          # noqa: E402
-        sys.path.insert(0, os.path.join(here, "..", "lib"))
-        import rulehook                                       # noqa: E402
-        r = bbapi.call("/api/v1/hook", {"kind": "note", "path": rel, "symbol": symbol,
-                                        "agent": os.environ.get("BB_AGENT") or "claude",
-                                        "slot": os.environ.get("BB_SLOT") or "1",
-                                        "told": rulehook.fired(project, req.get("session_id"))[:200]},
-                       auth="Bearer " + os.environ.get("BB_TOKEN", ""), timeout=10)
-        r = r if isinstance(r, dict) else {}
+        r = rulehook.post_hook({"kind": "note", "path": rel, "symbol": symbol,
+                                "told": rulehook.fired(project, req.get("session_id"))[:200]})
         others = r.get("others") or []
         ruled, names = str(r.get("rules") or ""), list(r.get("names") or [])
     else:
@@ -140,13 +134,11 @@ def main():
         import overlap                                        # noqa: E402
         overlap.configure(state=os.environ.get("DASHBOARD_STATE", "/config"),
                           workspace=os.environ.get("WORKSPACE", "/workspace"),
-                          write_json=write_json)
+                          write_json=rulehook.write_json)
         # Keyed by account and agent (R95), named the same way.
         me = overlap.key(session, os.environ.get("BB_AGENT") or "claude")
         others = [overlap.said(o) for o in overlap.others_touching(project, me, rel)]
         overlap.note(project, me, rel, symbol)
-        sys.path.insert(0, os.path.join(here, "..", "lib"))
-        import rulehook                                       # noqa: E402
         ruled, names = house_rules(project, rel, rulehook.fired(project, req.get("session_id")))
     # ...and any house rule this file fires (roadmap #7). Here rather than in
     # the prompt hook because this is the half that knows which file is about
@@ -163,8 +155,6 @@ def main():
         said.append(ruled)
         # ...remembered, so a summary of this conversation does not drop it
         # (bb-rule-hook recall).
-        sys.path.insert(0, os.path.join(here, "..", "lib"))
-        import rulehook                                       # noqa: E402
         rulehook.remember(project, req.get("session_id"), names)
     if not said:
         return

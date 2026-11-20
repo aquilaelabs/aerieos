@@ -77,24 +77,15 @@ def human_part(text):
     return text.strip()
 
 
-def on_node():
-    return os.environ.get("BUILDERBOT_ROLE", "").lower() in ("node", "worker", "agent")
-
-
-def post_hook(body):
-    """The controller's hook endpoint, with the session's own token: how a
-    session on a node reaches the feed it cannot write (roadmap #24)."""
-    here = os.path.dirname(os.path.abspath(__file__))
-    sys.path.insert(0, os.path.join(here, "..", "lib"))
-    # A hook runs under a timeout of its own: a call here never waits out a
-    # restarting controller (bbapi.request, R251), it says so at once.
-    os.environ["BB_CONTROLLER_WAIT"] = "0"
-    import bbapi                                             # noqa: E402
-    # ...naming which agent's session it is (R95 step 7), and its slot on
-    # the project (R143), which the launcher sets.
-    body = {**body, "agent": os.environ.get("BB_AGENT") or "claude", "slot": os.environ.get("BB_SLOT") or "1"}
-    return bbapi.call("/api/v1/hook", body,
-                      auth="Bearer " + os.environ.get("BB_TOKEN", ""), timeout=10) or {}
+def hooklib():
+    """rulehook, where what the hooks share is kept (the node test, the word
+    to the controller, the rules a conversation was told), from the lib
+    folder beside this one: loaded when it is first asked for."""
+    lib = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib")
+    if lib not in sys.path:
+        sys.path.insert(0, lib)
+    import rulehook                                          # noqa: E402
+    return rulehook
 
 
 def catchup(project, session, prompt="", told=()):
@@ -107,8 +98,9 @@ def catchup(project, session, prompt="", told=()):
     of every prompt in every session.
     """
     try:
-        if on_node():
-            r = post_hook({"kind": "seen", "prompt": prompt[:20000], "told": list(told)[:200]})
+        rulehook = hooklib()
+        if rulehook.on_node():
+            r = rulehook.post_hook({"kind": "seen", "prompt": prompt[:20000], "told": list(told)[:200]})
             return (str(r.get("line") or ""),
                     "\n\n".join(x for x in (str(r.get("rules") or ""), str(r.get("related") or "")) if x),
                     [str(n) for n in r.get("names") or []])
@@ -117,7 +109,7 @@ def catchup(project, session, prompt="", told=()):
         import roadmap                                          # noqa: E402
         import pending                                       # noqa: E402
         roadmap.configure(state=os.environ.get("DASHBOARD_STATE", "/config"),
-                       write_json=_write_json)
+                       write_json=rulehook.write_json)
         # ...and what the operator decided about anything this session had
         # waiting for approval (roadmap #27), told once.
         line = " ".join(x for x in (str(roadmap.catchup(project, session) or ""),
@@ -128,20 +120,13 @@ def catchup(project, session, prompt="", told=()):
         import bugs                                          # noqa: E402
         import preamble                                      # noqa: E402
         import rules                                         # noqa: E402
-        bugs.configure(state=os.environ.get("DASHBOARD_STATE", "/config"), write_json=_write_json)
-        rules.configure(state=os.environ.get("DASHBOARD_STATE", "/config"), write_json=_write_json)
+        bugs.configure(state=os.environ.get("DASHBOARD_STATE", "/config"), write_json=rulehook.write_json)
+        rules.configure(state=os.environ.get("DASHBOARD_STATE", "/config"), write_json=rulehook.write_json)
         preamble.configure(rules_mod=rules, roadmap_mod=roadmap, bugs_mod=bugs)
         related, rnames = preamble.mentioned(project, prompt, told)
         return line, "\n\n".join(x for x in (said, related) if x), names + rnames
     except Exception:                     # noqa: BLE001  (never cost a turn)
         return "", "", []
-
-
-def _write_json(p, d):
-    tmp = f"{p}.new"
-    with open(tmp, "w") as f:
-        json.dump(d, f, indent=2)
-    os.replace(tmp, p)
 
 
 def rules_firing(project, *, prompt="", path="", told=()):
@@ -160,7 +145,7 @@ def rules_firing(project, *, prompt="", path="", told=()):
             sys.path.insert(0, here)
         import rules                                          # noqa: E402
         rules.configure(state=os.environ.get("DASHBOARD_STATE", "/config"),
-                        write_json=_write_json)
+                        write_json=hooklib().write_json)
         hit = [r for r in rules.matching(project, prompt=prompt, path=path) if r["name"] not in set(told)]
         return rules.said(hit), [r["name"] for r in hit]
     except Exception:                     # noqa: BLE001  (never cost a turn)
@@ -173,8 +158,8 @@ def main():
     # and cannot see for one on a node. Nothing to read from stdin.
     if sys.argv[1:2] == ["--started"]:
         project = (sys.argv[2:3] or [""])[0]
-        if project and on_node():
-            post_hook({"kind": "started", "node": os.environ.get("BB_NODE", "")})
+        if project and hooklib().on_node():
+            hooklib().post_hook({"kind": "started", "node": os.environ.get("BB_NODE", "")})
         return
     project, session = (sys.argv[1:3] + ["", ""])[:2]
     try:
@@ -195,8 +180,7 @@ def main():
         # files rule whole on every background run's end (the operator, 12 Oct,
         # cutting tokens). And once a conversation: the rules it was told are
         # not said again until a summary drops them (bb-rule-hook recall).
-        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
-        import rulehook                                       # noqa: E402
+        rulehook = hooklib()
         told = rulehook.fired(project, req.get("session_id"))
         say, fired, names = catchup(project, session, text, told)
         if fired:
@@ -215,10 +199,10 @@ def main():
     if len(text) > MAX:
         text = text[:MAX].rstrip() + " …"
 
-    if on_node():
+    if hooklib().on_node():
         # The feed is the controller's; the token says whose session this
         # is, so the line is filed under the right name there.
-        post_hook({"kind": "asked", "text": text})
+        hooklib().post_hook({"kind": "asked", "text": text})
         return
 
     here = os.path.dirname(os.path.abspath(__file__))
@@ -227,8 +211,8 @@ def main():
     import users                                             # noqa: E402
 
     state = os.environ.get("DASHBOARD_STATE", "/config")
-    chat.configure(state=state, write_json=_write_json)
-    users.configure(state=state, write_json=_write_json)
+    chat.configure(state=state, write_json=hooklib().write_json)
+    users.configure(state=state, write_json=hooklib().write_json)
     who = next((n for n, u in users.load()["users"].items()
                 if u.get("uid") == session), session or "somebody")
     chat.post(project, session, f"{who} asked: {text}", kind="asked")

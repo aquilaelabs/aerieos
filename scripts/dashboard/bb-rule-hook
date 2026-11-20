@@ -43,38 +43,19 @@ sys.path.insert(0, os.path.join(HERE, "..", "lib"))
 import rulehook  # noqa: E402
 
 
-def on_node():
-    return os.environ.get("BUILDERBOT_ROLE", "").lower() in ("node", "worker", "agent")
-
-
-def post_hook(body):
-    # A hook runs under a timeout of its own: a call here never waits out a
-    # restarting controller (bbapi.request, R251), it says so at once.
-    os.environ["BB_CONTROLLER_WAIT"] = "0"
-    import bbapi                                             # noqa: E402
-    r = bbapi.call("/api/v1/hook", body, auth="Bearer " + os.environ.get("BB_TOKEN", ""), timeout=10)
-    return r if isinstance(r, dict) else {}
-
-
-def _write_json(p, d):
-    with open(f"{p}.new", "w") as f:
-        json.dump(d, f, indent=2)
-    os.replace(f"{p}.new", p)
-
-
 def local_rules():
     sys.path.insert(0, HERE)
     import rules                                             # noqa: E402
-    rules.configure(state=os.environ.get("DASHBOARD_STATE", "/config"), write_json=_write_json)
+    rules.configure(state=os.environ.get("DASHBOARD_STATE", "/config"), write_json=rulehook.write_json)
     return rules
 
 
 def guards(project):
-    if not on_node():
+    if not rulehook.on_node():
         return local_rules().guards(project)
     have = rulehook.cached_guards(project)
     if have is None:
-        got = post_hook({"kind": "guards"}).get("guards")
+        got = rulehook.post_hook({"kind": "guards"}).get("guards")
         if isinstance(got, list):
             rulehook.keep_guards(project, got)
             have = got
@@ -172,8 +153,8 @@ def recall(project, req):
     names = rulehook.fired(project, req.get("session_id"))
     if not names:
         return
-    if on_node():
-        said = str(post_hook({"kind": "recall", "names": names}).get("rules") or "")
+    if rulehook.on_node():
+        said = str(rulehook.post_hook({"kind": "recall", "names": names}).get("rules") or "")
     else:
         r = local_rules()
         said = r.said(r.by_names(project, names), again=True)

@@ -62,7 +62,7 @@ scripts/
   lib/bbapi.py                   the controller's API from aerie: one client, the loopback or BB_CONTROLLER, pinned https
   lib/say.py                     the `[builderbot] ERROR:` line a helper ends on with exit code 1, and the check of an answer for one
   lib/cmdmatch.py                which commands a shell line runs, read as a shell splits it, for a rule that refuses (R200)
-  lib/rulehook.py                what a session's hooks keep about the house rules: what fired, the guard list, a refusal's words (R200)
+  lib/rulehook.py                what a session's hooks keep about the house rules: what fired, the guard list, a refusal's words (R200); and what the hooks share, the node test, the word to the controller's hook endpoint and the stores' writer
   lib/scopedir.py                where an account keeps what it has for one space on this machine: the one builder of that path in Python, for bbapi and the hooks (bb_scope_dir in common.sh is the shell's)
   lib/sealfile.py                what a root helper in shell keeps, sealed and opened under the install key by the controller's own seal (the deploy keys)
   lib/syncwait.py                a session's aerie on a synced node waits for its copy to be in step with the controller's (R163)

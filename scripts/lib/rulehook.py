@@ -14,8 +14,13 @@ own folder for the space (scopedir.scope_dir) beside bb-check-relay's stamp:
 Here rather than in the hooks themselves because three of them read and
 write it (bb-work-note, bb-prompt-relay, bb-rule-hook), and in scripts/lib
 because a node carries this directory and not the dashboard's modules.
-Every function swallows its own failures: a hook that cannot keep a note
-is never worth a turn.
+Every function of the records swallows its own failures: a hook that cannot
+keep a note is never worth a turn.
+
+And what those three share besides, each being a program of its own started
+for one call: on_node (which half of AerieOS this is), post_hook (a word to
+the controller's hook endpoint) and write_json (the writer the dashboard's
+modules are handed when a hook runs them on the controller).
 """
 import json
 import os
@@ -31,6 +36,39 @@ from scopedir import scope_dir
 GUARDS_FOR = 60                 # seconds a node's copy of the guards is used
 FIRED_FOR = 14 * 86400          # a conversation's record kept this long after its last write
 _ID = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
+
+
+def on_node():
+    """True on a node, as common.sh's on_node answers the shell. There the
+    notebook, the rules and the feed are the controller's and a hook asks
+    for them with post_hook; on the controller it reads the store itself."""
+    return os.environ.get("BUILDERBOT_ROLE", "").lower() in ("node", "worker", "agent")
+
+
+def post_hook(body, timeout=10):
+    """One word to the controller's hook endpoint, with the session's own
+    token: how a session on a node reaches the store it cannot read or write
+    (roadmap #24). The answer, or {} for anything that is not one. Every
+    word names which coding agent's session speaks (R95 step 7) and its slot
+    on the space (R143), which the launcher sets, because the controller
+    counts each one as heard from that session (hooks.verb)."""
+    # A hook runs under a timeout of its own: a call here never waits out a
+    # restarting controller (bbapi.request, R251), it says so at once.
+    os.environ["BB_CONTROLLER_WAIT"] = "0"
+    import bbapi
+    body = {**body, "agent": os.environ.get("BB_AGENT") or "claude", "slot": os.environ.get("BB_SLOT") or "1"}
+    r = bbapi.call("/api/v1/hook", body, auth="Bearer " + os.environ.get("BB_TOKEN", ""), timeout=timeout)
+    return r if isinstance(r, dict) else {}
+
+
+def write_json(p, d):
+    """A store's file written beside itself and moved into place: what a
+    hook hands the dashboard's modules (rules, roadmap, bugs, overlap, chat,
+    users) as their writer when it runs them on the controller."""
+    tmp = f"{p}.new"
+    with open(tmp, "w") as f:
+        json.dump(d, f, indent=2)
+    os.replace(tmp, p)
 
 
 def _fired_file(project, conversation):
