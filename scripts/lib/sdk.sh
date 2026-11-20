@@ -1447,6 +1447,34 @@ sdk_install_script() {
     sdk_declared_done "$what" "$d" "$(sdk_verified_digest "$d")"
 }
 
+# sdk_bounded SECONDS CMD...: CMD run in a session of its own with nothing to
+# read, and ended with everything it started once SECONDS have passed: 124
+# then, else CMD's own exit. The whole group is signaled here, by its id,
+# and killed five seconds later if it is still there. `timeout` was not
+# enough: a tool whose script traps the signal and goes on (flutter's waits
+# for its own lock in a loop) outlived it on a node whose timeout signals
+# the one process it started, and what was left kept the directory busy, so
+# the partial install could not be removed and the next install was refused
+# as in use.
+sdk_bounded() {
+    local secs="$1" pid t=0
+    shift
+    setsid "$@" < /dev/null &
+    pid=$!
+    while kill -0 "$pid" 2>/dev/null; do
+        if [ "$t" -ge "$secs" ]; then
+            kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true
+            sleep 5
+            kill -KILL -- "-$pid" 2>/dev/null || true
+            wait "$pid" 2>/dev/null || true
+            return 124
+        fi
+        sleep 1
+        t=$((t + 1))
+    done
+    wait "$pid"
+}
+
 # A shallow clone. The tool updates itself in place from here, which a tarball
 # cannot do, and it is the form its own tooling expects.
 sdk_install_git() {
@@ -1521,14 +1549,15 @@ sdk_install_git() {
     if [ "${#warm[@]}" != 0 ]; then
         log "$(sdk_meta field "$what" source.warm_note)"
         # Bounded, and asked of nobody: flutter's first --version sat for half
-        # an hour on bb-sandbox with nothing written (12 Oct) and held every
+        # an hour on a node with nothing written (12 Oct) and held every
         # toolchain queued behind it. CI=true is how its tool knows no person
         # is there to answer; a warm-up that does not finish in the limit
         # fails this toolchain alone, saying so, and the job goes on.
-        if ! CI=true FLUTTER_SUPPRESS_ANALYTICS=true DOTNET_CLI_TELEMETRY_OPTOUT=1 \
-                timeout --kill-after=30 "${BB_WARM_TIMEOUT:-900}" "${SDK_CUT[@]}" "${warm[@]}" < /dev/null; then
-            die "${what}: warming did not finish within ${BB_WARM_TIMEOUT:-900}s (${warm[*]}); this install is taken off again, and Install retries it"
-        fi
+        local rc=0
+        CI=true FLUTTER_SUPPRESS_ANALYTICS=true DOTNET_CLI_TELEMETRY_OPTOUT=1 \
+            sdk_bounded "${BB_WARM_TIMEOUT:-900}" "${SDK_CUT[@]}" "${warm[@]}" || rc=$?
+        [ "$rc" != 124 ] || die "${what}: warming did not finish within ${BB_WARM_TIMEOUT:-900}s (${warm[*]}); this install is taken off again, and Install retries it"
+        [ "$rc" = 0 ] || die "${what}: warming failed (${warm[*]}, exit ${rc}); this install is taken off again, and Install retries it"
     fi
     # A repository that installs more than itself (a tool pack's install
     # steps fetching its binaries) runs them as the script kind does.
