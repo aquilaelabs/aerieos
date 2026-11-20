@@ -1,0 +1,65 @@
+{
+  "_comment": "The CI runners a node installs, each with its pin: the version and the sha256 of the exact file for every platform it is offered on. The one copy, which tools/pins.py --file moves (check, move, pin, verify). A row's name is the kind of git host its runner registers with, and its source is written as a toolchain's is: tarball for an archive that is unpacked, script for a file that is itself the program.",
+  "runners": [
+    {
+      "name": "github",
+      "source": {
+        "kind": "tarball",
+        "url": {
+          "linux/amd64": "https://github.com/actions/runner/releases/download/v{version}/actions-runner-linux-x64-{version}.tar.gz",
+          "linux/arm64": "https://github.com/actions/runner/releases/download/v{version}/actions-runner-linux-arm64-{version}.tar.gz",
+          "darwin/amd64": "https://github.com/actions/runner/releases/download/v{version}/actions-runner-osx-x64-{version}.tar.gz",
+          "darwin/arm64": "https://github.com/actions/runner/releases/download/v{version}/actions-runner-osx-arm64-{version}.tar.gz"
+        },
+        "version": {
+          "resolver": "github-release",
+          "repo": "actions/runner",
+          "trim_prefix": "v",
+          "numeric": true
+        },
+        "checksum": {
+          "from": "pin",
+          "version": "2.338.2",
+          "sha256": {
+            "linux/amd64": "baebf204307bac6193480852732f0aba2ae97b6c5597c244f4d5558390147c40",
+            "linux/arm64": "670adb2f268fe21dcbb58b3db0e0aa9d5b3bddfe2c651481336e561ff86de945",
+            "darwin/amd64": "109fff505a34014a7e8d1acb850c33d404811102f572b8fb9788e2fff013cc49",
+            "darwin/arm64": "25a065af409ffa317ab4d5a3b614dd15fc9c40f2172bc1b35a1b1258e919a388"
+          },
+          "found": {
+            "from": "github-asset"
+          }
+        }
+      },
+      "rev": 1
+    },
+    {
+      "name": "gitea",
+      "source": {
+        "kind": "script",
+        "url": {
+          "linux/amd64": "https://gitea.com/gitea/runner/releases/download/v{version}/gitea-runner-{version}-linux-amd64",
+          "linux/arm64": "https://gitea.com/gitea/runner/releases/download/v{version}/gitea-runner-{version}-linux-arm64"
+        },
+        "version": {
+          "resolver": "match",
+          "url": "https://gitea.com/api/v1/repos/gitea/runner/releases/latest",
+          "match": "\"tag_name\":\\s*\"v([0-9][0-9.]*)\""
+        },
+        "checksum": {
+          "from": "pin",
+          "version": "6.0.1",
+          "sha256": {
+            "linux/amd64": "37be79b1e72e31e3e02004ee1d768a0bc23224b9520351f46bb7157de7433fbd",
+            "linux/arm64": "5e6993fdb493ecc685beb29ecacf7e4b27a5b7129e25fded99f6dc642230cdb5"
+          },
+          "found": {
+            "from": "file",
+            "url": "{base}/checksums.txt"
+          }
+        }
+      },
+      "rev": 1
+    }
+  ]
+}

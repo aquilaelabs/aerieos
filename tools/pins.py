@@ -49,6 +49,9 @@ script, which has nothing to track, is asked for the bytes it answers today.
 
     --file PATH     another table than config/toolchains.json. The official packs are written only
                     for the shipped one, and the coding agents' recipes are read beside it alone.
+                    A table lists its rows under toolchains, or under runners: the CI runners a
+                    node installs are pinned the same way, in scripts/dashboard/runner-pins.json,
+                    and --file with that path checks, moves, pins and verifies them.
     --agents PATH   another file of the coding agents' recipes than the shipped one.
     --version V     with pin or move and one NAME: that version, not the one the resolver finds (a
                     release whose files for every platform are not out yet).
@@ -88,6 +91,10 @@ AGENTS = os.path.join(ROOT, "scripts", "dashboard", "agent-recipes.json")
 # A digest its publisher states that is no sha256 is checked while the file
 # is hashed, by these.
 ALSO = ("sha1", "sha512")
+# The name a table's document lists its rows under: the toolchains', or the
+# CI runners' (scripts/dashboard/runner-pins.json), whose rows are written
+# as a toolchain's source is.
+LISTS = ("toolchains", "runners")
 
 
 class Refused(Exception):
@@ -797,6 +804,11 @@ def load(path):
         return json.load(f)
 
 
+def table(doc):
+    """The rows of a table's document, under whichever name it lists them."""
+    return doc[doc.get("_list") or LISTS[0]]
+
+
 def save(path, doc):
     """The table as it is laid out, so a move's diff is the lines that
     changed and no others."""
@@ -822,8 +834,9 @@ def agent_rows(recipes):
 
 
 # What this tool keeps in the table's document beside the table: the
-# agents' rows, the file they came from, and which of the two files moved.
-BESIDE = ("_agents", "_recipes", "_moved")
+# agents' rows, the file they came from, which of the two files moved, and
+# the name the table lists its rows under.
+BESIDE = ("_agents", "_recipes", "_moved", "_list")
 
 
 def agents_written(doc):
@@ -843,7 +856,7 @@ def agents_written(doc):
 
 def put(doc, row, new):
     """`new` in `row`'s place, in the table or among the agents' rows."""
-    rows = doc["_agents"] if row.get("agent") else doc["toolchains"]
+    rows = doc["_agents"] if row.get("agent") else table(doc)
     rows[rows.index(row)] = new
     doc.setdefault("_moved", set()).add("agents" if row.get("agent") else "table")
 
@@ -851,11 +864,12 @@ def put(doc, row, new):
 def chosen(doc, names):
     """The rows named, in the table's order and then the coding agents';
     every one with none named."""
-    rows = doc["toolchains"] + doc.get("_agents", [])
+    rows = table(doc) + doc.get("_agents", [])
     have = {r.get("name") for r in rows}
     missing = [n for n in names if n not in have]
     if missing:
-        raise Refused(f"no toolchain{' or coding agent' if doc.get('_agents') else ''} named {', '.join(missing)} in the table")
+        what = (doc.get("_list") or LISTS[0]).removesuffix("s")
+        raise Refused(f"no {what}{' or coding agent' if doc.get('_agents') else ''} named {', '.join(missing)} in the table")
     return [r for r in rows if not names or r.get("name") in names]
 
 
@@ -1080,8 +1094,9 @@ def main(argv, out=print):
         return 1
     try:
         doc = load(opts["file"])
-        if not isinstance(doc.get("toolchains"), list):
-            raise ValueError("it has no list of toolchains")
+        doc["_list"] = next((k for k in LISTS if isinstance(doc.get(k), list)), "")
+        if not doc["_list"]:
+            raise ValueError(f"it has no list of {' or '.join(LISTS)}")
     except (OSError, ValueError, AttributeError) as e:
         out(f"pins: cannot read {opts['file']}: {said(e)}")
         return 1

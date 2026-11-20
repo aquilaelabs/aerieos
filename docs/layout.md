@@ -312,6 +312,7 @@ scripts/
     featuresoff.py               the features an install switches off from its environment (FEATURES_OFF): the list, the sentence, and what the page and the routes read of it (R81)
     doctor.py                    `aerie doctor` run on a timer and cached, for the Doctor card
     runners.py                   a node's CI runners: the root-only token helper, and the Runner card's list
+    runner-pins.json             the CI runners a node installs, a row for each kind of git host: the version and the sha256 of the file for every platform, written as a toolchain's pinned source is; the one copy, moved by tools/pins.py --file
     findings.py                  the scanner's reports read and attributed, and what they used to say
     gitrelay.py                  a node session's push, fetch and pull, done in a repository of the controller's own
     pushscan.py                  what a push would send, read for secrets and private things before it goes, and the lines a person okayed (R219)
@@ -456,7 +457,7 @@ tools/aerieos-usb-maker.py    the stick maker in a window (R198): which release,
 tools/api-doc.py                 writes docs/api.md from server.py's route tables; aerie lint holds the two equal
 tools/git-hosts-doc.py           writes docs/git-hosts.md from forgeaccess.ABILITIES; aerie lint holds the two equal
 tools/packs-export.py            writes the official packs under packs/ from config/toolchains.json and agents.py's table; aerie lint's --check holds them to it (R169 step 1)
-tools/pins.py                    moves the pins of the shipped toolchains: check says what each pinned row is pinned to and what its own resolver finds now, move writes the new version and digests for every platform and raises the row's rev, pin turns an origin-checked row into a pinned one and fills in what it declares, verify holds each pinned file to its pin; what a row asks pip or npm for is resolved to exact files, each a declared download; a row's own data says how, and no vendor is named in it
+tools/pins.py                    moves the pins of the shipped toolchains: check says what each pinned row is pinned to and what its own resolver finds now, move writes the new version and digests for every platform and raises the row's rev, pin turns an origin-checked row into a pinned one and fills in what it declares, verify holds each pinned file to its pin; with --file, the same over the CI runners' table (scripts/dashboard/runner-pins.json); what a row asks pip or npm for is resolved to exact files, each a declared download; a row's own data says how, and no vendor is named in it
 tools/check-sysdeps.py           checks every recipe's system packages, and with --controller the controller's own list, against each distribution's package index
 tools/agent-version.sh           the lint check that the agent's version moved with its file
 tools/no-em-dash.sh              the house rule voice's check: no em dash on a line this branch adds

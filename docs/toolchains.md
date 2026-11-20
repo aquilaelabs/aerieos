@@ -460,6 +460,21 @@ tools/pins.py verify --all       # download every pinned file and hold it to its
   `--all` for every one. For a repository it says whether the tag the row
   names is still at the pinned commit.
 
+**The CI runners a node installs** are pinned the same way, in a table of
+their own: `scripts/dashboard/runner-pins.json` lists a row for each kind
+of git host a runner registers with (`github`, GitHub's Actions runner;
+`gitea`, the runner Gitea and Forgejo share), its source written as a
+toolchain's is, with the version and the sha256 of the file for every
+platform it is offered on. `--file` with that path reads it, and the four
+verbs do there what they do for a toolchain; nothing else is written
+beside it, since a runner is not a pack.
+
+```bash
+tools/pins.py --file scripts/dashboard/runner-pins.json check          # what each runner is pinned to, and what its resolver finds now
+tools/pins.py --file scripts/dashboard/runner-pins.json move gitea     # the new version and every platform's digest
+tools/pins.py --file scripts/dashboard/runner-pins.json verify --all   # each pinned file streamed, hashed and held to its pin
+```
+
 **What a package manager installs** moves the same way. A row says what it
 asks pip or npm for (`source.lock`: the requirements, and for pip the
 Python and the platforms), and the tool asks the manager's own resolver
