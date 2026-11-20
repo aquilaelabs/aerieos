@@ -4955,6 +4955,14 @@ process.exit(bad ? 1 : 0);' "$f" || jsbad+=("$f (inline)")
         section "names defined twice (python functions and methods, the page's scripts)"
         python3 "$BB_LIB/lint-checks.py" dupes || rc=1
     fi
+    # AerieOS's release key file, read by its one reader (releasepub.py): a
+    # file that does not parse names no key, and every node enrolled from
+    # that build would pin none. Asked of the tree that signs with it, so a
+    # file gone missing fails too.
+    if _lint_own_tree && [ -f tools/sign-agent.py ] && grep -qF '"releasekey": releasekey' "$BB_LIB/lint-checks.py"; then
+        section "release key (config/aerieos-release.pub names the key, or the key and its spare)"
+        python3 "$BB_LIB/lint-checks.py" releasekey || rc=1
+    fi
     if [ -f tools/packs-export.py ] && grep -qF '"packs": packs' "$BB_LIB/lint-checks.py"; then
         section "packs (packs/ vs config/toolchains.json and agents.py)"
         python3 "$BB_LIB/lint-checks.py" packs || rc=1

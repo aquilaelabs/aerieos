@@ -38,6 +38,7 @@ import base64
 import os
 import ipaddress
 import re
+import sys
 import time
 import urllib.parse
 
@@ -55,21 +56,27 @@ _DROP = re.compile(r"^\s*(DNS|PreUp|PostUp|PreDown|PostDown|SaveConfig|Table)\s*
 _NAME = re.compile(r"[^A-Za-z0-9._-]")
 
 
-
 RELEASE_PUB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "config", "aerieos-release.pub")
+# The file's one reader (scripts/lib, which the image carries beside this
+# directory): the build's signer and aerie lint read it there too.
+_lib = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib")
+if _lib not in sys.path:
+    sys.path.insert(0, _lib)
+import releasepub  # noqa: E402
 
 
 def release_keys():
     """AerieOS's release keys as this build names them (config/aerieos-release.pub:
     a line of 64 hex characters for the key the builds sign with, and a
-    second for its spare, R232), the first one first; [] while it names none."""
-    try:
-        with open(RELEASE_PUB, encoding="utf-8") as f:
-            keys = [ln.split()[-1].strip().lower() for ln in f if ln.strip() and not ln.startswith("#")]
-    except OSError:
-        return []
-    keys = list(dict.fromkeys(keys))
-    return keys if keys and len(keys) <= 2 and all(re.fullmatch(r"[0-9a-f]{64}", k) for k in keys) else []
+    second for its spare, R232), the first one first; [] while it names
+    none, and for a file that does not parse, which release_keys_why says
+    and aerie lint fails on."""
+    return releasepub.read(RELEASE_PUB)[0]
+
+
+def release_keys_why():
+    """Why this build names no release key, or "" when it names one."""
+    return releasepub.read(RELEASE_PUB)[1]
 
 
 def release_key():

@@ -510,9 +510,29 @@ def dupes():
     sys.exit(1 if bad else 0)
 
 
+def releasekey():
+    """config/aerieos-release.pub parses to the release key, or the key and
+    its spare, each 64 hex characters, as its one reader reads it
+    (releasepub.py: the Enroll script's and the build's signer's). A file
+    that does not parse names no key at all, so every node enrolled from
+    that build would pin nothing: a red build here, never that."""
+    # The tree being linted, not the copy of aerie this runs from.
+    sys.path.insert(0, os.path.join(os.getcwd(), "scripts", "lib"))
+    import releasepub                                               # noqa: E402
+    keys, why = releasepub.read(os.path.join("config", "aerieos-release.pub"))
+    if why:
+        print(f"  [FAIL] config/aerieos-release.pub: {why}. It names the release key on one line and its spare on a "
+              f"second, each as {releasepub.NAME} and 64 hex characters; as it is, the Enroll script would hand a new "
+              "node no key to pin")
+        sys.exit(1)
+    print("  [ok]   config/aerieos-release.pub names the release key" + (" and its spare" if len(keys) > 1 else "")
+          + ", read as the Enroll script and the build's signer read it")
+    sys.exit(0)
+
+
 CHECKS = {"runner": runner, "xml": xml_, "settings": settings, "layout": layout, "hosted": hosted, "pinned": pinned,
           "channels": channels, "shipped": shipped, "formats": formats, "packs": packs, "unraid": unraid,
-          "changelog": changelog, "dupes": dupes}
+          "changelog": changelog, "dupes": dupes, "releasekey": releasekey}
 
 if __name__ == "__main__":
     # What a check returns is its verdict: layout answered 1 for a tracked
