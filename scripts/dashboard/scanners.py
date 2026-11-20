@@ -24,7 +24,6 @@ read-only at /src/NAME, and the SARIF lands in ./reports beside the file.
 The versions are pinned per node when it is deployed or updated (as nginx's
 image is, R192), and a weekly check reads Docker Hub and PyPI for newer.
 """
-import contextlib
 import json
 import os
 import re
@@ -57,7 +56,6 @@ IMAGES = {"semgrep": "semgrep/semgrep", "trivy": "aquasec/trivy"}
 SEMGREP_TAGS_URL = os.environ.get("BB_SEMGREP_TAGS_URL") or "https://hub.docker.com/v2/repositories/semgrep/semgrep/tags?page_size=100"
 TRIVY_TAGS_URL = os.environ.get("BB_TRIVY_TAGS_URL") or "https://hub.docker.com/v2/repositories/aquasec/trivy/tags?page_size=100"
 MOBSFSCAN_URL = os.environ.get("BB_MOBSFSCAN_URL") or "https://pypi.org/pypi/mobsfscan/json"
-CHECK_EVERY = 7 * 86400
 CHECK_DELAY = float(os.environ.get("BB_SCANNER_CHECK_DELAY") or 300)
 AUTOCHECK = os.environ.get("BB_SCANNER_AUTOCHECK", "1") != "0"
 DEFAULT_CRON = "0 4 * * 0"
@@ -195,7 +193,6 @@ def _agent_nodes():
 def uncovered():
     """The projects no scanner covers, each with why: no node, a node that
     hosts containers only, or a node with no scanners deployed."""
-    held = holders()
     nodes = {n["id"]: n for n in _agent_nodes()}
     recs = _load()["nodes"]
     out = []
@@ -209,7 +206,6 @@ def uncovered():
             out.append({"project": p, "why": f"{nodes[nid].get('name') or nid} hosts containers only"})
         elif not (recs.get(nid) or {}).get("deployed"):
             out.append({"project": p, "why": f"no scanners on {nodes[nid].get('name') or nid}"})
-    del held
     return out
 
 
@@ -364,12 +360,9 @@ def checked_at():
 
 
 def check_loop():
-    time.sleep(CHECK_DELAY)
-    while True:
-        if AUTOCHECK and checks.due("scanners", checked_at()):
-            with contextlib.suppress(Exception):            # noqa: BLE001 (the loop outlives one bad answer)
-                check_versions()
-        time.sleep(600)
+    """The check on its cadence. The server starts it under nginx's switch,
+    so the scanners' own is read here on every pass."""
+    checks.loop("scanners", checked_at, check_versions, CHECK_DELAY, 600, on=lambda: AUTOCHECK)
 
 
 def behind(rec):

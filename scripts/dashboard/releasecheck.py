@@ -123,12 +123,11 @@ def rank(v):
     return parse_dev(v)
 
 
-def check():
-    """Ask what the newest published release is, now. The record."""
-    with _lock:
-        if _latest["checking"]:
-            return dict(_latest)
-        _latest["checking"] = True
+def _read():
+    """What the releases list says now, for the record: ({version, tag, url}
+    of the newest release when there is one, with the dev channel's newest
+    under dev when the list was read, why not). The versions debug mode
+    picks from and the drafts' files are kept as it reads."""
     version, tag, url, error = "", "", "", ""
     token = _token()
     try:
@@ -168,13 +167,14 @@ def check():
     except (OSError, ValueError) as e:
         error = f"the releases did not answer: {e}"[:200]
         devrec = None
-    with _lock:
-        _latest.update(checking=False, at=int(time.time()), error=error)
-        if version:
-            _latest.update(version=version, tag=tag, url=url)
-        if devrec is not None:
-            _latest["dev"] = devrec
-        return dict(_latest)
+    return {**({"version": version, "tag": tag, "url": url} if version else {}),
+            **({"dev": devrec} if devrec is not None else {})}, error
+
+
+def check():
+    """Ask what the newest published release is, now. The record."""
+    import checks
+    return checks.guarded(_lock, lambda: _latest, _read)
 
 
 def latest():

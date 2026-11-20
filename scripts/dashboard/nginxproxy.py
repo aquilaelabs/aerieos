@@ -48,10 +48,9 @@ IMAGE_LINE = re.compile(r"^(\d+)\.(\d+)-alpine$")
 # toolchains' upstreams; a test points it at a file.
 TAGS_URL = (os.environ.get("BB_NGINX_TAGS_URL")
             or "https://hub.docker.com/v2/repositories/library/nginx/tags?page_size=100&name=-alpine")
-CHECK_EVERY = 7 * 86400
 CHECK_DELAY = float(os.environ.get("BB_NGINX_CHECK_DELAY") or 240)
 AUTOCHECK = os.environ.get("BB_NGINX_AUTOCHECK", "1") != "0"
-_checking = False
+_checking = {"checking": False}     # a check of the registry in flight (checks.guarded)
 HOST_RE = re.compile(r"^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?)*$")
 PATH_RE = re.compile(r"^/[A-Za-z0-9._~/-]*$")
 MAX_ROUTES = 64
@@ -460,16 +459,15 @@ def latest_image():
     return dict(_load().get("_image") or {})
 
 
-def check_image():
-    """Read the registry's tag list now and keep the newest release line's
-    alpine tag with its digest (the manifest list's, which is what a pull
-    by digest takes). An answer that could not be read keeps the last one
-    and says why; the record is what came back."""
-    global _checking
-    with _lock:
-        if _checking:
-            return latest_image()
-        _checking = True
+def _keep_image(rec):
+    st = _load()
+    st["_image"] = rec
+    _save(st)
+
+
+def _read_image():
+    """({tag, digest}, "") for the newest release line's alpine tag the
+    registry lists, or ({}, why it could not be read)."""
     tag, digest, error = "", "", ""
     try:
         with urllib.request.urlopen(TAGS_URL, timeout=20) as r:   # noqa: S310 (a fixed https URL, or a test's file://)  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
@@ -493,16 +491,15 @@ def check_image():
             error = "the registry listed no release line's alpine tag"
     except (OSError, http.client.HTTPException, ValueError, TypeError, KeyError) as e:   # URLError and a timeout are OSErrors
         error = f"could not reach the registry: {e}"[:200]
-    with _lock:
-        st = _load()
-        rec = dict(st.get("_image") or {})
-        rec.update(at=int(time.time()), error=error)
-        if tag:
-            rec.update(tag=tag, digest=digest)
-        st["_image"] = rec
-        _save(st)
-        _checking = False
-    return dict(rec)
+    return ({"tag": tag, "digest": digest} if tag else {}), error
+
+
+def check_image():
+    """Read the registry's tag list now and keep the newest release line's
+    alpine tag with its digest (the manifest list's, which is what a pull
+    by digest takes). An answer that could not be read keeps the last one
+    and says why; the record is what came back."""
+    return checks.guarded(_lock, latest_image, _read_image, keep=_keep_image, flag=_checking)
 
 
 def image_of(rec):
@@ -592,12 +589,7 @@ def check_loop():
     """The weekly check, from when the last one happened rather than from
     the start: a container restart is not a reason to ask the registry
     again. Started by the server beside the toolchains' loop."""
-    time.sleep(CHECK_DELAY)
-    while True:
-        if checks.due("nginx", checked_at()):
-            with contextlib.suppress(Exception):   # noqa: BLE001 (the loop outlives one bad answer)
-                check_image()
-        time.sleep(300)
+    checks.loop("nginx", checked_at, check_image, CHECK_DELAY, 300)
 
 
 def deployed(devapp, nid):

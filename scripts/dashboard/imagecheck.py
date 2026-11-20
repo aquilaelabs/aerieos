@@ -18,7 +18,6 @@ what a public image on Docker Hub, ghcr.io or quay.io answers; a private
 one says it could not be read, on the row, rather than guessing. The
 harness points BB_IMAGE_DIGESTS_FILE at {ref: digest} instead.
 """
-import contextlib
 import hashlib
 import http.client
 import json
@@ -37,7 +36,6 @@ devapp = None
 _lock = threading.Lock()
 _checking = {"on": False}
 
-CHECK_EVERY = 7 * 86400
 CHECK_DELAY = float(os.environ.get("BB_IMAGE_CHECK_DELAY") or 300)
 AUTOCHECK = os.environ.get("BB_IMAGE_AUTOCHECK", "1") != "0"
 DIGESTS_FILE = os.environ.get("BB_IMAGE_DIGESTS_FILE") or ""
@@ -266,9 +264,4 @@ import checks  # noqa: E402 (the cadence, R176)
 def check_loop():
     """The weekly check, from when the last one ran rather than from the
     start, beside the toolchains' and nginx's."""
-    time.sleep(CHECK_DELAY)
-    while True:
-        if checks.due("images", last_at()):
-            with contextlib.suppress(Exception):   # noqa: BLE001 (the loop outlives one bad pass)
-                check()
-        time.sleep(600)
+    checks.loop("images", last_at, check, CHECK_DELAY, 600)

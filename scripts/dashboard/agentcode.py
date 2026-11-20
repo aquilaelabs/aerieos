@@ -40,6 +40,7 @@ import time
 import urllib.request
 
 import agents
+import checks
 
 VER = re.compile(r"(\d+\.\d+\.\d+)")
 # What update and start_hold say, by key, where the agent's row has no
@@ -180,35 +181,29 @@ def check(agent_id):
     # What answers, as an error names it: a row's `latest` file is its
     # maker's download service's, anything else a registry's.
     asked = "download service" if a.latest_file else "registry"
-    with _lock:
-        rec = _latest.setdefault(a.id, {"version": "", "at": 0, "error": "", "checking": False})
-        if rec["checking"]:
-            return dict(rec)
-        rec["checking"] = True
-    version, error = "", ""
-    try:
-        with urllib.request.urlopen(latest_url(a), timeout=15) as r:   # noqa: S310 (a fixed https URL from the table, or a test's file://)  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
-            text = r.read(65536).decode("utf-8", "replace").strip()
-        # A registry's document names the version, and one that answers
-        # plainly is read as it stands; a `latest` file is only ever the
-        # version itself, so a document there is not an answer.
+
+    def read():
+        version, error = "", ""
         try:
-            got = text if a.latest_file else str((json.loads(text) or {}).get("version") or "")
-        except (ValueError, AttributeError):
-            got = text
-        m = VER.match(got)
-        if m:
-            version = m.group(1)
-        else:
-            error = f"unexpected answer from the {asked}: {got[:40]!r}"
-    except (OSError, http.client.HTTPException, ValueError) as e:   # URLError and a timeout are OSErrors; a bad URL is a ValueError
-        error = f"could not reach the {asked}: {e}"[:200]
-    with _lock:
-        rec = _latest[a.id]
-        rec.update(checking=False, at=int(time.time()), error=error)
-        if version:
-            rec["version"] = version
-        return dict(rec)
+            with urllib.request.urlopen(latest_url(a), timeout=15) as r:   # noqa: S310 (a fixed https URL from the table, or a test's file://)  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
+                text = r.read(65536).decode("utf-8", "replace").strip()
+            # A registry's document names the version, and one that answers
+            # plainly is read as it stands; a `latest` file is only ever the
+            # version itself, so a document there is not an answer.
+            try:
+                got = text if a.latest_file else str((json.loads(text) or {}).get("version") or "")
+            except (ValueError, AttributeError):
+                got = text
+            m = VER.match(got)
+            if m:
+                version = m.group(1)
+            else:
+                error = f"unexpected answer from the {asked}: {got[:40]!r}"
+        except (OSError, http.client.HTTPException, ValueError) as e:   # URLError and a timeout are OSErrors; a bad URL is a ValueError
+            error = f"could not reach the {asked}: {e}"[:200]
+        return ({"version": version} if version else {}), error
+    return checks.guarded(
+        _lock, lambda: _latest.setdefault(a.id, {"version": "", "at": 0, "error": "", "checking": False}), read)
 
 
 def check_all():
