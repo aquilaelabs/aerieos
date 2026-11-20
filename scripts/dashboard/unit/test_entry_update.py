@@ -67,6 +67,25 @@ class Row(unittest.TestCase):
         self.assertEqual(moved, {f"ex/web:2@{A}": f"ex/web:2@{B}"})
         self.assertEqual([packformat.image_said(to) for to in moved.values()], ["ex/web:2 (" + "b" * 12 + ")"])
 
+    def test_the_bell_s_row_names_a_container_behind_its_entry_by_name_and_tag(self):
+        # One row a node, beside the containers a registry's check found
+        # behind: the image said with no digest, which is the row's to show.
+        self.app()
+        for name, value in (("_load", lambda: {"site-1": {devapp.MAIN: {}}, "other": {"second": {}}}), ("_pname", lambda p, i=devapp.MAIN: p),
+                            ("_instance_node", lambda p, i: "n1")):
+            p = mock.patch.object(devapp, name, value)
+            p.start()
+            self.addCleanup(p.stop)
+        rows = containers.entries_behind()
+        self.assertEqual(rows, [("site-1", "n1", "site-1", ["ex/web:2"])])
+        import imagecheck
+        with mock.patch.object(imagecheck, "_load", lambda: {"radarr": {"node": "n1", "project": "radarr", "behind": [{"image": "lscr.io/radarr:latest"}]}}):
+            got = imagecheck.attention(lambda nid: "vps", entries=rows)
+            self.assertEqual([(a["kind"], a["node"], a["containers"]) for a in got],
+                             [("image", "vps", [{"name": "radarr", "images": ["lscr.io/radarr:latest"]}, {"name": "site-1", "images": ["ex/web:2"]}])])
+            self.assertEqual(imagecheck.attention(lambda nid: "vps", allowed=lambda p: False, entries=rows), [], "only for who may act on it")
+            self.assertNotEqual(got[0]["digest"], imagecheck.attention(lambda nid: "vps")[0]["digest"], "a dismissal holds until what is behind changes")
+
     def test_nothing_is_offered_while_the_entry_names_what_it_runs_or_is_gone(self):
         self.app(compose=MADE)
         self.assertEqual(containers.entry_moved("site-1"), {})

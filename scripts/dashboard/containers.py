@@ -535,6 +535,30 @@ def entry_moved(name, kept=None):
     return images_moved(packformat.compose_images(_compose_of(name)), entry) if entry else {}
 
 
+def entries_behind():
+    """The written containers whose entry names another image than their
+    file runs, for the bell's row beside the registry's
+    (imagecheck.attention): [(its name, its node's id, the space it is
+    under, [each image as its row names it])]. An image is said by its
+    name and tag: the digest is the row's to show, not a notice's."""
+    import nasapps
+    import packformat
+    kept, out = nasapps._all(), []
+    for project, insts in sorted(devapp._load().items()):
+        if devapp.MAIN not in insts:
+            continue
+        moved = entry_moved(project, kept)
+        if not moved:
+            continue
+        said = []
+        for to in moved.values():
+            parts = packformat.image_parts(to) or {}
+            said.append((parts.get("name") or str(to)[:120]) + (f":{parts['tag']}" if parts.get("tag") else ""))
+        out.append((devapp._pname(project, devapp.MAIN), devapp._instance_node(project, devapp.MAIN) or "",
+                    devapp.owner_of(project, devapp.MAIN) or project, said))
+    return out
+
+
 def repin(name):
     """The first half of Update on a row whose entry names another image:
     its compose file's image lines moved to the entry's, the rest of the

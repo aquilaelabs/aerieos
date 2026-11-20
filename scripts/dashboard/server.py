@@ -2227,9 +2227,11 @@ def _attention(who):
                # newest scanner versions (scanners.attention, R145).
                + scanners.attention()
                # ...and a container whose registry image moved (imagecheck, R195).
+               # ...or whose entry names another image than it runs.
                + imagecheck.attention(lambda nid: (nodes.node(nid) or {}).get("name") or nid,
                                       allowed=lambda p: users.may(who, "docker-write", p) == ""
-                                      if p and users.may_work(who, p) else users.is_admin(who))
+                                      if p and users.may_work(who, p) else users.is_admin(who),
+                                      entries=containers.entries_behind())
                # ...and a copy or move that did not happen (relocate.py).
                + relocate.attention(lambda nid: (nodes.node(nid) or {}).get("name") or nid))
             # ...and a schedule whose last run failed or was skipped (R117),

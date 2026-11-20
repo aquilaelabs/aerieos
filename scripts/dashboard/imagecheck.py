@@ -236,12 +236,15 @@ def _project_of(name, v):
     return ""
 
 
-def attention(node_name, allowed=None):
+def attention(node_name, allowed=None, entries=()):
     """The bell's rows: one per node with a container behind, kind image,
     keyed by bellseen on the digests it would move to. `allowed(project)`
     keeps the containers of the projects this account may act on: a row of
     another project's updates is news about containers it cannot touch, and
-    names what it may not see (the operator, 16 Oct)."""
+    names what it may not see (the operator, 16 Oct). `entries` are the
+    containers held by a digest whose entry names another now
+    (containers.entries_behind): no registry is asked about those, and
+    they are on the same row, since Update on the same page moves both."""
     by = {}
     for name, v in _load().items():
         if name.startswith("_") or not (v or {}).get("behind"):
@@ -249,6 +252,12 @@ def attention(node_name, allowed=None):
         if allowed is not None and not allowed(_project_of(name, v)):
             continue
         by.setdefault(v.get("node") or "", []).append((name, v["behind"]))
+    for name, nid, project, images in entries:
+        if allowed is not None and not allowed(project):
+            continue
+        rows = by.setdefault(nid or "", [])
+        if all(n != name for n, _ in rows):
+            rows.append((name, [{"image": i} for i in images]))
     out = []
     for nid, rows in sorted(by.items()):
         rows.sort()
