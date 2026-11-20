@@ -120,7 +120,43 @@ def catalog_dir_paths(root):
     return out
 
 
+def _rev(m):
+    """A pack's recipe revision, as the catalog's copy and this tree's are
+    compared by: a shipped toolchain's row's (`rev` in the pack), a coding
+    agent's install recipe's, 0 for a pack that carries neither."""
+    def n(v):
+        return v if isinstance(v, int) and not isinstance(v, bool) else 0
+    m = m if isinstance(m, dict) else {}
+    ship = m.get("shipped") if isinstance(m.get("shipped"), dict) else {}
+    agent = m.get("agent") if isinstance(m.get("agent"), dict) else {}
+    inst = agent.get("install") if isinstance(agent.get("install"), dict) else {}
+    return max(n(m.get("rev")), n(ship.get("rev")), n(inst.get("rev")))
+
+
+def catalog_ahead(root):
+    """[(name, the catalog's rev, this tree's)] for each official pack whose
+    recipe the catalog holds at a later revision than this tree. A pin moved
+    in the catalog between releases raises its rev there; written over from a
+    tree that has not taken the move, the catalog would go back to the older
+    recipe, and an install would stop reading it as the newer one."""
+    out = []
+    for path, m, name in catalog_dir_paths(root):
+        try:
+            with open(path, encoding="utf-8") as f:
+                there = json.load(f)
+        except (OSError, ValueError):
+            continue
+        if _rev(there) > _rev(m):
+            out.append((name, _rev(there), _rev(m)))
+    return out
+
+
 def catalog_write(root):
+    ahead = catalog_ahead(root)
+    if ahead:
+        sys.exit("not written: the catalog holds a later recipe than this tree for "
+                 + ", ".join(f"{name} (rev {a} there, {b} here)" for name, a, b in ahead)
+                 + ". Move this tree's pin first (tools/pins.py move NAME), so the export does not take a newer recipe back.")
     n = 0
     for path, m, _name in catalog_dir_paths(root):
         os.makedirs(os.path.dirname(path), exist_ok=True)

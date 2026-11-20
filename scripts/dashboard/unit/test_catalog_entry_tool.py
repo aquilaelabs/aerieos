@@ -285,3 +285,42 @@ class Scratch(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NeverBack(unittest.TestCase):
+    """A pin moved in the catalog between releases raises a recipe's rev
+    there. Written over from a tree that has not taken the move, the catalog
+    would go back to the older recipe: the export refuses, naming the pack."""
+
+    def setUp(self):
+        self.d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.d, True)
+        self.t = tool()
+
+    def test_a_revision_is_read_wherever_a_pack_carries_it(self):
+        rev = self.t._rev
+        self.assertEqual(rev({"shipped": {"rev": 3}}), 3)
+        self.assertEqual(rev({"agent": {"install": {"rev": 4}}}), 4)
+        self.assertEqual(rev({"service": {"kind": "router"}}), 0)
+        self.assertEqual(rev({"shipped": {"rev": True}}), 0)
+        self.assertEqual(rev(None), 0)
+
+    def test_a_later_recipe_in_the_catalog_is_not_written_over(self):
+        self.t.catalog_write(self.d)                    # the folders, as this tree has them
+        self.assertEqual(self.t.catalog_ahead(self.d), [])
+        path, mine, name = next(x for x in self.t.catalog_dir_paths(self.d) if self.t._rev(x[1]))
+        with open(path, encoding="utf-8") as f:
+            there = json.load(f)
+        if isinstance(there.get("shipped"), dict) and there["shipped"].get("rev"):
+            there["shipped"]["rev"] += 1
+        else:
+            there["agent"]["install"]["rev"] += 1
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(there, f)
+        self.assertEqual(self.t.catalog_ahead(self.d), [(name, self.t._rev(mine) + 1, self.t._rev(mine))])
+        with self.assertRaises(SystemExit) as e:
+            self.t.catalog_write(self.d)
+        self.assertIn(name, str(e.exception))
+        self.assertIn("tools/pins.py move", str(e.exception))
+        with open(path, encoding="utf-8") as f:
+            self.assertEqual(json.load(f), there, "nothing was written")
