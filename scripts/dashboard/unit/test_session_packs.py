@@ -1,8 +1,9 @@
 """A session asks for a tool pack from the vetted catalog (R169 step 5): the
 project's Install a tool pack dial (ask by default) kept as the others are,
 the briefing naming the catalog and the dial, an ask held for the
-administrators with the index's pin, and aerie tool's own words kept out of a
-pack's name."""
+administrators with the index's pin and the node it is for, and aerie tool's
+own words kept out of a pack's name. What the ask and its Allow do is
+test_tool_install.py's."""
 import json
 import os
 import shutil
@@ -43,12 +44,16 @@ class SessionPacks(unittest.TestCase):
         self.assertIn("Install a tool pack is deny", line)
 
     def test_an_ask_is_held_with_the_pin(self):
-        entry = {"name": "hexkit", "url": "https://example.com/hex", "commit": "a" * 40, "sha256": "b" * 64, "path": "", "tier": "vetted"}
+        entry = {"name": "hexkit", "url": "https://example.com/hex", "commit": "a" * 40, "sha256": "b" * 64, "path": "", "tier": "vetted",
+                 "node": "n_1234abcd", "node_name": "sandbox"}
         self.assertIn("error", phone.ask_pack("", "alpha", entry))
         r = phone.ask_pack("to read firmware dumps", "alpha", entry, asker_name="ann")
         self.assertTrue(r.get("ok"))
+        self.assertEqual(r["node"], "sandbox", "the asker is told which node it is for")
         held = next(x for x in phone._reqs if x["id"] == r["id"])
         self.assertEqual((held["kind"], held["pack"]["commit"], held["cmd"]), ("pack", "a" * 40, ["tool", "install", "hexkit"]))
+        self.assertEqual((held["node"], held["node_name"], held["to"]), ("n_1234abcd", "sandbox", "admins"))
+        self.assertNotIn("node", held["pack"], "the node is the request's, as every ask's is")
 
     def test_bb_tools_own_words_are_not_pack_names(self):
         m, errs = toolpacks.validate({"name": "install", "label": "x", "platforms": ["linux/amd64"],

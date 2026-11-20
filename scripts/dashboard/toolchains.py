@@ -29,7 +29,7 @@ from pathlib import Path
 # import finds nothing.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from fields import field  # noqa: E402
-from names import tmux_name  # noqa: E402
+from names import agent_sessions, tmux_name  # noqa: E402
 import agents  # noqa: E402
 import catalogrows  # noqa: E402
 import packformat  # noqa: E402
@@ -1815,6 +1815,16 @@ def node_has(n):
     return out
 
 
+def node_whole(n):
+    """The toolchain names this node's store holds with their tool in them:
+    node_has's, without the folders the node lists as incomplete (an install
+    that did not finish: a directory with no tool its layout runs, which
+    the installer clears before it installs again). What is installed, where
+    node_has is what holds files."""
+    rep = (n or {}).get("reported") or {}
+    return node_has(n) - set((rep.get("store_dirs") or {}).get("incomplete") or [])
+
+
 def installed_where(name):
     """The names of the nodes whose store holds `name`, by what each last
     reported: what a tool pack's removal is refused over (B84), since a pack
@@ -1910,6 +1920,31 @@ def unsupported(names, plat):
     by = {p["name"]: p for p in TOOLCHAINS}
     return [(x, ", ".join(by[x].get("platforms") or ["linux/amd64"]))
             for x in names if x in by and not supports(by[x], plat)]
+
+
+def unfit(n, names):
+    """Why this node cannot have these toolchains, or "": one packaged for
+    another platform, or one whose system packages are named for other
+    package managers alone. Asked before a job is queued, and before a
+    person is asked to allow one a session wants."""
+    # Seven of these recipes name linux-x86_64 in their URL and one names
+    # ubuntu24.04, so a node of another platform would download a couple
+    # of hundred megabytes and fail on exec, or install and fail later.
+    # Refused by name instead. arm64 Linux needs no new agent to reach
+    # this, which is why it is a live wrong answer rather than a future
+    # one (roadmap #18).
+    plat = platform_of(n)
+    no = unsupported(names, plat)
+    if no:
+        return (f"{n['name']} is {plat}, and "
+                + "; ".join(f"{x} is packaged for {p}" for x, p in no)
+                + ". The catalog names the platform each recipe works on; "
+                  "adding another is a URL per row, not a code change.")
+    fam = str(((n.get("reported") or {}).get("sysdeps") or {}).get("family") or "")
+    by = {p["name"]: p for p in TOOLCHAINS}
+    off = [(x, family_miss(by.get(x) or {}, fam)) for x in names]
+    off = [(x, w) for x, w in off if w]
+    return "; ".join(f"{x} is not for {n['name']}: {w}" for x, w in off)
 
 
 def _need_kb(name):
@@ -2173,28 +2208,15 @@ def node_job(principal, nid, action, names, driver=""):
     if action == "install" and names:
         # What these need, ahead of them. android-tools without a jdk fails
         # inside sdkmanager with a message that names neither.
-        have = node_has(n)
+        # One whose folder holds no tool (an install that did not finish)
+        # is not there to build on: it is installed again, ahead of what
+        # needs it.
+        have = node_whole(n)
         ordered, _ = with_requires(names, have)
         names, added = ordered, [x for x in ordered if x not in names]
-        # Seven of these recipes name linux-x86_64 in their URL and one names
-        # ubuntu24.04, so a node of another platform would download a couple
-        # of hundred megabytes and fail on exec, or install and fail later.
-        # Refused by name instead. arm64 Linux needs no new agent to reach
-        # this, which is why it is a live wrong answer rather than a future
-        # one (roadmap #18).
-        plat = platform_of(n)
-        no = unsupported(names, plat)
-        if no:
-            return {"error": f"{n['name']} is {plat}, and "
-                             + "; ".join(f"{x} is packaged for {p}" for x, p in no)
-                             + ". The catalog names the platform each recipe works on; "
-                               "adding another is a URL per row, not a code change."}
-        fam = str(((n.get("reported") or {}).get("sysdeps") or {}).get("family") or "")
-        by = {p["name"]: p for p in TOOLCHAINS}
-        off = [(x, family_miss(by.get(x) or {}, fam)) for x in names]
-        off = [(x, w) for x, w in off if w]
-        if off:
-            return {"error": "; ".join(f"{x} is not for {n['name']}: {w}" for x, w in off)}
+        why = unfit(n, names)
+        if why:
+            return {"error": why}
         need_kb = sum(_need_kb(x) for x in names)
         free = store.get("free_mb")
         if need_kb and free is not None and free * 1024 < need_kb * 1.2:
@@ -2565,3 +2587,189 @@ def verb(action, req, principal):
         return {"error": "nothing selected"}, 400
     start_job(action, names)
     return {"ok": True, "queued": names}, 200
+
+
+# ---- what a session asks for with `aerie tool install` ---------------------
+# A session names a tool and it is installed on the node that session runs
+# on, once its space's Install a tool pack dial lets it: at once (auto), or
+# when a person allows the ask on the bell, in that person's name. The name
+# is a toolchain AerieOS ships, installed as the Library's Install does, or
+# a pack of the vetted catalog, added here first when it is not yet. An ask
+# used to add the pack and stop: Allow installed nothing on any node and
+# said so to nobody, and a shipped toolchain's name was looked up among the
+# packs and kept as one beside the toolchain it named.
+#
+# The four below are the server's, handed over as packs_rows is: this
+# module reads neither the catalog's index, the kept packs nor the bell.
+pack_entry = None     # name -> the vetted catalog's pack entry of that name, withdrawn ones left out, or None
+pack_have = None      # toolpacks.packs: {name: record} of the packs kept here
+pack_add = None       # (entry, by, may_root) -> the pack kept at the index's pin, or {"error"}
+pack_ask = None       # phone.ask_pack: the ask held for a person on the bell
+# What an ask holds of a pack's entry in the signed index until a person
+# answers: where it is fetched from and at which pin, its tier, and the
+# format it is written in, which a build too old for it refuses by.
+PIN_KEYS = ("url", "commit", "sha256", "path", "tier", "format", "framework")
+
+
+def shipped_names():
+    """The names of the toolchains AerieOS ships: the catalog's rows that
+    no pack brought."""
+    return {p["name"] for p in TOOLCHAINS if not p.get("pack")}
+
+
+def shipped_name(name):
+    """The shipped toolchain `name` means, or "": a row's own name, or the
+    vetted catalog's word for an Android part (android-ndk for android:ndk,
+    a pack's name taking no colon)."""
+    name = str(name or "")
+    have = shipped_names()
+    if name in have:
+        return name
+    part = "android:" + name[len("android-"):] if name.startswith("android-") else ""
+    return part if part in have else ""
+
+
+def session_node(mine, said="", uid="", project="", shown="", what="it"):
+    """(node id, "") for the node a session of `project` asks from, or
+    ("", why). `mine` is the space's nodes, its own first and then the ones
+    it also works on. A space on one node is on that one. On several, the
+    session says which: the id its terminal was told, believed only when it
+    is one of the space's own, since a variable is the session's to set.
+    One that says none is found by the heartbeats, when exactly one node of
+    the space's reports a session of this account's on this space."""
+    mine = [i for i in dict.fromkeys(mine or []) if i]
+    shown = shown or project or "this space"
+    if not mine or not nodes:
+        return "", (f"{shown} runs on no node, so there is no machine to install {what} on: "
+                    "a node is picked in the space's settings")
+    if said in mine:
+        return said, ""
+    if len(mine) == 1:
+        return mine[0], ""
+    want = set(agent_sessions(project)) if project and uid else set()
+    live = nodes.node_sessions() if want else {}
+    on = [nid for nid in mine
+          if any(str((r or {}).get("name") or "").startswith(f"{uid}~")
+                 and _OWNER.sub("", str((r or {}).get("name") or "")) in want
+                 for r in (live.get(nid) or ("", []))[1])]
+    if len(on) == 1:
+        return on[0], ""
+    names = ", ".join((nodes.node(i) or {}).get("name") or i for i in mine)
+    return "", (f"{shown} works on several nodes ({names}) and which one this session runs on could not be told: "
+                f"start the session again from the dashboard, or have a person install {what} on its node from the Library")
+
+
+def _accepts(name, node_name):
+    """(why, the agreements) when installing `name` is not a session's to
+    start, or ("", []): it accepts an agreement (Google's Android SDK
+    terms, NVIDIA's CUDA license), and only a person accepts one, by name,
+    in the Library. Never an Allow on the bell, which would accept it on
+    the strength of a session's reason."""
+    need = agreements([name])
+    if not need:
+        return "", []
+    return (f"installing {name} accepts {' and '.join(t['label'] for t in need)}, which only a person accepts: "
+            f"a person installs {name} on {node_name} from the Library, where they accept it"), need
+
+
+def session_install(project, req, *, mine, uid="", mode="ask", asker="", shown=""):
+    """A session's `aerie tool install NAME`, once server.py has read whose
+    session asks: the tool on the node that session runs on, as its space's
+    Install a tool pack dial says. One the node holds whole is said at
+    once and nobody is asked; deny refuses; ask holds it for a person on
+    the bell, naming the node; auto installs it now, as the session's own.
+    (payload, status)."""
+    name = field(req, "name")
+    tc = shipped_name(name)
+    entry = None
+    if not tc:
+        entry = pack_entry(name) if pack_entry else None
+        if not entry:
+            return {"error": f"no tool pack called {name or 'nothing'} in the vetted catalog: "
+                             "aerie tool search WORDS lists them"}, 400
+        # One the index calls official that is no toolchain's row is a coding
+        # agent AerieOS ships: never a pack to add, and not a session's.
+        if entry.get("tier") == "official":
+            return {"error": f"{name} is part of AerieOS itself, not a tool pack to add: "
+                             "a person installs or updates it from the Library"}, 400
+    what = tc or name
+    nid, no_node = session_node(mine, field(req, "node"), uid, project, shown, what)
+    n = nodes.node(nid) if nid else None
+    added = bool(tc) or what in (pack_have() if pack_have else {})
+    if n and added and what in node_whole(n):
+        return {"ok": True, "installed": True, "name": what, "node": n["name"],
+                "note": f"{what} is installed on {n['name']} already"
+                        + ("" if tc else ": a pack is switched on for a space under its settings' Toolchains")}, 200
+    if mode == "deny":
+        return {"error": f"{project}'s settings say an agent may not add a tool pack (Install a tool pack is deny): "
+                         "a person adds one from the Library, or changes that in the space's settings"}, 403
+    if not n:
+        return {"error": no_node or f"the node {shown or project} runs on is gone: pick another in the space's settings"}, 400
+    if n.get("kind") != "agent":
+        return {"error": f"{n['name']} runs no agent, so nothing is installed there from here: "
+                         "toolchains are installed there by hand"}, 400
+    # What would be refused on Allow is refused now, before a person is
+    # asked: a platform it is not packaged for, an agreement to accept.
+    if added:
+        why = unfit(n, with_requires([what], node_whole(n))[0])
+        if why:
+            return {"error": why}, 400
+        why, need = _accepts(what, n["name"])
+        if why:
+            return {"error": why, "accept": need}, 409
+    elif entry.get("platforms") and not supports({"platforms": entry["platforms"]}, platform_of(n)):
+        return {"error": f"{n['name']} is {platform_of(n)}, and {what} is packaged for "
+                         f"{', '.join(str(x) for x in entry['platforms'])}"}, 400
+    held = {"name": what, "node": nid, "node_name": n["name"], "toolchain": bool(tc),
+            **({k: entry[k] for k in PIN_KEYS if entry.get(k) is not None} if entry else {})}
+    if mode == "ask":
+        r = pack_ask(field(req, "why") or f"install {what} on {n['name']}", project, held, asker_name=asker) \
+            if pack_ask else {"error": "no ask is wired up here"}
+        return (r, 400) if r.get("error") else (r | {"name": what}, 200)
+    r = session_do(held, f"session:{project}")
+    return r, (400 if r.get("error") else 200)
+
+
+def session_do(held, by, pack_by="", may_root=False):
+    """Install what a session asked for on the node it asked from: a pack
+    not yet kept here is added first, at the pin the ask held (as
+    `pack_by`, with `may_root` for an administrator's Allow), and then the
+    install is queued there as `by`, the way the Library's Install queues
+    it. Run at once for a dial at auto, and by a person's Allow on the bell.
+    {ok, job, said, ...}, {ok, said} where there was nothing left to do, or
+    {error}: `said` is the sentence for whoever asked and whoever allowed,
+    which the job's id is put after."""
+    name, nid = str(held.get("name") or ""), str(held.get("node") or "")
+    n = nodes.node(nid) if nodes and nid else None
+    if not n:
+        return {"error": f"the node {name} was asked for on is gone: ask again from a session on the space's node"}
+    added = False
+    if not held.get("toolchain"):
+        rec = (pack_have() if pack_have else {}).get(name)
+        if rec is None:
+            r = pack_add(held, pack_by or by, may_root) if pack_add else {"error": "no tool pack path is wired up here"}
+            if r.get("error"):
+                return r
+            refresh_packs()
+            added = True
+        elif ((rec.get("manifest") or {}).get("touches") or {}).get("root") and not may_root:
+            # Added by an administrator, and still theirs to put on a node.
+            return {"error": f"{name}: it needs root on the node (its touches say so): "
+                             f"an administrator installs it on {n['name']} from the Library"}
+    kept = f"{name} is added to the catalog here, and " if added else ""
+    if name in node_whole(n):
+        return {"ok": True, "name": name, "node": nid, "node_name": n["name"], "added": added,
+                "said": f"{kept}{'it' if added else name} is installed on {n['name']} already"}
+    why = _accepts(name, n["name"])[0]
+    if why:
+        return {"error": kept + why}
+    r, _ = verb("install", {"node": nid, "names": [name]}, by)
+    if r.get("error"):
+        return {"error": f"{kept}its install on {n['name']} was refused: {r['error']}" if added else r["error"]}
+    also = [x for x in (r.get("added") or []) if x != name]
+    said = (f"{name} is already queued to install on {n['name']}" if r.get("already")
+            else f"{kept}installing {'it' if added else name} on {n['name']}"
+                 + (f", with {' and '.join(also)} which it needs" if also else "")
+                 + (", once the job running there ends" if r.get("waits") else ""))
+    return {"ok": True, "job": r.get("job") or "", "name": name, "node": nid, "node_name": n["name"],
+            "added": added, "also": also, "said": said}

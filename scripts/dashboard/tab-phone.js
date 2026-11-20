@@ -121,6 +121,12 @@ async function phRead(probe){
 function phLanded(j, pressed){
   if (j.error){ if (pressed || !j.unreached) notify(j.unreached ? "phone: " + j.error : j.error, true); }
   else ph = j;
+  // What an Approve started, said to whoever pressed it: the install a
+  // session asked for (aerie tool install), as its job's own toast.
+  if (pressed && !j.error && j.said){
+    if (j.job) notifyJob(j.job, j.said);
+    else notify(j.said);
+  }
   phBusy = ""; phRefreshing = false;
   if (ph && !ph.nodes.some(n => n.id === phNode)) phNode = ph.nodes[0]?.id || "";
 }

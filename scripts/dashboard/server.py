@@ -5068,10 +5068,30 @@ def _pack_from_catalog(entry, by, may_root=False):
         return {"error": f"{entry['name']} {past}"}
     shipped = {r["name"] for r in toolchains.load_toolchains()}
     return toolpacks.add(entry["url"], entry["commit"], by, shipped, sha256=entry["sha256"],
-                         tier=packformat.tier_of(entry.get("tier")), path=entry.get("path", ""), may_root=may_root)
+                         tier=packformat.tier_of(entry.get("tier")), path=entry.get("path") or "", may_root=may_root)
 
 
-phone.pack_runner = lambda project, entry, by: _pack_from_catalog(entry, f"session:{project} (allowed by {by})", may_root=True)
+def _catalog_pack(name):
+    """The vetted catalog's tool pack entry of this name, withdrawn ones
+    left out, or None: what a session's aerie tool install names when it is
+    no toolchain AerieOS ships."""
+    return next((e for e in (catalogindex.index(settings.get("catalog_url") or None).get("index") or {}).get("packs") or []
+                 if e["name"] == name and e.get("kind", "pack") == "pack" and not e.get("withdrawn")), None)
+
+
+# A session's aerie tool install (toolchains.session_install): the catalog's
+# entry for a name, the packs kept here, the add at the index's pin and the
+# ask on the bell are this file's to hand over.
+toolchains.pack_entry = _catalog_pack
+toolchains.pack_have = toolpacks.packs
+toolchains.pack_add = _pack_from_catalog
+toolchains.pack_ask = phone.ask_pack
+# Allow installs it on the node the ask names, as the person who allowed
+# it, the session named beside them on the job; a pack kept on the way is
+# the session's, allowed by them, as it was. An administrator's Allow, so
+# a pack that needs root may be kept.
+phone.pack_runner = lambda project, held, by: toolchains.session_do(
+    held, f"user:{by} (for session:{project})", pack_by=f"session:{project} (allowed by {by})", may_root=True)
 
 
 def _with_vmnets(nid, own):
@@ -6819,7 +6839,7 @@ ROUTES = (
     Route("POST", "prefix", "/api/toolchains", "_toolchains", "handler"),
     Route("POST", "exact", "/api/agents", "_agents", "handler"),
     Route("POST", "exact", "/api/toolpacks", "_toolpacks", "handler", session=("install",),
-          instead="a session asks for a pack from the catalog with aerie tool install NAME, nothing else"),
+          instead="a session asks for a tool on its node with aerie tool install NAME, nothing else"),
     Route("POST", "prefix", "/api/emulator", "_emulator", "handler"),
     Route("POST", "prefix", "/api/logs", "_logs", "handler"),
     Route("POST", "prefix", "/api/idle", "_idle", "handler"),
@@ -12535,27 +12555,22 @@ class Handler(BaseHTTPRequestHandler):
         archive (/api/upload-archive's id); add it as it was shown; read a
         pack made here's manifest back for Edit; or remove it (R77).
         Curate's (R174), since a pack joins every node's catalog. A session
-        asks for one from the vetted catalog by name (aerie tool install, R169
-        step 5), as its project's Install a tool pack dial says."""
+        asks for a tool by name (aerie tool install, R169 step 5), a
+        toolchain AerieOS ships or a pack of the vetted catalog, to be
+        installed on the node it runs on, as its project's Install a tool
+        pack dial says."""
         me = self._who() or {}
         if me.get("session"):
             sess = me["session"]             # install alone reaches here (SESSION_ACTIONS)
-            name = field(req, "name")
-            entry = next((e for e in (catalogindex.index(settings.get("catalog_url") or None).get("index") or {}).get("packs") or []
-                          if e["name"] == name and e.get("kind", "pack") == "pack" and not e.get("withdrawn")), None)
-            if not entry:
-                return self._json({"error": f"no tool pack called {name or 'nothing'} in the vetted catalog: aerie tool search WORDS lists them"}, 400)
-            if name in toolpacks.packs():
-                return self._json({"ok": True, "note": f"{name} is added already: install it on a node from the Library"})
-            mode = prefs.get(sess)["installpacks"]
-            if mode == "deny":
-                return self._json({"error": f"{sess}'s settings say an agent may not add a tool pack (Install a tool pack is deny): "
-                                            "a person adds one from the Library, or changes that in the space's settings"}, 403)
-            # At auto one that needs root is refused by the add itself (R169
-            # step 4), its words saying to ask: an administrator's alone.
-            if mode == "ask":
-                return self._result(phone.ask_pack(field(req, "why") or f"add the tool pack {name}", sess, entry, asker_name=me.get("name") or ""))
-            return self._result(_pack_from_catalog(entry, f"session:{sess}"))
+            # Whose session, and which nodes its space works on, are read
+            # here from the token: the project it proves and the account it
+            # was minted for. The node the request names counts only among
+            # those (toolchains.session_node).
+            pf = prefs.get(sess) or {}
+            return self._json(*toolchains.session_install(
+                sess, req, mine=[] if NODES_OK else [pf.get("node") or "", *(pf.get("nodes") or [])],
+                uid=me.get("seat") or "", mode=pf.get("installpacks") or "ask",
+                asker=me.get("name") or "", shown=roles.shown(sess)))
         if self._refused("curate"):
             return None
         action = req.get("action")

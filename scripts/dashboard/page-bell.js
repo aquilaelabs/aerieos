@@ -572,6 +572,9 @@ function askTag(a){
           : a.kind === "release-withdraw" ? `withdraw the ${esc(a.tag || "")} release of ${esc(a.project ? projLabel(a.project) : "a project")} and its tag: needs your answer`
           : a.kind === "phone-use" ? `your phone, from ${esc(a.project ? projLabel(a.project) : "a project")}: needs your answer`
           : a.kind === "push" ? `a push from ${esc(a.project ? projLabel(a.project) : "a project")} looks sensitive: needs your answer`
+          // A tool a session asked for (aerie tool install): which one, and
+          // the node Approve installs it on.
+          : a.kind === "pack" ? `install ${esc(a.name || "a tool")} on ${esc(a.node_name || "its node")}: needs your answer`
           : "needs your answer");
 }
 
@@ -579,7 +582,7 @@ function askTag(a){
 // verbs, adb's for a phone.
 function askCmd(a){
   const pre = a.kind === "root" ? "# " : a.kind === "phone-use" ? ""
-    : ["rebuild", "container", "sign", "sign-key", "release", "release-edit", "release-remove", "release-withdraw", "release-sign", "push"].includes(a.kind) ? "aerie " : "adb ";
+    : ["rebuild", "container", "sign", "sign-key", "release", "release-edit", "release-remove", "release-withdraw", "release-sign", "push", "pack"].includes(a.kind) ? "aerie " : "adb ";
   return pre + esc((a.cmd || []).join(" "));
 }
 

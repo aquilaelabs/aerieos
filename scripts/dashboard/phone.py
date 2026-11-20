@@ -68,7 +68,9 @@ container_maker = None
 # A VM's create or action, run on Allow (R91): vms.create or vms.act, as the
 # page runs them, with the asking session's project.
 vm_runner = None
-pack_runner = None         # (project, entry, by) -> a catalog pack added (R169 step 5)
+# (project, held, by) -> the tool a session asked for (R169 step 5), installed
+# on the node the ask names by the person who allowed it: {ok, job, said}.
+pack_runner = None
 # signing.start(principal, project, file, route), set by the server: what
 # Allow on a session's `aerie sign` runs (R106), queued as the session asked.
 signer = None
@@ -749,6 +751,10 @@ def _req_public(r):
     if r.get("kind") == "push":
         out["detail"] = r.get("detail") or ""
         out["count"] = len(r.get("findings") or [])
+    # A tool a session asked for is named, for the row that says what goes
+    # on which node; its address and pin stay off the row.
+    if r.get("kind") == "pack":
+        out["name"] = (r.get("pack") or {}).get("name") or ""
     return out
 
 
@@ -1274,16 +1280,22 @@ def ask_vm(why, project, req, asker_name=""):
                   "claude", "admins", "the administrators", asker_name, extra={"vm": keep})
 
 
-def ask_pack(why, project, entry, asker_name=""):
-    """A session asking for a tool pack from the vetted catalog (R169 step
-    5), its project's Install a tool pack dial at ask: held for the
-    administrators, since a pack joins every node's catalog. Allow keeps it
-    at the commit the signed index pins, as the Library's Install does."""
+def ask_pack(why, project, held, asker_name=""):
+    """A session asking for a tool on the node it runs on (aerie tool
+    install, R169 step 5), its project's Install a tool pack dial at ask:
+    held for the administrators, since a toolchain goes into a node's
+    store and a pack joins every node's catalog. `held` names the tool, the
+    node, whether it is a toolchain AerieOS ships and, for a pack of the
+    vetted catalog, the pin the signed index names. Allow installs it on
+    that node as the Library's Install does, a pack kept first at that pin
+    when it is not yet (toolchains.session_do); the request names the node,
+    so the person reads where it goes before they answer."""
     why = _reason(why)
     if not why:
-        return {"error": "say what the pack is for: a person is answering a question you are asking them"}
-    keep = {k: entry.get(k) for k in ("name", "url", "commit", "sha256", "path", "tier")}
-    return _queue("pack", why, ["tool", "install", str(entry.get("name") or "")], "", "", project,
+        return {"error": "say what the tool is for: a person is answering a question you are asking them"}
+    keep = {k: held.get(k) for k in ("name", "url", "commit", "sha256", "path", "tier", "format", "framework", "toolchain") if k in held}
+    return _queue("pack", why, ["tool", "install", str(held.get("name") or "")],
+                  str(held.get("node") or ""), str(held.get("node_name") or ""), project,
                   "claude", "admins", "the administrators", asker_name, extra={"pack": keep})
 
 
@@ -1509,12 +1521,20 @@ def decide(rid, allow, uid, name="", admin=False, session=False):
                      out=str(res.get("error") or res.get("job") or "done"))
         return {"error": res["error"]} if res.get("error") else {"ok": True}
     if r.get("kind") == "pack":
-        # A catalog pack a session asked for (R169 step 5), kept at its pin.
-        res = pack_runner(r.get("project") or "", r.get("pack") or {}, name or "a person") if pack_runner else \
-            {"error": "no tool pack path is wired up here"}
+        # A tool a session asked for (R169 step 5), installed on the node it
+        # asked from: the outcome names the job, for the session's verb, and
+        # the answer to this press carries it too, for the person's toast.
+        # Allow used to keep the pack and install it nowhere (B1040).
+        res = pack_runner(r.get("project") or "", {**(r.get("pack") or {}), "node": r.get("node") or "",
+                                                  "node_name": r.get("node_name") or ""}, name or "a person") \
+            if pack_runner else {"error": "no tool pack path is wired up here"}
+        done = str(res.get("said") or "installed") + (f": job {res['job']}" if res.get("job") else "")
         with _lock:
-            r.update(state="done", code=1 if res.get("error") else 0, out=str(res.get("error") or "added"))
-        return {"error": res["error"]} if res.get("error") else {"ok": True}
+            r.update(state="done", code=1 if res.get("error") else 0,
+                     out=str(res.get("error") or done), job=str(res.get("job") or ""))
+        if res.get("error"):
+            return {"error": res["error"]}
+        return {"ok": True, **{k: res[k] for k in ("job", "said") if res.get(k)}}
     if r.get("kind") == "phone-use":
         # A lent phone's command, allowed by its owner (R120): run as the
         # lease would have run it, on a thread (a recording takes its
@@ -1595,7 +1615,9 @@ def outcome(rid, project=""):
             return {"error": "no such request"}
         return {"ok": True, "state": r["state"], "out": r["out"],
                 "code": r["code"], "why": r["why"],
-                **({"apply": r["apply"]} if r.get("apply") else {})}
+                **({"apply": r["apply"]} if r.get("apply") else {}),
+                # The job an allowed install queued (aerie tool install).
+                **({"job": r["job"]} if r.get("job") else {})}
 
 
 # ---- installing an APK -----------------------------------------------------
