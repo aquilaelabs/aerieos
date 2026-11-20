@@ -96,6 +96,45 @@ class JavaScript(unittest.TestCase):
                                "5  function (anonymous) passed to add_filter"])
 
 
+class MethodsInACall(unittest.TestCase):
+    """An object written inside a call's parentheses, and what is its."""
+
+    def test_a_method_of_an_object_handed_to_a_call_is_a_definition(self):
+        s = scan("const t = {};\n"
+                 "walk(parse(read(D), false), {Program(p){\n"
+                 "  for (const n of ['A', 'B'])\n"
+                 "    t[n] = (p.x || []).map(e => e.y);\n"
+                 "  p.stop();\n"
+                 "}});\n"
+                 "function f(){\n"
+                 "  walk(tree, {\n"
+                 "    Leaf(p){ note(p); },\n"
+                 "  }, {Other(q){ keep(q); }});\n"
+                 "}\n", "a.mjs")
+        self.assertIn(("Program", 2, 6), defs(s))
+        self.assertIn(("map", 4, "Program"), calls(s))
+        self.assertIn(("stop", 5, "Program"), calls(s))
+        self.assertNotIn("Program", {c["name"] for c in s.calls})
+        self.assertIn(("Other", 10, 10), defs(s))
+        self.assertIn(("keep", 10, "Other"), calls(s))
+
+    def test_a_call_in_a_method_s_own_parameters_is_still_a_call(self):
+        s = scan("class A {\n"
+                 "  bound(a, b = f(1), c = [g(2), h(3)]) {\n"
+                 "    go();\n"
+                 "  }\n"
+                 "  other(x = {k: pick(4)}) {\n"
+                 "    go();\n"
+                 "  }\n"
+                 "}\n", "a.js")
+        names = {d[0] for d in defs(s)}
+        self.assertIn("bound", names)
+        self.assertIn("other", names)
+        for n in ("f", "g", "h", "pick"):
+            self.assertNotIn(n, names)
+            self.assertIn(n, {c["name"] for c in s.calls})
+
+
 class Routes(unittest.TestCase):
     """A route table's rows, which are how a python change reaches the
     suites that ask its paths."""

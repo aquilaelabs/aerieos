@@ -960,12 +960,18 @@ class JSScanner:
             self.fn_generic -= 1
             self.last_sig = ">"
             return
-        mm = getattr(self, "maybe_method", None)
+        mm, mm_depth = getattr(self, "maybe_method", None), getattr(self, "mm_depth", 0)
         self._punct(c)
-        if c == "(" and mm and self.parens - 1 > mm[2]:
+        now = self.maybe_method
+        if c == "(" and mm and self.parens - 1 > mm[2] and not (now is not None and now is not mm and self.depth > mm_depth):
             # a paren inside a method's own parameters, `(number | null)[]`
-            # or a default `x = f()`, does not undo the method's header
-            self.maybe_method = mm
+            # or a default `x = f()`, does not undo the method's header.
+            # Unless a brace has opened inside those parentheses since and
+            # the name stands where a method does: `walk(tree, {Program(p){`
+            # is a call handed an object, and Program is that object's method.
+            self.maybe_method, self.mm_depth = mm, mm_depth
+        elif now is not None and now is not mm:
+            self.mm_depth = self.depth
 
     def _punct(self, c):
         s = self.s
