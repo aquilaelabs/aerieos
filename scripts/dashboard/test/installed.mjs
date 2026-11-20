@@ -212,18 +212,41 @@ await section("an install's receipt", async () => {
     const host = document.createElement('div');
     const at = Date.UTC(2026, 10, 13, 5, 0, 0) / 1000;
     const rc = more => ({ commit: 'a'.repeat(40), tree: '1'.repeat(64), files: 214, bytes: 50331648, at, stale: '', before: '', differs: [], ...more });
-    const text = p => { host.innerHTML = tcReceiptLines(p); return [...host.querySelectorAll('.tcreceipt')].map(e => `${e.classList.contains('warn') ? 'WARN ' : ''}${e.textContent}`); };
+    // A pack's row carries its pack; a toolchain AerieOS ships carries none.
+    const text = (p, pack = {}) => { host.innerHTML = tcReceiptLines({ pack, ...p }); return [...host.querySelectorAll('.tcreceipt')].map(e => `${e.classList.contains('warn') ? 'WARN ' : ''}${e.textContent}`); };
+    const dl = more => ({ to: 'dl/x.tgz', url: 'https://example.com/x.tgz', held: 'sha256', sha256: 'ab'.repeat(32), keys: '', sig: '', platform: '', ...more });
+    const line = p => { host.innerHTML = tcHeldLine(p); return host.querySelector('.tcheld')?.textContent || ''; };
     return { plain: text({ installed: true, receipt: rc() }),
              one: text({ installed: true, receipt: rc({ files: 1 }) })[0],
              stale: text({ installed: true, receipt: rc({ stale: 'b'.repeat(40) }) }),
              before: text({ installed: true, receipt: rc({ before: '2'.repeat(64) }) }),
              differs: text({ installed: true, receipt: rc({ differs: [{ node: 'alder', tree: '3'.repeat(64) }, { node: 'birch', tree: '4'.repeat(64) }] }) }),
              cut: text({ installed: true, receipt: rc({ net: 'cut' }) }), open: text({ installed: true, receipt: rc({ net: 'open' }) }),
+             // Pack format 5: a download held by its publisher's signature,
+             // an installer that keeps the network, and a shipped toolchain's
+             // receipt, which has no manifest to name.
+             signed: text({ installed: true, receipt: rc({ net: 'cut', downloads: [dl(), dl({ held: 'signed', sha256: '', keys: 'tern.asc' })] }) }),
+             online: text({ installed: true, receipt: rc({ net: 'online', why: 'rustup downloads the toolchain from static.rust-lang.org.', downloads: [dl()] }) }),
+             shipped: [text({ installed: true, receipt: rc({ net: 'cut', commit: 'd'.repeat(64) }) }, null),
+                       text({ installed: true, receipt: rc({ net: 'cut', commit: '' }) }, null),
+                       text({ installed: true, receipt: rc({ net: 'online', commit: 'd'.repeat(64), why: 'sdkmanager downloads each package from Google' }) }, null)],
+             held: [line({ held: { word: 'pinned', why: 'every download is held' } }),
+                    line({ held: { word: 'installer', why: 'rustup downloads the toolchain from static.rust-lang.org.' } }),
+                    line({ held: { word: 'open', why: 'its install steps run with the network, and its entry does not say what they fetch' } }),
+                    line({}), line({ held: { word: '', why: '' } })],
              seen: (() => {
                // The Look dialog says what a pack declares it downloads, or that it declares none.
                const m = more => ({ manifest: { name: 'hexkit', label: 'Hex kit', platforms: ['linux/amd64'], verbs: {}, steps: [['sh', '{dir}/install.sh']], ...more }, commit: 'c'.repeat(40) });
                const read = seen => { host.innerHTML = tpSeen(seen, null, false); return [...host.querySelectorAll('.sub')].map(e => e.textContent).filter(t => /declares/.test(t)).join(' | '); };
-               return [read(m({ fetch: [{ url: 'https://example.com/hexkit.tgz', sha256: 'ab'.repeat(32), to: 'dl/hexkit.tgz' }] })), read(m({})), read(m({ steps: [] }))];
+               const one = { url: 'https://example.com/hexkit.tgz', sha256: 'ab'.repeat(32), to: 'dl/hexkit.tgz' };
+               return [read(m({ fetch: [one] })), read(m({})), read(m({ steps: [] })),
+                       // Pack format 5, as Look answers it: how each is held and for which platform,
+                       // a pack that declares it downloads nothing, and an installer that keeps the network.
+                       read({ ...m({ fetch: [one, { url: 'https://example.com/tern.tar.xz', sha256: '', to: 'dl/tern.tar.xz' }] }), held: { word: 'pinned', why: '' },
+                              downloads: [dl({ to: 'dl/hexkit.tgz', url: one.url, platform: 'linux/amd64' }), dl({ to: 'dl/tern.tar.xz', url: 'https://example.com/tern.tar.xz', held: 'signed', sha256: '', keys: 'tern.asc' })] }),
+                       read({ ...m({ fetch: [], offline: true }), held: { word: 'pinned', why: '' }, downloads: [] }),
+                       read({ ...m({ fetch: [one], online: 'its installer fetches its models from example.com' }), held: { word: 'installer', why: 'its installer fetches its models from example.com.' },
+                              downloads: [dl({ to: 'dl/hexkit.tgz', url: one.url })] })];
              })(),
              none: [text({ installed: true, receipt: null }).length, text({ installed: false, receipt: rc() }).length] };
   });
@@ -262,6 +285,26 @@ await section("an install's receipt", async () => {
   ok(/^It declares what it downloads, each held to its sha256 before its steps run with no network: dl\/hexkit\.tgz from https:\/\/example\.com\/hexkit\.tgz \(abababababab\)\.$/.test(said.seen[0])
      && /^It declares no downloads: what its install steps fetch is not checked/.test(said.seen[1]) && said.seen[2] === '',
      `...and Look says what it declares it downloads, or that it declares none, before it is added (${JSON.stringify(said.seen)})`);
+  // Pack format 5 (R267): a download may be held by its publisher's
+  // signature and be for one platform, a pack may declare that it downloads
+  // nothing, and an installer that fetches the rest by itself says so.
+  ok(/each held to its sha256 or its publisher's signature before its steps run with no network: dl\/hexkit\.tgz from https:\/\/example\.com\/hexkit\.tgz \(abababababab\) on linux\/amd64; dl\/tern\.tar\.xz from https:\/\/example\.com\/tern\.tar\.xz \(signed, key tern\.asc\)\.$/.test(said.seen[3])
+     && said.seen[4] === 'It declares that it downloads nothing: its install steps run with no network.'
+     && /^It declares what it downloads, each held to its sha256 before its installer runs, which keeps the network \(its installer fetches its models from example\.com\): dl\/hexkit\.tgz /.test(said.seen[5]),
+     `Look says a signed download by its key and a platform's by its platform, a pack that downloads nothing, and an installer that keeps the network (${JSON.stringify(said.seen.slice(3))})`);
+  ok(/^Its downloads are declared: each matched its sha256 or its publisher's signature, and its install steps ran with no network\.$/.test(said.signed[1])
+     && said.online[1] === 'Its downloads are declared and each matched its sha256; its installer kept the network: rustup downloads the toolchain from static.rust-lang.org.',
+     `a receipt says a signature beside a sha256, and an installer that kept the network with its entry's sentence (${said.signed[1]} | ${said.online[1]})`);
+  ok(/^Installed .+, its download dddddddddddd: 214 files, 48\.0 MB, receipt 111111111111\.$/.test(said.shipped[0][0])
+     && said.shipped[0][1] === 'Its download was checked, and what it ran after that ran with no network.'
+     && /^Installed .+: 214 files, 48\.0 MB, receipt 111111111111\.$/.test(said.shipped[1][0]) && !/manifest|download/.test(said.shipped[1][0])
+     && said.shipped[2][1] === 'Its download was checked; its installer kept the network: sdkmanager downloads each package from Google.',
+     `a toolchain AerieOS ships names no manifest on its receipt: its download's sha256, or nothing where a signature held it (${JSON.stringify(said.shipped)})`);
+  ok(said.held[0] === 'Every download is pinned, and its install runs with no network.'
+     && said.held[1] === 'Its installer is pinned and downloads the rest itself: rustup downloads the toolchain from static.rust-lang.org.'
+     && said.held[2] === 'Its downloads are not pinned: its install steps run with the network, and its entry does not say what they fetch.'
+     && said.held[3] === '' && said.held[4] === '',
+     `an entry's Details says in one line what its downloads are held to, and nothing for an entry that does not say (${JSON.stringify(said.held)})`);
 });
 
 await done(browser);

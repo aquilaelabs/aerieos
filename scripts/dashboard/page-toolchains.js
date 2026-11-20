@@ -165,17 +165,43 @@ function tcVerifiedLine(p){
 // another node's copy of the same manifest being another set of files,
 // which is what an install that fetches "the latest" looks like. Nothing for
 // one installed before receipts were kept.
+// What an entry's downloads are held to, as its Details says it in one
+// line (R267; the operator, 20 Nov: one mechanism for every entry, and no
+// paragraph where a phrase does): every download pinned, its installer
+// pinned with what it fetches by itself in the entry's own sentence, or not
+// pinned and which part. "" for an entry that says none (an app, a card
+// from a catalog whose index does not carry it).
+function tcHeldLine(p){
+  const h = p.held;
+  if (!h?.word) return "";
+  const why = esc(String(h.why || "").replace(/\.+$/, ""));
+  if (h.word === "pinned") return `<span class="sub tcheld">Every download is pinned, and its install runs with no network.</span>`;
+  if (h.word === "installer") return `<span class="sub tcheld">Its installer is pinned and downloads the rest itself${why ? `: ${why}` : ""}.</span>`;
+  return `<span class="sub tcheld">Its downloads are not pinned${why ? `: ${why}` : ""}.</span>`;
+}
+
 function tcReceiptLines(p){
   const r = p.installed ? p.receipt : null;
   if (!r) return "";
   const short = h => esc(String(h || "").slice(0, 12));
-  const lines = [`<span class="sub tcreceipt">Installed ${esc(flWhen(r.at))} from manifest <code>${short(r.commit)}</code>: ${
+  // A pack's copy came from its manifest at a commit. A toolchain AerieOS
+  // ships has no manifest: its receipt is filed under the sha256 its own
+  // download was held to, or under nothing where a signature held it.
+  const from = p.pack ? ` from manifest <code>${short(r.commit)}</code>` : r.commit ? `, its download <code>${short(r.commit)}</code>` : "";
+  const lines = [`<span class="sub tcreceipt">Installed ${esc(flWhen(r.at))}${from}: ${
     r.files === 1 ? "1 file" : `${esc(String(r.files))} files`}, ${esc(flSize(r.bytes))}, receipt <code>${short(r.tree)}</code>.</span>`];
-  // A pack that declares its downloads (pack format 3): each was held to the
-  // sha256 its manifest says, and its steps ran with no network, or with
-  // it on a node that cannot cut it.
-  if (r.net === "cut") lines.push(`<span class="sub tcreceipt">Its downloads are declared: each matched its sha256, and its install steps ran with no network.</span>`);
-  if (r.net === "open") lines.push(`<span class="sub tcreceipt">Its downloads are declared and each matched its sha256, but this node cannot cut the network for a step, so its install steps ran with it.</span>`);
+  // What it downloaded was held to what its entry carries (a sha256, or its
+  // publisher's signature), and what ran after that ran with no network, or
+  // with it on a node that cannot cut it, or with it because its installer
+  // downloads the rest by itself and its entry says so (pack format 5).
+  const how = (r.downloads || []).some(d => d.held === "signed") ? "its sha256 or its publisher's signature" : "its sha256";
+  const said = p.pack || (r.downloads || []).length ? `Its downloads are declared` : "";
+  if (r.net === "cut") lines.push(`<span class="sub tcreceipt">${said ? `${said}: each matched ${how}, and its install steps ran with no network.`
+    : "Its download was checked, and what it ran after that ran with no network."}</span>`);
+  if (r.net === "open") lines.push(`<span class="sub tcreceipt">${said ? `${said} and each matched ${how}, but this node cannot cut the network for a step, so its install steps ran with it.`
+    : "Its download was checked, but this node cannot cut the network for a step, so what it ran after that ran with it."}</span>`);
+  if (r.net === "online") lines.push(`<span class="sub tcreceipt">${said ? `${said} and each matched ${how}` : "Its download was checked"}; its installer kept the network${
+    r.why ? `: ${esc(String(r.why).replace(/\.+$/, ""))}` : ""}.</span>`);
   if (r.stale) lines.push(`<span class="sub warn tcreceipt">This copy is from an earlier manifest: the one kept now is <code>${short(r.stale)}</code>. Install again takes what that one installs.</span>`);
   if (r.before) lines.push(`<span class="sub warn tcreceipt">The same manifest left other files here the time before (receipt <code>${short(r.before)}</code>): something its install fetches has changed.</span>`);
   if (r.differs?.length) lines.push(`<span class="sub warn tcreceipt">The same manifest left other files on ${esc(r.differs.map(d => d.node).join(", "))} (receipt ${
@@ -301,6 +327,12 @@ function tpSeen(seen, was, offer = true){
       .map(v => `<div class="sub">aerie tool ${esc(m.name)} ${esc(v)} <span class="pill warn">gone</span></div>`).join("");
   const steps = (m.steps || []).map(w).join(", ") + (was && !same(m.steps || [], was.steps || [])
     ? ` <span class="pill warn">changed</span>${(was.steps || []).length ? ` <span class="sub">was ${(was.steps || []).map(w).join(", ")}</span>` : ""}` : "");
+  // Its declared downloads as Look answers them (how each is held, and the
+  // platform it is for), and the entry's own sentence where its installer
+  // keeps the network (pack format 5); a Look from before those is read
+  // from the manifest's own list.
+  const dls = seen.downloads || (m.fetch || []).map(f => ({...f, held: f.sha256 ? "sha256" : "signed", keys: f.signed?.keys || "", platform: f.platform || ""}));
+  const keeps = seen.held?.word === "installer" ? String(seen.held.why || "").replace(/\.+$/, "") : "";
   return `<div class="tpseen">
     <div class="name">${esc(m.label)} <span class="pill">${esc(m.name)}</span> <span class="sub">${seen.here
       ? `as given here, ${seen.nfiles} file${seen.nfiles === 1 ? "" : "s"}` : `at ${esc(seen.commit.slice(0, 12))}`}</span></div>
@@ -309,9 +341,13 @@ function tpSeen(seen, was, offer = true){
       m.verify ? `, and checks it with ${w(m.verify)}` : ""}; on ${esc((m.platforms || []).join(", "))}.</div>
     ${verbs}
     ${Object.keys(m.system || {}).length ? `<div class="sub">System packages it installs first: ${Object.entries(m.system).map(([k, v]) => `${esc(k)} <code>${esc(v.join(" "))}</code>`).join("; ")}; a node of another package manager is not offered it.</div>` : ""}
-    ${(m.fetch || []).length ? `<div class="sub">It declares what it downloads, each held to its sha256 before its steps run with no network: ${
-      m.fetch.map(f => `<code>${esc(f.to)}</code> from <code>${esc(f.url)}</code> (<code>${esc(f.sha256.slice(0, 12))}</code>)`).join("; ")}.${
+    ${(m.fetch || []).length ? `<div class="sub">It declares what it downloads, each held to ${dls.some(f => f.held === "signed") ? "its sha256 or its publisher's signature" : "its sha256"} before its ${
+      keeps ? `installer runs, which keeps the network (${esc(keeps)})` : "steps run with no network"}: ${
+      dls.map(f => `<code>${esc(f.to)}</code> from <code>${esc(f.url)}</code> (${f.held === "signed" ? `signed, key <code>${esc(f.keys)}</code>` : `<code>${esc(String(f.sha256 || "").slice(0, 12))}</code>`})${
+        f.platform ? ` on ${esc(f.platform)}` : ""}`).join("; ")}.${
       was && !same(m.fetch, was.fetch || []) ? ` <span class="pill warn">changed</span>` : ""}</div>`
+      : seen.held?.word === "pinned" && (m.steps || []).length ? `<div class="sub">It declares that it downloads nothing: its install steps run with no network.</div>`
+      : keeps ? `<div class="sub">Its installer keeps the network: ${esc(keeps)}.</div>`
       : (m.steps || []).length ? `<div class="sub">It declares no downloads: what its install steps fetch is not checked, and its receipt on a node says what landed.</div>` : ""}
     ${(m.touches?.hosts || []).length ? `<div class="sub">Its install fetches from ${m.touches.hosts.map(h => `<code>${esc(h)}</code>`).join(", ")}.</div>` : ""}
     ${(m.works_with || []).length ? `<div class="sub">It works with AerieOS ${esc(m.works_with.join(", "))}.</div>` : ""}
