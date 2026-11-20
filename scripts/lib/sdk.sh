@@ -1332,11 +1332,12 @@ sdk_verify_download() {
     algo="${said%%$'\t'*}"; said="${said#*$'\t'}"; want="${said%%$'\t'*}"; where="${said#*$'\t'}"
     if [ "$algo" = gpg ]; then
         # The publisher signs the download itself (Swift): its signature
-        # checked with the publisher's keys shipped beside the catalog.
+        # checked with the publisher's keys the row carries, or the ones
+        # shipped beside the catalog under that name.
         local sig keyring signer
         sig="$(mktemp "${TMPDIR:-/tmp}/bb-sig.XXXXXX")"
         sdk_fetch "$want" "$sig" >/dev/null 2>&1 || { rm -f "$file" "$sig"; die "could not fetch ${what}'s signature (${want})"; }
-        keyring="$(sdk_meta keyring "$where")" || { rm -f "$file" "$sig"; die "${what}: no keys to check its signature with"; }
+        keyring="$(sdk_meta keyring "$where" "$what")" || { rm -f "$file" "$sig"; die "${what}: no keys to check its signature with"; }
         if ! signer="$(gpgv --keyring "$keyring" "$sig" "$file" 2>&1)"; then
             rm -f "$file" "$sig"
             die "${what}'s download does not carry its publisher's signature: $(printf '%s' "$signer" | tail -2 | tr '\n' ' ')nothing was installed"
@@ -1385,7 +1386,13 @@ sdk_install_tarball() {
     # have to say whether a release ships .gz or .xz this year.
     tar -xaf "$tmp" -C "$d" --strip-components="$strip" || { rm -f "$tmp"; die "could not unpack ${url}"; }
     rm -f "$tmp"
+    # Unpacking is AerieOS's own; nothing of the entry has run yet. What it
+    # declares it downloads besides is fetched and checked here, and its
+    # follow-up steps and its verify then run as it declares (sdk_declared).
+    sdk_declared "$what" "$d"
+    sdk_install_steps "$what" "$d"
     sdk_install_verify "$what" "$d" "$version"
+    sdk_declared_done "$what" "$d" "$(sdk_verified_digest "$d")"
 }
 
 # Fetch an installer and run it. The URL here is a script, not the payload;
@@ -1421,10 +1428,17 @@ sdk_install_script() {
     sdk_meta_into cmd argv "$what" source.run "dir=$d" "script=$tmp" "version=$version"
     [ "${#cmd[@]}" != 0 ] || { rm -f "$tmp"; die "no run command in the catalog for ${what}"; }
     sdk_meta_into env env "$what" source.env "dir=$d"
-    env "${env[@]}" "${cmd[@]}" || { rm -rf "$tmpdir"; die "${what} installer failed"; }
+    # The installer is here and checked, and has not run. What the entry
+    # declares it downloads besides is fetched and checked first; the
+    # installer, the follow-up steps and the verify then run as it declares
+    # (sdk_declared).
+    sdk_declared "$what" "$d"
+    env "${env[@]}" "${SDK_CUT[@]}" "${cmd[@]}" \
+        || { rm -rf "$tmpdir"; die "${what} installer failed${SDK_CUT[*]:+ (it ran with no network: what it fetches is declared in its entry)}"; }
     rm -rf "$tmpdir"
     sdk_install_steps "$what" "$d"
     sdk_install_verify "$what" "$d" "$version"
+    sdk_declared_done "$what" "$d" "$(sdk_verified_digest "$d")"
 }
 
 # A shallow clone. The tool updates itself in place from here, which a tarball
@@ -1465,6 +1479,11 @@ sdk_install_git() {
     fi
     [ -z "$(sdk_meta field "$what" source.safe_directory)" ] \
         || git config --global --add safe.directory "$d"
+    # The repository is here, and nothing of it has run. What it declares
+    # it downloads (pack format 3) is fetched and checked now; its warm-up,
+    # its steps and its verify then run as it declares (sdk_declared), so
+    # what it did not declare cannot arrive.
+    sdk_declared "$what" "$d"
     local -a warm
     sdk_meta_into warm argv "$what" source.warm "dir=$d"
     if [ "${#warm[@]}" != 0 ]; then
@@ -1475,70 +1494,164 @@ sdk_install_git() {
         # is there to answer; a warm-up that does not finish in the limit
         # fails this toolchain alone, saying so, and the job goes on.
         if ! CI=true FLUTTER_SUPPRESS_ANALYTICS=true DOTNET_CLI_TELEMETRY_OPTOUT=1 \
-                timeout --kill-after=30 "${BB_WARM_TIMEOUT:-900}" "${warm[@]}" < /dev/null; then
+                timeout --kill-after=30 "${BB_WARM_TIMEOUT:-900}" "${SDK_CUT[@]}" "${warm[@]}" < /dev/null; then
             die "${what}: warming did not finish within ${BB_WARM_TIMEOUT:-900}s (${warm[*]}); this install is taken off again, and Install retries it"
         fi
-    fi
-    # What it declares it downloads (pack format 3), fetched and checked
-    # here, and then the network cut for its steps and its verify, so what
-    # it did not declare cannot arrive.
-    SDK_CUT=()
-    if [ -n "$commit" ] && [ -n "$(sdk_meta field "$what" source.offline)" ]; then
-        sdk_fetch_declared "$what" "$d"
-        sdk_net_cut "$what" "$d"
     fi
     # A repository that installs more than itself (a tool pack's install
     # steps fetching its binaries) runs them as the script kind does.
     sdk_install_steps "$what" "$d"
     [ -z "$commit" ] || sdk_mark_exec "$what" "$d"
     sdk_install_verify "$what" "$d" ""
-    SDK_CUT=()
-    [ -z "$commit" ] || sdk_receipt "$what" "$d" "$commit"
+    # A pinned repository leaves a receipt whether or not it declares.
+    [ -z "$commit" ] || SDK_DECLARED=1
+    sdk_declared_done "$what" "$d" "$commit"
 }
 
-# sdk_fetch_declared WHAT DIR: each download a pack's manifest declares
-# (install.fetch: an address, the sha256 of what it answers, and the file
-# inside the pack it is kept as), fetched into DIR and held to that sha256.
-# One that answers anything else installs nothing: the pack's directory is
-# the partial install the caller takes off again.
+# sdk_declared WHAT DIR: what an entry declares of its own install, done
+# before anything of the entry runs. One code path for every kind of source
+# and every entry, a row AerieOS ships or anybody's pack, read from the
+# entry alone:
+#
+#   source.fetch    the downloads it declares (a pack's install.fetch), each
+#                   fetched into DIR and held to its sha256 or its
+#                   publisher's signature (sdk_fetch_declared);
+#   source.offline  its steps run with no network, which a pack that
+#                   declares downloads always says;
+#   source.online   a sentence: its installer downloads the rest by itself,
+#                   and from where. Its declared downloads are fetched and
+#                   checked all the same, and its steps keep the network.
+#
+# An entry that says none of the three is installed as it always was. For
+# one that does, SDK_CUT is afterwards the words that run a command with no
+# network (sdk_net_cut), or nothing where it says online or this node
+# cannot cut, and everything of the entry that runs from here on runs
+# behind them: a script's installer and a command's run, the follow-up
+# steps, a repository's warm-up, the verify. DIR/.bb-net keeps which it
+# was (cut, open, or online with the entry's sentence on the next line),
+# for the receipt. Where each kind calls this:
+#
+#   tarball   after its own download is checked and unpacked
+#   script    after its installer is fetched and checked, before it runs
+#   git       after the checkout, before its warm-up
+#   command   before its command
+SDK_DECLARED=""
+sdk_declared() {
+    local what="$1" d="$2" online
+    SDK_CUT=()
+    SDK_DECLARED=""
+    online="$(sdk_meta field "$what" source.online)"
+    if [ -z "$online" ] && [ -z "$(sdk_meta field "$what" source.offline)" ] \
+            && [ -z "$(sdk_meta field "$what" source.fetch.0.url)" ]; then
+        return 0
+    fi
+    SDK_DECLARED=1
+    sdk_fetch_declared "$what" "$d"
+    if [ -n "$online" ]; then
+        log "${what} keeps the network for its steps, as its entry says: ${online}"
+        printf 'online\n%s\n' "$online" > "$d/.bb-net" 2>/dev/null || true
+    else
+        sdk_net_cut "$what" "$d"
+    fi
+}
+
+# sdk_declared_done WHAT DIR ID: the end of an install that declared
+# (sdk_declared), or of a pinned repository's: the cut is over, and what
+# landed is written down as its receipt, under the commit it was fetched at
+# or the sha256 its own download was held to (ID).
+sdk_declared_done() {
+    SDK_CUT=()
+    [ -z "$SDK_DECLARED" ] || sdk_receipt "$1" "$2" "$3"
+    SDK_DECLARED=""
+}
+
+# sdk_https_only WHAT URL: an address a declared download names is fetched
+# over https and nothing else; SDK_PROTO becomes curl's word for it. A
+# suite's download is a file on disk (BB_TOOLPACKS_FILE_URLS=1, as its packs
+# are).
+SDK_PROTO="=https"
+sdk_https_only() {
+    SDK_PROTO="=https"
+    case "$2" in
+        https://*) ;;
+        file:///*) [ "${BB_TOOLPACKS_FILE_URLS:-}" = 1 ] || die "${1}: a declared download is fetched over https, and ${2} is not"
+                   SDK_PROTO="=file" ;;
+        *) die "${1}: a declared download is fetched over https, and ${2} is not" ;;
+    esac
+}
+
+# sdk_fetch_declared WHAT DIR: each download an entry declares
+# (source.fetch, a pack's install.fetch: an address, the file inside the
+# entry's directory it is kept as, and what holds it), fetched into DIR and
+# held before anything uses it: to the sha256 the entry names, or, where
+# it names `signed` in the sha256's place, to its publisher's detached
+# signature (signed.sig) under the keys the entry carries (signed.keys:
+# sdkmeta.py keyring). One that names a platform is fetched on that
+# platform alone. One that answers anything else installs nothing: the
+# directory is the partial install the caller takes off again.
 sdk_fetch_declared() {
-    local what="$1" d="$2" i=0 url want to tmp got proto
+    local what="$1" d="$2" i=0 url want to tmp got plat sig keys sigf keyring signer
     while :; do
         url="$(sdk_meta field "$what" "source.fetch.${i}.url")"
         [ -n "$url" ] || break
         want="$(sdk_meta field "$what" "source.fetch.${i}.sha256")"
         to="$(sdk_meta field "$what" "source.fetch.${i}.to")"
-        # https and nothing else; a suite's download is a file on disk
-        # (BB_TOOLPACKS_FILE_URLS=1, as its packs are).
-        proto="=https"
-        case "$url" in
-            https://*) ;;
-            file:///*) [ "${BB_TOOLPACKS_FILE_URLS:-}" = 1 ] || die "${what}: a declared download is fetched over https, and ${url} is not"
-                       proto="=file" ;;
-            *) die "${what}: a declared download is fetched over https, and ${url} is not" ;;
-        esac
+        plat="$(sdk_meta field "$what" "source.fetch.${i}.platform")"
+        sig="$(sdk_meta field "$what" "source.fetch.${i}.signed.sig")"
+        keys="$(sdk_meta field "$what" "source.fetch.${i}.signed.keys")"
+        i=$((i + 1))
+        if [ -n "$plat" ] && ! sdk_meta on-platform "$plat"; then
+            log "leaving out ${to}: it is for ${plat}"
+            continue
+        fi
+        sdk_https_only "$what" "$url"
         case "/${to}/" in *"/../"*|"//"*) die "${what}: a declared download is kept inside the pack, and ${to} is not" ;; esac
+        [ -n "$want" ] || [ -n "$sig" ] \
+            || die "${what}: ${to} is held to nothing: a declared download names its sha256, or its publisher's signature"
         log "fetching ${to} from ${url}"
         tmp="$(mktemp "${d}/.bb-fetch.XXXXXX")"
-        if ! curl -fL --proto "$proto" --proto-redir '=https' --progress-bar --connect-timeout 30 \
+        if ! curl -fL --proto "$SDK_PROTO" --proto-redir '=https' --progress-bar --connect-timeout 30 \
                 --speed-limit 1024 --speed-time 120 --retry 2 --retry-delay 5 -o "$tmp" "$url"; then
             rm -f "$tmp"
             die "${what}: ${url} could not be fetched: nothing is installed"
         fi
-        got="$(sha256sum "$tmp" | cut -d' ' -f1)"
-        if [ "$got" != "$want" ]; then
-            rm -f "$tmp"
-            die "${what}: ${url} answered a file whose sha256 is ${got}, and its manifest declares ${want}: nothing is installed"
+        if [ -n "$want" ]; then
+            got="$(sha256sum "$tmp" | cut -d' ' -f1)"
+            if [ "$got" != "$want" ]; then
+                rm -f "$tmp"
+                die "${what}: ${url} answered a file whose sha256 is ${got}, and its manifest declares ${want}: nothing is installed"
+            fi
+            log "verified: sha256 matches what ${what} declares for ${to}"
+        else
+            # Held by its publisher's signature, under keys the entry
+            # carries or names: never a keyring of this machine's.
+            [ -n "$keys" ] || { rm -f "$tmp"; die "${what}: ${to} is signed, and its entry names no keys to check it with"; }
+            command -v gpgv >/dev/null 2>&1 \
+                || { rm -f "$tmp"; die "${what}: there is no gpgv here to check the signature of ${to} with: nothing is installed"; }
+            sdk_https_only "$what" "$sig"
+            sigf="$(mktemp "${d}/.bb-fetch.XXXXXX")"
+            if ! curl -fsL --proto "$SDK_PROTO" --proto-redir '=https' --connect-timeout 30 --max-time 120 \
+                    --retry 2 --retry-delay 5 -o "$sigf" "$sig"; then
+                rm -f "$tmp" "$sigf"
+                die "${what}: the signature of ${to} (${sig}) could not be fetched: nothing is installed"
+            fi
+            keyring="$(sdk_meta keyring "$keys" "$what")" \
+                || { rm -f "$tmp" "$sigf"; die "${what}: no keys named ${keys} to check ${to} with: nothing is installed"; }
+            if ! signer="$(gpgv --keyring "$keyring" "$sigf" "$tmp" 2>&1)"; then
+                rm -f "$tmp" "$sigf"
+                die "${what}: ${url} answered a file that does not carry its publisher's signature under ${keys}: $(printf '%s' "$signer" | tail -2 | tr '\n' ' ')nothing is installed"
+            fi
+            rm -f "$sigf"
+            signer="$(printf '%s' "$signer" | sed -n 's/.*Good signature from "\([^"]*\)".*/\1/p' | head -1)"
+            log "verified: ${to} is signed by ${signer:-a key of its publisher} (${keys})"
         fi
         mkdir -p "$(dirname "${d}/${to}")"
         mv -f "$tmp" "${d}/${to}"
-        log "verified: sha256 matches what ${what} declares for ${to}"
-        i=$((i + 1))
     done
 }
 
 # sdk_net_cut WHAT DIR: SDK_CUT becomes the words that run a command with no
-# network, for a pack whose downloads are declared: a network namespace of
+# network, for an entry whose downloads are declared: a network namespace of
 # its own, as the same account where this unshare can say so, else as that
 # namespace's root with tar told not to hand files to owners that do not
 # exist there. Where the machine keeps user namespaces from an account (a
@@ -1627,7 +1740,12 @@ sdk_install_command() {
     sdk_meta_into cmd argv "$what" source.run "dir=$d"
     sdk_meta_into env env "$what" source.env "dir=$d"
     log "installing ${what} into ${d}"
-    env "${env[@]}" "${cmd[@]}"
+    # Nothing of the entry has run. What it declares it downloads is
+    # fetched and checked first, and its command then runs as it declares
+    # (sdk_declared).
+    sdk_declared "$what" "$d"
+    env "${env[@]}" "${SDK_CUT[@]}" "${cmd[@]}" \
+        || die "${what}: its install command failed${SDK_CUT[*]:+ (it ran with no network: what it fetches is declared in its entry)}"
     # A stable path to whatever the run produced under a revisioned name, so
     # that everything pointing at it survives the next release.
     local find_at link_at exe
@@ -1647,6 +1765,7 @@ sdk_install_command() {
             ln -sfn "${rel:-$exe}" "$at"
         fi
     fi
+    sdk_declared_done "$what" "$d" ""
     log "${what} ready at ${d}"
 }
 
@@ -1665,7 +1784,7 @@ sdk_install_steps() {
         [ -z "$note" ] || log "$note"
         sdk_meta_into env env "$what" "source.then.${i}.env" "dir=$d"
         if ! env "${env[@]}" "${SDK_CUT[@]}" "${cmd[@]}"; then
-            [ -n "$soft" ] || die "${what}: a required step failed${SDK_CUT[*]:+ (it ran with no network: what it fetches is declared in its manifest, install.fetch)}"
+            [ -n "$soft" ] || die "${what}: a required step failed${SDK_CUT[*]:+ (it ran with no network: what it fetches is declared in its entry, install.fetch in a manifest)}"
             warn "$soft"
         fi
         i=$((i + 1))

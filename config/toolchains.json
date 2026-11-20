@@ -97,7 +97,20 @@
     "           not: {from: pin, version, sha256} carries the version and the sha256 of the exact",
     "           file (one digest, or one per platform keyed as source.url is), so the row itself",
     "           says what the download is. A pinned row installs that version with nobody asked,",
-    "           and source.version stays as how a newer one is found."
+    "           and source.version stays as how a newer one is found.",
+    "",
+    "  fetch    what the install downloads besides its own source, declared: each {url, to} with",
+    "           the sha256 it is held to, or signed: {sig, keys} where its publisher's detached",
+    "           signature holds it, and platform where it is for one <os>/<arch>. AerieOS fetches",
+    "           and checks each into the directory before anything of the row runs (sdk.sh",
+    "           sdk_declared), and what runs then (a script's installer, a command, the then",
+    "           steps, a warm-up, the verify) runs with no network. offline: true says the same",
+    "           of a row that downloads nothing more.",
+    "  online   one sentence, for a row whose installer downloads the rest by itself: what, and",
+    "           from where. Its declared downloads are fetched and checked all the same, and its",
+    "           steps keep the network; the install, its receipt and its row say the sentence.",
+    "  keyring  {name: an armored public key}: a publisher's keys the row carries itself, which a",
+    "           signature's keys names and which wins over config/release-keys' file of that name."
   ],
   "android_images": {
     "_comment": [

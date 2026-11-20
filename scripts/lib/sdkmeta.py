@@ -208,6 +208,21 @@ def for_platform(value):
     return ""
 
 
+def on_platform(plat):
+    """Whether this machine is the platform a declared download names:
+    "<os>/<arch>", or "<os>/*" for any architecture of a system, matched as
+    for_platform matches a key. One that names none is for every machine."""
+    return True if not plat else bool(for_platform({str(plat): True}))
+
+
+def declared(tc):
+    """The downloads an entry declares that are this machine's
+    (source.fetch, a pack's install.fetch): each {url, to} with the sha256
+    it is held to, or `signed` where its publisher's signature holds it."""
+    rows = (tc.get("source") or {}).get("fetch")
+    return [f for f in rows if isinstance(f, dict) and f.get("url") and on_platform(f.get("platform"))] if isinstance(rows, list) else []
+
+
 # Documents fetched while resolving, kept briefly on disk.
 #
 # A check asks about thirteen toolchains in thirteen separate processes, and
@@ -423,15 +438,30 @@ def _name_of(url):
 KEYS_DIR = os.path.join(HERE, "..", "..", "config", "release-keys")
 
 
-def keyring(name):
-    """The publisher's keys `name` (config/release-keys), as a keyring file
-    gpgv reads: dearmored once into this run's cache. Never the machine's
-    own keyring, which anybody with a shell may have added to."""
-    src = os.path.join(KEYS_DIR, os.path.basename(str(name or "")))
-    if not os.path.isfile(src):
-        die(f"no release keys named {name!r} beside the catalog")
-    with open(src, "rb") as f:
-        armored = f.read()
+KEY_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+
+
+def keyring(name, tc=None):
+    """The publisher's keys `name`, as a keyring file gpgv reads: dearmored
+    once into this run's cache. One rule for every entry: the armored key
+    the entry `tc` carries under that name (source.keyring, a pack's
+    install.keyring) where it carries one, which wins, so a publisher's key
+    that changes is a catalog commit; otherwise the file of that name
+    AerieOS ships (config/release-keys). Never the machine's own keyring,
+    which anybody with a shell may have added to."""
+    name = os.path.basename(str(name or ""))
+    carried = ((tc or {}).get("source") or {}).get("keyring")
+    armored = carried.get(name) if isinstance(carried, dict) else None
+    if isinstance(armored, str) and armored.strip():
+        if not KEY_NAME.fullmatch(name):
+            die(f"{name!r} is no name for a publisher's keys")
+        armored = armored.encode()
+    else:
+        src = os.path.join(KEYS_DIR, name)
+        if not KEY_NAME.fullmatch(name) or not os.path.isfile(src):
+            die(f"no release keys named {name!r} beside the catalog" + (", and its entry carries none" if tc else ""))
+        with open(src, "rb") as f:
+            armored = f.read()
     out = os.path.join(CACHE_DIR, "keys-" + hashlib.sha256(armored).hexdigest()[:16] + ".gpg")
     if not os.path.isfile(out):
         os.makedirs(CACHE_DIR, exist_ok=True)
@@ -444,9 +474,10 @@ def keyring(name):
     return out
 
 
-def signed_by(data, sig, keys):
+def signed_by(data, sig, keys, tc=None):
     """Who of the publisher's keys `keys` signed `data` (bytes) with the
-    detached signature `sig` (bytes), or a refusal."""
+    detached signature `sig` (bytes), or a refusal. `tc` is the entry the
+    keys are resolved for (keyring)."""
     import tempfile  # noqa: PLC0415
     with tempfile.TemporaryDirectory() as d:
         dp, sp = os.path.join(d, "data"), os.path.join(d, "data.sig")
@@ -455,7 +486,7 @@ def signed_by(data, sig, keys):
         with open(sp, "wb") as f:
             f.write(sig)
         try:
-            p = subprocess.run(["gpgv", "--keyring", keyring(keys), sp, dp], capture_output=True, text=True,
+            p = subprocess.run(["gpgv", "--keyring", keyring(keys, tc), sp, dp], capture_output=True, text=True,
                                timeout=60, check=False)
         except FileNotFoundError:
             die("there is no gpgv here to check the publisher's signature with")
@@ -506,7 +537,7 @@ def checksum(tc, url, version):
             # The checksum file believed only once the publisher's signature
             # over its exact bytes holds (Node's SHASUMS256.txt), so a mirror
             # cannot hand out a file and a list that agree with each other.
-            who = signed_by(raw, get(fill(signed["sig"], subs), decode=False), signed["keys"])
+            who = signed_by(raw, get(fill(signed["sig"], subs), decode=False), signed["keys"], tc)
             src = f"{src}, signed by {who}"
         lines = [ln.split() for ln in text.splitlines() if ln.strip()]
         for parts in lines:
@@ -555,7 +586,14 @@ def content_length(url):
 
 
 def download_urls(tc):
-    """Every URL an install of this toolchain would fetch, or none.
+    """Every URL an install of this toolchain would fetch, or none: what
+    its source names or can be asked for (_source_urls), and each download
+    it declares for this machine."""
+    return _source_urls(tc) + [f["url"] for f in declared(tc)]
+
+
+def _source_urls(tc):
+    """The URLs a toolchain's own source would fetch, or none.
 
     Two ways to know. A recipe whose own source.url is the payload (a tarball)
     is its own answer. Everything else has to ask the installer, and most of
@@ -783,15 +821,18 @@ def unreachable(host, timeout=6):
 def receipt(d, commit, name=""):
     """An install's receipt (R234): every file that landed in DIR with its
     sha256, one hash over the whole list, and the commit it was installed
-    from. A pack's pin covers its own files, and what its install steps
-    fetch from somewhere else left no trail (the operator, 13 Nov): this is
-    it. Written to DIR/.bb-receipt, whose first line is the summary the
-    node's census reads (format, commit, tree, files, bytes, when, the
-    tree the same commit made here before where that was another, and
-    whether its steps ran with the network cut, for a pack that declares
-    its downloads: cut, open, or nothing for one that declares none), and
-    added as a line to the store's own log (.bb-receipts beside DIR), which
-    a remove and a reinstall leave alone. Returns the summary as words.
+    from (for an entry that is no repository, the sha256 its download was
+    held to, or nothing). A pack's pin covers its own files, and what its
+    install steps fetch from somewhere else left no trail (the operator,
+    13 Nov): this is it. Written to DIR/.bb-receipt, whose first line is
+    the summary the node's census reads (format, commit, tree, files,
+    bytes, when, the tree the same commit made here before where that was
+    another, and whether its steps ran with the network cut, for an entry
+    that declares its downloads: cut, open, online with the entry's
+    sentence in a field after it, or nothing for one that declares none),
+    and added as a line to the store's own log (.bb-receipts beside DIR),
+    which a remove and a reinstall leave alone. Returns the summary as
+    words.
 
     Left out: git's own directory, AerieOS's marks (.bb-*) and compiled
     python, which carries the moment it was compiled."""
@@ -837,27 +878,32 @@ def receipt(d, commit, name=""):
         with open(log, encoding="utf-8", errors="replace") as f:
             for ln in f:
                 r = ln.rstrip("\n").split("\t")
-                if len(r) >= 4 and r[1] == name and r[2] == commit:
+                if commit and len(r) >= 4 and r[1] == name and r[2] == commit:
                     before = r[3] if r[3] != tree else ""
     except OSError:
         pass
-    # Whether its steps ran with the network cut (sdk.sh sdk_net_cut).
-    net = ""
+    # Whether its steps ran with the network cut (sdk.sh sdk_declared), or
+    # kept it because its entry says its installer downloads the rest, with
+    # the entry's own sentence on the line after.
+    net, why = "", ""
     try:
         with open(os.path.join(d, ".bb-net"), encoding="utf-8") as f:
             net = f.readline().strip()
+            why = " ".join(f.readline().split())[:300]
     except OSError:
         pass
-    net = net if net in ("cut", "open") else ""
+    net = net if net in ("cut", "open", "online") else ""
+    why = why if net == "online" else ""
     with open(os.path.join(d, ".bb-receipt"), "w", encoding="utf-8", errors="surrogateescape") as f:
-        f.write(f"1\t{commit}\t{tree}\t{len(lines)}\t{total}\t{now}\t{before}\t{net}\n{body}")
+        f.write(f"1\t{commit}\t{tree}\t{len(lines)}\t{total}\t{now}\t{before}\t{net}" + (f"\t{why}" if why else "") + f"\n{body}")
     try:
         with open(log, "a", encoding="utf-8") as f:
             f.write(f"{now}\t{name}\t{commit}\t{tree}\t{len(lines)}\t{total}\n")
     except OSError:
         pass
     said = f"receipt: {len(lines)} files, {total} bytes, from {commit[:12] or 'no commit'}, {tree[:12]} over them all"
-    said += {"cut": "; its steps ran with no network", "open": "; its steps ran with the network, which this node cannot cut"}.get(net, "")
+    said += {"cut": "; its steps ran with no network", "open": "; its steps ran with the network, which this node cannot cut",
+             "online": f"; its steps kept the network, as its entry says: {why or 'its installer downloads the rest'}"}.get(net, "")
     return said + (f"; the same commit made {before[:12]} here before" if before else "")
 
 
@@ -884,9 +930,16 @@ def main(argv):
         return
 
     if op == "keyring":
-        # The keyring file gpgv reads for one publisher's keys (R137).
-        print(keyring(argv[1] if len(argv) > 1 else ""))
+        # keyring KEYS [NAME]: the keyring file gpgv reads for one
+        # publisher's keys (R137), the ones the entry NAME carries where it
+        # carries them.
+        print(keyring(argv[1] if len(argv) > 1 else "", toolchain(argv[2]) if len(argv) > 2 else None))
         return
+
+    if op == "on-platform":
+        # on-platform PLATFORM: exit 0 where this machine is one a declared
+        # download names (as for_platform matches a key), 1 where it is not.
+        raise SystemExit(0 if on_platform(argv[1] if len(argv) > 1 else "") else 1)
 
     if op == "images":
         for pid, api, flavor, size in available_images():
