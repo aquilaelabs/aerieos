@@ -835,7 +835,14 @@ print(next(k for k in d if k != "master"))' 2>/dev/null)"
         d="$(sdk_find "$what" 2>/dev/null)" || d=""
         [ -z "$d" ] || have="$(sdk_verified_digest "$d")"
         if [ "$inst" != "-" ] && [ -n "$want" ] && [ -n "$have" ]; then
-            if [ "$have" = "$want" ]; then status=current; else status=update; fi
+            if [ "$have" = "$want" ]; then status=current
+            # Another file than the pin's, and a later release than the pin
+            # names: a copy installed when installs took the vendor's newest,
+            # or under a pin that has since been moved back. Installing the
+            # pin over it would be a step down, so it is not offered as an
+            # update; it reads as current until the pin passes it.
+            elif sdk_vnewer "$inst" "$latest"; then status=current
+            else status=update; fi
         fi
     fi
     # A local probe knows what is installed and nothing about what exists
@@ -882,6 +889,20 @@ sdk_versions() {
 
 # A version with its trailing zero components off (6.4.0 and 6.4 are one
 # release), for the one comparison the check makes.
+# sdk_vnewer A B: whether A names a later release than B, each read as the
+# first run of dotted numbers in it (21.0.13.1 in java's own word, 21.0.13
+# in jdk-21.0.13+9), compared number by number. False where either has
+# none, or they are the same.
+sdk_vnewer() {
+    local a b
+    a="$(printf '%s' "$1" | grep -oE '[0-9]+(\.[0-9]+)+' | head -1)"
+    b="$(printf '%s' "$2" | grep -oE '[0-9]+(\.[0-9]+)+' | head -1)"
+    [ -n "$a" ] && [ -n "$b" ] || return 1
+    a="$(sdk_vnorm "$a")"; b="$(sdk_vnorm "$b")"
+    [ "$a" != "$b" ] || return 1
+    [ "$(printf '%s\n%s\n' "$a" "$b" | sort -V | tail -1)" = "$a" ]
+}
+
 sdk_vnorm() {
     local v="$1"
     while [ "${v%.0}" != "$v" ]; do v="${v%.0}"; done

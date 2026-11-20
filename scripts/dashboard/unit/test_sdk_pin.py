@@ -184,6 +184,12 @@ class Installs(unittest.TestCase):
         rc, out = self.s.sh("sdk_check_one go", PATH=self.curl_refused())
         self.assertEqual(out.rstrip("\n").split("\t")[:4], ["go", "go1.99.0", "go1.99.0", "update"], out)
         self.assertFalse(os.path.exists(os.path.join(self.root, "curl-called")))
+        # A pin that names an earlier release than the copy here (one
+        # installed when installs took the vendor's newest, or a pin moved
+        # back) is no update: installing it would be a step down.
+        self.go("go1.98.2")
+        rc, out = self.s.sh("sdk_check_one go", PATH=self.curl_refused())
+        self.assertEqual(out.rstrip("\n").split("\t")[:4], ["go", "go1.99.0", "go1.98.2", "current"], out)
         # What is installed, with nobody asked, is as it was.
         rc, out = self.s.sh("sdk_versions go")
         self.assertEqual(out, "go\tgo1.99.0\t-\tlocal\n")
