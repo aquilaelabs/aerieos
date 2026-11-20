@@ -2200,17 +2200,31 @@ def _pins_file():
     return STATE / "pinned-projects.json"
 
 
-def _load_pins():
-    """Every account's pinned set, {uid: [names]}. The file was one flat list
-    for everybody until 27 Sep; read as everyone's default under "*" once,
-    and written back keyed by account the first time anybody pins."""
-    v = statefile.read_json(_pins_file())    # read once while the same file (R228 step 1)
-    if isinstance(v, list):
+def _load_user_sets(path, legacy_list=False):
+    """Every account's set of names kept in `path`, {uid: [names]}, sorted.
+    `legacy_list` reads a file that is one flat list for everybody as
+    everyone's default under "*"."""
+    v = statefile.read_json(path)            # read once while the same file (R228 step 1)
+    if legacy_list and isinstance(v, list):
         return {"*": sorted({x for x in v if isinstance(x, str)})}
     if not isinstance(v, dict):
         return {}
     return {k: sorted({x for x in names if isinstance(x, str)})
             for k, names in v.items() if isinstance(k, str) and isinstance(names, list)}
+
+
+def _rename_in_sets(path, sets, old, new):
+    """`old` kept as `new` in every account's set of `path`, written when
+    any of them holds it."""
+    if any(old in (v or []) for v in sets.values()):
+        write_json(path, {u: sorted({new if x == old else x for x in (v or [])}) for u, v in sets.items()})
+
+
+def _load_pins():
+    """Every account's pinned set, {uid: [names]}. The file was one flat list
+    for everybody until 27 Sep; read as everyone's default under "*" once,
+    and written back keyed by account the first time anybody pins."""
+    return _load_user_sets(_pins_file(), legacy_list=True)
 
 
 def load_project_pins(uid, fresh=False):
@@ -2434,9 +2448,7 @@ def rekey(old, new):
     under `old` (a repository, before it was put in a project) kept under
     its project `new` instead (R138), as migration 0010 moves them."""
     with lock:
-        pins = _load_pins()
-        if any(old in (v or []) for v in pins.values()):
-            write_json(_pins_file(), {u: sorted({new if x == old else x for x in (v or [])}) for u, v in pins.items()})
+        _rename_in_sets(_pins_file(), _load_pins(), old, new)
         for kind in MARK_FILES:
             d = _marks(kind)
             if any(isinstance(v, dict) and old in v for v in d.values()):
@@ -2444,9 +2456,7 @@ def rekey(old, new):
                     if isinstance(v, dict) and old in v:
                         v.setdefault(new, v.pop(old))
                 write_json(STATE / MARK_FILES[kind], d)
-        arch = _load_archives()
-        if any(old in (v or []) for v in arch.values()):
-            write_json(_archived_file(), {u: sorted({new if x == old else x for x in (v or [])}) for u, v in arch.items()})
+        _rename_in_sets(_archived_file(), _load_archives(), old, new)
         try:
             locks = json.loads(_locks_file().read_text())
         except (OSError, ValueError):
@@ -2467,11 +2477,7 @@ def load_locks():
 
 def _load_archives():
     """Every account's archived spaces, {uid: [names]}."""
-    v = statefile.read_json(_archived_file())  # read once while the same file (R228 step 1)
-    if not isinstance(v, dict):
-        return {}
-    return {k: sorted({x for x in names if isinstance(x, str)})
-            for k, names in v.items() if isinstance(k, str) and isinstance(names, list)}
+    return _load_user_sets(_archived_file())
 
 
 def load_archived(uid):

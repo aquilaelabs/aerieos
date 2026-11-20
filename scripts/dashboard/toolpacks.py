@@ -39,6 +39,7 @@ import threading
 import time
 from pathlib import Path
 
+import agents
 import packformat
 import services
 import statefile
@@ -182,7 +183,6 @@ def _agent(a, errors):
     _agent_allow(a, out, errors)
     # How it is installed (R169 step 13): a shipped agent's alone, since a
     # pack agent is installed by its pack's own steps.
-    import agents                                               # noqa: PLC0415 (beside this file)
     recipe, why = agents.install_checked(a.get("install"))
     if why:
         errors.append(why)
@@ -227,7 +227,6 @@ def _agent_allow(a, out, errors):
     """An agent's `allow` (R231): how it is told the aerie verbs the
     controller decides need no asking, checked by agents.allow_checked and
     kept only where it says a way."""
-    import agents                                               # noqa: PLC0415 (beside this file)
     spec, why = agents.allow_checked(a.get("allow"))
     if why:
         errors.append(why)
@@ -378,7 +377,7 @@ def _hooks_data(h, errors):
 
 
 PACK_AGENT_FIRST = ("after-dashdash", "flag", "none")
-SHIPPED_AGENTS = ("claude", "codex", "copilot", "grok", "open")
+SHIPPED_AGENTS = tuple(a.id for a in agents.TABLE)
 FLAG = re.compile(r"^-{1,2}[A-Za-z0-9][A-Za-z0-9-]{0,40}$")
 ENV_NAME = re.compile(r"^[A-Z][A-Z0-9_]{0,40}$")
 ARG = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._=:,/-]{0,80}$|^-{1,2}[A-Za-z0-9][A-Za-z0-9._=:,/-]{0,80}$")

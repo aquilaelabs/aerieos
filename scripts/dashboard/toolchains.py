@@ -1414,8 +1414,7 @@ def payload_for_node(nid):
     if nodes:
         cur, behind = current_of(nodes.jobs_for(node_id=nid, type="toolchain", active=True, n=50))
         for j in [cur] if cur else []:
-            names = [DRIVER if str(x).startswith(DRIVER + ":") else str(x)
-                     for x in (j.get("spec") or {}).get("names", [])]
+            names = [base_name(x) for x in (j.get("spec") or {}).get("names", [])]
             # How far through the batch it is, from the name the agent says
             # it is on (step): the ones before it are behind it, the ones
             # after it still to come. Every name sat in the queue for the
@@ -1449,7 +1448,7 @@ def payload_for_node(nid):
                 if j.get("state") not in ("succeeded", "failed", "canceled"):
                     break
                 sp = j.get("spec") or {}
-                names = [DRIVER if str(x).startswith(DRIVER + ":") else str(x) for x in (sp.get("names") or [])]
+                names = [base_name(x) for x in (sp.get("names") or [])]
                 act = sp.get("action") or "install"
                 here = {i["name"] for i in items if i["installed"]}
                 here |= {r["name"] for r in (driver_row(n), container_row(n)) if r and r["here"]}
@@ -1535,6 +1534,21 @@ def payload_for_node(nid):
 
 
 DRIVER = "nvidia-driver"
+
+
+def base_name(x):
+    """A job's name as its row is called: nvidia-driver for the
+    nvidia-driver:PACKAGE a picked branch is queued as, any other as it is."""
+    x = str(x)
+    return DRIVER if x.startswith(DRIVER + ":") else x
+
+
+def is_machine(x):
+    """Whether a job's name is one of the machine's own two, the NVIDIA
+    driver (with a branch's package or without) or the container toolkit:
+    what no store holds."""
+    x = str(x)
+    return x == TOOLKIT or x == DRIVER or x.startswith(DRIVER + ":")
 
 
 def _imaged(rep):
@@ -1630,8 +1644,8 @@ def _store_settling(job, items):
     if j.get("state") != "succeeded" or time.time() - int(j.get("ended") or 0) > 120:
         return False
     here = {i["name"] for i in items if i["installed"]}
-    names = [n for n in ((j.get("spec") or {}).get("names") or []) if n != DRIVER and not str(n).startswith(DRIVER + ":")
-             and n != TOOLKIT and n in {i["name"] for i in items}]
+    names = [n for n in ((j.get("spec") or {}).get("names") or [])
+             if not is_machine(n) and n in {i["name"] for i in items}]
     want = job["action"] != "remove"
     return any((n in here) != want for n in names)
 
@@ -1935,7 +1949,7 @@ def store_areas(names, action="install", where=""):
     out = set()
     for x in names:
         x = str(x)
-        if x == TOOLKIT or x == DRIVER or x.startswith(DRIVER + ":"):
+        if is_machine(x):
             continue
         out.add((where, "android" if x == "android-tools" or x.startswith("android:") else x))
     return out

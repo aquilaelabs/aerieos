@@ -41,6 +41,7 @@ import urllib.request
 
 import agents
 import checks
+from vers import vkey
 
 VER = re.compile(r"(\d+\.\d+\.\d+)")
 # What update and start_hold say, by key, where the agent's row has no
@@ -227,13 +228,9 @@ def installed(n, agent_id):
     return m.group(1) if m else ""
 
 
-def _tup(v):
-    return tuple(int(x) for x in v.split("."))
-
-
 def behind(n, agent_id):
     i, cur = installed(n, agent_id), latest(agent_id)["version"]
-    return bool(i and cur and _tup(i) < _tup(cur))
+    return bool(i and cur and vkey(i) < vkey(cur))
 
 
 def updating(node_id, agent_id):

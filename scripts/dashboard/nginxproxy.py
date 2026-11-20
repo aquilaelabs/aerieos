@@ -31,6 +31,7 @@ import time
 import urllib.request
 from pathlib import Path
 
+import nodeset
 import statefile
 import syscontainer
 
@@ -557,9 +558,7 @@ def attention(deployed):
     if not lt.get("digest"):
         return []
     out = []
-    for n in node_list():
-        if n.get("kind") != "agent" or n.get("state") in ("retired", "pending"):
-            continue
+    for n in nodeset.live_agents(node_list()):
         nid = n["id"]
         if not deployed(nid):
             continue
@@ -637,9 +636,7 @@ def view(devapp, instance_state):
     443 themselves. `instance_state` is devactions.state, for a deployed one.
     The two daemon reads per node come from a short memo (_daemon_half)."""
     out = []
-    for n in node_list():
-        if n.get("kind") != "agent" or n.get("state") in ("retired", "pending"):
-            continue
+    for n in nodeset.live_agents(node_list()):
         nid = n["id"]
         rec = record(nid)
         name = container_name(nid)

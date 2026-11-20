@@ -38,6 +38,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import statefile   # noqa: E402
+from vers import vkey   # noqa: E402
 
 # The directory a project's component keeps its changelog in, from version.py
 # (its _sub), set by server.py for editor_verb(); bb never calls that.
@@ -937,7 +938,7 @@ def stitch(ours, theirs):
 
     def key(t):
         m = _TITLE_VER.match(t)
-        return tuple(int(x) for x in m[1].split(".")) if m else None
+        return vkey(m[1]) if m else None
 
     for t, b in sorted(new, key=lambda tb: key(tb[0]), reverse=True):
         k = key(t)

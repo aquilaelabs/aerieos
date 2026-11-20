@@ -101,6 +101,7 @@ if _here not in sys.path:
     sys.path.insert(0, _here)
 import statefile  # noqa: E402
 import time
+from vers import vkey  # noqa: E402
 from pathlib import Path
 
 WORKSPACE = None
@@ -432,11 +433,6 @@ def _repo(project):
 # named for it, claude/0.7.0 or release/v0.6.2.
 LINE_RE = re.compile(r"(?:^|/)v?(\d{1,4}\.\d{1,5}\.\d{1,6})$")
 _VER = re.compile(r"\d{1,4}\.\d{1,5}\.\d{1,6}")
-
-
-def vkey(v):
-    """A version as a tuple that sorts as versions do."""
-    return tuple(int(x) for x in v.split("."))
 
 
 def branch_of(project):

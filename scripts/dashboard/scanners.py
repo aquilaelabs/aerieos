@@ -33,8 +33,10 @@ import time
 import urllib.request
 from pathlib import Path
 
+import nodeset
 import statefile
 import syscontainer
+from vers import vkey
 
 STATE = None
 write_json = None
@@ -187,7 +189,7 @@ def holders():
 
 
 def _agent_nodes():
-    return [n for n in (node_list() if node_list else []) if n.get("kind") == "agent" and n.get("state") not in ("retired", "pending")]
+    return nodeset.live_agents(node_list() if node_list else [])
 
 
 def uncovered():
@@ -310,7 +312,7 @@ def _newest(tags):
     best = None
     for t in tags:
         if VERSION_RE.match(str(t)):
-            parts = tuple(int(x) for x in str(t).split("."))
+            parts = vkey(str(t))
             if best is None or parts > best[0]:
                 best = (parts, str(t))
     return best[1] if best else ""
@@ -343,7 +345,7 @@ def check_versions():
         errors.append(f"mobsfscan: {type(e).__name__}")
     with _lock:
         d = _load()
-        d["latest"] = {"at": int(time.time()), "versions": {s: max(found.get(s, VERSIONS[s]), VERSIONS[s], key=lambda x: tuple(int(p) for p in x.split(".")))
+        d["latest"] = {"at": int(time.time()), "versions": {s: max(found.get(s, VERSIONS[s]), VERSIONS[s], key=vkey)
                                                             for s in SCANNERS},
                        "error": "; ".join(errors)}
         _save(d)

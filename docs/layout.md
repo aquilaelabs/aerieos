@@ -238,6 +238,7 @@ scripts/
     overlap.py                   what each session is changing, and where two of them collide
     chat.py                      messages between accounts, and what each project's people are doing
     version.py                   one version identity per project, rendered for whatever is asking
+    vers.py                      a dotted version as a tuple that sorts, for any module to import
     changelog.py                 the user-facing record beside it: categories, and the editor's writes
     artifacts.py                 what a project built: dist/, and what a row may offer
     signing.py                   a project's Android signing keys, kept by the controller, never a session's, and the sign-key jobs that work on them on the project's node (R106)
@@ -284,6 +285,7 @@ scripts/
     phonelease.py                a phone lent to a project (R113): the lease, and what its sessions may do on the phone without asking
     db.py                        the controller's store: the SQLite connection, the migrations, ids and the audit trail
     nodes.py                     the node registry, the job queue and the agent's channel (docs/nodes.md); the Nodes page's verbs; a build job from the controller
+    nodeset.py                   which rows of the node list are agent nodes work can go to, enrolled and not retired, for the modules handed the list
     channel.py                   the node agent's verbs behind /api/v1/agent/: enroll, hello, work, a job's files, log and result
     claudecode.py                what is Claude Code's alone on a node: the hold on a node without it or updating it, and the status payload's versions
     agentcode.py                 the coding agents on each node (Claude Code, Codex CLI, Copilot CLI and the others): which version, the latest out, installing, updating and removing each (R95, R145)
