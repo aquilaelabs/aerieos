@@ -9,6 +9,10 @@ unraid
 !scripts/**/*.md
 # Shipped so sessions can copy it into a project from inside the container.
 !config/templates/*.md
+# ...and the note beside the publishers' release keys, which rides in the
+# bundle a node fetches: a release signs the list of that bundle's files, so
+# the image holds every one of them a checkout does (scripts/lib/bundleparts.py).
+!config/release-keys/README.md
 # ...and the changelog, which the welcome panel shows once per image update:
 # it has to travel with the image it describes (the Dockerfile copies it).
 !CHANGELOG.md

@@ -69,7 +69,7 @@ scripts/
   lib/codemap.py                 the code map aerie map answers from: an index over the tree, rebuilt when a source is newer (R75)
   lib/trace-verbs.py             aerie dashboard trace: what the server was asked over a window, by endpoint and asker
   lib/gh-fetch                   one GitHub release asset, kept only when it matches the digest GitHub states for it: the image and the bare-metal installer fetch their own tools with it (B335)
-  lib/sdkmeta.py                 reads config/toolchains.json for aerie, with the tool packs beside it: fields, argv, versions
+  lib/sdkmeta.py                 reads config/toolchains.json for aerie (on a node, the catalog's newer rows beside it where the bundle carries them), with the tool packs beside it: fields, argv, versions
   lib/toolpack-run.py            `aerie tool PACK VERB`: a tool pack's verb from its manifest, the caller's words in place of {args}
   lib/docker-probe.py            which daemon is live, for `aerie doctor` and the boot log
   lib/log-split.sh               splits a long-running process's output: all of it to its own file, warnings to the boot log
@@ -152,6 +152,7 @@ scripts/
   lib/doctor-probes.py           egl, project node, commit identity, session-capable node, signed-in account
   lib/lint-checks.py             aerie lint's own checks: runner label pinning, XML well-formedness, settings agreement
   lib/releasepub.py              config/aerieos-release.pub read one way, for the Enroll script, the build's signer and aerie lint: the key and its spare, or none and why
+  lib/bundleparts.py             what a release ships in the bundle a node fetches, and the list of those files a release signs (R267 step 6): the parts, their files without Python's bytecode, and one line a file with its sha256; read by the controller's bundle and tools/sign-agent.py
   startup.d/*.sh                 startup hooks
   dashboard/                     web dashboard: server.py (the routes, the transport and the gates, each handler one call
                                  into a module beside it); index.html (the markup); page-*.css (the stylesheet, a cascade layer a file);
@@ -196,7 +197,7 @@ scripts/
     packconfig.py                what each added pack is configured with per node (R172): the answers to its config block, secrets sealed, handed in the hello
     library.py                   the Library's one list (R170): the toolchains and packs with what a node's store holds, the coding agents, the apps, the catalog's offers and the companions as rows of one shape
     catalogindex.py              the vetted catalog's index (R169 step 2): fetched from the catalog's address, its signature checked against config/catalog.pub before an entry is read, a withdrawn pack on the bell
-    catalogrows.py               a shipped toolchain's recipe from the catalog when the catalog's is newer (R234 step 4): its row from its official pack's manifest, held to the primitives this build carries, kept under the state and carried by the table and the nodes' bundle in the shipped row's place
+    catalogrows.py               a shipped toolchain's recipe from the catalog when the catalog's is newer (R234 step 4): its row from its official pack's manifest, held to the primitives this build carries, kept under the state and carried by the table in the shipped row's place and by the nodes' bundle as config/toolchains.catalog.json beside the shipped file
     packformat.py                the catalog's format number (R234): the number this build reads, what each added, and the sentence an entry past it is refused with; unit/packformat/N keeps manifests of each
     catalogmirror.py             the vetted catalog's mirror (R169 step 6): an archive tools/catalog-mirror.py made, imported under Controller settings once its index is the maintainers', answering when the catalog does not and holding each pinned repository as a git bundle
     emulator.py                  everything behind the Emulator page: a node's Android system images

@@ -341,7 +341,12 @@ COPY config/icon.png /opt/aerieos/icon.png
 # above keeps a session's tree clean, and with it nothing ever wrote any, so
 # every relayed verb's python compiled its modules again (200 ms where 30
 # would do) and the dashboard compiled itself at each start. A node's agent
-# is unaffected: its bundle takes only the .py files (bundle.sources).
+# is unaffected: its bundle takes only the .py files (bundle.sources). So is
+# the bundle of aerie a node fetches, which leaves the bytecode out
+# (scripts/lib/bundleparts.py): a release signs the list of that bundle's
+# files from the tree, so nothing here may write or rewrite any other file
+# under the parts it names, or every node that pinned the release key
+# refuses the image's bundle.
 RUN set -eux; \
     chmod -R +x /opt/aerieos/scripts; \
     python3 -m compileall -q -j 0 /opt/aerieos/scripts; \

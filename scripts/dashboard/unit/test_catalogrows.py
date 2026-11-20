@@ -1,9 +1,9 @@
 """A shipped toolchain's recipe from the catalog when the catalog's is newer
 (R234 step 4): every row comes back whole from its official pack's
 manifest, a newer one is fetched at its pin and held to its shape, the
-controller's table and the nodes' bundle carry it in the shipped row's
-place, and the image's copy is what runs whenever the catalog's is no
-newer or is one this build does not read."""
+controller's table carries it in the shipped row's place and the nodes'
+bundle in a file beside the shipped one, and the image's copy is what runs
+whenever the catalog's is no newer or is one this build does not read."""
 import copy
 import io
 import json
@@ -137,7 +137,9 @@ class Taken(unittest.TestCase):
                 mock.patch.dict(workspace._bundle, {}, clear=True):
             body = workspace.bundle()["body"]
         with tarfile.open(fileobj=io.BytesIO(body)) as tar:
-            got = json.load(tar.extractfile("config/toolchains.json"))
+            got = json.load(tar.extractfile("config/toolchains.catalog.json"))
+            # ...beside the shipped file, which goes as its release signed it.
+            self.assertEqual(tar.extractfile("config/toolchains.json").read().decode(), shipped_text)
         self.assertEqual(next(r for r in got["toolchains"] if r["name"] == "zig")["rev"], 2)
         self.assertEqual(len(got["toolchains"]), len(SHIPPED))
 

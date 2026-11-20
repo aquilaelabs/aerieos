@@ -34,9 +34,17 @@ SDK_TOOLCHAINS="android node jdk playwright flutter dotnet swift go rust zig"
 # can drift. config/toolchains.json sits at the same place relative to this
 # script in the image and in a checkout.
 # The catalog, at the one place it sits relative to this file in both the
-# image and a checkout.
+# image and a checkout. On a node the bundle may carry a second file beside
+# it, the shipped rows with the vetted catalog's newer ones in their places
+# (toolchains.catalog.json, which the controller adds): that one is read
+# where it is there, and the shipped file stays as its release signed it.
 sdk_meta_file() {
-    printf '%s' "${BB_SCRIPTS:-$(dirname "$(readlink -f "$0")")}/../config/toolchains.json"
+    local d="${BB_SCRIPTS:-$(dirname "$(readlink -f "$0")")}/../config"
+    if [ -f "$d/toolchains.catalog.json" ]; then
+        printf '%s' "$d/toolchains.catalog.json"
+    else
+        printf '%s' "$d/toolchains.json"
+    fi
 }
 
 sdk_checkable() {

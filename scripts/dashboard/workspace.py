@@ -33,6 +33,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 import tarfile
 import threading
 import time
@@ -42,6 +43,12 @@ import artifacts  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
+# What the bundle is made of and how its files are listed, from scripts/lib
+# (which the image carries beside this directory): the build's signer reads
+# the same module.
+if str(HERE.parent / "lib") not in sys.path:
+    sys.path.insert(0, str(HERE.parent / "lib"))
+import bundleparts  # noqa: E402
 WORKSPACE = None
 SNAPS = None
 paths = None              # set by server.py: paths.py, where what grows is kept
@@ -53,9 +60,9 @@ _bundle = {}
 # the server: the bundle carries them as config/toolpacks.json beside the
 # shipped catalog, which is how a node installs a pack by name.
 packs_json = None
-# The shipped catalog as the nodes get it (catalogrows.text, R234 step 4):
-# config/toolchains.json with a row's newer recipe from the vetted catalog in
-# its place, "" when the file goes as it is.
+# The shipped catalog with a row's newer recipe from the vetted catalog in
+# its place (catalogrows.text, R234 step 4), "" when there is none: the
+# bundle carries it beside config/toolchains.json, as CATALOG_ROWS.
 toolchains_json = None
 # ...and the packs made on the controller, each a git bundle carried as
 # config/toolpacks/NAME.bundle (toolpacks.hosted_files): [(arcname, path)].
@@ -304,127 +311,124 @@ def provenance(project, rel):
 # ---------------------------------------------------------------------------
 # the toolchain bundle
 
-# bb-tty and the two hooks it writes into a session's settings ride along
-# since roadmap #24: a node runs sessions from this same bundle. NOT the
-# rest of scripts/dashboard (the notebook modules, users.py, server.py),
-# because a node has no /config for them to read; the verbs that need them
-# are relayed back here (server._bb_relay).
-BUNDLE_PARTS = ("scripts/aerie", "scripts/bb", "scripts/lib", "config/toolchains.json",
-                # The publishers' release keys a download is checked against (R137).
-                "config/release-keys",
-                "nodes/provision-linux.sh", "nodes/families",
-                # The root helper that builds a session's view, which the
-                # agent installs from here on a sandbox node (R35).
-                "nodes/bb-session",
-                # ...and the one that cuts the network for a declared pack's
-                # install steps where the job account cannot (R234).
-                "nodes/bb-netcut",
-                "scripts/dashboard/bb-tty", "scripts/dashboard/bb-work-note",
-                "scripts/dashboard/bb-prompt-relay", "scripts/dashboard/bb-check-relay",
-                "scripts/dashboard/bb-rule-hook",
-                # ...and the other coding agents' one hook, which runs these
-                # (R95 step 6): their hooks files name it in this bundle.
-                "scripts/dashboard/bb-agent-hook",
-                # ...and the agents' table it reads the aerie verbs a session
-                # is not asked about from (bb-agent-hook --allow, and an
-                # agent approved by its hook): without it no session on a
-                # node was handed them.
-                "scripts/dashboard/agents.py",
-                # ...and what trusts Codex's for a launch (B284).
-                "scripts/dashboard/bb-codex-trust",
-                # The gate, which refuses every tool call while the
-                # controller is not answering, so a node's sessions stop for
-                # an update the same way the controller's do.
-                "scripts/dashboard/bb-gate",
-                # The record documents aerie design show NAME, aerie wiki and bb
-                # roadmap --format print, which the verbs in scripts/lib
-                # import from beside the dashboard (B426: a node's bb
-                # had no records module).
-                "scripts/dashboard/records.py")
+# What a release ships in the bundle, named in scripts/lib/bundleparts.py: the
+# build's signer lists the same files from the tree (tools/sign-agent.py),
+# and a node that pinned the release key holds what it is sent to that list.
+BUNDLE_PARTS = bundleparts.PARTS
 
 
-# The parts a bundle was built without, each said once (bundle()).
+# What a bundle's build said already, each once (bundle()): a part it was
+# built without, by name, and a list of files its build did not sign.
 _bundle_missing = set()
 
 
 # The member a node reads the release's signature over root's tools from
 # (the agent's base.TOOLS_SIG).
 TOOLS_SIG = "nodes/root-tools.sig"
+# The list of the files a release ships in this bundle, each with its
+# sha256, made from the very bytes the tar carries (bundleparts.listing), and
+# the release's signature over that list's digest, where the build made one
+# (the agent's base.BUNDLE_LIST and BUNDLE_SIG, release.may_keep_bundle).
+BUNDLE_LIST = "nodes/bundle.list"
+BUNDLE_SIG = "nodes/bundle.sig"
+# The shipped catalog with the vetted catalog's newer rows in the shipped
+# ones' places, as a member of its own: config/toolchains.json goes as the
+# release shipped it, which is what the release signed, and the three
+# readers on a node take this one where it is beside it (sdk.sh, sdkmeta.py,
+# the agent's toolchains.read_catalog).
+CATALOG_ROWS = "config/toolchains.catalog.json"
+
+
+def _signed(part):
+    """One part of scripts/agent/agent.sig as (digest, sig): the tools root
+    installs ("tools") or the list of the bundle's files ("bundle"), which
+    a release's build writes and a build from a branch does not. ("", "")
+    where there is none, or its signature is not one."""
+    try:
+        d = json.loads((REPO / "scripts" / "agent" / "agent.sig").read_text())
+        t = d.get(part) if isinstance(d, dict) else None
+        if isinstance(t, dict) and re.fullmatch(r"[0-9a-f]{128}", str(t.get("sig") or "")):
+            return str(t.get("digest") or "")[:80], t["sig"]
+    except (OSError, ValueError):
+        pass
+    return "", ""
 
 
 def _tools_sig():
     """The bundle's root-tools.sig as text, or "": {"digest", "sig"} from
     the tools half of scripts/agent/agent.sig, which a release's build
     writes and a build from a branch does not."""
-    try:
-        d = json.loads((REPO / "scripts" / "agent" / "agent.sig").read_text())
-        t = d.get("tools") if isinstance(d, dict) else None
-        if isinstance(t, dict) and re.fullmatch(r"[0-9a-f]{128}", str(t.get("sig") or "")):
-            return json.dumps({"digest": str(t.get("digest") or "")[:80], "sig": t["sig"]})
-    except (OSError, ValueError):
-        pass
-    return ""
+    digest, sig = _signed("tools")
+    return json.dumps({"digest": digest, "sig": sig}) if sig else ""
+
+
+def _bundle_sig():
+    """The bundle's bundle.sig as text, or "": {"digest", "sig"} from the
+    part of scripts/agent/agent.sig that signs the list of the bundle's
+    files. Passed on as it is: this side holds no key and checks nothing,
+    since the node is the one that must not take this controller's word."""
+    digest, sig = _signed("bundle")
+    return json.dumps({"digest": digest, "sig": sig}) if sig else ""
 
 
 def bundle():
-    """bb, its library and the catalog as one tar: {body, digest}. Rebuilt
-    when any of its files moves, so a node installing a toolchain runs the
-    recipes this controller ships right now, by digest."""
-    stamp = []
-    for part in BUNDLE_PARTS:
-        p = REPO / part
-        if p.is_dir():
-            stamp.extend(int(x.stat().st_mtime_ns) for x in sorted(p.rglob("*")) if x.is_file())
-        elif p.is_file():
-            stamp.append(int(p.stat().st_mtime_ns))
+    """bb, its library and the catalog as one tar: {body, digest, files,
+    files_signed}. Rebuilt when any of its files moves, so a node
+    installing a toolchain runs the recipes this controller ships right
+    now, by digest. `files` is the digest of the list of what a release
+    ships in it, as this install holds those files, and `files_signed`
+    whether this build's signature names that same list."""
+    pairs = bundleparts.files(REPO, BUNDLE_PARTS)
+    stamp = [(name, int(os.stat(path).st_mtime_ns)) for name, path in pairs]
     packs = packs_json() if packs_json else ""
     hosted = packs_files() if packs_files else []
     stamp.extend(int(p.stat().st_mtime_ns) for _, p in hosted)
     shipped = REPO / "config" / "toolchains.json"
     newer = toolchains_json(shipped.read_text()) if toolchains_json and shipped.is_file() else ""
-    # The release's signature over the tools root installs from this bundle
-    # (R227 step 1), where the build made one: beside the agent's, in the
-    # file tools/sign-agent.py writes, and carried as a member of its own.
-    tools_sig = _tools_sig()
-    key = hash((tuple(stamp), packs, newer, tools_sig))
+    # The release's signatures over the tools root installs from this bundle
+    # (R227 step 1) and over the list of every file it ships (R267 step 6),
+    # where the build made them: beside the agent's, in the file
+    # tools/sign-agent.py writes, and each carried as a member of its own.
+    tools_sig, bundle_sig = _tools_sig(), _bundle_sig()
+    key = hash((tuple(stamp), packs, newer, tools_sig, bundle_sig))
     if _bundle.get("key") != key:
         import io
-        buf = io.BytesIO()
+        for part in bundleparts.missing(REPO, BUNDLE_PARTS):
+            # Said by name, once a build: a part this image does not
+            # hold was left out without a word, and the node that
+            # needed it found out by not having it (the audit of 13
+            # Nov: bb-netcut, until the Dockerfile named it).
+            if part not in _bundle_missing:
+                _bundle_missing.add(part)
+                print(f"dashboard: the bundle a node fetches is missing {part}: this install does not hold it",
+                      flush=True)
+        buf, held, newest = io.BytesIO(), [], 0
         with tarfile.open(fileobj=buf, mode="w", format=tarfile.PAX_FORMAT) as tar:
-            for part in BUNDLE_PARTS:
-                p = REPO / part
-                if not p.exists():
-                    # Said by name, once a build: a part this image does not
-                    # hold was left out without a word, and the node that
-                    # needed it found out by not having it (the audit of 13
-                    # Nov: bb-netcut, until the Dockerfile named it).
-                    if part not in _bundle_missing:
-                        _bundle_missing.add(part)
-                        print(f"dashboard: the bundle a node fetches is missing {part}: this install does not hold it",
-                              flush=True)
-                    continue
-                for f in ([p] if p.is_file() else sorted(x for x in p.rglob("*") if x.is_file())):
-                    ti = tar.gettarinfo(str(f), arcname=str(f.relative_to(REPO)))
-                    ti.uid = ti.gid = 0
-                    ti.uname = ti.gname = ""
-                    if newer and f == shipped:
-                        # The catalog's newer rows in the shipped ones' places.
-                        data = newer.encode("utf-8")
-                        ti.size = len(data)
-                        tar.addfile(ti, io.BytesIO(data))
-                        continue
-                    with open(f, "rb") as fh:
-                        tar.addfile(ti, fh)
-            if tools_sig:
-                data = tools_sig.encode("utf-8")
-                ti = tarfile.TarInfo(TOOLS_SIG)
-                ti.size, ti.mode, ti.mtime = len(data), 0o644, int(time.time())
+            for name, path in pairs:
+                ti = tar.gettarinfo(path, arcname=name)
+                ti.uid = ti.gid = 0
+                ti.uname = ti.gname = ""
+                # Read once: the bytes the tar carries are the bytes listed.
+                with open(path, "rb") as fh:
+                    data = fh.read()
+                ti.size = len(data)
                 tar.addfile(ti, io.BytesIO(data))
-            if packs:
-                data = packs.encode("utf-8")
-                ti = tarfile.TarInfo("config/toolpacks.json")
-                ti.size, ti.mode, ti.mtime = len(data), 0o644, int(time.time())
-                tar.addfile(ti, io.BytesIO(data))
+                held.append((name, data))
+                newest = max(newest, int(ti.mtime))
+            text, listed = bundleparts.listing(held)
+            # What this side adds beside the release's files. Each carries
+            # the newest of those files' times, not this moment's: the same
+            # files make the same tar at every start, so a controller that
+            # restarts sends no node a new bundle for it.
+            for name, data in ((BUNDLE_LIST, text), (BUNDLE_SIG, bundle_sig), (TOOLS_SIG, tools_sig),
+                               # The catalog's newer rows, beside the shipped
+                               # file and never in its place.
+                               (CATALOG_ROWS, newer), ("config/toolpacks.json", packs)):
+                if data:
+                    data = data.encode("utf-8")
+                    ti = tarfile.TarInfo(name)
+                    ti.size, ti.mode, ti.mtime = len(data), 0o644, newest
+                    tar.addfile(ti, io.BytesIO(data))
             for arc, f in hosted:
                 ti = tar.gettarinfo(str(f), arcname=arc)
                 ti.uid = ti.gid = 0
@@ -432,7 +436,18 @@ def bundle():
                 ti.mode = 0o644
                 with open(f, "rb") as fh:
                     tar.addfile(ti, fh)
+        signed = _signed("bundle")[0]
+        if signed and signed != listed and "not signed" not in _bundle_missing:
+            # Once a build, and no guess at which file: a build's signature
+            # is over the files it was made from, and an install whose files
+            # are others (one edited in place, a part missing) is refused
+            # by every node that pinned a key.
+            _bundle_missing.add("not signed")
+            print("dashboard: the files in the bundle a node fetches are not the ones this build signed "
+                  f"(they list as {listed[7:23]}, the signature is for {signed[7:23]}): "
+                  "a node that pinned a release key refuses them and keeps the bundle it has", flush=True)
         body = buf.getvalue()
-        _bundle.update(key=key, body=body,
+        _bundle.update(key=key, body=body, files=listed, files_signed=bool(signed) and signed == listed,
                        digest="sha256:" + hashlib.sha256(body).hexdigest())
-    return {"body": _bundle["body"], "digest": _bundle["digest"]}
+    return {"body": _bundle["body"], "digest": _bundle["digest"],
+            "files": _bundle["files"], "files_signed": _bundle["files_signed"]}

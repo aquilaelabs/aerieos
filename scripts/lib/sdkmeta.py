@@ -51,12 +51,27 @@ import urllib.request
 import xml.etree.ElementTree as ET  # nosemgrep: python.lang.security.use-defused-xml.use-defused-xml
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+# The file a node's bundle may carry beside the shipped catalog: the shipped
+# rows with the vetted catalog's newer ones in their places, which the
+# controller adds as a member of its own (workspace.CATALOG_ROWS).
+CATALOG_ROWS = "toolchains.catalog.json"
+
+
+def catalog_file(shipped):
+    """The catalog to read where `shipped` is config/toolchains.json: the
+    file beside it with the vetted catalog's newer rows where a bundle
+    carries one, the shipped file otherwise. The shipped file is never
+    rewritten for those rows: a release signs it as it is."""
+    newer = os.path.join(os.path.dirname(shipped), CATALOG_ROWS)
+    return newer if os.path.isfile(newer) else shipped
+
+
 # BB_TOOLCHAINS_JSON points this at another catalog. It exists so the install
 # machinery can be exercised against a fake one: five recipes fetched from
 # file:// URLs prove the fetching, unpacking, environment and verify steps
 # without spending gigabytes or touching the real toolchain store root.
-CATALOG = os.environ.get("BB_TOOLCHAINS_JSON") or os.path.join(
-    HERE, "..", "..", "config", "toolchains.json")
+CATALOG = os.environ.get("BB_TOOLCHAINS_JSON") or catalog_file(os.path.join(
+    HERE, "..", "..", "config", "toolchains.json"))
 TIMEOUT = 30
 # Some of these hosts hand a bare urllib a different answer, or none: go.dev
 # serves the plain version file happily, github's release redirect does not

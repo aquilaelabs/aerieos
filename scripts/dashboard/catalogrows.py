@@ -10,9 +10,12 @@ fix used to wait for a release of AerieOS. Now a row has a `rev`, its
 catalog entry repeats it (`shipped_rev`), and an install that reads a signed
 index whose rev is higher than its own row's fetches that pack at its pin,
 under its sha256, holds the row to its shape, and keeps it under the state:
-the controller's own table and the bundle every node installs from then
-carry the newer row in the shipped one's place. The image's copy is what
-runs with no network, at first boot, and whenever the catalog's is no newer.
+the controller's own table then carries the newer row in the shipped one's
+place, and the bundle every node installs from carries the rows so merged as
+a file of their own beside the shipped one (config/toolchains.catalog.json),
+which a node reads where it is there: config/toolchains.json itself goes as
+its release signed it. The image's copy is what runs with no network, at
+first boot, and whenever the catalog's is no newer.
 
 What a row may say is the format's, not the catalog's: its source kind, its
 version resolvers and its checksum kinds are a closed set this build
@@ -168,9 +171,10 @@ def merged(rows):
 
 
 def text(shipped_text):
-    """config/toolchains.json as the bundle carries it: the shipped file
-    with the catalog's newer rows in place, or "" when none applies and the
-    file goes as it is."""
+    """What the bundle carries beside config/toolchains.json, as
+    config/toolchains.catalog.json: the shipped file's text with the
+    catalog's newer rows in the shipped ones' places, or "" when none
+    applies and the bundle carries the shipped file alone."""
     try:
         doc = json.loads(shipped_text)
         rows = doc["toolchains"]
