@@ -443,6 +443,17 @@ pinned node a recipe of their own: what a recipe downloads and runs, it
 runs as the jobs account, and the system packages it names are installed
 by root from that machine's own repositories.
 
+**What a recipe downloads is held to what the recipe says.** A row of the
+shipped catalog, which the release signs, or of the vetted catalog, whose
+index is signed, can carry what each of its downloads is: the sha256 of
+the exact file (a pin), its publisher's signature under a key the row
+carries or the release ships, or a commit. A row that does is not at the
+mercy of the place it downloads from; one that asks that place what the
+file should be on the day of the install still is, and its entry says
+which: pinned, installer (its pinned installer downloads the rest, and
+says from where) or open
+([Declared downloads](tool-packs.md#declared-downloads)).
+
 **The rest, it still does, unless its console says otherwise.** The agent
 runs as root; a root command an administrator approves is run as given
 (which, on a node provisioned as a sandbox, could also undo the pin); and

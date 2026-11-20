@@ -264,6 +264,26 @@ Hover a size to see which one you are reading. Measuring walks the tree, so
 it happens on a worker rather than in the request: the first draw after an
 install carries the estimate and the real number arrives a moment later.
 
+**A download is held to something before it is unpacked or run.** Each row
+of the catalog says to what (`source.checksum`). Most ask its publisher at
+the moment of the install: the digest GitHub states for a release asset, a
+checksum file beside the download, the vendor's own index. Two rest on
+their publisher's signature, under keys AerieOS ships
+(`config/release-keys`) or the row carries itself. And a row may carry the
+answer whole, as a **pin**: the version and the sha256 of the exact file,
+which the signed release or the signed catalog then holds, so the file is
+held to something its own origin cannot change. A pinned row installs that
+version and asks nobody what is newest; a check offers the pinned version,
+and a newer one is the pin moving in the row. A download that is not what
+its row says is removed and the install stops, naming both digests, with
+nothing left installed. The Installed page says under each toolchain how
+its download was checked. What a row downloads besides its own source it
+can declare the same way a pack does, each file held to a sha256 or a
+signature and fetched before anything of the row runs:
+[Declared downloads](tool-packs.md#declared-downloads) has the rule, the
+format and the three words (pinned, installer, open) an entry's downloads
+come down to.
+
 Android needs no PATH help on the machine that has it: a node's agent points
 `ANDROID_HOME` at its store's `android/` directory for every job and session,
 so Gradle and `sdkmanager` install and find things in one place. (The

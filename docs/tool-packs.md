@@ -62,7 +62,9 @@ it (`Installed 13 Nov from manifest 1a2b3c4d5e6f: 214 files, 48.0 MB,
 receipt 9f8e7d6c5b4a`), the whole list is beside the pack on the node
 (`.bb-receipt` in its directory), and the node's store keeps a line for
 every install it has made (`.bb-receipts`), which a remove and a reinstall
-leave alone.
+leave alone. A toolchain AerieOS ships leaves one too when its row
+[declares its downloads](#declared-downloads), under the sha256 its own
+download was held to in the commit's place.
 
 The page says three more things when the receipt shows them:
 
@@ -83,33 +85,169 @@ is 0.9.433 or newer.
 
 ### Declared downloads
 
-A receipt says what landed. A pack can also say beforehand what it will
-download, and then nothing else can arrive. In its manifest, at pack format
-3:
+A receipt says what landed. An entry can also say beforehand what it will
+download, and then nothing else can arrive. One rule covers everything
+AerieOS installs from somewhere else, a toolchain it ships and anybody's
+pack alike:
+
+**Whatever an entry fetches is held to something the entry itself
+carries.** The entry is held in turn by the commit it is kept at, the
+catalog's signed index or the signed release, so what holds a download is
+never the word of the place it comes from on the day of the install. It is
+one of three things: the sha256 of the exact file, its publisher's
+signature under a key the entry carries, or, for a repository, a commit.
+Nothing in AerieOS knows a vendor by name; a download that moves is moved
+in the entry.
+
+In a manifest each download is a row of `install.fetch`: the address it
+comes from, the file inside the pack it is kept as, and what holds it.
+
+**A pinned download, one per platform.** The sha256 of what the address
+answers, and the platform the file is for:
 
 ```json
-"format": 3,
+"format": 5,
 "install": {
   "fetch": [
-    {"url": "https://github.com/hexkit/hexkit/releases/download/v1.4.2/hexkit-linux.tar.gz",
-     "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
-     "to": "dl/hexkit-linux.tar.gz"}
+    {"url": "https://github.com/quill-prose/quill/releases/download/v3.1.0/quill-3.1.0-linux-x64.tar.gz",
+     "sha256": "2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae",
+     "to": "dl/quill.tar.gz",
+     "platform": "linux/amd64"},
+    {"url": "https://github.com/quill-prose/quill/releases/download/v3.1.0/quill-3.1.0-linux-arm64.tar.gz",
+     "sha256": "fcde2b2edba56bf408601fb721fe9b5c338d10ee429ea04fae5511b68fbf8fb9",
+     "to": "dl/quill.tar.gz",
+     "platform": "linux/arm64"}
   ],
   "steps": [["sh", "{dir}/install.sh"]]
 }
 ```
 
-On a node AerieOS fetches each download itself, over `https` alone, and
-holds it to the sha256 the manifest says; one that answers another file
-stops the install, naming both. The files are then where `to` says, inside
-the pack, and the install steps and the verify command run with no
-network: a step that tries to fetch anything else fails, and the job says
-it ran with no network. So a pinned commit pins everything the install
-brings, and a newer version of the tool is a new commit of the pack with a
-new address and sha256, which a Manifest update shows.
+A download that names a `platform` is fetched on that platform alone:
+`linux/amd64`, `linux/arm64`, `darwin/arm64`, or `linux/*` for any
+architecture of a system. One that names none is for every platform. Two
+whose platforms can never be the same machine may be kept under one name,
+as above, so the install script reads one path. A download with a `sha256`
+and no `platform` is all pack format 3 asks for; `platform` is format 5's.
+
+**A download held by its publisher's signature.** Where a publisher signs
+its releases, the signature holds the file in the sha256's place, and the
+pack carries the key:
+
+```json
+"format": 5,
+"install": {
+  "fetch": [
+    {"url": "https://downloads.tern.example.org/2.4.0/tern-2.4.0-linux.tar.xz",
+     "to": "dl/tern.tar.xz",
+     "signed": {"sig": "https://downloads.tern.example.org/2.4.0/tern-2.4.0-linux.tar.xz.sig", "keys": "tern.asc"}}
+  ],
+  "keyring": {
+    "tern.asc": "-----BEGIN PGP PUBLIC KEY BLOCK-----\n\nmDMEaw...\n-----END PGP PUBLIC KEY BLOCK-----\n"
+  },
+  "steps": [["sh", "{dir}/install.sh"]]
+}
+```
+
+A row says exactly one of `sha256` and `signed`. `sig` is the address of
+the detached signature and `keys` a plain file name in `install.keyring`,
+which maps up to four names to an armored public key of at most 32 KB
+each. AerieOS checks the file with `gpgv` against that key and no other,
+never a keyring of the machine's. A publisher's key that changes is a new
+commit of the pack, and no release of AerieOS.
+
+**An installer that keeps the network.** Some installers download the rest
+by themselves: a language's own installer fetching its compiler, a package
+manager fetching packages. The installer is pinned like any download, and
+the pack says in one sentence what it then downloads and from where:
+
+```json
+"format": 5,
+"install": {
+  "fetch": [
+    {"url": "https://get.kestrel.example.org/1.8.0/kestrel-up.sh",
+     "sha256": "60303ae22b998861bce3b28f33eec1be758a213c86c93c076dbe9f558c11c752",
+     "to": "dl/kestrel-up.sh"}
+  ],
+  "online": "Its installer, kestrel-up, downloads the compiler and the standard library for this machine from releases.kestrel.example.org.",
+  "steps": [["sh", "{dir}/dl/kestrel-up.sh", "--prefix", "{dir}", "--version", "1.8.0"]]
+}
+```
+
+With `online`, what the pack declares is still fetched and checked first,
+and its steps then keep the network; the job, the receipt (`.bb-receipt`,
+and `.bb-net` beside it) and the pack's entry say so in the pack's own
+sentence. Without it, a pack that declares its downloads runs its steps
+with no network.
+
+**What a node does with them.** AerieOS fetches each download itself, over
+`https` alone, before anything of the pack runs, and holds it to its sha256
+or its signature; one that answers another file stops the install, naming
+what it expected and what it got, and leaves nothing installed. The files
+are then where `to` says, inside the pack, and the install steps and the
+verify command run with no network: a step that tries to fetch anything
+else fails, and the job says it ran with no network. So a pinned commit
+pins everything the install brings, and a newer version of the tool is a
+new commit of the pack with a new address and a new sha256, which a
+Manifest update shows.
 
 **Look** lists what a pack declares before it is added, or says that it
 declares none.
+
+**The three words.** What an entry's downloads are held to comes down to
+one word, worked out from the entry alone, the same way for a shipped
+toolchain, an official pack, a vetted one and one you sideload:
+
+- **pinned**: every download it makes is a pin, a publisher's signature
+  under a key it carries, or a commit, and its steps run with no network.
+- **installer**: the same for everything it declares, and it says `online`:
+  its pinned installer downloads the rest from its vendor. The word comes
+  with the entry's sentence.
+- **open**: anything else, with the part that is held to nothing: a
+  download checked only against what its own origin says that day or not
+  checked at all, a repository at a branch with no commit, or steps that
+  run with the network and no declared reason (a pack with install steps
+  and no `install.fetch`).
+
+`/api/toolchains` answers it for every row as `held` (`word` and `why`),
+the Library's rows pass it on, and **Look** answers it for a pack before it
+is added.
+
+**A toolchain AerieOS ships** says the same things in its row's `source`
+(`config/toolchains.json`), whatever its kind: `fetch`, `keyring` and
+`online` as above, `offline: true` for a row that downloads nothing more
+and whose steps are to run with no network, and for its own download a
+checksum of kind `pin`:
+
+```json
+"source": {
+  "kind": "tarball",
+  "url": {"linux/amd64": "https://github.com/osprey-build/osprey/releases/download/{version}/osprey-{version}-linux-x64.tar.gz",
+          "linux/arm64": "https://github.com/osprey-build/osprey/releases/download/{version}/osprey-{version}-linux-arm64.tar.gz"},
+  "version": {"resolver": "github-release", "repo": "osprey-build/osprey"},
+  "checksum": {"from": "pin", "version": "v4.2.0",
+               "sha256": {"linux/amd64": "2c624232cdd221771294dfbb310aca000a0df6ac8b66b696d90ef06fdefb64a3",
+                          "linux/arm64": "19581e27de7ced00ff1ce50b2047e7a567c76b1cbaebabe5ef03f7c3017bb5b7"}},
+  "strip": 1,
+  "offline": true,
+  "verify": ["{dir}/bin/osprey", "--version"]
+}
+```
+
+A pinned row installs the pinned version from the address made from it and
+asks nobody what is newest: `version` stays in the row as how a newer one
+is found, and is not read by an install. The digest is one per platform,
+keyed as `url` is, or a single string where one file serves every
+platform; a machine the pin names no digest for is told the row offers no
+pinned download for it. `aerie toolchains check` offers the pinned version
+for such a row, and an update is the pin moving in the row. A row's keys
+are read from its own `keyring` first and from `config/release-keys/`
+otherwise, for a declared download's `signed` and for the `signature` and
+`file` checksum kinds alike. What a row declares is fetched before anything
+of the row runs: after a tarball is checked and unpacked, after a script's
+installer is checked and before it runs, after a repository's checkout,
+and before a command; the installer, the follow-up steps, a warm-up and
+the verify then run with no network, or with it where the row says
+`online`.
 
 The cut is a network namespace of the step's own. The account a node's jobs
 run as makes it itself where the machine lets an account do that. Where it

@@ -69,7 +69,7 @@ scripts/
   lib/codemap.py                 the code map aerie map answers from: an index over the tree, rebuilt when a source is newer (R75)
   lib/trace-verbs.py             aerie dashboard trace: what the server was asked over a window, by endpoint and asker
   lib/gh-fetch                   one GitHub release asset, kept only when it matches the digest GitHub states for it: the image and the bare-metal installer fetch their own tools with it (B335)
-  lib/sdkmeta.py                 reads config/toolchains.json for aerie (on a node, the catalog's newer rows beside it where the bundle carries them), with the tool packs beside it: fields, argv, versions
+  lib/sdkmeta.py                 reads config/toolchains.json for aerie (on a node, the catalog's newer rows beside it where the bundle carries them), with the tool packs beside it: fields, argv, versions, what a download is held to (its publisher's word, a pin, a signature) and an install's receipt
   lib/toolpack-run.py            `aerie tool PACK VERB`: a tool pack's verb from its manifest, the caller's words in place of {args}
   lib/docker-probe.py            which daemon is live, for `aerie doctor` and the boot log
   lib/log-split.sh               splits a long-running process's output: all of it to its own file, warnings to the boot log
@@ -198,7 +198,7 @@ scripts/
     library.py                   the Library's one list (R170): the toolchains and packs with what a node's store holds, the coding agents, the apps, the catalog's offers and the companions as rows of one shape
     catalogindex.py              the vetted catalog's index (R169 step 2): fetched from the catalog's address, its signature checked against config/catalog.pub before an entry is read, a withdrawn pack on the bell
     catalogrows.py               a shipped toolchain's recipe from the catalog when the catalog's is newer (R234 step 4): its row from its official pack's manifest, held to the primitives this build carries, kept under the state and carried by the table in the shipped row's place and by the nodes' bundle as config/toolchains.catalog.json beside the shipped file
-    packformat.py                the catalog's format number (R234): the number this build reads, what each added, and the sentence an entry past it is refused with; unit/packformat/N keeps manifests of each
+    packformat.py                the catalog's format number (R234): the number this build reads, what each added, and the sentence an entry past it is refused with; what an entry's downloads are held to (a pin, a declared download, the keys it carries, an installer that keeps the network) and the word for it, pinned, installer or open; unit/packformat/N keeps manifests of each
     catalogmirror.py             the vetted catalog's mirror (R169 step 6): an archive tools/catalog-mirror.py made, imported under Controller settings once its index is the maintainers', answering when the catalog does not and holding each pinned repository as a git bundle
     emulator.py                  everything behind the Emulator page: a node's Android system images
     enrollscript.py              Enroll node as one script: the answers, the token and a WireGuard tunnel inside the provisioner
@@ -333,7 +333,7 @@ scripts/
     notify.py                    getting a line into a running session, and knowing it landed
     signin.py                    each agent's sign-in and sign-out on one node, as jobs there
     test/                        its Playwright suite: `aerie dashboard test`, isolated; device-api.json in it pins what the released companion and VS Code extension read from the controller, each field's type, and deviceapi.mjs drives it (R79)
-    unit/                        its python unit tier: `aerie tests unit`, the modules' rules without a server or a browser, run first by preflight (agentpkg.py loads the node agent for it)
+    unit/                        its python unit tier: `aerie tests unit`, the modules' rules without a server or a browser, run first by preflight (agentpkg.py loads the node agent for it; sdkstore.py is a store and a catalog of made-up rows for the installer's)
     roottier/                    the root tier: what the root agent and the root helpers do in a folder an account controls, with a link planted where root works, seen as root (world.py is what its modules stand on)
   agent/builderbot-agent.py      the node agent's entry: runs the package beside it, and is the __main__.py of the zip a node runs
   agent/aerieos_agent/        the node agent, stdlib only, shipped to nodes by the dashboard as one zip
