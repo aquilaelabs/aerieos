@@ -342,9 +342,18 @@ sdk_status_local() {
     # alone took this command from instant to seven seconds), and the size of
     # a toolchain is a question for `du` on the day you ask it, not something
     # to pay for on every status.
-    local t d
+    local t d unfinished tool
+    unfinished="$(sdk_unfinished "$root")"
     for t in $SDK_TOOLCHAINS; do
         d="$(sdk_dir "$t")"
+        # A folder with no tool in it is an install that did not finish, not
+        # a toolchain: said, with the verb that clears it and installs again.
+        tool="$(printf '%s\n' "$unfinished" | awk -F'\t' -v n="$t" '$1 == n { print $2; exit }')"
+        if [ -n "$tool" ]; then
+            printf '  %-11s not installed: %s holds no %s, an install that did not finish (aerie toolchains install %s clears it)\n' \
+                "$t" "$d" "$tool" "$t"
+            continue
+        fi
         if [ "$t" = android ]; then
             # Android is the one that also lives in the image: the bootstrap
             # tools ship there, the packages are what moved out.
@@ -1050,6 +1059,34 @@ sdk_clear_interrupted() {
 # bin/flutter, listed as installed until the census asked for the tool, and
 # then refused by a fresh-only install as "already installed" (diagnostics
 # #124). Nothing in it can run, so nothing in it is kept.
+# sdk_unfinished [ROOT]: every toolchain whose folder is in the store and
+# holds no tool its layout runs, a line each of NAME, a tab and the tool: the
+# same test as sdk_clear_toolless, asked of the whole catalog at once, for
+# the status to say an install did not finish where it listed such a folder
+# as installed (a JDK left as lib/ alone by an update that stopped).
+sdk_unfinished() {
+    local meta root="${1:-}"
+    meta="$(sdk_meta_file)"
+    [ -n "$root" ] || root="$(sdk_root)"
+    [ -f "$meta" ] || return 0
+    python3 - "$meta" "$BB_LIB" "$root" <<'PY' 2>/dev/null || true
+import os, sys
+sys.path.insert(0, sys.argv[2])
+import sdkmeta
+for t in sdkmeta.catalog_at(sys.argv[1]):
+    name, lay = t.get("name", ""), t.get("layout") if isinstance(t.get("layout"), dict) else {}
+    tool = lay.get("tool") or ""
+    if not name or ":" in name or not tool or tool.startswith("root:") or lay.get("needs"):
+        continue
+    d = os.path.join(sys.argv[3], name)
+    try:
+        held = os.path.isdir(d) and bool(os.listdir(d))
+    except OSError:
+        held = False
+    if held and not os.path.exists(os.path.join(d, tool)):
+        print(f"{name}\t{tool}")
+PY
+}
 sdk_clear_toolless() {
     local what="$1" d="$2" tool
     [ -d "$d" ] && [ -n "$(ls -A "$d" 2>/dev/null)" ] || return 0

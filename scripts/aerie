@@ -934,15 +934,24 @@ cmd_status() {
     # `aerie toolchains` because this is the command a session runs first, and "is
     # flutter on this box" should not need a second guess.
     echo "== toolchains =="
-    local root have=""
+    local root have="" unfinished broken=""
     root="$(sdk_root)"
+    # A folder with no tool in it is not installed (an update that stopped
+    # left a JDK as lib/ alone, listed here while java was missing above).
+    unfinished="$(sdk_unfinished "$root" | cut -f1)"
     for t in $SDK_TOOLCHAINS; do
         [ "$t" = android ] && continue
-        sdk_have "$root" "$t" && have="${have:+$have }$t"
+        sdk_have "$root" "$t" || continue
+        case "
+$unfinished
+" in *"
+$t
+"*) broken="${broken:+$broken }$t" ;; *) have="${have:+$have }$t" ;; esac
     done
     printf '  %-8s %s%s\n' root "$root" \
         "$(is_mountpoint "$root" && printf ' (share)' || printf ' (home volume)')"
     printf '  %-8s %s\n' installed "${have:-none (see: aerie toolchains)}"
+    [ -z "$broken" ] || printf '  %-8s %s (an install that did not finish: aerie toolchains status)\n' unfinished "$broken"
     echo
     # CI runs on nodes (docs/nodes.md phase 7); `aerie ci-labels` lists their
     # runners' labels and the Nodes tab shows each one's state.
