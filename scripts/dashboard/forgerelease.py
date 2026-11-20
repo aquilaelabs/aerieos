@@ -285,38 +285,63 @@ def _draft_by_tag(repo, tag, token, pages=3):
     return None
 
 
-def _req(method, url, token, body=None, data=None, ctype="application/json"):
-    if not (url.startswith(API + "/repos/") or url.startswith(UPLOADS + "/repos/")):
-        raise Refused("not an address this asks GitHub at")
+# What a token must be allowed for a release, by the kind of forge: the words
+# its refusal is answered with.
+_NEEDS = {"github": "contents write", "gitlab": "the api scope", "gitea": "the repository scope with write"}
+
+
+def _request(method, url, accept, auth, body, data, ctype):
+    """The request for one call: `data` as it is, else `body` as JSON."""
     payload = data if data is not None else (json.dumps(body).encode() if body is not None else None)
-    req = urllib.request.Request(url, data=payload, method=method,
-                                 headers={"User-Agent": "AerieOS", "Accept": "application/vnd.github+json",
-                                          **({"Content-Type": ctype} if payload is not None else {})})
-    req.add_unredirected_header("Authorization", f"Bearer {token}")
+    return urllib.request.Request(url, data=payload, method=method,
+                                  headers={"User-Agent": "AerieOS", "Accept": accept, **auth,
+                                           **({"Content-Type": ctype} if payload is not None else {})})
+
+
+def _send(opener, req, name, kind, upload, reasons, gone=None):
+    """One request sent to the forge called `name`, and its JSON answered, {}
+    for an empty body. A GET the forge has nothing at answers gone(), or None
+    without one. Any other refusal raises Refused with the forge's name and
+    its own reason, the first of the `reasons` keys its answer carries."""
     try:
-        # The host is one of the two literals above, checked; the path is the repo's.
         # Ten minutes for an upload, thirty seconds for anything else: a
         # host that stopped answering held a page's lookup that long (B566).
-        with urllib.request.urlopen(req, timeout=600 if data is not None else 30) as r:  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
+        with opener(req, timeout=600 if upload else 30) as r:
             raw = r.read(2_000_000)
             return json.loads(raw) if raw.strip() else {}
     except urllib.error.HTTPError as e:
-        if e.code == 404 and method == "GET":
-            # A draft release is never found by its tag (GitHub's rule), and
-            # every release starts a draft (the operator, 1 Nov): looked for
-            # among the listed ones, which a token that may see drafts lists.
-            m = _BY_TAG.fullmatch(url)
-            return _draft_by_tag(m.group(1), urllib.parse.unquote(m.group(2)), token) if m else None
+        if e.code == 404 and req.get_method() == "GET":
+            return gone() if gone else None
         try:
-            why = (json.loads(e.read(20000)) or {}).get("message") or ""
+            j = json.loads(e.read(20000)) or {}
+            why = str(next((j[k] for k in reasons if j.get(k)), "")) if isinstance(j, dict) else ""
         except (ValueError, OSError):
             why = ""
         if e.code in (401, 403):
-            raise Refused("GitHub refused the token for releases: it needs contents write "
+            raise Refused(f"{name} refused the token for releases: it needs {_NEEDS[kind]} "
                           "on this repository" + (f" ({why})" if why else "")) from e
-        raise Refused(f"GitHub answered {e.code}" + (f": {why}" if why else "")) from e
+        raise Refused(f"{name} answered {e.code}" + (f": {why}" if why else "")) from e
     except (urllib.error.URLError, OSError) as e:
-        raise Refused(f"could not reach GitHub: {e}") from e
+        raise Refused(f"could not reach {name}: {e}") from e
+
+
+def _req(method, url, token, body=None, data=None, ctype="application/json"):
+    """One call to GitHub, at its API or its upload host and nowhere else.
+    The token goes in a header a redirect does not carry on, since an
+    asset's download is answered with one to another host."""
+    if not (url.startswith(API + "/repos/") or url.startswith(UPLOADS + "/repos/")):
+        raise Refused("not an address this asks GitHub at")
+    req = _request(method, url, "application/vnd.github+json", {}, body, data, ctype)
+    req.add_unredirected_header("Authorization", f"Bearer {token}")
+
+    def gone():
+        # A draft release is never found by its tag (GitHub's rule), and
+        # every release starts a draft (the operator, 1 Nov): looked for
+        # among the listed ones, which a token that may see drafts lists.
+        m = _BY_TAG.fullmatch(url)
+        return _draft_by_tag(m.group(1), urllib.parse.unquote(m.group(2)), token) if m else None
+    # The host is one of the two literals above, checked; the path is the repo's.
+    return _send(urllib.request.urlopen, req, "GitHub", "github", data is not None, ("message",), gone)  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
 
 
 def publish(project, tag, version, sha, comp="", pre=False):
@@ -329,76 +354,58 @@ def publish(project, tag, version, sha, comp="", pre=False):
     if not comp and (WORKSPACE / project / ".release-files").is_file():
         return {"url": "", "made": False, "assets": [], "skipped": [], "forge": "CI",
                 "note": "CI makes this release as a draft: read it and publish it from the Artifacts view's Drafts"}
-    if cilogs.repo_of(project):
-        return _github(project, tag, version, sha, comp, pre)
-    at = _remote(project)
-    entry = forges.forge_of(at["host"]) if at else None
-    if not at or not entry or entry["kind"] not in ("gitea", "gitlab"):
-        name = entry["name"] if at and entry and entry["id"] != "git" else ""
-        why = (f"{project} is on {name}, which has no release this can make, so the tag is its release"
-               if name else f"{project} is not on GitHub, Gitea or GitLab, so the tag is its release")
-        return {"error": why, "forge": name}
-    name = entry["name"]
-    token, scheme = _own_token(project, at["host"])
-    if not token:
-        why = f"the controller has no {name} token for this space, so the tag is its release"
-        _keep(project, tag, "", why, name)
-        return {"error": why, "forge": name}
-    base = forges.api_base(entry, at["host"], scheme or ("https" if at["scheme"] == "ssh" else at["scheme"]))
+    try:
+        h = _find(project)
+    except _NoForge as e:
+        if e.token:
+            why = f"the controller has no {e.name} token for this space, so the tag is its release"
+            _keep(project, tag, "", why, e.name)
+        else:
+            why = (f"{project} is on {e.name}, which has no release this can make, so the tag is its release"
+                   if e.name else f"{project} is not on GitHub, Gitea or GitLab, so the tag is its release")
+        return {"error": why, "forge": e.name}
     where = WORKSPACE / project / comp if comp else WORKSPACE / project
-    title = f"{comp + ' ' if comp else ''}{version}"
-    body = notes(where, version, tag, at["path"]) or f"{_shown(project)} {version}"
-    body = with_files_table(project, body, [f.name for f in assets(project, sha)], version, tag, at["path"], where)
     try:
-        made = _gitlab(_Forge(base, entry, token), at, project, tag, version, sha, title, body) \
-            if entry["kind"] == "gitlab" else \
-            _gitea(_Forge(base, entry, token), at, project, tag, version, sha, title, body, pre)
+        made = h.publish(project, tag, version, sha, where, f"{comp + ' ' if comp else ''}{version}", pre)
     except Refused as e:
-        _keep(project, tag, "", str(e), name)
-        return {"error": str(e), "forge": name}
-    _keep(project, tag, made["url"], "", name)
-    return made | {"forge": name}
+        _keep(project, tag, "", str(e), h.name)
+        return {"error": str(e), "forge": h.name}
+    _keep(project, tag, made["url"], "", h.name)
+    return made | {"forge": h.name}
 
 
-def _github(project, tag, version, sha, comp="", pre=False):
-    repo = cilogs.repo_of(project)
-    token = cilogs._token(project)
-    if not token:
-        why = "the controller has no GitHub token for this space, so the tag is its release"
-        _keep(project, tag, "", why)
-        return {"error": why, "forge": "GitHub"}
+def _body(project, where, version, tag, repo, names):
+    """A new release's notes, the project's name and the version where it
+    has written none, with the table of the files called `names` over them."""
+    body = notes(where, version, tag, repo) or f"{_shown(project)} {version}"
+    return with_files_table(project, body, names, version, tag, repo, where)
+
+
+def _github(repo, token, project, tag, version, sha, where, title, pre=False):
+    """GitHub's release by its tag, made if it is not there, and each build
+    uploaded to it. The table names the builds GitHub will take."""
     base = f"{API}/repos/{repo}/releases"
-    try:
-        have = _req("GET", f"{base}/tags/{urllib.parse.quote(tag, safe="")}", token)
-        if have:
-            _keep(project, tag, have.get("html_url") or "")
-            return {"url": have.get("html_url") or "", "made": False, "assets": [], "skipped": [],
-                    "forge": "GitHub"}
-        where = WORKSPACE / project / comp if comp else WORKSPACE / project
-        body = notes(where, version, tag, repo) or f"{_shown(project)} {version}"
-        body = with_files_table(project, body, [f.name for f in assets(project, sha) if f.stat().st_size <= ASSET_MAX],
-                                version, tag, repo, where)
-        rel = _req("POST", base, token, {"tag_name": tag, "name": f"{comp + ' ' if comp else ''}{version}",
-                                         "body": body, "draft": False, "prerelease": bool(pre),
-                                         **({"make_latest": "false"} if pre else {})})
-        up, skipped = [], []
-        for f in assets(project, sha):
-            size = f.stat().st_size
-            if size > ASSET_MAX:
-                skipped.append(f"{f.name} is {size // 1_000_000} MB, over GitHub's limit")
-                continue
-            url = f"{UPLOADS}/repos/{repo}/releases/{int(rel['id'])}/assets?name={urllib.parse.quote(f.name)}"
-            try:
-                _req("POST", url, token, data=f.read_bytes(), ctype="application/octet-stream")
-                up.append(f.name)
-            except Refused as e:
-                skipped.append(f"{f.name}: {e}")
-        _keep(project, tag, rel.get("html_url") or "")
-        return {"url": rel.get("html_url") or "", "made": True, "assets": up, "skipped": skipped,
-                "forge": "GitHub"}
-    except Refused as e:
-        _keep(project, tag, "", str(e))
-        return {"error": str(e), "forge": "GitHub"}
+    have = _req("GET", f"{base}/tags/{urllib.parse.quote(tag, safe="")}", token)
+    if have:
+        return {"url": have.get("html_url") or "", "made": False, "assets": [], "skipped": []}
+    body = _body(project, where, version, tag, repo,
+                 [f.name for f in assets(project, sha) if f.stat().st_size <= ASSET_MAX])
+    rel = _req("POST", base, token, {"tag_name": tag, "name": title,
+                                     "body": body, "draft": False, "prerelease": bool(pre),
+                                     **({"make_latest": "false"} if pre else {})})
+    up, skipped = [], []
+    for f in assets(project, sha):
+        size = f.stat().st_size
+        if size > ASSET_MAX:
+            skipped.append(f"{f.name} is {size // 1_000_000} MB, over GitHub's limit")
+            continue
+        url = f"{UPLOADS}/repos/{repo}/releases/{int(rel['id'])}/assets?name={urllib.parse.quote(f.name)}"
+        try:
+            _req("POST", url, token, data=f.read_bytes(), ctype="application/octet-stream")
+            up.append(f.name)
+        except Refused as e:
+            skipped.append(f"{f.name}: {e}")
+    return {"url": rel.get("html_url") or "", "made": True, "assets": up, "skipped": skipped}
 
 
 # ---- Gitea and GitLab (R124) ---------------------------------------------------
@@ -443,36 +450,230 @@ class _Forge:
 
     def ask(self, method, path, body=None, data=None, ctype="application/json"):
         url = self.base + path
+        name, kind = self.entry["name"], self.entry["kind"]
         if not path.startswith("/") or not url.lower().startswith(("https://", "http://")):
-            raise Refused(f"not an address this asks {self.entry['name']} at")
-        payload = data if data is not None else (json.dumps(body).encode() if body is not None else None)
-        auth = ({"PRIVATE-TOKEN": self.token} if self.entry["kind"] == "gitlab"
-                else {"Authorization": f"token {self.token}"})
-        req = urllib.request.Request(url, data=payload, method=method,
-                                     headers={"User-Agent": "AerieOS", "Accept": "application/json", **auth,
-                                              **({"Content-Type": ctype} if payload is not None else {})})
-        name = self.entry["name"]
-        try:
-            # The root is forges.api_base()'s, from a host its URL pattern
-            # matched and a scheme of http or https, checked above.
-            with forges._OPENER.open(req, timeout=600 if data is not None else 30) as r:  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
-                raw = r.read(2_000_000)
-                return json.loads(raw) if raw.strip() else {}
-        except urllib.error.HTTPError as e:
-            if e.code == 404 and method == "GET":
-                return None
-            try:
-                j = json.loads(e.read(20000)) or {}
-                why = str(j.get("message") or j.get("error") or "") if isinstance(j, dict) else ""
-            except (ValueError, OSError):
-                why = ""
-            if e.code in (401, 403):
-                need = "the api scope" if self.entry["kind"] == "gitlab" else "the repository scope with write"
-                raise Refused(f"{name} refused the token for releases: it needs {need} "
-                              f"on this repository" + (f" ({why})" if why else "")) from e
-            raise Refused(f"{name} answered {e.code}" + (f": {why}" if why else "")) from e
-        except (urllib.error.URLError, OSError) as e:
-            raise Refused(f"could not reach {name}: {e}") from e
+            raise Refused(f"not an address this asks {name} at")
+        req = _request(method, url, "application/json", forges._auth(kind, self.token), body, data, ctype)
+        # The root is forges.api_base()'s, from a host its URL pattern
+        # matched and a scheme of http or https, checked above.
+        return _send(forges._OPENER.open, req, name, kind, data is not None, ("message", "error"))  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
+
+
+# ---- the forge at hand ---------------------------------------------------------
+# One driver a kind of forge: what publish, edit, remove and withdraw ask of
+# it, each in that forge's own addresses. A driver is made from the forge's
+# name and a ctx, the two _handle() answers after the kind.
+
+class _NoForge(Exception):
+    """The project has no forge to ask a release of. `name` is the forge it
+    is on, "" when that is none this knows; `token` says the forge is one of
+    the three and only its token is missing."""
+
+    def __init__(self, name, token=False):
+        super().__init__(name)
+        self.name, self.token = name, token
+
+
+class _Driver:
+    """What every forge answers alike unless its driver says otherwise."""
+
+    def __init__(self, name, ctx):
+        self.name, self.ctx = name, ctx
+
+    def attached(self, rel):
+        """The files a release as read holds."""
+        return rel.get("assets") or []
+
+    def swept(self, project, tag):
+        """What a withdrawn release left behind and this took away, for
+        withdraw's answer."""
+        return {}
+
+
+class _GitHub(_Driver):
+    """GitHub, asked with _req: its ctx is (owner/name, token)."""
+    kind = "github"
+
+    def __init__(self, name, ctx):
+        super().__init__(name, ctx)
+        self.repo, self.token = ctx
+
+    def call(self, method, url):
+        return _req(method, url, self.token)
+
+    def publish(self, project, tag, version, sha, where, title, pre):
+        return _github(self.repo, self.token, project, tag, version, sha, where, title, pre)
+
+    def raw(self, sha, rel):
+        """The address of the committed file `rel` as commit `sha` has it."""
+        return f"https://github.com/{self.repo}/raw/{sha}/{rel}"
+
+    def edit(self, project, tag, notes, files):
+        return _github_edit(project, self.repo, self.token, tag, notes, files)
+
+    def files_on(self, tag):
+        """(release url, {file name: (id, size, release id)}) of the release
+        for `tag`."""
+        rel = _req("GET", f"{API}/repos/{self.repo}/releases/tags/{urllib.parse.quote(tag, safe='')}", self.token)
+        if not rel:
+            raise NoRelease(f"there is no release for {tag} on GitHub")
+        return rel.get("html_url") or "", {a.get("name"): (int(a["id"]), int(a.get("size") or 0), int(rel["id"]))
+                                           for a in rel.get("assets") or []}
+
+    def delete_asset(self, project, tag, name, got):
+        """The file `name` off the release for `tag`: `got` is what
+        files_on() said of it."""
+        _req("DELETE", f"{API}/repos/{self.repo}/releases/assets/{got[0]}", self.token)
+
+    def paths(self, tag):
+        """The addresses call() takes for `tag`: {rel: the release by tag,
+        ref: the tag read, unref: the tag deleted, by_id: a release by its
+        id ("" where the tag names it)}."""
+        t, base = urllib.parse.quote(tag, safe=""), f"{API}/repos/{self.repo}"
+        # git/ref/ reads one ref exactly; git/refs/ would list every tag
+        # the name begins (v0.9.0-dev.45 reading v0.9.0-dev.4500).
+        return {"rel": f"{base}/releases/tags/{t}", "ref": f"{base}/git/ref/tags/{t}",
+                "unref": f"{base}/git/refs/tags/{t}", "by_id": f"{base}/releases/"}
+
+
+class _Gitea(_Driver):
+    """Gitea, and the Forgejo and Codeberg that answer its API: its ctx is
+    (the _Forge to ask, the remote)."""
+    kind = "gitea"
+
+    def __init__(self, name, ctx):
+        super().__init__(name, ctx)
+        self.f, self.at = ctx
+        owner, _, repo = self.at["path"].partition("/")
+        self.root = f"/repos/{urllib.parse.quote(owner)}/{urllib.parse.quote(repo)}"
+
+    def call(self, method, path):
+        return self.f.ask(method, path)
+
+    def publish(self, project, tag, version, sha, where, title, pre):
+        body = _body(project, where, version, tag, self.at["path"], [f.name for f in assets(project, sha)])
+        return _gitea(self.f, self.at, project, tag, version, sha, title, body, pre)
+
+    def raw(self, sha, rel):
+        return f"{self.at['web']}/raw/commit/{sha}/{rel}"
+
+    def edit(self, project, tag, notes, files):
+        return _gitea_edit(self.f, self.at, project, tag, notes, files)
+
+    def files_on(self, tag):
+        rel = self.f.ask("GET", f"{self.root}/releases/tags/{urllib.parse.quote(tag, safe='')}")
+        if not rel:
+            raise NoRelease(f"there is no release for {tag} on {self.name}")
+        return rel.get("html_url") or "", {a.get("name"): (int(a["id"]), int(a.get("size") or 0), int(rel["id"]))
+                                           for a in rel.get("assets") or []}
+
+    def delete_asset(self, project, tag, name, got):
+        self.f.ask("DELETE", f"{self.root}/releases/{got[2]}/assets/{got[0]}")
+
+    def paths(self, tag):
+        t = urllib.parse.quote(tag, safe="")
+        return {"rel": f"{self.root}/releases/tags/{t}", "ref": f"{self.root}/tags/{t}",
+                "unref": f"{self.root}/tags/{t}", "by_id": f"{self.root}/releases/"}
+
+
+class _GitLab(_Driver):
+    """GitLab, which names a project by its whole path, holds links where
+    the others hold files, and keeps the builds in its package registry: its
+    ctx is (the _Forge to ask, the remote)."""
+    kind = "gitlab"
+
+    def __init__(self, name, ctx):
+        super().__init__(name, ctx)
+        self.f, self.at = ctx
+        self.pid = urllib.parse.quote(self.at["path"], safe="")
+
+    def call(self, method, path):
+        return self.f.ask(method, path)
+
+    def publish(self, project, tag, version, sha, where, title, pre):
+        body = _body(project, where, version, tag, self.at["path"], [f.name for f in assets(project, sha)])
+        return _gitlab(self.f, self.at, project, tag, version, sha, title, body)
+
+    def raw(self, sha, rel):
+        return f"{self.at['web']}/-/raw/{sha}/{rel}"
+
+    def edit(self, project, tag, notes, files):
+        return _gitlab_edit(self.f, self.at, project, tag, notes, files)
+
+    def files_on(self, tag):
+        rel = self.f.ask("GET", f"/projects/{self.pid}/releases/{urllib.parse.quote(tag, safe='')}")
+        if not rel:
+            raise NoRelease(f"there is no release for {tag} on GitLab")
+        return ((rel.get("_links") or {}).get("self") or "",
+                {x.get("name"): (int(x["id"]), 0, 0) for x in self.attached(rel)})
+
+    def delete_asset(self, project, tag, name, got):
+        self.f.ask("DELETE", f"/projects/{self.pid}/releases/{urllib.parse.quote(tag, safe='')}/assets/links/{got[0]}")
+        # ...and the file the link served (B561): the link gone, the
+        # package registry still handed the build out.
+        _gl_pkg_drop(self.f, self.pid, project, tag, name)
+
+    def paths(self, tag):
+        t = urllib.parse.quote(tag, safe="")
+        return {"rel": f"/projects/{self.pid}/releases/{t}", "ref": f"/projects/{self.pid}/repository/tags/{t}",
+                "unref": f"/projects/{self.pid}/repository/tags/{t}", "by_id": ""}
+
+    def attached(self, rel):
+        return (rel.get("assets") or {}).get("links") or []
+
+    def swept(self, project, tag):
+        # GitLab keeps a release's builds in its package registry, which
+        # deleting the release leaves serving them (B561).
+        return {"packages": _gl_pkg_drop(self.f, self.pid, project, tag)}
+
+
+_DRIVERS = {d.kind: d for d in (_GitHub, _Gitea, _GitLab)}
+
+
+def _driver(kind, name, ctx):
+    """The driver for what _handle() answered."""
+    return _DRIVERS[kind](name, ctx)
+
+
+def _find(project):
+    """The driver for the project's forge, or raises _NoForge. GitHub is
+    asked with the project's own token, else the shared one; Gitea and
+    GitLab with the token the project's link stored, at the address it was
+    stored for."""
+    repo = cilogs.repo_of(project)
+    if repo:
+        token = cilogs._token(project)
+        if not token:
+            raise _NoForge("GitHub", token=True)
+        return _driver("github", "GitHub", (repo, token))
+    at = _remote(project)
+    entry = forges.forge_of(at["host"]) if at else None
+    if not at or not entry or entry["kind"] not in ("gitea", "gitlab"):
+        raise _NoForge(entry["name"] if at and entry and entry["id"] != "git" else "")
+    token, scheme = _own_token(project, at["host"])
+    if not token:
+        raise _NoForge(entry["name"], token=True)
+    # The stored line's scheme is the one the host answers on; a remote that
+    # is read without one is asked over https.
+    api = forges.api_base(entry, at["host"], scheme or ("https" if at["scheme"] == "ssh" else at["scheme"]))
+    web = f"{scheme or ('https' if at['scheme'] in ('ssh', '') else at['scheme'])}://{at['host']}/{at['path']}"
+    return _driver(entry["kind"], entry["name"], (_Forge(api, entry, token), at | {"web": web}))
+
+
+def _handle(project):
+    """(kind, name, ctx) for the project's forge, or raises Refused: what a
+    driver is made from, and what a caller outside this module holds."""
+    try:
+        h = _find(project)
+    except _NoForge as e:
+        raise Refused(f"the controller has no {e.name} token for this space" if e.token else
+                      f"{project} is not on GitHub, Gitea or GitLab, so it has no release page") from e
+    return h.kind, h.name, h.ctx
+
+
+def _driver_of(project):
+    """The driver for the project's forge, or raises Refused."""
+    return _driver(*_handle(project))
 
 
 def _gitea(f, at, project, tag, version, sha, title, body, pre=False):
@@ -664,37 +865,19 @@ def edit(project, plan):
     skipped, forge} or {error, forge}."""
     tag, notes, files = plan["tag"], plan.get("notes"), plan.get("files") or []
     pinned = plan.get("pinned") or {}
-    if cilogs.repo_of(project):
-        name = "GitHub"
-        if notes is not None:
-            notes = _with_files(notes, pinned, lambda sha, rel: f"https://github.com/{cilogs.repo_of(project)}/raw/{sha}/{rel}")
-        token = cilogs._token(project)
-        if not token:
-            return {"error": "the controller has no GitHub token for this space", "forge": name}
-        try:
-            return _github_edit(project, cilogs.repo_of(project), token, tag, notes, files) | {"forge": name}
-        except Refused as e:
-            return {"error": str(e), "forge": name}
-    at = _remote(project)
-    entry = forges.forge_of(at["host"]) if at else None
-    if not at or not entry or entry["kind"] not in ("gitea", "gitlab"):
+    try:
+        h = _find(project)
+    except _NoForge as e:
+        if e.token:
+            return {"error": f"the controller has no {e.name} token for this space", "forge": e.name}
         return {"error": f"{project} is not on GitHub, Gitea or GitLab, so it has no release page to edit",
                 "forge": ""}
-    name = entry["name"]
-    token, scheme = _own_token(project, at["host"])
-    if not token:
-        return {"error": f"the controller has no {name} token for this space", "forge": name}
-    f = _Forge(forges.api_base(entry, at["host"], scheme or ("https" if at["scheme"] == "ssh" else at["scheme"])),
-               entry, token)
-    web = f"{scheme or ('https' if at['scheme'] in ('ssh', '') else at['scheme'])}://{at['host']}/{at['path']}"
     if notes is not None:
-        notes = _with_files(notes, pinned, lambda sha, rel: f"{web}/-/raw/{sha}/{rel}" if entry["kind"] == "gitlab"
-                            else f"{web}/raw/commit/{sha}/{rel}")
+        notes = _with_files(notes, pinned, h.raw)
     try:
-        run = _gitlab_edit if entry["kind"] == "gitlab" else _gitea_edit
-        return run(f, at, project, tag, notes, files) | {"forge": name}
+        return h.edit(project, tag, notes, files) | {"forge": h.name}
     except Refused as e:
-        return {"error": str(e), "forge": name}
+        return {"error": str(e), "forge": h.name}
 
 
 def _said(rel, notes, urls, attached, replaced, skipped):
@@ -784,8 +967,7 @@ def _gitlab_edit(f, at, project, tag, notes, files):
         raise Refused(f"there is no release for {tag} on GitLab to edit: aerie version release makes one")
     links = {x.get("name"): x for x in ((rel.get("assets") or {}).get("links") or [])}
     urls = {n: x.get("url") or "" for n, x in links.items()}
-    pkg = re.sub(r"[^A-Za-z0-9._-]", "-", project) or "builds"
-    ver = re.sub(r"[^A-Za-z0-9._+-]", "-", re.sub(r"^(?:.*-)?v(?=\d)", "", tag)) or "0"
+    pkg, ver = _gl_pkg(project, tag)
     attached, replaced, skipped = [], [], []
     for x in files:
         path = f"/projects/{pid}/packages/generic/{pkg}/{ver}/{urllib.parse.quote(x['name'])}"
@@ -831,50 +1013,10 @@ def edit_said(r):
 # (the operator, 5 Oct). The release is read first, so the ask names files
 # that are really there, with their sizes.
 
-def _handle(project):
-    """(kind, name, ctx) for the project's forge, or raises Refused: what
-    the listing and the deletion below need, by forge."""
-    if cilogs.repo_of(project):
-        token = cilogs._token(project)
-        if not token:
-            raise Refused("the controller has no GitHub token for this space")
-        return "github", "GitHub", (cilogs.repo_of(project), token)
-    at = _remote(project)
-    entry = forges.forge_of(at["host"]) if at else None
-    if not at or not entry or entry["kind"] not in ("gitea", "gitlab"):
-        raise Refused(f"{project} is not on GitHub, Gitea or GitLab, so it has no release page")
-    token, scheme = _own_token(project, at["host"])
-    if not token:
-        raise Refused(f"the controller has no {entry['name']} token for this space")
-    f = _Forge(forges.api_base(entry, at["host"], scheme or ("https" if at["scheme"] == "ssh" else at["scheme"])),
-               entry, token)
-    return entry["kind"], entry["name"], (f, at)
-
-
 def _files_on(kind, name, ctx, tag):
-    """(release url, {file name: (id, size)}) of the release for `tag`."""
-    t = urllib.parse.quote(tag, safe="")
-    if kind == "github":
-        repo, token = ctx
-        rel = _req("GET", f"{API}/repos/{repo}/releases/tags/{t}", token)
-        if not rel:
-            raise NoRelease(f"there is no release for {tag} on GitHub")
-        return rel.get("html_url") or "", {a.get("name"): (int(a["id"]), int(a.get("size") or 0), int(rel["id"]))
-                                           for a in rel.get("assets") or []}
-    f, at = ctx
-    if kind == "gitlab":
-        pid = urllib.parse.quote(at["path"], safe="")
-        rel = f.ask("GET", f"/projects/{pid}/releases/{t}")
-        if not rel:
-            raise NoRelease(f"there is no release for {tag} on GitLab")
-        return ((rel.get("_links") or {}).get("self") or "",
-                {x.get("name"): (int(x["id"]), 0, 0) for x in ((rel.get("assets") or {}).get("links") or [])})
-    owner, _, repo = at["path"].partition("/")
-    rel = f.ask("GET", f"/repos/{urllib.parse.quote(owner)}/{urllib.parse.quote(repo)}/releases/tags/{t}")
-    if not rel:
-        raise NoRelease(f"there is no release for {tag} on {name}")
-    return rel.get("html_url") or "", {a.get("name"): (int(a["id"]), int(a.get("size") or 0), int(rel["id"]))
-                                       for a in rel.get("assets") or []}
+    """(release url, {file name: (id, size, release id)}) of the release for
+    `tag`, for a caller holding what _handle() answered."""
+    return _driver(kind, name, ctx).files_on(tag)
 
 
 def remove_plan(project, tag, names):
@@ -889,15 +1031,15 @@ def remove_plan(project, tag, names):
     if len(names) > ATTACH_MAX or len(set(names)) != len(names):
         return {"error": f"name each file once, {ATTACH_MAX} at most"}
     try:
-        kind, name, ctx = _handle(project)
-        _url, have = _files_on(kind, name, ctx, tag)
+        h = _driver_of(project)
+        _url, have = h.files_on(tag)
     except Refused as e:
         return {"error": str(e)}
     missing = [n for n in names if n not in have]
     if missing:
-        return {"error": f"the {tag} release on {name} has no {', '.join(missing)}; it has "
+        return {"error": f"the {tag} release on {h.name} has no {', '.join(missing)}; it has "
                          + (", ".join(sorted(have)) or "no files")}
-    return {"tag": tag, "forge": name, "files": [{"name": n, "size": have[n][1]} for n in names]}
+    return {"tag": tag, "forge": h.name, "files": [{"name": n, "size": have[n][1]} for n in names]}
 
 
 def remove(project, plan):
@@ -905,8 +1047,8 @@ def remove(project, plan):
     (an id read at the ask may be stale by the Allow): {url, removed,
     skipped, forge} or {error, forge}."""
     try:
-        kind, name, ctx = _handle(project)
-        url, have = _files_on(kind, name, ctx, plan["tag"])
+        h = _driver_of(project)
+        url, have = h.files_on(plan["tag"])
     except Refused as e:
         return {"error": str(e), "forge": ""}
     removed, skipped = [], []
@@ -916,25 +1058,11 @@ def remove(project, plan):
             skipped.append(f"{x['name']} was already gone")
             continue
         try:
-            if kind == "github":
-                repo, token = ctx
-                _req("DELETE", f"{API}/repos/{repo}/releases/assets/{got[0]}", token)
-            elif kind == "gitlab":
-                f, at = ctx
-                pid = urllib.parse.quote(at["path"], safe="")
-                f.ask("DELETE", f"/projects/{pid}/releases/{urllib.parse.quote(plan['tag'], safe='')}/assets/links/{got[0]}")
-                # ...and the file the link served (B561): the link gone, the
-                # package registry still handed the build out.
-                _gl_pkg_drop(f, pid, project, plan["tag"], x["name"])
-            else:
-                f, at = ctx
-                owner, _, repo = at["path"].partition("/")
-                f.ask("DELETE", f"/repos/{urllib.parse.quote(owner)}/{urllib.parse.quote(repo)}/releases/"
-                                f"{got[2]}/assets/{got[0]}")
+            h.delete_asset(project, plan["tag"], x["name"], got)
             removed.append(x["name"])
         except Refused as e:
             skipped.append(f"{x['name']}: {e}")
-    return {"url": url, "removed": removed, "skipped": skipped, "forge": name}
+    return {"url": url, "removed": removed, "skipped": skipped, "forge": h.name}
 
 
 def remove_said(r):
@@ -979,29 +1107,6 @@ def _gl_pkg_drop(f, pid, project, tag, name=None):
 # 0.9.0 dev release left three to be deleted by hand, one of them a tag with
 # no release (the operator, 30 Oct). Always a person's answer, whatever the
 # dial: it is the one change here nothing undoes.
-
-def _paths(kind, ctx, tag):
-    """The API paths for `tag` on this forge, and the caller for them:
-    {rel: the release by tag, ref: the tag read, unref: the tag deleted,
-    by_id: a release by its id ("" where the tag names it), call}."""
-    t = urllib.parse.quote(tag, safe="")
-    if kind == "github":
-        repo, token = ctx
-        # git/ref/ reads one ref exactly; git/refs/ would list every tag
-        # the name begins (v0.9.0-dev.45 reading v0.9.0-dev.4500).
-        return {"rel": f"{API}/repos/{repo}/releases/tags/{t}", "ref": f"{API}/repos/{repo}/git/ref/tags/{t}",
-                "unref": f"{API}/repos/{repo}/git/refs/tags/{t}", "by_id": f"{API}/repos/{repo}/releases/",
-                "call": lambda m, u: _req(m, u, token)}
-    f, at = ctx
-    if kind == "gitlab":
-        pid = urllib.parse.quote(at["path"], safe="")
-        return {"rel": f"/projects/{pid}/releases/{t}", "ref": f"/projects/{pid}/repository/tags/{t}",
-                "unref": f"/projects/{pid}/repository/tags/{t}", "by_id": "", "call": f.ask}
-    owner, _, repo = at["path"].partition("/")
-    base = f"/repos/{urllib.parse.quote(owner)}/{urllib.parse.quote(repo)}"
-    return {"rel": f"{base}/releases/tags/{t}", "ref": f"{base}/tags/{t}", "unref": f"{base}/tags/{t}",
-            "by_id": f"{base}/releases/", "call": f.ask}
-
 
 
 # ---- drafts (the operator, 1 Nov) --------------------------------------------
@@ -1148,17 +1253,16 @@ def withdraw_plan(project, tag):
     if not tag or not TAG.fullmatch(tag) or ".." in tag:
         return {"error": f"not a tag: {tag or '(none)'}"}
     try:
-        kind, name, ctx = _handle(project)
-        p = _paths(kind, ctx, tag)
-        rel, ref = p["call"]("GET", p["rel"]), p["call"]("GET", p["ref"])
+        h = _driver_of(project)
+        p = h.paths(tag)
+        rel, ref = h.call("GET", p["rel"]), h.call("GET", p["ref"])
     except Refused as e:
         return {"error": str(e)}
     if not rel and not ref:
-        return {"error": f"{name} has neither a release nor a tag called {tag}"}
+        return {"error": f"{h.name} has neither a release nor a tag called {tag}"}
     rel = rel or {}
-    files = (rel.get("assets") or {}).get("links") or [] if kind == "gitlab" else rel.get("assets") or []
-    return {"tag": tag, "forge": name, "release": bool(rel), "tagged": bool(ref),
-            "prerelease": bool(rel.get("prerelease")), "files": len(files),
+    return {"tag": tag, "forge": h.name, "release": bool(rel), "tagged": bool(ref),
+            "prerelease": bool(rel.get("prerelease")), "files": len(h.attached(rel)),
             "url": rel.get("html_url") or (rel.get("_links") or {}).get("self") or ""}
 
 
@@ -1167,22 +1271,18 @@ def withdraw(project, tag):
     the Allow: {forge, tag, release, tagged} saying what went, or
     {error, forge}."""
     try:
-        kind, name, ctx = _handle(project)
+        h = _driver_of(project)
     except Refused as e:
         return {"error": str(e), "forge": ""}
-    p, out = _paths(kind, ctx, tag), {"forge": name, "tag": tag, "release": False, "tagged": False}
+    p, out = h.paths(tag), {"forge": h.name, "tag": tag, "release": False, "tagged": False}
     try:
-        rel = p["call"]("GET", p["rel"])
+        rel = h.call("GET", p["rel"])
         if rel:
-            p["call"]("DELETE", p["by_id"] + str(int(rel["id"])) if p["by_id"] else p["rel"])
+            h.call("DELETE", p["by_id"] + str(int(rel["id"])) if p["by_id"] else p["rel"])
             out["release"] = True
-        if kind == "gitlab":
-            # GitLab keeps a release's builds in its package registry, which
-            # deleting the release leaves serving them (B561).
-            f, at = ctx
-            out["packages"] = _gl_pkg_drop(f, urllib.parse.quote(at["path"], safe=""), project, tag)
-        if p["call"]("GET", p["ref"]):
-            p["call"]("DELETE", p["unref"])
+        out.update(h.swept(project, tag))
+        if h.call("GET", p["ref"]):
+            h.call("DELETE", p["unref"])
             out["tagged"] = True
     except Refused as e:
         return {**out, "error": str(e)}
