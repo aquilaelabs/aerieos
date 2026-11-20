@@ -1794,10 +1794,14 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
       const LROW = `.nodestab .ndrow[data-node="${lk.id}"]`;
       await page.waitForSelector(`${LROW} [data-nd="lockdown"]`, { timeout: 10000 });
       page.dialogs.length = 0;
+      let lockYes = [];
+      page.answers.push(q => { lockYes = q.choices || []; return 0; });
       await page.click(`${LROW} [data-nd="lockdown"]`);
       await page.waitForSelector(`${LROW} [data-nd="lockdown"][disabled]`, { timeout: 10000 });
       ok(page.dialogs.length === 1 && /Lock down vps-lock[\s\S]*revoked[\s\S]*provider's console/.test(page.dialogs[0]),
          `Lock down asks first, saying what stops, that its credential goes, and the console's stop (${page.dialogs[0]?.slice(0, 40)})`);
+      // Its yes is the row's own words, not "Lock", which is the lock that comes off again.
+      ok(lockYes.join() === 'Lock down', `...and its yes reads Lock down (${lockYes.join()})`);
       const refused = await as('devdata', {});
       // The press is answered a moment after it, in the page's modal, and
       // the lockdown job is queued then: asked for until it is there.

@@ -161,6 +161,21 @@ await section("a pack that brings a coding agent sits with the agents", async ()
   });
   ok(!got.edit.catalog && got.edit.own && got.edit.remove,
      `a pack kept from the catalog has Remove and no Edit on its row, and one a person added has Edit (${JSON.stringify(got.edit)})`);
+  // Edit reads the store's rows before it opens the pack's dialog: opened by
+  // itself the page holds only a stand-in for them, and the dialog, finding no
+  // pack in it, opened as Add your own with an empty address.
+  const editOrder = await page.evaluate(async () => {
+    toolchains = { name: 'stand-in', job: null, items: [], stub: true };
+    const order = [], open0 = tpOpen, load0 = loadToolchains;
+    window.loadToolchains = async (...a) => { order.push('read'); const r = await load0(...a); return r; };
+    window.tpOpen = name => { order.push(`open ${name} on ${toolchains?.stub ? 'the stand-in' : 'the rows'}`); };
+    inst.rows.push({ kind: 'pack', pack: true, name: 'walk-pack', label: 'Walk pack', tier: 'sideloaded', installed: true });
+    await instAct(document.createElement('button'), 'edit', 'pack', 'walk-pack');
+    inst.rows.pop(); window.tpOpen = open0; window.loadToolchains = load0;
+    return order;
+  });
+  ok(editOrder.join('; ') === 'read; open walk-pack on the rows',
+     `Edit on a pack a person added reads the store's rows first, so its own dialog opens (${editOrder.join('; ')})`);
   ok(got.here.button && /You are not signed in to Kite on \S+: sign in here, or in the terminal of a Kite session there/.test(got.here.text),
      `a pack agent whose pack says how it signs in has Sign in on its page, and the page says its terminal is the other way (${got.here.text.slice(0, 120)})`);
   ok(got.paste.field && got.paste.link && /sign in to Example, and paste the code it gives you/.test(got.paste.text),

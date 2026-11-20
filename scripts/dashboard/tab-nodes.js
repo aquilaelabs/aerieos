@@ -2736,6 +2736,11 @@ function ndPowerSaid(id){
   return sessionsEndSaid(nodeOf(id)?.reported?.sessions || sessionsOn(id),
     {lead: "It ends", after: ", everybody's", tail: ", each closed before the machine goes; transcripts are kept. "});
 }
+// A question whose button askYes would word or color wrongly from its first
+// word: Lock down revokes the node's credential and shuts its door for good,
+// so its yes is the row's own words in red, where "Lock" alone reads as the
+// lock that is taken off again.
+const ND_ASK_AS = {lockdown: {verb: "Lock down", danger: true}};
 // What a node's verb (data-nd) asks before it is sent: the question's words
 // for that node and that button, or "" where this press costs nothing. A
 // verb that is not here asks nothing (R265: a press asks only where its yes
@@ -2846,7 +2851,7 @@ function wireNodesTab(root){
       }
       // What the verb asks first, where its yes costs something (ND_ASK).
       const asks = ND_ASK[act]?.(id, b);
-      if (asks && !await askYes(asks)) return;
+      if (asks && !await askYes(asks, ND_ASK_AS[act] || {})) return;
       // The verb, said on the button for the round trip and, for the
       // actions whose effect the row cannot see at once: beyond it.
       busyFor(b, act, {...ND_BUSY, feature: b.dataset.op === "remove" ? "Uninstalling" : "Installing"});

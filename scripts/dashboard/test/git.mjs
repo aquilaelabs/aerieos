@@ -1246,6 +1246,22 @@ await section("step 3: the policy, and Send to Claude", async () => {
      && hostSect.elsewhere,
      `Permissions lists each git host ability it governs with an Allow or Deny, merging at Deny, the rest where they are set, and Measure (${JSON.stringify(hostSect)})`);
   await page.selectOption('.nb .nbview[data-view="permissions"] [data-forgepol="pr_write"]', 'deny');
+  // A pick not applied yet is unsaved work, as a staged step or an edited
+  // rule is: pressing another view asks first, and a no leaves the view, the
+  // pick and Apply as they were. It was dropped with no word.
+  {
+    page.dialogs.length = 0;
+    page.answers.push(-1);
+    await page.evaluate(() => document.querySelector('.nb .nbtabs [data-v="bugs"]').click());
+    await new Promise(r => setTimeout(r, 600));
+    const stayed = await page.$eval('.nb', el => ({
+      view: [...el.querySelectorAll('.nbview')].find(v => !v.hidden)?.dataset.view,
+      pick: el.querySelector('.nbview[data-view="permissions"] [data-forgepol="pr_write"]')?.value,
+      apply: el.querySelector('.nbview[data-view="permissions"] .permHostApply')?.disabled }));
+    ok(page.dialogs.length === 1 && /a staged git host permission would be thrown away/.test(page.dialogs[0])
+       && stayed.view === 'permissions' && stayed.pick === 'deny' && stayed.apply === false,
+       `a git host pick not applied yet is asked about before another view is shown, and a no keeps it (${page.dialogs[0]?.slice(0, 70)}; ${JSON.stringify(stayed)})`);
+  }
   await page.click('.nb .nbview[data-view="permissions"] .permHostApply');
   const saved = await page.waitForFunction(async () => {
     const j = await (await fetch('/api/forge-access?project=beta')).json();
