@@ -511,8 +511,10 @@ function attRow(a){
       a.projects.map(esc).join(", ")}</pre></details>` : ""}
     ${a.back ? `<div class="bsum bad">it took the update and went back to the agent it had: it ${esc(a.back)}</div>` : ""}
     ${a.failed && !a.back ? `<div class="bsum bad">its last update failed: ${esc(a.failed)}</div>` : ""}
+    ${a.held && !a.failed && !a.back ? `<div class="bsum">${esc(a.held)}</div>` : ""}
     <div class="bfoot"><span>${a.window ? "work on it is stopped"
       : a.back ? "not sent again by itself: Update agent there tries it again"
+      : a.held ? "not sent by itself: it waits for a signed build"
       : a.auto ? (a.failed ? "tried again once the node is idle, or press Update agent there" : "updates itself once the node is idle")
       : "on the Nodes page"}</span>
       <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}

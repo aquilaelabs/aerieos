@@ -3399,6 +3399,29 @@ def went_back(n):
     return b.get("why") or "it did not start there"
 
 
+def unsigned_refused(n):
+    """Why this node refuses the agent this controller ships for want of a
+    release's signature, "" where it would take it: the build is not sent
+    to it unasked, since nothing a second try sends is any different (the
+    agent's release.py; a branch's build carries no signature, and one sent
+    every two minutes was a failed job every two minutes). Known from what
+    the node reports, a key pinned and unsigned builds not allowed at its
+    console, with no signature here to send; and from its last answer to
+    this same build, for a signature it did not accept."""
+    if not n:
+        return ""
+    rep = n.get("reported") or {}
+    ours = agent_file()
+    if rep.get("release_key") and rep.get("unsigned_ok") is not True and not agent_sig(ours["digest"]):
+        return ("it takes only agent updates a release signed, and this controller's build is unsigned: "
+                "a signed build updates it, or aerieos-agent unsigned on at its console allows this one")
+    last = next(iter(jobs_for(node_id=n["id"], n=1, type="self-update")), None)
+    if last and last.get("state") == "failed" and last.get("exit_code") == 77 \
+            and (last.get("spec") or {}).get("digest") == ours["digest"]:
+        return str(last.get("error") or "it refused this build's signature")[:300]
+    return ""
+
+
 def agent_stale(n):
     """"" if this node runs the agent this controller ships, else why that
     matters right now.
@@ -3471,10 +3494,13 @@ def attention(project_nodes):
         # It took the update and went back to the agent it had (R241): said,
         # and no longer the controller's to send by itself.
         back = went_back(n)
-        auto = auto and not back
+        # It takes only a signed release and this build is not one: held, and
+        # said, where the row promised an update that was refused each time.
+        held = unsigned_refused(n) if auto and not back else ""
+        auto = auto and not back and not held
         out.append({"kind": "agent", "node": n["name"], "id": n["id"],
                     "from": (n.get("agent") or {}).get("version") or "?",
-                    "to": ours["version"], "window": agent_gap(n), "auto": auto, "back": back,
+                    "to": ours["version"], "window": agent_gap(n), "auto": auto, "back": back, "held": held,
                     "failed": (last.get("error") or "it failed") if last and last.get("state") == "failed" else "",
                     "projects": sorted(p for p, nid in project_nodes.items() if nid == n["id"])})
     return out
@@ -3682,6 +3708,10 @@ def auto_update(nid):
     # A build this node went back from is a person's to send again (the
     # operator, 13 Nov): no loop of update, fail and go back.
     if went_back(n):
+        return None
+    # ...and so is one this node refuses for want of a release's signature:
+    # asked again it answers the same, a failed job every two minutes.
+    if unsigned_refused(n):
         return None
     now = time.time()
     if now - _auto_tried.get(nid, 0) < AUTO_UPDATE_EVERY or jobs_for(node_id=nid, n=1, active=True):

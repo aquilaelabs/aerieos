@@ -1,7 +1,8 @@
 """A node's agent behind this controller inside its window is updated by the
 controller itself once the node is idle (R253); one with a job in flight is
-left until it is idle, one from another window is the operator's press, and
-an attempt is not repeated within AUTO_UPDATE_EVERY."""
+left until it is idle, one from another window is the operator's press, an
+attempt is not repeated within AUTO_UPDATE_EVERY, and a node that will
+refuse the build for want of a release's signature is not sent it unasked."""
 import os
 import sys
 import tempfile
@@ -50,6 +51,55 @@ class AutoUpdate(unittest.TestCase):
         self.runs("harness")
         self.assertIsNone(nodes.auto_update(self.nid), "a version with no window is no proof of the same one")
         self.assertEqual(self.queued(), [])
+
+    def pins(self, unsigned_ok=False):
+        nodes._exec("UPDATE nodes SET reported = json_set(reported, '$.release_key', ?, '$.unsigned_ok', json(?)) WHERE id = ?",
+                    ("2eb9add8c0659630", "true" if unsigned_ok else "false", self.nid))
+
+    def test_a_node_taking_only_signed_updates_is_not_sent_an_unsigned_build_by_itself(self):
+        # It refuses it, and asked again it refuses it again: a failed job
+        # every two minutes on a controller built from a branch.
+        self.runs(self.ours["version"])
+        self.pins()
+        with mock.patch.object(nodes, "agent_sig", lambda digest=None: ""):
+            self.assertIn("signed", nodes.unsigned_refused(nodes.node(self.nid)))
+            self.assertIsNone(nodes.auto_update(self.nid))
+            self.assertEqual(self.queued(), [], "nothing queued for a node that will refuse it")
+            row = next(a for a in nodes.attention({}) if a.get("id") == self.nid) if nodes.node(self.nid).get("live") else None
+            if row:
+                self.assertFalse(row["auto"])
+                self.assertIn("signed", row["held"])
+            # A person's press still sends it: the node says why itself.
+            self.assertTrue(nodes.node_update_agent("user:test", self.nid).get("job"))
+
+    def test_with_a_signature_or_unsigned_builds_allowed_it_is_sent(self):
+        self.runs(self.ours["version"])
+        self.pins()
+        with mock.patch.object(nodes, "agent_sig", lambda digest=None: "ab" * 64):
+            self.assertEqual(nodes.unsigned_refused(nodes.node(self.nid)), "")
+            self.assertTrue(nodes.auto_update(self.nid), "a signed build is sent to a node that pinned the key")
+        nodes._auto_tried.clear()
+        for j in self.queued():
+            nodes.job_result(self.nid, j["id"], "failed", 75, "busy")
+        self.pins(unsigned_ok=True)
+        with mock.patch.object(nodes, "agent_sig", lambda digest=None: ""):
+            self.assertEqual(nodes.unsigned_refused(nodes.node(self.nid)), "")
+            self.assertTrue(nodes.auto_update(self.nid), "its console allows unsigned builds")
+
+    def test_a_signature_the_node_refused_is_not_sent_again_until_the_build_moves(self):
+        self.runs(self.ours["version"])
+        job = nodes.auto_update(self.nid)
+        self.assertTrue(job)
+        nodes.job_result(self.nid, self.queued()[0]["id"], "failed", 77,
+                         "refused: the signature is not the release key's. This node takes only updates signed by it")
+        nodes._auto_tried.clear()
+        self.assertIn("refused", nodes.unsigned_refused(nodes.node(self.nid)))
+        self.assertIsNone(nodes.auto_update(self.nid), "the same build, the same answer: not asked again")
+        self.assertEqual(self.queued(), [])
+        # Another build is another question.
+        other = dict(self.ours, digest="sha256:" + "1" * 64)
+        with mock.patch.object(nodes, "agent_file", lambda: other):
+            self.assertEqual(nodes.unsigned_refused(nodes.node(self.nid)), "")
 
 
 if __name__ == "__main__":

@@ -2662,6 +2662,18 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
      `the bell lists "Agent update on" the node under Needs attention, with a way to the Nodes page (${bellText.slice(0, 160)})`);
   ok(await page.$eval('#bBell .dot', d => d.classList.contains('warn')),
      '...in amber: an update waiting is not work stopped');
+  // A node that takes only a signed release, on a build that is not one, is
+  // not promised an update that it refuses each time (B1039): the row says
+  // why it is held, in the note's own voice, and what it waits for.
+  const heldRow = await page.evaluate(() => { const d = document.createElement('div');
+    const a = { kind: 'agent', node: 'box', id: 'n_held', from: '0.9.1', to: '0.9.2', window: false, auto: false, back: '', failed: '', projects: [],
+      held: "it takes only agent updates a release signed, and this controller's build is unsigned" };
+    d.innerHTML = attRow(a); const held = d.textContent.replace(/\s+/g, ' ');
+    d.innerHTML = attRow({ ...a, held: '', auto: true });
+    return { held, bad: /class="bsum bad"/.test(attRow(a)), plain: d.textContent.replace(/\s+/g, ' ') }; });
+  ok(/takes only agent updates a release signed/.test(heldRow.held) && /not sent by itself: it waits for a signed build/.test(heldRow.held)
+     && !/updates itself once the node is idle/.test(heldRow.held) && !heldRow.bad && /updates itself once the node is idle/.test(heldRow.plain),
+     `a node held for a signed build says so on its bell row, not in red, and is not promised an update (${heldRow.held.slice(0, 200)})`);
   // Its link goes to THIS node, whichever the tab was on, with Update agent
   // brought into view (the operator, 4 Oct).
   const other = await page.evaluate(id => nodesList.find(n => n.id !== id && n.kind === 'agent' && n.state !== 'retired')?.id, minted.id);
