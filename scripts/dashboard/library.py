@@ -2,8 +2,9 @@
 list of one shape, for one node. The toolchains the catalog offers with
 what the node's store holds (toolchains.payload_for_node), the coding
 agents with their version against the latest (agentcode.rows), the tool
-packs a person added (among the toolchain rows, by their tier), the apps a
-NAS runs (nasapps.catalog), the vetted catalog's entries not yet added
+packs a person added (among the toolchain rows, by their tier), the apps
+kept here from the catalog or added by a person (nasapps.catalog; none is
+shipped), the vetted catalog's entries not yet added
 (catalogindex) and the companions a person downloads (apps.view), each a
 row: kind, tier, name, label, about, platforms, where it stands on the
 node (installed, version, latest, update due, a job in flight), and the
@@ -75,6 +76,18 @@ def repo_of(catalog_url):
     if m:
         return f"https://github.com/{m.group(1)}/{m.group(2)}"
     return u.rsplit("/", 1)[0] if u.endswith((".json", ".sig")) else u.rstrip("/")
+
+
+# No app is shipped (R238): one is a card because the catalog's signed index
+# lists it or because it is kept here. An install that has read no index
+# and keeps none says so in a line where the Apps would be.
+NO_APPS = "No app is offered: the catalog could not be read, and none is kept here."
+
+
+def apps_note(apps, catalog_index):
+    """What the Library's Apps say in the place of cards, or "": NO_APPS
+    where no app is kept and no index of the catalog has been read."""
+    return "" if apps or catalog_index else NO_APPS
 
 
 def _tier(t):

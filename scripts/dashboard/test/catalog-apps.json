@@ -1,0 +1,79 @@
+{
+ "apps": {
+  "lantern": {
+   "name": "Lantern",
+   "what": "a reading light for the shelf: one small web page, kept in its own folder",
+   "port": 8061,
+   "media": false,
+   "compose": "services:\n  lantern:\n    image: ghcr.io/example/lantern:1.4.2@sha256:c5220b3c4266890f047190c18dc4243e0dac079d43ca8065899c4f9f3cf124ef\n    restart: unless-stopped\n    environment:\n      TZ: ${TZ}\n    ports:\n      - \"${PORT}:8061\"\n    volumes:\n      - ${DATA}:/data\n",
+   "secrets": [],
+   "by": "the fixture catalog",
+   "at": 1,
+   "tier": "aerie",
+   "maker": "Example Labs",
+   "credits": [],
+   "fields": [
+    {
+     "var": "DATA",
+     "kind": "folder",
+     "label": "Its settings",
+     "help": "its own folder, which holds what it keeps",
+     "required": true,
+     "default": "apps/lantern"
+    }
+   ],
+   "pin": {
+    "url": "https://example.com/catalog",
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "path": "packs/apps/lantern"
+   }
+  },
+  "tidepool": {
+   "name": "Tidepool",
+   "what": "photos from every phone, with a database of its own beside it",
+   "port": 8062,
+   "media": false,
+   "compose": "services:\n  tidepool:\n    image: ghcr.io/example/tidepool:2.0.1@sha256:ad6eaaed527d2071e865d190ad76cd2609c91ad8f396b1db927ef59012f74643\n    restart: unless-stopped\n    environment:\n      TZ: ${TZ}\n      DB_PASSWORD: ${DB_PASSWORD}\n    ports:\n      - \"${PORT}:8062\"\n    volumes:\n      - ${LIBRARY}:/photos\n    depends_on:\n      - db\n  db:\n    image: postgres:16-alpine@sha256:a761ddad11e149543ee1b071565452252099aae522171fda46ef56ce30540c25\n    restart: unless-stopped\n    environment:\n      POSTGRES_PASSWORD: ${DB_PASSWORD}\n    volumes:\n      - ${DATA}/db:/var/lib/postgresql/data\n",
+   "secrets": [],
+   "by": "the fixture catalog",
+   "at": 1,
+   "tier": "aerie",
+   "maker": "Example Labs",
+   "credits": [],
+   "fields": [
+    {
+     "var": "DATA",
+     "kind": "folder",
+     "label": "Its database",
+     "help": "its own folder, which holds its database",
+     "required": true,
+     "default": "apps/tidepool"
+    },
+    {
+     "var": "LIBRARY",
+     "kind": "folder",
+     "label": "Its photos",
+     "help": "the share's folder what is uploaded is kept in",
+     "required": true,
+     "default": "",
+     "example": "/mnt/tank/photos"
+    },
+    {
+     "var": "DB_PASSWORD",
+     "kind": "secret",
+     "label": "Database password",
+     "help": "its database's own, made for it when left empty",
+     "required": false,
+     "default": ""
+    }
+   ],
+   "pin": {
+    "url": "https://example.com/catalog",
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "path": "packs/apps/tidepool"
+   }
+  }
+ }
+}

@@ -994,6 +994,14 @@ node runs Docker (the card says when it does not); from then on New
 container offers it to everyone, and each Create makes another container
 of it, which keeps beside its compose file which app it was made from.
 
+Every Docker app comes this way: AerieOS ships none of its own. An install
+that has read no index of the catalog (it cannot reach it and holds no
+mirror) and has kept no app says so in one line where the Library's Apps
+would be, and offers none; an app kept earlier stays offered with no
+network. A container made from an app keeps what it needs of that app
+beside its own compose file, so it runs and opens its Configure whatever
+the Library holds later, an app AerieOS used to ship among them.
+
 An app is fixed or re-pinned by a commit to the catalog. When the signed
 index pins another commit of an app kept here, the Library takes that
 definition the next time it reads the index, fetched and checked as the

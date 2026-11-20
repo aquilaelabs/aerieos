@@ -90,7 +90,7 @@ class Makers(unittest.TestCase):
         idx, why = catalogindex.parse(json.dumps({"version": 1, "packs": [{**ENTRY, "maker": "Eclipse Adoptium"}, {**ENTRY, "name": "plain"}]}).encode())
         self.assertEqual((why, idx["packs"][0]["maker"], "maker" in idx["packs"][1]), ("", "Eclipse Adoptium", False))
 
-    def test_every_shipped_row_agent_and_app_names_its_maker(self):
+    def test_every_shipped_row_and_agent_names_its_maker(self):
         root = Path(__file__).resolve().parents[3]
         rows = json.loads((root / "config" / "toolchains.json").read_text())["toolchains"]
         self.assertEqual([r["name"] for r in rows if not packformat.maker_of(r)], [])
@@ -98,7 +98,6 @@ class Makers(unittest.TestCase):
             self.assertEqual(packformat.credits_of(r), r.get("credits") or [], r["name"])
             if r["maker"] == "AerieOS":
                 self.assertGreater(len(r.get("credits") or []), 1, f"{r['name']}: a toolchain AerieOS put together credits each maker's tool in it")
-        self.assertEqual([k for k, v in nasapps.APPS.items() if not packformat.maker_of(v)], [])
         import agents
         self.assertEqual([a.id for a in agents.TABLE if not (library.AGENT_MAKERS.get(a.id) or a.provider)], [])
 

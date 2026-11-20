@@ -170,11 +170,15 @@ stop. The row then says how the job ended rather than silently reverting to
 whatever state it was in.
 
 **From the Library** (R164, R170): an app's New container on the Library
-opens this dialog on that app (Jellyfin, Plex, the arr stack, qBittorrent,
-Immich, Nextcloud, Home Assistant, Syncthing, any an administrator added
-from the Library's Add your own, and any kept from the vetted catalog's
-apps); New container opened anywhere else offers no apps, since they are
-picked on the Library alone. The app's part of the dialog is a panel of its
+opens this dialog on that app: one kept from the vetted catalog's apps
+(Jellyfin, Plex, Sonarr, Radarr, Prowlarr, qBittorrent, Immich, Nextcloud,
+Home Assistant and Syncthing are among them), or one an administrator
+added from the Library's Add your own. AerieOS ships none itself: an app
+is offered because the catalog's signed index lists it, and is added,
+fixed or re-pinned there with no release of AerieOS
+([tool-packs.md](tool-packs.md#docker-apps-in-the-catalog)). New
+container opened anywhere else offers no apps, since they are picked on
+the Library alone. The app's part of the dialog is a panel of its
 own over the rest, headed as its Library card is, with the fields the app
 declares (Immich asks for its photos and videos and for its database's
 folder, a media server for its media), then who it runs as, the time zone

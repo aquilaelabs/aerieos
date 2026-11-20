@@ -591,11 +591,11 @@ repository, a pasted bbtool.json or an upload of its files, docs/tool-packs.md;
 a pack with an agent block is a coding agent) or an app, a compose file of
 your own with the blanks New container fills (`${PORT}`, `${DATA}`,
 `${MEDIA}`, `${PUID}`, `${PGID}`, `${TZ}`), its name, its id, what it is
-and its port. Look checks it the way the shipped apps are held (every image
-pinned to a tag, never latest, nothing built or privileged, no blank but
-the known ones) and says what it would run; Add keeps it under the state as
-sideloaded, offered on an Apps card and in New container like the shipped
-ones, with Edit on its card to change or remove it. Both are an
+and its port. Look checks it the way the catalog's apps are held (every image
+held by its digest or pinned to a tag, never latest, nothing built or
+privileged, no blank but the known ones) and says what it would run; Add
+keeps it under the state as sideloaded, offered on an Apps card and in New
+container like the catalog's, with Edit on its card to change or remove it. Both are an
 administrator's, since every person's New container then offers them. Over
 the Tool packs, **Submit it to the vetted catalog** links to the catalog's
 repository for a pull request, the way a pack becomes vetted. What it

@@ -992,6 +992,11 @@ mkdir -p "$S/ws/vendored-junk/deep" && echo x > "$S/ws/vendored-junk/deep/thing.
 # owner included. It is archived for the test owner too, once that account
 # is made below: an archive is each person's own.
 echo '{"delta": {"by": "u_0000aaaa", "admin": true}}' > "$S/state/locked-projects.json"
+# The world's Docker apps (R238): none is shipped, so the two this world
+# offers are kept here as the Library keeps one from the catalog, each from
+# a pin in a catalog that is made up (catalog-apps.json), every image by
+# its digest. A suite that wants another writes it beside them.
+cp "$HERE/catalog-apps.json" "$S/state/sideapps.json"
 # alpha may push, on the deploy key its remote uses. Stated here rather than
 # left to a migration: the one-off that used to grant this on first boot went
 # at 0.5.0, and a fixture that leans on a migration is a fixture that breaks

@@ -187,7 +187,7 @@ scripts/
     extmounts.py                 the other disks and shares the controller's own machine mounts (R162 step 4): the record, a share's password sealed, what the hello hands the agent
     storebackups.py              the backups the controller's own machine copies (R162 step 5): the record, what the hello hands the agent, the summary Home and the bell read
     poolkeys.py                  the passphrases of the own machine's encrypted pools (R162 step 3): kept sealed, or asked after every boot and offered once; what the hello hands the agent, nothing in Safe mode
-    nasapps.py                   the catalog of ready apps New container offers (R164 step 2): each a compose file pinned to a tag with its blanks in the environment, filled by render
+    nasapps.py                   the Docker apps New container offers (R164 step 2, R238): none shipped, each kept from the vetted catalog at the commit its signed index pins or added by a person; a compose file with every image held by its digest (pack format 5) or pinned to a tag, the fields its panel asks for filled into its environment by render_with, and a kept app's newer definition taken when the index pins another commit
     schedules.py                 the Schedules page's scripts (R117): an administrator's cron in the state, its timetable in words, its timer and the built-in scan
     tunnel.py                    the home tunnel the controller runs itself (R176): cloudflared as its child from the settings, and the hostname's record and rules through Cloudflare's API
     statefile.py                 writing a state file, and holding it while you read-modify-write one
@@ -337,7 +337,7 @@ scripts/
                                  what a run measured it costing
     notify.py                    getting a line into a running session, and knowing it landed
     signin.py                    each agent's sign-in and sign-out on one node, as jobs there
-    test/                        its Playwright suite: `aerie dashboard test`, isolated; device-api.json in it pins what the released companion and VS Code extension read from the controller, each field's type, and deviceapi.mjs drives it (R79)
+    test/                        its Playwright suite: `aerie dashboard test`, isolated; catalog-apps.json in it is the two Docker apps its world offers, kept as from a made-up catalog since none is shipped; device-api.json in it pins what the released companion and VS Code extension read from the controller, each field's type, and deviceapi.mjs drives it (R79)
     unit/                        its python unit tier: `aerie tests unit`, the modules' rules without a server or a browser, run first by preflight (agentpkg.py loads the node agent for it; sdkstore.py is a store and a catalog of made-up rows for the installer's)
     roottier/                    the root tier: what the root agent and the root helpers do in a folder an account controls, with a link planted where root works, seen as root (world.py is what its modules stand on)
   agent/builderbot-agent.py      the node agent's entry: runs the package beside it, and is the __main__.py of the zip a node runs

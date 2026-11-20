@@ -364,7 +364,7 @@ function tpSeen(seen, was, offer = true){
 
 // An app of the person's own (R170 step 3, the Library's Add your own): a
 // compose file with the blanks New container fills, its id, name, what it
-// is and its port; Look checks it the way the shipped apps are held (every
+// is and its port; Look checks it the way the catalog's apps are held (every
 // image pinned, no blank but the known ones) and says what it would run;
 // Add keeps it at tier sideloaded, and it is offered as any app is.
 function tpAppHtml(f){
@@ -421,7 +421,7 @@ function tpWhatHtml(f){
   return `<div class="field"><label id="tpWhatLabel">What</label>
     <div class="pseg" role="group" aria-labelledby="tpWhatLabel">${[["pack", "A tool pack"], ["app", "An app"]]
       .map(([k, t]) => `<button type="button" data-tpwhat="${k}" class="${f.what === k ? "on" : ""}" aria-pressed="${f.what === k}">${t}</button>`).join("")}</div>
-    <div class="hint">${f.what === "app" ? "A compose file of your own, offered in New container and on the Library's Apps cards like the shipped ones, kept as sideloaded."
+    <div class="hint">${f.what === "app" ? "A compose file of your own, offered in New container and on the Library's Apps cards like the catalog's, kept as sideloaded."
       : `A tool pack installs on a node like any toolchain and gives a session aerie tool verbs; a pack with an agent block is a coding agent. Help's <a href="#/help/tool-packs">Tool packs</a> says how to write one.`}
       One meant for everybody goes to the vetted catalog: <a href="#/help/submitting">Submitting to the catalog</a> says how.</div></div>`;
 }

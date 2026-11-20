@@ -1,16 +1,20 @@
-"""Apps a NAS runs (R164 step 2): a catalog of ready containers (a media
-server, the arr stack, photos, files, home automation, a download client,
-syncing) each a compose file and an environment with a few blanks (where
-its data and media live, who it runs as, the time zone, its port), filled
-from the New container dialog and made through the Containers page as any
-container is: on the node picked, reached on its port, and put behind a
-node's nginx with a certificate from that node's nginx page. Images are
-pinned to a tag, never latest, and the registry update check says when
-one moves. The catalog is this list, and beside it the apps a person
-added (R170 step 3, the Library's Add your own): a compose file of their
-own with the same blanks, checked before it is kept, held at tier
-sideloaded in sideapps.json under the state; the vetted public catalog is
-R169's.
+"""Apps a NAS runs (R164 step 2, R238): ready containers (a media server,
+photos, files, home automation, a download client, syncing), each a
+compose file and the fields its panel asks for (where its data and media
+live, who it runs as, the time zone, its port), filled from the New
+container dialog and made through the Containers page as any container
+is: on the node picked, reached on its port, and put behind a node's nginx
+with a certificate from that node's nginx page.
+
+None is shipped in this file. An app is offered because the vetted
+catalog's signed index lists it (R169, R238 step 1): its folder is fetched
+at the commit the index pins and kept here (add_catalog), and an app is
+added, fixed or re-pinned by a commit to the catalog, with no release of
+AerieOS (refresh). Beside those, the apps a person added (R170 step 3,
+the Library's Add your own): a compose file of their own, checked before
+it is kept, held at tier sideloaded. Both are kept in sideapps.json under
+the state. From pack format 5 an app names every image by its digest; one
+of an earlier format pins each to a tag, never latest.
 """
 import json
 import os
@@ -53,238 +57,6 @@ LEGACY = {"DATA": {"var": "DATA", "kind": "folder", "label": "Its data", "defaul
 TZ_RE = re.compile(r"[A-Za-z0-9_+-]{1,32}(/[A-Za-z0-9_+-]{1,32}){0,2}")
 PATH_RE = re.compile(r"/(mnt|srv)/[\w./ +-]{1,180}")
 IDS_RE = re.compile(r"[0-9]{1,6}:[0-9]{1,6}")
-
-# Each app: what it is, the fields its panel asks for (R238 step 2: its own,
-# as a format 4 manifest declares them, beside AerieOS's own its compose
-# reads), and its compose with each as a ${VAR} the environment fills, so
-# the file reads as compose everywhere and the Environment tab holds only
-# what its fields do not set. They move to the catalog as app packs (R238
-# step 1), which the release after the catalog holds them empties this for.
-def _folder(var, label, default="", example="", help=""):
-    return {"var": var, "kind": "folder", "label": label, "default": default, "example": example, "help": help}
-
-
-APPS = {
-    "jellyfin": {"maker": "Jellyfin", "name": "Jellyfin", "what": "a media server: films, series and music streamed to every screen", "port": 8096, "media": True,
-                 "fields": [_folder("DATA", "Its settings and cache", "apps/jellyfin", help="its own folder, which holds its library's database and its cache"),
-                            _folder("MEDIA", "Its media", example="/mnt/tank/media", help="the films, series and music it serves; read-only to it")],
-                 "compose": """services:
-  jellyfin:
-    image: jellyfin/jellyfin:10.10.7
-    restart: unless-stopped
-    user: "${PUID}:${PGID}"
-    environment:
-      TZ: ${TZ}
-    ports:
-      - "${PORT}:8096"
-    volumes:
-      - ${DATA}/config:/config
-      - ${DATA}/cache:/cache
-      - ${MEDIA}:/media:ro
-"""},
-    "plex": {"maker": "Plex", "name": "Plex", "what": "a media server with Plex's apps and account; claim it on its first open", "port": 32400, "media": True,
-             "fields": [_folder("DATA", "Its settings and transcodes", "apps/plex", help="its own folder, which holds its library's database and what it transcodes"),
-                        _folder("MEDIA", "Its media", example="/mnt/tank/media", help="the films, series and music it serves; read-only to it"),
-                        {"var": "CLAIM", "kind": "text", "label": "Claim token", "example": "claim-…",
-                         "help": "from plex.tv/claim, good for four minutes, to tie it to your Plex account as it starts; or leave it empty and claim it on its first open"}],
-             "compose": """services:
-  plex:
-    image: plexinc/pms-docker:1.41.6.9685-d301f511a
-    restart: unless-stopped
-    environment:
-      TZ: ${TZ}
-      PLEX_UID: ${PUID}
-      PLEX_GID: ${PGID}
-      PLEX_CLAIM: ${CLAIM}
-    ports:
-      - "${PORT}:32400"
-    volumes:
-      - ${DATA}/config:/config
-      - ${DATA}/transcode:/transcode
-      - ${MEDIA}:/data:ro
-"""},
-    "arr": {"maker": "AerieOS", "credits": [{"name": "Sonarr", "maker": "the Sonarr team"}, {"name": "Radarr", "maker": "the Radarr team"}, {"name": "Prowlarr", "maker": "the Prowlarr team"}, {"name": "the container images", "maker": "LinuxServer.io"}], "name": "The arr stack", "what": "Sonarr, Radarr and Prowlarr: series, films and the indexers they search", "port": 8989, "media": True,
-            # Going (R238 step 5): each is an app of its own in the catalog.
-            "going": "Going in the next release: Sonarr, Radarr and Prowlarr are each an app of their own in the Library, to install in its place. A stack made from this one keeps running.",
-            "fields": [_folder("DATA", "Their settings", "apps/arr", help="one folder for the three, each keeping its own under it"),
-                       _folder("MEDIA", "Their media", example="/mnt/tank/media", help="the series and films they manage and the downloads they import")],
-            "compose": """services:
-  sonarr:
-    image: lscr.io/linuxserver/sonarr:4.0.14
-    restart: unless-stopped
-    environment:
-      PUID: ${PUID}
-      PGID: ${PGID}
-      TZ: ${TZ}
-    ports:
-      - "${PORT}:8989"
-    volumes:
-      - ${DATA}/sonarr:/config
-      - ${MEDIA}:/media
-  radarr:
-    image: lscr.io/linuxserver/radarr:5.21.1
-    restart: unless-stopped
-    environment:
-      PUID: ${PUID}
-      PGID: ${PGID}
-      TZ: ${TZ}
-    ports:
-      - "7878:7878"
-    volumes:
-      - ${DATA}/radarr:/config
-      - ${MEDIA}:/media
-  prowlarr:
-    image: lscr.io/linuxserver/prowlarr:1.33.3
-    restart: unless-stopped
-    environment:
-      PUID: ${PUID}
-      PGID: ${PGID}
-      TZ: ${TZ}
-    ports:
-      - "9696:9696"
-    volumes:
-      - ${DATA}/prowlarr:/config
-"""},
-    "qbittorrent": {"maker": "the qBittorrent project", "name": "qBittorrent", "what": "a download client with a web page; its first password is in its log", "port": 8080, "media": True,
-                    "fields": [_folder("DATA", "Its settings", "apps/qbittorrent", help="its own folder, which holds its settings and the torrents it is working on"),
-                               _folder("DOWNLOADS", "Its downloads", example="/mnt/tank/downloads", help="the share's folder finished downloads go to")],
-                    "compose": """services:
-  qbittorrent:
-    image: lscr.io/linuxserver/qbittorrent:5.0.4
-    restart: unless-stopped
-    environment:
-      PUID: ${PUID}
-      PGID: ${PGID}
-      TZ: ${TZ}
-      WEBUI_PORT: ${PORT}
-    ports:
-      - "${PORT}:${PORT}"
-      - "6881:6881"
-      - "6881:6881/udp"
-    volumes:
-      - ${DATA}/config:/config
-      - ${DOWNLOADS}:/downloads
-"""},
-    "immich": {"maker": "Immich", "name": "Immich", "what": "photos and videos from every phone, with faces, places and search; its own database beside it", "port": 2283, "media": True,
-               "fields": [_folder("LIBRARY", "Its photos and videos", example="/mnt/tank/photos", help="the share's folder what is uploaded to it is kept in"),
-                          _folder("DATA", "Its database and models", "apps/immich", help="its own folder, which holds its database and the models it searches with"),
-                          {"var": "DB_PASSWORD", "kind": "secret", "label": "Database password", "help": "its database's own, made for it when left empty"}],
-               "compose": """services:
-  immich-server:
-    image: ghcr.io/immich-app/immich-server:v1.131.3
-    restart: unless-stopped
-    environment:
-      TZ: ${TZ}
-      DB_HOSTNAME: database
-      DB_USERNAME: postgres
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_DATABASE_NAME: immich
-      REDIS_HOSTNAME: redis
-    ports:
-      - "${PORT}:2283"
-    volumes:
-      - ${LIBRARY}:/usr/src/app/upload
-      - /etc/localtime:/etc/localtime:ro
-    depends_on:
-      - redis
-      - database
-  immich-machine-learning:
-    image: ghcr.io/immich-app/immich-machine-learning:v1.131.3
-    restart: unless-stopped
-    volumes:
-      - ${DATA}/model-cache:/cache
-  redis:
-    image: docker.io/valkey/valkey:8-bookworm
-    restart: unless-stopped
-  database:
-    image: ghcr.io/immich-app/postgres:14-vectorchord0.3.0-pgvectors0.2.0
-    restart: unless-stopped
-    environment:
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_USER: postgres
-      POSTGRES_DB: immich
-      POSTGRES_INITDB_ARGS: '--data-checksums'
-    volumes:
-      - ${DATA}/postgres:/var/lib/postgresql/data
-"""},
-    "nextcloud": {"maker": "Nextcloud", "name": "Nextcloud", "what": "files, calendars and contacts with its apps, on a database of its own", "port": 8081, "media": True,
-                  "fields": [_folder("FILES", "Its files", example="/mnt/tank/files", help="the share's folder each account's files are kept in"),
-                             _folder("DATA", "Its app and database", "apps/nextcloud", help="its own folder, which holds Nextcloud itself, its apps and its database"),
-                             {"var": "ADMIN_USER", "kind": "text", "label": "Admin account", "default": "admin", "required": True,
-                              "help": "the account it makes for you as it first starts"},
-                             {"var": "ADMIN_PASSWORD", "kind": "secret", "label": "Admin password",
-                              "help": "that account's first password, made for it when left empty; Configure reads it back"},
-                             {"var": "DB_PASSWORD", "kind": "secret", "label": "Database password", "help": "its database's own, made for it when left empty"}],
-                  "compose": """services:
-  nextcloud:
-    image: nextcloud:31.0.5-apache
-    restart: unless-stopped
-    environment:
-      MYSQL_HOST: db
-      MYSQL_DATABASE: nextcloud
-      MYSQL_USER: nextcloud
-      MYSQL_PASSWORD: ${DB_PASSWORD}
-      NEXTCLOUD_ADMIN_USER: ${ADMIN_USER}
-      NEXTCLOUD_ADMIN_PASSWORD: ${ADMIN_PASSWORD}
-      TZ: ${TZ}
-    ports:
-      - "${PORT}:80"
-    volumes:
-      - ${DATA}/html:/var/www/html
-      - ${FILES}:/var/www/html/data
-    depends_on:
-      - db
-  db:
-    image: mariadb:11.4
-    restart: unless-stopped
-    command: --transaction-isolation=READ-COMMITTED --log-bin=binlog --binlog-format=ROW
-    environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
-      MYSQL_DATABASE: nextcloud
-      MYSQL_USER: nextcloud
-      MYSQL_PASSWORD: ${DB_PASSWORD}
-    volumes:
-      - ${DATA}/db:/var/lib/mysql
-"""},
-    # On the machine's own network and not privileged (the operator, 18 Nov):
-    # it finds the devices around it and reaches Bluetooth through dbus; a USB
-    # radio waits for a device field.
-    "homeassistant": {"maker": "Open Home Foundation", "name": "Home Assistant", "what": "home automation; on the machine's own network so it finds the devices around it", "port": 8123, "media": False,
-                      "network": "host",
-                      "fields": [_folder("DATA", "Its settings", "apps/homeassistant", help="its own folder, which holds its configuration, automations and history")],
-                      "compose": """services:
-  homeassistant:
-    image: ghcr.io/home-assistant/home-assistant:2025.5.3
-    restart: unless-stopped
-    network_mode: host
-    environment:
-      TZ: ${TZ}
-    volumes:
-      - ${DATA}/config:/config
-      - /run/dbus:/run/dbus:ro
-"""},
-    "syncthing": {"maker": "Syncthing Foundation", "name": "Syncthing", "what": "folders kept the same between this machine and others, with no cloud between", "port": 8384, "media": True,
-                  "fields": [_folder("DATA", "Its settings", "apps/syncthing", help="its own folder, which holds its keys and the devices it knows"),
-                             _folder("SYNC", "Its synced folders", example="/mnt/tank/sync", help="the share's folder it keeps in step with the other machines")],
-                  "compose": """services:
-  syncthing:
-    image: syncthing/syncthing:1.29.6
-    restart: unless-stopped
-    environment:
-      PUID: ${PUID}
-      PGID: ${PGID}
-      TZ: ${TZ}
-    ports:
-      - "${PORT}:8384"
-      - "22000:22000/tcp"
-      - "22000:22000/udp"
-      - "21027:21027/udp"
-    volumes:
-      - ${DATA}/config:/var/syncthing/config
-      - ${SYNC}:/var/syncthing/Sync
-"""},
-}
-
 
 answers_fn = None      # (node, port) -> True when something on the node already answers there
 
@@ -356,12 +128,9 @@ def _save(apps):
 
 
 def _all():
-    """Every app, the shipped ones first with their tier, then the added: a
-    person's own as sideloaded, one taken from the catalog at its tier."""
-    out = {k: {**v, "tier": "official", **({"fields": fields_of(v["fields"], [])} if "fields" in v else {})} for k, v in APPS.items()}
-    for k, v in _load().items():
-        out[k] = {**v, "tier": v["tier"] if v.get("pin") and v.get("tier") in packformat.TIERS else "sideloaded"}
-    return out
+    """Every app kept here, each with its tier: a person's own as
+    sideloaded, one taken from the catalog at the tier its entry said."""
+    return {k: {**v, "tier": v["tier"] if v.get("pin") and v.get("tier") in packformat.TIERS else "sideloaded"} for k, v in _load().items()}
 
 
 def catalog():
@@ -375,7 +144,7 @@ def catalog():
         mine, own = app_fields({**v, "id": k})
         out.append({"id": k, "name": v["name"], "what": v["what"], "port": v["port"], "media": v.get("media", False),
                     "secrets": v.get("secrets", []) or [f["var"] for f in mine if f["kind"] == "secret"],
-                    "tier": v.get("tier", "official"), "by": v.get("by", ""), "at": v.get("at", 0),
+                    "tier": v["tier"], "by": v.get("by", ""), "at": v.get("at", 0),
                     # Who the app itself is by (the operator, 12 Nov), where it says.
                     "maker": str(v.get("maker") or ""), "credits": list(v.get("credits") or []),
                     "icon": f"/api/pack-icon?app={k}&v={v.get('at', 0)}" if icon_of(k) else "",
@@ -583,7 +352,7 @@ def held_of(a):
 def check(compose, fields=None, network=""):
     """What a compose file of a person's own would run, before it is kept
     (the Look): {services: [{name, image, ports, volumes}], blanks, media}
-    or {error}. Held to what the shipped ones are held to: a services
+    or {error}. Held to what the catalog's are held to: a services
     mapping, every image held by its digest or pinned to a tag that is not
     latest, and no blank
     but the ones New container fills: the six every app shared, or, for an
@@ -648,13 +417,10 @@ def check(compose, fields=None, network=""):
 
 def add(app, name, what, port, compose, by="", replace=False):
     """Keep an app of a person's own, looked at first (check): {app} or
-    {error}. `replace` takes a new version of one added before; a shipped
-    app's id is never taken."""
+    {error}. `replace` takes a new version of one added before."""
     app = str(app or "").strip().lower()
     if not ID_RE.fullmatch(app):
         return {"error": "an app's id is 2 to 32 lower-case letters, digits and dashes, starting with a letter"}
-    if app in APPS:
-        return {"error": f"{app} is a shipped app: pick another id"}
     name, what = str(name or "").strip(), str(what or "").strip()
     if not 1 <= len(name) <= 60:
         return {"error": "its name is 1 to 60 characters"}
@@ -707,8 +473,6 @@ def add_catalog(entry, by="", fetch=None):
     late = packformat.needs(meta, packformat.uses_of(meta))
     if late:
         return {"error": f"{app}'s bbapp.json: {late[0]}"}
-    if app in APPS:
-        return {"error": f"{app} is a shipped app already"}
     seen = check_app(meta, compose)
     if seen.get("error"):
         return {"error": f"{app}: {seen['error']}"}

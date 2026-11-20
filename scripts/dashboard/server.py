@@ -13053,6 +13053,8 @@ class Handler(BaseHTTPRequestHandler):
         return self._json({"node": nid, "name": tc.get("name") or (n or {}).get("name") or "", "live": bool(tc.get("live", (n or {}).get("live"))),
                            "rows": rows, **look,
                            "job": tc.get("job") or {"running": False}, "catalog_error": cat.get("error", ""),
+                           # With no app kept and no index read, the Apps say so in a line (R238).
+                           "apps_note": library.apps_note(napps, cat.get("index")) if may_apps else "",
                            # Whether this node runs Docker, for an app's card (R170 step 7).
                            "docker": bool(((n or {}).get("reported") or {}).get("docker")),
                            "may": {"install": may_install, "apps": may_apps, "packs": not users.may(who, "curate"),

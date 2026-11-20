@@ -179,5 +179,33 @@ class Rows(unittest.TestCase):
         self.assertEqual((by["armonly"]["wrong_platform"], by["xcode"]["wrong_platform"]), ("", "not for this node: needs darwin/arm64"),
                          "a node that has not said its platform is not judged")
 
+class NoShippedApps(unittest.TestCase):
+    """No app is shipped (R238): the Apps are what the catalog's index
+    lists and what is kept here, and nothing where there is neither."""
+    INDEX = {"packs": [{"name": "whoami", "kind": "app", "url": "https://example.com/catalog", "commit": "c" * 40, "sha256": "d" * 64,
+                        "path": "packs/apps/whoami", "tier": "aerie", "about": "A tiny web server.", "maker": "Traefik Labs"}]}
+    KEPT = {"id": "site", "name": "Site", "what": "a site", "port": 8080, "tier": "aerie", "maker": "Example Labs", "compose": "",
+            "held": {"word": "pinned", "why": "every image it runs is named by the digest its entry carries"}}
+
+    def apps(self, apps, index):
+        return [r for r in library.rows({"items": []}, [], apps, index, {}) if r["kind"] == "app"]
+
+    def test_the_apps_are_the_index_s_and_the_kept_ones(self):
+        got = self.apps([], self.INDEX)
+        self.assertEqual([(r["name"], r["verb"], r["catalog"]["commit"]) for r in got], [("whoami", "install", "c" * 40)], "offered from the signed index")
+        got = self.apps([self.KEPT], self.INDEX)
+        self.assertEqual(sorted(r["name"] for r in got), ["site", "whoami"])
+        self.assertEqual(next(r for r in got if r["name"] == "site")["held"]["word"], "pinned", "a kept one says what its images are held to")
+        self.assertEqual(library.apps_note([self.KEPT], None), "", "one kept here is offered with no catalog")
+        self.assertEqual(library.apps_note([], self.INDEX), "")
+
+    def test_with_no_catalog_read_and_none_kept_they_say_so_in_a_line_and_offer_nothing(self):
+        self.assertEqual(self.apps([], None), [])
+        note = library.apps_note([], None)
+        self.assertEqual(note, library.NO_APPS)
+        self.assertLessEqual(len(note), 80, "one short sentence")
+        self.assertNotIn("\n", note)
+
+
 if __name__ == "__main__":
     unittest.main()

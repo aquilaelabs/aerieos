@@ -1,4 +1,5 @@
-"""Apps a NAS runs (R164 step 2, R238): a compose file is held to the
+"""Apps a NAS runs (R164 step 2, R238): none is shipped, each kept from
+the catalog or added by a person; a compose file is held to the
 catalog's rules before it is kept; an app from before pack format 4 asks
 for the folders of the six blanks its compose reads, and one of format 4
 for the fields its bbapp.json declares, beside AerieOS's own; rendering
@@ -187,26 +188,78 @@ class Fields(unittest.TestCase):
         self.assertIn("about says", nasapps.check_app({"about": "a word " * 29}, COMPOSE)["error"])
 
 
-class Shipped(unittest.TestCase):
-    """The apps AerieOS ships until the catalog holds them (R238): each held
-    to what a format 4 manifest is, pinned, and made with its defaults."""
+class NoneShipped(unittest.TestCase):
+    """No app is shipped (R238 step 1): one is offered because the catalog's
+    signed index lists it, or because a person added it, and for no other
+    reason."""
 
-    def test_every_shipped_app_is_a_format_4_app_and_renders(self):
-        import packformat
-        for k, v in nasapps.APPS.items():
-            meta = {"format": 4, **{x: v[x] for x in ("fields", "network", "going") if x in v}}
-            seen = nasapps.check_app(meta, v["compose"])
-            self.assertNotIn("error", seen, k)
-            self.assertTrue(packformat.maker_of(v), f"{k} names who it is by")
-            for img in (s["image"] for s in seen["services"]):
-                self.assertNotIn(":latest", img, k)
-            a = next(x for x in nasapps.catalog() if x["id"] == k)
-            values = {f["var"]: "/mnt/tank/x" for f in a["fields"] if f["kind"] == "folder"}
-            r = nasapps.render_with(a, values, tz="Europe/Paris")
-            self.assertNotIn("error", r, k)
-            env = nasapps.env_values(r["env"])
-            self.assertTrue(set(seen["blanks"]) <= set(env), f"{k}: {set(seen['blanks']) - set(env)} not in its environment")
-            self.assertEqual(env.get("PORT"), None if v.get("network") == "host" else str(v["port"]), k)
+    def test_with_nothing_kept_nothing_is_offered(self):
+        d = tempfile.TemporaryDirectory()
+        self.addCleanup(d.cleanup)
+        nasapps.configure(state=d.name, write_json=lambda p, o: Path(p).write_text(json.dumps(o)))
+        self.assertFalse(hasattr(nasapps, "APPS"), "the table is gone")
+        self.assertEqual(nasapps.catalog(), [])
+        self.assertIn("no app called jellyfin", nasapps.render("jellyfin", {})["error"])
+
+    def test_an_id_a_shipped_app_had_is_anybody_s_now(self):
+        d = tempfile.TemporaryDirectory()
+        self.addCleanup(d.cleanup)
+        nasapps.configure(state=d.name, write_json=lambda p, o: Path(p).write_text(json.dumps(o)))
+        self.assertEqual(nasapps.add("jellyfin", "Jellyfin", "mine", 8096, COMPOSE).get("app"), "jellyfin")
+        self.assertEqual([(a["id"], a["tier"]) for a in nasapps.catalog()], [("jellyfin", "sideloaded")])
+
+
+class MadeBefore(unittest.TestCase):
+    """A container made from an app while AerieOS shipped it keeps running
+    and keeps its Configure: what it needs of its app is beside its own
+    compose file (app.json), never in a table."""
+    COMPOSE = ("services:\n  jellyfin:\n    image: jellyfin/jellyfin:10.10.7\n    restart: unless-stopped\n    user: \"${PUID}:${PGID}\"\n"
+               "    environment:\n      TZ: ${TZ}\n    ports:\n      - \"${PORT}:8096\"\n    volumes:\n      - ${DATA}/config:/config\n"
+               "      - ${DATA}/cache:/cache\n      - ${MEDIA}:/media:ro\n")
+    # As New container kept it then (nasapps.snapshot of the shipped row).
+    SNAP = {"id": "jellyfin", "name": "Jellyfin", "maker": "Jellyfin", "tier": "official", "own": ["PUID", "PGID", "TZ", "PORT"], "network": "",
+            "port": 8096, "commit": "", "at": 0,
+            "fields": [{"var": "DATA", "kind": "folder", "label": "Its settings and cache", "help": "its own folder", "required": True, "default": "apps/jellyfin"},
+                       {"var": "MEDIA", "kind": "folder", "label": "Its media", "help": "what it serves", "required": True, "default": "", "example": "/mnt/tank/media"}]}
+    ENV = "DATA=/mnt/tank/apps/jellyfin\nMEDIA=/mnt/tank/media\nPUID=1000\nPGID=1000\nTZ=Europe/Paris\nPORT=8096\nJELLYFIN_PUBLISHED_URL=https://tv.example.com\n"
+
+    def setUp(self):
+        import containers
+        import devapp
+        from unittest import mock
+        self.containers = containers
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        nasapps.configure(state=self.tmp.name, write_json=lambda p, o: Path(p).write_text(json.dumps(o)))
+        home = Path(self.tmp.name) / "containers" / "jellyfin"
+        home.mkdir(parents=True)
+        (home / "docker-compose.yml").write_text(self.COMPOSE)
+        (home / "app.json").write_text(json.dumps(self.SNAP))
+        for target, name, value in ((devapp, "containers_dir", lambda name: Path(self.tmp.name) / "containers" / name),
+                                    (containers, "apps_held", lambda nid, but="": {"names": ["jellyfin"], "ports": [], "apps": []})):
+            p = mock.patch.object(target, name, value)
+            p.start()
+            self.addCleanup(p.stop)
+
+    def test_configure_opens_on_its_fields_with_nothing_in_the_library(self):
+        self.assertEqual(nasapps.catalog(), [], "no app is shipped and none is kept")
+        view = self.containers.app_view("jellyfin", self.ENV)
+        self.assertEqual([f["var"] for f in view["fields"]], ["DATA", "MEDIA"])
+        self.assertEqual(view["values"], {"DATA": "/mnt/tank/apps/jellyfin", "MEDIA": "/mnt/tank/media", "PUID": "1000", "PGID": "1000",
+                                          "TZ": "Europe/Paris", "PORT": "8096"}, "each value read back from its environment")
+        self.assertEqual(view["extra"], "JELLYFIN_PUBLISHED_URL=https://tv.example.com\n")
+        self.assertIsNone(view["newer"], "nothing newer is offered where the Library holds no app of that name")
+
+    def test_a_save_makes_its_environment_from_what_it_kept(self):
+        snap = self.containers.app_of("jellyfin")
+        req = {"values": {"DATA": "/mnt/tank/apps/jellyfin", "MEDIA": "/mnt/tank/films"}, "ids": "1000:1000", "tz": "Europe/Paris", "port": 8097,
+               "env": "JELLYFIN_PUBLISHED_URL=https://tv.example.com\n"}
+        made = self.containers.app_made(req, {**snap, "compose": self.containers._compose_of("jellyfin")}, "n1", nasapps.env_values(self.ENV), "jellyfin")
+        self.assertNotIn("error", made)
+        self.assertEqual(made["compose"], self.COMPOSE, "the file it was made with")
+        env = nasapps.env_values(made["env"])
+        self.assertEqual((env["MEDIA"], env["PORT"], env["JELLYFIN_PUBLISHED_URL"]), ("/mnt/tank/films", "8097", "https://tv.example.com"))
+        self.assertEqual(made["app"]["id"], "jellyfin")
 
 
 class Render(unittest.TestCase):

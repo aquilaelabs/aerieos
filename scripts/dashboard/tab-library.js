@@ -495,7 +495,11 @@ function libShelves(may){
   // catalog has to say over them is still said.
   const packsSaid = !(lib.shelves || []).some(sh => sh.kind === "pack") && libPackNote(may)
     ? `<div class="libgroup" data-libgroup="pack"><h3 class="libgname">Tool packs</h3>${libPackNote(may)}</div>` : "";
-  return mine + kinds + packsSaid || `<div class="empty">Nothing here yet.</div>`;
+  // No app at all is no shelf either (R238: none is shipped), and an
+  // install that read no catalog and keeps none says so in a line.
+  const appsSaid = !(lib.shelves || []).some(sh => sh.kind === "app") && lib.apps_note
+    ? `<div class="libgroup" data-libgroup="app"><h3 class="libgname">Apps</h3><div class="hint warn">${esc(lib.apps_note)}</div></div>` : "";
+  return mine + kinds + packsSaid + appsSaid || `<div class="empty">Nothing here yet.</div>`;
 }
 
 // A list (a chip, a topic or the search): one sorted list, a page at a time.
@@ -505,7 +509,7 @@ function libList(may){
   const noun = libKind && !LIB_STANDS[libKind] ? (LIB_KINDS.find(([k]) => k === libKind) || ["", "entries"])[1].toLowerCase() : "entries";
   const hidden = lib.hidden ? `<div class="hint libhidden">${lib.hidden} more ${lib.hidden === 1 ? "runs" : "run"} only on other systems than ${esc(lib.name || "this node")}'s. <button type="button" class="link" data-liball="1">Show ${lib.hidden === 1 ? "it" : "them"}</button></div>`
     : libAll ? `<div class="hint libhidden">Showing what runs on other systems too, each marked. <button type="button" class="link" data-liball="0">Hide them</button></div>` : "";
-  const note = libKind === "pack" ? libPackNote(may) : "";
+  const note = libKind === "pack" ? libPackNote(may) : libKind === "app" && lib.apps_note ? `<div class="hint warn">${esc(lib.apps_note)}</div>` : "";
   const body = rows.length ? libCards(rows, may)
     : `<div class="empty">${libQ.trim() ? `Nothing ${kindWord ? kindWord + " " : ""}matches ${esc(libQ.trim())}.` : "Nothing here matches."}</div>`;
   return `<div class="libgroup libone" data-libgroup="list">${note}${hidden}${body}</div>`;
