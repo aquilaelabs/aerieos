@@ -167,11 +167,9 @@ function bootPage(hash){
   if (key === "projects" && parts[1] && !g.tools.some(([k]) => k === parts[1])){
     // A project's notebook: its header, its view strip under it the
     // pane's width with the view's group open, then rows.
-    const GROUPS = [["overview", "Overview", [["overview", "Overview"], ["sessions", "Sessions"], ["permissions", "Permissions"], ["settings", "Settings"]]],
-                    ["plan", "Plan", [["roadmap", "Roadmap"], ["bugs", "Bugs"]]],
-                    ["code", "Code", [["git", "Git"], ["tests", "Tests"], ["analysis", "Analysis"]]],
-                    ["ship", "Ship", [["artifacts", "Artifacts"], ["docker", "Docker"], ["vms", "VMs"], ["signing", "Signing"]]],
-                    ["docs", "Docs", [["design", "Design"], ["wiki", "Wiki"]]]];
+    // The notebook's own groups and views (NB_VIEWS), each view by its
+    // name in an address, so this strip is the one the notebook then draws.
+    const GROUPS = NB_GROUPS.map(([k, w]) => [k, w, NB_VIEWS.filter(x => x.group === k).map(x => [x.addr || x.key, x.label])]);
     const view = parts[2] || "overview", grp = GROUPS.find(x => x[2].some(([v]) => v === view)) || GROUPS[0];
     const btn = (on, w) => `<button type="button" disabled class="${on ? "on" : ""}">${w}</button>`;
     bar = `<span class="phead"><span class="pname">${skv(6)}</span><span class="pfacts">${skv(14)}</span><span class="sp"></span>

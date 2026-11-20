@@ -832,7 +832,78 @@ async function nbCoreLeaving(nb){
   return true;
 }
 
-// ---- the four views ------------------------------------------------------
+// ---- the notebook's views --------------------------------------------------
+// The strip's five groups, in the order a space is worked, by key and by
+// the word on the button.
+const NB_GROUPS = [["overview", "Overview"], ["plan", "Plan"], ["code", "Code"], ["ship", "Ship"], ["docs", "Docs"]];
+// Every view, in the strip's order, a group's views together as the row
+// under it draws them. The one list of them: the strip in #nbTpl is static
+// markup held to it by test/surface.mjs, and the first paint's strip
+// (bootPage), what showing a view loads (nbCoreSetView) and what it watches
+// while it is on screen (nbCoreWatchViews) are read from it.
+//
+//   key     the view's name in the markup (data-v, data-view), in the
+//           address and in what a browser remembers; never changed
+//   label   the word on its button
+//   group   the group whose row it is in
+//   addr    its name in an address, where that is not its key
+//   show    what it does as it comes on, before it is marked as waiting:
+//           Permissions draws itself from what the page holds, and a mark
+//           put on first would flash under it
+//   read    what it asks for once marked, so it waits as its markup
+//           declares (R109)
+//   watch   what it reads again while it is on screen, by the revision
+//           token that moves; a token ending in a colon is the space's own.
+//           Only ever acted on while the view is the one showing: a token
+//           moving for a view nobody is looking at is not worth a fetch.
+const NB_VIEWS = [
+  // The rules once; the code base every time the view is shown, since a
+  // commit moves it and the server answers from its cache when not.
+  {key: "briefing", label: "Overview", group: "overview", addr: "overview", read: nb => {
+    if (!nb.ruleData) nb.loadRules(); else nb.loadCodebase().then(() => nb.drawRules());
+    // Once, on the first show. It is re-read when one of the three stores
+    // behind it moves, and only while this view is the one on screen.
+    if (!nb.preData) nb.loadPreamble();
+    // Every show: the brief leaves the tree when the first session starts,
+    // which can be while this notebook sits open.
+    nb.loadBrief();
+  }},
+  {key: "sessions", label: "Sessions", group: "overview", show: nb => nb.loadSessions()},
+  {key: "permissions", label: "Permissions", group: "overview", show: nb => nb.loadPerms()},
+  {key: "settings", label: "Settings", group: "overview"},
+  {key: "roadmap", label: "Roadmap", group: "plan"},
+  {key: "bugs", label: "Bugs", group: "plan", read: nb => { if (!nb.bugs) nb.loadBugs(); }},
+  {key: "git", label: "Git", group: "code", read: nb => nb.loadGit(), watch: {"git:": nb => nb.loadGit()}},
+  {key: "tests", label: "Tests", group: "code", read: nb => { if (!nb.tests) nb.loadTests(); }},
+  {key: "analysis", label: "Analysis", group: "code", read: nb => nb.loadAnalysis(),
+   watch: {reports: nb => nb.loadAnalysis(), findings: nb => nb.loadAnalysis()}},
+  {key: "artifacts", label: "Artifacts", group: "ship", read: nb => { nb.loadArtifacts(); nb.loadVersion(); }, watch: {
+    "dist:": nb => { nb.loadArtifacts(); nb.loadVersion(); },
+    // A session bumping while this tab is open, and the policy changing from
+    // anywhere else. Both are file mtimes on the server: neither costs a git
+    // call to notice.
+    "ver:": nb => nb.loadVersion(),
+    vpolicy: nb => nb.loadVersion(),
+    devapp: nb => nb.loadArtifacts(),
+    // A commit changes what the dev row says about the build being current,
+    // and what the version block computes since the target last moved.
+    "git:": nb => { nb.loadArtifacts(); nb.loadVersion(); },
+    "phone.dev": nb => nb.loadArtifacts()}},
+  // The Docker view re-reads on the manager's token, as the Docker tab
+  // does: a job queued, taken or finished, an instance written. Not on the
+  // status poll (B727): a read of an agent node's docker is a round trip
+  // through its agent, whose heartbeat moves the nodes token, whose watch
+  // runs the status poll, which re-read docker again, 134 requests in 30 s.
+  {key: "docker", label: "Docker", group: "ship", read: nb => nbCoreLoadDocker(nb), watch: {devapp: nb => nbCoreLoadDocker(nb)}},
+  {key: "vms", label: "VMs", group: "ship", read: nb => nbCoreLoadVms(nb), watch: {vms: nb => nbCoreLoadVms(nb)}},
+  // A release's APK looked for and signed (R106), by the press or the
+  // hourly look: the Releases section follows it to its end.
+  {key: "signing", label: "Signing", group: "ship", read: nb => nb.loadSigning(), watch: {releasesign: nb => nb.loadSigning()}},
+  {key: "wiki", label: "Wiki", group: "docs", read: nb => nb.loadWiki(),
+   watch: {"wiki:": (nb, k) => { if (nb.wikiNews(k)) nb.loadWiki(); }}},
+  {key: "design", label: "Design", group: "docs", read: nb => nb.loadDesign()},
+];
+
 function nbCoreSetView(nb, v){
   const {project, root} = nb;
   // Which view somebody is on is half of what the presence line says, so it
@@ -886,31 +957,13 @@ function nbCoreSetView(nb, v){
   if (v !== "permissions") nb.leavePerms();
   if (v === "settings") settingsInto(project, root.querySelector('.nbview[data-view="settings"] .nbsettings'));
   else if (rnHost && root.contains(rnHost)) settingsOut();
-  if (v === "permissions") nb.loadPerms();
-  if (v === "sessions") nb.loadSessions();
+  // What the view itself does on show is its row's (NB_VIEWS); a name that
+  // is no view's does nothing here.
+  const view = NB_VIEWS.find(x => x.key === v);
+  view?.show?.(nb);
   // A view still waiting on its data waits as its markup declares (R109).
   glanceWaiting(root.querySelector(`.nbview[data-view="${v}"] .nbglance`));
-  if (v === "git") nb.loadGit();
-  if (v === "docker") nbCoreLoadDocker(nb);
-  if (v === "vms") nbCoreLoadVms(nb);
-  if (v === "signing") nb.loadSigning();
-  if (v === "bugs" && !nb.bugs) nb.loadBugs();
-  if (v === "analysis") nb.loadAnalysis();
-  if (v === "design") nb.loadDesign();
-  if (v === "wiki") nb.loadWiki();
-  if (v === "artifacts"){ nb.loadArtifacts(); nb.loadVersion(); }
-  if (v === "tests" && !nb.tests) nb.loadTests();
-  // The rules once; the code base every time the view is shown, since a
-  // commit moves it and the server answers from its cache when not.
-  if (v === "briefing"){
-    if (!nb.ruleData) nb.loadRules(); else nb.loadCodebase().then(() => nb.drawRules());
-    // Once, on the first show. It is re-read when one of the three stores
-    // behind it moves, and only while this view is the one on screen.
-    if (!nb.preData) nb.loadPreamble();
-    // Every show: the brief leaves the tree when the first session starts,
-    // which can be while this notebook sits open.
-    nb.loadBrief();
-  }
+  view?.read?.(nb);
 }
 // Unsaved work does not follow you to another tab.
 //
@@ -1014,40 +1067,15 @@ function nbCoreWatchState(nb){
   nb.unwatch = [];
   nb.watch = (k, fn) => nbCoreWatch(nb, k, fn);
 }
-// What this notebook watches. Registered once per instance, and only ever
-// acted on while the view in question is actually on screen: a token
-// moving for a tab nobody is looking at is not worth a fetch.
+// What this notebook's views watch, each row's own (NB_VIEWS). Registered
+// once per instance, and only ever acted on while the view in question is
+// actually on screen.
 function nbCoreWatchViews(nb){
   const {project} = nb;
-  nbCoreWatch(nb, () => `dist:${project}`, () => {
-    if (nbCoreShowing(nb, "artifacts")){ nb.loadArtifacts(); nb.loadVersion(); }
-  });
-  // A session bumping while this tab is open, and the policy changing from
-  // anywhere else. Both are file mtimes on the server: neither costs a git
-  // call to notice.
-  nbCoreWatch(nb, () => `ver:${project}`, () => { if (nbCoreShowing(nb, "artifacts")) nb.loadVersion(); });
-  nbCoreWatch(nb, "vpolicy", () => { if (nbCoreShowing(nb, "artifacts")) nb.loadVersion(); });
-  nbCoreWatch(nb, "devapp", () => { if (nbCoreShowing(nb, "artifacts")) nb.loadArtifacts(); });
-  // A commit changes what the dev row says about the build being current,
-  // and what the version block computes since the target last moved.
-  nbCoreWatch(nb, () => `git:${project}`, () => {
-    if (nbCoreShowing(nb, "artifacts")){ nb.loadArtifacts(); nb.loadVersion(); }
-    if (nbCoreShowing(nb, "git")) nb.loadGit();
-  });
-  nbCoreWatch(nb, "phone.dev", () => { if (nbCoreShowing(nb, "artifacts")) nb.loadArtifacts(); });
-  // The Docker view re-reads on the manager's token, as the Docker tab
-  // does: a job queued, taken or finished, an instance written. Not on the
-  // status poll (B727): a read of an agent node's docker is a round trip
-  // through its agent, whose heartbeat moves the nodes token, whose watch
-  // runs the status poll, which re-read docker again, 134 requests in 30 s.
-  nbCoreWatch(nb, "devapp", () => { if (nbCoreShowing(nb, "docker")) nbCoreLoadDocker(nb); });
-  nbCoreWatch(nb, "vms", () => { if (nbCoreShowing(nb, "vms")) nbCoreLoadVms(nb); });
-  // A release's APK looked for and signed (R106), by the press or the
-  // hourly look: the Releases section follows it to its end.
-  nbCoreWatch(nb, "releasesign", () => { if (nbCoreShowing(nb, "signing")) nb.loadSigning(); });
-  nbCoreWatch(nb, "reports", () => { if (nbCoreShowing(nb, "analysis")) nb.loadAnalysis(); });
-  nbCoreWatch(nb, () => `wiki:${project}`, k => { if (nbCoreShowing(nb, "wiki") && nb.wikiNews(k)) nb.loadWiki(); });
-  nbCoreWatch(nb, "findings", () => { if (nbCoreShowing(nb, "analysis")) nb.loadAnalysis(); });
+  for (const view of NB_VIEWS)
+    for (const [token, read] of Object.entries(view.watch || {}))
+      nbCoreWatch(nb, token.endsWith(":") ? () => token + project : token,
+                  k => { if (nbCoreShowing(nb, view.key)) read(nb, k); });
 }
 
 // ---- the notebook's own six halves ---------------------------------------

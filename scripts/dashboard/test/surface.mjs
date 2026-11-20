@@ -232,11 +232,13 @@ ok(twice.length === 0,
 // that is assigned to it. The state is the nb of makeNotebook, of a view, or
 // of a function a view is cut into: any function or const arrow named nb...
 // whose own nb it is, so a put or a read moved out of a view's closure still
-// counts.
+// counts. A row of NB_VIEWS is handed it too: what a view loads and watches
+// is an arrow in the table.
 const isState = p => {
   const fn = p.scope.getBinding('nb')?.scope.path;
   const name = fn?.node.type === 'FunctionDeclaration' ? fn.node.id?.name
-    : fn?.parentPath?.isVariableDeclarator() ? fn.parent.id.name : '';
+    : fn?.parentPath?.isVariableDeclarator() ? fn.parent.id.name
+    : fn?.findParent(q => q.isVariableDeclarator())?.node.id.name === 'NB_VIEWS' ? 'nbViews' : '';
   return /^(makeNotebook|nb\w+)$/.test(name || '');
 };
 const put = new Set(), reads = [], hands = {}, assignedFrom = [];
@@ -266,6 +268,45 @@ const unput = [...new Set(reads.filter(r => !put.has(r.n)).map(r => `nb.${r.n} (
 ok(reads.length > 100 && assignedFrom.length > 5 && unput.length === 0,
    `every one of the ${reads.length} reads of the notebook's state finds a name something puts there${
      unput.length ? `; put nowhere: ${unput.join(', ')}` : ''}`);
+
+// The notebook's views, one list. NB_VIEWS in nb-core.js is what the first
+// paint's strip, a view's loads and its watches are read from; the strip
+// itself is static markup in the notebook's template, there before any
+// script has run on it, so it is held to the table here, from the source:
+// the same groups in the same order under the same words, each group's
+// views in the table's order under theirs, and a pane for every view.
+const lit = n => n?.type === 'StringLiteral' ? n.value : null;
+const table = {};
+traverse(babelParse(readFileSync(join(DASH, 'nb-core.js'), 'utf8'), 'nb-core.js', false), {Program(p){
+  for (const name of ['NB_GROUPS', 'NB_VIEWS'])
+    table[name] = (p.scope.bindings[name]?.path.node.init?.elements || []).map(e => e.type === 'ArrayExpression'
+      ? e.elements.map(lit)
+      : Object.fromEntries(e.properties.filter(q => lit(q.value) !== null).map(q => [q.key.name, q.value.value])));
+  p.stop();
+}});
+const strip = /<div class="nbtabs"[^>]*>\s*<div class="nbgroups[^>]*>([\s\S]*?)<\/div>\s*<div class="nbsub[^>]*>([\s\S]*?)<\/div>/.exec(html) || [];
+const stripGroups = [...(strip[1] || '').matchAll(/<button type="button" data-g="([^"]+)">([^<]*)<\/button>/g)].map(m => [m[1], m[2]]);
+const stripViews = [...(strip[2] || '').matchAll(/<button type="button" data-v="([^"]+)" data-in="([^"]+)">([^<]*)<\/button>/g)]
+  .map(m => ({key: m[1], group: m[2], label: m[3]}));
+const viewPanes = [...html.matchAll(/<div class="nbview[^"]*" data-view="([^"]+)"/g)].map(m => m[1]);
+const rowOf = (list, g) => list.filter(v => v.group === g).map(v => `${v.key} "${v.label}"`).join(', ');
+const offStrip = [];
+if (JSON.stringify(stripGroups) !== JSON.stringify(table.NB_GROUPS))
+  offStrip.push(`the groups are ${JSON.stringify(stripGroups)}, the table's ${JSON.stringify(table.NB_GROUPS)}`);
+for (const [g] of table.NB_GROUPS)
+  if (rowOf(stripViews, g) !== rowOf(table.NB_VIEWS, g))
+    offStrip.push(`${g} is ${rowOf(stripViews, g) || 'empty'}, the table's ${rowOf(table.NB_VIEWS, g) || 'empty'}`);
+// A button the two patterns did not read, a view in a group the table does
+// not have, a key written twice: none of which the rows above would show.
+if (((strip[1] || '') + (strip[2] || '')).split('<button').length - 1 !== stripGroups.length + stripViews.length
+    || stripViews.length !== table.NB_VIEWS.length || new Set(table.NB_VIEWS.map(v => v.key)).size !== table.NB_VIEWS.length
+    || table.NB_VIEWS.some(v => !table.NB_GROUPS.some(([g]) => g === v.group)))
+  offStrip.push(`the markup has ${stripViews.length} view buttons and the table ${table.NB_VIEWS.length} views, which are to be the same ones, each once and in one of the groups`);
+if ([...viewPanes].sort().join() !== table.NB_VIEWS.map(v => v.key).sort().join())
+  offStrip.push(`the panes are ${viewPanes.join(', ')}`);
+ok(table.NB_GROUPS.length === 5 && table.NB_VIEWS.length >= 15 && offStrip.length === 0,
+   `the notebook's strip in the markup is NB_VIEWS: ${table.NB_GROUPS.length} groups, ${table.NB_VIEWS.length} views in their rows, a pane each${
+     offStrip.length ? `; not so: ${offStrip.join('; ')}` : ''}`);
 
 ok(page.errors.length === 0, 'zero console errors');
 if (page.errors.length) console.log(page.errors);
