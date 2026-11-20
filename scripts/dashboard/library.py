@@ -244,6 +244,8 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
                             "platforms": e.get("platforms") or [], "installed": False, "version": "", "latest": e.get("commit", "")[:12],
                             "update": False, "running": False, "compose": "", "blanks": [],
                             "catalog": {"url": e["url"], "commit": e["commit"], "sha256": e["sha256"], "path": e.get("path", "")}, "verb": "install",
+                            # What its images are held to, as its entry says before it is kept: {word, why}, or None where it says no word.
+                            "held": packformat.held_offer(e),
                             **_past(e, catalog_index)})
             continue
         if e.get("kind") == "service":
@@ -252,6 +254,9 @@ def rows(node_payload, agent_rows, apps, catalog_index, companions, services=(),
                     "maker": e.get("maker", ""), "framework": e.get("framework", ""),
                     "platforms": e.get("platforms") or [], "installed": False, "version": "", "latest": e.get("commit", "")[:12], "update": False,
                     "running": False, "catalog": {"url": e["url"], "commit": e["commit"], "sha256": e["sha256"], "path": e.get("path", "")}, "verb": "add",
+                    # What its downloads are held to, as its entry says before it is added: {word, why} as a kept pack's row has it,
+                    # the why an installer's own sentence, or None where the entry says no word.
+                    "held": packformat.held_offer(e),
                     **_past(e, catalog_index)})
     for c in (companions or {}).get("apps") or []:
         if not c.get("offered"):

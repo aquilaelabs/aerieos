@@ -132,6 +132,15 @@ def _pin(p, own=True):
     ww = p.get("works_with")
     if isinstance(ww, list) and 0 < len(ww) <= 12 and all(isinstance(x, str) and re.fullmatch(r"\d{1,3}\.\d{1,3}", x) for x in ww):
         out["works_with"] = list(ww)
+    # What its downloads are held to, in the word its manifest reads
+    # (packformat.held_entry), so a card says it before anything is
+    # fetched; and an installer's own sentence with it. A word this build
+    # has not met is left out, and the card says none.
+    if p.get("held") in packformat.HELD_WORDS:
+        out["held"] = p["held"]
+        sentence = packformat.online_checked(p.get("online"))[0] if out["held"] == "installer" else ""
+        if sentence:
+            out["online"] = sentence
     return out
 
 

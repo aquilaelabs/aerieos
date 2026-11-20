@@ -1043,3 +1043,41 @@ def taken(index, reads=None):
             got = _at(e, last) if last else {k: v for k, v in e.items() if k != "older"} if "older" in e else e
         out.append(got)
     return out
+
+
+# What an entry says its downloads are held to, before anything of it is
+# fetched: the word its manifest reads (held, above) under `held`, and for
+# an installer the manifest's own sentence under `online`, both the pinned
+# manifest's and so a pin's (ENTRY_PIN). The other two words' sentences are
+# not the entry's to carry: pinned's is this build's own, and open's names
+# a file or a step of the manifest, which a person reads once the entry is
+# looked at or kept.
+OFFER_INSTALLER = "its pinned installer downloads the rest from its vendor"
+OFFER_OPEN = "a download or a step of it is held to nothing its entry carries"
+
+
+def held_entry(held):
+    """What an index entry says of a manifest whose downloads read `held`
+    ({word, why} as held_of answers, or held's pair): {"held": the word},
+    and {"online": the sentence} with it for an installer. What the tools
+    write into an entry, and what the catalog's check holds an entry's to."""
+    pair = (held.get("word"), held.get("why")) if isinstance(held, dict) else held
+    word, why = pair if isinstance(pair, (tuple, list)) and len(pair) == 2 else (None, None)
+    if word not in HELD_WORDS:
+        return {}
+    return {"held": word, **({"online": " ".join(str(why).split())[:ONLINE_MAX]} if word == "installer" and why else {})}
+
+
+def held_offer(entry):
+    """{word, why} for an entry not kept here yet, from what it says
+    (held_entry), or None for one that says no word: the shape a kept
+    pack's and a kept app's `held` has. An app's and a service's downloads
+    are the images they run."""
+    word = entry.get("held") if isinstance(entry, dict) else None
+    if word not in HELD_WORDS:
+        return None
+    if word == "pinned":
+        return {"word": word, "why": IMAGES_SAID if entry.get("kind") in ("app", "service") else PINNED_SAID}
+    if word == "installer":
+        return {"word": word, "why": online_checked(entry.get("online"))[0] or OFFER_INSTALLER}
+    return {"word": word, "why": OFFER_OPEN}
