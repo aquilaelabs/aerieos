@@ -9,14 +9,37 @@ script's --check holds the two to each other in aerie lint.
 
     tools/packs-export.py --write     write packs/official/*/bbtool.json and packs/agents/*/bbtool.json
     tools/packs-export.py --check     fail when what is written is not what the tables say
-    tools/packs-export.py --catalog DIR          write the same folders under DIR/packs/ (the builderbot-catalog checkout)
+    tools/packs-export.py --catalog DIR          write the same folders under DIR/packs/ (the catalog's checkout)
     tools/packs-export.py --catalog DIR --index  rewrite DIR/index.json's official entries from DIR's HEAD commit
+    tools/packs-export.py --catalog DIR --entry FOLDER... [--commit REF] [--tier TIER] [--topics T,T]
+                                                 write the index entry of any folder under DIR/packs from its own
+                                                 manifest at REF (DIR's HEAD when none is named): a pack's bbtool.json or
+                                                 an app's bbapp.json and compose. TIER for a folder with no entry yet;
+                                                 T,T what the entries named are about, one to three of the catalog's topics.
+    tools/packs-export.py --catalog DIR --drop-older N
+                                                 drop every older pin written in pack format N; with --index or
+                                                 --entry too, after they wrote
 The catalog (R170 step 6, the operator: the shipped toolchains and agents live
 in the catalog repository): every official pack is a folder of that repository,
 and its index entry pins the catalog's own commit, the folder as `path`, and
 the sha256 of `git archive --format=tar COMMIT PATH`. Two commits, since an
 index cannot pin the commit that holds it: --catalog writes the folders to
 commit first, --index then pins that commit; the maintainer signs the index.
+
+No entry is typed: what an entry repeats of its manifest (its pack format, the
+framework's version, its platforms, its label, the release lines it works with,
+what its downloads are held to, a recipe's rev) is read from the folder at the
+commit, fetched and held as an install would, and what is the entry's own (its
+tier, its topics, the day it was added, whether it is withdrawn) is kept from
+the entry the index has. A folder that is as one of its entry's pins has it
+keeps that pin, whatever commit is asked for.
+
+A pin is placed by its pack format. One in a format past the entry's newest
+becomes its newest, and the pin that was there is kept under `older`, for the
+releases that read only its format (packformat.pin_for); one in the newest's
+format takes its place; one in an earlier format (--commit, a commit where the
+folder holds the earlier manifest) takes the place of that format's older pin.
+An older pin is dropped only by --drop-older, once no listed release takes it.
 """
 import json
 import os
@@ -107,70 +130,235 @@ def catalog_write(root):
     print(f"  wrote {n} official pack(s) under {os.path.join(root, 'packs')}")
 
 
-def catalog_index(root):
-    """DIR/index.json with an official entry per pack, pinned to DIR's HEAD
-    and the sha256 of that folder's archive there; other entries kept."""
-    import hashlib
+# ---- the catalog's index entries ------------------------------------------------
+# An entry is written from the folder it pins, never typed
+# (scripts/dashboard/catalogentry.py): this is the part that reads the
+# catalog's checkout and writes its index.json.
+OWN_FOLDERS = ("packs/official/", "packs/agents/", "packs/services/")
+CATALOG_URL = "https://github.com/aquilaelabs/aerieos-catalog"
+
+
+def _git(root, *args, text=True):
     import subprocess
-    import time
-    head = subprocess.run(["git", "-C", root, "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
-    dirty = subprocess.run(["git", "-C", root, "status", "--porcelain", "packs"], capture_output=True, text=True, check=True).stdout.strip()
-    if dirty:
-        print("  [FAIL] packs/ in the catalog is not committed: commit the folders first, then --index pins that commit")
-        return 1
-    url = subprocess.run(["git", "-C", root, "remote", "get-url", "origin"], capture_output=True, text=True, check=False).stdout.strip() \
-        or "https://github.com/aquilaelabs/aerieos-catalog"
-    url = url.removesuffix(".git")
-    idx_path = os.path.join(root, "index.json")
+    return subprocess.run(["git", "-C", root, *args], capture_output=True, text=text, check=False)
+
+
+def catalog_url(root):
+    """The address the catalog's own entries are pinned under: its origin's."""
+    return (_git(root, "remote", "get-url", "origin").stdout.strip() or CATALOG_URL).removesuffix(".git")
+
+
+def index_read(root):
     try:
-        with open(idx_path, encoding="utf-8") as f:
+        with open(os.path.join(root, "index.json"), encoding="utf-8") as f:
             idx = json.load(f)
     except (OSError, ValueError):
-        idx = {"version": 1, "packs": []}
-    kept = [p for p in idx.get("packs", []) if p.get("tier") != "official"]
-    new = []
-    for path, m, name in catalog_dir_paths(root):
-        folder = os.path.relpath(os.path.dirname(path), root)
-        tar = subprocess.run(["git", "-C", root, "archive", "--format=tar", head, folder], capture_output=True, check=True).stdout
-        new.append({"name": name, "url": url, "commit": head, "path": folder, "sha256": hashlib.sha256(tar).hexdigest(),
-                    "tier": "official", "withdrawn": False, "about": m["about"] or m["label"], "platforms": m["platforms"]})
-        # Who the tool is by, for its card before the pack is fetched.
-        if m.get("maker"):
-            new[-1]["maker"] = m["maker"]
-        # ...and the framework's version it is written for, where that is
-        # past its format alone.
-        if m.get("framework"):
-            new[-1]["framework"] = m["framework"]
-        # A deployed thing's entry says its kind, or an install's Library
-        # offers it a second time as a tool pack to add.
-        if m.get("service"):
-            new[-1]["kind"] = "service"
-        # A coding agent's entry says its install recipe's rev, so an
-        # install fetches the pack only when that is higher than its own.
-        rev = ((m.get("agent") or {}).get("install") or {}).get("rev")
-        if rev:
-            new[-1]["install_rev"] = rev
-        # ...and a shipped toolchain's its recipe's, past the first (R234 step 4).
-        if (m.get("shipped") or {}).get("rev"):
-            new[-1]["shipped_rev"] = m["shipped"]["rev"]
-    # (packformat.framework_of reads an entry's as it reads a manifest's.)
-    # What the index says beside its entries (the first AerieOS that reads
-    # each pack format) is kept as it was.
+        idx = {}
+    return idx if isinstance(idx, dict) and isinstance(idx.get("packs"), list) else {"version": 1, "packs": []}
+
+
+def index_write(root, idx, packs):
+    """The index with these entries, stamped now. What it says beside its
+    entries (the first AerieOS that reads each pack format) is kept as it was."""
+    import time
     idx = {**{k: v for k, v in idx.items() if k not in ("version", "generated", "packs")},
-           "version": 1, "generated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "packs": new + kept}
-    with open(idx_path, "w", encoding="utf-8") as f:
+           "version": 1, "generated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "packs": packs}
+    with open(os.path.join(root, "index.json"), "w", encoding="utf-8") as f:
         json.dump(idx, f, indent=1)
         f.write("\n")
-    print(f"  wrote {len(new)} official entries pinned to {head[:12]} (and kept {len(kept)} others) in {idx_path}; sign it")
+    # A format an entry is written in and the index does not date is said:
+    # the catalog's own check refuses to sign an index that leaves it out.
+    since = idx.get("formats") if isinstance(idx.get("formats"), dict) else {}
+    for fmt in sorted({p.get("format", 1) for e in packs for p in (e, *(e.get("older") or [])) if isinstance(p.get("format", 1), int)}):
+        if fmt > 1 and str(fmt) not in since:
+            print(f"  [note] the index's formats does not say which AerieOS first reads pack format {fmt}: add it before signing")
+
+
+def entry_at(root, folder, commit, was=None, tier="", url="", topics=None):
+    """(entry, said, why) for one folder under the catalog's packs/ at
+    `commit`: its index entry written from its own manifest there
+    (catalogentry.said_at, the folder fetched from the checkout as an
+    install fetches it), over the entry the index holds for it (`was`).
+    The tier is the entry's own: official for the folders AerieOS's own
+    packs are kept in, else the one it has, else the one named."""
+    import hashlib
+    import catalogentry
+    folder = folder.strip("/")
+    tier = "official" if folder.startswith(OWN_FOLDERS) else tier or (was or {}).get("tier") or ""
+    if tier not in packformat.TIERS or (tier == "official") != folder.startswith(OWN_FOLDERS):
+        return None, "", f"it has no entry yet: name its tier with --tier ({', '.join(t for t in packformat.TIERS if t != 'official')})"
+    tree = _git(root, "rev-parse", "--verify", "-q", f"{commit}:{folder}").stdout.strip()
+    if not tree:
+        return None, "", f"it is not in the catalog at {commit[:12]}"
+    # A folder that is as one of the entry's pins has it (the same tree at
+    # that pin's commit) keeps that pin: an archive names its commit, so a
+    # new commit alone would read as a new pin, and everything kept from
+    # the entry would be offered an update that changes nothing.
+    for held in (was or {}), *((was or {}).get("older") or []):
+        at = str(held.get("commit") or "") if isinstance(held, dict) else ""
+        if at and at != commit and _git(root, "rev-parse", "--verify", "-q", f"{at}:{folder}").stdout.strip() == tree:
+            commit = at
+            break
+    tar = _git(root, "archive", "--format=tar", commit, folder, text=False)
+    if tar.returncode != 0:
+        return None, "", f"it is not in the catalog at {commit[:12]}"
+    # A Docker app is the folder with a bbapp.json; any other is a pack.
+    kind = "app" if _git(root, "cat-file", "-e", f"{commit}:{folder}/bbapp.json").returncode == 0 else "pack"
+    os.environ["BB_TOOLPACKS_FILE_URLS"] = "1"
+    pin, own, why = catalogentry.said_at("file://" + os.path.abspath(root), commit, hashlib.sha256(tar.stdout).hexdigest(), folder, kind,
+                                         official=tier == "official")
+    if why:
+        return None, "", why
+    if was and was.get("name") != own["name"]:
+        return None, "", f"its manifest names it {own['name']}, and its entry is {was.get('name')}"
+    if not (own.get("maker") or (was or {}).get("maker")):
+        return None, "", "its manifest names no maker: an entry says who its tool is by"
+    if topics and packformat.topics_refused({"topics": topics}):
+        return None, "", packformat.topics_refused({"topics": topics})
+    entry, said = catalogentry.entry_with(was, pin, own, tier, url or catalog_url(root), folder, topics)
+    return entry, said, ""
+
+
+def dropped(packs, drop):
+    """The entries with the older pins of each format named dropped, said."""
+    import catalogentry
+    for fmt in drop:
+        packs, n = catalogentry.drop_older(packs, fmt)
+        print(f"  dropped {n} older pin(s) written in pack format {fmt}")
+    return packs
+
+
+def catalog_head(root):
+    """The catalog's HEAD commit, or "" with the reason said: packs/ must
+    be committed, since an entry pins a commit that holds its folder."""
+    head = _git(root, "rev-parse", "HEAD").stdout.strip()
+    if not head or _git(root, "status", "--porcelain", "packs").stdout.strip():
+        print("  [FAIL] packs/ in the catalog is not committed: commit the folders first, then the index pins that commit")
+        return ""
+    return head
+
+
+def catalog_index(root, drop=()):
+    """DIR/index.json with an official entry per pack exported from this
+    tree, each written from its folder at DIR's HEAD (entry_at); other
+    entries kept. An entry that moves to a newer pack format keeps the pin
+    it had as an older one."""
+    head = catalog_head(root)
+    if not head:
+        return 1
+    idx, url = index_read(root), catalog_url(root)
+    have = {p.get("name"): p for p in idx["packs"] if isinstance(p, dict) and p.get("tier") == "official"}
+    kept = [p for p in idx["packs"] if isinstance(p, dict) and p.get("tier") != "official"]
+    new, bad = [], 0
+    for path, _m, name in catalog_dir_paths(root):
+        folder = os.path.relpath(os.path.dirname(path), root)
+        entry, said, why = entry_at(root, folder, head, have.get(name), "official", url)
+        if why:
+            print(f"  [FAIL] {name}: {why}")
+            bad += 1
+            continue
+        if said:
+            print(f"  {name}: {said}")
+        new.append(entry)
+    if bad:
+        print("  nothing was written")
+        return 1
+    index_write(root, idx, dropped(new + kept, drop))
+    moved = sum(1 for e in new if e != have.get(e["name"]))
+    print(f"  wrote {len(new)} official entries from {head[:12]} ({moved} changed, {len(kept)} others kept) in {os.path.join(root, 'index.json')}; sign it")
     return 0
+
+
+def catalog_entries(root, folders, commit="", tier="", drop=(), topics=None):
+    """DIR/index.json with the entry of each folder named, any folder under
+    DIR/packs, written from its own manifest at `commit` (DIR's HEAD when
+    none is named): in the place of the entry the index has for it, or
+    after the others where it has none. Nothing else of the index changes."""
+    head = catalog_head(root)
+    if not head:
+        return 1
+    if commit:
+        got = _git(root, "rev-parse", "--verify", f"{commit}^{{commit}}").stdout.strip()
+        if not got:
+            print(f"  [FAIL] {commit} is no commit of the catalog")
+            return 1
+        commit = got
+    idx, url = index_read(root), catalog_url(root)
+    packs, bad = [p for p in idx["packs"] if isinstance(p, dict)], 0
+    for folder in folders:
+        folder = os.path.relpath(os.path.abspath(folder), os.path.abspath(root)) if os.path.isabs(folder) else folder.strip("/")
+        if not folder.startswith("packs/") or ".." in folder.split("/"):
+            print(f"  [FAIL] {folder}: an entry's folder is under the catalog's packs/")
+            bad += 1
+            continue
+        at = next((i for i, p in enumerate(packs) if (p.get("path") or "").strip("/") == folder), None)
+        entry, said, why = entry_at(root, folder, commit or head, packs[at] if at is not None else None, tier, url, topics)
+        if why:
+            print(f"  [FAIL] {folder}: {why}")
+            bad += 1
+            continue
+        if at is None and any(p.get("name") == entry["name"] for p in packs):
+            print(f"  [FAIL] {folder}: the index has another entry named {entry['name']}")
+            bad += 1
+            continue
+        was = packs[at] if at is not None else None
+        print(f"  {entry['name']}: " + ("as the index has it" if entry == was else (said or (f"pinned at {entry['commit'][:12]}" if was else f"added at {entry['commit'][:12]}"))))
+        if at is None:
+            packs.append(entry)
+        else:
+            packs[at] = entry
+    if bad:
+        print("  nothing was written")
+        return 1
+    index_write(root, idx, dropped(packs, drop))
+    print(f"  wrote {os.path.join(root, 'index.json')}; sign it")
+    return 0
+
+
+def catalog_drop(root, drop):
+    """DIR/index.json with the older pins of the formats named dropped,
+    and nothing else changed."""
+    idx = index_read(root)
+    index_write(root, idx, dropped([p for p in idx["packs"] if isinstance(p, dict)], drop))
+    print(f"  wrote {os.path.join(root, 'index.json')}; sign it")
+    return 0
+
+
+def _values(argv, flag):
+    """The values after `flag` up to the next flag, for each time it is said."""
+    out = []
+    for i, a in enumerate(argv):
+        if a == flag:
+            for v in argv[i + 1:]:
+                if v.startswith("--"):
+                    break
+                out.append(v)
+    return out
 
 
 def main(argv):
     want = toolchain_packs() + agent_packs() + service_packs()
     if "--catalog" in argv:
-        root = argv[argv.index("--catalog") + 1]
+        root = (_values(argv, "--catalog") or [""])[0]
+        if not os.path.isdir(os.path.join(root, "packs")):
+            print("  [FAIL] --catalog names a checkout of the catalog, with its packs/")
+            return 1
+        drop = _values(argv, "--drop-older")
+        if not all(d.isdigit() and int(d) >= 1 for d in drop) or ("--drop-older" in argv and not drop):
+            print("  [FAIL] --drop-older names the pack format whose older pins go, a whole number")
+            return 1
+        drop = [int(d) for d in drop]
         if "--index" in argv:
-            return catalog_index(root)
+            return catalog_index(root, drop)
+        if "--entry" in argv:
+            folders = _values(argv, "--entry")
+            if not folders:
+                print("  [FAIL] --entry names a folder under the catalog's packs/")
+                return 1
+            topics = [t for v in _values(argv, "--topics") for t in v.split(",") if t]
+            return catalog_entries(root, folders, (_values(argv, "--commit") or [""])[0], (_values(argv, "--tier") or [""])[0], drop, topics)
+        if drop:
+            return catalog_drop(root, drop)
         bad = sum(1 for _p, m in want if toolpacks.validate(m, shipped=(), official=True)[1])
         if bad:
             return 1
