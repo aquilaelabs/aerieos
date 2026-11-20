@@ -1,6 +1,7 @@
 {
  "about": "Chromium, Firefox and WebKit with the module that drives them, for aerie capture shot and browser tests. Needs node.",
- "framework": "2.1",
+ "format": 5,
+ "framework": "5.1",
  "label": "Playwright browsers",
  "layout": {
   "bin": [
@@ -23,6 +24,7 @@
   "requires": [
    "node"
   ],
+  "rev": 2,
   "source": {
    "download": {
     "match": "Download url:\\s+(\\S+)",
@@ -39,16 +41,42 @@
    "env": {
     "PLAYWRIGHT_BROWSERS_PATH": "{dir}"
    },
+   "fetch": [
+    {
+     "sha256": "e2ebec5abb40f511c7a4442e83042fd8a4e654c3367e120b76e94a61a8f91e01",
+     "to": "dl/npm/playwright-1.65.1.tgz",
+     "url": "https://registry.npmjs.org/playwright/-/playwright-1.65.1.tgz"
+    },
+    {
+     "sha256": "6f5a60be62a4fddfbe7d10c448d8fbd54547da3358f2f8a04211440471ee863e",
+     "to": "dl/npm/playwright-core-1.65.1.tgz",
+     "url": "https://registry.npmjs.org/playwright-core/-/playwright-core-1.65.1.tgz"
+    }
+   ],
+   "files": {
+    "dl/npm/package-lock.json": "{\"name\":\"entry\",\"lockfileVersion\":3,\"requires\":true,\"packages\":{\"\":{\"dependencies\":{\"playwright\":\"^1.65.1\"}},\"node_modules/playwright\":{\"version\":\"1.65.1\",\"resolved\":\"https://registry.npmjs.org/playwright/-/playwright-1.65.1.tgz\",\"integrity\":\"sha512-vJ1FuoOrNwOKHUIVEvSt3jT1L+wjjDpwhwIstKtfvTh8XIG4FG4bIFuvNdMxi81LGfAhUgUZleVFaOLY4RIUUw==\",\"license\":\"Apache-2.0\",\"dependencies\":{\"playwright-core\":\"1.65.1\"},\"bin\":{\"playwright\":\"cli.js\"},\"engines\":{\"node\":\">=20\"}},\"node_modules/playwright-core\":{\"version\":\"1.65.1\",\"resolved\":\"https://registry.npmjs.org/playwright-core/-/playwright-core-1.65.1.tgz\",\"integrity\":\"sha512-hqPpz7blSMPxWVdoeE1yiBSzXsKiVOd2k+kjCvmUywD2GPO2Dd9HfcWnq9NN0GHbNZDFgZ9JfBFr+X5/BLo0qw==\",\"license\":\"Apache-2.0\",\"bin\":{\"playwright-core\":\"cli.js\"},\"engines\":{\"node\":\">=20\"}}}}\n",
+    "dl/npm/package.json": "{\n  \"private\": true,\n  \"dependencies\": {\n    \"playwright\": \"^1.65.1\"\n  }\n}\n"
+   },
    "kind": "command",
    "link": {
     "as": "{dir}/chromium",
     "find": "*/chromium-*/chrome-linux*/chrome"
    },
+   "lock": [
+    {
+     "kind": "npm",
+     "requirements": [
+      "playwright"
+     ],
+     "to": "dl/npm"
+    }
+   ],
+   "online": "Playwright, installed from the pinned packages this entry declares with no network asked, then downloads the Chromium, Firefox and WebKit builds its version names from its publisher's own host, cdn.playwright.dev; nothing in this entry holds those files.",
    "requires": "npm",
    "run": [
     "sh",
-    "-c",
-    "npm install --prefix \"$1\" --no-audit --no-fund --loglevel=error playwright@latest && \"$1/node_modules/.bin/playwright\" install chromium firefox webkit",
+    "-ec",
+    "d=\"$1\"; t=\"$(mktemp -d)\"; npm cache add --cache \"$t\" --no-update-notifier \"$d\"/dl/npm/*.tgz >/dev/null; cp \"$d\"/dl/npm/package.json \"$d\"/dl/npm/package-lock.json \"$d\"/; npm ci --offline --cache \"$t\" --ignore-scripts --no-audit --no-fund --no-update-notifier --loglevel=error --prefix \"$d\"; rm -rf \"$t\" \"$d\"/dl; \"$d/node_modules/.bin/playwright\" install chromium firefox webkit",
     "--",
     "{dir}"
    ]

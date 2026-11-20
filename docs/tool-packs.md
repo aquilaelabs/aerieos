@@ -298,11 +298,12 @@ A toolchain AerieOS ships says the same in its row (`source.lock`), and
 `tools/pins.py` writes the lock's downloads for it: it asks `uv` or `npm`
 what the requirements resolve to for each platform the row names, writes
 each file as a declared download, and writes the requirements or the lock
-the step reads into the row itself (`source.files`, a few small text files
-AerieOS writes into the row's directory before its steps: a row has no
-repository to keep them in, which is why a pack has no such key). An entry
-may declare up to 256 downloads, which is what a tool with a couple of
-hundred packages under it asks for.
+the step reads into the row itself (`source.files`: up to eight small text
+files, 96 KB together, which AerieOS writes into the row's directory before
+its steps; a row has no repository to keep them in, which is why a pack has
+no such key). An entry may declare up to 256 downloads, and a shipped row's
+recipe may be 192 KB: what a tool with a couple of hundred packages under
+it asks for.
 
 **What a node does with them.** AerieOS fetches each download itself, over
 `https` alone, before anything of the pack runs, and holds it to its sha256

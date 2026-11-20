@@ -14,7 +14,8 @@
    "name": "TypeScript"
   }
  ],
- "framework": "2.1",
+ "format": 5,
+ "framework": "5.1",
  "label": "Language servers (Python, TypeScript)",
  "layout": {
   "bin": [
@@ -35,17 +36,56 @@
   "requires": [
    "node"
   ],
+  "rev": 2,
   "source": {
    "download": {
     "bytes": 46000000,
     "resolver": "approximate"
    },
+   "fetch": [
+    {
+     "platform": "darwin/*",
+     "sha256": "c77e7a5d5ff31dd7acea7c44d4a0455e0528cdacbd24a8cb6c82b66d239b587e",
+     "to": "dl/npm/fsevents-2.3.3.tgz",
+     "url": "https://registry.npmjs.org/fsevents/-/fsevents-2.3.3.tgz"
+    },
+    {
+     "sha256": "bf5f473f6167c0d14175492c3263d783b4489a6956e1c06c18e15228e3a3fa42",
+     "to": "dl/npm/pyright-1.1.414.tgz",
+     "url": "https://registry.npmjs.org/pyright/-/pyright-1.1.414.tgz"
+    },
+    {
+     "sha256": "10e108c9cf7d5f2879053dff18515fb405abf2ccef63eaaf017d9c571687a1d3",
+     "to": "dl/npm/typescript-5.9.3.tgz",
+     "url": "https://registry.npmjs.org/typescript/-/typescript-5.9.3.tgz"
+    },
+    {
+     "sha256": "7e32f3958f4ce9f6e5d7169dd091602456896d2768a62a32b5abc62ea51767b0",
+     "to": "dl/npm/typescript-language-server-6.1.0.tgz",
+     "url": "https://registry.npmjs.org/typescript-language-server/-/typescript-language-server-6.1.0.tgz"
+    }
+   ],
+   "files": {
+    "dl/npm/package-lock.json": "{\"name\":\"entry\",\"lockfileVersion\":3,\"requires\":true,\"packages\":{\"\":{\"dependencies\":{\"pyright\":\"^1.1.414\",\"typescript\":\"^5.9.3\",\"typescript-language-server\":\"^6.1.0\"}},\"node_modules/fsevents\":{\"version\":\"2.3.3\",\"resolved\":\"https://registry.npmjs.org/fsevents/-/fsevents-2.3.3.tgz\",\"integrity\":\"sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==\",\"hasInstallScript\":true,\"license\":\"MIT\",\"optional\":true,\"os\":[\"darwin\"],\"engines\":{\"node\":\"^8.16.0 || ^10.6.0 || >=11.0.0\"}},\"node_modules/pyright\":{\"version\":\"1.1.414\",\"resolved\":\"https://registry.npmjs.org/pyright/-/pyright-1.1.414.tgz\",\"integrity\":\"sha512-FPZZb51jepDX4eP7TEYDeNFtmE3WgwkkEcJpvH3/QmUSsj0EAy3LXu+xB4T/FWDejtsXlCfFr/rbWFjwuwuXww==\",\"license\":\"MIT\",\"bin\":{\"pyright\":\"index.js\",\"pyright-langserver\":\"langserver.index.js\"},\"engines\":{\"node\":\">=14.0.0\"},\"optionalDependencies\":{\"fsevents\":\"~2.3.3\"}},\"node_modules/typescript\":{\"version\":\"5.9.3\",\"resolved\":\"https://registry.npmjs.org/typescript/-/typescript-5.9.3.tgz\",\"integrity\":\"sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==\",\"license\":\"Apache-2.0\",\"bin\":{\"tsc\":\"bin/tsc\",\"tsserver\":\"bin/tsserver\"},\"engines\":{\"node\":\">=14.17\"}},\"node_modules/typescript-language-server\":{\"version\":\"6.1.0\",\"resolved\":\"https://registry.npmjs.org/typescript-language-server/-/typescript-language-server-6.1.0.tgz\",\"integrity\":\"sha512-/O/dr2CbvDS1W9jKJcBQxk4WagUQ97oBb8k/eq9cOslsbtAuC2BDPpkcULxE2SEZiPIJvVNLeNjLZe9hQl1zCQ==\",\"license\":\"Apache-2.0\",\"bin\":{\"typescript-language-server\":\"lib/cli.mjs\"},\"engines\":{\"node\":\">=22.22.2\"}}}}\n",
+    "dl/npm/package.json": "{\n  \"private\": true,\n  \"dependencies\": {\n    \"pyright\": \"^1.1.414\",\n    \"typescript\": \"^5.9.3\",\n    \"typescript-language-server\": \"^6.1.0\"\n  }\n}\n"
+   },
    "kind": "command",
+   "lock": [
+    {
+     "kind": "npm",
+     "requirements": [
+      "pyright",
+      "typescript-language-server",
+      "typescript@5"
+     ],
+     "to": "dl/npm"
+    }
+   ],
    "requires": "npm",
    "run": [
     "sh",
-    "-c",
-    "npm install --prefix \"$1\" --no-audit --no-fund --loglevel=error pyright@latest typescript-language-server@latest typescript@5",
+    "-ec",
+    "d=\"$1\"; t=\"$(mktemp -d)\"; npm cache add --cache \"$t\" --no-update-notifier \"$d\"/dl/npm/*.tgz >/dev/null; cp \"$d\"/dl/npm/package.json \"$d\"/dl/npm/package-lock.json \"$d\"/; npm ci --offline --cache \"$t\" --ignore-scripts --no-audit --no-fund --no-update-notifier --loglevel=error --prefix \"$d\"; rm -rf \"$t\" \"$d\"/dl",
     "--",
     "{dir}"
    ]

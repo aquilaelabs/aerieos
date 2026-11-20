@@ -267,7 +267,9 @@ class Shipped(sdkstore.KitCase):
             else:
                 self.assertEqual(plan[:1], ["net\x1fcut\x1f"] if sdkmeta.held_by_entry(r) or declares else [], name)
             self.assertEqual([ln.split("\x1f")[0] for ln in plan[1:]], [("fetch" if sdkmeta.on_platform(f.get("platform")) else "skip") for f in declares], name)
-        self.assertEqual((sdkmeta.declared_plan(rows["playwright"]), sdkmeta.held_by_entry(rows["playwright"])), ([], False))
+        # A command has no download of its own to hold: what it declares is what cuts it, or its sentence keeps the network.
+        self.assertEqual((sdkmeta.declared_plan(rows["language-servers"])[0], sdkmeta.held_by_entry(rows["language-servers"])), ("net\x1fcut\x1f", False))
+        self.assertEqual((sdkmeta.declared_plan(rows["playwright"])[0].split("\x1f")[:2], sdkmeta.held_by_entry(rows["playwright"])), (["net", "online"], False))
         tools = rows["android-tools"]
         self.assertEqual((sdkmeta.held_by_entry(tools), tools["source"]["kind"], "online" in tools["source"]), (True, "script", False),
                          "the program that installs every Android package is itself a pinned file, unpacked with no network")
