@@ -83,6 +83,19 @@ Every field is in [Writing one](tool-packs.md#writing-one); what a verb may
 run is in [Verbs](tool-packs.md#verbs). A new version of the tool is a new
 commit of your pack, and a new pin in the catalog.
 
+**Every download is held.** A script that fetches for itself, as the one
+above does, is held by nothing AerieOS can see, and the pack's card says
+**open**. From pack format 5 the manifest declares each file instead
+(`install.fetch`: its address, the sha256 of what the address answers or
+its publisher's signature, and where in the pack it is kept); AerieOS
+fetches and checks each one, and the steps then run with no network. The
+card of such a pack says **pinned**. One whose pinned installer has to
+download the rest from its vendor says so in one sentence
+(`install.online`), and its card says **installer**, with the sentence.
+The word is on the card before anybody adds the pack, and **Look** shows
+it for yours. Aim for pinned:
+[Declared downloads](tool-packs.md#declared-downloads) has each shape.
+
 ## A coding agent
 
 A coding agent is a tool pack whose manifest also carries an `agent` block:
@@ -171,7 +184,9 @@ From pack format 5 every image is named by its digest,
 manifest list where the image is built for several platforms, so one
 reference serves each of them. A node pulls and runs that digest, and the
 tag beside it is what a person reads. An app that names an image by its
-tag alone is refused at format 5, with the image named.
+tag alone is refused at format 5, with the image named. An app whose every
+image carries its digest reads **pinned** on its card; one held by tags
+alone reads **open** ([Images by digest](tool-packs.md#images-by-digest)).
 
 From pack format 4 an app declares its own `fields`, which New container
 draws as the app's panel, in their order: each the variable it fills
@@ -287,6 +302,7 @@ AerieOS's own validators as every supported release carries them.
    | `sha256` | Of the archive at that commit: `git archive --format=tar COMMIT \| sha256sum`, or `git archive --format=tar COMMIT PATH \| sha256sum` with a `path`. |
    | `tier` | `vetted`. A maintainer sets `verified` for a vendor `verified-vendors.json` lists. |
    | `format` | The manifest's `format`, when it is more than 1. |
+   | `held` | What the manifest's downloads are held to, the word **Look** shows for your pack: `pinned`, `installer` or `open`. With `installer`, `online` repeats the manifest's sentence. |
    | `works_with` | The manifest's `works_with`, when it names any: an install on another release line does not list the entry. |
    | `kind` | `"app"` for a Docker app; left out for a pack. |
    | `agent`, `label` | `true` and the agent's name, for a pack that brings a coding agent. |
@@ -370,6 +386,15 @@ from whom it says. It is not a promise about the tool itself.
 - **What is there is never rewritten.** The framework only grows: a
   manifest valid today is valid on every later AerieOS, so no change to
   AerieOS or to the catalog will ask you to rewrite an entry.
+- **A move to a newer format keeps the pin you had.** When an update's
+  manifest needs a newer pack format than the entry said, the installs on
+  releases that read only the earlier format are still offered your pack:
+  the pin the entry had stays in the index beside the new one (`older`),
+  written there by the maintainers' tools, and each install takes the
+  newest pin it reads. The earlier commit must stay in your repository for
+  as long as that pin is listed. It is dropped once every AerieOS release
+  the catalog still lists reads the newer format
+  ([An entry's older pins](tool-packs.md#an-entrys-older-pins)).
 - **Say which AerieOS it works with only when you must.** A manifest with
   no `works_with` works with every release line. One that names lines is
   shown only on those, and on an install that upgrades past them a kept

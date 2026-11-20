@@ -344,7 +344,12 @@ toolchain, an official pack, a vetted one and one you sideload:
 
 `/api/toolchains` answers it for every row as `held` (`word` and `why`),
 the Library's rows pass it on, and **Look** answers it for a pack before it
-is added. Beside it each answers the entry's declared downloads as
+is added. An entry of the catalog's index says the word too (`held`, and
+with `installer` the manifest's sentence as `online`), so the card of a
+pack or an app not kept here yet says it before anything is fetched: its
+row carries `held` the same way, the `why` an installer's own sentence,
+and for `open` one sentence that says something is held to nothing, with
+the part named once the pack is looked at. Beside it each answers the entry's declared downloads as
 `downloads`, a row a download: the file it is kept as (`to`), its address
 (`url`), how it is held (`held`: `sha256` with the digest in `sha256`, or
 `signed` with the keys' name in `keys` and the signature's address in
@@ -549,7 +554,8 @@ this way, and one that does not is refused with the image named. An app
 written in an earlier format means what it meant: each image pinned to a
 tag that is not `latest`. A compose file of your own is held to the same
 two: a digest, or a tag that is not `latest`. An app whose every image has
-its digest reads **pinned**, as a tool whose every download is held does.
+its digest reads **pinned**, as a tool whose every download is held does,
+and its entry in the index says so, so its card does before it is kept.
 
 AerieOS's own services are held the same way: the model router, nginx and
 the Scanners each name every image they run in their entry's `images`, a
@@ -766,6 +772,10 @@ whoever writes a pack:
   as it is written in a format installs already read: a tool, a Docker app,
   a coding agent with words of its own are each a signed commit to the
   catalog.
+- **A pack that moves to a newer format keeps serving the installs that
+  read the one before.** Its entry keeps the pin of the manifest written in
+  the earlier format beside the new one, and each install is offered the
+  newest it reads ([An entry's older pins](#an-entrys-older-pins)).
 
 ### The framework's version
 
@@ -858,6 +868,75 @@ release shipped. The catalog's own check holds every entry to each AerieOS
 release still supported, so an entry is signed only when the oldest install
 that reads its format takes it as the newest does.
 
+### An entry's older pins
+
+An entry of the index pins one manifest: the commit it is at, the sha256
+of its archive, and what the entry repeats of that manifest so a card can
+say it before anything is fetched. The entry's own keys are its newest
+pin. When a pack moves to a newer pack format, the installs on releases
+that read only the earlier one would be left with a card that says what it
+needs and nothing to add. So the entry keeps the pin it had, under
+`older`, newest first. The earlier manifest is still in the pack's
+repository at its earlier commit, so nothing is copied:
+
+```json
+{"name": "hexkit", "url": "https://github.com/you/hexkit-pack", "tier": "vetted", "maker": "Hexkit Project",
+ "about": "Looks inside binaries: dumps, strings, headers.", "withdrawn": false,
+ "format": 6, "framework": "6.0", "commit": "89ab...", "sha256": "5e1f...", "platforms": ["linux/amd64", "linux/arm64"], "held": "pinned",
+ "older": [
+   {"format": 5, "framework": "5.2", "commit": "0123...", "sha256": "9c4d...", "platforms": ["linux/amd64"], "held": "installer",
+    "online": "Its installer downloads the build for this machine from the project's releases."}
+ ]}
+```
+
+What moves with a pin is what is the pinned manifest's: `format`,
+`framework`, `commit`, `sha256`, `platforms`, `label`, `works_with`,
+`held` with `online`, and a shipped recipe's rev (`install_rev`,
+`shipped_rev`). A pin is whole: an older one says each of those its
+manifest gave the entry, and takes nothing from the pin beside it. What is
+the entry's own is said once: its name, where it is kept (`url`, `path`),
+its `kind`, its `tier`, its `maker`, what it is `about`, its `topics`, the
+day it was `added` and whether it is `withdrawn`. `older` lists up to
+eight pins, each with its `format`, `commit` and `sha256`, the formats
+going down from below the entry's own with none twice.
+
+An install takes the newest pin whose format it reads, and everything it
+does with the entry is done with that pin: the card and its Install, a
+Manifest update of a pack kept from it, a kept app's newer definition, a
+shipped toolchain's or a coding agent's newer recipe, a mirror's import.
+It says nothing of a newer pin it cannot use, and a pack kept from an older
+pin is offered the newer one by the first AerieOS that reads it. An entry
+with no pin an install reads is not listed there, as before. An `older`
+that is not written as above is left out whole by an install and the
+entry kept: its newest pin is as good as it was, an install too old for
+that pin is left with nothing to add, and what the entry says of itself,
+that it is withdrawn above all, is never lost with it.
+
+**When an older pin goes.** Every listed release takes the newest pin
+whose format it reads, so an older pin is still needed while some release
+the catalog lists (`aerieos-releases`) is answered that pin. It goes once
+every listed release reads the format of the pin after it, which is when
+the last release that read only the older format is taken off the list.
+The catalog serves the releases from the first that reads `older`
+forward: a release from before it reads an entry's own keys alone.
+
+Nobody writes any of this by hand. `tools/packs-export.py --catalog DIR
+--entry FOLDER` writes the entry of any folder under the catalog's
+`packs/` from that folder's own manifest at a commit, read as an install
+reads it, with the sha256 an install holds the folder to, and keeps what
+is the entry's own; `--index` does the same for every official pack. A pin
+is placed by its format: one past the entry's newest becomes the newest
+and the pin that was there is kept under `older`, one in the newest's
+format takes its place, and one in an earlier format (`--commit REF`, a
+commit where the folder holds the earlier manifest) takes that format's
+older pin. An older pin is dropped only by `--drop-older N`, which names
+the format. The pins inside the catalog's packs are moved by
+`tools/pins.py --catalog DIR`, the four verbs of
+[Moving a pin](toolchains.md#moving-a-pin) over every folder: a pack's
+declared downloads and what it asks a package manager for, a shipped
+toolchain's recipe, a coding agent's install recipe, a service's images
+and the images a Docker app's compose names.
+
 ## The vetted catalog
 
 To put a pack, a coding agent or an app of yours into it, see
@@ -948,7 +1027,8 @@ else is a pack by address, Sideloaded.
 ### What is not for this AerieOS
 
 The Library shows what this install can take, and nothing else. A catalog
-entry written in a pack format past the one this AerieOS reads, or one
+entry with no pin in a pack format this AerieOS reads
+([An entry's older pins](#an-entrys-older-pins)), or one
 whose `works_with` names other release lines than this one, is not listed;
 the page's head counts them (**Not for this AerieOS**), so a person knows a
 newer AerieOS would show more. A newer pin of a pack already kept is
@@ -969,7 +1049,9 @@ A controller that cannot reach the catalog installs from a mirror of it.
 `tools/catalog-mirror.py catalog-mirror.tar.gz`, run on a machine with the
 network (from a checkout of AerieOS), reads the catalog's index, checks
 its signature, and fetches every repository the index pins at each commit it
-pins, into one archive: the index as signed and a git bundle per repository.
+pins, an entry's older pins among them, into one archive: the index as
+signed and a git bundle per repository. An import holds the mirror to the
+pin the importing AerieOS takes of each entry.
 `--from-dir` reads the index from a checkout of the catalog instead.
 
 Controller settings' **Vetted catalog** imports it with **Import a mirror**.
