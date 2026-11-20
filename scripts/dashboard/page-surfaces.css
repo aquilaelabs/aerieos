@@ -1980,10 +1980,16 @@ body.firstrun #panes{display:none}
    reach (inert). Off under reduced motion, where the faces swap. */
 .pcard.pflip{display:grid;perspective:1400px}
 .pcard.pflip>.pcface{grid-area:1/1;display:flex;flex-direction:column;gap:4px;min-width:0;
-  backface-visibility:hidden;-webkit-backface-visibility:hidden;transition:transform .42s cubic-bezier(.33,1,.68,1)}
+  backface-visibility:hidden;-webkit-backface-visibility:hidden;transition:transform .42s cubic-bezier(.33,1,.68,1),visibility 0s}
 .pcard.pflip>.pcback{transform:rotateY(180deg)}
 .pcard.pflip.flipped>.pcfront{transform:rotateY(-180deg)}
 .pcard.pflip.flipped>.pcback{transform:none}
+/* The face away is also taken out of the picture once it has turned, and
+   the face arriving is put back as the turn starts: an engine painting
+   with no 3D compositing culls no back face, and drew the face away
+   mirrored through the one on show. */
+.pcard.pflip>.pcback,.pcard.pflip.flipped>.pcfront{visibility:hidden;transition-delay:0s,.42s}
+.pcard.pflip.flipped>.pcback{visibility:visible;transition-delay:0s}
 /* The compact view: a folded card is its name line alone, its back not
    drawn at all (a face kept behind it held the card at its full height),
    its whole face a press that opens it; a card in a row beside an open one

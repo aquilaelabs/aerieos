@@ -569,6 +569,15 @@ await section("a project's card on the Projects page, at a phone and at a desk",
   }, `${card} .pcback`, { timeout: 3000 }).then(h => h.jsonValue(), async () => page.$$eval(`${card} .pcback`, es => JSON.stringify(es.map(e =>
     ({ t: getComputedStyle(e).transitionProperty, conn: e.isConnected, par: e.parentElement?.className, ghost: !!e.closest('.fghost') })))));
   ok(/transform/.test(turn) && !/^\[/.test(turn), `...on a tween of its transform (${turn})`);
+  // The face away is not painted at all once the turn ends: an engine with
+  // no 3D compositing culls no back face, and drew the one away mirrored
+  // through the one on show (B1038).
+  const faces = await page.waitForFunction(sel => {
+    const c = document.querySelector(sel), v = e => getComputedStyle(e).visibility;
+    return !!c && v(c.querySelector(':scope > .pcfront')) === 'hidden' && v(c.querySelector(':scope > .pcback')) === 'visible'
+      && [...document.querySelectorAll('.pcard.pflip:not(.flipped):not(.compact)')].every(o => v(o.querySelector(':scope > .pcfront')) === 'visible' && v(o.querySelector(':scope > .pcback')) === 'hidden');
+  }, card, { timeout: 3000 }).then(() => true, () => false);
+  ok(faces, '...and a face turned away is not painted: the turned card\'s front, and every other card\'s back');
   await page.setViewportSize({ width: 1280, height: 1000 });
   await atWidth(1280);
   // The turn over: measured mid-turn, the icons of a face still swinging
