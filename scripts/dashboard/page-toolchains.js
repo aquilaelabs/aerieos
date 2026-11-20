@@ -72,7 +72,7 @@ let tcNode = "";
 // on every load, so a node retired under a page is not read as if it were
 // still there.
 function tcPick(){
-  const live = (nodesList || []).filter(n => n.kind === "agent" && n.state !== "retired");
+  const live = liveAgents();
   if (tcNode === "local") return tcNode;
   let want = tcNode;
   if (!live.some(n => n.id === want)){

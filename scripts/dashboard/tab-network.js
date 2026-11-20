@@ -34,18 +34,18 @@ function networkReach(){
     ["Port", location.port || (location.protocol === "https:" ? "443" : "80")],
     ["Served over", served],
     ["Hostname", host || "none set"],
-    ["Nodes", String((nodesList || []).filter(n => n.kind === "agent" && n.state !== "retired").length)]]});
+    ["Nodes", String(liveAgents().length)]]});
 }
 
 // The dial section's status: how many of the nodes answer.
 function networkDialStatus(){
   if (nodesList === null) return "";
-  const rows = (nodesList || []).filter(n => n.kind === "agent" && n.state !== "retired");
+  const rows = liveAgents();
   return `${rows.filter(n => n.live).length} of ${rows.length} answering`;
 }
 
 function networkDial(){
-  const rows = (nodesList || []).filter(n => n.kind === "agent" && n.state !== "retired");
+  const rows = liveAgents();
   if (nodesList === null) return `<div class="field">${skRows(2)}</div>`;
   if (!rows.length) return `<div class="empty">No node yet. Enroll node, on the Nodes page, makes the script that adds a machine; the address it dials is the one this page is reached at, or the hostname Reach from outside names.</div>`;
   const cols = [{label: "Node"}, {label: "Dials in from"}, {label: "Seen"}, {label: "Reaches the controller"}];

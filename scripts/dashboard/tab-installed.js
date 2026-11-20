@@ -24,30 +24,17 @@ function openInstalledTab(){
 // ...on a node somebody named (a project's Sign in on NODE, the bell), the
 // agent's row open on its sign-in once the rows land.
 function openInstalledOn(id, agent = "", row = ""){
-  if (id && id !== instNode){ instNode = id; inst = null; }
   // ...or any thing's own page by its key (service:model-router, R181: a
-  // system container's Configure), at its Configure.
+  // system container's Configure), at its Configure, on that node.
   if (row){ openThing(id, row, "configure"); return; }
   if (agent) instWantAgent = agent;
-  if (!(nodesList || []).some(n => n.id === id)) nodesStale = true;
-  try{ localStorage.setItem(PAGE_KINDS.installed.keep, id); }catch(e){ /* private */ }
-  const was = location.hash;
-  openInstalledTab();
-  readMoved("installed");
-  const to = routeOf(tabOf(panes[0]));
-  if (to && to !== was) shellPush(to);
-  loadInstalled();
+  openKindOn("installed", id);
 }
 
 // The node the page opens on: the one it showed last, else the Library's,
 // else the first agent node.
 function instPick(){
-  const live = (nodesList || []).filter(n => n.kind === "agent" && n.state !== "retired");
-  let want = instNode;
-  if (!live.some(n => n.id === want)){
-    try{ want = localStorage.getItem(PAGE_KINDS.installed.keep) || localStorage.getItem(PAGE_KINDS.library.keep) || ""; }catch(e){ want = ""; }
-  }
-  if (!live.some(n => n.id === want)) want = live[0]?.id || "";
+  const live = liveAgents(), want = keptNode("installed", {have: live, also: PAGE_KINDS.library.keep});
   instNode = want;
   // The toolchain job's verbs act on tcNode; the pack dialogs read its rows.
   if (want && want !== tcNode){ tcNode = want; toolchains = null; }

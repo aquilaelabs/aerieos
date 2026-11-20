@@ -634,6 +634,46 @@ function machinesLive(kind = ""){
 function machinesNode(kind){
   return NODE_PICKED[kind]?.() || "";
 }
+// Every node with an agent that is not retired: what a page about a node's
+// own tools picks from and counts (the Library, Installed, Files, the
+// Emulator, a CI runner, the nodes that dial in). One not yet enrolled,
+// switched off, hosting only or quiet is among them, and says so where it
+// is drawn.
+function liveAgents(){
+  return (nodesList || []).filter(n => n.kind === "agent" && n.state !== "retired");
+}
+// The node a page opens on: the one it shows now (`cur`) while that is among
+// the nodes there are (`have`, each named by `idOf`), else the one this
+// browser kept for it (its record's keep, then the key `also` names), else
+// `fallback` where the page has one, else the first there is, else "".
+// Asked on every load and draw, so a node retired under a page is not shown
+// as if it were still there.
+function keptNode(kind, {have = liveAgents(), idOf = n => n.id, cur = PAGE_KINDS[kind].node(), also = "", fallback} = {}){
+  const there = id => have.some(n => idOf(n) === id);
+  let want = cur;
+  if (!there(want)){
+    try{ want = localStorage.getItem(PAGE_KINDS[kind].keep) || (also && localStorage.getItem(also)) || ""; }catch(e){ want = ""; }
+  }
+  if (!there(want) && fallback !== undefined) want = fallback;
+  if (!there(want)) want = (have.length && idOf(have[0])) || "";
+  return want;
+}
+// A page opened on a node somebody named (the bell's rows, a node's page, a
+// space's Sign in on NODE): the node set and kept, the page opened with its
+// address pushed as a press pushes it, and read for that node. A node the
+// list does not hold yet is read for first (B754's lesson).
+function openKindOn(kind, id){
+  const k = PAGE_KINDS[kind];
+  if (id) k.setNode(id);
+  if (!(nodesList || []).some(n => n.id === id)) nodesStale = true;
+  try{ localStorage.setItem(k.keep, id); }catch(e){ /* private */ }
+  const was = location.hash;
+  k.open();
+  readMoved(k.moved);
+  const to = routeOf(tabOf(panes[0]));
+  if (to && to !== was) shellPush(to);
+  k.load();
+}
 // One node per group (the operator, 29 Oct: the header's pick is the node
 // every sub-tab of the group shows). A page whose own node differs from the
 // group's is moved to it when it is drawn, read again for it; a page an

@@ -2255,7 +2255,7 @@ function renderRunnerInto(i){
     drawHTML(d.list, skTpl(`<div class="ndrow runnerpanel"><div class="ndruns"><div class="field ndrunhead"><b>Runners</b><span class="sp"></span><span class="actbar ndrunadd"><button type="button" class="primary" disabled>Add runner</button></span></div>${skRows(1)}</div></div>`));
     return;
   }
-  const ns = (nodesList || []).filter(n => n.kind === "agent" && n.state !== "retired");
+  const ns = liveAgents();
   const has = n => (n.reported?.services?.runners || []).length || Object.keys(n.services?.runners || {}).length;
   if (!ns.some(n => n.id === runnerNode)) runnerNode = (ns.find(has) || ns[0])?.id || "";
   const n = ns.find(x => x.id === runnerNode);

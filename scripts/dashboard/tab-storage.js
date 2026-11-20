@@ -47,13 +47,8 @@ function loadStorage(){
 // browser), else the first in the answer, else nothing.
 function storagePick(){
   const have = storageList || [];
-  let want = storageNode;
-  if (!have.some(n => n.node === want)){
-    try{ want = localStorage.getItem(PAGE_KINDS.storage.keep) || ""; }catch(e){ want = ""; }
-  }
-  if (!have.some(n => n.node === want)) want = have[0]?.node || "";
-  storageNode = want;
-  return have.find(n => n.node === want) || null;
+  storageNode = keptNode("storage", {have, idOf: n => n.node});
+  return have.find(n => n.node === storageNode) || null;
 }
 
 // MB as a person reads it: TB above ten million, GB from one (a decimal

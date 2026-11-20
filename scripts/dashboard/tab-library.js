@@ -92,30 +92,19 @@ function openLibrary(){
 // ...on a node somebody named (the bell's rows, a node's page): read for
 // first when the page has not listed it yet (B754's lesson).
 function openLibraryOn(id, agent = ""){
-  if (id && id !== libNode){ libNode = id; lib = null; }
   // A door that names a coding agent (a project's Sign in on NODE, the
   // bell's row) opens that agent's card on its sign-in once the rows land.
   if (agent) libWantAgent = agent;
-  if (!(nodesList || []).some(n => n.id === id)) nodesStale = true;
-  try{ localStorage.setItem(PAGE_KINDS.library.keep, id); }catch(e){ /* private */ }
-  const was = location.hash;
-  openLibrary();
-  readMoved("library");
-  const to = routeOf(tabOf(panes[0]));
-  if (to && to !== was) shellPush(to);
-  loadLibrary();
+  openKindOn("library", id);
 }
 
 // The node the page opens on: the one it showed last, else the first agent
 // node, as the Toolchains page picked. The toolchain and pack verbs act on
 // tcNode, so the pick is theirs too.
 function libPick(){
-  const live = (nodesList || []).filter(n => n.kind === "agent" && n.state !== "retired");
-  let want = libNode;
-  if (!live.some(n => n.id === want)){
-    try{ want = localStorage.getItem(PAGE_KINDS.library.keep) || localStorage.getItem("bb.tcnode") || ""; }catch(e){ want = ""; }
-  }
-  if (!live.some(n => n.id === want)) want = live[0]?.id || "";
+  // ...and where this browser kept none, the one a node's toolchains were
+  // last read for (tcPick's key).
+  const live = liveAgents(), want = keptNode("library", {have: live, also: "bb.tcnode"});
   libNode = want;
   if (want && want !== tcNode){ tcNode = want; toolchains = null; tcDriverPick = ""; }
   return live.find(n => n.id === want) || null;

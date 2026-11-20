@@ -1019,7 +1019,7 @@ async function askReset(){
   const modal = $("resetmodal"), body = $("resetBody");
   if (!modal || !body) return;
   try { await loadNodes(); } catch {}
-  const list = (nodesList || []).filter(n => n.kind === "agent" && n.state !== "retired");
+  const list = liveAgents();
   const shut = () => { modal.hidden = true; body.innerHTML = ""; };
   drawHTML(body, `<div class="field">
       <div class="hint bad">Accounts, nodes, space settings, tokens, the notebook, memories and logs move into a dated

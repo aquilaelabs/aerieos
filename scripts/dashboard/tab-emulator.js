@@ -24,18 +24,11 @@ function openEmulator(){
 // The node the tab opens on: the one it showed last, else the first agent
 // node that has what the tab needs, else the first agent node.
 function emuPick(){
-  const live = (nodesList || []).filter(n => n.kind === "agent" && n.state !== "retired");
-  let want = emuNode;
-  if (!live.some(n => n.id === want)){
-    try{ want = localStorage.getItem(PAGE_KINDS.emulator.keep) || ""; }catch(e){ want = ""; }
-  }
   // The server names the node this tab is FOR: one that can hold an image,
   // and the one that already does when there is one. Which platforms the
   // Android recipes are packaged for is the catalog's answer, not a rule to
   // keep a second copy of here.
-  if (!live.some(n => n.id === want)) want = state?.emulator?.node || "";
-  if (!live.some(n => n.id === want)) want = live[0]?.id || "";
-  emuNode = want;
+  emuNode = keptNode("emulator", {fallback: state?.emulator?.node || ""});
   return emuNode;
 }
 
@@ -213,7 +206,7 @@ function renderEmulatorInto(i){
 
     return;
   }
-  const pnodes = (nodesList || []).filter(n => n.kind === "agent" && n.state !== "retired");
+  const pnodes = liveAgents();
   const pnode = pnodes.find(n => n.id === emuNode) || {};
   const stale = nodeStale(pnode);
   const job = d.job || {};

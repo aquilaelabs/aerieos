@@ -29,7 +29,7 @@ function renderDebugInto(i){
   if (!d) return;
   d.setBar("");
   if (nodesList === null) nodesKnown();
-  const nodes = (nodesList || []).filter(n => n.kind === "agent" && n.state !== "retired");
+  const nodes = liveAgents();
   const dev = debugDev ?? !!state?.settings?.settings?.offer_unvetted?.value;
   // A project with a repository: the grants are saved through it, as its
   // settings saved them.

@@ -104,13 +104,8 @@ async function nginxAct(body){
 // draw, so a node retired under the tab is not shown as if it were there.
 function nginxPick(){
   const have = nginxList || [];
-  let want = nginxNode;
-  if (!have.some(n => n.node === want)){
-    try{ want = localStorage.getItem(PAGE_KINDS.nginx.keep) || ""; }catch(e){ want = ""; }
-  }
-  if (!have.some(n => n.node === want)) want = have[0]?.node || "";
-  nginxNode = want;
-  return have.find(n => n.node === want) || null;
+  nginxNode = keptNode("nginx", {have, idOf: n => n.node});
+  return have.find(n => n.node === nginxNode) || null;
 }
 
 // A route as a row of fields: hostname, path, port, TLS, and Remove.

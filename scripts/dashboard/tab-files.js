@@ -25,12 +25,7 @@ function openFilesTab(){
 
 // The node the page opens on: the one it showed last, else the first.
 function flPick(){
-  const live = (nodesList || []).filter(n => n.kind === "agent" && n.state !== "retired");
-  let want = flNode;
-  if (!live.some(n => n.id === want)){
-    try{ want = localStorage.getItem(PAGE_KINDS.files.keep) || ""; }catch(e){ want = ""; }
-  }
-  if (!live.some(n => n.id === want)) want = live[0]?.id || "";
+  const live = liveAgents(), want = keptNode("files", {have: live});
   if (want !== flNode){ flNode = want; flRoot = ""; flPath = ""; flSel.clear(); }
   return live.find(n => n.id === want) || null;
 }
