@@ -829,6 +829,12 @@ class ConfigPlaneMixin:
         who = self.session_account()
         root = tc_root(self.state)
         ctl = (self.ctl.url or "").rstrip("/")
+        # The controller's key where this node pinned it, so a shell at the
+        # console holds the controller to it as a session does. Only that
+        # form: it is made of base64's characters, and it outlives the
+        # controller's certificates, which a pinned certificate would not.
+        pin = str(self.state.get("pin") or "")
+        pin = pin if re.fullmatch(r"sha256//[A-Za-z0-9+/]{43}=", pin) else ""
         text = (
             "# Written by AerieOS's agent. A session on this node, at a console.\n"
             'case "$(id -un)" in\n'
@@ -836,6 +842,7 @@ class ConfigPlaneMixin:
             "        export BUILDERBOT_ROLE=node WORKSPACE=/workspace\n"
             '        export BB_NODE="$(hostname)"\n'
             + (f'        export BB_CONTROLLER="{ctl}"\n' if ctl else "")
+            + (f'        export BB_CONTROLLER_PIN="{pin}"\n' if ctl and pin else "")
             + (f'        [ -d "{root}/.bb/current/scripts" ] \\\n'
                f'            && PATH="{root}/.bb/current/scripts:$PATH"\n' if root else "")
             + '        PATH="$HOME/.local/bin:$PATH"\n'

@@ -5317,7 +5317,10 @@ cmd_browser() {
 # token and refused it, and anybody's page there would have had it too.
 capture_trust() {
     if [ -n "${BB_CONTROLLER:-}" ]; then
-        printf '%s' "$BB_CONTROLLER" | sed -E 's#^(https?://[^/]+).*#\1#'
+        # Under both schemes: the controller's one port answers http and
+        # https, and a node's channel may be either (its agent moves it to
+        # https by itself), so the page is the controller's own at both.
+        printf '%s' "$BB_CONTROLLER" | sed -E 's#^https?://([^/]+).*#http://\1,https://\1#'
     else
         printf 'http://127.0.0.1:%s,http://localhost:%s' "${DASHBOARD_PORT:-7680}" "${DASHBOARD_PORT:-7680}"
     fi

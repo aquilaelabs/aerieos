@@ -2011,7 +2011,7 @@ function ndRowHtml(n, lead = ""){
       ? `${n.reported.cpu} cpu · ${Math.round((n.reported.mem_mb || 0) / 1024)} GB`
       : "";
     const where = n.kind === "local" ? "this container"
-      : n.agent?.addr ? `dials in from ${n.agent.addr}` : "";
+      : n.agent?.addr ? `dials in from ${n.agent.addr}${n.channel_said ? `, ${n.channel_said}` : ""}` : "";
     // Behind when the node's agent is not the file this controller ships.
     // Said on the row before anybody presses anything: a five-version-old
     // agent otherwise looks exactly like a current one.

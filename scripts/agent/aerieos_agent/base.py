@@ -57,6 +57,11 @@ SESSION = {}
 # node's log left its row on the controller saying nothing.
 REFUSED = {}
 REFUSED_MOST = 200
+# Why this node's channel to its controller is still plain http, as one
+# phrase, while the controller names a key to pin and the move to https
+# under it has not been made (the agent's channel_move): {"why": ...}, empty
+# once it has moved or where nothing was named. The census says it.
+CHANNEL = {}
 # What the screen relay says of itself in the hello (census, R243): its
 # certificate's sha256 once it has one, which the controller pins, and that
 # it takes a signed request once. Set by screen.py.

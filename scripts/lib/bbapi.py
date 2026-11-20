@@ -13,9 +13,11 @@ So this is where those changes live:
   * the URL is BB_CONTROLLER when set (the agent exports it into every
     session it starts), the loopback otherwise;
   * https is verified by PIN, not by CA, exactly as the node agent verifies
-    it: BB_CONTROLLER_PIN is the certificate digest the node learned at
-    enrollment, and a different one is refused. No pin and https is allowed
-    and unverified, which is the node's own choice at enrollment, repeated here;
+    it: BB_CONTROLLER_PIN is the pin the node holds, the controller's key
+    (KEY_PIN's form, which any certificate over that key passes) or the
+    certificate digest the node learned at enrollment, and a different one
+    is refused. No pin and https is allowed and unverified, which is the
+    node's own choice at enrollment, repeated here;
   * the auth header is whatever bb_auth_or_die produced: a session token
     (Bearer) or a name:password for the command (Basic).
 
@@ -69,6 +71,53 @@ def keep_token(tok):
     return ""
 
 
+# A pin of the controller's key, as the node agent reads it (its
+# controller.py, which says why): this, then the base64 of the sha256 of
+# the certificate's SubjectPublicKeyInfo. The agent hands a session this
+# form only where this file reads it (it looks for this line).
+KEY_PIN = "sha256//"
+
+
+def _tlv(buf, at):
+    """(tag, where its value starts, where it ends) of the DER element at `at`."""
+    tag, n = buf[at], buf[at + 1]
+    at += 2
+    if n & 0x80:
+        k = n & 0x7F
+        if not 1 <= k <= 4:
+            raise ValueError("not a DER length")
+        n = int.from_bytes(buf[at:at + k], "big")
+        at += k
+    if at + n > len(buf):
+        raise ValueError("a DER element runs past its buffer")
+    return tag, at, at + n
+
+
+def key_pin_of(der):
+    """The pin of the key a DER certificate carries, or "": its
+    SubjectPublicKeyInfo found by stepping over the fields before it, as
+    the agent finds it (controller.spki_of; a test holds the two, and
+    bb-session's, to each other and to the cryptography library)."""
+    try:
+        tag, at, end = _tlv(der, 0)
+        if tag != 0x30:
+            return ""
+        tag, at, end = _tlv(der, at)
+        if tag != 0x30:
+            return ""
+        tag, _, after = _tlv(der, at)
+        if tag == 0xA0:
+            at = after
+        for _ in range(5):
+            _, _, at = _tlv(der, at)
+        tag, _, after = _tlv(der, at)
+        if tag != 0x30 or after > end:
+            return ""
+    except (IndexError, ValueError, TypeError):
+        return ""
+    return KEY_PIN + base64.b64encode(hashlib.sha256(bytes(der[at:after])).digest()).decode()
+
+
 def url():
     return (os.environ.get("BB_CONTROLLER")
             or f"http://127.0.0.1:{os.environ.get('DASHBOARD_PORT', '7680')}").rstrip("/")
@@ -104,7 +153,14 @@ def _conn(timeout):
     # Pinned on first use, see the agent.
     c = http.client.HTTPSConnection(u.hostname, port, timeout=timeout, context=ctx)  # nosemgrep: python.lang.security.audit.httpsconnection-detected.httpsconnection-detected
     c.connect()
-    seen = "sha256:" + hashlib.sha256(c.sock.getpeercert(True)).hexdigest()
+    der = c.sock.getpeercert(True)
+    if pin.startswith(KEY_PIN):
+        # The controller's key: any certificate over it, and no other.
+        if key_pin_of(der) != pin:
+            c.close()
+            raise OSError(f"controller key changed: pinned {pin[:19]}…, presented another")
+        return c, u.path.rstrip("/")
+    seen = "sha256:" + hashlib.sha256(der).hexdigest()
     if pin and seen != pin:
         c.close()
         raise OSError(f"controller certificate changed: pinned {pin[:19]}…, "

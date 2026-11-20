@@ -1878,6 +1878,52 @@ def check_net(c):
 # change: the check is this file's own, and bb-tty runs from the root-owned
 # copy the agent keeps.
 TOKEN = re.compile(r"bbs_[A-Za-z0-9_-]{8,200}")
+# A pin of the controller's key, as the node agent reads it (its
+# controller.py, which says why): this, then the base64 of the sha256 of
+# the certificate's SubjectPublicKeyInfo. The agent writes this form into
+# the layout file only where this file reads it (it looks for this line).
+KEY_PIN = "sha256//"
+
+
+def _tlv(buf, at):
+    """(tag, where its value starts, where it ends) of the DER element at `at`."""
+    tag, n = buf[at], buf[at + 1]
+    at += 2
+    if n & 0x80:
+        k = n & 0x7F
+        if not 1 <= k <= 4:
+            raise ValueError("not a DER length")
+        n = int.from_bytes(buf[at:at + k], "big")
+        at += k
+    if at + n > len(buf):
+        raise ValueError("a DER element runs past its buffer")
+    return tag, at, at + n
+
+
+def key_pin_of(der):
+    """The pin of the key a DER certificate carries, or "": its
+    SubjectPublicKeyInfo found by stepping over the fields before it, as
+    the agent finds it. This file's own, like the rest of the check."""
+    import base64
+    import hashlib
+    try:
+        tag, at, end = _tlv(der, 0)
+        if tag != 0x30:
+            return ""
+        tag, at, end = _tlv(der, at)
+        if tag != 0x30:
+            return ""
+        tag, _, after = _tlv(der, at)
+        if tag == 0xA0:
+            at = after
+        for _ in range(5):
+            _, _, at = _tlv(der, at)
+        tag, _, after = _tlv(der, at)
+        if tag != 0x30 or after > end:
+            return ""
+    except (IndexError, ValueError, TypeError):
+        return ""
+    return KEY_PIN + base64.b64encode(hashlib.sha256(bytes(der[at:after])).digest()).decode()
 
 
 def _grant(c, target, tok, ro):
@@ -1903,10 +1949,15 @@ def _grant(c, target, tok, ro):
             ctx.verify_mode = ssl.CERT_NONE          # the pin below is the check, as bbapi's
             conn = http.client.HTTPSConnection(u.hostname, port, timeout=20, context=ctx)
             conn.connect()
-            seen = "sha256:" + hashlib.sha256(conn.sock.getpeercert(True)).hexdigest()
-            if c.get("CONTROLLER_PIN") and seen != c["CONTROLLER_PIN"]:
+            der = conn.sock.getpeercert(True)
+            pin = c.get("CONTROLLER_PIN") or ""
+            # The controller's key where that is what this node pinned (any
+            # certificate over it passes), else the certificate itself.
+            seen = key_pin_of(der) if pin.startswith(KEY_PIN) else "sha256:" + hashlib.sha256(der).hexdigest()
+            if pin and seen != pin:
                 conn.close()
-                raise Refused("bb-session: the controller's certificate is not the one this node pinned")
+                raise Refused("bb-session: the controller's " + ("key" if pin.startswith(KEY_PIN) else "certificate")
+                              + " is not the one this node pinned")
     else:
         conn = http.client.HTTPConnection(u.hostname, port, timeout=20)
     body = json.dumps({"arg": target, "ro": ro}).encode()

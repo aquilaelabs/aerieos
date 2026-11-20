@@ -13,10 +13,11 @@ import time
 import traceback
 from . import AGENT_VERSION
 from .coverage import _COV_OUT, _cov_write
-from .base import BEAT_S, REFUSED, RUNNER_DIAG_KEEP, SESSION_WALL, TRIAL_S, cap_file, fs_holds, log, log_once, own_digest, own_path, prune_dir
+from .base import BEAT_S, CHANNEL, REFUSED, ROOT_BUNDLE_DIR, RUNNER_DIAG_KEEP, SESSION_BIN, SESSION_WALL, TRIAL_S
+from .base import cap_file, fs_holds, log, log_once, own_digest, own_path, prune_dir
 from .base import back_note, selfcheck, test_lock_ready, trial_begin, trial_give_way, trial_note, trial_passed
-from .controller import Controller
-from .stores import console_said, load_state, pin_release, pin_spare, save_state, use_scope
+from .controller import KEY_PIN, Controller
+from .stores import console_said, load_state, pin_release, pin_spare, save_state, tc_root, use_scope
 from .toolchains import share_images
 from .sessnet import SessionNet
 from .runners import RunnersMixin, runner_dirs
@@ -672,6 +673,10 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
                 self.refresh_session_tool()
                 self.refresh_virtiofsd_wrap()
             self.runner_env_sync()
+            # The channel itself, last, once the bundle and root's tools
+            # are the ones this controller ships: over TLS under the
+            # controller's key where it names one (channel_move).
+            self.channel_move(r.get("tls"))
             # A bundle that moved carries a catalog that may have moved with
             # it, and the census read that catalog before the fetch: one more
             # hello now, so the row does not show the old answer until the
@@ -1151,6 +1156,101 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         log(f"job {job['id']}: {job.get('type')} "
             f"{' '.join((job.get('spec') or {}).get('argv') or [])[:80]}")
         j.start()
+
+    # -- the channel over TLS, under the controller's key ----------------------
+    def channel_reads_key(self):
+        """Whether every copy here of what dials the controller for a
+        session reads a key's pin: the bundle's client the terminals run
+        (bbapi.py), root's copy of it, and the installed bb-session. Each
+        says so in a line of its own (KEY_PIN = ...). A copy from before
+        this does not, and would refuse the controller under a pin it
+        takes for a certificate's digest; one that is not on this node
+        dials nothing. The name of the first that does not, or ""."""
+        store = tc_root(self.state)
+        files = [os.path.join(store, ".bb", "current", "scripts", "lib", "bbapi.py")] if store else []
+        files += [os.path.join(ROOT_BUNDLE_DIR, "current", "scripts", "lib", "bbapi.py"), SESSION_BIN]
+        mark = f'KEY_PIN = "{KEY_PIN}"'.encode()
+        for path in files:
+            try:
+                with open(path, "rb") as f:
+                    if mark not in f.read():
+                        return path
+            except OSError:
+                continue
+        return ""
+
+    def channel_move(self, named):
+        """This node's channel taken to TLS under the controller's key, by
+        itself: `named` is what the controller's hello says of its TLS,
+        {"pin": the pin of its own key}. A node on plain http asks the same
+        address over https, with that pin, whether it is this node's
+        controller (its own `beat`, with its token): answered, the address
+        and the pin are kept in node.json and used from here on, and
+        nothing here ever writes http back. A node already on https that
+        pinned the certificate itself moves its pin to the key when the
+        certificate it just met is over the key named, which is the same
+        trust said so that a renewal passes. Not answered (a proxy in
+        front that speaks only http to the controller, a port that does
+        not pass TLS), the node stays as it is and says why in its census.
+        Nothing moves for a node reached through a public hostname, whose
+        certificate is the name's and is checked by the system's
+        authorities, nor while a copy of the session tools here is from
+        before a key's pin. Whether it moved."""
+        pin = named.get("pin") if isinstance(named, dict) else ""
+        if not isinstance(pin, str) or not re.fullmatch(re.escape(KEY_PIN) + r"[A-Za-z0-9+/]{43}=", pin):
+            CHANNEL.clear()
+            return False
+        if self.ctl.pin == Controller.CA or self.state.get("reach") == "public" or self.ctl.pin == pin:
+            CHANNEL.clear()
+            return False
+        old = self.channel_reads_key()
+        if old:
+            CHANNEL.update(why="its session tools are from before a pinned channel")
+            log_once("channel", f"the channel stays as it is for now: {old} is from before a key's pin; "
+                                "it moves once the controller's bundle is the one here")
+            return False
+        if self.ctl.scheme == "https":
+            CHANNEL.clear()
+            # The certificate pinned is over the key named: the key is pinned
+            # in its place, so the controller's next certificate passes.
+            if self.ctl.pin.startswith("sha256:") and getattr(self.ctl, "seen_key", "") == pin:
+                return self.channel_keep(self.ctl.url, pin, "the controller's key is pinned in place of its certificate: "
+                                                            "a renewed certificate over the same key is taken")
+            return False
+        url = "https://" + self.ctl.url.split("://", 1)[1]
+        probe = Controller(url, self.state.get("token") or "", pin)
+        st, r = probe.call("beat", {}, timeout=10)
+        if st != 200:
+            why = "its controller's address does not answer over TLS" if st == 0 else f"its controller answered {st} over TLS"
+            CHANNEL.update(why=why)
+            log_once("channel", f"the channel stays plain http: {url} did not answer as this node's controller under the "
+                                f"key it names ({(r or {}).get('error') or st}); asked again at the next hello")
+            return False
+        CHANNEL.clear()
+        return self.channel_keep(url, pin, f"this node's channel is {url} now, under the controller's key: "
+                                           "it does not go back to plain http by itself")
+
+    def channel_keep(self, url, pin, words):
+        """The controller's address and pin written into node.json and used
+        from here on, and handed to what starts a session's terminal (its
+        environment, bb-session's layout file, the console shell's
+        profile), so a session dials as the agent does."""
+        self.state.update({"controller": url, "pin": pin, "scheme": "https"})
+        save_state(self.state)
+        self.ctl = Controller(url, self.state.get("token") or "", pin)
+        log(words)
+        for kind in (getattr(self, "term_kinds", None) or {}).values():
+            if isinstance(kind.get("env"), dict) and "BB_CONTROLLER" in kind["env"]:
+                kind["env"].update({"BB_CONTROLLER": self.ctl.url, "BB_CONTROLLER_PIN": pin})
+        # Each never fatal: a file that could not be rewritten now is
+        # rewritten at the next hello or the next start.
+        for step in (self.tty_env_write, self.refresh_session_tool, self.write_session_profile):
+            try:
+                step()
+            except Exception as e:  # noqa: BLE001 (the channel moved; what follows it is retried)
+                log(f"the channel moved, and {step.__name__} did not follow it yet: {type(e).__name__}: {e}")
+        self.hello_again("the channel to the controller moved to TLS")
+        return True
 
     def shipped_named(self, named):
         """What a hello's answer says of the agent its controller ships,

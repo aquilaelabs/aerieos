@@ -4,7 +4,7 @@ import sys
 import time
 from . import AGENT_VERSION
 from .base import DEFAULT_STORES, NODE_JSON, harden, log, own_digest
-from .controller import Controller
+from .controller import KEY_PIN, Controller
 from .stores import load_state, make_store, save_state, store_path_ok
 from .census import Sampler, census
 from .agent import Agent
@@ -130,6 +130,9 @@ def cmd_enroll(args):
         if pin == Controller.CA:
             print(f"the controller is {ctl.host}, verified by the system's certificate authorities "
                   "on every call (a hostname behind a tunnel, whose own certificate this node never sees)")
+        elif pin.startswith(KEY_PIN):
+            print("pinned the controller's key, as the enrollment carried it: every connection must present a "
+                  "certificate over that key, so the controller's renewed certificates are taken and no other is")
         elif not opts["--pin"]:
             print(f"pinned the controller's certificate on first use: {pin}\n"
                   f"  check it against the controller; a different one next "

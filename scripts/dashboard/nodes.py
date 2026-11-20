@@ -2185,6 +2185,27 @@ def _c_release(c, out):
     out["release_unpinned"] = c.get("release_unpinned") is True
 
 
+def _c_channel(c, out):
+    # How it reaches this controller, as it says (the agent's
+    # census.channel_now): plain http or https, what an https channel is
+    # held to by its kind, and in a phrase why it is still on plain http
+    # where this controller names a key to pin. Absent from an agent from
+    # before this, which says nothing of it.
+    ch = c.get("channel")
+    if not isinstance(ch, dict) or ch.get("scheme") not in ("http", "https"):
+        return
+    out["channel"] = {"scheme": ch["scheme"], "pin": ch.get("pin") if ch.get("pin") in ("key", "cert", "ca", "none") else "none",
+                      **({"why": re.sub(r"[^ -~]", " ", ch["why"])[:120]} if isinstance(ch.get("why"), str) and ch["why"] else {})}
+
+
+def channel_said(n):
+    """What a node's row says of its channel, a phrase, or "": that it is
+    plain http, for a node that says so of itself. Nothing for one over
+    https, nor for one whose agent is from before it said."""
+    ch = ((n or {}).get("reported") or {}).get("channel") or {}
+    return "over plain http" if ch.get("scheme") == "http" else ""
+
+
 def _c_bundle_refused(c, out):
     # The bundle it refused and keeps refusing (the agent's
     # release.may_keep_bundle, R267 step 6): which one, by its digest, and
@@ -2555,6 +2576,7 @@ CENSUS = (
     (("sandbox",), _c_sandbox),
     (("release_key", "release_spare", "release_also", "unsigned_ok", "release_unpinned"), _c_release),
     (("bundle_refused",), _c_bundle_refused),
+    (("channel",), _c_channel),
     (("root_off",), _c_root_off),
     (("gpu_card", "gpu_display", "gpu_amd"), _c_gpu),
     (("gpu_driver", "gpu_card"), _c_gpu_driver),
@@ -5805,6 +5827,9 @@ def token_attention():
     return out
 
 
+# The pin of the controller's own TLS key (tls.key_pin), set by the server;
+# "" while no certificate is loaded, and wherever nothing set it.
+tls_pin = lambda: ""  # noqa: E731
 # A move prepared, per node (move.for_node), set by the server; {} when none.
 move_for_node = lambda nid: {}  # noqa: E731
 # ...and the node's hello on the controller a move landed on (R175 step 3).
@@ -5911,6 +5936,13 @@ def hello(nid, census, addr, version="", digest="", running=None, keep=None, rot
             "agent": {"digest": ours["digest"], "version": ours["version"],
                       **({"sig": agent_sig(ours["digest"])} if agent_sig(ours["digest"]) else {}),
                       **agent_release_keys(), **agent_spare_said()},
+            # The pin of this controller's own key, where its port answers a
+            # handshake under it (tls.key_pin): a node on plain http asks
+            # the same address over TLS under it and stays there, and one
+            # that pinned the certificate pins the key (the agent's
+            # channel_move). Left out where there is none; an agent from
+            # before this reads none of it.
+            **({"tls": {"pin": tls_pin()}} if tls_pin() else {}),
             # Where every toolchain lands, from the catalog: the node has no
             # catalog of its own, and this is what stops it keeping a second
             # copy of the answer that drifts from ours.
@@ -8904,6 +8936,9 @@ def tab_view(rows, admin):
                 if held:
                     n["bundle_held"] = held
             n["turns"] = turns_of(n)
+            # Its channel in a phrase, where it is plain http (R267 step 15).
+            if channel_said(n):
+                n["channel_said"] = channel_said(n)
             # Its last hour, for the charts on its page (R218 step 9).
             n["spark"] = spark_of(n["id"])
             # Its sign-ins still sealed under the install key before a

@@ -33,6 +33,8 @@ from .base import (
     read_json,
 )
 from .stores import _stores, console_said, noexec, store_dirs, tc_root
+from .controller import KEY_PIN
+from .base import CHANNEL
 from .backends import _have, net_backend, pkg_backend
 from .toolchains import _toolchains, sdk_images, sdk_receipts, sdk_verified, sdk_versions, sysdeps_now
 from .gpu import (
@@ -314,6 +316,19 @@ def timezone_now():
         return ""
 
 
+def channel_now(state):
+    """{"scheme", "pin", "why"?}: how node.json says this node reaches its
+    controller, the pin by its kind and never its characters."""
+    pin = str((state or {}).get("pin") or "")
+    out = {"scheme": "https" if str((state or {}).get("controller") or "").startswith("https://") else "http",
+           "pin": "key" if pin.startswith(KEY_PIN) else "ca" if pin == "ca" else "cert" if pin else "none"}
+    if out["scheme"] == "http":
+        out["pin"] = "none"
+        if CHANNEL.get("why"):
+            out["why"] = str(CHANNEL["why"])[:120]
+    return out
+
+
 def census(state):
     """What this machine is. Asked at hello, every ten minutes, so the
     slow questions (docker, java) are allowed here and not in the sample."""
@@ -416,6 +431,12 @@ def census(state):
         "release_unpinned": console_said().get("release_unpinned") is True,
         # ...and whether its console switched root commands off (R227 step 2).
         "root_off": console_said().get("root_off") is True,
+        # How this node reaches its controller: plain http or https, and
+        # what an https channel is held to (the controller's key, its
+        # certificate, the system's authorities for a public hostname, or
+        # nothing), with why it is still plain http where the controller
+        # names a key and the move was not made (the agent's channel_move).
+        "channel": channel_now(state),
         # ...and the controller's bundle this node refused and keeps
         # refusing, with why (bundle(), R267 step 6): named only while one
         # is, so the controller can say it where a person looks.

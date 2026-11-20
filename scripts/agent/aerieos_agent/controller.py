@@ -1,4 +1,5 @@
 """The connection to the controller."""
+import base64
 import hashlib
 import http.client
 import json
@@ -30,17 +31,80 @@ def _context(verify):
     return got
 
 
+# A pin of the controller's KEY: this, then the base64 of the sha256 of the
+# key's public half (the certificate's SubjectPublicKeyInfo, in DER), which
+# is the form curl's --pinnedpubkey takes, so the Enroll script hands one
+# word to both. It names the key and nothing else of the certificate: the
+# controller remakes its certificate over the same key, and the pin holds.
+KEY_PIN = "sha256//"
+
+
+def _tlv(buf, at):
+    """(tag, where its value starts, where it ends) of the DER element at
+    `at`; ValueError for one that runs past the buffer."""
+    tag, n = buf[at], buf[at + 1]
+    at += 2
+    if n & 0x80:
+        k = n & 0x7F
+        if not 1 <= k <= 4:
+            raise ValueError("not a DER length")
+        n = int.from_bytes(buf[at:at + k], "big")
+        at += k
+    if at + n > len(buf):
+        raise ValueError("a DER element runs past its buffer")
+    return tag, at, at + n
+
+
+def spki_of(der):
+    """The SubjectPublicKeyInfo of a DER certificate, whole, or b"". It is
+    the seventh field of the certificate's body, after the optional version
+    and the serial number, signature algorithm, issuer, validity and
+    subject: found by stepping over those, with no library, since this
+    package is the standard library alone and the standard library hands
+    out the certificate but not its key. Nothing is decided here but where
+    the field is: what does not parse as a certificate has no key, and a
+    pin then matches nothing."""
+    try:
+        tag, at, end = _tlv(der, 0)                 # Certificate
+        if tag != 0x30:
+            return b""
+        tag, at, end = _tlv(der, at)                # its body, tbsCertificate
+        if tag != 0x30:
+            return b""
+        tag, _, after = _tlv(der, at)
+        if tag == 0xA0:                             # [0] version, where there is one
+            at = after
+        for _ in range(5):                          # serial, signature, issuer, validity, subject
+            _, _, at = _tlv(der, at)
+        tag, _, after = _tlv(der, at)
+        if tag != 0x30 or after > end:
+            return b""
+        return bytes(der[at:after])
+    except (IndexError, ValueError, TypeError):
+        return b""
+
+
+def key_pin_of(der):
+    """The pin of the key a DER certificate carries (KEY_PIN's form), or ""."""
+    spki = spki_of(der)
+    return KEY_PIN + base64.b64encode(hashlib.sha256(spki).digest()).decode() if spki else ""
+
+
 class Controller:
     """One controller, one credential, one way to talk to it.
 
-    TLS is verified by PIN, not by CA: the controller's certificate digest is
-    learned at enrollment (given with --pin, or trusted on first use and
-    printed so it can be checked) and every later connection must present
-    the same one. A LAN dashboard with a self-signed certificate is exactly
-    the case, and a CA is a later layer (docs/nodes.md §4). Plain http is
-    allowed and said plainly: the token then travels in the clear, which is
-    no worse than the dashboard's own credential already does on that
-    network, and no better.
+    TLS is verified by PIN, not by CA, in one of two forms. The controller's
+    KEY (KEY_PIN and the key's digest) is what the Enroll script carries and
+    what a node moves to by itself: every connection must present a
+    certificate over that key, whatever else the certificate says, so the
+    controller's own renewals pass. The certificate's digest (sha256: and
+    hex) is the form from before, given with --pin or trusted on first use
+    and printed so it can be checked: every later connection must present
+    that very certificate. A LAN dashboard with a self-signed certificate is
+    exactly the case, and a CA is a later layer (docs/nodes.md §4). Plain
+    http is allowed and said plainly: the token then travels in the clear,
+    which is no worse than the dashboard's own credential already does on
+    that network, and no better.
     """
 
     # The pin that means "no pin: the hostname's public certificate, by the
@@ -82,7 +146,19 @@ class Controller:
         c = http.client.HTTPSConnection(self.host, self.port, timeout=timeout,  # nosemgrep: python.lang.security.audit.httpsconnection-detected.httpsconnection-detected (its own CA, verified: ctx)
                                         context=ctx)
         c.connect()
-        seen = "sha256:" + hashlib.sha256(c.sock.getpeercert(True)).hexdigest()
+        der = c.sock.getpeercert(True)
+        seen = "sha256:" + hashlib.sha256(der).hexdigest()
+        # The key this certificate is over, for whoever asks whether the
+        # controller's named key is the one just met (the agent's move).
+        self.seen_key = key_pin_of(der)
+        if self.pin.startswith(KEY_PIN):
+            # The key pinned: any certificate over it passes, no other does.
+            if self.seen_key != self.pin:
+                c.close()
+                raise ssl.SSLError(f"controller key changed: pinned {self.pin[:19]}…, "
+                                   f"presented {self.seen_key[:19] or 'no key this node can read'}…")
+            self.seen_pin = self.pin
+            return c
         if self.pin and seen != self.pin:
             c.close()
             raise ssl.SSLError(f"controller certificate changed: pinned "

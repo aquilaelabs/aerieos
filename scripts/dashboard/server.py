@@ -4735,6 +4735,9 @@ try:
     # rather than by one importing the other, which is the same seam every
     # other module pair uses.
     nodes.layout_of = toolchains.layout_for_node
+    # ...and the pin of this controller's own TLS key, which a hello names
+    # and an enrollment carries (R267 step 15).
+    nodes.tls_pin = tls.key_pin
     # ...and a toolchain or image job pressed while another writes the
     # store waits behind it rather than being refused.
     nodes.store_gate = toolchains.store_gate
