@@ -5,6 +5,7 @@
 ### Added
 
 - `aerie capture shot` and `reel` open a page in any browser installed (`--browser NAME`, or `all` for a shot in each) and as any device Playwright knows (`--device NAME`), with `--scheme` and `--set NAME=VALUE` for the rest; `aerie capture browsers` and `devices` list them (d8814eb)
+- A controller you build yourself can sign its node agent with a key of your own: `tools/sign-agent.py --builder-keygen FILE` makes it, `--builder FILE` signs a build, and a node takes such builds once the key is added at its console with `aerieos-agent release-key add HEX` (up to four, `release-key drop HEX` takes one away) (2cb12d8, b898ba9)
 
 ### Changed
 
@@ -58,6 +59,14 @@
 - `aerie map` reads a method of an object written inside a call's own parentheses as the definition it is, where it read it as a call and gave what it calls to the function around it (6ec31d6)
 - A space's card shows one face in a browser that draws without 3D acceleration, where its back showed mirrored through its front (2e5a823)
 - A node that takes only signed agent updates is left alone by a controller whose build is unsigned, and its row on the bell says it waits for a signed build, where the update was sent and refused every two minutes (81e1355)
+- `aerie toolchains status` and `aerie status` say a toolchain's folder with no program in it is an install that did not finish, where they listed it as installed (552b028)
+
+### Security
+
+- A release's Android app is signed only from the release tag's own run, checked against the tag's commit, its workflow and its repository, and a release already signed is not signed again unless a person asks (`aerie sign release --again TAG --why "..."`); the controller signed an unsigned APK from any recent run that carried the right artifact name (af75b04)
+- The vetted catalog refuses an index older than the one it holds, so an old signed index cannot be served again to bring back a withdrawn pack; a pack can no longer call itself official; and a pack kept from the catalog is checked against the signed digest on the second fetch too (7e45f30, baaacb0, 01fc389)
+- A node's first agent is checked at enrollment: the Enroll script and the token-only commands carry the agent's digest and, from a release's build, its signature, and the provisioner checks both before the agent ever runs; a provisioner run again asks the installed agent before it replaces it; and enrolling a Mac, enrolling with a token alone and a bare-metal install's own node pin the release key as the Enroll script does. Upgrading: an Enroll script or command made before a controller update is refused after it, and says to make a new one (b647f3c, 7e20fa6, 1c78941)
+- A node that pinned no release key pins it on the first agent update a release signed, and until then says in the update's job that nothing was checked; `aerieos-agent release-key none` at its console is kept as a choice and such a node pins nothing by itself (2f92f38, bdaa07f)
 
 ## 0.9.0-dev.5641: 2026-11-18
 
