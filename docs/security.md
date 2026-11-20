@@ -340,6 +340,12 @@ Enroll script again. An update with no signature, or one under another
 key, is taken as before and pins nothing; a node that has any key, the
 release's or one added at its console, is never offered one this way.
 
+`aerieos-agent check-update FILE [SIG]` is the same rule, for whatever
+replaces an agent from outside it (a provisioner run on a machine that has
+one) to ask first: it says in one line whether this node would take that
+file with that signature, exits 0 when it would and 77 when it refuses,
+and writes nothing.
+
 **The tools root installs from the bundle, it does not either.** The
 provisioner with the machine's own helper in it, the helper that builds a
 session's view and the one that cuts a pack's install off the network reach

@@ -366,6 +366,71 @@ def cmd_unsigned(args):
            + ("" if release.trusted(state) else "; none is pinned yet, so that applies once one is")))
 
 
+def _sig_given(text):
+    """The signature check-update was handed: its 128 hex characters, or a
+    file that holds them, bare or as the build's own agent.sig holds them
+    (a JSON object's "sig"). "" for none; what is neither is passed on as
+    it is, and read as no signature."""
+    from . import release
+    text = str(text or "").strip()
+    if not text or release.SIG_RE.fullmatch(text.lower()):
+        return text.lower()
+    try:
+        with open(text, encoding="utf-8") as f:
+            held = f.read(8192).strip()
+    except (OSError, ValueError):
+        return text
+    try:
+        d = json.loads(held)
+    except ValueError:
+        return held
+    return str(d.get("sig") or "") if isinstance(d, dict) else held
+
+
+def cmd_check_update(args):
+    """check-update FILE [SIG]: whether this node would take FILE as its
+    agent, by the rule its own update goes by (release.may_install), with
+    the signature that came with it. For the provisioner, which swaps an
+    agent in itself and so passed the node's own check by: it asks before
+    the swap. One line is said, and the exit is 0 when the file may be
+    installed and 77 when it is refused, the code the update's own job ends
+    with. It reads the file and node.json and writes nothing: no key is
+    pinned here, whatever the signature is under."""
+    import hashlib
+    from . import release
+    if not 1 <= len(args) <= 2 or not args[0]:
+        print("check-update takes the agent file, and after it the signature that came with it", file=sys.stderr)
+        sys.exit(64)
+    try:
+        with open(args[0], "rb") as f:
+            digest = "sha256:" + hashlib.sha256(f.read()).hexdigest()
+    except OSError as e:
+        print(f"refused: {args[0]} could not be read ({e.strerror or e})")
+        sys.exit(77)
+    # The record as it is on the disk, which the console writes. A machine
+    # with none has pinned nothing; one whose record cannot be read may
+    # have, so nothing is taken on that.
+    try:
+        with open(NODE_JSON) as f:
+            state = json.load(f)
+    except FileNotFoundError:
+        state = {}
+    except ValueError:
+        state = None
+    except OSError as e:
+        print(f"refused: {NODE_JSON} could not be read ({e.strerror or e}), so what this node pinned is not known; "
+              "check-update is root's")
+        sys.exit(77)
+    if not isinstance(state, dict):
+        # No agent starts on such a record either: enrolling again writes a new one.
+        print(f"not checked: {NODE_JSON} is not a node's record, so no key pinned here can be read from it")
+        return
+    ok, said = release.may_install(state, digest, _sig_given(args[1] if len(args) > 1 else ""))
+    print(said)
+    if not ok:
+        sys.exit(77)
+
+
 def cmd_root_asks(args):
     """root-asks [on|off]: whether this machine runs a root command the
     controller sends (R227 step 2)."""
@@ -397,6 +462,8 @@ def main(argv):
         cmd_release_key(argv[1:])
     elif cmd == "unsigned":
         cmd_unsigned(argv[1:])
+    elif cmd == "check-update":
+        cmd_check_update(argv[1:])
     elif cmd == "root-asks":
         cmd_root_asks(argv[1:])
     elif cmd == "follow":
