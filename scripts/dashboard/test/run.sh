@@ -426,6 +426,10 @@ if [ -z "${BB_TEST_CONCURRENT:-}" ] && [ -w "$NODE_LOCK" ] && command -v flock >
 fi
 fi
 S="$(mktemp -d "${TMPDIR:-/tmp}/dashboard-test.XXXXXX")"
+# The images AerieOS's own services run, as the tree names them, in a file
+# of the world's own (BB_SERVICE_IMAGES_FILE): a suite moves an entry by
+# writing it, which is all an update of AerieOS does to one.
+cp "$DASH/service-images.json" "$S/service-images.json"
 # Where each suite's seconds are kept for the run's queue (run_file, the
 # queue's order, R130): beside the code map in the tree the run was made from, which
 # is this node's own and gitignored; workers inherit the path.
@@ -1729,7 +1733,7 @@ rm -rf "$S/agentsrc"; cp -r "$DASH/../agent" "$S/agentsrc"
     BB_ARCHIVE_SPOOL="$S/spool" \
     BB_CLAUDE_LATEST_URL="file://$S/claude-latest" BB_CLAUDE_CHECK_DELAY=3600 \
     BB_CODEX_LATEST_URL="file://$S/codex-latest.json" BB_COPILOT_LATEST_URL="file://$S/copilot-latest.json" \
-    BB_NGINX_TAGS_URL="file://$S/nginx-tags.json" BB_NGINX_CHECK_DELAY=3600 \
+    BB_SERVICE_IMAGES_FILE="$S/service-images.json" BB_NGINX_CHECK_DELAY=3600 \
     BB_APPS_RELEASES_URL="file://$S/releases.json" BB_APPS_BOOT_DELAY=3600 \
     BB_RELEASE_SIGNERS="$S/release-signers" \
     BB_TOOLPACKS_FILE_URLS=1 \

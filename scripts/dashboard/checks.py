@@ -2,7 +2,7 @@
 
 Each check AerieOS makes by itself has a cadence under Controller
 settings, Update checks: the release (a newer AerieOS), the container
-images, nginx, the scanners, and the catalog (the toolchains, the coding
+images, and the catalog (the toolchains, the coding
 agents and the vetted index this controller offers), each daily, weekly
 (the default), monthly or off, with Check now beside it. A node's own
 version check (what its store holds against what is out) is that node's
@@ -20,14 +20,12 @@ import threading
 import time
 from pathlib import Path
 
-import services
 import statefile
 
 CADENCE = {"daily": 86400, "weekly": 7 * 86400, "monthly": 30 * 86400, "off": None}
-# Every check, in the order Controller settings lists them: the services'
-# own (nginx's image, the scanners' versions) between the images and the
-# catalog, by the kinds services.py's table says have one.
-KINDS = ("release", "images", *services.CHECKED, "catalog")
+# Every check, in the order Controller settings lists them. AerieOS's own
+# services have none: each runs the images its entry names by digest.
+KINDS = ("release", "images", "catalog")
 STATE = Path("/config")
 settings = None
 _last = {}       # kind -> fn returning the epoch it last ran, or 0

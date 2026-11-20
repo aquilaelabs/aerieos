@@ -24,7 +24,7 @@ let nginxList = null;             // last answer, or null before the first
 let nginxErr = "";
 let nginxNode = "";               // the node the tab shows
 let nginxWant = "";               // a node asked for that the last read did not list yet
-let nginxLatest = {};             // the registry's newest line, from the same answer
+let nginxLatest = {};             // the image nginx's entry names, from the same answer
 let nginxCertOpen = false;        // Add a certificate pressed: its form unrolled
 let nginxAcmeOpen = false;  // the Let's Encrypt form unrolled (R150)
 let nginxHostnames = [];          // every node's hostnames: [{name, used: [{node, path, port}]}]
@@ -76,7 +76,6 @@ async function nginxAct(body){
   else if (j.note) notify(j.note, true);
   else if (j.job) notify(`${body.action === "deploy" ? "deploying" : body.action === "update" ? `updating nginx to ${j.to}` : "rebuilding nginx"}${
     body.action === "deploy" ? " nginx" : ""}: its row on the Containers page has the build`);
-  else if (body.action === "check") notify(`the registry lists nginx:${j.latest?.tag || "?"}`);
   // A hostname added or deleted comes back with the list as it now is, so
   // the pull-downs hold it the moment the answer lands rather than after
   // the whole tab is read again (every node's daemon, B721).
@@ -309,17 +308,17 @@ function nginxBody(n){
   const facts = [["Container", `nginx-${esc(n.container.replace(/^nginx-/, ""))} on the ${pageLink("docker", "Containers page")}`, {html: true}],
                  ["Routes", `${count} route${count === 1 ? "" : "s"}`],
                  ["Node", n.host_only ? "hosting-only" : ""]];
-  // The image it is pinned to, the newest line, and Update when behind
-  // (R192): its own action bar, since Check now and Update are two verbs.
-  const im = n.image || {}, lt = nginxLatest || {};
+  // The image it is pinned to, the one this AerieOS names, and Update when
+  // behind (R192): nothing asks a registry, so there is nothing to check.
+  const im = n.image || {};
   const pinned = `nginx:${im.tag || "?"}${im.digest ? ` (${im.digest.slice(7, 19)})` : ", not pinned to a digest yet"}`;
   // A newer build of the tag it already runs is said as that, not as the
   // same tag named twice.
   const rebuild = !!n.behind && n.behind === im.tag;
   const out = rebuild ? `a newer build of nginx:${n.behind}` : `nginx:${n.behind}`;
-  const news = n.behind ? `${out} is out: Update pins it and rebuilds`
-    : lt.digest ? "the newest line the registry lists" : "no check has read the registry yet";
-  const checked = lt.at ? `checked ${ago(lt.at)}` : "never checked";
+  // ...with the first digits of the digest it would move to.
+  const news = n.behind ? `${out}${n.behind_digest ? ` (${n.behind_digest})` : ""} is out: Update pins it and rebuilds`
+    : "the image this AerieOS names";
   // Four sections (R218 step 29): each says its state in its head, opens
   // on one short line with the rest behind its ?, and saves what it writes
   // under itself; Remove stands apart at the page's foot.
@@ -327,10 +326,9 @@ function nginxBody(n){
   const image = ngSect("image", n.behind ? (rebuild ? "a newer build is out" : `${out} is out`) : `nginx:${im.tag || "?"}`,
     `<div class="field">
       <div class="sub data ngimage">${esc(pinned)}</div>
-      <div class="hint${n.behind ? " warn" : ""}">${esc(news)}.${helpIcon("The registry is read once a week by itself; a node is pinned to a digest when it is deployed or updated, so a Save never moves it.")}</div>
-      <div class="actbar ngimgbar"><span class="state">${esc(checked)}${lt.error ? ` · ${esc(lt.error)}` : ""}</span><span class="sp"></span>
-        <button type="button" data-ngcheck>Check for updates</button>
-        ${n.behind ? `<button type="button" class="primary" data-ngupdate>${rebuild ? "Update to the newer build" : `Update to ${esc(n.behind)}`}</button>` : ""}</div>
+      <div class="hint${n.behind ? " warn" : ""}">${esc(news)}.${helpIcon("A node is pinned to a digest when it is deployed or updated, so a Save never moves it. A newer image comes with an update of AerieOS.")}</div>
+      ${n.behind ? `<div class="actbar ngimgbar"><span class="sp"></span>
+        <button type="button" class="primary" data-ngupdate>${rebuild ? "Update to the newer build" : `Update to ${esc(n.behind)}`}</button></div>` : ""}
     </div>`, {cls: n.behind ? "warn" : ""});
   const clash = (n.clash || []).length
     ? `<div class="field"><div class="hint bad">${esc(n.clash.join(", "))} ${n.clash.length === 1 ? "holds" : "hold"} a port nginx needs on this node: it listens on 80 and 443 there, so one of them has to give way.</div></div>` : "";
@@ -624,13 +622,6 @@ function wireNginxTab(root){
     nginxReadDraft(sect, n);
     Object.assign(nginxDraftOf(n), {cert: "", key: "", certFor: ""});
     nginxCertOpen = false;
-    nginxRedraw();
-  };
-  const chk = sect.querySelector("[data-ngcheck]");
-  if (chk) chk.onclick = async e => {
-    nginxReadDraft(sect, n);
-    busy(e.target, "Checking");
-    await nginxAct({action: "check", node: nid});
     nginxRedraw();
   };
   const upd = sect.querySelector("[data-ngupdate]");

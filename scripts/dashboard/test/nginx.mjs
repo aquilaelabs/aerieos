@@ -311,27 +311,28 @@ await section("A certificate per domain", async () => {
 });
 
 
-// The image (R192): the registry's tag list read by Check now (a file here,
-// BB_NGINX_TAGS_URL), the newest release line's alpine tag kept, and the
-// deployed nginx, unpinned since nothing had been read when it was written,
-// said to be behind it on the tab, on its Docker row and in the bell;
-// Update pins the digest into its compose file and rebuilds.
-ok(await page.$eval(`${sect} .ngimgbar .state`, e => /never checked/.test(e.textContent))
-   && !(await page.$(`${sect} [data-ngupdate]`))
-   && await page.$eval(`${sect} .ngimage`, e => /nginx:1\.27-alpine, not pinned/.test(e.textContent)),
-   'before any check the Image field says never checked and unpinned, with no Update');
-writeFileSync(`${DIR}/nginx-tags.json`, JSON.stringify({ results: [
-  { name: '1.27-alpine', digest: 'sha256:' + 'a'.repeat(64) },
-  { name: '1.29-alpine-slim', digest: 'sha256:' + 'c'.repeat(64) },
-  { name: '1.29-alpine', digest: 'sha256:' + 'b'.repeat(64) },
-  { name: 'stable-alpine', digest: 'sha256:' + 'd'.repeat(64) } ] }));
-await page.click(`${sect} [data-ngcheck]`);
+// The image (R192): the one nginx's entry names by its digest (a file of the
+// world's own here, BB_SERVICE_IMAGES_FILE), which the deployed nginx was
+// pinned to as it was written. Nothing asks a registry: the entry naming
+// another image is what puts a node behind, said on the tab, on its
+// Containers row and in the bell; Update pins the digest into its compose
+// file and rebuilds.
+const entryMoves = (tag, d) => {
+  const doc = JSON.parse(readFileSync(`${DIR}/service-images.json`, 'utf8'));
+  doc.services.find(s => s.name === 'nginx').images.nginx = `nginx:${tag}@sha256:${d.repeat(64)}`;
+  writeFileSync(`${DIR}/service-images.json`, JSON.stringify(doc, null, 2) + '\n');
+};
+ok(!(await page.$(`${sect} .ngimgbar`))
+   && !(await page.$(`${sect} [data-ngupdate]`)) && !(await page.$(`${sect} [data-ngcheck]`))
+   && await page.$eval(`${sect} .ngimage`, e => /nginx:[\w.-]+ \([0-9a-f]{12}\)/.test(e.textContent)),
+   'a deployed nginx is pinned to the digest its entry names, with no Update and no check to press');
+entryMoves('1.29-alpine', 'b');
+await page.evaluate(() => loadNginx());
 await page.waitForFunction(() => nginxLatest?.tag === '1.29-alpine', { timeout: 10000 });
 await page.waitForSelector(`${sect} [data-ngupdate]`, { timeout: 10000 });
 ok(await page.$eval(sect, s => /Update to 1\.29-alpine/.test(s.querySelector('[data-ngupdate]').textContent)
-     && /1\.29-alpine is out/.test(s.querySelector('.ngimgbar').previousElementSibling.textContent)
-     && /checked/.test(s.querySelector('.ngimgbar .state').textContent)),
-   'Check now reads the registry: the newest line is 1.29-alpine (not -slim or stable-), and the unpinned nginx is behind it, with Update');
+     && /nginx:1\.29-alpine \(b{12}\) is out/.test(s.querySelector('.ngimgbar').previousElementSibling.textContent)),
+   'the entry names another image: the nginx pinned to the old one is behind it, with Update and the short digest it would move to');
 // The bell's own note for it, to the nginx tab on that node.
 await page.click('#bBell');
 await page.waitForSelector('#bellPanel [data-bnginx]', { timeout: 15000 });
@@ -387,9 +388,9 @@ await section("The nginx page opens from a space's page, and Back names the spac
   const boot = await page.evaluate(() => { const pg = bootPage('#/spaces/alpha/roadmap'); return { rail: pg.rail, proj: /bar proj/.test(pg.bar) }; });
   ok(boot.rail === 'projects' && boot.proj, `a reload on a space's address waits as that space's page, not as Home (${JSON.stringify(boot)})`);
 });
-ok(await page.$eval('.dmtab .row[data-inst="nginx-sandbox|main"]', r => /1\.29-alpine is out/.test(r.querySelector('.dmnginx').textContent)
+ok(await page.$eval('.dmtab .row[data-inst="nginx-sandbox|main"]', r => /1\.29-alpine \(b{12}\) is out/.test(r.querySelector('.dmnginx').textContent)
      && r.querySelector('[data-dm="nginx-update"]').textContent.trim() === 'Update'),
-   'the Containers page\'s row of a node\'s nginx says the line is out, with Update as on every row');
+   'the Containers page\'s row of a node\'s nginx says the image is out, with the short digest and Update as on every row');
 await page.evaluate(() => openNginxTab());
 await page.waitForSelector(`${sect} [data-ngupdate]`, { timeout: 10000 });
 await page.click(`${sect} [data-ngupdate]`);   // its confirm is accepted by lib.mjs's dialog handler
@@ -400,19 +401,17 @@ ok(/image: nginx:1\.29-alpine@sha256:b{64}/.test(pinned.compose || '')
    && !(await page.$(`${sect} [data-ngupdate]`)),
    'Update pins the digest into the compose file and rebuilds, and the node is not behind any more');
 ok((await api('/api/nginx', { action: 'update', node: sandbox.node })).same === true, 'a second Update has nothing to move to and says so');
-// The same tag built again upstream is a newer build, not the tag named twice (B27).
-await section("The same tag built again upstream is a newer build, not the tag named twice", async () => {
-  const tags = d => writeFileSync(`${DIR}/nginx-tags.json`, JSON.stringify({ results: [
-    { name: '1.29-alpine', digest: 'sha256:' + d.repeat(64) }] }));
-  tags('f');
-  await page.click(`${sect} [data-ngcheck]`);
+// The same tag under another digest is a newer build, not the tag named twice (B27).
+await section("The same tag under another digest is a newer build, not the tag named twice", async () => {
+  entryMoves('1.29-alpine', 'f');
+  await page.evaluate(() => loadNginx());
   await page.waitForSelector(`${sect} [data-ngupdate]`, { timeout: 10000 });
   const said = await page.$eval(sect, s => ({ btn: s.querySelector('[data-ngupdate]').textContent.trim(),
     hint: s.querySelector('.ngimgbar').previousElementSibling.textContent }));
-  ok(said.btn === 'Update to the newer build' && /a newer build of nginx:1\.29-alpine is out/.test(said.hint),
-     `a rebuilt tag is said as a newer build of it (${said.btn} | ${said.hint.trim().slice(0, 60)})`);
-  tags('b');
-  await page.click(`${sect} [data-ngcheck]`);
+  ok(said.btn === 'Update to the newer build' && /a newer build of nginx:1\.29-alpine \(f{12}\) is out/.test(said.hint),
+     `the tag it runs under another digest is said as a newer build of it (${said.btn} | ${said.hint.trim().slice(0, 60)})`);
+  entryMoves('1.29-alpine', 'b');
+  await page.evaluate(() => loadNginx());
   await page.waitForFunction(s => !document.querySelector(s + ' [data-ngupdate]'), sect, { timeout: 10000 });
 });
 // Its rebuild is a job of the instance, and a compose verb is refused while

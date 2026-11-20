@@ -693,8 +693,6 @@ async function clearReports(btn){
 const CHECK_KINDS = [
   ["release", "A newer AerieOS", "Asks the releases for a newer version than this install runs, on a bare-metal install; the Update window applies it."],
   ["images", "Container images", "Asks each space container's registry for a newer image."],
-  ["nginx", "nginx", "Asks the registry for a newer nginx image for the nodes that serve hostnames."],
-  ["scanners", "Scanners", "Asks for newer versions of the scanners the nodes run over spaces."],
   ["catalog", "Library", "Asks upstream for the toolchains' and coding agents' newest versions, and the vetted catalog for its index. A node's own check of what it holds is on its page."]];
 const SETTING_GROUPS = [
   // The apps this controller offers its people (R272 step 3, apps.py): each
@@ -876,7 +874,7 @@ function connectionStatus(s){
 
 // What the Apps section holds, over its switches, and Check for updates.
 // The clocks alone (the operator, 3 Nov): Check for updates is on each
-// thing's own page (Containers, nginx, Scanners, the Library, Updates), so
+// thing's own page (Containers, the Library, Updates), so
 // this section says when each last looked and sets how often.
 function checksIntro(){
   const c = state?.checks || {};

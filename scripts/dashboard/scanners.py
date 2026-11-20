@@ -12,17 +12,19 @@ in its state beside the folder a host scanner may still write to
 (SCANNER_REPORTS_PATH, deprecated in 0.9.0), and findings.py reads both.
 
   STATE/scanners.json      {"schedule": {"on", "cron", "due", "last", "skipped"},
-                            "nodes": {nid: {"versions": {...}, "deployed": t,
-                            "last": {at, job, error, by, late, projects}}},
-                            "latest": {"at", "versions", "error"}}
+                            "nodes": {nid: {"images": {...}, "versions": {...},
+                            "deployed": t, "last": {at, job, error, by, late,
+                            "projects"}}}}
   STATE/scan-reports/NID/  the SARIF a node's run sent up, one per scanner
 
 The compose file carries the three as one-shot services under a profile,
 so a `compose up` starts none; a run (the agent's scan job, scan.py there)
 is `compose run --rm` per scanner with that node's project copies mounted
 read-only at /src/NAME, and the SARIF lands in ./reports beside the file.
-The versions are pinned per node when it is deployed or updated (as nginx's
-image is, R192), and a weekly check reads Docker Hub and PyPI for newer.
+Each scanner is an image its entry names by its tag and its digest
+(services.images), the tool already in it: nothing is installed at a scan.
+A node is pinned to those images when it is deployed or updated (as nginx's
+is, R192), and a newer one arrives as a change to the entry.
 """
 import json
 import os
@@ -30,14 +32,13 @@ import re
 import shutil
 import threading
 import time
-import urllib.request
 from pathlib import Path
 
 import nodeset
+import packformat
 import services
 import statefile
 import syscontainer
-from vers import vkey
 
 STATE = None
 write_json = None
@@ -52,19 +53,9 @@ cron_words = None        # schedules.words(cron)
 _lock = threading.Lock()
 
 SCANNERS = ("semgrep", "trivy", "mobsfscan")
-# The pins a fresh deploy takes, moved on purpose a release at a time, and
-# what the weekly check compares against.
-VERSIONS = {"semgrep": "1.179.0", "trivy": "0.75.0", "mobsfscan": "0.4.5"}
-IMAGES = {"semgrep": "semgrep/semgrep", "trivy": "aquasec/trivy"}
-SEMGREP_TAGS_URL = os.environ.get("BB_SEMGREP_TAGS_URL") or "https://hub.docker.com/v2/repositories/semgrep/semgrep/tags?page_size=100"
-TRIVY_TAGS_URL = os.environ.get("BB_TRIVY_TAGS_URL") or "https://hub.docker.com/v2/repositories/aquasec/trivy/tags?page_size=100"
-MOBSFSCAN_URL = os.environ.get("BB_MOBSFSCAN_URL") or "https://pypi.org/pypi/mobsfscan/json"
-CHECK_DELAY = float(os.environ.get("BB_SCANNER_CHECK_DELAY") or 300)
-AUTOCHECK = os.environ.get("BB_SCANNER_AUTOCHECK", "1") != "0"
 DEFAULT_CRON = "0 4 * * 0"
 TIMEOUT = 4 * 3600
 MAX_REPORT = 64 << 20
-VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
 PRINCIPAL = "scanners"
 # The pack this service is, and so the row of services.py's images that is its own.
 PACK = "scanners"
@@ -122,11 +113,27 @@ def container_name(nid):
     return syscontainer.container_name("scanners", node_name(nid) or nid)
 
 
+def entry_images():
+    """{scanner: reference} as this service's entry names them, each by its
+    tag and its digest."""
+    refs = services.images(PACK)
+    return {s: str(refs.get(s) or "") for s in SCANNERS}
+
+
+def images_of(rec):
+    """What a node runs: the images it was pinned to when it was deployed
+    or updated, and the entry's for a scanner its record names none for."""
+    mine = rec.get("images") if isinstance(rec.get("images"), dict) else {}
+    return {s: str(mine.get(s) or ref) for s, ref in entry_images().items()}
+
+
+def _tags(refs):
+    return {s: (packformat.image_parts(ref) or {}).get("tag", "") for s, ref in refs.items()}
+
+
 def versions_of(rec):
-    """What a node runs: its pins, or the defaults for one deployed before
-    pins were kept."""
-    v = rec.get("versions") if isinstance(rec.get("versions"), dict) else {}
-    return {s: str(v.get(s) or VERSIONS[s]) for s in SCANNERS}
+    """The version of each scanner a node runs: its image's tag."""
+    return _tags(images_of(rec))
 
 
 # ---- the compose file ---------------------------------------------------------
@@ -134,15 +141,16 @@ def versions_of(rec):
 def compose_text(nid, rec):
     """The three scanners as one-shot services under the scan profile:
     nothing starts at an up; a run is `compose run --rm` per service with
-    the projects mounted at /src by the agent. Cache volumes are docker's
-    own, named; the reports land in ./reports beside the file."""
-    v = versions_of(rec)
+    the projects mounted at /src by the agent. Each is the image the node
+    is pinned to, by its digest, with the tool in it. Cache volumes are
+    docker's own, named; the reports land in ./reports beside the file."""
+    image = images_of(rec)
     excl = "--exclude node_modules --exclude .git --exclude .worktrees --exclude .claude"
     return "\n".join([
         "# Written by AerieOS from the Scanners page (scanners.py); Deploy and Update rewrite it.",
         "services:",
         "  semgrep:",
-        f"    image: {IMAGES['semgrep']}:{v['semgrep']}",
+        f"    image: {image['semgrep']}",
         "    profiles: [scan]",
         "    working_dir: /src",
         "    volumes:",
@@ -152,24 +160,23 @@ def compose_text(nid, rec):
         "    # `# nosemgrep: RULE` line with its reason answers a finding.",
         f"    command: semgrep scan --config p/default --metrics off --sarif --output /reports/semgrep.sarif {excl} /src",
         "  trivy:",
-        f"    image: {IMAGES['trivy']}:{v['trivy']}",
+        f"    image: {image['trivy']}",
         "    profiles: [scan]",
         "    volumes:",
         "      - ./reports:/reports",
         "      - trivy_cache:/cache",
         "    command: fs --cache-dir /cache --scanners vuln,secret,misconfig --format sarif --output /reports/trivy.sarif --skip-dirs node_modules --skip-dirs .worktrees /src",
         "  mobsfscan:",
-        "    image: python:3.12-slim",
+        f"    image: {image['mobsfscan']}",
         "    profiles: [scan]",
         "    volumes:",
         "      - ./reports:/reports",
-        "      - mobsfscan_cache:/root/.cache/pip",
         "    # Its exit 1 means it found something, which is not a failed scan.",
-        f"    command: sh -c \"pip install --quiet --no-cache-dir mobsfscan=={v['mobsfscan']} && mobsfscan --sarif -o /reports/mobsfscan.sarif /src; s=$$?; [ $$s -le 1 ]\"",
+        "    entrypoint: [\"sh\", \"-c\"]",
+        "    command: [\"mobsfscan --sarif -o /reports/mobsfscan.sarif /src; s=$$?; [ $$s -le 1 ]\"]",
         "volumes:",
         "  semgrep_cache:",
         "  trivy_cache:",
-        "  mobsfscan_cache:",
         "",
     ])
 
@@ -217,8 +224,8 @@ def uncovered():
 # ---- deploy, update, remove ---------------------------------------------------
 
 def deploy(nid, by=""):
-    """The scanners put on a node: its versions pinned to what is newest
-    known, the compose file written on the node and its images pulled, as a
+    """The scanners put on a node: pinned to the images their entry names,
+    the compose file written on the node and its images pulled, as a
     compose job there."""
     n = next((x for x in _agent_nodes() if x["id"] == nid), None)
     if not n:
@@ -228,7 +235,8 @@ def deploy(nid, by=""):
     with _lock:
         d = _load()
         rec = dict(d["nodes"].get(str(nid)) or {})
-        rec["versions"] = dict(latest_versions())
+        rec["images"] = entry_images()
+        rec["versions"] = _tags(rec["images"])
         d["nodes"][str(nid)] = rec
         _save(d)
     r = job_add(f"{PRINCIPAL}:{by or 'page'}", {"node": nid}, "compose",
@@ -237,7 +245,7 @@ def deploy(nid, by=""):
         return r
     with _lock:
         d = _load()
-        d["nodes"].setdefault(str(nid), {}).update(deployed=int(time.time()), versions=rec["versions"], deploy_job=r["job"])
+        d["nodes"].setdefault(str(nid), {}).update(deployed=int(time.time()), images=rec["images"], versions=rec["versions"], deploy_job=r["job"])
         _save(d)
     return {"ok": True, "job": r["job"], "versions": rec["versions"]}
 
@@ -254,13 +262,12 @@ def deploy_all(by=""):
 
 
 def update(nid, by=""):
-    """The newer versions pinned on the node and pulled."""
+    """The images the entry names now pinned on the node and pulled."""
     rec = record(nid)
     if not rec.get("deployed"):
         return {"error": "not deployed there: Deploy puts the scanners on the node"}
-    lt = latest_versions()
-    if versions_of(rec) == lt:
-        return {"ok": True, "same": True, "note": "it runs the newest versions known"}
+    if not behind(rec):
+        return {"ok": True, "same": True, "note": "it runs the images its entry names"}
     return deploy(nid, by)
 
 
@@ -300,80 +307,20 @@ def service_remove(nid, by=""):
     return remove(nid, by)
 
 
-# ---- the versions: a weekly check, Update when behind ---------------------------
+# ---- the versions: the entry's, Update when behind --------------------------------
 
 def latest_versions():
-    """The newest versions known: the last check's where it found newer,
-    else the defaults."""
-    lt = _load()["latest"]
-    v = lt.get("versions") if isinstance(lt.get("versions"), dict) else {}
-    return {s: str(v.get(s) or VERSIONS[s]) for s in SCANNERS}
-
-
-def _newest(tags):
-    """The highest plain x.y.z among tag names."""
-    best = None
-    for t in tags:
-        if VERSION_RE.match(str(t)):
-            parts = vkey(str(t))
-            if best is None or parts > best[0]:
-                best = (parts, str(t))
-    return best[1] if best else ""
-
-
-def _fetch_json(url):
-    with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "AerieOS"}), timeout=30) as r:
-        return json.loads(r.read())
-
-
-def check_versions():
-    """Docker Hub's tag lists and PyPI read now; what is newer than the
-    defaults kept as latest, the error otherwise."""
-    found, errors = {}, []
-    for s, url in (("semgrep", SEMGREP_TAGS_URL), ("trivy", TRIVY_TAGS_URL)):
-        try:
-            d = _fetch_json(url)
-            tags = [t.get("name") for t in (d.get("results") or []) if isinstance(t, dict)]
-            v = _newest(tags)
-            if v:
-                found[s] = v
-        except (OSError, ValueError, AttributeError) as e:
-            errors.append(f"{s}: {type(e).__name__}")
-    try:
-        d = _fetch_json(MOBSFSCAN_URL)
-        v = str((d.get("info") or {}).get("version") or "")
-        if VERSION_RE.match(v):
-            found["mobsfscan"] = v
-    except (OSError, ValueError, AttributeError) as e:
-        errors.append(f"mobsfscan: {type(e).__name__}")
-    with _lock:
-        d = _load()
-        d["latest"] = {"at": int(time.time()), "versions": {s: max(found.get(s, VERSIONS[s]), VERSIONS[s], key=vkey)
-                                                            for s in SCANNERS},
-                       "error": "; ".join(errors)}
-        _save(d)
-    return d["latest"]
-
-
-import checks  # noqa: E402 (the cadence, R176)
-
-
-def checked_at():
-    """When the versions were last read upstream, or 0: what the check's
-    cadence counts from (checks.py)."""
-    return int(_load()["latest"].get("at") or 0)
-
-
-def check_loop():
-    """The check on its cadence. The server starts it under nginx's switch,
-    so the scanners' own is read here on every pass."""
-    checks.loop("scanners", checked_at, check_versions, CHECK_DELAY, 600, on=lambda: AUTOCHECK)
+    """The version of each scanner the entry names: its image's tag."""
+    return _tags(entry_images())
 
 
 def behind(rec):
-    """The scanners a deployed node runs older versions of than known."""
-    v, lt = versions_of(rec), latest_versions()
-    return {s: lt[s] for s in SCANNERS if v[s] != lt[s]}
+    """The scanners a deployed node is pinned to another image of than the
+    entry names, each with the tag and the first twelve digits of the
+    digest it would move to."""
+    want = entry_images()
+    mine = rec.get("images") if isinstance(rec.get("images"), dict) else {}
+    return {s: packformat.image_said(want[s]).rpartition(":")[2] for s in SCANNERS if mine.get(s) and mine[s] != want[s]}
 
 
 # ---- the schedule and a run -----------------------------------------------------
@@ -404,8 +351,18 @@ def set_schedule(on=None, cron=None):
 
 
 def _run_on(nid, projects, by, late=""):
-    """One run on a node: the scan job, with the projects whose node it is."""
+    """One run on a node: the scan job, with the projects whose node it is.
+    A node whose record names no images yet is pinned to the entry's here,
+    so what its compose file says from this run on is what its record says."""
     rec = record(nid)
+    if not isinstance(rec.get("images"), dict):
+        with _lock:
+            d = _load()
+            rec = d["nodes"].setdefault(str(nid), {})
+            rec["images"] = entry_images()
+            rec["versions"] = _tags(rec["images"])
+            _save(d)
+        rec = record(nid)
     spec = _spec(nid, rec, [], {"projects": projects, "scanners": list(SCANNERS), "timeout": TIMEOUT,
                                 "versions": versions_of(rec)})
     r = job_add(f"{PRINCIPAL}:{by or 'schedule'}", {"node": nid}, "scan", spec)
@@ -523,7 +480,7 @@ def report_files():
 
 def view():
     """The Scanners page: each agent node with its scanners' state, the
-    schedule, the versions known, and the projects nothing covers."""
+    schedule, the versions the entry names, and the projects nothing covers."""
     d = _load()
     held = holders()
     lt = latest_versions()
@@ -540,13 +497,13 @@ def view():
                      "projects": held.get(nid, []), "last": {**last, "state": st},
                      "reports": rec.get("reports") or {}, "deploy_job": rec.get("deploy_job", ""),
                      "deploy_state": job_state(rec.get("deploy_job")) if job_state and rec.get("deploy_job") else ""})
-    return {"nodes": rows, "schedule": schedule(), "latest": {**d["latest"], "versions": lt}, "defaults": VERSIONS,
+    return {"nodes": rows, "schedule": schedule(), "latest": {"versions": lt}, "defaults": lt,
             "uncovered": uncovered(), "rev": rev()}
 
 
 def attention():
     """The bell's rows: a run that failed on a node, and a node behind the
-    newest versions, each kind scan."""
+    images the entry names, each kind scan."""
     out = []
     d = _load()
     names = {n["id"]: n.get("name") or n["id"] for n in _agent_nodes()}

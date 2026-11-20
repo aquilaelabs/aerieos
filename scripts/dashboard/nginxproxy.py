@@ -20,7 +20,6 @@ machine, so a container that publishes either itself is named as the clash.
 """
 import concurrent.futures
 import contextlib
-import http.client
 import json
 import os
 import re
@@ -32,6 +31,7 @@ import urllib.request
 from pathlib import Path
 
 import nodeset
+import packformat
 import services
 import statefile
 import syscontainer
@@ -40,21 +40,13 @@ STATE = None
 write_json = None
 _lock = threading.Lock()
 
-# The image: the alpine build of a release line. A node's nginx is pinned
-# to the newest line's digest when it is deployed or updated (R192), so what
-# runs is what the record says; the line's tag here is only what a node
-# deployed before any check had read the registry says of itself.
-IMAGE = "nginx:1.27-alpine"
-# The pack this service is, and so the row of services.py's images that is its own.
+# The image is the one this service's entry names, by its tag and its
+# digest (services.images): a node's nginx is pinned to it when it is
+# deployed or updated (R192), so what runs is what the record says, and a
+# newer one arrives as a change to the entry.
 PACK = "nginx"
-IMAGE_LINE = re.compile(r"^(\d+)\.(\d+)-alpine$")
-# Docker Hub's tag list for the official image, read weekly like the
-# toolchains' upstreams; a test points it at a file.
-TAGS_URL = (os.environ.get("BB_NGINX_TAGS_URL")
-            or "https://hub.docker.com/v2/repositories/library/nginx/tags?page_size=100&name=-alpine")
+# How long after a start the first look at the certificates waits.
 CHECK_DELAY = float(os.environ.get("BB_NGINX_CHECK_DELAY") or 240)
-AUTOCHECK = os.environ.get("BB_NGINX_AUTOCHECK", "1") != "0"
-_checking = {"checking": False}     # a check of the registry in flight (checks.guarded)
 HOST_RE = re.compile(r"^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?)*$")
 PATH_RE = re.compile(r"^/[A-Za-z0-9._~/-]*$")
 MAX_ROUTES = 64
@@ -455,93 +447,57 @@ def record(nid):
     return dict(_load().get(str(nid)) or {})
 
 
-# ---- the image: a weekly check, a pin per node, Update (R192) ----
+# ---- the image: the entry's, a pin per node, Update (R192) ----
 
 def latest_image():
-    """The newest line the registry listed: {tag, digest, at, error}, kept
-    in the store beside the nodes' records so it outlives the container."""
-    return dict(_load().get("_image") or {})
-
-
-def _keep_image(rec):
-    st = _load()
-    st["_image"] = rec
-    _save(st)
-
-
-def _read_image():
-    """({tag, digest}, "") for the newest release line's alpine tag the
-    registry lists, or ({}, why it could not be read)."""
-    tag, digest, error = "", "", ""
-    try:
-        with urllib.request.urlopen(TAGS_URL, timeout=20) as r:   # noqa: S310 (a fixed https URL, or a test's file://)  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
-            d = json.loads(r.read(4_000_000).decode("utf-8", "replace"))
-        best = None
-        for t in (d.get("results") or []) if isinstance(d, dict) else []:
-            m = IMAGE_LINE.match(str((t or {}).get("name") or ""))
-            if not m:
-                continue
-            key = (int(m.group(1)), int(m.group(2)))
-            if best is None or key > best[0]:
-                best = (key, t)
-        if best:
-            t = best[1]
-            tag = str(t["name"])
-            digest = str(t.get("digest") or next((i.get("digest") for i in (t.get("images") or [])
-                                                  if (i or {}).get("digest")), "") or "")
-            if not digest.startswith("sha256:"):
-                tag, digest, error = "", "", f"the registry gave no digest for nginx:{t['name']}"
-        else:
-            error = "the registry listed no release line's alpine tag"
-    except (OSError, http.client.HTTPException, ValueError, TypeError, KeyError) as e:   # URLError and a timeout are OSErrors
-        error = f"could not reach the registry: {e}"[:200]
-    return ({"tag": tag, "digest": digest} if tag else {}), error
-
-
-def check_image():
-    """Read the registry's tag list now and keep the newest release line's
-    alpine tag with its digest (the manifest list's, which is what a pull
-    by digest takes). An answer that could not be read keeps the last one
-    and says why; the record is what came back."""
-    return checks.guarded(_lock, latest_image, _read_image, keep=_keep_image, flag=_checking)
+    """The image this service's entry names: {name, tag, digest}, the
+    digest the one a node pulls."""
+    parts = packformat.image_parts(services.images(PACK).get("nginx")) or {"name": "", "tag": "", "digest": ""}
+    return dict(parts)
 
 
 def image_of(rec):
-    """What a node's nginx is pinned to: its tag and digest, or the line's
-    tag alone for one deployed before a check had read the registry."""
+    """What a node's nginx is pinned to: its tag and digest, the entry's
+    for one whose record names none, which its next write pins it to."""
     im = rec.get("image") or {}
-    return {"tag": str(im.get("tag") or IMAGE.partition(":")[2]), "digest": str(im.get("digest") or "")}
+    lt = latest_image()
+    return {"tag": str(im["tag"]), "digest": str(im["digest"])} if im.get("tag") and im.get("digest") else {"tag": lt["tag"], "digest": lt["digest"]}
 
 
 def image_ref(rec):
     """The compose file's image line: nginx:TAG@sha256:... once pinned, so
     a rebuild pulls exactly that and nothing moves under a Save."""
     im = image_of(rec)
-    return f"nginx:{im['tag']}" + (f"@{im['digest']}" if im["digest"] else "")
+    return f"{latest_image()['name']}:{im['tag']}" + (f"@{im['digest']}" if im["digest"] else "")
 
 
 def behind(rec):
-    """The tag a node's nginx would move to, or "": the newest line's digest
-    is not the one it is pinned to, and one not pinned at all is behind
-    whatever the registry says is newest."""
+    """The tag a node's nginx would move to, or "": the digest its entry
+    names is not the one it is pinned to."""
     lt = latest_image()
     if not lt.get("digest"):
         return ""
     return str(lt["tag"]) if image_of(rec)["digest"] != lt["digest"] else ""
 
 
+def behind_said(rec):
+    """behind() as a row says it: the tag and the first twelve digits of
+    the digest it would move to, or ""."""
+    lt = latest_image()
+    return f"{lt['tag']} ({lt['digest'][7:19]})" if behind(rec) else ""
+
+
 def behind_named(name):
-    """behind() for the Containers page's row of that name, or "" for a container
-    that is not a node's nginx."""
+    """behind_said() for the Containers page's row of that name, or "" for a
+    container that is not a node's nginx."""
     for n in node_list():
         if container_name(n["id"]) == name:
-            return behind(record(n["id"]))
+            return behind_said(record(n["id"]))
     return ""
 
 
 def pin_latest(nid):
-    """A node's nginx pinned to the newest line the registry listed; nothing
-    changes when no check has read one yet."""
+    """A node's nginx pinned to the image its entry names."""
     lt = latest_image()
     if not lt.get("digest"):
         return {}
@@ -554,9 +510,9 @@ def pin_latest(nid):
 
 def attention(deployed):
     """The bell's rows (R192): each node whose deployed nginx is behind the
-    newest line, kind nginx, keyed by bellseen on the digest it would move
-    to, so a dismissal holds until the registry moves again. `deployed`
-    says whether a node's nginx is on the Containers page."""
+    image its entry names, kind nginx, keyed by bellseen on the digest it
+    would move to, so a dismissal holds until the entry moves again.
+    `deployed` says whether a node's nginx is on the Containers page."""
     lt = latest_image()
     if not lt.get("digest"):
         return []
@@ -571,27 +527,11 @@ def attention(deployed):
             continue
         im = image_of(rec)
         out.append({"kind": "nginx", "node": n.get("name") or nid, "id": nid,
-                    "from": f"nginx:{im['tag']}" + (f" ({im['digest'][7:19]})" if im["digest"] else ", not pinned"),
-                    "to": f"nginx:{to} ({lt['digest'][7:19]})", "digest": lt["digest"],
-                    # The tag it runs, rebuilt upstream: said as a newer build.
+                    "from": f"{lt['name']}:{im['tag']} ({im['digest'][7:19]})",
+                    "to": f"{lt['name']}:{to} ({lt['digest'][7:19]})", "digest": lt["digest"],
+                    # The tag it runs, under another digest: said as a newer build.
                     "rebuild": im["tag"] == to})
     return out
-
-
-import checks  # noqa: E402 (the cadence, R176)
-
-
-def checked_at():
-    """When the registry was last read, or 0: what the check's cadence
-    counts from (checks.py)."""
-    return int(latest_image().get("at") or 0)
-
-
-def check_loop():
-    """The weekly check, from when the last one happened rather than from
-    the start: a container restart is not a reason to ask the registry
-    again. Started by the server beside the toolchains' loop."""
-    checks.loop("nginx", checked_at, check_image, CHECK_DELAY, 300)
 
 
 def deployed(devapp, nid):
@@ -655,6 +595,8 @@ def view(devapp, instance_state):
                "live": n.get("live"), "clash": [],
                # What it is pinned to and the line it would move to (R192).
                "image": image_of(rec) | {"ref": image_ref(rec)}, "behind": behind(rec),
+               # ...and the first digits of the digest it would move to.
+               "behind_digest": latest_image()["digest"][7:19] if behind(rec) else "",
                # Certificates from Let's Encrypt (R150): what is being asked
                # for, the email the account was made with, and whether a
                # DNS-01 challenge has a Cloudflare token to write with.
@@ -670,7 +612,8 @@ def view(devapp, instance_state):
         row["clash"] = clash
         if state is not None:
             row["state"] = state
-    return {"nodes": [row for row, _ in out], "image": IMAGE, "latest": latest_image(), "hostnames": hostnames()}
+    lt = latest_image()
+    return {"nodes": [row for row, _ in out], "image": f"{lt['name']}:{lt['tag']}", "latest": lt, "hostnames": hostnames()}
 
 
 # ---- certificates from an ACME directory (R150) -----------------------------
@@ -947,7 +890,7 @@ def acme_due(now=None):
 def renew_loop(containers, devactions, devapp):
     """Every few hours: each ACME pair ending within thirty days asked for
     again, the way it was first; a failure is said on the bell and tried
-    again next round. Started by the server beside check_loop."""
+    again next round. Started by the server."""
     time.sleep(CHECK_DELAY)
     while True:
         try:
@@ -1100,7 +1043,7 @@ def deploy(nid, containers, devactions, devapp):
     the node has enrolled."""
     return syscontainer.deploy(nid, container_name(nid), lambda: compose_text(nid, record(nid)),
                                containers, devactions, devapp, node_list,
-                               # A new one is the newest line the registry listed, pinned (R192).
+                               # A new one is the image its entry names, pinned (R192).
                                first=lambda: pin_latest(nid))
 
 
@@ -1119,25 +1062,27 @@ def apply(nid, containers, devactions, devapp):
     """A deployed nginx given its new compose file and rebuilt, so what was
     saved is what runs; nothing to do where it is not deployed yet."""
     name = container_name(nid)
-    return syscontainer.apply(name, lambda: compose_text(nid, record(nid)), containers, devactions, devapp,
-                              first=lambda: claim(devapp, name))
+    def first():
+        claim(devapp, name)
+        # One whose record names no image is pinned as its file is written,
+        # so the entry moving later never moves it under a Save.
+        if not (record(nid).get("image") or {}).get("digest"):
+            pin_latest(nid)
+    return syscontainer.apply(name, lambda: compose_text(nid, record(nid)), containers, devactions, devapp, first=first)
 
 
 def update(nid, containers, devactions, devapp):
-    """Update on the nginx page's node or its Docker row (R192): the newest
-    line's digest pinned on the record and the container rebuilt with it,
-    so the pull is the whole of what changes. The registry is read now
-    when no check has, so the first press needs no Check first."""
+    """Update on the nginx page's node or its Docker row (R192): the digest
+    its entry names pinned on the record and the container rebuilt with it,
+    so the pull is the whole of what changes."""
     name = container_name(nid)
     if not devapp.is_file_source(name):
-        return {"error": f"{name} is not deployed: Deploy puts the newest nginx on the node"}
+        return {"error": f"{name} is not deployed: Deploy puts nginx on the node"}
     lt = latest_image()
     if not lt.get("digest"):
-        lt = check_image()
-    if not lt.get("digest"):
-        return {"error": lt.get("error") or "no check has read the registry yet"}
+        return {"error": "nginx's entry names no image"}
     if image_of(record(nid))["digest"] == lt["digest"]:
-        return {"ok": True, "same": True, "note": f"{name} already runs nginx:{lt['tag']} at that digest"}
+        return {"ok": True, "same": True, "note": f"{name} already runs {lt['name']}:{lt['tag']} at that digest"}
     pin_latest(nid)
     r = apply(nid, containers, devactions, devapp)
     return r if r.get("error") else r | {"to": lt["tag"]}

@@ -125,8 +125,7 @@ function scannersUncovered(rows){
 // their own over a gap).
 function scannersActs(d){
   const undeployed = d ? (d.nodes || []).filter(n => !n.deployed && !n.host_only && (n.projects || []).length).length : 0;
-  return `<button type="button" data-scancheck${d ? "" : " disabled"}>Check for updates</button>${
-    undeployed ? `<button type="button" class="primary" data-scandeployall>Deploy on ${undeployed === 1 ? "the node" : `${undeployed} nodes`}</button>` : ""}`;
+  return undeployed ? `<button type="button" class="primary" data-scandeployall>Deploy on ${undeployed === 1 ? "the node" : `${undeployed} nodes`}</button>` : "";
 }
 
 function renderScannersInto(i){
@@ -135,7 +134,7 @@ function renderScannersInto(i){
   if (scannersData === null){
     d.setBar("");
     drawHTML(d.list, scannersErr ? `<div class="hint bad">${esc(scannersErr)}</div>`
-      : skTpl(pageHead({facts: [["Newest known", GHOST], ["Checked", GHOST]], actions: scannersActs(null)})
+      : skTpl(pageHead({facts: [["This AerieOS names", GHOST], ["Nodes scanning", GHOST]], actions: scannersActs(null)})
         + docSection("scanners", "schedule", "Schedule", "", `<div class="field">${skRows(2)}</div>`)
         // A node's section before its name is read: a word, since a
         // section's title is words and the ghost is a fact's value.
@@ -148,9 +147,8 @@ function renderScannersInto(i){
   const lt = data.latest || {};
   d.setBar("");
   const deployed = (data.nodes || []).some(n => n.deployed);
-  patch(d.list, pageHead({facts: [["Newest known", scannersVersions(lt.versions)],
-      ["Checked", lt.at ? ago(lt.at) : "never: the defaults this release pins"], ["Nodes scanning", String((data.nodes || []).filter(n => n.deployed).length)]], actions: scannersActs(data)})
-    + (lt.error ? `<div class="hint warn">${esc(lt.error)}</div>` : "")
+  patch(d.list, pageHead({facts: [["This AerieOS names", scannersVersions(lt.versions)],
+      ["Nodes scanning", String((data.nodes || []).filter(n => n.deployed).length)]], actions: scannersActs(data)})
     + scannersScheduleSection(data.schedule || {}, deployed)
     + (data.nodes || []).map(scannersNodeSection).join("")
     + ((data.nodes || []).length ? "" : noNodeYet("the scanners run on a node"))
@@ -166,7 +164,6 @@ function wireScannersTab(root){
   act("[data-scanupdate]", b => scannersAct({action: "update", node: b.dataset.scanupdate}));
   act("[data-scanrun]", b => scannersAct({action: "run", node: b.dataset.scanrun}));
   act("[data-scanrunall]", () => scannersAct({action: "run"}));
-  act("[data-scancheck]", () => scannersAct({action: "check"}));
   act("[data-scanon]", b => scannersAct({action: "schedule", on: b.dataset.scanon === "1"}));
   act("[data-scansave]", () => scannersAct({action: "schedule", cron: scannersCustom ?? root.querySelector("#scanCron")?.value ?? ""}).then(() => { scannersCustom = null; }));
   root.querySelectorAll("[data-scanremove]").forEach(b => b.onclick = async () => {

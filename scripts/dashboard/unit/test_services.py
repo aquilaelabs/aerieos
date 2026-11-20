@@ -41,8 +41,7 @@ class Table(unittest.TestCase):
     def test_every_list_reads_the_table_in_its_order(self):
         self.assertEqual(services.KINDS, ("router", "nginx", "scanners"))
         self.assertIs(toolpacks.SERVICES, services.KINDS)
-        self.assertEqual(services.CHECKED, ("nginx", "scanners"))
-        self.assertEqual(checks.KINDS, ("release", "images", "nginx", "scanners", "catalog"))
+        self.assertEqual(checks.KINDS, ("release", "images", "catalog"), "no service asks what is newest: each runs the images its entry names")
         self.assertEqual([k for k in settings.KEYS if k.startswith("check_")], [f"check_{k}" for k in checks.KINDS])
 
     def test_each_pack_names_its_kind_and_is_found_by_its_name(self):
@@ -79,10 +78,6 @@ class Table(unittest.TestCase):
             for name in ("pack", "container_name", "service_deployed", "service_install", "service_remove"):
                 self.assertTrue(callable(getattr(m, name, None)), f"{kind}: {name}")
             self.assertIsInstance(m.REMOVES, str, kind)
-        for kind in services.CHECKED:
-            m = services.module(kind)
-            for name in ("checked_at", "check_loop", services.TABLE[kind]["check"]):
-                self.assertTrue(callable(getattr(m, name, None)), f"{kind}: {name}")
 
     def test_the_grants_differ_and_only_the_router_is_set_on_its_card(self):
         self.assertEqual({k: services.grant(k) for k in services.KINDS},
@@ -178,21 +173,12 @@ class OnANode(unittest.TestCase):
         scanners.deploy("n1")
         self.assertTrue(services.deployed("scanners", "n1"))
 
-    def test_the_checks_are_the_modules_own(self):
-        last, run, loops = services.check_last(), services.check_run(), services.check_loops()
-        self.assertEqual((list(last), list(run), list(loops)), (["nginx", "scanners"],) * 3)
-        self.assertEqual((last["nginx"](), last["scanners"]()), (0, 0))
-        ran = []
-        with mock.patch.object(nginxproxy, "check_image", lambda: ran.append("nginx")), \
-                mock.patch.object(scanners, "check_versions", lambda: ran.append("scanners")), \
-                mock.patch.object(nginxproxy, "check_loop", lambda: ran.append("nginx loop")), \
-                mock.patch.object(scanners, "check_loop", lambda: ran.append("scanners loop")), \
-                mock.patch.object(nginxproxy, "checked_at", lambda: 7), mock.patch.object(scanners, "checked_at", lambda: 9):
-            for k in services.CHECKED:
-                run[k]()
-                loops[k]()
-            self.assertEqual((last["nginx"](), last["scanners"]()), (7, 9))
-        self.assertEqual(ran, ["nginx", "nginx loop", "scanners", "scanners loop"])
+    def test_no_service_has_a_check_of_its_own(self):
+        for kind in services.KINDS:
+            m = services.module(kind)
+            self.assertNotIn("check", services.TABLE[kind], kind)
+            for name in ("checked_at", "check_loop", "check_image", "check_versions"):
+                self.assertFalse(hasattr(m, name), f"{kind}: {name}: what it runs is its entry's, and a newer image is a change to the entry")
 
 
 if __name__ == "__main__":

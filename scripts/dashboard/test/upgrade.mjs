@@ -74,7 +74,7 @@ async function startOnce(w, dash, build){
     BB_DOCKER_BIN: `${DIR}/bin/docker`, BB_ADB_BIN: `${DIR}/bin/adb`, BB_WEBEXT_BIN: `${DIR}/bin/web-ext`,
     BB_DOCTOR_FIXTURE: `${DIR}/doctor.txt`, BB_DEV_DATA_DIR: `${w}/devdata`, BB_ARCHIVE_SPOOL: `${w}/spool`,
     TC_AUTOCHECK: '0', BB_NODE_POLL: '3', BB_CLAUDE_LATEST_URL: 'file:///nonexistent', BB_CLAUDE_CHECK_DELAY: '3600',
-    BB_NGINX_TAGS_URL: 'file:///nonexistent', BB_NGINX_CHECK_DELAY: '3600',
+    BB_NGINX_CHECK_DELAY: '3600',
     BB_APPS_RELEASES_URL: 'file:///nonexistent', BB_APPS_BOOT_DELAY: '3600',
     BB_IMAGE_DIGESTS_FILE: `${w}/image-digests.json`, BB_IMAGE_CHECK_DELAY: '3600',
     BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', BB_COVERAGE_OUT: '' } });

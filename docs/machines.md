@@ -667,9 +667,10 @@ and the build it is serving. Its sections, each with its own Apply and Revert:
 - **Update checks** (R176): how often AerieOS asks by itself for what is
   newer, each check daily, weekly (the default), monthly or off, with when it
   last ran and **Check for updates** beside it: a newer AerieOS (a bare-metal
-  install's), the container images, nginx, the scanners and the Library (the
+  install's), the container images and the Library (the
   toolchains' and coding agents' newest versions and the vetted catalog's
-  index). Off leaves only Check for updates. A node's own check of what it holds is
+  index). nginx, the model router and the scanners are not among them:
+  each runs the images this AerieOS names by digest. Off leaves only Check for updates. A node's own check of what it holds is
   its **Version check** on its row's Advanced section, weekly unless set.
 - **Idle sessions**: the idle rule, which ends any agent's session after N minutes
   with nothing typed or written, here and on every node, where the node

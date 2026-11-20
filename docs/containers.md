@@ -442,18 +442,17 @@ routed, and is deleted only when nothing routes it, the refusal saying
 where it is. A route's hostname is picked from that list, so several routes,
 nodes and spaces' containers use one name without typing it again.
 
-nginx keeps up to date like the toolchains and the agent (R192, the
-operator, 11 Oct). The controller reads the registry's tag list once a week
-(Check for updates on the nginx page reads it at once) and keeps the newest release
-line's alpine tag with its digest; a node's nginx is pinned to a digest when
-it is deployed or updated, written into its compose file as
-`nginx:TAG@sha256:...`, so a Save rebuilds with exactly what it had and
-nothing moves under it. A deployed nginx behind the newest line says so on
-the nginx page's node and on its Containers page row, each with Update, which pins
-the new digest and rebuilds; the bell carries a note of its own kind, to the
-digest, so Dismiss holds until the registry moves the line again. One
-deployed before any check had read the registry is unpinned, and behind
-whatever is newest until its first Update.
+nginx runs the image AerieOS names for it, by its digest (R192, the
+operator, 11 Oct and 20 Nov). Nothing asks a registry what is newest: the
+image is part of nginx's entry, `nginx:TAG@sha256:...`, and a newer one
+arrives with an update of AerieOS. A node's nginx is pinned to that digest
+when it is deployed or updated, written into its compose file, so a Save
+rebuilds with exactly what it had and nothing moves under it. A deployed
+nginx behind the image its entry names says so on the nginx page's node and
+on its Containers page row, each with Update, which pins the new digest and
+rebuilds; the bell carries a note of its own kind, to the digest, so
+Dismiss holds until the entry names another. One whose record names no
+image yet is pinned to the entry's the next time its file is written.
 
 ### Certificates from Let's Encrypt
 
@@ -479,12 +478,12 @@ The Scanners page, opened from the Scanners' row on the Installed page or
 from the scanners' row in the System section,
 deploys AerieOS's own static analysis
 scanners (Semgrep, Trivy, mobsfscan) to each node that holds spaces as
-one compose space of one-shot services, their versions pinned at the
-deploy like nginx's image (R145), and runs them there on one schedule over
+one compose space of one-shot services, each the image AerieOS names by its
+digest, pinned at the deploy like nginx's (R145), and runs them there on one schedule over
 the spaces whose node it is; each node sends its SARIF up to the
 controller over the agent's own API, so nothing of the controller's is
 mounted on a node, and the Analysis page reads what came. The page says
-each node's state and versions, Update when newer are out (checked weekly),
+each node's state and versions, Update when this AerieOS names newer images,
 each node's last run with its log, Run now, Remove, and the spaces
 nothing covers with why. The whole of it is [scanners.md](scanners.md).
 

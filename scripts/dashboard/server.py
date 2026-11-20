@@ -5837,11 +5837,10 @@ releasecheck.configure(version=lambda: image_stamp().get("version") or "", bare_
 # setting, when it last ran read off its own module, and Check now.
 import checks                                                    # noqa: E402
 checks.configure(state=STATE, settings_mod=settings,
-                 # nginx's and the scanners' are their modules' own, by services.py's table.
-                 last={"images": imagecheck.last_at, **services.check_last(),
+                 last={"images": imagecheck.last_at,
                        "catalog": lambda: int(toolchains._tc_checked or 0)},
                  run={**({"release": lambda: (releasecheck.check(), checks.stamp("release"))} if BARE_METAL else {}),
-                      "images": imagecheck.check, **services.check_run(),
+                      "images": imagecheck.check,
                       "catalog": lambda: toolchains.start_job("check", [p["name"] for p in toolchains.TOOLCHAINS], auto=True)})
 
 
@@ -13425,8 +13424,6 @@ class Handler(BaseHTTPRequestHandler):
         by = (self._who() or {}).get("name") or ""
         if act == "deploy-all":
             r = scanners.deploy_all(by)
-        elif act == "check":
-            r = {"ok": True, "latest": scanners.check_versions()}
         elif act == "run":
             r = scanners.run_now(by, nid)
         elif act == "schedule":
@@ -13490,9 +13487,6 @@ class Handler(BaseHTTPRequestHandler):
                 r = nginxproxy.apply(nid, containers, devactions, devapp) | saved | kept
         elif act == "remove":
             r = nginxproxy.remove(nid, devactions, devapp)
-        elif act == "check":
-            lt = nginxproxy.check_image()
-            r = {"error": lt["error"]} if lt.get("error") else {"ok": True, "latest": lt}
         elif act == "update":
             r = nginxproxy.update(nid, containers, devactions, devapp)
         elif act == "acme":
@@ -14860,11 +14854,6 @@ def main():
     threading.Thread(target=wssync.look_loop, name="sync-look", daemon=True).start()
     if imagecheck.AUTOCHECK and "image-updates" not in featuresoff.off():  # every container's registry images, weekly (R195)
         threading.Thread(target=imagecheck.check_loop, name="image-check", daemon=True).start()
-    # The nginx image, weekly (R192), and the scanners' versions with it:
-    # each service's own check, started under nginx's switch.
-    if nginxproxy.AUTOCHECK and "image-updates" not in featuresoff.off():
-        for kind, loop in services.check_loops().items():
-            threading.Thread(target=loop, name=f"{kind}-check", daemon=True).start()
     # The ACME renewals of the nginx page's certificates (R150), thirty days
     # before a pair ends, whatever the image checks are set to: started under
     # their switch, turning image updates off stopped every renewal without a

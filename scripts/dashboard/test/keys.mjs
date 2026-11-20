@@ -45,7 +45,7 @@ const port = await freePort();
 const out = openSync(`${w}/server.log`, 'a');
 const proc = spawn('python3', ['-u', `${DASH}/server.py`], { stdio: ['ignore', out, out], env: {
   ...env, DASHBOARD_PORT: String(port), BUILDER_HOME: `${w}/home`, TC_AUTOCHECK: '0', BB_NODE_POLL: '3',
-  BB_CLAUDE_LATEST_URL: 'file:///nonexistent', BB_CLAUDE_CHECK_DELAY: '3600', BB_NGINX_TAGS_URL: 'file:///nonexistent',
+  BB_CLAUDE_LATEST_URL: 'file:///nonexistent', BB_CLAUDE_CHECK_DELAY: '3600',
   BB_NGINX_CHECK_DELAY: '3600', BB_APPS_RELEASES_URL: 'file:///nonexistent', BB_APPS_BOOT_DELAY: '3600',
   BB_IMAGE_CHECK_DELAY: '3600', BUILDERBOT_ROLE: 'controller', BB_TOKEN: '', BB_COVERAGE_OUT: '' } });
 const base = `http://127.0.0.1:${port}`;

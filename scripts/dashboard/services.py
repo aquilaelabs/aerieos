@@ -6,9 +6,10 @@ Scanners (scanners.py). Each is named here once, what differs between them
 as plain data, and every list of them reads this table: the kinds a pack's
 service block may name (toolpacks.SERVICES), the packs written under
 packs/services (tools/packs-export.py), which of a node's System containers
-is whose (containers.manager_view), the Library's rows with its Install and
-Remove (server.py), and the update checks two of them have (checks.KINDS,
-the server's runners and loops).
+is whose (containers.manager_view), and the Library's rows with its Install
+and Remove (server.py). None asks a registry what is newest: each runs the
+images its entry names by digest (images, below), and a newer one arrives
+as a change to that entry.
 
 A service's module answers by the same names as the others, which is all
 this file asks of it:
@@ -24,12 +25,10 @@ this file asks of it:
                              page's own words
   service_row(nid)           where it has more to say on its row than
                              whether it is deployed: the keys it sets
-  checked_at()               where it has a check: when that last ran
-  check_loop()               ...and the loop that runs it on its cadence
 
 The modules are imported when first asked for and never as this one loads:
-toolpacks and checks read the table while they load, and nginxproxy and
-scanners import checks themselves.
+toolpacks reads the table while it loads, and each service's module reads
+its images from here.
 """
 import importlib
 import json
@@ -39,43 +38,43 @@ import packformat
 
 # kind (a pack's service.kind) -> the module that is the service; the grant
 # on a node that its Library row comes to (the server's Install and Remove
-# name the same one in their own gates); whether its settings are a page of
-# its own, so the Library only installs and removes it; and the function of
-# its module that runs its update check now, "" where it has none. The
-# order is the one every list of them keeps.
+# name the same one in their own gates); and whether its settings are a
+# page of its own, so the Library only installs and removes it. The order
+# is the one every list of them keeps.
 TABLE = {
-    "router": {"module": "router", "grant": "configure", "page": False, "check": ""},
-    "nginx": {"module": "nginxproxy", "grant": "docker-write", "page": True, "check": "check_image"},
-    "scanners": {"module": "scanners", "grant": "docker-write", "page": True, "check": "check_versions"},
+    "router": {"module": "router", "grant": "configure", "page": False},
+    "nginx": {"module": "nginxproxy", "grant": "docker-write", "page": True},
+    "scanners": {"module": "scanners", "grant": "docker-write", "page": True},
 }
 KINDS = tuple(TABLE)
-# The kinds with an update check of their own, each a cadence under
-# Controller settings by its kind's name.
-CHECKED = tuple(k for k, s in TABLE.items() if s["check"])
-
 
 # The images each service runs, by its pack's name: the one copy, a file
 # beside this one that tools/pins.py moves. Each is named by its tag and
 # the digest of what is pulled, and a service's module reads its own by
 # the names the file gives them: nothing of an image is a constant in code.
-IMAGES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "service-images.json")
-_images = {}
+# BB_SERVICE_IMAGES_FILE names another file, for the harness, and the file
+# is read again when it changes.
+IMAGES_FILE = os.environ.get("BB_SERVICE_IMAGES_FILE") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "service-images.json")
+_images = {"at": None, "rows": {}}
 
 
 def images(name):
     """{key: reference} for the images the service whose pack is `name`
-    runs, each name:tag@sha256:..., read once; {} for a name the file has
-    no row for, or a row that is not what the format takes."""
-    if not _images:
+    runs, each name:tag@sha256:...; {} for a name the file has no row for,
+    or a row that is not what the format takes."""
+    try:
+        at = os.stat(IMAGES_FILE).st_mtime_ns
+    except OSError:
+        at = 0
+    if _images["at"] != at:
         try:
             with open(IMAGES_FILE, encoding="utf-8") as f:
                 rows = json.load(f)["services"]
         except (OSError, ValueError, KeyError, TypeError):
             rows = []
-        for r in rows if isinstance(rows, list) else []:
-            if isinstance(r, dict) and isinstance(r.get("name"), str):
-                _images[r["name"]] = packformat.images_checked(r.get("images"))[0]
-    return dict(_images.get(name) or {})
+        _images.update(at=at, rows={r["name"]: packformat.images_checked(r.get("images"))[0] for r in (rows if isinstance(rows, list) else [])
+                                    if isinstance(r, dict) and isinstance(r.get("name"), str)})
+    return dict(_images["rows"].get(name) or {})
 
 
 def entry(m):
@@ -155,21 +154,3 @@ def rows(nid, may=None):
             row.update(more(nid))
         out.append(row)
     return out
-
-
-# ---- the update checks (checks.py) -------------------------------------------------
-
-def check_last():
-    """{kind: () -> when its check last ran} for checks.configure."""
-    return {k: (lambda k=k: module(k).checked_at()) for k in CHECKED}
-
-
-def check_run():
-    """{kind: () -> its check run now} for checks.configure."""
-    return {k: (lambda k=k: getattr(module(k), TABLE[k]["check"])()) for k in CHECKED}
-
-
-def check_loops():
-    """{kind: the loop that runs its check when due}, each a thread's
-    target at the server's start."""
-    return {k: (lambda k=k: module(k).check_loop()) for k in CHECKED}
