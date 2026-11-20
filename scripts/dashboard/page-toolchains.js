@@ -169,15 +169,17 @@ function tcVerifiedLine(p){
 // line (R267; the operator, 20 Nov: one mechanism for every entry, and no
 // paragraph where a phrase does): every download pinned, its installer
 // pinned with what it fetches by itself in the entry's own sentence, or not
-// pinned and which part. "" for an entry that says none (an app, a card
-// from a catalog whose index does not carry it).
+// pinned. Which part of an entry is not held is its author's to read (Look
+// and the catalog's check say it), and on this page it was a paragraph.
+// "" for an entry that says none (an app, a card from a catalog whose index
+// does not carry it).
 function tcHeldLine(p){
   const h = p.held;
   if (!h?.word) return "";
   const why = esc(String(h.why || "").replace(/\.+$/, ""));
   if (h.word === "pinned") return `<span class="sub tcheld">Every download is pinned, and its install runs with no network.</span>`;
   if (h.word === "installer") return `<span class="sub tcheld">Its installer is pinned and downloads the rest itself${why ? `: ${why}` : ""}.</span>`;
-  return `<span class="sub tcheld">Its downloads are not pinned${why ? `: ${why}` : ""}.</span>`;
+  return `<span class="sub tcheld">Its downloads are not pinned: what its install fetches is not checked against anything it carries.</span>`;
 }
 
 function tcReceiptLines(p){

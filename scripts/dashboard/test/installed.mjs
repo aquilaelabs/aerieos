@@ -302,7 +302,7 @@ await section("an install's receipt", async () => {
      `a toolchain AerieOS ships names no manifest on its receipt: its download's sha256, or nothing where a signature held it (${JSON.stringify(said.shipped)})`);
   ok(said.held[0] === 'Every download is pinned, and its install runs with no network.'
      && said.held[1] === 'Its installer is pinned and downloads the rest itself: rustup downloads the toolchain from static.rust-lang.org.'
-     && said.held[2] === 'Its downloads are not pinned: its install steps run with the network, and its entry does not say what they fetch.'
+     && said.held[2] === 'Its downloads are not pinned: what its install fetches is not checked against anything it carries.'
      && said.held[3] === '' && said.held[4] === '',
      `an entry's Details says in one line what its downloads are held to, and nothing for an entry that does not say (${JSON.stringify(said.held)})`);
 });
