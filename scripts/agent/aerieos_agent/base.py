@@ -474,7 +474,10 @@ def wipe(b):
         for i in range(len(b)):
             b[i] = 0
         return True
-    if isinstance(b, bytes) and b and sys.implementation.name == "cpython":
+    # One byte or none is never zeroed: CPython keeps one object for each
+    # one-byte value and hands it to everybody, so zeroing a one-byte file's
+    # content would turn that byte to zero for the whole process.
+    if isinstance(b, bytes) and len(b) > 1 and sys.implementation.name == "cpython":
         try:
             import ctypes
             ctypes.memset(id(b) + bytes.__basicsize__ - 1, 0, len(b))

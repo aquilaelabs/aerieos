@@ -38,6 +38,23 @@ class Apply(unittest.TestCase):
         self.assertEqual(k, b"\0" * 32)
         self.assertFalse(hardening.wipe("not bytes"))
 
+    def test_wipe_leaves_a_one_byte_value_alone_here_and_on_a_node(self):
+        # CPython keeps one object for each one-byte value: zeroing the
+        # content of a one-byte file would zero that byte for the whole
+        # process (a newline read from a file is the same object as b"\n").
+        import agentpkg
+        agent = agentpkg.load("aerieos_agent_wipe")
+        for wipe in (hardening.wipe, agent.base.wipe if hasattr(agent, "base") else __import__("aerieos_agent_wipe.base", fromlist=["x"]).wipe):
+            for n in (10, 65, 0, 255):
+                one = bytes([n])
+                self.assertFalse(wipe(one), "nothing is zeroed")
+                self.assertEqual(bytes([n])[0], n, "the shared one-byte value is as it was")
+            self.assertEqual(b"\n", bytes([10]))
+            self.assertFalse(wipe(b""))
+            two = os.urandom(2)
+            self.assertTrue(wipe(two))
+            self.assertEqual(two, b"\0\0")
+
 
 if __name__ == "__main__":
     unittest.main()
