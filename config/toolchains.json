@@ -53,7 +53,7 @@
     "",
     "  kind: tarball      resolve a version, fetch source.url, unpack with strip.",
     "        script       fetch source.url and run it with the given args and env.",
-    "        git          shallow-clone a branch; the tool then updates in place.",
+    "        git          shallow-clone a branch, or fetch the one commit the row pins (commit, below).",
     "        command      run something already in the image, pointed at {dir}.",
     "        sdkmanager   an android package, installed by sdkmanager.",
     "",

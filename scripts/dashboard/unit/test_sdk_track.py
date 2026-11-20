@@ -181,6 +181,25 @@ class Repository(unittest.TestCase):
         rc, out, _ = self.s.meta("offer", "kit")
         self.assertEqual(out, f"{self.commit[:8]}\t\n")
 
+    def test_an_update_of_it_installs_the_commit_its_entry_pins_now(self):
+        self.row(tag="1.2.0", branch="stable")
+        rc, out = self.s.sh("sdk_install kit")
+        self.assertEqual(rc, 0, out)
+        # The pin moves in the entry: a second commit, under its own tag.
+        with open(os.path.join(self.repo, "more"), "w") as f:
+            f.write("two\n")
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "two")
+        self.git("tag", "1.3.0")
+        first, self.commit = self.commit, self.git("rev-parse", "HEAD")
+        self.row(tag="1.3.0", branch="stable")
+        rc, out = self.s.sh("sdk_update kit")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("updating kit to what its entry pins", out)
+        self.assertIn(f"kit 1.3.0 on stable from {self.repo}", out)
+        self.assertEqual(self.s.read("kit", ".bb-verified"), f"sha1\t{self.commit}\tthe commit its entry pins\n")
+        self.assertNotEqual(first, self.commit)
+
     def test_a_tag_that_has_moved_off_the_pinned_commit_installs_nothing(self):
         with open(os.path.join(self.repo, "more"), "w") as f:
             f.write("two\n")
