@@ -1557,6 +1557,10 @@ sdk_declared() {
     if [ "$tag" = net ] && [ "$net" = online ]; then
         log "${what} keeps the network for its steps, as its entry says: ${online}"
         printf 'online\n%s\n' "$online" > "$d/.bb-net" 2>/dev/null || true
+    elif [ "$plan" = "${plan%%$'\n'*}" ]; then
+        # Nothing declared beside it: a row cut because its own download is
+        # held (a pin, its publisher's signature), said as that.
+        sdk_net_cut "$what" "$d" "${what}'s download is held to what its entry carries"
     else
         sdk_net_cut "$what" "$d"
     fi
@@ -1655,7 +1659,7 @@ sdk_fetch_declared() {
     done 3<<< "$plan"
 }
 
-# sdk_net_cut WHAT DIR: SDK_CUT becomes the words that run a command with no
+# sdk_net_cut WHAT DIR [SAID]: SDK_CUT becomes the words that run a command with no
 # network, for an entry whose downloads are declared: a network namespace of
 # its own, as the same account where this unshare can say so, else as that
 # namespace's root with tar told not to hand files to owners that do not
@@ -1680,7 +1684,7 @@ rc=$?
 rm -f "$f"
 exit "$rc"'
 sdk_net_cut() {
-    local what="$1" d="$2"
+    local what="$1" d="$2" said="${3:-${1} declares its downloads}"
     SDK_CUT=()
     if unshare --user --map-user="$(id -u)" --map-group="$(id -g)" --net true 2>/dev/null; then
         SDK_CUT=(unshare --user --map-user="$(id -u)" --map-group="$(id -g)" --net)
@@ -1690,10 +1694,10 @@ sdk_net_cut() {
         SDK_CUT=(bash -c "$SDK_NETCUT_RELAY" "$SDK_NETCUT_BIN")
     fi
     if [ "${#SDK_CUT[@]}" != 0 ]; then
-        log "${what} declares its downloads: its steps run with no network"
+        log "${said}: its steps run with no network"
         printf 'cut\n' > "$d/.bb-net" 2>/dev/null || true
     else
-        log "${what} declares its downloads, but this node cannot cut the network for a step (this account may make no network namespace, and no bb-netcut makes one for it): its steps run with it"
+        log "${said}, but this node cannot cut the network for a step (this account may make no network namespace, and no bb-netcut makes one for it): its steps run with it"
         printf 'open\n' > "$d/.bb-net" 2>/dev/null || true
     fi
 }

@@ -128,6 +128,11 @@ class Installs(unittest.TestCase):
         self.assertIn("installing go go1.99.0 into", out)
         self.assertIn("verified: sha256 matches the pin its entry carries", out)
         self.assertIn("go version go1.99.0", out, "and its verify ran")
+        # A row that declares nothing beside its own download is cut because
+        # that download is held, and its job says that, not that it declares.
+        self.assertIn("go's download is held to what its entry carries", out)
+        self.assertNotIn("go declares its downloads", out)
+        self.assertRegex(out, rf"receipt: \d+ files, \d+ bytes, from {sha[:12]}, [0-9a-f]{{12}} over them all")
         self.assertEqual(self.s.read("go", ".bb-verified"), f"sha256\t{sha}\tthe pin its entry carries\n")
         self.assertIn("; checked: sha256 matched the pin its entry carries", out, "the status line reads the same record")
 

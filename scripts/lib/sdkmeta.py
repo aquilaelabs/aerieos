@@ -953,7 +953,9 @@ def receipt(d, commit, name=""):
             f.write(f"{now}\t{name}\t{commit}\t{tree}\t{len(lines)}\t{total}\n")
     except OSError:
         pass
-    said = f"receipt: {len(lines)} files, {total} bytes, from {commit[:12] or 'no commit'}, {tree[:12]} over them all"
+    # Filed under the commit it was fetched at or the sha256 its download
+    # was held to; a download its publisher's signature held has neither.
+    said = f"receipt: {len(lines)} files, {total} bytes, " + (f"from {commit[:12]}, " if commit else "") + f"{tree[:12]} over them all"
     said += {"cut": "; its steps ran with no network", "open": "; its steps ran with the network, which this node cannot cut",
              "online": f"; its steps kept the network, as its entry says: {why or 'its installer downloads the rest'}"}.get(net, "")
     return said + (f"; the same commit made {before[:12]} here before" if before else "")
