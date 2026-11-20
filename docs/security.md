@@ -312,7 +312,12 @@ the release's builds and passed on by the controller, which checks nothing
 itself). A controller built from a branch ships an unsigned agent, which a
 pinned node refuses, saying so on the update's job; a machine its owner
 uses for such builds says `sudo aerieos-agent unsigned on` at its own
-console. Both choices are a person's at the machine: they take root and a
+console. Somebody who builds the controller themselves and signs those
+builds with a key of their own adds its public half there instead (`sudo
+aerieos-agent release-key add HEX`, four at most, and `release-key drop
+HEX` takes one away): the node then takes what that key signed beside what
+the release signed, and the update's job says which key it was. These
+choices are a person's at the machine: they take root and a
 terminal, the running agent never writes over them, and nothing the
 controller sends in the channel changes them. A pinned node that meets an
 unsigned controller stays on the agent it has, and since a controller
@@ -332,7 +337,8 @@ signs the list of those files, each with its digest, and a pinned node
 keeps a copy of them for root only under that signature: otherwise root
 goes on with the copy it has, the job saying why, and a machine whose
 console allows unsigned builds takes them from a branch's build as it takes
-that build's agent.
+that build's agent. A key added at the console counts here as it does for
+the agent: root's tools signed by it are kept.
 
 **The rest, it still does, unless its console says otherwise.** The agent
 runs as root; a root command an administrator approves is run as given

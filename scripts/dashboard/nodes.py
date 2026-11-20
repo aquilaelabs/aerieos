@@ -2161,9 +2161,14 @@ def _c_sandbox(c, out):
 
 def _c_release(c, out):
     # Whose agent updates it takes (the agent's release.py): the release key
-    # it pinned, shortened, and whether its console allows unsigned builds.
+    # it pinned, shortened, the keys added at its console beside it (four at
+    # most, shortened the same way; the row counts them, so what is not a
+    # key's hex is left out) and whether its console allows unsigned builds.
     out["release_key"] = re.sub(r"[^0-9a-f]", "", str(c.get("release_key") or ""))[:16]
     out["release_spare"] = re.sub(r"[^0-9a-f]", "", str(c.get("release_spare") or ""))[:16]
+    also = c.get("release_also")
+    out["release_also"] = [x[:16] for x in (also if isinstance(also, list) else [])
+                           if isinstance(x, str) and re.fullmatch(r"[0-9a-f]{16,64}", x)][:4]
     out["unsigned_ok"] = c.get("unsigned_ok") is True
 
 
@@ -2525,7 +2530,7 @@ CENSUS = (
     (("vm_host",), _c_vm_host),
     (("vm_isos",), _c_vm_isos),
     (("sandbox",), _c_sandbox),
-    (("release_key", "release_spare", "unsigned_ok"), _c_release),
+    (("release_key", "release_spare", "release_also", "unsigned_ok"), _c_release),
     (("root_off",), _c_root_off),
     (("gpu_card", "gpu_display", "gpu_amd"), _c_gpu),
     (("gpu_driver", "gpu_card"), _c_gpu_driver),
@@ -3407,13 +3412,16 @@ def unsigned_refused(n):
     every two minutes was a failed job every two minutes). Known from what
     the node reports, a key pinned and unsigned builds not allowed at its
     console, with no signature here to send; and from its last answer to
-    this same build, for a signature it did not accept."""
+    this same build, for a signature it did not accept. A node with keys
+    added at its console and no release key pinned refuses an unsigned
+    build the same way."""
     if not n:
         return ""
     rep = n.get("reported") or {}
     ours = agent_file()
-    if rep.get("release_key") and rep.get("unsigned_ok") is not True and not agent_sig(ours["digest"]):
-        return ("it takes only agent updates a release signed, and this controller's build is unsigned: "
+    if (rep.get("release_key") or rep.get("release_also")) and rep.get("unsigned_ok") is not True and not agent_sig(ours["digest"]):
+        return ("it takes only agent updates " + ("a release signed" if rep.get("release_key") else "signed by a key added at its console")
+                + ", and this controller's build is unsigned: "
                 "a signed build updates it, or aerieos-agent unsigned on at its console allows this one")
     last = next(iter(jobs_for(node_id=n["id"], n=1, type="self-update")), None)
     if last and last.get("state") == "failed" and last.get("exit_code") == 77 \

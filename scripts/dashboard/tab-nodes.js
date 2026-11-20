@@ -1944,21 +1944,34 @@ function ndBar(live){
 // the one in its enroll script's name.
 const ND_FACTS = ["Reached", "Has", "Seen", "Agent", "Updates", "Jobs run as", "Runs on", "Id"];
 // Whose agent updates a node takes (R227 step 1, the agent's release.py):
-// only those AerieOS's release signed, once it has pinned the release key;
+// only those AerieOS's release signed, once it has pinned the release key,
+// and those signed by a key a person added at its console (a controller
+// somebody built themselves, signed with their own key), said by how many;
 // an unsigned build too where its own console said so; else this
 // controller's word, as every node did before.
 function ndUpdatesFact(n){
   if (n.kind !== "agent" || !n.reported) return "";
   const key = n.reported.release_key || "";
-  // Before AerieOS names a release key, no node can pin one: nothing to say.
-  if (!key) return nodesAgent?.release_key ? "taken on this controller's word: no release key pinned (Enroll script pins it)" : "";
-  // A pinned node meeting an unsigned build here will refuse its update.
-  if (!n.reported.unsigned_ok && nodesAgent && nodesAgent.signed === false && nodeStale(n))
+  const also = (n.reported.release_also || []).length;
+  const added = `${also} ${also === 1 ? "key" : "keys"} added at its console`;
+  // A node that checks signatures meeting an unsigned build here will refuse its update.
+  const refused = !n.reported.unsigned_ok && nodesAgent && nodesAgent.signed === false && nodeStale(n);
+  if (!key){
+    // Keys added there and no release key: signed builds only, all the same.
+    if (also) return refused
+      ? `signed builds only (${added}): this controller's build is unsigned, so its update is refused there`
+      : (n.reported.unsigned_ok ? `signed builds (${added}), and unsigned builds, allowed at its console` : `signed builds only (${added})`)
+        + (nodesAgent?.release_key ? "; no release key pinned (Enroll script pins it)" : "");
+    // Before AerieOS names a release key, no node can pin one: nothing to say.
+    return nodesAgent?.release_key ? "taken on this controller's word: no release key pinned (Enroll script pins it)" : "";
+  }
+  if (refused)
     return `signed releases only (key ${key.slice(0, 8)}…): this controller's build is unsigned, so its update is refused there`;
   // The spare (R232): pinned with the key, or named by this build and not
   // pinned there yet, which the Enroll script puts right.
   const spare = n.reported.release_spare || "";
-  const keys = spare ? `key ${key.slice(0, 8)}…, spare ${spare.slice(0, 8)}…` : `key ${key.slice(0, 8)}…`;
+  const keys = (spare ? `key ${key.slice(0, 8)}…, spare ${spare.slice(0, 8)}…` : `key ${key.slice(0, 8)}…`)
+    + (also ? `; ${also} more ${also === 1 ? "key" : "keys"} added at its console` : "");
   const owed = !spare && nodesAgent?.release_spare ? "; no spare key pinned (Enroll script pins it)" : "";
   return (n.reported.unsigned_ok
     ? `signed releases (${keys}), and unsigned builds, allowed at its console`

@@ -28,6 +28,14 @@ with a person's tool packs, so no release can sign it; what a release signs
 is the list of those files, each with its digest (tools_digest), under a
 line of its own, and a pinned node keeps a copy of them for root only when
 that signature covers the files it was sent.
+
+A controller somebody builds on their own machine is not a release, and its
+builder signs it with a key of their own. A node trusts such a key beside
+the release key and its spare once a person adds it at the node's console
+(`aerieos-agent release-key add HEX`, up to ALSO_MAX of them, kept in
+node.json as release_also): an update or a list of root's tools signed by an
+added key is taken as one the release signed, and said as what it is.
+Nothing a controller sends adds, changes or drops one.
 """
 import hashlib
 import re
@@ -44,6 +52,8 @@ MESSAGE = b"aerieos agent v1\n"
 TOOLS_MESSAGE = b"aerieos root tools v1\n"
 KEY_RE = re.compile(r"[0-9a-f]{64}")
 SIG_RE = re.compile(r"[0-9a-f]{128}")
+# How many keys a console may add beside the release key and its spare.
+ALSO_MAX = 4
 
 
 def clean_key(text):
@@ -75,8 +85,68 @@ def keys(state):
     return list(dict.fromkeys(k for k in (pinned(state), spare(state)) if k))
 
 
+def also(state):
+    """The keys added at this node's console (release-key add), in the order
+    they were added: whoever builds a controller of their own signs it with
+    one. [] for none; what is not a key is passed over, and no more than
+    ALSO_MAX are read."""
+    got = (state or {}).get("release_also")
+    if not isinstance(got, list):
+        return []
+    return list(dict.fromkeys(k for k in (clean_key(x) for x in got if isinstance(x, str)) if k))[:ALSO_MAX]
+
+
+def trusted(state):
+    """Every key this node trusts, the release key and its spare first and
+    the ones added at its console after them: [] for a node that checks
+    nothing."""
+    return list(dict.fromkeys(keys(state) + also(state)))
+
+
 def unsigned_ok(state):
     return (state or {}).get("unsigned_ok") is True
+
+
+def _kind(state, key):
+    """What a key trusted here is, in the words a job's log says it by."""
+    pins = keys(state)
+    if key in pins:
+        return "the release key this node pinned" if key == pins[0] else "the spare release key this node pinned"
+    return "a key added at this node's console"
+
+
+def _signer(state, digest, sig, message):
+    """(who, why): the key trusted here that signed `digest`, said as its
+    kind with the key shortened, or "" and why none of them did."""
+    why = ""
+    for key in trusted(state):
+        said = verify(key, digest, sig, message)
+        if not said:
+            return f"{_kind(state, key)} ({key[:16]}…)", ""
+        why = why or said
+    if also(state):
+        # Among several kinds of key, "the pinned release key's" names one.
+        why = why.replace("its signature is not the pinned release key's", "its signature is under no key this node trusts")
+    return "", why
+
+
+def _named(state):
+    """The keys this node takes a signature under, as a refusal names them."""
+    pins, added = keys(state), [k for k in also(state) if k not in keys(state)]
+    said = []
+    if pins:
+        said.append(f"the release key it pinned ({pins[0][:16]}…)" + (f" or its spare ({pins[1][:16]}…)" if len(pins) > 1 else ""))
+    if added:
+        said.append(("a key" if len(added) == 1 else "one of the keys") + " added at its console ("
+                    + ", ".join(f"{k[:16]}…" for k in added) + ")")
+    return " or ".join(said)
+
+
+def _console_can():
+    """What a person at the machine can do about a refusal: the two verbs."""
+    return ("A build made outside AerieOS's release builds is unsigned unless its builder signs it with a key of their "
+            f"own. At this machine's own console: sudo {names.command()} release-key add HEX trusts that builder's key, "
+            f"sudo {names.command()} unsigned on allows unsigned builds")
 
 
 def tools_digest(files):
@@ -114,46 +184,33 @@ def verify(key, digest, sig, message=MESSAGE):
 
 def may_install(state, digest, sig):
     """(ok, words) for an update of `digest` carrying `sig`: taken with no
-    key pinned (said so), taken when the signature is under a key pinned
-    here (the release key or its spare), taken unsigned only where this
-    node's console said so, refused otherwise."""
-    pins = keys(state)
-    if not pins:
+    key trusted here, taken when the signature is under a key this node
+    trusts (the release key, its spare, or one added at its console, said as
+    which), taken unsigned only where this node's console said so, refused
+    otherwise."""
+    if not trusted(state):
         return True, ""
-    why = ""
-    for i, key in enumerate(pins):
-        said = verify(key, digest, sig)
-        if not said:
-            return True, (f"signed by the release key this node pinned ({key[:16]}…)" if i == 0
-                          else f"signed by the spare release key this node pinned ({key[:16]}…)")
-        why = why or said
+    who, why = _signer(state, digest, sig, MESSAGE)
+    if who:
+        return True, f"signed by {who}"
     if unsigned_ok(state):
         return True, f"not checked ({why}): this node's console allows unsigned builds"
-    named = f"the release key it pinned ({pins[0][:16]}…)" + (f" or its spare ({pins[1][:16]}…)" if len(pins) > 1 else "")
-    return False, (f"refused: {why}. This node takes only updates signed by {named}; "
-                   "a controller built from a branch ships an unsigned agent. To allow those on this machine, at its "
-                   f"own console: sudo {names.command()} unsigned on")
+    return False, f"refused: {why}. This node takes only updates signed by {_named(state)}. {_console_can()}"
 
 
 def may_keep_tools(state, digest, sig):
     """(ok, words) for root's copy of the bundle's tools, whose list is
     `digest` and came with `sig`: as may_install decides an update. Kept
-    with no key pinned, kept when the signature is under a key pinned here,
-    kept unsigned only where this node's console said so, and otherwise not:
-    root goes on with the copy it has."""
-    pins = keys(state)
-    if not pins:
+    with no key trusted here, kept when the signature is under a key this
+    node trusts, kept unsigned only where this node's console said so, and
+    otherwise not: root goes on with the copy it has."""
+    if not trusted(state):
         return True, ""
-    why = ""
-    for i, key in enumerate(pins):
-        said = verify(key, digest, sig, TOOLS_MESSAGE)
-        if not said:
-            return True, (f"root's tools are signed by the release key this node pinned ({key[:16]}…)" if i == 0
-                          else f"root's tools are signed by the spare release key this node pinned ({key[:16]}…)")
-        why = why or said.replace("the update names no digest to check", "the bundle holds none of root's tools")
+    who, why = _signer(state, digest, sig, TOOLS_MESSAGE)
+    if who:
+        return True, f"root's tools are signed by {who}"
+    why = why.replace("the update names no digest to check", "the bundle holds none of root's tools")
     if unsigned_ok(state):
         return True, f"root's tools not checked ({why}): this node's console allows unsigned builds"
-    named = f"the release key it pinned ({pins[0][:16]}…)" + (f" or its spare ({pins[1][:16]}…)" if len(pins) > 1 else "")
-    return False, (f"refused: the tools root installs from this bundle are not AerieOS's release ({why}), so root keeps "
-                   f"the copy it has. This node takes only what is signed by {named}; a controller built from a branch "
-                   f"ships them unsigned. To allow those on this machine, at its own console: sudo {names.command()} unsigned on")
+    return False, (f"refused: the tools root installs from this bundle are not signed by a key this node trusts ({why}), so "
+                   f"root keeps the copy it has. This node takes only what is signed by {_named(state)}. {_console_can()}")

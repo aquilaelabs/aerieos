@@ -46,6 +46,7 @@ from .gpu import (
 )
 from .sessnet import SESSNET_STATUS, isolation_now
 from .runners import _runner_state, runner_dirs
+from . import release
 from . import storage
 from . import vmhw
 from .disks import disks_now
@@ -404,9 +405,11 @@ def census(state):
         # The row draws the operator's desired config against these.
         "sandbox": os.access(SANDBOX_BIN, os.X_OK),
         # Whose agent updates this node takes (release.py): the release key
-        # it pinned, shortened, and whether its console allows unsigned ones.
+        # it pinned, shortened, the keys added at its console the same way,
+        # and whether its console allows unsigned ones.
         "release_key": str(console_said().get("release_key") or "")[:16],
         "release_spare": str(console_said().get("release_spare") or "")[:16],
+        "release_also": [k[:16] for k in release.also(console_said())],
         "unsigned_ok": console_said().get("unsigned_ok") is True,
         # ...and whether its console switched root commands off (R227 step 2).
         "root_off": console_said().get("root_off") is True,

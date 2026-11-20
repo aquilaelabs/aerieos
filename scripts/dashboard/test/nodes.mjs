@@ -113,13 +113,25 @@ await section("A node's Updates line names the release key it pinned and its spa
       const both = ndUpdatesFact(n({ release_key: 'a'.repeat(16), release_spare: 'b'.repeat(16) }));
       const owed = ndUpdatesFact(n({ release_key: 'a'.repeat(16) }));
       nodesAgent = { release_key: 'a'.repeat(16), release_spare: '', signed: true };
-      return [both, owed, ndUpdatesFact(n({ release_key: 'a'.repeat(16) }))];
+      // Keys a person added at the node's console, for a controller somebody
+      // built themselves: counted, beside the release key or with none pinned.
+      const c = 'c'.repeat(16), d = 'd'.repeat(16);
+      return [both, owed, ndUpdatesFact(n({ release_key: 'a'.repeat(16) })),
+              ndUpdatesFact(n({ release_key: 'a'.repeat(16), release_also: [c] })),
+              ndUpdatesFact(n({ release_key: 'a'.repeat(16), release_also: [c, d], unsigned_ok: true })),
+              ndUpdatesFact(n({ release_also: [c, d] })),
+              ndUpdatesFact(n({ release_key: 'a'.repeat(16), release_also: [] }))];
     } finally { nodesAgent = was; }
   });
   ok(said[0] === 'signed releases only (key aaaaaaaa…, spare bbbbbbbb…)'
      && said[1] === 'signed releases only (key aaaaaaaa…); no spare key pinned (Enroll script pins it)'
      && said[2] === 'signed releases only (key aaaaaaaa…)',
      `a node's Updates line names its release key and its spare, and says when the spare is still to pin (${JSON.stringify(said)})`);
+  ok(said[3] === 'signed releases only (key aaaaaaaa…; 1 more key added at its console)'
+     && said[4] === 'signed releases (key aaaaaaaa…; 2 more keys added at its console), and unsigned builds, allowed at its console'
+     && said[5] === 'signed builds only (2 keys added at its console); no release key pinned (Enroll script pins it)'
+     && said[6] === said[2],
+     `...and how many keys were added at its console, beside the release key or with none pinned (${JSON.stringify(said.slice(3))})`);
 });
 ok(await page.evaluate(() => !document.querySelector('.nodestab [data-cap], .nodestab [data-encap]')),
    'no capability toggles anywhere: a node does everything for the spaces bound to it');

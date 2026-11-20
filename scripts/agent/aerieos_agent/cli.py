@@ -113,6 +113,7 @@ def cmd_enroll(args):
         raise SystemExit("--release-key takes the release key as 64 hex characters, and its spare after a comma")
     pins = release.clean_keys(opts["--release-key"]) or release.keys(was)
     unsigned = release.unsigned_ok(was)
+    added = release.also(was)
     root_off = was.get("root_off") is True
     # The account sessions run as (roadmap #24), when this agent runs as
     # root. Recorded even when empty, so `status` shows the decision.
@@ -143,12 +144,17 @@ def cmd_enroll(args):
     # nothing between could then write the record without them.
     state.pop("release_key", None)
     state.pop("release_spare", None)
+    state.pop("release_also", None)
     state.pop("unsigned_ok", None)
     state.pop("root_off", None)
     if root_off:
         # What the console said of root commands outlives an enrollment, as
         # the pin does: enrolling again is the controller's script.
         state["root_off"] = True
+    if added:
+        # ...and so do the keys a person added here: the script names the
+        # release key and its spare, and knows nothing of these.
+        state["release_also"] = added
     if pins:
         state["release_key"] = pins[0]
         if len(pins) > 1:
@@ -262,22 +268,34 @@ def _at_console(what):
 
 def cmd_release_key(args):
     """release-key [HEX[,HEX]|none]: show, pin or drop AerieOS's release
-    key here, with its spare after a comma."""
+    key here, with its spare after a comma. release-key add HEX and
+    release-key drop HEX: trust, or stop trusting, one more key beside
+    them, the one a controller somebody built themselves is signed with."""
     from . import release
     state = load_state()
     if not args:
-        key, spare = release.pinned(state), release.spare(state)
-        print(f"release key: {key}" if key else "release key: none pinned; agent updates are taken on the controller's word")
+        key, spare, added = release.pinned(state), release.spare(state), release.also(state)
+        print(f"release key: {key}" if key else "release key: none pinned"
+              + ("" if added else "; agent updates are taken on the controller's word"))
         if spare:
             print(f"spare key:   {spare}")
-        print("unsigned builds: " + ("allowed here" if release.unsigned_ok(state) else "refused" if release.keys(state) else "not asked, with no key pinned"))
+        for k in added:
+            print(f"added here:  {k}")
+        print("unsigned builds: " + ("allowed here" if release.unsigned_ok(state) else "refused" if release.trusted(state)
+                                     else "not asked, with no key pinned"))
+        return
+    if args[0] in ("add", "drop"):
+        _release_also(state, args[0], args[1:])
         return
     _at_console("pinning a release key")
     if args[0] == "none":
         state.pop("release_key", None)
         state.pop("release_spare", None)
         save_state(state, console=True)
-        print("no release key pinned: agent updates are taken on the controller's word again")
+        added = release.also(state)
+        print("no release key pinned: agent updates are taken on the controller's word again" if not added else
+              "no release key pinned: this node still takes only agent updates signed by "
+              + ("the key" if len(added) == 1 else f"one of the {len(added)} keys") + " added here")
         return
     pins = release.clean_keys(",".join(args))
     if not pins:
@@ -290,6 +308,42 @@ def cmd_release_key(args):
     save_state(state, console=True)
     print(f"pinned {pins[0][:16]}…" + (f" and its spare {pins[1][:16]}…" if len(pins) > 1 else "")
           + ": this node takes only agent updates signed by " + ("one of them" if len(pins) > 1 else "it"))
+
+
+def _release_also(state, verb, args):
+    """release-key add HEX, release-key drop HEX: the keys this machine
+    trusts beside the release key and its spare (release.also). A person's
+    at the machine, like the pin: no job reaches here."""
+    from . import names, release
+    _at_console("adding a key this machine trusts" if verb == "add" else "dropping a key this machine trusts")
+    key = release.clean_key(args[0]) if len(args) == 1 else ""
+    if not key:
+        raise SystemExit(f"release-key {verb} takes one key as 64 hex characters: the public half of the key a build is signed with")
+    added = release.also(state)
+    if verb == "drop":
+        if key not in added:
+            raise SystemExit(f"{key[:16]}… is not a key added here: {names.command()} release-key shows them")
+        added.remove(key)
+        state.pop("release_also", None)
+        if added:
+            state["release_also"] = added
+        save_state(state, console=True)
+        print(f"dropped {key[:16]}…: this node takes nothing more on its signature")
+        return
+    if key in release.keys(state):
+        print(f"{key[:16]}… is pinned here as the release key or its spare already: nothing added")
+        return
+    if key in added:
+        print(f"{key[:16]}… was added here already")
+        return
+    if len(added) >= release.ALSO_MAX:
+        raise SystemExit(f"this node holds {release.ALSO_MAX} added keys, the most it keeps: drop one first "
+                         f"({names.command()} release-key drop HEX)")
+    state["release_also"] = added + [key]
+    save_state(state, console=True)
+    print(f"added {key[:16]}…: this node takes "
+          + ("agent updates and root's tools signed by it, beside what the release key signs" if release.keys(state)
+             else "only agent updates and root's tools signed by a key added here"))
 
 
 def cmd_unsigned(args):
@@ -305,8 +359,9 @@ def cmd_unsigned(args):
         state.pop("unsigned_ok", None)
     save_state(state, console=True)
     print(("this machine takes agent updates no release signed (a controller built from a branch)" if args[0] == "on"
-           else "this machine refuses agent updates the pinned release key did not sign"
-           + ("" if release.keys(state) else "; none is pinned yet, so that applies once one is")))
+           else ("this machine refuses agent updates no key it trusts signed" if release.also(state)
+                 else "this machine refuses agent updates the pinned release key did not sign")
+           + ("" if release.trusted(state) else "; none is pinned yet, so that applies once one is")))
 
 
 def cmd_root_asks(args):

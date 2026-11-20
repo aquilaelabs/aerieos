@@ -443,13 +443,14 @@ def load_state():
         raise SystemExit(f"{NODE_JSON} is not JSON ({e}); enroll again") from e
 
 
-# What this machine's console alone decides: the release key pinned here
-# and whether an unsigned agent is taken (release.py), and whether a root
+# What this machine's console alone decides: the release key pinned here,
+# the keys added beside it and whether an unsigned agent is taken
+# (release.py), and whether a root
 # command the controller sends is run at all (root_off, R227 step 2). A running agent holds
 # node.json in memory and writes it whole at every token it is handed, so
 # what the console wrote is read back from the file and kept, never the
 # agent's older copy of it.
-CONSOLE_KEYS = ("release_key", "release_spare", "unsigned_ok", "root_off")
+CONSOLE_KEYS = ("release_key", "release_spare", "release_also", "unsigned_ok", "root_off")
 
 
 def console_said():
