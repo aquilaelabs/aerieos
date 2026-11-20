@@ -550,6 +550,99 @@ agent_proved() {
     return 0
 }
 
+# The node's own record, which its agent keeps: what it enrolled as, and what
+# it pinned at its console.
+NODE_RECORD=/etc/aerieos/node.json
+
+# agent_pinned: the release key this node pinned, with its spare after a
+# comma, as its record holds them (the agent's release.keys); "none" for a
+# node that pinned none, and nothing at all where the record cannot be read,
+# which is not the same thing and is not taken for it.
+agent_pinned() {
+    python3 -c 'import json, re, sys
+d = json.load(open(sys.argv[1]))
+keys = [str(d.get(k) or "").strip().lower() for k in ("release_key", "release_spare")]
+keys = list(dict.fromkeys(k for k in keys if re.fullmatch("[0-9a-f]{64}", k)))
+print(",".join(keys) or "none")' "$NODE_RECORD" 2>/dev/null || true
+}
+
+# agent_swap NEW SENT SIG: a newer agent, fetched on a run after the
+# enrollment, put in the installed one's place or left out of it, and said
+# either way. NEW is the file, SENT the digest and SIG the release's
+# signature as the controller's answer named them.
+#
+# The node pinned its release key so that an update is not the controller's
+# word, and this is an update: the installed agent is asked, with the verb
+# it answers at the console (check-update FILE [SIG]: why, and 0 when this
+# node may install it, 77 when it refuses, nothing changed either way), and
+# on 77 the installed agent stays, with its words. Swapping the file in on
+# the digest alone was a way around the pin for anyone the controller's
+# answer could be made by.
+#
+# Any other answer is no answer: an agent from before the verb says unknown
+# command and exits 64, and a machine that lost its agent and kept its
+# record has none to ask (B669). Then the node's record says what it
+# pinned. With no key pinned the agent goes in on the digest, as it always
+# did. With one pinned, this script makes the check itself, the signature
+# under the pinned key (release_sig_ok), and the agent goes in only when
+# that passes: a node that pinned a key is never handed an agent nothing
+# checked. What its console allows of unsigned builds is the agent's own to
+# weigh, so here such a node keeps the agent it has and is told the two
+# ways on: Update agent on its row, which the running agent decides, and
+# Enroll script on its row where no agent is left.
+agent_swap() {
+    local new="$1" sent="$2" sig="$3" got have said="" rc=0 pinned="" why=""
+    got="sha256:$(sha256sum "$new" | cut -d' ' -f1)"
+    have="sha256:$( { sha256sum "$AGENT" 2>/dev/null || echo none; } | cut -d' ' -f1)"
+    if [ -z "$sent" ] || [ ! -s "$new" ]; then
+        warn "what the controller sent for the agent is not AerieOS's ($(stat -c %s "$new" 2>/dev/null || echo 0) bytes, no digest); leaving the installed one"
+        rm -f "$new"; return 0
+    elif [ "$sent" != "$got" ]; then
+        warn "the agent that arrived does not match the digest the controller sent (${got} vs ${sent}); leaving the installed one"
+        rm -f "$new"; return 0
+    elif [ "$got" = "$have" ]; then
+        say "agent: already current (${got:7:12})"
+        rm -f "$new"; return 0
+    fi
+    [[ "$sig" =~ ^[0-9a-f]{128}$ ]] || sig=""
+    if [ -x "$AGENT" ]; then
+        said="$("$AGENT" check-update "$new" ${sig:+"$sig"} 2>&1)" || rc=$?
+    else
+        rc=127
+    fi
+    case "$rc" in
+        0) ;;
+        77) warn "agent: this node refuses the newer agent (${got:7:12}) and keeps the one it has (${have:7:12}). ${said}"
+            rm -f "$new"; return 0 ;;
+        *)  pinned="$(agent_pinned)"
+            if [ "$pinned" = none ]; then
+                said="no release key is pinned on this node, so it was taken on the digest the controller sent"
+            else
+                rc=0
+                if [ -z "$pinned" ]; then
+                    rc=2; SIG_SAID="${NODE_RECORD} could not be read for what this node pinned"
+                else
+                    release_sig_ok "$pinned" "$sig" "$got" || rc=$?
+                fi
+                case "$rc" in
+                    0) said="signed by the release key this node pinned (${SIG_SAID:0:16}…); checked by this script, since the installed agent could not be asked" ;;
+                    1) [ -n "$sig" ] && why="the signature the controller sent with it is not the pinned key's (${pinned:0:16}…)" \
+                           || why="the controller sent no release signature with it (its build carries none)" ;;
+                    *) why="this machine cannot check a signature: ${SIG_SAID}" ;;
+                esac
+                if [ -n "$why" ]; then
+                    warn "agent: the newer agent (${got:7:12}) is left out, and the one installed (${have:7:12}) stays. The installed agent could not be asked whether this node takes it (it is from before it could answer, or it is not there), and this node pinned a release key, so this script checked instead: ${why}. Update agent on the node's row asks the running agent, which decides as this machine's console allows; where no agent is left here, Enroll script on its row enrolls the machine again"
+                    rm -f "$new"; return 0
+                fi
+            fi ;;
+    esac
+    chmod 755 "$new"; mv -f "$new" "$AGENT"
+    svc_restart aerieos-agent 2>/dev/null || true
+    say "agent: updated ${have:7:12} -> ${got:7:12} and restarted"
+    [ -z "$said" ] || printf '   %s\n' "$said"
+    return 0
+}
+
 # ---- a GUEST node: somebody's own machine (roadmap R23) ---------------------
 #
 # The managed shape below owns the box: it makes accounts, installs docker,
@@ -3864,10 +3957,10 @@ elif [ -f /etc/aerieos/node.json ]; then
     # lasted did at every boot (B669). The agent does NOT keep itself current
     # (the dashboard's Update button queues that as a job, and nothing runs
     # it unasked), so a re-run here is the console path to the same thing:
-    # fetch what the controller ships with this node's own token, check it
-    # against the digest the controller sends, and swap it in only when it
-    # differs. The token never leaves this shell; the same check the agent
-    # makes of its own updates, made here by hand.
+    # fetch what the controller ships with this node's own token, and the
+    # release's signature beside it, and put it in only where the node would
+    # take it as an update: the installed agent is asked (agent_swap). The
+    # token never leaves this shell.
     # The accounts' homes too: a machine that lost them with the old root keeps
     # the accounts in /etc, and a session or an install has nowhere to write.
     for who in "${USER_NAME:-}" "${SESSION_NAME:-}"; do
@@ -3884,25 +3977,12 @@ elif [ -f /etc/aerieos/node.json ]; then
     done
     say "agent: already enrolled; checking the controller for a newer agent"
     ctl=""; tok=""
-    read -r ctl tok < <(python3 -c 'import json; d = json.load(open("/etc/aerieos/node.json")); print(d.get("controller", ""), d.get("token", ""))' 2>/dev/null || true)
+    read -r ctl tok < <(python3 -c 'import json, sys; d = json.load(open(sys.argv[1])); print(d.get("controller", ""), d.get("token", ""))' "$NODE_RECORD" 2>/dev/null || true)
     if [ -n "$ctl" ] && [ -n "$tok" ]; then
         hdr="$(mktemp)"
         if curl -fsSL -D "$hdr" -H @<(printf 'Authorization: Bearer %s\n' "${tok}") \
                 "${ctl%/}/api/v1/agent/download" -o "${AGENT}.new" 2>/dev/null; then
-            want="$(tr -d '\r' < "$hdr" | awk 'tolower($1)=="x-agent-digest:"{print $2}')"
-            got="sha256:$(sha256sum "${AGENT}.new" | cut -d' ' -f1)"
-            have="sha256:$( { sha256sum "$AGENT" 2>/dev/null || echo none; } | cut -d' ' -f1)"
-            if [ -n "$want" ] && [ "$want" != "$got" ]; then
-                warn "the agent that arrived does not match the digest the controller sent (${got} vs ${want}); leaving the installed one"
-                rm -f "${AGENT}.new"
-            elif [ "$got" = "$have" ]; then
-                say "agent: already current (${got:7:12})"
-                rm -f "${AGENT}.new"
-            else
-                chmod 755 "${AGENT}.new"; mv -f "${AGENT}.new" "$AGENT"
-                svc_restart aerieos-agent 2>/dev/null || true
-                say "agent: updated ${have:7:12} -> ${got:7:12} and restarted"
-            fi
+            agent_swap "${AGENT}.new" "$(agent_sent "$hdr" x-agent-digest)" "$(agent_sent "$hdr" x-agent-sig)"
         else
             warn "could not fetch the agent from ${ctl}. Is the controller up? The installed agent is left as it is"
             rm -f "${AGENT}.new"

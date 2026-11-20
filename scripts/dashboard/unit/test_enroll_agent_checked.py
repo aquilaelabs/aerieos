@@ -15,6 +15,7 @@ before running it; and a run after the enrollment asks the installed agent
 lines, cut from the script and run under bash with curl, the agent and the
 services stood in for."""
 import functools
+import json
 import os
 import re
 import shutil
@@ -32,6 +33,7 @@ MAC = os.path.join(ROOT, "nodes", "provision-macos.sh")
 sys.path.insert(0, os.path.join(HERE, ".."))
 sys.path.insert(0, HERE)
 import agentpkg  # noqa: E402
+import channel  # noqa: E402
 import enrollscript as es  # noqa: E402
 import nodes  # noqa: E402
 
@@ -306,6 +308,124 @@ class FirstAgent(Bash):
         self.assertEqual(release.verify(self.pub, self.digest, self.sig), "")
 
 
+class RunAgain(Bash):
+    """A provisioner run again on an enrolled node: the installed agent is
+    asked before a newer one takes its place."""
+
+    def again(self, *, answers, body=OTHER, sig=None, record=None, headers=None, pre="", same=False):
+        """`answers` is the installed agent's exit code to check-update
+        (None: there is no agent installed); `same` has the controller send
+        the very agent that is installed. (the installed agent after, what
+        it was asked, what was said)."""
+        src = text(LINUX)
+        agent = os.path.join(self.d, "aerieos-agent")
+        asked = os.path.join(self.d, "asked")
+        for f in (agent, agent + ".new", asked):
+            if os.path.exists(f):
+                os.unlink(f)
+        if answers is not None:
+            # The agent's own answer, in the words each would give.
+            words = {0: "signed by the release key this node pinned", 77: "refused: the controller sent no signature with it.",
+                     64: "unknown command check-update"}[answers]
+            with open(agent, "w") as f:
+                f.write(f"#!/usr/bin/env bash\nprintf '%s\\n' \"$*\" >> {asked!r}\necho {words!r}\nexit {answers}\n")
+            os.chmod(agent, 0o755)
+        was = held(agent)
+        body = was if same else body
+        self.lay(body, ({"X-Agent-Digest": digest_of(body)} | ({"X-Agent-Sig": sig} if sig else {})) if headers is None else headers)
+        rec = os.path.join(self.d, "node.json")
+        with open(rec, "w") as f:
+            json.dump({"controller": "http://controller.example:7680", "token": "bbn_x"} | (record or {}), f)
+        block = between(src, '    say "agent: already enrolled; checking the controller for a newer agent"',
+                        '        warn "/etc/aerieos/node.json carries no controller or token')
+        run = (STUBS + section(src, "# ---- a GUEST node") + pre + f"AGENT={agent!r}; NODE_RECORD={rec!r}\n"
+               + "path() {\n" + block + "    fi\n}\npath\n")
+        rc, said = self.bash(run)
+        self.assertEqual(rc, 0, said)
+        self.assertFalse(os.path.exists(agent + ".new"), "the fetched file is put in place or taken away")
+        now = held(agent)
+        return ("kept" if now == was else "replaced" if now == body else "other"), \
+            (text(asked).strip() if os.path.exists(asked) else ""), said
+
+    def test_the_agent_says_it_may_be_installed_and_it_is(self):
+        sig = signed(self.key, digest_of(OTHER))
+        state, asked, said = self.again(answers=0, sig=sig, record={"release_key": self.pub})
+        self.assertEqual(state, "replaced", said)
+        # Asked with the file and the signature the controller sent beside it.
+        self.assertEqual(asked, f"check-update {self.d}/aerieos-agent.new {sig}")
+        self.assertIn("restarted aerieos-agent", said)
+        self.assertIn("signed by the release key this node pinned", said)
+        # No signature sent: asked with the file alone, and still its to say.
+        state, asked, said = self.again(answers=0)
+        self.assertEqual((state, asked), ("replaced", f"check-update {self.d}/aerieos-agent.new"), said)
+
+    def test_the_agent_refuses_and_the_installed_one_stays(self):
+        state, asked, said = self.again(answers=77, record={"release_key": self.pub})
+        self.assertEqual(state, "kept", said)
+        self.assertTrue(asked.startswith("check-update "), asked)
+        self.assertIn("this node refuses the newer agent", said)
+        self.assertIn("refused: the controller sent no signature with it.", said)
+        self.assertNotIn("restarted", said)
+        # Refused whatever the record says: the answer is the agent's.
+        self.assertEqual(self.again(answers=77)[0], "kept")
+
+    def test_an_agent_too_old_to_answer_on_a_node_that_pinned_a_key(self):
+        pinned = {"release_key": self.pub, "release_spare": self.spare_pub}
+        # The release's signature under the pinned key, checked here: it goes in.
+        state, _asked, said = self.again(answers=64, sig=signed(self.key, digest_of(OTHER)), record=pinned)
+        self.assertEqual(state, "replaced", said)
+        self.assertIn(f"signed by the release key this node pinned ({self.pub[:16]}", said)
+        self.assertIn("checked by this script", said)
+        self.assertEqual(self.again(answers=64, sig=signed(self.spare, digest_of(OTHER)), record=pinned)[0], "replaced")
+        # No signature (a build from a branch): never handed over unchecked.
+        state, _asked, said = self.again(answers=64, record=pinned)
+        self.assertEqual(state, "kept", said)
+        self.assertIn("the controller sent no release signature with it", said)
+        self.assertIn("Update agent on the node's row", said)
+        self.assertNotIn("restarted", said)
+        # ...not even where its console allows unsigned builds: that is the
+        # agent's own to weigh, and this one cannot be asked.
+        self.assertEqual(self.again(answers=64, record=pinned | {"unsigned_ok": True})[0], "kept")
+        # Somebody else's signature, and the release's over another agent.
+        other, _ = pair()
+        state, _asked, said = self.again(answers=64, sig=signed(other, digest_of(OTHER)), record=pinned)
+        self.assertEqual(state, "kept", said)
+        self.assertIn("is not the pinned key's", said)
+        self.assertEqual(self.again(answers=64, sig=self.sig, record=pinned)[0], "kept")
+        # A signature nothing here can check.
+        state, _asked, said = self.again(answers=64, sig=signed(self.key, digest_of(OTHER)), record=pinned, pre=BLIND)
+        self.assertEqual(state, "kept", said)
+        self.assertIn("this machine cannot check a signature", said)
+
+    def test_an_agent_too_old_to_answer_on_a_node_that_pinned_none_updates_as_before(self):
+        state, asked, said = self.again(answers=64)
+        self.assertEqual(state, "replaced", said)
+        self.assertTrue(asked.startswith("check-update "), "asked all the same")
+        self.assertIn("no release key is pinned on this node", said)
+        self.assertIn("restarted aerieos-agent", said)
+
+    def test_a_machine_that_lost_its_agent_takes_it_back_only_checked(self):
+        pinned = {"release_key": self.pub}
+        state, _asked, said = self.again(answers=None, sig=signed(self.key, digest_of(OTHER)), record=pinned)
+        self.assertEqual(state, "replaced", said)
+        state, _asked, said = self.again(answers=None, record=pinned)
+        self.assertEqual(state, "kept", said)
+        self.assertIn("Enroll script on its row", said)
+        self.assertEqual(self.again(answers=None)[0], "replaced", "with no key pinned, as before")
+
+    def test_the_same_agent_and_a_bad_answer_ask_nothing(self):
+        state, asked, said = self.again(answers=77, same=True)
+        self.assertEqual((state, asked), ("kept", ""), said)
+        self.assertIn("already current", said)
+        state, asked, said = self.again(answers=0, headers={"X-Agent-Digest": digest_of(AGENT)})
+        self.assertEqual((state, asked), ("kept", ""), said)
+        self.assertIn("does not match the digest the controller sent", said)
+        # No digest with it was taken as it came; it is left out now.
+        state, asked, said = self.again(answers=0, headers={})
+        self.assertEqual((state, asked), ("kept", ""), said)
+        self.assertIn("no digest", said)
+
+
 class Carried(unittest.TestCase):
     """What the controller puts in an enrollment, and beside the download."""
 
@@ -361,6 +481,25 @@ class Carried(unittest.TestCase):
         nodes.agent_sig = lambda digest=None: ""
         self.assertEqual(nodes.agent_carried(), {"digest": ours["digest"], "sig": ""})
         self.assertIn("agent=agent_carried()", text(os.path.join(HERE, "..", "nodes.py")))
+
+    def test_the_download_names_the_signature_only_when_there_is_one(self):
+        self.addCleanup(setattr, channel.nodes, "agent_file", channel.nodes.agent_file)
+        self.addCleanup(setattr, channel.nodes, "agent_sig", channel.nodes.agent_sig)
+        channel.nodes.agent_file = lambda: {"body": AGENT, "digest": digest_of(AGENT)}
+        asked = []
+
+        def sig_for(digest=None):
+            asked.append(digest)
+            return self.sig
+        channel.nodes.agent_sig = sig_for
+        got, status = channel.fetch("download", {"error": "no token"}, {"what": [""]}, authed=lambda: True)
+        self.assertEqual(status, 200)
+        self.assertEqual(got["headers"], {"X-Agent-Digest": digest_of(AGENT), "X-Agent-Sig": self.sig})
+        self.assertEqual(asked, [digest_of(AGENT)], "the signature of the agent it sends")
+        channel.nodes.agent_sig = lambda digest=None: ""
+        got, _status = channel.fetch("download", {"error": "no token"}, {"what": [""]}, authed=lambda: True)
+        self.assertEqual(got["headers"], {"X-Agent-Digest": digest_of(AGENT)}, "no header at all for a build with none")
+
 
 if __name__ == "__main__":
     unittest.main()

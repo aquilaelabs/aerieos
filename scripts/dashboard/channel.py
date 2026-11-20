@@ -164,8 +164,14 @@ def fetch(verb, auth, q, authed):
     f = nodes.agent_file()
     if not f["body"]:
         return {"error": "this controller ships no agent"}, 404
+    # The release's signature over it, where this build has one: a
+    # provisioner run again on an enrolled node hands it to the installed
+    # agent with the file (check-update), which takes the file only as it
+    # would take an update. Present only when there is one, so its absence
+    # reads as an unsigned build and never as an empty signature.
+    sig = nodes.agent_sig(f["digest"])
     return {"body": f["body"], "ctype": "text/x-python; charset=utf-8",
-            "headers": {"X-Agent-Digest": f["digest"]}}, 200
+            "headers": {"X-Agent-Digest": f["digest"], **({"X-Agent-Sig": sig} if sig else {})}}, 200
 
 
 def _sign_key_job(auth, jid):
