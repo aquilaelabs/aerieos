@@ -4973,7 +4973,7 @@ router.configure(state=STATE, write_json=write_json, seal=signing.seal, unseal=s
 # secrets under the key before, and lost them when that went (B567).
 installkey.configure(passes=(signing.seal_all, gitcreds.seal_all, settings.seal_all, mfa.seal_all,
                              accountkeys.seal_all, reach.seal_all, router.seal_all, extmounts.seal_all,
-                             poolkeys.seal_all, packconfig.seal_all, projects.deploy_keys_seal_all),
+                             poolkeys.seal_all, packconfig.seal_all, projects.deploy_keys_seal_all, tls.seal_all),
                      nodes_previous=lambda: tokenkeys.sealed_under(_node_seals(), signing.PREVIOUS)
                      if signing.PREVIOUS else 0)
 installkey.note_made()
@@ -11717,7 +11717,7 @@ class Handler(BaseHTTPRequestHandler):
         # The dashboard's own TLS key (R158 step 2), sealed under the install key.
         if tls.certificate_pem():
             rows.append({"kind": "tls", "name": "the dashboard's certificate", "sealed": tls._key_sealed(),
-                         "uses": "https on the dashboard's own port (Controller settings, Connection)", "go": ["settings", "connection"]})
+                         "uses": "https on the dashboard's own port: a node's channel, and the page where Connection says so", "go": ["settings", "connection"]})
         d = settings.load()
         for key, spec in settings.KEYS.items():
             if spec["kind"] == "secret" and d.get(key):
@@ -14721,9 +14721,10 @@ class Server(tls.WrapOnItsThread, ThreadingHTTPServer):
     turned seconds into a minute. Threads are daemons so a stop is not held
     up by a request still being answered. One port, both ways (R158 step 2,
     tls.py): a connection that opens a TLS handshake is wrapped in the
-    certificate in force, the rest served as plain http, so a node keeps
-    dialing http while a browser gets https; the look is on the request's
-    own thread (tls.WrapOnItsThread)."""
+    certificate loaded, the rest served as plain http, so whoever speaks
+    http is answered as before while a node's pinned channel and a browser
+    at https are answered over TLS; the look is on the request's own thread
+    (tls.WrapOnItsThread)."""
     request_queue_size = 128
     daemon_threads = True
 
@@ -14850,25 +14851,26 @@ def main():
     releasefiles.start()      # a release's files checked against its list (R190)
     if "tunnel" not in featuresoff.off():
         tunnel.apply()        # the home tunnel, where the settings say so (R176)
-        # ...and the dashboard's own TLS as the settings say (R158 step 2),
-        # with a loop that remakes the install's own certificate or asks
-        # Let's Encrypt again a month before it ends.
-        with contextlib.suppress(Exception):             # noqa: BLE001 (http is the fallback, said on the Doctor)
-            tls.apply(settings.get, names=_tls_names())
+    # The dashboard's own TLS as the settings say (R158 step 2), and the
+    # install's own certificate in every mode, which a node's channel is
+    # pinned to (R267 step 15): made at the first start, loaded here, and
+    # remade over the same key a month before it ends by this loop, which
+    # asks Let's Encrypt again for the name's as well.
+    with contextlib.suppress(Exception):                 # noqa: BLE001 (http is the fallback, said on the Doctor)
+        tls.apply(settings.get, names=_tls_names())
 
-        def _tls_loop():
-            while True:
-                time.sleep(6 * 3600)
-                try:
-                    if tls.renew_due():
-                        if tls.mode_of(settings.get) == "self":
-                            tls.apply(settings.get, names=_tls_names())
-                        elif tls.mode_of(settings.get) == "acme":
-                            _tls_issue()
-                except Exception as e:                   # noqa: BLE001 (the loop outlives one bad round, and says it)
-                    print(f"dashboard: its own certificate was not renewed this round, and is tried again in six hours: "
-                          f"{type(e).__name__}: {e}", flush=True)
-        threading.Thread(target=_tls_loop, name="tls-renew", daemon=True).start()
+    def _tls_loop():
+        while True:
+            time.sleep(6 * 3600)
+            try:
+                if tls.own_due():
+                    tls.apply(settings.get, names=_tls_names())
+                if tls.mode_of(settings.get) == "acme" and tls.renew_due():
+                    _tls_issue()
+            except Exception as e:                       # noqa: BLE001 (the loop outlives one bad round, and says it)
+                print(f"dashboard: its own certificate was not renewed this round, and is tried again in six hours: "
+                      f"{type(e).__name__}: {e}", flush=True)
+    threading.Thread(target=_tls_loop, name="tls-renew", daemon=True).start()
     if toolchains.AUTOCHECK:
         threading.Thread(target=toolchains.versions_loop, daemon=True).start()
     # The copies the nodes hold, looked at here on a timer and announced when
