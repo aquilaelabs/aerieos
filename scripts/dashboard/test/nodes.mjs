@@ -2711,8 +2711,8 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
       dismiss: d.querySelector('[data-bdismiss]')?.dataset.bdismiss || '',
       verbs: (d.textContent.match(/unsigned on/g) || []).length };
     d.innerHTML = attRow({ ...a, more: '' });
-    return { ...got, bare: !d.querySelector('details') && /keeps the bundle it had/.test(d.textContent) }; });
-  ok(/box keeps the bundle it had/.test(refusedRow.text) && /it refused this controller's: this bundle's files are not ones signed/.test(refusedRow.text)
+    return { ...got, bare: !d.querySelector('details') && /refused this controller's bundle/.test(d.textContent) }; });
+  ok(/box refused this controller's bundle/.test(refusedRow.text) && /this bundle's files are not ones signed/.test(refusedRow.text)
      && /scripts\/aerie is changed/.test(refusedRow.text) && !/Agent update on/.test(refusedRow.text) && !refusedRow.bad,
      `a node that refused this controller's bundle has a bell row saying it keeps the one it had and why, not in red (${refusedRow.text.slice(0, 200)})`);
   ok(/unsigned on allows unsigned builds/.test(refusedRow.folded) && refusedRow.verbs === 1 && refusedRow.bare
@@ -2724,10 +2724,10 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
     const on = { ...n, config: { ...(n.config || {}), host_only: false } };
     const d = document.createElement('div');
     d.innerHTML = nodeSessionsSection({ ...on, bundle_held: 'its files are not ones a release signed (scripts/aerie is changed)' });
-    const note = [...d.querySelectorAll('.sub.warn')].map(e => e.textContent).find(t => /Keeps the bundle it had/.test(t)) || '';
+    const note = [...d.querySelectorAll('.sub.warn')].map(e => e.textContent).find(t => /Refused this controller's bundle/.test(t)) || '';
     d.innerHTML = nodeSessionsSection(on);
-    return { note, plain: /Keeps the bundle it had/.test(d.textContent) }; }, minted.id);
-  ok(heldNote && /^Keeps the bundle it had, not this controller's: its files are not ones a release signed \(scripts\/aerie is changed\)\.$/.test(heldNote.note)
+    return { note, plain: /Refused this controller's bundle/.test(d.textContent) }; }, minted.id);
+  ok(heldNote && /^Refused this controller's bundle: its files are not ones a release signed \(scripts\/aerie is changed\)\.$/.test(heldNote.note)
      && !heldNote.plain,
      `the node's Sessions section says it keeps the bundle it had, in its own words, and says nothing without the refusal (${heldNote?.note})`);
   // Its link goes to THIS node, whichever the tab was on, with Update agent

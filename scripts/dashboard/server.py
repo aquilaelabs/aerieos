@@ -1783,7 +1783,7 @@ def _att_words(a):
         return (f"{node}'s agent is out of window" if a.get("window") else f"Agent update on {node}",
                 f"runs agent {a.get('from', '')} and this controller ships {a.get('to', '')}")
     if k == "bundle-refused":
-        return (f"{node} keeps the bundle it had", f"it refused this controller's: {a.get('why', '')}")
+        return (f"{node} refused this controller's bundle", a.get("why", ""))
     if k == "held":
         return (f"A session in {label} stopped for the update", f"on {node}")
     if k == "relocate":

@@ -513,8 +513,8 @@ function attRow(a){
   // (which keys it takes, what its console can do) folded under it.
   if (a.kind === "bundle-refused"){
     return `<div class="bnote att">
-      <div class="bt">${esc(a.node)} keeps the bundle it had</div>
-      <div class="bsum">it refused this controller's: ${esc(a.why || "its files are not ones a key that node trusts signed")}</div>
+      <div class="bt">${esc(a.node)} refused this controller's bundle</div>
+      <div class="bsum">${esc(a.why || "its files are not ones a key that node trusts signed")}</div>
       ${a.more ? `<details class="bdetail chev"${sectAttr("bell:bundle:" + a.id)}><summary>what that node takes</summary><pre>${esc(a.more)}</pre></details>` : ""}
       <div class="bfoot"><span>its terminals and jobs run the aerie it had</span>
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}

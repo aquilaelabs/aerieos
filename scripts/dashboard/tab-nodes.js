@@ -1054,7 +1054,7 @@ function nodeSessionsSection(n){
   }
   // It refused this controller's bundle (R267 step 6), said in its own
   // words: its terminals and jobs run the aerie it had before.
-  if (!host && n.bundle_held) notes.push([`Keeps the bundle it had, not this controller's: ${n.bundle_held}.`, "warn"]);
+  if (!host && n.bundle_held) notes.push([`Refused this controller's bundle: ${n.bundle_held}.`, "warn"]);
   const body = `<div class="field">${facts}${notes.map(([x, c]) => `<div class="sub ${c}">${esc(x)}</div>`).join("")}</div>
     ${nodeSessSettings(n)}
     <div class="ndactions">
