@@ -284,9 +284,11 @@ the verify then run with no network, or with it where the row says
 
 **How a pin moves.** An install never asks a vendor what is newest: it
 takes the pin. A newer version arrives as a change to the entry, proposed
-by a tool and reviewed like any other change. How the tool finds the newer
-version is the entry's own data too, so nothing in the tool knows a vendor.
-It is read by the tool and by no install:
+by a tool (`tools/pins.py` for the rows AerieOS ships:
+[Moving a pin](toolchains.md#moving-a-pin)) and reviewed like any other
+change. How the tool finds the newer version is the entry's own data too,
+so nothing in the tool knows a vendor. It is read by the tool and by no
+install:
 
 - A pin may say `found`: how the new file's digest is learned from its
   publisher's own statement without downloading it, written as a checksum

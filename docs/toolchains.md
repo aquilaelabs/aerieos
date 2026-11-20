@@ -399,6 +399,50 @@ session.
 empty installs the Playwright browsers (~1.3GB) on first start. That happens
 once per share; from then on updates cost nothing.
 
+### Moving a pin
+
+A pinned row installs the version its pin names and asks nobody what is
+newest, so a newer version arrives as a change to the row, in a release of
+AerieOS or in the signed catalog. `tools/pins.py` proposes that change, and
+a person reviews it like any other. It names no vendor: how a row's newest
+version is found (`source.version`, `source.track` for a repository, a
+declared download's `track`) and how the new file's digest is learned
+(`found`) are the row's own data, read with the same resolvers an install
+of an unpinned row uses.
+
+```bash
+tools/pins.py check              # what each pinned row is pinned to, and what its resolver finds now
+tools/pins.py move go zig        # write the new version and digests for those rows, every platform
+tools/pins.py pin NAME           # a row not pinned yet becomes a pin at what its resolver finds now
+tools/pins.py verify --all       # download every pinned file and hold it to its pin
+```
+
+- **check** reads the network and writes nothing. It exits 0 when nothing
+  would move, 3 when something would, 1 on an error. A file with no version
+  in its address has nothing to track: check downloads it and says when its
+  bytes are no longer the pinned ones, which is the day an install of it
+  starts being refused.
+- **move** writes `config/toolchains.json` and then the official packs
+  (`tools/packs-export.py --write`). A row that moved has its `rev` raised
+  by one, which is what lets the catalog carry it to installs with no
+  release. A row moves whole: when one platform's file cannot be learned
+  the row is left as it was, said by name, and the others still move.
+  `--version V` with one row names the version in the resolver's place, for
+  a release whose files are not out for every platform yet.
+- **pin** turns a row whose download is checked against its own origin
+  into a pinned one, and keeps the old checksum as the pin's `found`. For a
+  repository it writes `source.commit`, and `source.tag` where its track is
+  by tag.
+- **verify** is a release's check. It streams each pinned file, hashes it
+  and never keeps it; `--platform linux/arm64` asks for one platform and
+  `--all` for every one. For a repository it says whether the tag the row
+  names is still at the pinned commit.
+
+Where a publisher states a sha256, the tool takes it and says from where.
+Where it states a sha1 or a sha512, or nothing, the tool downloads the file,
+hashes it, and holds it to what the publisher does state. `--file PATH`
+reads another table than the shipped one.
+
 ## The Library
 
 **Build** opens on the **Library**: everything an AerieOS installs or
