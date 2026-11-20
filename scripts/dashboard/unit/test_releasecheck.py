@@ -17,7 +17,9 @@ class ReleaseCheck(unittest.TestCase):
         d = tempfile.mkdtemp()
         self.addCleanup(lambda: None)
         rows = [{"tag_name": "v0.9.1", "draft": True, "html_url": "x"},
-                {"tag_name": "v1.0.0", "prerelease": True},
+                # A dev build's tag on a release marked stable: the tag is
+                # what says which release it is, so no stable release.
+                {"tag_name": "v1.0.0-dev.1", "prerelease": False},
                 {"tag_name": "v0.9.0", "html_url": "https://example/v0.9.0"},
                 {"tag_name": "v0.8.2"}, {"tag_name": "junk"},
                 {"tag_name": "v0.9.1-dev.4500", "prerelease": True, "html_url": "https://example/dev4500"},
@@ -39,7 +41,8 @@ class ReleaseCheck(unittest.TestCase):
     def test_the_newest_published_release_and_whether_it_is_newer(self):
         releasecheck.configure(version=lambda: "0.8.2", bare_metal=lambda: True)
         got = releasecheck.check()
-        self.assertEqual((got["version"], got["tag"], got["error"]), ("0.9.0", "v0.9.0", ""), "a draft and a prerelease are passed over")
+        self.assertEqual((got["version"], got["tag"], got["error"]), ("0.9.0", "v0.9.0", ""),
+                         "a draft and a dev build's tag marked stable are passed over")
         self.assertEqual(releasecheck.newer(), "0.9.0")
         self.assertEqual(releasecheck.attention("n_own")[0]["key"], "release:0.9.0")
         self.assertEqual(releasecheck.status()["newer"], "0.9.0")
@@ -64,6 +67,26 @@ class ReleaseCheck(unittest.TestCase):
         self.assertIn("did not answer", got["error"])
         self.assertEqual(releasecheck.newer(), "")
 
+    def test_the_stable_channel_goes_by_the_tag_whatever_the_flag_beside_it_says(self):
+        # The flag is the git host's, and whoever can edit a release flips
+        # it: a dev build marked stable is no stable release, and a stable
+        # release is one whether or not it is marked a pre-release. Who may
+        # have signed its files follows the same reading of the tag.
+        rows = [{"tag_name": "v1.1.0-dev.7", "prerelease": False, "html_url": "x"},
+                {"tag_name": "v1.1.0-rc.8", "prerelease": False},
+                {"tag_name": "v1.0.1", "prerelease": True, "html_url": "https://example/v1.0.1"},
+                {"tag_name": "v1.0.0", "prerelease": False}]
+        d = tempfile.mkdtemp()
+        with open(os.path.join(d, "releases.json"), "w") as f:
+            json.dump(rows, f)
+        releasecheck.RELEASES_URL = "file://" + os.path.join(d, "releases.json")
+        releasecheck.configure(version=lambda: "1.0.0", bare_metal=lambda: True, channel=lambda: "normal")
+        got = releasecheck.check()
+        self.assertEqual((got["version"], got["tag"], got["url"]), ("1.0.1", "v1.0.1", "https://example/v1.0.1"))
+        self.assertEqual(releasecheck.newer(), "1.0.1", "never 1.1.0-dev.7 or 1.1.0-rc.8, marked stable as they are")
+        self.assertEqual(got["dev"]["version"], "", "the dev channel takes a pre-release's tag marked as one, as before")
+        for tag, kind in (("v1.0.1", "stable"), ("v1.1.0-dev.7", "pre"), ("v1.1.0-rc.8", "pre"), ("1.0.1", ""), ("junk", "")):
+            self.assertEqual(releasecheck.tag_kind(tag), kind, tag)
 
 
     def test_the_dev_channel_takes_pre_releases_and_debug_mode_picks_any(self):

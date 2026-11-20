@@ -152,8 +152,12 @@ def _read():
             req.add_unredirected_header("Authorization", f"Bearer {token}")
         with urllib.request.urlopen(req, timeout=TIMEOUT) as r:   # noqa: S310 (our releases, or a test's file://)  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
             rows = json.loads(r.read(8 << 20) or b"[]")
-        # A stable release's draft too where asked with the token.
-        live = [x for x in rows if isinstance(x, dict) and (token or not x.get("draft")) and not x.get("prerelease") and parse(x.get("tag_name"))]
+        # The stable channel's: a release whose tag is a stable release's
+        # (tag_kind), whatever the pre-release flag beside it says. The flag
+        # is the git host's, flipped by whoever can edit a release; the tag
+        # is what the release's files are signed for. A stable release's
+        # draft too where asked with the token.
+        live = [x for x in rows if isinstance(x, dict) and (token or not x.get("draft")) and tag_kind(x.get("tag_name")) == "stable"]
         live.sort(key=lambda x: parse(x.get("tag_name")), reverse=True)
         if live:
             tag = str(live[0].get("tag_name") or "")
