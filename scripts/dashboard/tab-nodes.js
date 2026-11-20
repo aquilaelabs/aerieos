@@ -2716,6 +2716,92 @@ aerieos-agent enroll --controller ${esc(m.url)} --token ${esc(m.token)}${
   return {modal, body, shut, mintForm, mintScript, vmForm, openVm, openEnroll};
 }
 
+// The sessions the status poll holds on a node.
+function sessionsOn(id){ return (state?.sessions || []).filter(x => x.node_id === id); }
+// The sentence a question says of the sessions its verb ends, or "" where
+// none is open there. `lead` and `tail` are the question's own words around
+// the count and `after` what it says of whose they are; how many of them are
+// a coding agent's conversation is said unless `whose` is false.
+function sessionsEndSaid(here, {lead = "This ends", after = "", whose = true, tail = ""} = {}){
+  if (!here.length) return "";
+  const mine = whose ? here.filter(x => agentOfSession(tmuxBase(x.name))) : [];
+  return `${lead} the ${here.length} session${here.length === 1 ? "" : "s"} open there${after}${
+    mine.length ? ` (${mine.length} of them a ${agentsWord(mine.map(x => x.name))} conversation)` : ""}${tail}`;
+}
+// A reboot and a shutdown end every session on the node, so the question
+// names them. Everybody's, as the node reports them, not only this
+// account's (the operator, 26 Oct): each is ended cleanly before the machine
+// goes, so none is left open on the record.
+function ndPowerSaid(id){
+  return sessionsEndSaid(nodeOf(id)?.reported?.sessions || sessionsOn(id),
+    {lead: "It ends", after: ", everybody's", tail: ", each closed before the machine goes; transcripts are kept. "});
+}
+// What a node's verb (data-nd) asks before it is sent: the question's words
+// for that node and that button, or "" where this press costs nothing. A
+// verb that is not here asks nothing (R265: a press asks only where its yes
+// costs something): Disable keeps the node enrolled with its sessions
+// running and Enable on the same row puts it back, the SSH door opens again
+// from the row that shut it, and Drain, Lock and a feature's Install are
+// undone the same way. The title, the word on the button and its color are
+// askYes's reading of the words: red for what cannot be taken back, amber
+// for what interrupts and loses nothing, the accent for the rest.
+const ND_ASK = {
+  retire: () => "Remove this node from every list? Its containers and "
+    + "its data stay on the machine; the row is kept as "
+    + "history.",
+  uninstall: () => "Uninstall AerieOS from this machine?\n\nThe agent, its accounts, "
+    + "mounts and runners are removed. Docker and the shares stay. "
+    + "Enrolling it again starts from scratch.",
+  lockdown: id => `Lock down ${nodeNameOf(id)}?\n\nFrom now it may ask this controller for nothing but the job that stops `
+    + "every container there, its nginx with them, keeps them from starting at a boot and shuts its SSH door. "
+    + "Its credential is revoked when that job ends, or in five minutes if the box never answers, and the node is removed.\n\n"
+    + "If the box itself may be taken over, also power it off from its provider's console: that stop does not need the agent.",
+  // Both name the sessions they end; a shutdown says as well that the
+  // machine does not come back by itself.
+  reboot: id => `Reboot ${nodeNameOf(id)}?\n\n${ndPowerSaid(id)}Whatever is running there stops; the agent dials in again when the machine is back up.`,
+  poweroff: id => `Shut down ${nodeNameOf(id)}?\n\n${ndPowerSaid(id)}It does not come back on its own: switch it on from its console or its hypervisor.`,
+  // An agent update RESTARTS the agent, and until B107 is fixed that
+  // takes every session on the node with it: their tmux
+  // servers and the Claude processes inside them are all in the agent's
+  // systemd cgroup, so systemd's default kill reaches the lot. Said
+  // before the press, naming what is open there, because the operator
+  // who pressed this lost two conversations mid-work with no warning.
+  // With nothing open there it asks nothing.
+  "update-agent": id => {
+    const ends = sessionsEndSaid(sessionsOn(id), {tail: ". Transcripts are kept; whatever they were running stops."});
+    return ends && `Update the agent on ${nodeNameOf(id)}?\n\n${ends}`;
+  },
+  "gpu-display": id => `Set up the GPU display on ${nodeNameOf(id)}?\n\n`
+    + "This installs the NVIDIA driver and a headless X server on the card, which "
+    + "takes minutes, and the driver takes the card only after a reboot: the row "
+    + "says when to press Reboot.",
+  // Leaving the synced copy (R164) ends the sessions, as a reboot does;
+  // cleaning up removes the copies, which only the drain allows.
+  "sync-stop": id => `Stop syncing ${nodeNameOf(id)}?\n\n`
+    + sessionsEndSaid(sessionsOn(id), {whose: false, tail: "; transcripts are kept. "})
+    + "No session starts there while it sends up what is left; then Clean up /workspace removes its copies.",
+  "sync-clean": id => `Remove the space copies on ${nodeNameOf(id)}?\n\n`
+    + "Everything there has reached the controller. The node then holds no spaces until it moves to a synced copy again.",
+  "host-only": id => `Make ${nodeNameOf(id)} hosting only?\n\nIt keeps running the containers sent to it. `
+    + "No space may list it, no session or synced copy runs there, and its agent may ask "
+    + "the controller for nothing but its own jobs. A space that lists it now has to be "
+    + "moved off it first.",
+  discard: id => `Discard ${nodeNameOf(id, "this row")}?\n\nNothing has enrolled with its script, so the row goes outright and the script it was made for stops working.`,
+  // A feature coming off, by which one it is.
+  feature: (id, b) => b.dataset.op !== "remove" ? ""
+    : b.dataset.feature === "vmhost"
+    ? `Uninstall VM host from ${nodeNameOf(id)}?\n\nThe packages AerieOS added for it come off; what the machine had before stays. It is refused while any VM is still there.`
+    : b.dataset.feature === "iommu"
+    ? `Take the IOMMU off ${nodeNameOf(id)}'s kernel command line?\n\nAfter its next restart no PCI device or USB controller can go to a VM there.`
+    : `Turn the hosting firewall off on ${nodeNameOf(id)}?\n\nEvery port this box and its containers publish is reachable from the internet again.`,
+  "cache-clear": () => "Clear this node's build caches? Every space's Gradle, "
+    + "npm and snapshot cache there goes; the next build of "
+    + "each re-downloads what it needs.",
+};
+// The word a verb's button wears on this page where it is not the shared
+// table's (BUSY_WORDS, page-motion.js).
+const ND_BUSY = {disable: "Disabling", enable: "Enabling", "reenroll-now": "Making", "sess-save": "Saving"};
+
 function wireNodesTab(root){
   // A node's own version check's cadence (R176), saved on its pick.
   root.querySelectorAll("[data-ndcheck]").forEach(s => s.onchange = async () => {
@@ -2750,131 +2836,21 @@ function wireNodesTab(root){
       openLogTab(`log:node:${b.dataset.ndlog}:agent`, `Log: ${b.dataset.ndlogname}'s agent`));
     box.querySelectorAll("[data-nd]").forEach(b => b.onclick = () => pressing(b, async () => {
       const act = b.dataset.nd;
-      if (act === "disable" || act === "enable"){
-        // Disable asks nothing (R265: a press asks only where its yes costs something): the node stays enrolled, its
-        // sessions run on, and Enable on the same row puts it back.
-        busy(b, act === "disable" ? "Disabling" : "Enabling");
-        const j = await nodeAct({action: act, id});
-        if (j.error) notify(j.error, true);
-        await loadNodes();
-        return;
-      }
-      if (act === "unenroll"){
+      // The two that send nothing from here: each opens a dialog of its own,
+      // Un-enroll's with its own question and Enroll again's form.
+      if (act === "unenroll" || act === "reenroll"){
         const n = nodeOf(id);
-        if (n) openUnenroll(n);
+        if (n && act === "unenroll") openUnenroll(n);
+        else if (n){ modal.hidden = false; mintForm({}, n); }
         return;
       }
-      if (act === "retire"
-          && !await askYes("Remove this node from every list? Its containers and "
-                      + "its data stay on the machine; the row is kept as "
-                      + "history.")) return;
-      if (act === "uninstall"
-          && !await askYes("Uninstall AerieOS from this machine?\n\nThe agent, its accounts, "
-                      + "mounts and runners are removed. Docker and the shares stay. "
-                      + "Enrolling it again starts from scratch.")) return;
-      // A reboot ends every session on the node, so the press names them,
-      // as Update agent's does; a shutdown also does not come back by itself.
-      if (act === "lockdown"){
-        const name = nodeNameOf(id);
-        if (!await askYes(`Lock down ${name}?\n\nFrom now it may ask this controller for nothing but the job that stops `
-              + "every container there, its nginx with them, keeps them from starting at a boot and shuts its SSH door. "
-              + "Its credential is revoked when that job ends, or in five minutes if the box never answers, and the node is removed.\n\n"
-              + "If the box itself may be taken over, also power it off from its provider's console: that stop does not need the agent.")) return;
-      }
-      if (act === "reboot" || act === "poweroff"){
-        const nd = nodeOf(id), name = nd?.name || "this node";
-        // Everybody's, as the node reports them, not only this account's
-        // (the operator, 26 Oct): each is ended cleanly before the machine
-        // goes, so none is left open on the record.
-        const here = nd?.reported?.sessions || (state?.sessions || []).filter(x => x.node_id === id);
-        const mine = here.filter(x => agentOfSession(tmuxBase(x.name)));
-        const open = here.length
-          ? `It ends the ${here.length} session${here.length === 1 ? "" : "s"} open there, everybody's`
-            + `${mine.length ? ` (${mine.length} of them a ${agentsWord(mine.map(x => x.name))} conversation)` : ""}, each closed before the machine goes; transcripts are kept. `
-          : "";
-        if (!await askYes(act === "reboot"
-              ? `Reboot ${name}?\n\n${open}Whatever is running there stops; the agent dials in again when the machine is back up.`
-              : `Shut down ${name}?\n\n${open}It does not come back on its own: switch it on from its console or its hypervisor.`)) return;
-      }
-      // An agent update RESTARTS the agent, and until B107 is fixed that
-      // takes every session on the node with it: their tmux
-      // servers and the Claude processes inside them are all in the agent's
-      // systemd cgroup, so systemd's default kill reaches the lot. Said
-      // before the press, naming what is open there, because the operator
-      // who pressed this lost two conversations mid-work with no warning.
-      if (act === "update-agent"){
-        const here = (state?.sessions || []).filter(x => x.node_id === id);
-        const mine = here.filter(x => agentOfSession(tmuxBase(x.name)));
-        if (here.length && !await askYes(
-              `Update the agent on ${
-                nodeNameOf(id)}?\n\n`
-              + `This ends the ${here.length} session`
-              + `${here.length === 1 ? "" : "s"} open there`
-              + `${mine.length ? ` (${mine.length} of them a ${agentsWord(mine.map(x => x.name))} conversation)` : ""}`
-              + `. Transcripts are kept; whatever they were running stops.`)) return;
-      }
-      if (act === "gpu-display"
-          && !await askYes(`Set up the GPU display on ${nodeNameOf(id)}?\n\n`
-                      + "This installs the NVIDIA driver and a headless X server on the card, which "
-                      + "takes minutes, and the driver takes the card only after a reboot: the row "
-                      + "says when to press Reboot.")) return;
-      // Leaving the synced copy (R164) ends the sessions, as a reboot does;
-      // cleaning up removes the copies, which only the drain allows.
-      if (act === "sync-stop"){
-        const name = nodeNameOf(id);
-        const here = (state?.sessions || []).filter(x => x.node_id === id);
-        if (!await askYes(`Stop syncing ${name}?\n\n`
-              + (here.length ? `This ends the ${here.length} session${here.length === 1 ? "" : "s"} open there; transcripts are kept. ` : "")
-              + "No session starts there while it sends up what is left; then Clean up /workspace removes its copies.")) return;
-      }
-      if (act === "sync-clean"){
-        const name = nodeNameOf(id);
-        if (!await askYes(`Remove the space copies on ${name}?\n\n`
-              + "Everything there has reached the controller. The node then holds no spaces until it moves to a synced copy again.")) return;
-      }
-      if (act === "host-only"){
-        const name = nodeNameOf(id);
-        if (!await askYes(`Make ${name} hosting only?\n\nIt keeps running the containers sent to it. `
-              + "No space may list it, no session or synced copy runs there, and its agent may ask "
-              + "the controller for nothing but its own jobs. A space that lists it now has to be "
-              + "moved off it first.")) return;
-      }
-      if (act === "discard"){
-        const n = nodeOf(id);
-        if (!await askYes(`Discard ${n?.name || "this row"}?\n\nNothing has enrolled with its script, so the row goes outright and the script it was made for stops working.`)) return;
-      }
-      if (act === "reenroll"){
-        const n = nodeOf(id);
-        if (n){ modal.hidden = false; mintForm({}, n); }
-        return;
-      }
-      if (act === "reenroll-now"){
-        // The row's own script (R210): built on the controller from what
-        // the node was enrolled with, saved the moment it arrives.
-        busy(b, "Making");
-        const r = await nodeAct({action: "enroll", script: true, node: id, as_row: true, controller: location.origin});
-        if (r.error) return;
-        modal.hidden = false; mintScript(r);
-        readMoved("nodes"); drawPanes();
-        return;
-      }
-      // Shutting the SSH door asks nothing (R265: a press asks only where its yes costs something): it opens again
-      // from the same row.
-      if (act === "feature" && b.dataset.op === "remove"){
-        const name = nodeNameOf(id);
-        if (!await askYes(b.dataset.feature === "vmhost"
-              ? `Uninstall VM host from ${name}?\n\nThe packages AerieOS added for it come off; what the machine had before stays. It is refused while any VM is still there.`
-              : b.dataset.feature === "iommu"
-              ? `Take the IOMMU off ${name}'s kernel command line?\n\nAfter its next restart no PCI device or USB controller can go to a VM there.`
-              : `Turn the hosting firewall off on ${name}?\n\nEvery port this box and its containers publish is reachable from the internet again.`)) return;
-      }
-      if (act === "cache-clear"
-          && !await askYes("Clear this node's build caches? Every space's Gradle, "
-                      + "npm and snapshot cache there goes; the next build of "
-                      + "each re-downloads what it needs.")) return;
+      // What the verb asks first, where its yes costs something (ND_ASK).
+      const asks = ND_ASK[act]?.(id, b);
+      if (asks && !await askYes(asks)) return;
       // The verb, said on the button for the round trip and, for the
       // actions whose effect the row cannot see at once: beyond it.
-      busyFor(b, act, {feature: b.dataset.op === "remove" ? "Uninstalling" : "Installing"});
+      busyFor(b, act, {...ND_BUSY, feature: b.dataset.op === "remove" ? "Uninstalling" : "Installing"});
+      // The verbs whose press is more than one post, each with its own steps.
       if (act === "update-agent"){
         nodesUpdating[id] = Date.now();
         const j = await nodeAct({action: "update-agent", id});
@@ -2885,6 +2861,15 @@ function wireNodesTab(root){
         else if (j.ok) notifyJob(j.job, `agent update on ${nodeNameOf(id, "the node")}`,
           r => { if (r.state !== "succeeded"){ delete nodesUpdating[id]; readMoved("nodes"); drawPanes(); } });
         else delete nodesUpdating[id];
+        return;
+      }
+      if (act === "reenroll-now"){
+        // The row's own script (R210): built on the controller from what
+        // the node was enrolled with, saved the moment it arrives.
+        const r = await nodeAct({action: "enroll", script: true, node: id, as_row: true, controller: location.origin});
+        if (r.error) return;
+        modal.hidden = false; mintScript(r);
+        readMoved("nodes"); drawPanes();
         return;
       }
       if (act === "rename"){
@@ -2911,7 +2896,6 @@ function wireNodesTab(root){
         const n0 = nodeOf(id) || {}, conf = n0.config || {};
         const val = k => box.querySelector(`[data-k="${k}"]`);
         const said = [];
-        busy(b, "Saving");
         const step = async (el, was, body, line) => {
           if (!el) return true;
           const now = el.type === "checkbox" ? el.checked : String(Number(el.value) || 0);
@@ -2977,14 +2961,12 @@ function wireNodesTab(root){
         now.classList.toggle("warn", !j.on);
         return;
       }
-      if (act === "to-sync"){
-        const j = await nodeAct({action: "to-sync", id});
-        if (j.ok && !j.error) notify("Moved: each space is copied down now");
-        return;
-      }
-      // The door's press says which way (R174); every other verb is its name.
-      await nodeAct({action: act, id, ...(act === "door" ? {on: b.dataset.on === "1"} : {}),
-                     ...(act === "feature" ? {feature: b.dataset.feature, op: b.dataset.op} : {})});
+      // Every other verb is its name, sent with the node: the door's press
+      // says which way (R174) and a feature's which one. nodeAct says a
+      // refusal and reads the nodes again.
+      const j = await nodeAct({action: act, id, ...(act === "door" ? {on: b.dataset.on === "1"} : {}),
+                               ...(act === "feature" ? {feature: b.dataset.feature, op: b.dataset.op} : {})});
+      if (act === "to-sync" && j.ok && !j.error) notify("Moved: each space is copied down now");
     }));
     box.querySelectorAll("[data-ndvmlan]").forEach(c => c.onchange = async () => {
       const j = await nodeAct({action: "vm-lan", id, on: c.checked});
