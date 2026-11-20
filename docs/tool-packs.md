@@ -566,13 +566,31 @@ of it, which keeps beside its compose file which app it was made from.
 A session looks through the catalog with `aerie tool search WORDS`: each
 entry's name, kind, tier and what it is, and whether it is added here, never
 its address or commit. `aerie tool install NAME --why "what it is for"` asks for
-a tool pack from it, and the space's **Install a tool pack** setting,
-under Agents may, says what happens: **deny** refuses, **ask** (the default)
-puts it on the bell for a person who may curate the catalog, whose Allow
-adds it at the commit the signed index pins, its sha256 checked, and
-**auto** adds it at once the same way. A session never installs a pack on a
-node itself: once it is added, a person installs it from the Library. The
-briefing names the two verbs and the setting's value.
+a tool on the node that session runs on: a toolchain AerieOS ships, by its
+own name, or a tool pack of the catalog. The space's **Install a tool pack**
+setting, under Agents may, says what happens: **deny** refuses; **ask** (the
+default) puts it on the bell, naming the tool and the node, for a person who
+may curate the catalog, and their Allow installs it there as the Library's
+Install does, in their name with the session named beside it; **auto** does
+the same at once, as the session's own. A pack not yet added is added first,
+at the commit the signed index pins, its sha256 checked. The verb waits for
+the answer and names the job that installs it, and the person who allowed it
+gets that job's notice.
+
+A tool the node already holds is said at once and nobody is asked. A folder
+an install left with no tool in it is not a tool held: the ask goes ahead,
+and the install clears the folder. A toolchain whose install accepts an
+agreement (Google's Android SDK terms, NVIDIA's CUDA license) is never
+accepted for anybody: nothing is asked, and the verb says that a person
+installs it from the Library, where they accept it. A pack that needs root
+stays an administrator's: refused at auto, and kept or installed only on an
+administrator's Allow. A name AerieOS ships is always the toolchain and is
+never kept as a pack. A space that works on several nodes is asked for on the
+node the session runs on; where that cannot be told the verb says so and
+nobody is asked. A session never installs a pack on a node itself: the job
+is the controller's, queued in the name of whoever allowed it. A pack stays
+off for a space until a person switches it on under the space's Toolchains
+settings (below). The briefing names the two verbs and the setting's value.
 
 ## What a space's sessions can use
 

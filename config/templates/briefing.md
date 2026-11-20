@@ -161,7 +161,9 @@ view counts it undescribed.
 A space whose build or test command is not set refuses and says so: `aerie
 settings set build|test|outputs "..."` fills the field in for the operator,
 under the space's gate. When the toolchain lacks what a build needs, say
-so; installing is the operator's, from the Library. `aerie toolchains`
+so, and ask for it with `aerie tool install NAME --why "..."`: it goes on
+this node as the space's Install a tool pack setting says, and what that
+refuses is the operator's to install, from the Library. `aerie toolchains`
 says what is installed, where, and how each download was checked:
 this node carries git, tmux, jq, python3 and curl by itself, and nothing
 else is a given. That python3 has no pip and no venv: a space's own

@@ -909,10 +909,13 @@ aerie capture prune [--days N] [NAME...]
 aerie tool            the tools toolchains add to a session, each under its own name
 aerie tool search [WORDS...]  the vetted catalog's tool packs and apps, each with
                    its tier and what it is, and whether it is added here
-aerie tool install NAME --why "..."  ask for a pack from the vetted catalog, as the
+aerie tool install NAME --why "..."  ask for a toolchain AerieOS ships, or a pack
+                   from the vetted catalog, on this session's node, as the
                    space's Install a tool pack setting says: refused, asked
-                   of a person on the bell, or added now; a person installs
-                   it on a node from the Library
+                   of a person on the bell whose Allow installs it there, or
+                   installed now. One the node has is said at once; one whose
+                   install accepts an agreement is a person's to install
+                   from the Library
 aerie tool graphics CMD  pictures a session can make and then read back, with the
                    graphics toolchain on its node: info, resize, crop, compose,
                    annotate, diff, svg2png and optimize, into dist/img/, and

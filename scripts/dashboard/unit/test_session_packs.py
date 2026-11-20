@@ -42,6 +42,17 @@ class SessionPacks(unittest.TestCase):
         line = preamble.packs_line("alpha")
         self.assertIn("aerie tool search WORDS", line)
         self.assertIn("Install a tool pack is deny", line)
+        self.assertIn("(refused here: ", line)
+        # What the verb comes to, as the dial stands: a person's Allow is
+        # what installs it at ask, and nobody's is needed at auto. The
+        # session installs nothing on a node itself either way.
+        for mode, how in (("ask", "(a person answers on the bell, and their Allow installs it: Install a tool pack is ask)"),
+                          ("auto", "(installed at once: Install a tool pack is auto)")):
+            prefs.set_prefs("alpha", installpacks=mode)
+            line = preamble.packs_line("alpha")
+            self.assertIn(how, line)
+            self.assertIn("asks for a toolchain AerieOS ships, or a pack of the catalog, on this session's node", line)
+            self.assertTrue(line.endswith("a session never installs a pack on a node itself."), line)
 
     def test_an_ask_is_held_with_the_pin(self):
         entry = {"name": "hexkit", "url": "https://example.com/hex", "commit": "a" * 40, "sha256": "b" * 64, "path": "", "tier": "vetted",

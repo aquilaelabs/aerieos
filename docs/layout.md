@@ -100,7 +100,7 @@ scripts/
   lib/browser.mjs                `aerie browser`: Chrome or Firefox with an unpacked extension loaded, on its own port and profile, driven and stopped by one verb
   lib/proc-verbs.py              `aerie proc`: this account's processes by a word of their command line, listed, ended or waited for, never the call's own shell
   lib/container-verbs.py         `aerie container`: status and new
-  lib/pack-verbs.py              `aerie tool search` and `aerie tool install`: the vetted catalog looked through, a pack asked for as the project's Install a tool pack setting says (R169 step 5)
+  lib/pack-verbs.py              `aerie tool search` and `aerie tool install`: the vetted catalog looked through, a shipped toolchain or a pack asked for on the session's node as the space's Install a tool pack setting says (R169 step 5)
   lib/vm-verbs.py                `aerie vm`: a project's VMs listed, made, started, stopped, snapshotted and removed (R91)
   lib/phone-verbs.py             `aerie phone`: status and run
   lib/root-verbs.py              `aerie root`: status and run
