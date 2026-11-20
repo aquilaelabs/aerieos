@@ -7162,6 +7162,22 @@ class Handler(BaseHTTPRequestHandler):
         self._json({"error": f"not a space: {name}" if name else "not a space"}, 400)
         return True
 
+    def _project_asked(self, req=None, *, query=None, write=False):
+        """The project a request names, or None with the refusal already
+        written: the opening of every handler that works on one project.
+        The name is the body's `project` field when a body is given, the
+        query's otherwise (`query` when the handler has parsed it already).
+        It is refused by _not_project when it is not a project this account
+        sees and, for a `write`, by _readonly after that, in that order,
+        which is the order a person hears the two in."""
+        if req is not None:
+            name = field(req, "project")
+        else:
+            name = (self._q() if query is None else query).get("project", [""])[0]
+        if self._not_project(name) or (write and self._readonly(name)):
+            return None
+        return name
+
     def _not_card(self, name):
         """_not_project, for what is a whole project's (R138: its pin,
         group, color, lock, archive, name and its deletion): a project's key
@@ -8785,8 +8801,7 @@ class Handler(BaseHTTPRequestHandler):
         """GET /api/git: the notebook's Git view (gitview.view), for a
         project this account may see."""
         q = self._q()
-        name = q.get("project", [""])[0]
-        if self._not_project(name):
+        if not (name := self._project_asked(query=q)):
             return
         try:
             n = int(q.get("n", ["0"])[0])
@@ -8805,9 +8820,7 @@ class Handler(BaseHTTPRequestHandler):
         host (R188), each ability with what its token says and the project's
         own override, from the kept measure; for a project this account
         sees."""
-        q = self._q()
-        name = q.get("project", [""])[0]
-        if self._not_project(name):
+        if not (name := self._project_asked()):
             return
         return self._result(forgeaccess.view(name))
 
@@ -8815,8 +8828,7 @@ class Handler(BaseHTTPRequestHandler):
         """GET /api/changelog: changelog.reading, for a project this account
         sees."""
         q = self._q()
-        name = q.get("project", [""])[0]
-        if self._not_project(name):
+        if not (name := self._project_asked(query=q)):
             return
         comp = q.get("component", [""])[0]
         out, code = changelog.reading(name, comp)
@@ -8895,9 +8907,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _get_version(self):
         """GET /api/version."""
-        q = self._q()
-        name = q.get("project", [""])[0]
-        if self._not_project(name):
+        if not (name := self._project_asked()):
             return
         # What would keep a release's APK from being signed (R134 step 4),
         # said by Release's confirm before the tag is made.
@@ -8907,9 +8917,7 @@ class Handler(BaseHTTPRequestHandler):
     def _get_artifacts(self):
         """GET /api/artifacts: artifacts.tab_view, for a project this account
         sees."""
-        q = self._q()
-        name = q.get("project", [""])[0]
-        if self._not_project(name):
+        if not (name := self._project_asked()):
             return
         return self._json(artifacts.tab_view(name, users.uid_of(self._who())))
 
@@ -8917,8 +8925,7 @@ class Handler(BaseHTTPRequestHandler):
         """GET /api/artifact: one file of a project's, as a download
         (artifacts.download)."""
         q = self._q()
-        name = q.get("project", [""])[0]
-        if self._not_project(name):
+        if not (name := self._project_asked(query=q)):
             return
         got, status = artifacts.download(name, q.get("path", [""])[0], q.get("tree", [""])[0])
         if status != 200:
@@ -9001,9 +9008,7 @@ class Handler(BaseHTTPRequestHandler):
         (artifacts.source_download). A person's download: a session's token
         does not reach this route (SESSION_ROUTES), and a session has the
         tree already."""
-        q = self._q()
-        name = q.get("project", [""])[0]
-        if self._not_project(name):
+        if not (name := self._project_asked()):
             return
         got, status = artifacts.source_download(name)
         if status != 200:
@@ -9696,26 +9701,20 @@ class Handler(BaseHTTPRequestHandler):
 
     def _get_claude_now(self):
         """GET /api/claude-now."""
-        q = self._q()
-        name = q.get("project", [""])[0]
-        if self._not_project(name):
+        if not (name := self._project_asked()):
             return
         return self._json({"model": claude_model_now(WORKSPACE / name, users.uid_of(self._who()))})
 
     def _get_todo(self):
         """GET /api/roadmap."""
-        q = self._q()
-        name = q.get("project", [""])[0]
-        if self._not_project(name):
+        if not (name := self._project_asked()):
             return
         return self._json({"project": name} | roadmap.panel(name, sessions_anywhere(),
                                                             users.tmux_prefix(self._who())))
 
     def _get_rules(self):
         """GET /api/rules."""
-        q = self._q()
-        name = q.get("project", [""])[0]
-        if self._not_project(name):
+        if not (name := self._project_asked()):
             return
         # With the number a Save is checked against (B195): read in the same
         # answer as the rules, so the two cannot describe different moments.
@@ -9740,8 +9739,7 @@ class Handler(BaseHTTPRequestHandler):
         # who can see the project: it is their own rules, roadmap and
         # bugs, already on the three tabs beside it.
         q = self._q()
-        name = q.get("project", [""])[0]
-        if self._not_project(name):
+        if not (name := self._project_asked(query=q)):
             return
         # The asker's own reply style rides the block, as it does for the
         # session bb-tty starts for them.
@@ -9759,9 +9757,7 @@ class Handler(BaseHTTPRequestHandler):
     def _get_brief(self):
         """GET /api/brief: brief.view, the brief waiting in a project's tree
         and the one kept after it left, for a project this account sees."""
-        q = self._q()
-        name = q.get("project", [""])[0]
-        if self._not_project(name):
+        if not (name := self._project_asked()):
             return
         return self._json(brief.view(name, users.whose(self._who())))
 
@@ -9769,8 +9765,7 @@ class Handler(BaseHTTPRequestHandler):
         """POST /api/brief: the first Claude press's Build it and Start
         without it, and a session's take as it starts: brief.verb, behind the
         gates here."""
-        name = field(req, "project")
-        if self._not_project(name):
+        if not (name := self._project_asked(req)):
             return
         who = self._who() or {}
         # A take is a session starting on its own project; the dialog's two
@@ -9786,8 +9781,7 @@ class Handler(BaseHTTPRequestHandler):
         pages and the vocabulary they are drawn from, for a project this
         account sees; a session reads it too, through aerie design."""
         q = self._q()
-        name = q.get("project", [""])[0]
-        if self._not_project(name):
+        if not (name := self._project_asked(query=q)):
             return
         # ?show= is aerie design's: the words rather than the record, so a
         # session prints what the tab shows and nothing is assembled twice.
@@ -9801,8 +9795,7 @@ class Handler(BaseHTTPRequestHandler):
         """POST /api/design: a Design section's Save of the language and the
         pages, and the file written into the tree: design.verb, for an
         account that works on the project."""
-        name = field(req, "project")
-        if self._not_project(name) or self._readonly(name):
+        if not (name := self._project_asked(req, write=True)):
             return
         who = self._who() or {}
         req["mine"] = users.tmux_prefix(who)
@@ -9814,8 +9807,7 @@ class Handler(BaseHTTPRequestHandler):
         with ?page=, for an account that sees the project; a session reads
         it too, through aerie wiki."""
         q = self._q()
-        name = q.get("project", [""])[0]
-        if self._not_project(name):
+        if not (name := self._project_asked(query=q)):
             return
         no = wiki.hidden_for(name, bool((self._who() or {}).get("session")))
         if no:
@@ -9834,8 +9826,7 @@ class Handler(BaseHTTPRequestHandler):
         each failed job's log (cilogs), for an account that sees the
         project; a session reads it through aerie ci-log."""
         q = self._q()
-        name = q.get("project", [""])[0]
-        if self._not_project(name):
+        if not (name := self._project_asked(query=q)):
             return
         run = q.get("run", [""])[0]
         if run and not run.isdigit():
@@ -9848,17 +9839,14 @@ class Handler(BaseHTTPRequestHandler):
     def _get_ci_watch(self):
         """GET /api/ci-watch: what the last look at a project's CI found
         (ciwatch.read), for an account that sees the project."""
-        q = self._q()
-        name = q.get("project", [""])[0]
-        if self._not_project(name):
+        if not (name := self._project_asked()):
             return
         return self._json(ciwatch.read(name))
 
     def _ci_watch(self, req):
         """POST /api/ci-watch: look at a project's CI now (ciwatch.look),
         for an account that sees the project; the answer is what it found."""
-        name = field(req, "project")
-        if self._not_project(name):
+        if not (name := self._project_asked(req)):
             return
         # One already looking: this waits for it, then looks itself.
         while not ciwatch.claim(name):
@@ -9871,9 +9859,7 @@ class Handler(BaseHTTPRequestHandler):
     def _get_wiki_export(self):
         """GET /api/wiki-export: the wiki as a zip of its Markdown pages,
         whether or not the project has a remote."""
-        q = self._q()
-        name = q.get("project", [""])[0]
-        if self._not_project(name):
+        if not (name := self._project_asked()):
             return
         try:
             fname, data = wiki.export_zip(name)
@@ -9886,8 +9872,7 @@ class Handler(BaseHTTPRequestHandler):
         pushed to or pulled from the forge's (wiki.verb), for an account
         that works on the project. A session's writes go through the
         project's dial, Agents may: Write the wiki."""
-        name = field(req, "project")
-        if self._not_project(name) or self._readonly(name):
+        if not (name := self._project_asked(req, write=True)):
             return
         who = self._who() or {}
         ident = users.git_identity(who, name) or {}
@@ -9898,45 +9883,36 @@ class Handler(BaseHTTPRequestHandler):
         """GET /api/codebase."""
         # What git tracks in the project, by language: the Briefing
         # tab's first section. Tracked files only, cached by commit.
-        q = self._q()
-        name = q.get("project", [""])[0]
-        if self._not_project(name):
+        if not (name := self._project_asked()):
             return
         return self._json(codebase.payload(name))
 
     def _get_pending(self):
         """GET /api/pending."""
-        q = self._q()
-        name = q.get("project", [""])[0]
-        if self._not_project(name):
+        if not (name := self._project_asked()):
             return
         return self._json(pending.payload(name))
 
     def _get_memory(self):
         """GET /api/memory."""
-        q = self._q()
         # Against what this account may see, like every read above it:
         # this one passed the name straight through (bug #68).
-        if self._not_project(q.get("project", [""])[0]):
+        if not (name := self._project_asked()):
             return
-        got = memory.payload(q.get("project", [""])[0], sessions_anywhere(),
+        got = memory.payload(name, sessions_anywhere(),
                              home=home_for(users.whose(self._who())))
         return self._json(got if got is not None
                           else {"error": "not a space"}, 400 if got is None else 200)
 
     def _get_tests(self):
         """GET /api/tests."""
-        q = self._q()
-        name = q.get("project", [""])[0]
-        if self._not_project(name):
+        if not (name := self._project_asked()):
             return
         return self._json(testreg.payload(name))
 
     def _get_bugs(self):
         """GET /api/bugs."""
-        q = self._q()
-        name = q.get("project", [""])[0]
-        if self._not_project(name):
+        if not (name := self._project_asked()):
             return
         return self._json(bugs.payload(name))
 
@@ -10936,8 +10912,7 @@ class Handler(BaseHTTPRequestHandler):
         other endpoint here does it: a name that came back off the filesystem
         cannot name something that was never there.
         """
-        name = field(req, "project")
-        if self._not_project(name):
+        if not (name := self._project_asked(req)):
             return
         # Seeing a project and being able to change it are different
         # questions now (users.may_work): an administrator is shown every
@@ -11330,8 +11305,7 @@ class Handler(BaseHTTPRequestHandler):
         A session's bump goes through `aerie version bump`, which asks the same
         policy and passes `by="claude"`.
         """
-        name = field(req, "project")
-        if self._not_project(name):
+        if not (name := self._project_asked(req)):
             return
         act = field(req, "action")
         # B173: this is the panel's, and `by="operator"` is only true of an
@@ -11933,14 +11907,11 @@ class Handler(BaseHTTPRequestHandler):
         """Push an .xpi from a project's dist/ to the paired phone, install
         an .apk there, or stop a push: phone.artifact_verb, behind the gates
         here."""
-        name = field(req, "project")
-        if self._not_project(name):
-            return
         # Seeing a project and being able to change it are different
         # questions now (users.may_work): an administrator is shown every
         # project and works on the ones they took on. The reads are named,
         # so an action added later is a write until somebody says otherwise.
-        if self._readonly(name):
+        if not (name := self._project_asked(req, write=True)):
             return None
         who = self._who() or {}
         if field(req, "action") == "forget-capture":
@@ -11988,8 +11959,7 @@ class Handler(BaseHTTPRequestHandler):
         host and nothing here can write a finding, so `history` is the only
         action there is: the entries are made by findings.counts noticing the
         report changed."""
-        name = field(req, "project")
-        if self._not_project(name):
+        if not (name := self._project_asked(req)):
             return
         if field(req, "action") != "history":
             return self._json({"error": "the findings log is read-only"}, 400)
@@ -12009,13 +11979,10 @@ class Handler(BaseHTTPRequestHandler):
         have been the way around the whole arrangement. The only writer is a
         person signed in to this dashboard with the project on their list.
         """
-        name = field(req, "project")
-        if self._not_project(name):
+        if not (name := self._project_asked(req)):
             return
         if self._refused("rules", name) or self._readonly(name):
             return None
-        if (bad := projects.locked_out(name, users.whose(self._who()))):
-            return self._json(bad, 409)
         return self._json(*rules.verb(name, field(req, "action"), req))
 
     def _global_rules(self, req):
@@ -12037,8 +12004,7 @@ class Handler(BaseHTTPRequestHandler):
         pending.verb. The operator's, by name: a session's own token is
         refused here the way it is for the rules, because a session approving
         its own additions is the setting not existing."""
-        name = field(req, "project")
-        if self._not_project(name):
+        if not (name := self._project_asked(req)):
             return
         if self._refused("pending", name) or self._readonly(name):
             return None
@@ -12046,8 +12012,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _tests(self, req):
         """The hand-written half of the registry: testreg.verb."""
-        name = field(req, "project")
-        if self._not_project(name):
+        if not (name := self._project_asked(req)):
             return
         # A run's start and end are not a write to the notebook: a locked
         # project's tests still run, and the record is memory the status
@@ -12059,8 +12024,6 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(*testreg.verb(name, act, req))
         if self._readonly(name):
             return None
-        if (bad := projects.locked_out(name, users.whose(self._who()))):
-            return self._json(bad, 409)
         return self._json(*testreg.verb(name, act, req))
 
     def _presence(self, req):
@@ -12079,8 +12042,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _bugs(self, req):
         """Report, edit, or close one bug: bugs.verb, behind the gates here."""
-        name = field(req, "project")
-        if self._not_project(name):
+        if not (name := self._project_asked(req)):
             return
         # Seeing a project and being able to change it are different
         # questions now (users.may_work): an administrator is shown every
@@ -12098,10 +12060,9 @@ class Handler(BaseHTTPRequestHandler):
         their index, or read the history: memory.verb, behind the gates
         here."""
         act = field(req, "action")
-        proj = field(req, "project")
         # A project this account sees, whatever the action: the history
         # read had no project check at all (the audit of 26 Sep).
-        if self._not_project(proj):
+        if not (proj := self._project_asked(req)):
             return None
         if (bad := projects.locked_out(proj, users.whose(self._who()))):
             return self._json(bad, 409)
@@ -12223,8 +12184,7 @@ class Handler(BaseHTTPRequestHandler):
         if not me or not uid:
             return self._json({"error": "not an account"}, 403)
         q = self._q()
-        name = q.get("project", [""])[0]
-        if self._not_project(name):
+        if not (name := self._project_asked(query=q)):
             return
         if q.get("audit"):
             # `aerie rules audit` (R200 step 6): the same conversations,
@@ -12258,11 +12218,11 @@ class Handler(BaseHTTPRequestHandler):
         uid = users.whose(me) if me else ""
         if not me or not uid:
             return self._json({"error": "not an account"}, 403)
-        name, sid, act = field(req, "project"), field(req, "id"), field(req, "action")
+        sid, act = field(req, "id"), field(req, "action")
         # Of these four a person's own session may say too; the rest are the
         # person's alone, which SESSION_ACTIONS holds at the gate.
         said = act in ("label", "note", "keep", "unkeep")
-        if self._not_project(name):
+        if not (name := self._project_asked(req)):
             return
         if act == "delete":
             r, st = transcripts.delete(uid, name, sid)
@@ -12294,8 +12254,7 @@ class Handler(BaseHTTPRequestHandler):
         if not me or not uid:
             return self._json({"error": "not an account"}, 403)
         q = self._q()
-        name = q.get("project", [""])[0]
-        if self._not_project(name):
+        if not (name := self._project_asked(query=q)):
             return
         # Another account's, made visible to every session on the project,
         # is read as its owner's; anything else of theirs is not found.
@@ -12336,8 +12295,7 @@ class Handler(BaseHTTPRequestHandler):
         """POST /api/forge-access {project, action: measure}: the token
         measured again, for the Permissions section's Measure; an account's
         on a project it may change."""
-        name = field(req, "project")
-        if self._not_project(name) or self._readonly(name):
+        if not (name := self._project_asked(req, write=True)):
             return None
         if field(req, "action") != "measure":
             return self._json({"error": "action: measure"}, 400)
@@ -12690,8 +12648,6 @@ class Handler(BaseHTTPRequestHandler):
         # either (B101): the Save was live for it, and went through.
         if self._not_project(name) or self._readonly(name):
             return
-        if (bad := projects.locked_out(name, users.whose(self._who()))):
-            return self._json(bad, 409)
         out, code = changelog.editor_verb(name, req)
         # A line written for fixed bugs (R255) is tied to them in the
         # notebook, by the words it was written with.
@@ -12799,8 +12755,7 @@ class Handler(BaseHTTPRequestHandler):
                 if a:
                     mine.append({"name": name, "access": a, **projects.app_flags(name, users.uid_of(me))})
             return self._json({"api": files.API, "api_min": files.API_MIN, "projects": mine})
-        project = field(req, "project")
-        if self._not_project(project):
+        if not (project := self._project_asked(req)):
             return None
         access, why = ftp.access_for(me, project, "editor")
         if not access:
@@ -13386,9 +13341,7 @@ class Handler(BaseHTTPRequestHandler):
         project's own key, for a session of that project at its start
         (bb-tty's launcher) or a person who may work on it; {} where no
         router allows the project."""
-        q = self._q()
-        name = q.get("project", [""])[0]
-        if self._not_project(name):
+        if not (name := self._project_asked()):
             return
         who = self._who() or {}
         if who.get("session") and who.get("session") != name and users.key_of(who.get("session") or "") != users.key_of(name):
@@ -13959,8 +13912,7 @@ class Handler(BaseHTTPRequestHandler):
         """A project's file access over FTP (ftp.py, R151): what it is, for
         whoever sees the project, and a change, for an account with File
         access Write on it (users.may's ftp)."""
-        name = field(req, "project")
-        if self._not_project(name):
+        if not (name := self._project_asked(req)):
             return None
         me = self._who() or {}
         may_set = not users.may(me, "ftp", name)
