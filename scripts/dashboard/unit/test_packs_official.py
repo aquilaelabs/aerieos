@@ -38,30 +38,86 @@ class Official(unittest.TestCase):
         _c, errors = toolpacks.validate(dict(good, service={"kind": "router"}))
         self.assertTrue(any("official pack's alone" in e for e in errors))
         import router
-        clean, errors = toolpacks.validate(router.pack())
+        clean, errors = toolpacks.validate(router.pack(), official=True)
         self.assertEqual(errors, [])
         self.assertEqual((clean["service"], clean["verbs"], [f["name"] for f in clean["config"]][-3:]), ({"kind": "router"}, {}, ["custom", "ollama", "projects"]))
-        _c, errors = toolpacks.validate(dict(router.pack(), service={"kind": "nope"}))
+        _c, errors = toolpacks.validate(dict(router.pack(), service={"kind": "nope"}), official=True)
         self.assertTrue(any("service.kind is one of" in e for e in errors))
 
     def test_an_official_pack_stands_in_for_steps_and_verbs(self):
         m = {"name": "jdk", "label": "JDK", "tier": "official", "platforms": ["linux/amd64"], "terms": [],
              "layout": {"bin": ["bin"], "env": {"JAVA_HOME": ""}, "tool": "bin/java"}, "shipped": {"source": {"kind": "tarball"}}}
-        clean, errors = toolpacks.validate(m, shipped=("jdk",))
+        clean, errors = toolpacks.validate(m, shipped=("jdk",), official=True)
         self.assertEqual(errors, [])
         self.assertEqual((clean["tier"], clean["shipped"]["source"]["kind"], clean["verbs"]), ("official", "tarball", {}))
         clean, errors = toolpacks.validate(dict(m, tier="url"), shipped=("jdk",))
         self.assertTrue(any("a name of its own" in e for e in errors) and any("official pack's alone" in e for e in errors))
+
+    def test_official_is_the_caller_s_word_and_never_the_manifest_s(self):
+        # What official unlocks is the shipped packs' alone: a shipped name
+        # (a colon in it too), a shipped recipe, a service, a shipped
+        # agent's table row and a layout under the store's root. A manifest
+        # that says the tier of itself, as one added by address, pasted or
+        # uploaded could, takes none of it.
+        said = "tier official is said by AerieOS of the packs it ships, never by a manifest of itself: a pack leaves tier out"
+        verbs = {"dump": {"about": "dump", "usage": "FILE", "run": ["{dir}/bin/hexkit", "{args}"]}}
+        plain = {"name": "hexkit", "label": "Hexkit", "tier": "official", "platforms": ["linux/amd64"], "terms": [], "verbs": verbs}
+        self.assertEqual(toolpacks.validate(plain)[1], [said], "the claim alone is refused, whatever else it asks for")
+        self.assertEqual(toolpacks.validate(plain, official=False)[1], [said])
+        self.assertEqual(toolpacks.validate(dict(plain, tier="url"))[1], [])
+        import router
+        a = {"product": "Claude Code", "command": "claude", "provider": "Anthropic", "reported": "claude", "update_job": "claude-update",
+             "login_job": "claude-login", "logout_job": "claude-logout", "briefing": "system-prompt-file", "guards": "hooks", "state": "hooks",
+             "transcripts": ".claude/projects", "latest_url": "", "tool": "claude-code"}
+        for grab, refused in (
+                ({"name": "jdk", "shipped": {"source": {"kind": "tarball"}}}, ("jdk is a toolchain AerieOS ships", "shipped (a toolchain's recipe) is an official pack's alone")),
+                ({"name": "android:emulator", "verbs": verbs}, ("name is 2 to 40",)),
+                ({"name": "graphics", "verbs": verbs}, ("graphics is one of aerie tool's own words",)),
+                ({"name": "hexkit", "verbs": verbs, "layout": {"bin": ["root:android/bin"], "tool": "root:android/tool"}}, ("layout.bin lists directories inside the pack", "layout.tool is a file inside the pack")),
+                ({k: v for k, v in router.pack().items() if k not in ("tier", "platforms", "terms", "label")}, ("service (a deployed thing of AerieOS's) is an official pack's alone",)),
+                ({"name": "claude", "agent": a}, ("a coding agent AerieOS ships",))):
+            m = {"label": "X", "tier": "official", "platforms": ["linux/amd64"], "terms": [], **grab}
+            errors = toolpacks.validate(m, shipped=("jdk",))[1]
+            self.assertIn(said, errors, grab["name"])
+            for why in refused:
+                self.assertTrue(any(why in e for e in errors), (grab["name"], why, errors))
+            # ...and each is the shipped pack it is written as once the
+            # caller says so.
+            self.assertEqual(toolpacks.validate(m, shipped=("jdk",), official=True)[1], [], grab["name"])
+        # The caller's word does not make a manifest official that is not
+        # written as one.
+        errors = toolpacks.validate({"name": "jdk", "label": "JDK", "platforms": ["linux/amd64"], "terms": [], "shipped": {"source": {"kind": "tarball"}}},
+                                    shipped=("jdk",), official=True)[1]
+        self.assertTrue(any("a name of its own" in e for e in errors) and any("official pack's alone" in e for e in errors), errors)
+
+    def test_every_pack_this_tree_ships_is_official_by_the_tables_and_not_by_itself(self):
+        # The files under packs/ say tier official, as the catalog's copies
+        # do: read as a person's pack each is refused, and read as what the
+        # tables wrote (tools/packs-export.py, the lint) each is whole.
+        seen = 0
+        for sub in ("official", "agents", "services"):
+            for name in sorted(os.listdir(os.path.join(ROOT, "packs", sub))):
+                with open(os.path.join(ROOT, "packs", sub, name, "bbtool.json"), encoding="utf-8") as f:
+                    m = json.load(f)
+                self.assertEqual(toolpacks.validate(m, official=True)[1], [], f"{sub}/{name}")
+                self.assertTrue(any("tier official is said by AerieOS" in e for e in toolpacks.validate(m)[1]), f"{sub}/{name}")
+                seen += 1
+        self.assertGreater(seen, 30)
+        import services
+        import toolchains
+        self.assertEqual(len(services.packs()), len(services.KINDS))
+        for m in services.packs():
+            self.assertEqual(toolpacks.validate(m, shipped={r["name"] for r in toolchains.load_toolchains()}, official=True)[1], [], m["name"])
 
     def test_an_agent_pack_is_checked_and_one_without_guards_is_refused(self):
         a = {"product": "Claude Code", "command": "claude", "provider": "Anthropic", "reported": "claude", "update_job": "claude-update",
              "login_job": "claude-login", "logout_job": "claude-logout", "briefing": "system-prompt-file", "guards": "hooks", "state": "hooks",
              "transcripts": ".claude/projects", "latest_url": "", "tool": "claude-code"}
         m = {"name": "claude", "label": "Claude", "tier": "official", "platforms": ["linux/*"], "terms": [], "agent": a}
-        clean, errors = toolpacks.validate(m)
+        clean, errors = toolpacks.validate(m, official=True)
         self.assertEqual(errors, [])
         self.assertEqual(clean["agent"]["command"], "claude")
-        clean, errors = toolpacks.validate({**m, "agent": {**a, "guards": "none"}})
+        clean, errors = toolpacks.validate({**m, "agent": {**a, "guards": "none"}}, official=True)
         self.assertTrue(any("cannot take AerieOS's guards" in e for e in errors))
         # Another pack's agent block is a pack agent's adapter (R169 step 8),
         # which never takes a shipped agent's name or its table's fields.

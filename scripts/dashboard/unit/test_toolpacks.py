@@ -24,6 +24,9 @@ GOOD = {
                          "run": ["python3", "{dir}/verbs/report.py", "--out", "{dist}", "{args}"]}},
     "guidance": "GUIDE.md",
 }
+# What a manifest that says tier official of itself is told, by whichever
+# way it came in.
+OFFICIAL_REFUSED = "tier official is said by AerieOS of the packs it ships, never by a manifest of itself"
 
 
 def git(*a, cwd):
@@ -71,6 +74,11 @@ class Manifest(unittest.TestCase):
     def test_a_shipped_name_is_refused(self):
         _, errors = toolpacks.validate(GOOD, shipped=("hexkit",))
         self.assertTrue(any("AerieOS ships" in e for e in errors), errors)
+        # ...and saying tier official of itself is no way to it: whether a
+        # manifest is one AerieOS ships is its caller's to say.
+        _, errors = toolpacks.validate(dict(GOOD, tier="official"), shipped=("hexkit",))
+        self.assertTrue(any("AerieOS ships" in e for e in errors) and any(OFFICIAL_REFUSED in e for e in errors), errors)
+        self.assertEqual(toolpacks.validate(dict(GOOD, tier="official"), shipped=("hexkit",), official=True)[1], [])
 
 
 class Repository(unittest.TestCase):
@@ -133,6 +141,43 @@ class Repository(unittest.TestCase):
         # without the index's sha256 (B440).
         self.assertEqual(toolpacks.add(self.url, commit, "operator", sha256=good, tier="official")["pack"]["tier"], "official")
         self.assertEqual(toolpacks.add(self.url, commit, "operator", tier="vetted")["pack"]["tier"], "url")
+
+    def test_a_pack_added_by_its_address_is_never_official_by_its_own_word(self):
+        # A repository anyone can point the Library at: its manifest says
+        # tier official and asks for what only a shipped pack has.
+        import hashlib
+        claim = dict(GOOD, tier="official", layout={"bin": ["root:android/bin"], "tool": "bin/hexkit"})
+        commit = self.commit(claim, "Trust me.")
+        seen = toolpacks.fetch(self.url)
+        self.assertIn(OFFICIAL_REFUSED, seen.get("error", ""), seen)
+        self.assertIn("layout.bin lists directories inside the pack", seen["error"])
+        self.assertIn(OFFICIAL_REFUSED, toolpacks.add(self.url, commit, "operator").get("error", ""))
+        # A sha256 sent beside it, as the page sends the catalog's, changes
+        # nothing: that it matches says what the archive is, not whose.
+        tar = subprocess.run(["git", "archive", "--format=tar", "HEAD"], cwd=self.repo, capture_output=True, check=True).stdout
+        good = hashlib.sha256(tar).hexdigest()
+        self.assertIn(OFFICIAL_REFUSED, toolpacks.fetch(self.url, commit, sha256=good).get("error", ""))
+        # Added from the catalog's Install, the index calling it official or
+        # not: a pack kept as a pack is still not a shipped one.
+        for tier in ("vetted", "official"):
+            self.assertIn(OFFICIAL_REFUSED, toolpacks.add(self.url, commit, "operator", sha256=good, tier=tier).get("error", ""), tier)
+        self.assertEqual(toolpacks.packs(), {})
+        # Official is said by a caller that read the pin from the signed
+        # index as one of AerieOS's own (a shipped agent's newer recipe),
+        # and counts only beside that pin's sha256.
+        self.assertNotIn("error", toolpacks.fetch(self.url, commit, sha256=good, official=True))
+        self.assertIn(OFFICIAL_REFUSED, toolpacks.fetch(self.url, commit, official=True).get("error", ""))
+        # In a folder of a repository, as the catalog's own packs are kept.
+        folder = os.path.join(self.repo, "packs", "hexkit")
+        os.makedirs(folder)
+        for name in ("bbtool.json", "GUIDE.md"):
+            os.rename(os.path.join(self.repo, name), os.path.join(folder, name))
+        git("add", "-A", cwd=self.repo)
+        git("commit", "-q", "-m", "a folder", cwd=self.repo)
+        commit = subprocess.run(["git", "rev-parse", "HEAD"], cwd=self.repo, capture_output=True, text=True, check=True).stdout.strip()
+        self.assertIn(OFFICIAL_REFUSED, toolpacks.fetch(self.url, commit, path="packs/hexkit").get("error", ""))
+        self.assertIn(OFFICIAL_REFUSED, toolpacks.add(self.url, commit, "operator", path="packs/hexkit").get("error", ""))
+        self.assertEqual(toolpacks.packs(), {})
 
     def test_a_pack_in_a_folder_of_the_repository(self):
         # R170 step 6: a pack kept in a folder (the catalog's own packs/):
@@ -278,6 +323,34 @@ class MadeHere(unittest.TestCase):
         self.assertEqual(seen["guidance"], "Read me first.")
         self.assertNotIn(".git/config", seen["files"], "an uploaded repository's own history is left out")
         self.assertTrue(toolpacks.add_staged(seen["staged"], "operator").get("ok"))
+
+    def test_a_pack_pasted_or_uploaded_is_never_official_by_its_own_word(self):
+        # Pasted: a manifest that says tier official, and one that asks for
+        # a shipped recipe, a service and a shipped name on the strength of it.
+        m = json.loads(json.dumps(GOOD))
+        m.pop("guidance")
+        self.assertIn(OFFICIAL_REFUSED, self.paste(dict(m, tier="official")).get("error", ""))
+        grab = {"name": "jdk", "label": "JDK", "tier": "official", "platforms": ["linux/amd64"], "terms": [],
+                "shipped": {"source": {"kind": "command", "run": ["sh", "-c", "id"]}}, "service": {"kind": "router"}}
+        said = toolpacks.stage(json.dumps(grab), shipped=("jdk",)).get("error", "")
+        for why in (OFFICIAL_REFUSED, "jdk is a toolchain AerieOS ships", "shipped (a toolchain's recipe) is an official pack's alone",
+                    "service (a deployed thing of AerieOS's) is an official pack's alone"):
+            self.assertIn(why, said)
+        # Uploaded: the same manifest in an archive.
+        self.uploads["d" * 16] = {"bbtool.json": json.dumps(dict(GOOD, tier="official")), "GUIDE.md": "Read me first.", "bin/hexkit": "#!/bin/sh\n"}
+        self.assertIn(OFFICIAL_REFUSED, toolpacks.stage(archive="d" * 16).get("error", ""))
+        self.assertEqual(os.listdir(os.path.join(self.tmp.name, "toolpacks", "staging")), [], "nothing refused is left staged")
+        # Add reads the staged files again, so one changed under it after
+        # the look is held to the same rule.
+        seen = self.paste(m)
+        with open(os.path.join(self.tmp.name, "toolpacks", "staging", seen["staged"], "bbtool.json"), "w") as f:
+            json.dump(dict(m, tier="official"), f)
+        self.assertIn(OFFICIAL_REFUSED, toolpacks.add_staged(seen["staged"], "operator").get("error", ""))
+        self.assertEqual(toolpacks.packs(), {})
+        # The same pack with no claim is kept, as a person's.
+        kept = toolpacks.add_staged(self.paste(m)["staged"], "operator")
+        self.assertTrue(kept.get("ok"), kept)
+        self.assertEqual((kept["pack"]["manifest"]["tier"], toolpacks.recipe(kept["pack"])["pack"]["tier"]), ("url", "here"))
 
     def test_a_pack_without_about_is_still_a_row(self):
         # B106: about is optional, and the catalog drops a row without one.

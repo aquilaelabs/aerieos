@@ -34,7 +34,7 @@ class Whole(unittest.TestCase):
     def test_every_shipped_row_comes_back_whole_from_its_manifest(self):
         for r in SHIPPED:
             self.assertEqual(catalogrows.row_of(catalogrows.manifest_of(r)), plain(r), r["name"])
-            self.assertEqual(toolpacks.validate(catalogrows.manifest_of(r))[1], [], r["name"])
+            self.assertEqual(toolpacks.validate(catalogrows.manifest_of(r), official=True)[1], [], r["name"])
 
     def test_every_word_a_shipped_row_names_is_a_primitive_this_build_lists(self):
         for r in SHIPPED:

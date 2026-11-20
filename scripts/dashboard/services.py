@@ -106,7 +106,8 @@ def rows(nid, may=None):
         if may is not None and not may(grant(kind)):
             continue
         m = module(kind)
-        manifest, errors = toolpacks.validate(m.pack(), shipped=())
+        # Official by this table's word: the pack is the service module's own.
+        manifest, errors = toolpacks.validate(m.pack(), shipped=(), official=True)
         if errors:
             continue
         row = {"manifest": manifest, "status": {"deployed": deployed(kind, nid)}, "ready": "", "removes": m.REMOVES}

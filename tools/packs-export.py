@@ -167,14 +167,16 @@ def main(argv):
         root = argv[argv.index("--catalog") + 1]
         if "--index" in argv:
             return catalog_index(root)
-        bad = sum(1 for _p, m in want if toolpacks.validate(m, shipped=())[1])
+        bad = sum(1 for _p, m in want if toolpacks.validate(m, shipped=(), official=True)[1])
         if bad:
             return 1
         catalog_write(root)
         return 0
     bad = 0
+    # Official by these tables' word: each manifest is written from a row
+    # AerieOS ships (validate takes that from its caller, never the manifest).
     for path, m in want:
-        clean, errors = toolpacks.validate(m, shipped=())
+        clean, errors = toolpacks.validate(m, shipped=(), official=True)
         if errors:
             print(f"  [FAIL] {os.path.relpath(path, ROOT)}: " + "; ".join(errors))
             bad += 1

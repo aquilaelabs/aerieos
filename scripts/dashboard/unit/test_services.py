@@ -48,7 +48,7 @@ class Table(unittest.TestCase):
     def test_each_pack_names_its_kind_and_is_found_by_its_name(self):
         self.assertEqual([m["name"] for m in services.packs()], ["model-router", "nginx", "scanners"])
         for kind, m in zip(services.KINDS, services.packs(), strict=True):
-            clean, errors = toolpacks.validate(m, shipped=())
+            clean, errors = toolpacks.validate(m, shipped=(), official=True)
             self.assertEqual(errors, [], kind)
             self.assertEqual(clean["service"], {"kind": kind})
             self.assertEqual(services.of_pack(m["name"]), kind)
@@ -98,11 +98,11 @@ class OnANode(unittest.TestCase):
 
     def spelled_out(self, nid):
         """The rows as the server made them with the three spelled out."""
-        return ([{"manifest": toolpacks.validate(router.pack(), shipped=())[0], "status": router.status(nid),
+        return ([{"manifest": toolpacks.validate(router.pack(), shipped=(), official=True)[0], "status": router.status(nid),
                   "ready": router._ready(nid), "all_projects": sorted(["web", "app"])}],
-                [{"manifest": toolpacks.validate(nginxproxy.pack(), shipped=())[0],
+                [{"manifest": toolpacks.validate(nginxproxy.pack(), shipped=(), official=True)[0],
                   "status": {"deployed": bool(nginxproxy.deployed(devapp, nid))}, "ready": "", "removes": NGINX_REMOVES},
-                 {"manifest": toolpacks.validate(scanners.pack(), shipped=())[0],
+                 {"manifest": toolpacks.validate(scanners.pack(), shipped=(), official=True)[0],
                   "status": {"deployed": bool(scanners.record(nid).get("deployed"))}, "ready": "", "removes": SCANNERS_REMOVES}])
 
     def drawn(self, rows):

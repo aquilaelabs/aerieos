@@ -45,7 +45,9 @@ class Kept(unittest.TestCase):
         for n in range(1, packformat.FORMAT + 1):
             for p in kept(n):
                 m = json.loads(p.read_text())
-                got, errors = toolpacks.validate(m)
+                # The kept manifests written as official are copies of packs
+                # AerieOS shipped, which is this file's to say of them.
+                got, errors = toolpacks.validate(m, official=m.get("tier") == "official")
                 self.assertEqual(errors, [], f"{p.parent.name}/{p.name}")
                 self.assertEqual(got["format"], n if n > 1 else packformat.of(m), p.name)
                 self.assertEqual(packformat.of(m), n, f"{p.name} says the format its folder is")

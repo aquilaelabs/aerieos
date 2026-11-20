@@ -67,7 +67,7 @@ _latest = {}               # {agent id: {version, at, error, checking}}
 # until then.
 _pressed = {}
 catalog_entry = None       # server: the signed index's official entry of this name, or None
-fetch_pack = None          # toolpacks.fetch
+fetch_pack = None          # toolpacks.fetch, asked with official=True for the index's official pin
 _recipes = {}              # {(agent id, commit): (the catalog's recipe there or None, when read, why not)}
 RECIPE_MISS_S = 300        # a pack that could not be fetched is asked again after this long
 _warming = threading.Event()   # a read-ahead of the catalog's recipes is running
@@ -110,7 +110,10 @@ def recipe(agent_id):
     with _lock:
         had = _recipes.get(key)
     if not had or (had[2] and time.time() - had[1] > RECIPE_MISS_S):
-        got = fetch_pack(entry["url"], entry["commit"], (), entry["sha256"], entry.get("path", ""))
+        # Official by the signed index's word (catalog_entry answers its
+        # official entries alone), which is what lets the manifest carry
+        # a shipped agent's own block; the manifest cannot say it of itself.
+        got = fetch_pack(entry["url"], entry["commit"], (), entry["sha256"], entry.get("path", ""), official=True)
         theirs = None if got.get("error") else ((got.get("manifest") or {}).get("agent") or {}).get("install")
         had = (theirs, time.time(), got.get("error") or "")
         with _lock:

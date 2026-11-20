@@ -127,7 +127,7 @@ class TheTablesData(unittest.TestCase):
             with open(os.path.join(HERE, "..", "..", "..", "packs", "agents", a.id, "bbtool.json"), encoding="utf-8") as f:
                 m = json.load(f)
             self.assertEqual(m["agent"].get("signin"), a.signin, a.id)
-            got, errors = toolpacks.validate(m)
+            got, errors = toolpacks.validate(m, official=True)
             self.assertEqual(errors, [], a.id)
             if a.signin:
                 self.assertEqual(got["agent"]["signin"]["flow"]["kept"], a.signin["flow"]["kept"])

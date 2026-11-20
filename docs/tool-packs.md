@@ -139,6 +139,11 @@ conversations are). Both carry `"tier": "official"`, which is what lets
 them stand in for install steps and verbs and take a shipped name; a pack
 you add is `url`, and a pack from the vetted catalog takes the tier its
 index entry says (the Library reads official and `aerie` as Packaged by Aerie).
+The word in the manifest is not what makes a pack official: AerieOS reads
+one as official only where it holds the manifest as its own (written from
+its tables, or at the pin the signed index names official for a row it
+ships). A pack you add by its address, paste or upload that says
+`"tier": "official"` is refused with that said; leave `tier` out.
 An agent whose manifest cannot name how it takes the guards is
 not a pack and is not listed. The files are written from the tables by
 `tools/packs-export.py --write` and `aerie lint` fails when they drift, so

@@ -223,7 +223,10 @@ def refresh(index, fetch, shipped_rows, validate=None):
             except (ValueError, UnicodeDecodeError, KeyError):
                 said.append((name, "its bbtool.json is not JSON"))
                 continue
-            errors = validate(m)[1] if validate else []
+            # Official by the signed index's word, not the manifest's: wanted
+            # took this pin from an entry at tier official that names a row
+            # this build ships, and fetch held its folder to the entry's sha256.
+            errors = validate(m, official=True)[1] if validate else []
             row, why = (None, "; ".join(errors)) if errors else checked(row_of(m), shipped[name])
             if not row:
                 said.append((name, why))

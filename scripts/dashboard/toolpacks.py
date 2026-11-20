@@ -22,7 +22,7 @@ the same way; the nodes take it as a git bundle that travels in the bundle
 beside config/toolpacks.json, and install it with the same pinned fetch.
 
     configure(state=, write_json=, unpack=)
-    validate(manifest)          (clean, [errors])
+    validate(manifest)          (clean, [errors]); official= is the caller's word that AerieOS ships it
     fetch(url, commit="")       the repository at a commit: {commit, manifest, guidance} or {error}
     stage(text=, archive=)      a pack made here, checked and held for Add: {staged, manifest, ...}
     add(url, commit, by) / add_staged(staged, by) / remove(name) / source(name)
@@ -747,12 +747,23 @@ def _config(c, errors, depth=0):
     return out
 
 
-def validate(m, shipped=()):
+def validate(m, shipped=(), official=False):
     """A manifest checked and cut down to what AerieOS reads: (clean,
     errors). Nothing in it is run here; the errors say what to fix. An
     official pack (tier official, R169 step 1) may carry a shipped
     toolchain's recipe or an agent's adapter in place of install steps and
-    verbs, and may take a shipped name, being the shipped thing itself."""
+    verbs, and may take a shipped name, being the shipped thing itself.
+
+    Whether a manifest is one AerieOS ships is the caller's to say
+    (`official`), never the manifest's: what official unlocks (a shipped
+    name, shipped, service, an agent's table row, a layout under root:) is
+    the shipped packs' alone, and a manifest that could award itself the
+    tier would take all of it. The callers that say it are the ones that hold a
+    shipped table's own manifest (services.rows, tools/packs-export.py) or
+    a pin the signed index names official (fetch's `official`, for a
+    shipped agent's newer recipe; catalogrows.refresh). A pack a person
+    adds, by address, pasted, uploaded or from the catalog's Install, is
+    never one, and tier official on it is refused."""
     errors = []
     if not isinstance(m, dict):
         return None, [f"{MANIFEST} is a JSON object"]
@@ -767,7 +778,10 @@ def validate(m, shipped=()):
     tier = str(m.get("tier") or "url")
     if tier not in TIERS:
         errors.append(f"tier is one of {', '.join(TIERS)}")
-    official = tier == "official"
+    elif tier == "official" and not official:
+        errors.append("tier official is said by AerieOS of the packs it ships, never by a manifest of itself: a pack leaves tier out")
+    # Official is both: the caller's word, and the manifest written as one.
+    official = bool(official) and tier == "official"
     name = str(m.get("name") or "")
     # A shipped toolchain's name may carry a colon (android:emulator), the
     # store's own family form; a person's pack never does.
@@ -998,13 +1012,16 @@ def _source(url, commit):
     return ["--depth", "1", url, commit or "HEAD"]
 
 
-def fetch(url, commit="", shipped=(), sha256="", path=""):
+def fetch(url, commit="", shipped=(), sha256="", path="", official=False):
     """The repository at `commit` (its default branch's head when none):
     {commit, manifest, guidance} with the manifest validated, or {error}.
     Fetched into a scratch directory that is gone when this returns. With
     `sha256` (the catalog's, of the archive at that commit, R169 step 4)
     the archive is made and compared, and a difference refuses the pack:
-    git's own hashes pin the commit, this pins what the maintainers saw."""
+    git's own hashes pin the commit, this pins what the maintainers saw.
+    `official` is said by a caller that read this pin from the signed
+    index as one of AerieOS's own shipped packs (agentcode.recipe), and
+    counts only beside that pin's sha256; a request never says it."""
     url = str(url or "").strip()
     # A suite's pack is a repository on disk (BB_TOOLPACKS_FILE_URLS=1); a
     # controller only ever fetches one over the network.
@@ -1046,7 +1063,8 @@ def fetch(url, commit="", shipped=(), sha256="", path=""):
             if r.returncode != 0:
                 return None
             return r.stdout[:cap + 1]
-        got_m = _examine(read, shipped, f"{url} has no {MANIFEST} at {('its ' + path) if path else 'its root'}")
+        got_m = _examine(read, shipped, f"{url} has no {MANIFEST} at {('its ' + path) if path else 'its root'}",
+                         official=bool(official and sha256))
         if got_m.get("error"):
             return {**got_m, "commit": got} if got_m.get("errors") else got_m
         return {"commit": got, **got_m, "plain": url.startswith("http://"), "path": path}
@@ -1096,10 +1114,11 @@ def fetch_folder(url, commit, sha256, path, files, cap=256 << 10):
         shutil.rmtree(tmp, ignore_errors=True)
 
 
-def _examine(read, shipped, missing):
+def _examine(read, shipped, missing, official=False):
     """The manifest and guidance a pack's files hold, read through `read(rel,
     cap)`: {manifest, guidance} validated, or {error}. One reading for a
-    repository and a pack made here."""
+    repository and a pack made here. `official` is validate's: fetch alone
+    passes it on, so nothing pasted, uploaded or kept as a pack is official."""
     raw = read(MANIFEST, MANIFEST_MAX)
     if raw is None:
         return {"error": missing}
@@ -1109,7 +1128,7 @@ def _examine(read, shipped, missing):
         m = json.loads(raw.decode("utf-8"))
     except (ValueError, UnicodeDecodeError) as e:
         return {"error": f"{MANIFEST} is not JSON: {e}"}
-    clean, errors = validate(m, shipped)
+    clean, errors = validate(m, shipped, official)
     if errors:
         return {"error": f"{MANIFEST} needs fixing: " + "; ".join(errors), "errors": errors}
     guidance = ""
