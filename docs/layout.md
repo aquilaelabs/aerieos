@@ -438,7 +438,7 @@ config/controller-packages.tsv   what the controller needs installed, per provis
 config/vm-images.json            the operating systems a VM is made from: each publisher's cloud image and its checksum file (R91)
 config/templates/                briefing.md, assembled per session by preamble.py; nothing is copied into a project
 tools/readme-shots.mjs           the README's pictures (dashboard, notebook, nodes, toolchains, the phone's dashboard and terminal) from a running dashboard, normally the dev instance: default scheme, addresses scrubbed, nothing saved
-tools/sign-agent.py              the agent's release signature (R227): --keygen makes the key pair once, a release build signs the agent's digest into scripts/agent/agent.sig with the key from its secret, --check holds a signature to the committed public key
+tools/sign-agent.py              the release's signatures over what a build sends its nodes (R227, R267 step 6): --keygen makes the key pair once, a release build signs the agent's digest, root's tools and the list of the bundle's files into scripts/agent/agent.sig with the key from its secret, --check holds all three to the committed public key, --digests prints what a tree would be signed as
 tools/bb-ref.sh                  writes the aerie block of docs/reference.md from aerie help; aerie lint holds the two equal
 tools/aerieos-stick.py        the USB stick maker (R161 step 5): a release's stick image onto a removable disk on Windows, a Mac or Linux, checked and read back, Python's own library alone
 tools/release-notes.py           a dev build's release notes: what the changelog's Unreleased gained since the last published release

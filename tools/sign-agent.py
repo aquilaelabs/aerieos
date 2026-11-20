@@ -1,30 +1,44 @@
 #!/usr/bin/env python3
-"""Sign the agent a build ships with AerieOS's release key (R227 step 1).
+"""Sign what a build sends its nodes with AerieOS's release key (R227 step 1,
+R267 step 6).
 
 A node that pinned the release key takes an agent update only when a
-signature under it covers the update's digest (scripts/agent/aerieos_agent/
-release.py). This makes that signature at build time, from the key a
-release build is handed and no controller holds:
+signature under it covers the update's digest, and the bundle it fetches
+from its controller only when one covers the list of the files a release
+ships in it (scripts/agent/aerieos_agent/release.py). This makes those
+signatures at build time, from the key a release build is handed and no
+controller holds. scripts/agent/agent.sig carries three, each under a line
+of its own so none passes as another: over the agent's zip, over the tools
+root installs from the bundle, and over the list of every file the bundle
+ships (scripts/lib/bundleparts.py: aerie, its library, the shipped catalog,
+the publishers' keys, root's tools, the hooks).
 
     tools/sign-agent.py --keygen
         a new key pair, printed once: the private half for the build's
         secret (AERIEOS_RELEASE_KEY), the public half for
         config/aerieos-release.pub, which is committed.
     AERIEOS_RELEASE_KEY=... tools/sign-agent.py
-        writes scripts/agent/agent.sig for the agent as this tree builds it.
-        With no key in the environment it writes nothing and says so: a
-        build from a branch ships unsigned.
+        writes scripts/agent/agent.sig for the agent, root's tools and the
+        bundle's files as this tree holds them. With no key in the
+        environment it writes nothing and says so: a build from a branch
+        ships unsigned.
     tools/sign-agent.py --check
         whether scripts/agent/agent.sig is the committed public key's
-        signature over this tree's agent: exit 0 when it is, 1 when not.
+        signature over this tree's agent, root's tools and the bundle's
+        files, all three: exit 0 when it is, 1 when not.
+    tools/sign-agent.py --digests
+        the three digests this tree would be signed as, one a line with its
+        name, and nothing written: for comparing a build with a checkout
+        (the Nodes page's status names the bundle's as `files`).
     tools/sign-agent.py --builder-keygen FILE
         a builder's own key, for whoever builds a controller on their own
         machine: the private half written to FILE (never printed), the
         public half printed with the command that adds it at a node's
         console. Not a release key: it goes in no repository.
     tools/sign-agent.py --builder FILE [--out SIG]
-        signs this tree's agent and root's tools with the key in FILE,
-        whatever config/aerieos-release.pub names: a node takes the build
+        signs this tree's agent, root's tools and the bundle's files with
+        the key in FILE, whatever config/aerieos-release.pub names: a node
+        takes the build
         once a person has added the key at its console (aerieos-agent
         release-key add), and no other node does. tools/build-image-here.sh
         runs this after its build.
@@ -32,7 +46,10 @@ release build is handed and no controller holds:
 The key never goes on a command line and is never printed after --keygen.
 The bytes signed are release.MESSAGE and the digest the controller's hello
 names, so the signature is of the sources (bundle.py builds the same zip
-from the same sources anywhere).
+from the same sources anywhere). The bundle's list is of the tree's files
+as they are, so it is signed from the tree the image is built from and
+nothing may rewrite one of those files on the way into the image
+(scripts/dashboard/unit/test_bundle_files_in_image.py).
 """
 import hashlib
 import importlib
@@ -75,15 +92,27 @@ def tools_digest():
     return _load("release").tools_digest(held)
 
 
+def _lib(name):
+    """One of scripts/lib's modules, which the controller reads too."""
+    lib = os.path.join(HERE, "..", "scripts", "lib")
+    if lib not in sys.path:
+        sys.path.insert(0, lib)
+    return importlib.import_module(name)
+
+
+def bundle_digest():
+    """The digest of the list of the files a release ships in the bundle,
+    as this tree holds them: what the controller's bundle carries as
+    nodes/bundle.list when its install's files are these, and what a node
+    works out from the list it was sent (scripts/lib/bundleparts.py)."""
+    return _lib("bundleparts").listing(os.path.join(HERE, ".."))[1]
+
+
 def _pub():
     """(keys, why) as the file's one reader answers (scripts/lib/releasepub.py,
     the Enroll script's and aerie lint's too): the keys it names, or none and
     what is wrong with it."""
-    lib = os.path.join(HERE, "..", "scripts", "lib")
-    if lib not in sys.path:
-        sys.path.insert(0, lib)
-    import releasepub
-    return releasepub.read(PUB)
+    return _lib("releasepub").read(PUB)
 
 
 def public_keys():
@@ -97,18 +126,22 @@ def public_key():
 
 
 def _write(key, path):
-    """The signature file for this tree's agent and root's tools under
-    `key`, written to `path`: (the agent's digest, the tools' digest)."""
+    """The signature file for this tree's agent, root's tools and the
+    bundle's files under `key`, written to `path`: what was signed, in
+    words (each digest shortened)."""
     release = _load("release")
-    d, t = digest(), tools_digest()
+    d, t, b = digest(), tools_digest(), bundle_digest()
     out = {"digest": d, "sig": key.sign(release.MESSAGE + d.encode()).hex(), "key": key.public_key().public_bytes_raw().hex(),
            # The tools root installs from the bundle, under a line of their
            # own: the controller puts this in the bundle it serves.
-           "tools": {"digest": t, "sig": key.sign(release.TOOLS_MESSAGE + t.encode()).hex()}}
+           "tools": {"digest": t, "sig": key.sign(release.TOOLS_MESSAGE + t.encode()).hex()},
+           # ...and the list of every file a release ships in that bundle,
+           # under a third line: the controller passes it on beside the list.
+           "bundle": {"digest": b, "sig": key.sign(release.BUNDLE_MESSAGE + b.encode()).hex()}}
     with open(path, "w", encoding="utf-8") as f:
         json.dump(out, f)
         f.write("\n")
-    return d, t
+    return f"the agent {d[:19]}…, root's tools {t[:19]}… and the bundle's files {b[:19]}…"
 
 
 def _console(pub):
@@ -158,8 +191,9 @@ def _builder_key(path, Ed25519PrivateKey):
 
 
 def _builder_sign(args, Ed25519PrivateKey):
-    """--builder FILE [--out SIG]: this tree's agent and root's tools signed
-    with a builder's own key, whatever the committed file names."""
+    """--builder FILE [--out SIG]: this tree's agent, root's tools and the
+    bundle's files signed with a builder's own key, whatever the committed
+    file names."""
     out = SIG
     if "--out" in args:
         i = args.index("--out")
@@ -174,13 +208,17 @@ def _builder_sign(args, Ed25519PrivateKey):
     if pub in public_keys():
         print("that is a release key, not a builder's: a release's build signs with AERIEOS_RELEASE_KEY", file=sys.stderr)
         return 2
-    d, t = _write(key, out)
-    print(f"signed the agent {d[:19]}… and root's tools {t[:19]}… with this builder's key {pub[:16]}…")
+    print(f"signed {_write(key, out)} with this builder's key {pub[:16]}…")
     print(_console(pub))
     return 0
 
 
 def main(argv):
+    if argv[:1] == ["--digests"]:
+        # Read-only, and with no key or signature in it: what this tree
+        # would be signed as, for a person holding a build against it.
+        print(f"agent   {digest()}\ntools   {tools_digest()}\nbundle  {bundle_digest()}")
+        return 0
     try:
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
     except ImportError:
@@ -227,7 +265,15 @@ def main(argv):
             "it is for other tools than this tree holds" if tools.get("digest") != tools_digest() else \
             next((w for w in [release.verify(by or public_key(), tools.get("digest"), tools.get("sig"), release.TOOLS_MESSAGE)] if w), "")
         print(f"{os.path.relpath(SIG)}: root's tools: " + (twhy or f"signed by {(by or public_key())[:16]}… for {tools_digest()[:19]}…"))
-        return 1 if why or twhy else 0
+        # ...and the list of the bundle's files, under the third line: a
+        # file of them changed after the signing is a signature that is not
+        # whole, which is what fails a release's tag.
+        part = got.get("bundle") if isinstance(got.get("bundle"), dict) else {}
+        bwhy = "it carries no signature for the files the bundle ships" if not part else \
+            "it is for other files than this tree's bundle ships" if part.get("digest") != bundle_digest() else \
+            release.verify(by or public_key(), part.get("digest"), part.get("sig"), release.BUNDLE_MESSAGE)
+        print(f"{os.path.relpath(SIG)}: the bundle's files: " + (bwhy or f"signed by {(by or public_key())[:16]}… for {bundle_digest()[:19]}…"))
+        return 1 if why or twhy or bwhy else 0
     if argv[:1] == ["--builder-keygen"]:
         return _builder_keygen(argv[1:], Ed25519PrivateKey)
     if argv[:1] == ["--builder"]:
@@ -252,8 +298,7 @@ def main(argv):
               + ", ".join(k[:16] + "…" for k in public_keys()) + "): nodes pinned to those would refuse this build, "
               "so nothing is signed", file=sys.stderr)
         return 2
-    d, t = _write(key, SIG)
-    print(f"signed the agent {d[:19]}… and root's tools {t[:19]}… with the "
+    print(f"signed {_write(key, SIG)} with the "
           + ("spare release key" if pub in public_keys()[1:] else "release key") + f" {pub[:16]}…")
     return 0
 

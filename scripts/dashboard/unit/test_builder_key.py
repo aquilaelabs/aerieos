@@ -1,9 +1,10 @@
 """Somebody who builds a controller on their own machine signs its node agent
 with a builder's key of their own (tools/sign-agent.py --builder-keygen and
 --builder): the private half stays in a file of that account's alone, the
-signature is over this tree's agent and root's tools, a node takes the build
-once the key is added at its console and not before, and a release key is
-refused as a builder's."""
+signature is over this tree's agent, root's tools and the bundle's files
+(the last held in test_sign_bundle_files.py), a node takes the build once the
+key is added at its console and not before, and a release key is refused as
+a builder's."""
 import json
 import os
 import shutil

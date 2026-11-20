@@ -278,7 +278,7 @@ class FromTheBuildToTheNode(unittest.TestCase):
         env = dict(os.environ, AERIEOS_RELEASE_PUB=mine, AERIEOS_RELEASE_KEY=k.private_bytes_raw().hex())
         r = subprocess.run([sys.executable, tool], env=env, capture_output=True, text=True, timeout=60, check=False)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        self.assertIn("and root's tools", r.stdout)
+        self.assertIn("root's tools", r.stdout)
         with open(sig) as f:
             got = json.load(f)
         self.assertEqual(release.verify(pub, got["tools"]["digest"], got["tools"]["sig"], release.TOOLS_MESSAGE), "")
