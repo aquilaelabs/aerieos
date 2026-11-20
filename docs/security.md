@@ -247,22 +247,23 @@ notebook's history, the forge's log under their own token) says what it did.
 
 ## What is held in one place
 
-**Who may reach a route.** Every route of the dashboard's API names what it
-asks of its caller in one table beside the routes (`ROUTE_GATES` in
-`server.py`), and the dispatcher holds it before the handler runs: the
-owner's alone, a person's own sign-in and never a session's token, or the
-handler's own check where it depends on what the request names (which
-space, which node, which action). A route with no line in the table is not
-served, and the auth suite fails on one, so a new route cannot be reached
-before somebody has said who may reach it. Most routes are still the
-handler's own; each one moved into the table is one fewer place to forget.
+**Who may reach a route.** Every route of the dashboard's API is one line
+of one record (`ROUTES` in `server.py`), and names there what it asks of
+its caller (the dispatcher's `ROUTE_GATES`, read off the record), which the
+dispatcher holds before the handler runs: the owner's alone, a person's own
+sign-in and never a session's token, or the handler's own check where it
+depends on what the request names (which space, which node, which action).
+A route that names nothing is not served, and the auth suite fails on one,
+so a new route cannot be reached before somebody has said who may reach it.
+Most routes are still the handler's own; each one moved onto its line is
+one fewer place to forget.
 
 **What a session's token reaches.** A coding agent's session is not a
 person with fewer rights: it is another kind of caller, and the dispatcher
-refuses it on every route but the ones a second table names
-(`SESSION_ROUTES`, beside the first): the routes its own verbs and hooks
-call, about forty of the hundred and eighty. A route in that table still
-holds its own scope (the session's own space, the action, the space's
+refuses it on every route but the ones whose line of the same record says a
+session's (`SESSION_ROUTES`, read off it too): the routes its own verbs and
+hooks call, about forty of the hundred and eighty. A route in that table
+still holds its own scope (the session's own space, the action, the space's
 dials); a route outside it cannot be reached by a session whatever its
 handler checks or forgets. So the accounts, the controller's settings, the
 page's own reads, a person's chat, tabs and other sessions are not a

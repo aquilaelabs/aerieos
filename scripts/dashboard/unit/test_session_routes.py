@@ -3,6 +3,7 @@
 are, every path a session-side client names (aerie, its library, bb-tty and
 the hooks) is in it, and the dispatcher's question refuses a session on any
 other route before the route's own gate is read."""
+import collections
 import glob
 import os
 import re
@@ -14,19 +15,31 @@ ROOT = os.path.normpath(os.path.join(HERE, "..", "..", ".."))
 SERVER = open(os.path.join(HERE, "..", "server.py"), encoding="utf-8").read()
 
 
-def table(name):
-    a = SERVER.index(f"\n{name} = (")
-    return re.findall(r'\("(exact|prefix)",\s*"([^"]+)",\s*"(_[a-z_0-9]+)"\)', SERVER[a:SERVER.index("\n)\n", a)])
+class _Users:
+    @staticmethod
+    def account_of(me):
+        return me
+
+    @staticmethod
+    def is_owner(me):
+        return (me or {}).get("role") == "owner"
 
 
-def names_between(opening, closing):
-    a = SERVER.index(opening)
-    return set(re.findall(r'"(_[a-z_0-9]+)"', SERVER[a:SERVER.index(closing, a)]))
+def lifted():
+    """The route record, the tables read off it and route_gate, run from
+    server.py's source with stand-ins for what they name of the rest of the
+    file: importing the server opens its state."""
+    a = SERVER.index("\nRoute = collections.namedtuple(")
+    b = SERVER.index("\n\n\n", SERVER.index("\ndef route_gate(name, me, action=None):"))
+    ns = {"collections": collections, "users": _Users, "MAX_BODY_FOR": {}}
+    exec(SERVER[a:b], ns)      # noqa: S102 (the repository's own source, read from beside this test)
+    return ns
 
 
-GET, POST = table("GET_ROUTES"), table("POST_ROUTES")
-GATES = set(re.findall(r'^    "(_[a-z_0-9]+)":', SERVER[SERVER.index("\nROUTE_GATES = {"):SERVER.index("\n}\n", SERVER.index("\nROUTE_GATES = {"))], re.M))
-SESSION = names_between("\nSESSION_ROUTES = frozenset({", "\n})\n")
+NS = lifted()
+GET, POST = list(NS["GET_ROUTES"]), list(NS["POST_ROUTES"])
+GATES = set(NS["ROUTE_GATES"])
+SESSION = set(NS["SESSION_ROUTES"])
 
 # The scripts that hold a session's token: aerie and what it runs, the
 # terminal's launcher and the coding agents' hooks.
@@ -88,21 +101,7 @@ class Gate(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        a = SERVER.index("\nROUTE_GATES = {")
-        b = SERVER.index("\ndef route_gate(name, me, action=None):")
-        c = SERVER.index("\n\n\n", b)
-
-        class _Users:
-            @staticmethod
-            def account_of(me):
-                return me
-
-            @staticmethod
-            def is_owner(me):
-                return (me or {}).get("role") == "owner"
-        ns = {"users": _Users}
-        exec(SERVER[a:c], ns)      # noqa: S102 (the repository's own source, read from beside this test)
-        cls.ns = ns
+        cls.ns = NS
 
     def test_a_session_is_refused_everywhere_but_its_table(self):
         gate, sess = self.ns["route_gate"], {"name": "session:alpha", "kind": "session", "session": "alpha", "role": "session", "seat": "u_1"}

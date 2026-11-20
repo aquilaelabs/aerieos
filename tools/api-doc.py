@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """docs/api.md, written from server.py (R91 step 7): every /api/ path in the
-two route tables, its method and how it is matched, the first sentence of
+route record, its method and how it is matched, the first sentence of
 its handler's docstring, and the permissions the handler refuses on. Read
 with ast rather than by running the server, so a route that is added and
 not described shows up as a row with no words, which aerie lint's check turns
@@ -16,12 +16,16 @@ SRC = ROOT / "scripts" / "dashboard" / "server.py"
 OUT = ROOT / "docs" / "api.md"
 
 
-def routes(tree, name):
+def routes(tree, method):
+    """A method's routes in the order they are matched, off the route record
+    (ROUTES): each Route's first four fields, and none of the doors, which
+    are answered ahead of the routes."""
     for node in tree.body:
-        if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == name for t in node.targets):
+        if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "ROUTES" for t in node.targets):
             for el in node.value.elts:
-                how, path, fn = (ast.literal_eval(e) for e in el.elts)
-                yield how, path, fn
+                did, how, path, fn = (ast.literal_eval(e) for e in el.args[:4])
+                if did == method and how != "door":
+                    yield how, path, fn
 
 
 def handlers(tree):
@@ -71,8 +75,8 @@ def render():
              "route takes every path it prefixes, in the order listed; an `exact` one takes its path alone.",
              "The companion app's own contract is `apps/android/api-surface.json`.", "",
              "| Method | Path | Match | Handler | What it does | Refuses on |", "|---|---|---|---|---|---|"]
-    for method, table in (("GET", "GET_ROUTES"), ("POST", "POST_ROUTES")):
-        for how, path, fn in routes(tree, table):
+    for method in ("GET", "POST"):
+        for how, path, fn in routes(tree, method):
             f = fns.get(fn)
             words = first_sentence(f) if f else "(no handler by that name)"
             gates = ", ".join(refusals(f)) if f else ""

@@ -1815,20 +1815,23 @@ ok(page.errors.length === 0, `zero console errors${page.errors.length ? ': ' + p
 // they name checked to exist, since a typo there is a 500 on first use.
 await section("the route tables", async () => {
   const got = JSON.parse(execFileSync('python3', ['-c', `
-import ast, json, re
+import collections, json, re
 src = open(${JSON.stringify(new globalThis.URL('../server.py', import.meta.url).pathname)}).read()
+# The route record and the tables read off it, run from the source as far
+# as route_gate, with the two names they take from the rest of the file.
+ns = {"collections": collections, "MAX_BODY_FOR": {}}
+exec(src[src.index("\\nRoute = collections.namedtuple("):src.index("\\ndef route_gate(")], ns)
 out = {}
 for table in ("GET_ROUTES", "POST_ROUTES"):
-    m = re.search(r'^' + table + r' = (\\(.*?^\\))', src, re.S | re.M)
-    routes = ast.literal_eval(m.group(1))
+    routes = ns[table]
     out[table] = {"routes": routes,
                   "missing": [n for _, _, n in routes if not re.search(r"^    def " + n + r"\\(self", src, re.M)]}
-gates = ast.literal_eval(re.search(r'^ROUTE_GATES = (\\{.*?^\\})', src, re.S | re.M).group(1))
+gates = ns["ROUTE_GATES"]
 named = {n for t in out.values() for _, _, n in t["routes"]}
 out["GATES"] = {"none": sorted(named - set(gates)), "stale": sorted(set(gates) - named),
                 "odd": sorted(n for n, g in gates.items() if g != "handler" and not (isinstance(g, tuple) and g[0] in ("owner", "person") and g[1])),
                 "central": sum(1 for g in gates.values() if g != "handler")}
-out["SESSION"] = sorted(re.findall(r'"(_[a-z_0-9]+)"', re.search(r'^SESSION_ROUTES = frozenset\\(\\{(.*?)^\\}\\)', src, re.S | re.M).group(1)))
+out["SESSION"] = sorted(ns["SESSION_ROUTES"])
 print(json.dumps(out))`], { encoding: 'utf8' }));
   // Every route names who may reach it, beside the routes (R227): one that
   // names nothing is refused by the dispatcher, and is caught here first.
