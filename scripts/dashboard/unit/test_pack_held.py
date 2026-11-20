@@ -27,7 +27,8 @@ SENTENCE = "Its installer downloads the compiler from releases.example.org."
 # Where the rows AerieOS ships stand: the ones whose every download is held
 # to something the row carries, and the ones whose pinned installer
 # downloads the rest. Every other row reads open, and waits for its pin.
-SHIPPED_PINNED = ["android-tools", "ffmpeg", "go", "graphics", "jdk", "kotlin-lsp", "lint-tools", "node", "office", "swift", "xcodes", "zig"]
+SHIPPED_PINNED = ["android-tools", "audio", "documents", "ffmpeg", "ftp", "go", "graphics", "jdk", "kotlin-lsp", "lint-tools", "node", "office", "pytorch",
+                  "swift", "xcodes", "zig"]
 SHIPPED_INSTALLER = ["android:build-tools", "android:cmake", "android:emulator", "android:ndk", "android:platform-tools", "android:platforms", "dotnet", "flutter",
                      "python", "rust"]
 

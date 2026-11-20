@@ -14,7 +14,8 @@
    "name": "faster-whisper"
   }
  ],
- "framework": "2.1",
+ "format": 5,
+ "framework": "5.1",
  "label": "Speech in and out (piper, whisper)",
  "layout": {
   "bin": [
@@ -31,30 +32,268 @@
  "shipped": {
   "probe": "audio",
   "reports": "piper",
+  "rev": 2,
   "source": {
    "checksum": {
-    "from": "github-asset"
+    "found": {
+     "from": "file",
+     "url": "{url}.sha256"
+    },
+    "from": "pin",
+    "sha256": "a7fbaff2b9a271d85c1bdb540941090fd1ce011797b4abeb48e4dcd39c2471d5",
+    "version": "0.13.9"
    },
    "download": {
     "bytes": 330000000,
     "resolver": "approximate"
    },
+   "fetch": [
+    {
+     "found": {
+      "from": "file",
+      "url": "{base}/SHA256SUMS"
+     },
+     "platform": "linux/amd64",
+     "sha256": "6a9e62dad033790aef722dbd370e0ce76ce17b73627ba3ae679f537049350b39",
+     "to": "dl/python.tar.gz",
+     "track": {
+      "asset": "^cpython-3\\.12\\.\\d+\\+\\d+-x86_64-unknown-linux-gnu-install_only_stripped\\.tar\\.gz$",
+      "repo": "astral-sh/python-build-standalone",
+      "resolver": "github-release"
+     },
+     "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.12.16%2B20261110-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+     "version": "20261110"
+    },
+    {
+     "sha256": "6f52a751e2349abe7a76735eb09dc1875298c77ea2342ffd2fef79ff81b87f22",
+     "to": "dl/voice/en_US-ljspeech-medium.onnx",
+     "track": {
+      "match": "^v\\d+\\.\\d+\\.\\d+$",
+      "resolver": "git-tag",
+      "url": "https://huggingface.co/rhasspy/piper-voices"
+     },
+     "url": "https://huggingface.co/rhasspy/piper-voices/resolve/{version}/en/en_US/ljspeech/medium/en_US-ljspeech-medium.onnx",
+     "version": "v1.0.0"
+    },
+    {
+     "sha256": "141d612cc0a95ed7efc1ca936b845c2364967f2e9217c5dbfcf69fc4d6c65860",
+     "to": "dl/voice/en_US-ljspeech-medium.onnx.json",
+     "track": {
+      "match": "^v\\d+\\.\\d+\\.\\d+$",
+      "resolver": "git-tag",
+      "url": "https://huggingface.co/rhasspy/piper-voices"
+     },
+     "url": "https://huggingface.co/rhasspy/piper-voices/resolve/{version}/en/en_US/ljspeech/medium/en_US-ljspeech-medium.onnx.json",
+     "version": "v1.0.0"
+    },
+    {
+     "sha256": "f3bc3821e9fc76a27bae538e11ae5b677dcdd352b4600429ce7951d398569aeb",
+     "to": "dl/whisper/config.json",
+     "track": {
+      "branch": "main",
+      "resolver": "git-branch",
+      "url": "https://huggingface.co/Systran/faster-whisper-base.en"
+     },
+     "url": "https://huggingface.co/Systran/faster-whisper-base.en/resolve/{version}/config.json",
+     "version": "3d3d5dee26484f91867d81cb899cfcf72b96be6c"
+    },
+    {
+     "sha256": "2a166925539a16005f14ff328359f9b9adb9dc4fb631bb3b227526862e93e2ef",
+     "to": "dl/whisper/model.bin",
+     "track": {
+      "branch": "main",
+      "resolver": "git-branch",
+      "url": "https://huggingface.co/Systran/faster-whisper-base.en"
+     },
+     "url": "https://huggingface.co/Systran/faster-whisper-base.en/resolve/{version}/model.bin",
+     "version": "3d3d5dee26484f91867d81cb899cfcf72b96be6c"
+    },
+    {
+     "sha256": "929c5252409436dce1b38a75d1abbcb5e132d170d8e324e4e04ed915fa2d22df",
+     "to": "dl/whisper/tokenizer.json",
+     "track": {
+      "branch": "main",
+      "resolver": "git-branch",
+      "url": "https://huggingface.co/Systran/faster-whisper-base.en"
+     },
+     "url": "https://huggingface.co/Systran/faster-whisper-base.en/resolve/{version}/tokenizer.json",
+     "version": "3d3d5dee26484f91867d81cb899cfcf72b96be6c"
+    },
+    {
+     "sha256": "ff77588746d3a2595d32ab5b69ffd7b95ce2441ac57533cb66fc3eb575a115cf",
+     "to": "dl/whisper/vocabulary.txt",
+     "track": {
+      "branch": "main",
+      "resolver": "git-branch",
+      "url": "https://huggingface.co/Systran/faster-whisper-base.en"
+     },
+     "url": "https://huggingface.co/Systran/faster-whisper-base.en/resolve/{version}/vocabulary.txt",
+     "version": "3d3d5dee26484f91867d81cb899cfcf72b96be6c"
+    },
+    {
+     "sha256": "c66ae634e0b8228396b801741beb3294326d4b6102f7bba4041c0dfb58c29026",
+     "to": "dl/pip/anyio-4.16.0-py3-none-any.whl",
+     "url": "https://files.pythonhosted.org/packages/a9/16/7757fb84c819accc7d7e9af5291b261e4abb8627ee040f99e7d35ef2457a/anyio-4.16.0-py3-none-any.whl"
+    },
+    {
+     "sha256": "11326f197e7001c4ca53a83b2dbc67fd39ddff8cdf62ce6be3b22d9f3f9338bd",
+     "to": "dl/pip/av-15.1.0-cp312-cp312-manylinux_2_28_x86_64.whl",
+     "url": "https://files.pythonhosted.org/packages/ac/13/37737ef2193e83862ccacff23580c39de251da456a1bf0459e762cca273c/av-15.1.0-cp312-cp312-manylinux_2_28_x86_64.whl"
+    },
+    {
+     "sha256": "8bb5376d2006950386f8c6427613334a2acadc5f559cb80e638d00b4df957e37",
+     "to": "dl/pip/click-8.5.1-py3-none-any.whl",
+     "url": "https://files.pythonhosted.org/packages/31/7d/164b7ffc8624fe9efb4221bf9af485d5c1e41b9ae118045d2b6dc5457d8b/click-8.5.1-py3-none-any.whl"
+    },
+    {
+     "sha256": "5d9b3edd73ba665f16a19cd3a498ce74fbfb6204bc0ac321f00f2600a41e8810",
+     "to": "dl/pip/ctranslate2-4.9.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+     "url": "https://files.pythonhosted.org/packages/61/41/f416fe0c6be955b0cdb8c09df145965d33bfd8a847b13229f547c1a7a5fd/ctranslate2-4.9.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl"
+    },
+    {
+     "sha256": "79a66ad50688c0b794dd501dc340a736992a6342f7f95e5811be60b5224a26a7",
+     "to": "dl/pip/faster_whisper-1.2.1-py3-none-any.whl",
+     "url": "https://files.pythonhosted.org/packages/05/99/49ee85903dee060d9f08297b4a342e5e0bcfca2f027a07b4ee0a38ab13f9/faster_whisper-1.2.1-py3-none-any.whl"
+    },
+    {
+     "sha256": "21decfec02f116ed4c954433cdb31f28c3b346b784543177b6d7059da2702ee9",
+     "to": "dl/pip/filelock-4.2.12-py3-none-any.whl",
+     "url": "https://files.pythonhosted.org/packages/8a/c9/eb6b6528c7edb958d4c24ac47a8b94113d9de36e4cfc6eecd599b1a4f349/filelock-4.2.12-py3-none-any.whl"
+    },
+    {
+     "sha256": "7634f50c427838bb021c2d66a3d1168e9d199b0607e6329399f04846d42e20b4",
+     "to": "dl/pip/flatbuffers-25.12.19-py2.py3-none-any.whl",
+     "url": "https://files.pythonhosted.org/packages/e8/2d/d2a548598be01649e2d46231d151a6c56d10b964d94043a335ae56ea2d92/flatbuffers-25.12.19-py2.py3-none-any.whl"
+    },
+    {
+     "sha256": "8dd6e646e99ea382bd85f97a45e6b526a442d79423a7dc673f1e2756d05fcb5f",
+     "to": "dl/pip/fsspec-2026.9.0-py3-none-any.whl",
+     "url": "https://files.pythonhosted.org/packages/6c/c0/a98505f18594f1bce828bb159cec0fcf9860562f1a2c85913409fc8f3d9e/fsspec-2026.9.0-py3-none-any.whl"
+    },
+    {
+     "sha256": "63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86",
+     "to": "dl/pip/h11-0.16.0-py3-none-any.whl",
+     "url": "https://files.pythonhosted.org/packages/04/4b/29cac41a4d98d144bf5f6d33995617b185d14b22401f75ca86f384e87ff1/h11-0.16.0-py3-none-any.whl"
+    },
+    {
+     "sha256": "29dab7c904cd1914a0439c6e1306c12c7497c8bd32290fbe563ebf51ca4b6d6d",
+     "to": "dl/pip/hf_xet-1.8.0-cp38-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+     "url": "https://files.pythonhosted.org/packages/f8/1e/1e8ecc05ef034e9a95c18ed32d2ec07905a7cd2ca611a9d88e25ee1f4850/hf_xet-1.8.0-cp38-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl"
+    },
+    {
+     "sha256": "16051ae2a42f776007543f32de9349a317b23d2cbb4e1456b4bac0e88b87419a",
+     "to": "dl/pip/httpcore2-2.16.2-py3-none-any.whl",
+     "url": "https://files.pythonhosted.org/packages/2a/e8/009c347feac27f8960605aa98d55ed263b5870dd4fd80b82fd1d00d5716c/httpcore2-2.16.2-py3-none-any.whl"
+    },
+    {
+     "sha256": "f05c13aade4c45dbf1c9060647a1058f0acad62398fad96e741269edb33d46f5",
+     "to": "dl/pip/httpx2-2.16.2-py3-none-any.whl",
+     "url": "https://files.pythonhosted.org/packages/77/de/8c4306a3d6aa2495111986addf33a9e561eff4c47552e4c4b9251160d0ad/httpx2-2.16.2-py3-none-any.whl"
+    },
+    {
+     "sha256": "42ecfd93ede47bdd333daebbf66a32d7bfe2e18752754fe4d2d4f98a0179d801",
+     "to": "dl/pip/huggingface_hub-2.4.0-py3-none-any.whl",
+     "url": "https://files.pythonhosted.org/packages/d4/55/ff47f1b082ecf5f43f4bc1e3b932d68eead171dabbbd1a92666c686301d7/huggingface_hub-2.4.0-py3-none-any.whl"
+    },
+    {
+     "sha256": "ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c",
+     "to": "dl/pip/idna-3.20-py3-none-any.whl",
+     "url": "https://files.pythonhosted.org/packages/58/a2/bb081bab032533a855d44de1d56f8e8426114ff1ba5d1f07a438a0a654f8/idna-3.20-py3-none-any.whl"
+    },
+    {
+     "sha256": "704d819265e5d1064d932968e9ee85fff2103ccc78c05b878c06943ba27b8507",
+     "to": "dl/pip/numpy-2.5.5-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+     "url": "https://files.pythonhosted.org/packages/99/61/522b973ba38987b22a4a71beaed2ea6ac9fd4f687baaa2bc9a45100625e0/numpy-2.5.5-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl"
+    },
+    {
+     "sha256": "99e1074c4b2197accd5073052a465361be17b89c093b8ffb6e6bd8f986c52df8",
+     "to": "dl/pip/onnxruntime-1.32.0-cp312-cp312-manylinux_2_28_x86_64.whl",
+     "url": "https://files.pythonhosted.org/packages/a3/81/55845186c20cba59f614991f4065dea148e48eeb9749893768c85ce64327/onnxruntime-1.32.0-cp312-cp312-manylinux_2_28_x86_64.whl"
+    },
+    {
+     "sha256": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
+     "to": "dl/pip/packaging-26.3-py3-none-any.whl",
+     "url": "https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl"
+    },
+    {
+     "sha256": "5263baab691f8e1af96092fa5137ee17df5bdfbd6cff1fcac4d6ef4bc2e1735f",
+     "to": "dl/pip/pathvalidate-3.3.1-py3-none-any.whl",
+     "url": "https://files.pythonhosted.org/packages/9a/70/875f4a23bfc4731703a5835487d0d2fb999031bd415e7d17c0ae615c18b7/pathvalidate-3.3.1-py3-none-any.whl"
+    },
+    {
+     "sha256": "25b4d3f31ff70c8fa7151908e00aaa5650cbdf16bca8fcf21299f3941b89a7d3",
+     "to": "dl/pip/piper_tts-1.8.0-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.manylinux_2_28_x86_64.whl",
+     "url": "https://files.pythonhosted.org/packages/84/81/0112a7d510911f33018dc24023d1655bb772f84a4e95fe7f0180f66bbd17/piper_tts-1.8.0-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.manylinux_2_28_x86_64.whl"
+    },
+    {
+     "sha256": "89f23aa53c24553a2416fd4fd1ec06f74fa42b14b546d8883128813f775bbfd2",
+     "to": "dl/pip/protobuf-7.36.2-cp310-abi3-manylinux2014_x86_64.whl",
+     "url": "https://files.pythonhosted.org/packages/db/f3/3996583dd2906297a637af12114deddf7658af6e683fedb83be061983fb5/protobuf-7.36.2-cp310-abi3-manylinux2014_x86_64.whl"
+    },
+    {
+     "sha256": "ba1cc08a7ccde2d2ec775841541641e4548226580ab850948cbfda66a1befcdc",
+     "to": "dl/pip/pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+     "url": "https://files.pythonhosted.org/packages/8b/9d/b3589d3877982d4f2329302ef98a8026e7f4443c765c46cfecc8858c6b4b/pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl"
+    },
+    {
+     "sha256": "376851d22bcf9d650a5c3090bb83e6cf9e895fbf0595369fa4cd43c1f69b5f87",
+     "to": "dl/pip/tokenizers-0.23.3-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+     "url": "https://files.pythonhosted.org/packages/3a/40/6706b82693715581457c6d5423eaa7faae576bb0526c5738a57085eb4449/tokenizers-0.23.3-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+    },
+    {
+     "sha256": "c293e525e6fef9c20e8728fd4612df02a0aa31bb5fe91ecd93e123b1b7bffa73",
+     "to": "dl/pip/tqdm-4.70.1-py3-none-any.whl",
+     "url": "https://files.pythonhosted.org/packages/a7/03/921a3d3c75785aca9ebfbfcabfbc3a1be12e2ab5265deb026d55a5a3f83e/tqdm-4.70.1-py3-none-any.whl"
+    },
+    {
+     "sha256": "9aaaedaefaf06d8b206278cf8b5012bc897f485a874503501e12d776df78951c",
+     "to": "dl/pip/truststore-0.10.5-py3-none-any.whl",
+     "url": "https://files.pythonhosted.org/packages/51/e9/3a7820be2bb0fe53b6bc9c3be26d3d1158004e4c3ab953aa6840b955b1e9/truststore-0.10.5-py3-none-any.whl"
+    },
+    {
+     "sha256": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8",
+     "to": "dl/pip/typing_extensions-4.16.0-py3-none-any.whl",
+     "url": "https://files.pythonhosted.org/packages/49/d3/b8441a820a491ddfc024b0b0cf0393375b75ea13866d9c66727e54c2fc80/typing_extensions-4.16.0-py3-none-any.whl"
+    }
+   ],
+   "files": {
+    "dl/pip/requirements.txt": "anyio==4.16.0 --hash=sha256:c66ae634e0b8228396b801741beb3294326d4b6102f7bba4041c0dfb58c29026\nav==15.1.0 --hash=sha256:11326f197e7001c4ca53a83b2dbc67fd39ddff8cdf62ce6be3b22d9f3f9338bd\nclick==8.5.1 --hash=sha256:8bb5376d2006950386f8c6427613334a2acadc5f559cb80e638d00b4df957e37\nctranslate2==4.9.0 --hash=sha256:5d9b3edd73ba665f16a19cd3a498ce74fbfb6204bc0ac321f00f2600a41e8810\nfaster-whisper==1.2.1 --hash=sha256:79a66ad50688c0b794dd501dc340a736992a6342f7f95e5811be60b5224a26a7\nfilelock==4.2.12 --hash=sha256:21decfec02f116ed4c954433cdb31f28c3b346b784543177b6d7059da2702ee9\nflatbuffers==25.12.19 --hash=sha256:7634f50c427838bb021c2d66a3d1168e9d199b0607e6329399f04846d42e20b4\nfsspec==2026.9.0 --hash=sha256:8dd6e646e99ea382bd85f97a45e6b526a442d79423a7dc673f1e2756d05fcb5f\nh11==0.16.0 --hash=sha256:63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86\nhf-xet==1.8.0 --hash=sha256:29dab7c904cd1914a0439c6e1306c12c7497c8bd32290fbe563ebf51ca4b6d6d\nhttpcore2==2.16.2 --hash=sha256:16051ae2a42f776007543f32de9349a317b23d2cbb4e1456b4bac0e88b87419a\nhttpx2==2.16.2 --hash=sha256:f05c13aade4c45dbf1c9060647a1058f0acad62398fad96e741269edb33d46f5\nhuggingface-hub==2.4.0 --hash=sha256:42ecfd93ede47bdd333daebbf66a32d7bfe2e18752754fe4d2d4f98a0179d801\nidna==3.20 --hash=sha256:ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c\nnumpy==2.5.5 --hash=sha256:704d819265e5d1064d932968e9ee85fff2103ccc78c05b878c06943ba27b8507\nonnxruntime==1.32.0 --hash=sha256:99e1074c4b2197accd5073052a465361be17b89c093b8ffb6e6bd8f986c52df8\npackaging==26.3 --hash=sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c\npathvalidate==3.3.1 --hash=sha256:5263baab691f8e1af96092fa5137ee17df5bdfbd6cff1fcac4d6ef4bc2e1735f\npiper-tts==1.8.0 --hash=sha256:25b4d3f31ff70c8fa7151908e00aaa5650cbdf16bca8fcf21299f3941b89a7d3\nprotobuf==7.36.2 --hash=sha256:89f23aa53c24553a2416fd4fd1ec06f74fa42b14b546d8883128813f775bbfd2\npyyaml==6.0.3 --hash=sha256:ba1cc08a7ccde2d2ec775841541641e4548226580ab850948cbfda66a1befcdc\ntokenizers==0.23.3 --hash=sha256:376851d22bcf9d650a5c3090bb83e6cf9e895fbf0595369fa4cd43c1f69b5f87\ntqdm==4.70.1 --hash=sha256:c293e525e6fef9c20e8728fd4612df02a0aa31bb5fe91ecd93e123b1b7bffa73\ntruststore==0.10.5 --hash=sha256:9aaaedaefaf06d8b206278cf8b5012bc897f485a874503501e12d776df78951c\ntyping-extensions==4.16.0 --hash=sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8\n"
+   },
    "fresh_only": true,
    "kind": "script",
+   "lock": [
+    {
+     "for": {
+      "linux/amd64": "x86_64-manylinux_2_28"
+     },
+     "kind": "pip",
+     "python": "3.12",
+     "requirements": [
+      "piper-tts",
+      "faster-whisper",
+      "av<16"
+     ],
+     "to": "dl/pip"
+    }
+   ],
    "run": [
     "sh",
     "-ec",
-    "dst=\"$2\"; mkdir -p \"$dst/bin\" \"$dst/libexec\" \"$dst/models/voices\" \"$dst/models/whisper\"; rm -rf \"$dst\"/.work.* 2>/dev/null || true; t=\"$(mktemp -d \"$dst/.work.XXXXXX\")\"; tar -xzf \"$1\" -C \"$t\"; cp \"$(find \"$t\" -name uv -type f | head -1)\" \"$dst/libexec/uv\"; chmod +x \"$dst/libexec/uv\"; rm -rf \"$dst/python\" \"$dst/venv\"; export UV_PYTHON_INSTALL_DIR=\"$dst/python\" UV_CACHE_DIR=\"$t/cache\" UV_NO_CONFIG=1 UV_LINK_MODE=copy HF_HUB_DISABLE_TELEMETRY=1; \"$dst/libexec/uv\" venv -q --python 3.12 \"$dst/venv\"; \"$dst/libexec/uv\" pip install -q --python \"$dst/venv/bin/python\" piper-tts faster-whisper \"av<16\"; \"$dst/venv/bin/python\" -m piper.download_voices --download-dir \"$dst/models/voices\" en_US-ljspeech-medium; \"$dst/venv/bin/python\" -c \"import sys; from faster_whisper import download_model; download_model('base.en', output_dir=sys.argv[1])\" \"$dst/models/whisper/base.en\"; ln -sf ../venv/bin/piper \"$dst/bin/piper\"; printf '#!/bin/sh\\nhere=\"$(dirname \"$(readlink -f \"$0\")\")\"\\nexec \"$here/../venv/bin/python\" \"$@\"\\n' > \"$dst/bin/python-audio\"; chmod +x \"$dst/bin/python-audio\"; rm -rf \"$t\" 2>/dev/null || true",
+    "dst=\"$2\"; dl=\"$dst/dl\"; mkdir -p \"$dst/bin\" \"$dst/libexec\" \"$dst/models/voices\" \"$dst/models/whisper/base.en\"; rm -rf \"$dst\"/.work.* 2>/dev/null || true; t=\"$(mktemp -d \"$dst/.work.XXXXXX\")\"; tar -xzf \"$1\" -C \"$t\"; cp \"$(find \"$t\" -name uv -type f | head -1)\" \"$dst/libexec/uv\"; chmod +x \"$dst/libexec/uv\"; rm -rf \"$dst/python\" \"$dst/venv\"; tar -xzf \"$dl/python.tar.gz\" -C \"$dst\"; py=\"$dst/python/bin/python3.12\"; test -x \"$py\"; export UV_CACHE_DIR=\"$t/cache\" UV_NO_CONFIG=1 UV_LINK_MODE=copy UV_OFFLINE=1 UV_PYTHON_DOWNLOADS=never; \"$dst/libexec/uv\" venv -q --python \"$py\" \"$dst/venv\"; \"$dst/libexec/uv\" pip install -q --python \"$dst/venv/bin/python\" --no-index --find-links \"$dl/pip\" --require-hashes -r \"$dl/pip/requirements.txt\"; mv \"$dl\"/voice/* \"$dst/models/voices/\"; mv \"$dl\"/whisper/* \"$dst/models/whisper/base.en/\"; ln -sf ../venv/bin/piper \"$dst/bin/piper\"; printf '#!/bin/sh\\nhere=\"$(dirname \"$(readlink -f \"$0\")\")\"\\nexec \"$here/../venv/bin/python\" \"$@\"\\n' > \"$dst/bin/python-audio\"; chmod +x \"$dst/bin/python-audio\"; rm -rf \"$t\" \"$dl\" 2>/dev/null || true",
     "--",
     "{script}",
     "{dir}"
    ],
-   "url": "https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-unknown-linux-gnu.tar.gz",
+   "url": "https://github.com/astral-sh/uv/releases/download/{version}/uv-x86_64-unknown-linux-gnu.tar.gz",
    "verify": [
     "{dir}/bin/python-audio",
     "-c",
     "import piper, faster_whisper; print('piper and faster-whisper', faster_whisper.__version__)"
-   ]
+   ],
+   "version": {
+    "repo": "astral-sh/uv",
+    "resolver": "github-release"
+   }
   },
   "tool": "sound",
   "updatable": true
