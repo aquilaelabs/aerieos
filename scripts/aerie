@@ -2358,13 +2358,6 @@ cmd_diag() {
 # A person's Windows PC lent to this project by the Windows companion
 # (R270 step 6): lib/pc.py says the verbs.
 cmd_pc() {
-    case "${1:-}" in
-        -h|--help)
-            printf '%s\n' 'usage: aerie pc                        the PCs lending this space and their verbs' \
-                '       aerie pc VERB [--why "..."]     run one (editor-start, editor-stop, game-start, game-stop, build, shot, log)' \
-                '       aerie pc editor-call METHOD PATH [--body JSON] [--why "..."]'
-            return 0 ;;
-    esac
     BB_AUTH_HEADER="$(bb_auth_or_die)" python3 "$BB_LIB/pc.py" "$@"
 }
 
@@ -2373,10 +2366,6 @@ cmd_report() {
     auth="$(bb_auth_or_die)"
     proj="$(need_project --soft 2>/dev/null)"
     case "$sub" in
-        -h|--help)
-            printf '%s\n' 'usage: aerie report "what happened" [--area A] [--repro "..."]' \
-                '       aerie report conversation N    the reporter'"'"'s conversation a report carries (the diagnostics'"'"' gate)'
-            return 0 ;;
         conversation) ;;
         "") die 'aerie report "what happened": say what went wrong; aerie diag reports lists what was reported' ;;
         *) sub=add ;;
@@ -2576,8 +2565,7 @@ cmd_history() {
 # prints is what the tab shows.
 cmd_design() {
     local verb="${1:-list}" proj
-    case "$verb" in list|show|file|json|schema|save|edit) ;; -h|--help)
-        echo "aerie design [list | show [ID|NAME] | file [--from FILE] | json | schema | save FILE [--file] | edit NAME --text FILE|--append FILE [--file]]: what this space looks like, from the notebook's Design view; aerie design save -h prints the record's shape"; return 0 ;;
+    case "$verb" in list|show|file|json|schema|save|edit) ;;
         *) die "aerie design [list | show [ID|NAME] | file [--from FILE] | json | schema | save FILE [--file] | edit NAME --text FILE|--append FILE [--file]]" ;; esac
     proj="$(need_project)" || exit
     api_py --project "$proj" design-verbs.py "$@"
@@ -2589,15 +2577,13 @@ cmd_design() {
 # the controller looks under its transcripts and nowhere else.
 cmd_wiki() {
     local proj
-    case "${1:-}" in -h|--help) usage | sed -n '/^aerie wiki /,/^bb [^w]/p' | sed '$d'; return 0 ;; esac
     proj="$(need_project)" || exit
     api_py --project "$proj" wiki-verbs.py "$@"
 }
 
 cmd_transcripts() {
     local verb="${1:-list}" proj
-    case "$verb" in list|show|fetch|label|note|keep|unkeep) ;; -h|--help)
-        echo "aerie transcripts [list | show ID [--tz ZONE] [--all] | fetch ID [--into DIR] | label ID WORDS | note ID WORDS | keep ID | unkeep ID]: your own conversations on this space, every agent's, from the controller"; return 0 ;;
+    case "$verb" in list|show|fetch|label|note|keep|unkeep) ;;
         *) die "aerie transcripts [list | show ID [--tz ZONE] [--all] | fetch ID [--into DIR] | label ID WORDS | note ID WORDS | keep ID | unkeep ID]" ;; esac
     proj="$(need_project)" || exit
     api_py --project "$proj" transcripts-verbs.py "$@"
@@ -2606,8 +2592,7 @@ cmd_transcripts() {
 cmd_memory() {
     local verb="${1:-list}" proj
     local use='aerie memory [list | show NAME | add NAME --type user|feedback|space|reference --about "one line" "what to remember" | forget NAME]'
-    case "$verb" in list|show|add|forget) ;; -h|--help)
-        echo "$use: your memories on this repository, kept for every coding agent; aerie -p REPO memory for another repository of the space"; return 0 ;;
+    case "$verb" in list|show|add|forget) ;;
         *) die "$use" ;; esac
     proj="$(need_project)" || exit
     api_py --project "$proj" memory-verbs.py "$@"
@@ -2615,7 +2600,7 @@ cmd_memory() {
 
 cmd_brief() {
     local verb="${1:-show}" auth proj
-    case "$verb" in show|take) ;; -h|--help) echo "aerie brief: the brief this space was started from"; return 0 ;;
+    case "$verb" in show|take) ;;
         *) die "aerie brief: the brief this space was started from (take is bb-tty's)" ;; esac
     proj="$(need_project --soft 2>/dev/null)"
     [ -n "$proj" ] || { [ "$verb" = take ] && return 0; not_in_a_space; }
@@ -2658,10 +2643,6 @@ cmd_rules() {
     # The house rules: the operator's on the Briefing tab, a session's own
     # through add/edit/rm here. Each carries who wrote it, and a session may
     # change only its own; see rules.py for the ownership and the log.
-    # Its help, as every verb's -h is (B411): the lines aerie help carries for it.
-    case "${1:-}" in
-        -h|--help) usage | sed -n '/^aerie rules /,/^aerie [^r]/p' | sed '$d'; return 0 ;;
-    esac
     local proj; proj="$(need_project)" || exit
     # `aerie rules check` runs a rule's check command HERE, in this tree, on
     # whichever machine the session is on (roadmap R31): the rules themselves
@@ -4220,9 +4201,6 @@ cmd_nodes() {
                 || die "aerie nodes enroll-token is run in a shell on the controller (docker exec Aerie-Workshop aerie nodes enroll-token NAME), not from a session"
             shift
             DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" python3 "$BB_LIB/nodes-verbs.py" enroll-token "$py" "$@" ;;
-        -h|--help) echo "aerie nodes            the enrolled machines, each with the agent it runs"
-                   echo "aerie nodes show NAME  one of them in full, by name or id"
-                   echo "aerie nodes enroll-token NAME [--user U] [--own]  a new node's enrollment token, from a shell on the controller" ;;
         *) die "aerie nodes [show NAME|enroll-token NAME]: '$1' is not one of its forms" ;;
     esac
 }
@@ -6455,8 +6433,7 @@ if on_node && [ -z "${BB_RELAYED:-}" ]; then
         # from, and `root` runs the root tier of the tree here (in a
         # container where docker answers): neither is the controller's.
         # `bisect` runs the harness here at each commit, as `run` does.
-        # `rules -h` is help, the bb beside it answers (B411).
-        "tests run"|"tests last"|"tests log"|"tests lab"|"tests probe"|"tests keep"|"tests preflight"|"tests unit"|"tests coverage"|"tests flakes"|"tests bisect"|"tests root"|"rules check"|"rules audit"|"rules -h"|"rules --help"|"findings sample") : ;;
+        "tests run"|"tests last"|"tests log"|"tests lab"|"tests probe"|"tests keep"|"tests preflight"|"tests unit"|"tests coverage"|"tests flakes"|"tests bisect"|"tests root"|"rules check"|"rules audit"|"findings sample") : ;;
         *)  # ...and that is the whole run: without the exit the dispatch
             # below ran the verb a second time HERE, against files the bundle
             # does not carry: `aerie bug` printed the controller's answer and
@@ -6505,7 +6482,6 @@ case "${1:-help}" in
     browser)  shift; cmd_browser "$@" ;;
     node)     shift
               case "${1:-busy}" in
-                  -h|--help) sed -n '/^aerie node busy/,/if it never was/p' "$0"; exit 0 ;;
                   # A node's own log is `aerie logs --node`; asked as `aerie node
                   # log NAME [--runner] [N]`, it is the same read.
                   log) shift; nd="${1:-${BB_NODE:-}}"; [ $# -gt 0 ] && shift
