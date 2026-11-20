@@ -57,6 +57,7 @@
 - A node's Enable or Disable that the controller refuses says so once, where it said it twice (bdce886)
 - `aerie map` reads a method of an object written inside a call's own parentheses as the definition it is, where it read it as a call and gave what it calls to the function around it (6ec31d6)
 - A space's card shows one face in a browser that draws without 3D acceleration, where its back showed mirrored through its front (2e5a823)
+- A node that takes only signed agent updates is left alone by a controller whose build is unsigned, and its row on the bell says it waits for a signed build, where the update was sent and refused every two minutes (81e1355)
 
 ## 0.9.0-dev.5641: 2026-11-18
 
