@@ -396,6 +396,24 @@ class TheLibrarysDownloads(Table):
     def test_an_app_the_library_offers(self):
         self.run_table()
 
+    def test_a_release_with_no_list_is_said_as_that_and_nothing_of_the_lookup_that_missed(self):
+        # The sentence a person reads on the Library names the two files and
+        # why a release may lack them, with no quoted key of a failed lookup.
+        d = Path(self.fresh())
+
+        def write(path, data):
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
+            Path(path).write_text(json.dumps(data))
+        apps.configure(state=d / "state", version=lambda: PRE[1:], setting={"apps_android": True}.get, write_json=write)
+        name = f"aerieos-app-{PRE[1:]}.apk"
+        (d / name).write_bytes(b"an apk")
+        (d / "releases.json").write_text(json.dumps([{"tag_name": PRE, "assets": [{"name": name, "browser_download_url": f"file://{d / name}"}]}]))
+        with mock.patch.multiple(apps, RELEASES_URL=f"file://{d / 'releases.json'}", SIGNERS=self.signers_file(TABLE[0], str(d)),
+                                 unvetted_ok=lambda: False):
+            v = apps.check()
+        self.assertIn("carries no signed list of its files (SHA256SUMS and SHA256SUMS.sig): it was made before releases were signed", v["problem"])
+        self.assertNotIn("'", v["problem"].split("its key's holder")[0])
+
     def test_a_file_held_from_before_the_list_was_asked_goes_when_the_list_names_other_bytes(self):
         # An install that came from a build with no signer holds what the
         # sha256 beside the file passed; the first look with a signer holds

@@ -231,7 +231,10 @@ def _signed_list(rel):
         sums = _get(_where(assets["SHA256SUMS"]), 1 << 20)
         sig = _get(_where(assets["SHA256SUMS.sig"]), 1 << 16)
     except (OSError, ValueError, KeyError) as e:
-        return None, "", (f"{tag} carries no signed list of its files (SHA256SUMS and SHA256SUMS.sig: {e}): it was made "
+        # A release that does not carry the two files is said as that, with
+        # no word of the lookup that missed; one that could not be read says why.
+        why = "" if isinstance(e, KeyError) else f": {e}"
+        return None, "", (f"{tag} carries no signed list of its files (SHA256SUMS and SHA256SUMS.sig{why}): it was made "
                           "before releases were signed, or its key's holder has not signed it yet")
     ns = ""
     try:
