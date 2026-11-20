@@ -65,7 +65,8 @@ class Verdicts(unittest.TestCase):
 
     def test_every_check_is_one_the_dispatcher_knows(self):
         self.assertEqual(set(checks.CHECKS), {"runner", "xml", "settings", "layout", "hosted", "pinned", "channels", "shipped",
-                                              "formats", "packs", "unraid", "changelog", "dupes", "releasekey"})
+                                              "formats", "packs", "unraid", "changelog", "dupes", "releasekey",
+                                              "releasesigners"})
 
     def test_an_action_named_by_a_tag_is_a_note_anywhere_and_a_failure_here(self):
         # R206: an action at @v4 runs whatever its publisher points v4 at,

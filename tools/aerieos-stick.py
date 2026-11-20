@@ -288,6 +288,8 @@ def check_sha(path, sha_file):
 # release's word for itself, and the attestation proves only which workflow
 # built it, which whoever changes the repository could run.
 RELEASE_SIGNERS = """
+aerieos-dev namespaces="aerieos-dev" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC65rdjAZZY0ad55f/HT6WeaGdkEyTlWSH9eJVDZgugY
+aerieos-dev namespaces="aerieos-dev" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFmZ+JSPAxCTUn43jmUEv0NugpMoNa6rzhLWAxY0WGzo
 """
 SIG_NS = "aerieos-release"
 

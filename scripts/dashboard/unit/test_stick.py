@@ -124,6 +124,7 @@ class Stick(unittest.TestCase):
         a = argparse.Namespace(disk="/dev/sdb", image=img, release=None, channel="normal", set=None, config=None, mirror=None, yes=True, no_verify=True)
         with mock.patch.object(self.m, "write_image", side_effect=OSError(5, "Input/output error")), \
                 mock.patch.object(self.m.shutil, "which", return_value=None), mock.patch.object(self.m, "say"), \
+                mock.patch.object(self.m, "signed"), \
                 mock.patch.object(self.m, "die", side_effect=SystemExit) as die, self.assertRaises(SystemExit):
             self.m.cmd_write(a)
         self.assertIn("the write stopped (Input/output error): the stick was unplugged or is failing", die.call_args[0][0])

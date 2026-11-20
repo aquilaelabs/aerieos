@@ -1,10 +1,29 @@
 # Who may sign an AerieOS release (R199): ssh-keygen's allowed signers
-# format, one line a key:
-#   aerieos-release namespaces="aerieos-release" ssh-ed25519 AAAA... COMMENT
-# Every update an install takes (the controller's bundle, AerieOS's
-# image, a stick's image) must carry a SHA256SUMS signed by a key here, as
-# the install holds this file, so someone who changes the repository or a
-# release cannot hand installs a build: they can build and attest one, not
-# sign it. The private half never touches the repository, CI or a controller:
-# its holder signs each release on their own machine (tools/release-sign.py).
-# With no key here yet, nothing is signed and updates say so.
+# format, one line a key, and the namespace says for which channel:
+#   aerieos-dev namespaces="aerieos-dev" ssh-ed25519 AAAA...
+#   aerieos-release namespaces="aerieos-release" ssh-ed25519 AAAA... aerieos-release
+# Every file an install takes from a release (the controller's bundle,
+# AerieOS's image, a stick's image, the apps the Library offers) must be in
+# the release's SHA256SUMS, and that list signed by a key here, as the
+# install holds this file: the sha256 beside a file is the release's word
+# for itself, and whoever can replace a file there can replace that too.
+# The release's TAG picks who may have signed. A pre-release (vX.Y.Z-dev.N,
+# -rc.N, -beta.N) takes a list signed in either namespace; a stable release
+# (vX.Y.Z) takes aerieos-release alone, so the key the release build holds
+# can never sign one. A release whose list is unsigned, or signed in a
+# namespace its tag may not use, is refused. Only with no key here at all
+# is nothing checked, and each update says so.
+#
+# Dev builds publish by themselves, so their signer is the key the release
+# build holds (its secret AERIEOS_RELEASE_KEY) and its spare:
+# config/aerieos-release.pub's keys as OpenSSH public keys, written here by
+# tools/release-signers.py --write and never typed (aerie lint holds them).
+aerieos-dev namespaces="aerieos-dev" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC65rdjAZZY0ad55f/HT6WeaGdkEyTlWSH9eJVDZgugY
+aerieos-dev namespaces="aerieos-dev" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFmZ+JSPAxCTUn43jmUEv0NugpMoNa6rzhLWAxY0WGzo
+#
+# Stable releases are signed by their key's holder on their own machine
+# (tools/release-sign.py sign); that private half never touches the
+# repository, CI or a controller. Its line goes under this comment, as
+# tools/release-sign.py key prints it, committed by hand. Until it is here
+# no stable release is taken, and an update to one says no stable signer is
+# named yet.

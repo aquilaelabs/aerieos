@@ -530,9 +530,21 @@ def releasekey():
     sys.exit(0)
 
 
+def releasesigners():
+    """config/release-signers' dev lines are config/aerieos-release.pub's keys
+    as OpenSSH writes them, each line is a signer in the one namespace it is
+    named for, no stable signer is a key the release build holds, and the
+    stick maker carries the same lines: tools/release-signers.py --check,
+    which --write puts right. A file that drifted is an install that
+    refuses every dev build, or a stick checked against other keys."""
+    import subprocess
+    r = subprocess.run([sys.executable, "tools/release-signers.py", "--check"], check=False)
+    sys.exit(r.returncode)
+
+
 CHECKS = {"runner": runner, "xml": xml_, "settings": settings, "layout": layout, "hosted": hosted, "pinned": pinned,
           "channels": channels, "shipped": shipped, "formats": formats, "packs": packs, "unraid": unraid,
-          "changelog": changelog, "dupes": dupes, "releasekey": releasekey}
+          "changelog": changelog, "dupes": dupes, "releasekey": releasekey, "releasesigners": releasesigners}
 
 if __name__ == "__main__":
     # What a check returns is its verdict: layout answered 1 for a tracked

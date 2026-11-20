@@ -4969,6 +4969,13 @@ process.exit(bad ? 1 : 0);' "$f" || jsbad+=("$f (inline)")
         section "release key (config/aerieos-release.pub names the key, or the key and its spare)"
         python3 "$BB_LIB/lint-checks.py" releasekey || rc=1
     fi
+    # Who may sign a release (config/release-signers) against what it is
+    # written from, and the stick maker's copy against it: a drifted file is
+    # an install that refuses every dev build.
+    if _lint_own_tree && [ -f tools/release-signers.py ] && grep -qF '"releasesigners": releasesigners' "$BB_LIB/lint-checks.py"; then
+        section "release signers (config/release-signers vs config/aerieos-release.pub, and the stick maker's copy)"
+        python3 "$BB_LIB/lint-checks.py" releasesigners || rc=1
+    fi
     if [ -f tools/packs-export.py ] && grep -qF '"packs": packs' "$BB_LIB/lint-checks.py"; then
         section "packs (packs/ vs config/toolchains.json and agents.py)"
         python3 "$BB_LIB/lint-checks.py" packs || rc=1
