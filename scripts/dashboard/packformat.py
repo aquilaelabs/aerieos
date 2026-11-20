@@ -446,6 +446,12 @@ def held(doc):
     return "pinned", PINNED_SAID
 
 
+def held_of(doc):
+    """held(doc) as an API answers it: {word, why}."""
+    word, why = held(doc)
+    return {"word": word, "why": why}
+
+
 def of(doc):
     """The format a manifest or an index entry says it needs: a whole
     number from 1, 1 when it says none, None when what it says is no number."""

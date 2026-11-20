@@ -1159,7 +1159,7 @@ def fetch_folder(url, commit, sha256, path, files, cap=256 << 10):
 
 def _examine(read, shipped, missing, official=False):
     """The manifest and guidance a pack's files hold, read through `read(rel,
-    cap)`: {manifest, guidance} validated, or {error}. One reading for a
+    cap)`: {manifest, held, guidance} validated, or {error}. One reading for a
     repository and a pack made here. `official` is validate's: fetch alone
     passes it on, so nothing pasted, uploaded or kept as a pack is official."""
     raw = read(MANIFEST, MANIFEST_MAX)
@@ -1190,7 +1190,9 @@ def _examine(read, shipped, missing, official=False):
         if why:
             return {"error": f"{clean['icon']}: {why}"}
         icon = (raw, ext)
-    return {"manifest": clean, "guidance": guidance, **({"icon_bytes": icon} if icon else {})}
+    # ...and what its downloads are held to, in a word and why, for Look to
+    # say before the pack is added (packformat.held).
+    return {"manifest": clean, "held": packformat.held_of(clean), "guidance": guidance, **({"icon_bytes": icon} if icon else {})}
 
 
 def icon_refused(raw, ext):

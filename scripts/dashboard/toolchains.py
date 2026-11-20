@@ -192,6 +192,10 @@ def load_toolchains(packs=()):
                            # ...and the downloads it declares (pack format 3).
                            "fetch": [{k: str(f.get(k) or "")[:2000] for k in ("url", "sha256", "to")}
                                      for f in ((r.get("source") or {}).get("fetch") or [])[:32] if isinstance(f, dict)]}
+        # What its downloads are held to (pack format 5), worked out here
+        # from the whole row, which is not kept: one of pinned, installer
+        # and open, with the sentence that says why (packformat.held).
+        row["held"] = packformat.held_of(r)
         out.append(row)
     # Sorted here rather than trusted from the file, so a toolchain added at the
     # end of the catalog still lands where somebody would look for it. Leading
@@ -542,6 +546,8 @@ def payload():
                       # Whether a newer version can be fetched in place, or
                       # whether getting one means removing this first.
                       "updatable": bool(p.get("updatable")),
+                      # What its downloads are held to: {word, why}.
+                      "held": p.get("held"),
                       # What it needs, and what needs it, so a toolchain that
                       # exists to serve another says so rather than looking
                       # like an unexplained independent choice.
@@ -1351,6 +1357,10 @@ def payload_for_node(nid):
                       # Whether a newer version can be fetched in place, or
                       # whether getting one means removing this first.
                       "updatable": bool(p.get("updatable")),
+                      # What its downloads are held to (pack format 5):
+                      # {word: pinned, installer or open, why}, from its
+                      # entry alone, whether or not it is installed here.
+                      "held": p.get("held"),
                       # Said on the row, so a toolchain this node cannot have
                       # reads that way rather than offering an install that
                       # is refused at the press.

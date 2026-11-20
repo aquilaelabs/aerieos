@@ -12,6 +12,7 @@ import os
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import catalogrows  # noqa: E402
@@ -256,6 +257,59 @@ class Held(unittest.TestCase):
         # checksum list does; the rest wait for their pins.
         self.assertEqual(words["flutter"][0], "open")
         self.assertEqual(words["go"][0], "open")
+
+
+class Said(unittest.TestCase):
+    """Where a person reads an entry: the rows the Library and the Installed
+    page are answered with, and Look before a pack is added."""
+
+    def test_every_row_of_the_table_carries_its_word(self):
+        import toolchains  # noqa: PLC0415
+        self.assertTrue(toolchains.TOOLCHAINS)
+        for p in toolchains.TOOLCHAINS:
+            self.assertIn(p["held"]["word"], packformat.HELD_WORDS, p["name"])
+            self.assertTrue(p["held"]["why"], p["name"])
+        # A pack among them is read from the row a node is handed.
+        clean, _ = toolpacks.validate(kept(5, "kestrel"))
+        rows = toolchains.load_toolchains([toolpacks.recipe({"manifest": clean, "url": "https://example.com/k", "commit": "c" * 40})])
+        row = next(r for r in rows if r["name"] == "kestrel")
+        self.assertEqual(row["held"]["word"], "installer")
+        self.assertTrue(row["held"]["why"].startswith("Its installer, kestrel-up, downloads"))
+
+    def test_a_node_s_rows_and_the_library_s_answer_it(self):
+        import library  # noqa: PLC0415
+        import toolchains  # noqa: PLC0415
+
+        class Nodes:
+            @staticmethod
+            def node(nid):
+                return {"id": nid, "name": "box", "live": True, "reported": {"platform": "linux/amd64", "store_dirs": {"top": [], "android": []}}}
+
+            @staticmethod
+            def node_list():
+                return []
+
+            @staticmethod
+            def jobs_for(**_kw):
+                return []
+
+        clean, _ = toolpacks.validate(kept(5, "tern"))
+        packed = toolchains.load_toolchains([toolpacks.recipe({"manifest": clean, "url": "https://example.com/t", "commit": "c" * 40})])
+        with mock.patch.object(toolchains, "nodes", Nodes), mock.patch.object(toolchains, "TOOLCHAINS", packed):
+            payload = toolchains.payload_for_node("n_1")
+        items = {i["name"]: i for i in payload["items"]}
+        self.assertEqual(items["tern"]["held"], {"word": "pinned", "why": packformat.PINNED_SAID})
+        self.assertEqual(items["go"]["held"]["word"], "open")
+        rows = {r["name"]: r for r in library.rows(payload, [], [], {"packs": []}, {})}
+        self.assertEqual(rows["tern"]["held"], items["tern"]["held"])
+        self.assertEqual((rows["tern"]["kind"], rows["go"]["kind"], rows["go"]["held"]["word"]), ("pack", "toolchain", "open"))
+
+    def test_look_says_it_before_a_pack_is_added(self):
+        read = lambda name: lambda rel, cap: json.dumps(kept(5, name)).encode() if rel == toolpacks.MANIFEST else None  # noqa: E731
+        self.assertEqual(toolpacks._examine(read("quill"), (), "none")["held"], {"word": "pinned", "why": packformat.PINNED_SAID})
+        self.assertEqual(toolpacks._examine(read("kestrel"), (), "none")["held"]["word"], "installer")
+        got = toolpacks._examine(lambda rel, cap: json.dumps(kept(1, "hexkit")).encode() if rel == toolpacks.MANIFEST else b"its guidance", (), "none")
+        self.assertEqual((got["held"]["word"], got["held"]["why"]), ("open", "its install steps run with the network, and its entry does not say what they fetch"))
 
 
 if __name__ == "__main__":
