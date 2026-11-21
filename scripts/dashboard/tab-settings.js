@@ -899,9 +899,13 @@ function wireChecks(root){
 // The mirror's line and its two presses: Import takes an archive that
 // tools/catalog-mirror.py made on a machine with the network.
 function catalogIntro(s){
-  const m = s?.catalog_mirror;
+  const m = s?.catalog_mirror, i = s?.catalog_index;
+  // When the index in use was made: an address that keeps answering an
+  // old one shows here, where nothing else would say it.
+  const made = i ? `The index in use was made ${esc(i.made || "at an unknown time")}${i.read ? `, read ${esc(ago(i.read))}` : ""}.` : "No index has been read yet.";
   return `<div class="sub">The Library lists the packs and apps AerieOS's maintainers reviewed, from the signed index at this address${
     helpIcon("Another address can only mirror the same files: index.json and index.sig are checked against the maintainers' key this install ships, so no other catalog passes as vetted. A controller that cannot reach the address imports a mirror instead: tools/catalog-mirror.py makes one on a machine with the network, and the Library installs from it with nothing fetched.")}</div>
+    <div class="sub" data-catalogmade>${made}</div>
     <div class="field">${m
       ? `<div class="row stack2"><div class="grow"><span class="name">Mirror</span> <span class="sub">${m.packs} entr${m.packs === 1 ? "y" : "ies"} from ${m.repos} repositor${m.repos === 1 ? "y" : "ies"}, made ${esc(m.generated || "at an unknown time")}, imported ${esc(ago(m.imported_at))}</span></div>
           <button type="button" data-mirrorforget>Forget</button></div>`

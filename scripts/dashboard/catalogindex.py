@@ -429,6 +429,20 @@ def index(url=None, fresh=False, opener=None):
     return {"index": r.get("index"), "error": r.get("error", "")}
 
 
+def said(url=None):
+    """When the index in use was made and when it was read, for Controller
+    settings' Vetted catalog group: {made, read}, or None with none yet.
+    `made` is the index's own `generated` as it is written, "" where it
+    says none; `read` when this install last took it from the address, 0
+    for a mirror's. An index the address keeps answering is never replaced
+    by a newer one, so its age is said where a person can see it: nothing
+    here expires one, since a catalog may be quiet for weeks."""
+    idx = known(url)
+    if not idx:
+        return None
+    return {"made": idx.get("generated") if made(idx) is not None else "", "read": int(idx.get("fetched_at") or 0)}
+
+
 def known(url=None):
     """The index as last read from this address (or the imported mirror's),
     never asked for now: what a press reads, which must not wait for the

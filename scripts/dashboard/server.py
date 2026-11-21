@@ -6405,6 +6405,8 @@ def _snapshot(who):
         # Controller settings' Update checks.
         "checks": _tpart("status:checks", checks.view) if users.is_admin(who) else None,
         "catalog_mirror": catalogmirror.held() if users.is_admin(who) else None,
+        # When the catalog's index in use was made and read, said beside it.
+        "catalog_index": catalogindex.said(settings.get("catalog_url") or None) if users.is_admin(who) else None,
         # The coding agents installed packs bring (R169 step 9), which the
         # page adds to its own table of the shipped five.
         "pack_agents": agents.page_rows(),

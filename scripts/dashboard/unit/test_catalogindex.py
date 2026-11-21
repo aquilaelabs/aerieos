@@ -10,6 +10,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import catalogindex  # noqa: E402
@@ -222,6 +223,36 @@ class Index(unittest.TestCase):
         self.assertEqual([p["name"] for p in catalogindex.known("https://catalog.example/")["packs"]], ["ghidra"], "from the copy kept under the state")
         self.assertIsNone(catalogindex.known("https://other.example/"))
         self.assertEqual(asked, [])
+
+    def test_when_the_index_in_use_was_made_is_said_where_a_person_sees_it(self):
+        # An address that keeps answering one signed index never brings a
+        # newer one, and nothing expires it: Controller settings' Vetted
+        # catalog group says when the index in use was made, with when it
+        # was read, from what is kept and never from the network.
+        self.assertIsNone(catalogindex.said("https://catalog.example/"), "none read yet")
+        before = int(time.time())
+        catalogindex.fetch("https://catalog.example/", opener=self.served([ENTRY], "2026-10-28T00:00:00Z"))
+        asked = []
+        real = catalogindex.urllib.request.urlopen
+        catalogindex.urllib.request.urlopen = lambda *a, **k: asked.append(a) or (_ for _ in ()).throw(OSError("asked"))
+        self.addCleanup(setattr, catalogindex.urllib.request, "urlopen", real)
+        got = catalogindex.said("https://catalog.example/")
+        self.assertEqual(got["made"], "2026-10-28T00:00:00Z")
+        self.assertGreaterEqual(got["read"], before)
+        # The same index answered again weeks later is still the one made then.
+        catalogindex._cache.update(at=0.0, index=None, error="")
+        self.assertEqual(catalogindex.said("https://catalog.example/")["made"], "2026-10-28T00:00:00Z", "from the copy kept under the state")
+        self.assertEqual(asked, [])
+        # One that does not say when it was made says so as nothing, never as a word that reads like a date.
+        with mock.patch.object(catalogindex, "known", lambda url=None: {"generated": "soon", "packs": []}):
+            self.assertEqual(catalogindex.said(), {"made": "", "read": 0})
+        # The page draws it in the group's own words, and the status hands it to an administrator alone.
+        dash = os.path.join(os.path.dirname(__file__), "..")
+        with open(os.path.join(dash, "tab-settings.js"), encoding="utf-8") as f:
+            page = f.read()
+        self.assertIn('`The index in use was made ${esc(i.made || "at an unknown time")}${i.read ? `, read ${esc(ago(i.read))}` : ""}.`', page)
+        with open(os.path.join(dash, "server.py"), encoding="utf-8") as f:
+            self.assertIn('"catalog_index": catalogindex.said(settings.get("catalog_url") or None) if users.is_admin(who) else None,', f.read())
 
     def test_an_index_signed_by_the_spare_is_read_as_one_signed_by_the_key(self):
         # R232: the install ships the key and its spare; an index signed by
