@@ -705,11 +705,9 @@ jobs:
       contents: write
       id-token: write
       attestations: write
-    # The Windows code-signing certificate, which is all it reads: it used
-    # to inherit every secret of the repository, the release key among them.
-    secrets:
-      BB_WIN_CERT_PFX_B64: ${{ secrets.BB_WIN_CERT_PFX_B64 }}
-      BB_WIN_CERT_PASSWORD: ${{ secrets.BB_WIN_CERT_PASSWORD }}
+    # No secret: the Windows code-signing certificate is the windows-signing
+    # environment's, which the called workflow's Windows job names on a
+    # tag's ref, and no repository secret is handed on.
 
   android:
     needs: [place, lint, suites]

@@ -297,8 +297,19 @@ class Gate(unittest.TestCase):
             self.assertNotIn("secrets", job, name)
             self.assertNotIn("${{ secrets.", str(job), name)
         self.assertEqual(list(wf["on"]), ["workflow_dispatch"])
-        # ...and the release's own run still hands the certificate, by name, to the one workflow that reads it.
-        self.assertEqual(sorted(load("build-image.yml")["jobs"]["apps"]["secrets"]), ["BB_WIN_CERT_PASSWORD", "BB_WIN_CERT_PFX_B64"])
+        # ...and the certificate is no repository secret any run is handed:
+        # the Windows job reads it from the windows-signing environment,
+        # which it names on a tag's ref alone and which admits v* tags.
+        self.assertNotIn("secrets", load("build-image.yml")["jobs"]["apps"])
+        companion = load("companion-app.yml")
+        self.assertNotIn("secrets", companion["on"]["workflow_call"])
+        self.assertEqual(build["environment"], "${{ startsWith(github.ref, 'refs/tags/v') && 'windows-signing' || '' }}")
+        for name, job in companion["jobs"].items():
+            if name != "build":
+                self.assertNotIn("${{ secrets.", str(job), name)
+                self.assertNotIn("environment", job, name)
+        with open(os.path.join(WF, "..", "..", "docs", "versions.md"), encoding="utf-8") as f:
+            self.assertIn("New environment\n  `windows-signing`", f.read())
 
     @unittest.skipUnless(shutil.which("ssh-keygen"), "ssh-keygen is not here")
     def test_the_tags_people_follow_move_onto_a_published_sealed_release_s_own_digest(self):

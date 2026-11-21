@@ -181,10 +181,16 @@ the widest of them leaves it:
   General, **Workflow permissions**: Read repository contents and packages
   permissions, and "Allow GitHub Actions to create and approve pull
   requests" off. Each workflow here names what its jobs need.
-- **The Windows certificate.** `BB_WIN_CERT_PFX_B64` and
-  `BB_WIN_CERT_PASSWORD` are read by the tag's run alone (a rehearsal is
-  handed neither): move them into an environment limited to `v*` tags too,
-  and name it on the companion's `build` job when they are.
+- **The Windows certificate.** Settings, Environments, New environment
+  `windows-signing`: **Deployment branches and tags**, Selected branches
+  and tags, the tag pattern `v*`; then add `BB_WIN_CERT_PFX_B64` and
+  `BB_WIN_CERT_PASSWORD` as its secrets and delete any repository secrets
+  of those names. The companion's Windows job names the environment on a
+  tag's ref alone, so a run by hand from a branch, a rehearsal, and a
+  branch that rewrites the workflow to name it are handed no certificate
+  and build the `.exe` unsigned. A repository secret of either name would
+  be handed to any workflow of any branch that names it, which is why
+  the environment, made once, is the step that stays.
 
 A controller started for development, on the dev channel and holding a
 token for AerieOS's repository, sees the drafts as well. Updating

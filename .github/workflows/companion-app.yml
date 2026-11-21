@@ -12,9 +12,13 @@
 # rehearsal, or by hand for a release that exists, where it attaches them
 # itself: a hosted Windows runner bills twice a Linux one's minutes, and a
 # build on every push kept as an artifact is what filled the account's
-# Actions storage once already (B669). Signed when the repository holds a
-# code-signing certificate (BB_WIN_CERT_PFX_B64 and BB_WIN_CERT_PASSWORD);
-# built unsigned and said so in the log where it does not.
+# Actions storage once already (B669). Signed where the run is a tag's and
+# the windows-signing environment holds a code-signing certificate
+# (BB_WIN_CERT_PFX_B64 and BB_WIN_CERT_PASSWORD): the Windows job names that
+# environment on a tag's ref alone, and the environment admits v* tags and
+# nothing else, so a run by hand from a branch, a rehearsal, or a branch's
+# own rewrite of this file is handed no certificate. Built unsigned and said
+# so in the log where it is not handed one.
 #
 # Each file built for a release carries a build attestation, made by the
 # job that built it (R199): the release's list of its files is signed only
@@ -47,13 +51,8 @@ on:
       hand-on:
         type: boolean
         default: false
-    # The two this reads, named, so a caller hands on these and no other
-    # secret of the repository's (it was handed all of them).
-    secrets:
-      BB_WIN_CERT_PFX_B64:
-        required: false
-      BB_WIN_CERT_PASSWORD:
-        required: false
+    # No secret is handed in: the certificate is the windows-signing
+    # environment's, read by the Windows job on a tag's ref alone.
 
 permissions:
   contents: write
@@ -150,6 +149,10 @@ jobs:
     needs: portable
     runs-on: windows-2025
     timeout-minutes: 30
+    # The code-signing certificate's environment, named on a tag's ref
+    # alone (no environment, and no certificate, on any other); it admits
+    # v* tags, so a job a branch rewrites to name it is refused by GitHub.
+    environment: ${{ startsWith(github.ref, 'refs/tags/v') && 'windows-signing' || '' }}
     permissions:
       contents: write
       id-token: write
@@ -198,14 +201,14 @@ jobs:
             --add-data "tools/aerieos-stick.py;." --distpath dist tools/aerieos-usb-maker.py
           echo "USBEXE=dist/aerieos-usb-maker-$v.exe" >> "$GITHUB_ENV"
 
-      - name: Sign it where the repository holds a certificate
+      - name: Sign it where a tag's run is handed the certificate
         env:
           BB_WIN_CERT_PFX_B64: ${{ secrets.BB_WIN_CERT_PFX_B64 }}
           BB_WIN_CERT_PASSWORD: ${{ secrets.BB_WIN_CERT_PASSWORD }}
         run: |
           set -eo pipefail
           if [ -z "$BB_WIN_CERT_PFX_B64" ]; then
-            echo "no code-signing certificate in this repository's secrets: the .exe is unsigned, and Windows says so on first run"
+            echo "no code-signing certificate for this run (a tag's run reads it from the windows-signing environment): the .exe is unsigned, and Windows says so on first run"
             exit 0
           fi
           printf '%s' "$BB_WIN_CERT_PFX_B64" | base64 -d > "$RUNNER_TEMP/cert.pfx"
