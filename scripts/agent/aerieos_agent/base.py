@@ -243,10 +243,24 @@ RECIPE_ARMOR = ("-----BEGIN PGP PUBLIC KEY BLOCK-----", "-----END PGP PUBLIC KEY
 # download that answered other bytes than the recipe holds, and one that
 # could not be fetched at all.
 HELD_CHANGED, HELD_UNFETCHED = 66, 65
-_RECIPE_NAME = re.compile(r"[A-Z][A-Z0-9_]{1,40}")
+# The names a recipe may set: the controller's one rule for every place an
+# entry sets one (packformat.env_name_ok: ENV_NAME, ENV_KEPT,
+# ENV_KEPT_PREFIXES), copied since the agent carries no dashboard module and
+# held to it by unit/test_agentcode.py. Never a name a loader, a shell, an
+# interpreter, git, ssh, the tools a download is checked with or AerieOS
+# reads at its start.
+_RECIPE_NAME = re.compile(r"[A-Z][A-Z0-9_]{0,40}")
+_RECIPE_ENV_KEPT = frozenset((
+    "PATH", "HOME", "USER", "LOGNAME", "SHELL", "TMPDIR", "IFS", "ENV", "BASH_ENV", "PROMPT_COMMAND",
+    "PYTHONSTARTUP", "PYTHONPATH", "PERL5OPT", "RUBYOPT", "NODE_OPTIONS", "GIT_EXEC_PATH",
+    "PYTHONHOME", "PYTHONUSERBASE", "PERL5LIB", "PERLLIB", "RUBYLIB", "JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS",
+    "OPENSSL_CONF", "OPENSSL_MODULES", "OPENSSL_ENGINES", "SSL_CERT_FILE", "SSL_CERT_DIR", "CURL_HOME",
+    "CURL_CA_BUNDLE", "WGETRC", "GNUPGHOME", "TAR_OPTIONS", "GCONV_PATH", "LOCPATH", "NLSPATH",
+    "XDG_CONFIG_HOME", "HOSTALIASES", "RES_OPTIONS", "LOCALDOMAIN", "GLIBC_TUNABLES",
+    "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY"))
+_RECIPE_ENV_KEPT_PREFIXES = ("LD_", "DYLD_", "GIT_", "SSH_", "MALLOC_", "BB_", "BUILDERBOT_", "AERIEOS_")
 _RECIPE_VALUE = re.compile(r"[A-Za-z0-9._/{}:=-]{0,200}")
 _RECIPE_PATH = re.compile(r"\.?[A-Za-z0-9_-]{1,40}(/[A-Za-z0-9._{}-]{1,60}){1,5}")
-_RECIPE_ENV_KEPT = ("PATH", "HOME", "USER", "LOGNAME", "SHELL", "IFS", "ENV", "BASH_ENV")
 
 
 def _recipe_path(v, braces=""):
@@ -257,7 +271,8 @@ def _recipe_path(v, braces=""):
 
 
 def _recipe_name(k):
-    return isinstance(k, str) and bool(_RECIPE_NAME.fullmatch(k)) and k not in _RECIPE_ENV_KEPT and not k.startswith("LD_")
+    return isinstance(k, str) and bool(_RECIPE_NAME.fullmatch(k)) and k not in _RECIPE_ENV_KEPT \
+        and not k.startswith(_RECIPE_ENV_KEPT_PREFIXES)
 
 
 def _recipe_fetch(rows):

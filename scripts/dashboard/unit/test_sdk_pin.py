@@ -196,6 +196,19 @@ class Installs(unittest.TestCase):
         rc, out = self.s.sh("sdk_versions go")
         self.assertEqual(out, "go\tgo1.99.0\t-\tlocal\n")
 
+    def test_a_row_that_pins_nothing_is_asked_through_its_own_resolver(self):
+        # sdk.sh asked go.dev, nodejs.org, ziglang.org, Adoptium and GitHub
+        # what is newest with probes of its own beside the rows' resolvers.
+        self.go()
+        rc, out = self.s.sh("sdk_install go")
+        self.assertEqual(rc, 0, out)
+        stand_in = ('sdk_meta() { case "$1" in offer) ;; resolve) [ "$2" = go ] && printf "go1.200.0\\t\\n" ;; '
+                    'size) echo 0 ;; field) ;; *) return 1 ;; esac; }\n')
+        rc, out = self.s.sh(stand_in + "sdk_check_one go", PATH=self.curl_refused())
+        self.assertEqual(rc, 0, out)
+        self.assertEqual(out.rstrip("\n").split("\t")[:4], ["go", "go1.99.0", "go1.200.0", "update"], out)
+        self.assertFalse(os.path.exists(os.path.join(self.root, "curl-called")), "no vendor is asked but through the row")
+
     def test_an_update_installs_what_the_entry_pins(self):
         self.go()
         rc, out = self.s.sh("sdk_install go")

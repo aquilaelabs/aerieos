@@ -682,39 +682,23 @@ sdk_check_one() {
     # the pinned version on offer and no other: its vendor is not asked
     # what is newest, so the probes below read what is installed and the
     # offer is the entry's (sdkmeta.py offer).
-    local offer=""
+    local offer="" asked=""
     if [ -z "$local_only" ]; then
         offer="$(sdk_meta offer "$what" 2>/dev/null)" || offer=""
         [ -z "$offer" ] || local_only=pinned
     fi
+    # Each case reads what is installed: the tool asked its own version.
+    # What is newest is the row's own version resolver's word (below), as
+    # an install asks it, so no vendor is named here twice.
     case "$what" in
         flutter)
+            # A git clone: what is installed is the commit its HEAD is at.
             d="$(sdk_find flutter)" || d=""
-            # A git clone on the stable branch: the honest question is whether
-            # our HEAD is the branch head, and ls-remote answers it without
-            # fetching an object. Against the clone's origin when there is a
-            # clone and against the upstream URL when there is not: the same
-            # answer either way, and the second form is what lets a row that
-            # has never been installed say what it would get.
-            [ -z "$d" ] || inst="$(git -C "$d" rev-parse --short=8 HEAD 2>/dev/null || echo -)"
-            if [ -z "$local_only" ]; then
-                if [ -n "$d" ]; then
-                    latest="$(timeout 30 git -C "$d" ls-remote origin refs/heads/stable 2>/dev/null | cut -c1-8)"
-                else
-                    latest="$(timeout 30 git ls-remote https://github.com/flutter/flutter.git refs/heads/stable 2>/dev/null | cut -c1-8)"
-                fi
-            fi
-            [ -n "$latest" ] || latest="-"
+            [ -z "$d" ] || inst="$(sdk_sys git -C "$d" rev-parse --short=8 HEAD 2>/dev/null || echo -)"
             ;;
         swift)
             d="$(sdk_find swift)" || d=""
             [ -z "$d" ] || inst="$("$d/usr/bin/swift" --version 2>/dev/null | sed -n 's/.*Swift version \([0-9.]*\).*/\1/p' | head -1)"
-            if [ -z "$local_only" ]; then
-                latest="$(timeout 30 curl -fsSLI -o /dev/null -w '%{url_effective}' \
-                          https://github.com/swiftlang/swift/releases/latest 2>/dev/null)"
-                latest="${latest##*/swift-}"; latest="${latest%-RELEASE}"
-            fi
-            case "$latest" in ''|*[!0-9.]*) latest="-" ;; esac
             ;;
         dotnet)
             d="$(sdk_find dotnet)" || d=""
@@ -725,8 +709,6 @@ sdk_check_one() {
         go)
             d="$(sdk_find go)" || d=""
             [ -z "$d" ] || inst="$("$d/bin/go" version 2>/dev/null | awk '{print $3}')"
-            [ -n "$local_only" ] || latest="$(timeout 30 curl -fsS 'https://go.dev/VERSION?m=text' 2>/dev/null | head -1)"
-            [ -n "$latest" ] || latest="-"
             ;;
         jdk)
             # java -version prints to STDERR, which is why the redirect is a
@@ -734,11 +716,6 @@ sdk_check_one() {
             # every installed JDK as absent.
             d="$(sdk_find jdk)" || d=""
             [ -z "$d" ] || inst="$("$d/bin/java" -version 2>&1 | sed -n 's/.*version "\([^"]*\)".*/\1/p' | head -1)"
-            [ -n "$local_only" ] || latest="$(timeout 30 curl -fsS \
-                'https://api.adoptium.net/v3/info/release_names?release_type=ga&version=%5B21%2C22%29&page_size=1&sort_order=DESC' \
-                2>/dev/null | python3 -c 'import json,sys
-print((json.load(sys.stdin).get("releases") or [""])[0].removeprefix("jdk-"))' 2>/dev/null)"
-            [ -n "$latest" ] || latest="-"
             ;;
         android-tools)
             # sdkmanager --version needs a JDK, so this reads the package file
@@ -761,49 +738,19 @@ print((json.load(sys.stdin).get("releases") or [""])[0].removeprefix("jdk-"))' 2
         node)
             d="$(sdk_find node)" || d=""
             [ -z "$d" ] || inst="$("$d/bin/node" --version 2>/dev/null | head -1)"
-            [ -n "$local_only" ] || latest="$(timeout 30 curl -fsS https://nodejs.org/dist/index.json 2>/dev/null \
-                      | python3 -c 'import json,sys
-print(next((r["version"] for r in json.load(sys.stdin) if r.get("lts")), ""))' 2>/dev/null)"
-            [ -n "$latest" ] || latest="-"
             ;;
         zig)
             d="$(sdk_find zig)" || d=""
             [ -z "$d" ] || inst="$("$d/zig" version 2>/dev/null | head -1)"
-            [ -n "$local_only" ] || latest="$(timeout 30 curl -fsS https://ziglang.org/download/index.json 2>/dev/null \
-                      | python3 -c 'import json,sys
-d = json.load(sys.stdin)
-print(next(k for k in d if k != "master"))' 2>/dev/null)"
-            [ -n "$latest" ] || latest="-"
             ;;
         rust)
             d="$(sdk_find rust)" || d=""
             [ -z "$d" ] || inst="$(RUSTUP_HOME="$d/rustup" CARGO_HOME="$d/cargo" "$d/cargo/bin/rustc" --version 2>/dev/null | awk '{print $2}')"
-            if [ -z "$local_only" ] && [ -n "$d" ]; then
-                # rustup already knows how to ask; its answer names the
-                # version it would move to, which is the only interesting half.
-                local line=""
-                line="$(RUSTUP_HOME="$d/rustup" CARGO_HOME="$d/cargo" timeout 60 \
-                        "$d/cargo/bin/rustup" check 2>/dev/null | grep -i 'stable' | head -1 || true)"
-                # Lower case, and a colon rather than an arrow:
-                #   stable-x86_64-unknown-linux-gnu - up to date: 1.97.1 (...)
-                #   stable-x86_64-unknown-linux-gnu - update available: 1.97.1 -> 1.98.0
-                case "$line" in
-                    *"up to date"*)      latest="$inst" ;;
-                    *"update available"*)
-                        latest="$(printf '%s' "$line" | sed -n 's/.*-> *\([0-9][0-9.]*\).*/\1/p')"
-                        [ -n "$latest" ] || latest="newer" ;;
-                    *) latest="-" ;;
-                esac
-            elif [ -z "$local_only" ]; then
-                # No rustup here to ask, so ask GitHub: the release tags are
-                # the same numbers rustc reports.
-                latest="$(timeout 30 curl -fsSLI -o /dev/null -w '%{url_effective}' \
-                          https://github.com/rust-lang/rust/releases/latest 2>/dev/null)"
-                latest="${latest##*/}"
-                case "$latest" in ''|*[!0-9.]*) latest="-" ;; esac
-            fi
             ;;
         playwright)
+            # The module itself answers both halves (its dry run), so no
+            # resolver is asked for it.
+            asked=1
             d="$(sdk_find playwright)" || d=""
             # The module decides which browser revisions it wants; --dry-run
             # names the directories it would use, and names them whether or
@@ -828,6 +775,8 @@ print(next(k for k in d if k != "master"))' 2>/dev/null)"
             fi
             ;;
         android:*)
+            # sdkmanager's repository answers both halves.
+            asked=1
             local pkg="${what#android:}"
             # A versioned row (the NDK, CMake, build-tools, the SDK platform)
             # is a family of packages side by side, and a newer one is a new
@@ -885,6 +834,11 @@ print(next(k for k in d if k != "master"))' 2>/dev/null)"
         *) printf '%s\t-\t-\tunknown\n' "$what"; return 0 ;;
     esac
     [ -n "$inst" ] || inst="-"
+    if [ -z "$local_only" ] && [ -z "$asked" ]; then
+        latest="$(sdk_meta resolve "$what" 2>/dev/null)" || latest=""
+        latest="${latest%%$'\t'*}"
+        [ -n "$latest" ] || latest="-"
+    fi
     if [ -n "$offer" ]; then
         # Pinned: what is on offer is the pin. An installed copy that was
         # held to the same digest is that file, whatever each calls its
