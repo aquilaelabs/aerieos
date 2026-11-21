@@ -35,6 +35,7 @@
 - A start no longer rewrites checkouts' credential helpers or a line of the home's .bashrc, and its banner names AerieOS; with no stable release, the bare-metal installer takes the newest published release (14aa76b, 1429a5b, f6a5ff3)
 - Container, nginx and scanner rows name an image by name and tag, a toolchain row's failure leaves its digests to the log, and release, container and move refusals, the CI, cut-landing and switched-off pack rows, two toasts and the Doctor's lines are each one sentence with no commit, key or command (a471b89, 6c70b3c, 308bf8f)
 - A node's root-off line, Un-enroll dialog, Updates fact, reused-token bell row and in-use toolchain refusal each say one sentence, with no key characters or commands; a switched-off pack is titled as switched off (aaa2257, 06cbd0a)
+- A toolchain row's failure is bb's error alone, and three more switches are honored only in AerieOS's source tree (e592c6c)
 
 ### Removed
 
@@ -88,6 +89,7 @@
 - A stick whose aerieos.env names BB_RELEASE_LINE is offered that line's releases and dev builds alone, where 0.10 was offered to a 0.9 stick (e7dabfb)
 - The node agent saves its record under one lock every change takes, so a save never meets it half changed (f1857cf)
 - Update agent no longer warns that a node's sessions end: they outlive the agent's restart (6414ccd)
+- aerie toolchains check answers for a pack and every other catalog row, and offers its pin as an update (2bda815)
 
 ### Security
 
@@ -133,6 +135,10 @@
 - An agent update that cannot check itself on the node is refused, not installed without a way back (3a9a3b5)
 - A node's terminals, files and VM screens open over TLS alone: the controller opens nothing on a node with no certificate, a node with one refuses a plain request, and the node's row says why (f9ef449, 097f5d8)
 - A node with no cryptography library seals no sign-in rather than sealing the old way, and says so on its row (c8e6dd0)
+- A storage backup copies only into a folder root alone may write, and a link left at a run's name in the destination stops the run instead of taking root's copy elsewhere (6dfdf25)
+- A toolchain's installer, steps and verify start with none of the variables another pack set for every job, a layout's own value is set only where its toolchain is installed, and a pinned repository's check reads no account's git configuration (a89e37e)
+- A pack's install steps cut from the network no longer reach the system bus's or the resolver's sockets under /run, and a cut that cannot cover /run is counted as run with the network (7d16922)
+- One account can no longer freeze every account's sign-in pass, or the node's hello, by leaving a FIFO where root writes in its folder (e82e424)
 
 ## 0.9.0-dev.5641: 2026-11-18
 
