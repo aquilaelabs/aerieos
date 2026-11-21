@@ -11,6 +11,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import tarfile
 import threading
 import time
 from .jobs import watched
@@ -51,23 +52,93 @@ from .accounts import kept_lookup
 
 
 
-def _pin_release(pin_dir, cmd, root):
+# What reads an installed agent out of an account's home for root to pin: a
+# process of that account, so a name there that was pointed at a file only
+# root reads between the look and the read is refused to it as to the
+# account. A release folder goes out as a tar on its standard output.
+_TREE_OUT = r"""
+import sys, tarfile
+with tarfile.open(fileobj=sys.stdout.buffer, mode="w|") as tar:
+    tar.add(sys.argv[1], arcname=".")
+"""
+
+
+def _file_as(who, src, dest):
+    """`src` as root's file `dest`, 0755: its bytes read by a process of
+    the account `who` and written by this one, which alone holds `dest`
+    open. Raises OSError when they could not be read."""
+    with contextlib.suppress(FileNotFoundError):
+        os.unlink(dest)
+    p = subprocess.Popen(["cat", "--", src], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, cwd="/", **(who or {}))
+    try:
+        fd = os.open(dest, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o755)
+        with os.fdopen(fd, "wb") as f:
+            shutil.copyfileobj(p.stdout, f, 1 << 20)
+            os.fchmod(f.fileno(), 0o755)
+    finally:
+        p.stdout.close()
+        code = p.wait()
+    if code != 0:
+        with contextlib.suppress(OSError):
+            os.unlink(dest)
+        raise OSError(f"{src} could not be read as the account it was installed for")
+
+
+def _tree_as(who, root, new):
+    """The folder `root` as root's folder `new`: read by a process of the
+    account `who` (_TREE_OUT) and written here from what it sent, which is
+    the account's word: plain files, folders and links that stay inside,
+    each made only where its real folder is under `new`, executable where
+    it was, and nothing else. Raises OSError when it could not be read."""
+    os.makedirs(new, mode=0o755)
+    top = os.path.realpath(new)
+    p = subprocess.Popen([sys.executable, "-I", "-c", _TREE_OUT, root], stdout=subprocess.PIPE,
+                         stderr=subprocess.DEVNULL, cwd="/", **(who or {}))
+    try:
+        with tarfile.open(fileobj=p.stdout, mode="r|") as tar:
+            for m in tar:
+                name = os.path.normpath(m.name)
+                if name == ".":
+                    continue
+                if name.startswith(("/", "..")):
+                    raise OSError(f"{m.name} is outside the folder")
+                dest = os.path.join(top, name)
+                parent = os.path.realpath(os.path.dirname(dest))
+                if parent != top and not parent.startswith(top + os.sep):
+                    raise OSError(f"{m.name} is outside the folder")
+                if m.isdir():
+                    os.makedirs(dest, mode=0o755, exist_ok=True)
+                elif m.isreg():
+                    mode = 0o755 if m.mode & 0o111 else 0o644
+                    fd = os.open(dest, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, mode)
+                    with os.fdopen(fd, "wb") as f:
+                        shutil.copyfileobj(tar.extractfile(m), f, 1 << 20)
+                        os.fchmod(f.fileno(), mode)
+                elif m.issym():
+                    inside = os.path.normpath(os.path.join(os.path.dirname(name), m.linkname))
+                    if not os.path.isabs(m.linkname) and not inside.startswith(".."):
+                        os.symlink(m.linkname, dest)
+    except (tarfile.TarError, EOFError) as e:
+        raise OSError(f"{root} could not be read as the account it was installed for ({e})") from e
+    finally:
+        p.stdout.close()
+        code = p.wait()
+    if code != 0:
+        raise OSError(f"{root} could not be read as the account it was installed for")
+
+
+def _pin_release(pin_dir, cmd, root, who=None):
     """Pin an agent the vendor installs as a release folder (Codex CLI's:
     bin/codex, bin/codex-code-mode-host and codex-resources beside them): the
     whole folder copied root-owned to <pin_dir>/release, swapped in whole,
     and the command and each helper beside it a link into it, so the agent
     finds its helpers where it looks, beside its own executable. Copying the
     one binary left Codex 0.163 without codex-code-mode-host, and every
-    command a session ran failed (B247)."""
+    command a session ran failed (B247). The folder is read as the account
+    `who` it was installed for (_tree_as)."""
     new, rel, old = (os.path.join(pin_dir, n) for n in (".release.new", "release", ".release.old"))
     shutil.rmtree(new, ignore_errors=True)
-    shutil.copytree(root, new, symlinks=True)
-    for d, dirs, files in os.walk(new):
-        for n in dirs + files:
-            with contextlib.suppress(OSError):
-                os.lchown(os.path.join(d, n), 0, 0)
-    os.lchown(new, 0, 0)
-    os.chmod(new, 0o755)
+    _tree_as(who, root, new)
     shutil.rmtree(old, ignore_errors=True)
     if os.path.isdir(rel) and not os.path.islink(rel):
         os.replace(rel, old)
@@ -915,18 +986,25 @@ class SessionsMixin:
         # session runs and the account's own install under its home.
         if spec.get("action") == "remove":
             gone = []
-            for path in (os.path.join(pin_dir, cmd), os.path.join(home, how["bin"]),
-                         *(os.path.join(home, a) for a in how.get("also", ()))):
-                if os.path.lexists(path):
-                    with contextlib.suppress(OSError):
-                        shutil.rmtree(path) if os.path.isdir(path) and not os.path.islink(path) else os.unlink(path)
-                        gone.append(path)
+            path = os.path.join(pin_dir, cmd)
+            if os.path.lexists(path):
+                with contextlib.suppress(OSError):
+                    shutil.rmtree(path) if os.path.isdir(path) and not os.path.islink(path) else os.unlink(path)
+                    gone.append(path)
+            # What is under the account's home goes by a process of the
+            # account: a name there is the account's to point elsewhere,
+            # and root would remove what it pointed at.
+            mine = [os.path.join(home, how["bin"]), *(os.path.join(home, a) for a in how.get("also", ()))]
             # ...the link an install made where the agent is not root...
             link = os.path.join(home, ".local", "bin", cmd)
             if os.path.islink(link) and os.readlink(link) == os.path.join(home, how["bin"]):
-                with contextlib.suppress(OSError):
-                    os.unlink(link)
-                    gone.append(link)
+                mine.append(link)
+            for path in mine:
+                if os.path.lexists(path):
+                    with contextlib.suppress(OSError, ValueError, subprocess.SubprocessError):
+                        if subprocess.run(["rm", "-rf", "--", path], env=env, cwd="/", timeout=120, check=False,
+                                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **who).returncode == 0:
+                            gone.append(path)
             # ...and a pinned release folder, with the links into it.
             rel = os.path.join(pin_dir, "release")
             if os.path.isdir(rel) and not os.path.islink(rel):
@@ -1076,17 +1154,18 @@ class SessionsMixin:
         if os.geteuid() == 0:
             try:
                 os.makedirs(pin_dir, mode=0o755, exist_ok=True)
+                # Read out of the account's home by a process of the
+                # account, and written here by root: a name there is the
+                # account's to point at a file only root reads.
                 root = _release_root(exe, src, home)
                 if root:
-                    _pin_release(pin_dir, cmd, root)
+                    _pin_release(pin_dir, cmd, root, who)
                 else:
                     # One binary, and any release folder an earlier pin made
                     # (B262) goes with what it held.
                     shutil.rmtree(os.path.join(pin_dir, "release"), ignore_errors=True)
                     tmp = os.path.join(pin_dir, cmd + ".new")
-                    shutil.copy2(src, tmp)
-                    os.chown(tmp, 0, 0)
-                    os.chmod(tmp, 0o755)
+                    _file_as(who, src, tmp)
                     os.replace(tmp, os.path.join(pin_dir, cmd))
                 job.say(f"pinned {ver} at {pin_dir}/{cmd}, root-owned: a session runs this copy and cannot change it\n")
             except OSError as e:
