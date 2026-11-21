@@ -539,7 +539,10 @@ where Docker's own file names an address to fetch the key from.
 
 **What the controller's image is built from, and what each part is held
 to.** The build takes five kinds of thing from somewhere else, and the
-bare-metal installer takes the same ones the same way:
+bare-metal installer takes the same ones the same way, but for uv, mise
+and cloudflared where the machine has one already: that copy is kept as
+found (its own package, or one installed before), and only one the
+machine lacks is fetched and held to its pin:
 
 | What | Held to |
 |---|---|

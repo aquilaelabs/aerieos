@@ -263,7 +263,14 @@ Each release says how far back it reaches, in two numbers.
 There is no downgrade. A container goes back by restoring the copy the
 upgrade took (`backups/before-VERSION`) under the older image. A bare-metal
 install goes back by itself only when a new release does not answer after an
-update.
+update. A node that holds AerieOS's release key never takes an agent older
+than the one it runs (its age floor), so after going back across an
+agent's window the older controller's update is refused there and that
+node's spaces wait until the newer build runs
+again or `sudo aerieos-agent older on` at the node's own console lets it
+take the older agent. That is a step at each such node's console, kept
+because a controller that could send an older agent by itself is what the
+floor is there to stop.
 
 ## Moving work between the lines
 

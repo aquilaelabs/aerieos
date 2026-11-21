@@ -224,7 +224,10 @@ and move it on when you choose to upgrade.
   their repositories. A controller started on such a `/config` stops and says
   so.
 - **No downgrades.** Going back is restoring the backup the upgrade made,
-  below, with the older image.
+  below, with the older image. A node that holds the release key takes no
+  older agent than it runs, so going back across an agent's window holds
+  it until `sudo aerieos-agent older on` at its console
+  ([versions.md](versions.md#what-a-release-upgrades-from)).
 
 **What the controller does for you.** `/config` carries the version of its
 state. On start, a controller moves older state forward, one numbered step
