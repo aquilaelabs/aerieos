@@ -1149,6 +1149,68 @@ def fs_holds(who):
     return acting_as(ids if _FS_HOLDS["ok"] else None)
 
 
+# -- a folder an account owns, reached by root without following its links -----
+
+
+def dir_at(parent, name, mode=0o755):
+    """A descriptor on the real folder `name` inside the folder `parent` is
+    a descriptor on: made when it is not there, and whatever else is at its
+    name (a link, a file) taken away first. Root's way into a folder an
+    account may write: by the folder itself, never through a link left at
+    its name. The caller closes it."""
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    for _ in range(3):
+        with contextlib.suppress(FileExistsError):
+            os.mkdir(name, mode, dir_fd=parent)
+        try:
+            return os.open(name, flags, dir_fd=parent)
+        except FileNotFoundError:
+            continue
+        except OSError:
+            os.unlink(name, dir_fd=parent)
+    raise OSError(f"{name} is not a folder and could not be made one")
+
+
+def open_dir(path):
+    """A descriptor on the folder at `path`, refused when a link is at its
+    name. The caller closes it."""
+    return os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+
+
+def write_at(folder, name, data, mode, uid=None, gid=None):
+    """`data` as the file `name` in the folder `folder` is a descriptor on,
+    replaced in one step, with `mode` and (given) the owner: made beside
+    itself under a name nothing is followed through, then renamed."""
+    tmp = name + ".tmp"
+    with contextlib.suppress(FileNotFoundError):
+        os.unlink(tmp, dir_fd=folder)
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, mode, dir_fd=folder)
+    with os.fdopen(fd, "wb") as f:
+        os.fchmod(f.fileno(), mode)
+        if uid is not None:
+            os.fchown(f.fileno(), uid, -1 if gid is None else gid)
+        f.write(data.encode("utf-8") if isinstance(data, str) else data)
+    os.rename(tmp, name, src_dir_fd=folder, dst_dir_fd=folder)
+
+
+def rm_at(parent, name):
+    """`name` inside the folder `parent` is a descriptor on, and all under
+    it, removed without following a link anywhere in it."""
+    try:
+        fd = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=parent)
+    except OSError:
+        with contextlib.suppress(OSError):
+            os.unlink(name, dir_fd=parent)
+        return
+    try:
+        for entry in os.listdir(fd):
+            rm_at(fd, entry)
+    finally:
+        os.close(fd)
+    with contextlib.suppress(OSError):
+        os.rmdir(name, dir_fd=parent)
+
+
 # -- a small file, written whole and read whole ---------------------------------
 
 

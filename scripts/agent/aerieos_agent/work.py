@@ -597,13 +597,17 @@ class WorkMixin:
         try:
             os.makedirs(work, mode=0o700, exist_ok=True)
             os.chmod(work, 0o700)
-            if who:
-                os.chown(work, who["user"], who["group"])
+            # Fetched while the folder is root's alone, and the folder given
+            # to the account only then: from there on a name in it is the
+            # account's to point elsewhere, and root writes nothing by name.
             src = os.path.join(work, "in" + kind)
             st, _ = self.ctl.fetch(f"file?job={job.job['id']}&path={urllib.parse.quote(rel)}", src)
             if st != 200:
                 job.say(f"could not fetch {rel} from the controller ({st})\n")
                 return "failed", 69
+            if who:
+                os.chown(src, who["user"], who["group"])
+                os.chown(work, who["user"], who["group"])
             # Which app it is, so the controller can hand the key its package
             # is mapped to (R106 step 6): aapt2 for an .apk; a bundle's
             # manifest is a protobuf no tool here reads, and the package name
@@ -611,8 +615,9 @@ class WorkMixin:
             package = ""
             if kind == ".apk":
                 with contextlib.suppress(OSError, subprocess.SubprocessError):
+                    # The store's aapt2, as the account the store is.
                     p = subprocess.run([tools["aapt2"], "dump", "packagename", src], capture_output=True,
-                                       text=True, timeout=60, check=False)
+                                       text=True, timeout=60, check=False, env=env, cwd=work, **who)
                     package = (p.stdout or "").strip().splitlines()[0] if p.returncode == 0 and p.stdout.strip() else ""
             else:
                 with contextlib.suppress(OSError, KeyError, zipfile.BadZipFile):
@@ -629,26 +634,15 @@ class WorkMixin:
             if st != 200 or not isinstance(k, dict) or not k.get("keystore"):
                 job.say(f"the controller did not hand over the key: {(k or {}).get('error') or st}\n")
                 return "failed", 69
-            ks = os.path.join(work, "key")
-            fd = os.open(ks, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-            with os.fdopen(fd, "wb") as f:
-                f.write(base64.b64decode(k["keystore"]))
-            for p in (src, ks):
-                if who:
-                    os.chown(p, who["user"], who["group"])
+            ks = keyops.private(work, "key", base64.b64decode(k["keystore"]), who)
             env.update({"BB_KS_PASS": str(k.get("store_pass") or ""),
                         "BB_KEY_PASS": str(k.get("key_pass") or k.get("store_pass") or "")})
             # A rotated key (R106 step 7): the key it replaced signs first and
             # the proof says the new one takes over, from Android 9 on.
             prev = k.get("previous") if kind == ".apk" and k.get("lineage") else None
             if prev:
-                pks, lin = os.path.join(work, "previous"), os.path.join(work, "lineage")
-                for path, data in ((pks, prev.get("keystore")), (lin, k.get("lineage"))):
-                    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-                    with os.fdopen(fd, "wb") as f:
-                        f.write(base64.b64decode(data or ""))
-                    if who:
-                        os.chown(path, who["user"], who["group"])
+                pks = keyops.private(work, "previous", base64.b64decode(prev.get("keystore") or ""), who)
+                lin = keyops.private(work, "lineage", base64.b64decode(k.get("lineage") or ""), who)
                 env.update({"BB_PREV_KS": str(prev.get("store_pass") or ""),
                             "BB_PREV_KEY": str(prev.get("key_pass") or prev.get("store_pass") or "")})
             elif k.get("previous"):
@@ -683,9 +677,8 @@ class WorkMixin:
                     return "failed", 1
                 said = step([tools["apksigner"], "verify", "--verbose", "--print-certs", out], "apksigner verify")
             else:
-                shutil.copyfile(src, out)
-                if who:
-                    os.chown(out, who["user"], who["group"])
+                if step(["cp", "--", src, out], "the copy to sign") is None:
+                    return "failed", 1
                 if step([tools["jarsigner"], "-keystore", ks, "-storepass:env", "BB_KS_PASS",
                          "-keypass:env", "BB_KEY_PASS", out, alias], "jarsigner") is None:
                     return "failed", 1
@@ -705,9 +698,12 @@ class WorkMixin:
             base = os.path.basename(rel)[:-len(kind)]
             base = base.replace("-unsigned", "") if "-unsigned" in base else base
             name = f"{base}-signed{kind}"
-            st, r = self.ctl.upload(f"artifact?job={job.job['id']}&name={name}&signed={route}"
-                                    f"&cert={cert or want}&schemes={schemes}&key={k.get('key') or 'default'}"
-                                    + (f"&rotated={prev.get('key')}" if prev else ""), out)
+            # Read as the account that signed it (as deliver() reads a job's
+            # outputs): the folder is that account's.
+            with fs_holds(who):
+                st, r = self.ctl.upload(f"artifact?job={job.job['id']}&name={name}&signed={route}"
+                                        f"&cert={cert or want}&schemes={schemes}&key={k.get('key') or 'default'}"
+                                        + (f"&rotated={prev.get('key')}" if prev else ""), out)
             if st != 200 or r.get("error"):
                 job.say(f"could not deliver {name}: {r.get('error') or st}\n")
                 return "failed", 1
@@ -760,8 +756,8 @@ class WorkMixin:
         try:
             os.makedirs(work, mode=0o700, exist_ok=True)
             os.chmod(work, 0o700)
-            if who:
-                os.chown(work, who["user"], who["group"])
+            # The APK fetched while the folder is root's alone, the folder
+            # given to the account only then (as a sign job's).
             package, src = "", os.path.join(work, "in.apk")
             if op == "release":
                 st, _ = self.ctl.fetch(f"file?job={jid}&path=release.apk", src)
@@ -771,6 +767,9 @@ class WorkMixin:
                     return "failed", 69
                 if who:
                     os.chown(src, who["user"], who["group"])
+            if who:
+                os.chown(work, who["user"], who["group"])
+            if op == "release":
                 package = keyops.package_of(tl["aapt2"], src, **kw)
                 if package:
                     job.say(f"the APK is {package}\n")
@@ -810,7 +809,8 @@ class WorkMixin:
                 got, why = keyops.sign_apk(tl, src, signed, raw(k), raw(prev) if prev else None,
                                            base64.b64decode(k.get("lineage") or ""), **kw)
                 if not why:
-                    st, r = self.ctl.upload(f"signing-put?job={jid}", signed)
+                    with fs_holds(who):
+                        st, r = self.ctl.upload(f"signing-put?job={jid}", signed)
                     if st != 200 or (r or {}).get("error"):
                         why = f"the signed APK did not reach the controller: {(r or {}).get('error') or st}"
                     out = {**got, "key": k.get("key") or "", "package": package,

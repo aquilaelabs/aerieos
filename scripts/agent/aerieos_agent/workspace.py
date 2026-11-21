@@ -6,12 +6,15 @@ import json
 import os
 import re
 import shutil
+import stat
+import subprocess
+import sys
 import tarfile
 import threading
 import time
 from . import release
 from .base import (BUNDLE_LIST, BUNDLE_SIG, LIST_MOST, REFUSED, REFUSED_MOST, ROOT_BUNDLE_DIR, ROOT_TOOLS, TOOLS_DIR, TOOLS_SIG,
-                   fs_holds, hello_again, log)
+                   dir_at, fs_holds, hello_again, log, open_dir, rm_at)
 from .stores import dir_bytes, load_state, tc_root
 
 
@@ -27,6 +30,42 @@ BUNDLE_SLACK_S = 300
 # it is unpacked: the tar that was checked is the tar unpacked, whatever
 # another thread was sent meanwhile.
 _UNPACK = threading.Lock()
+
+# The store's copy of the bundle, unpacked by a process of the account the
+# store is: the tar on its standard input, the store's .bb and the folder's
+# name its arguments. Beside itself first and renamed, so a folder of that
+# name is a whole bundle; `.bb/current` pointed at it either way. It prints
+# "unpacked" when it unpacked one.
+_STORE_UNPACK = r"""
+import os, shutil, sys, tarfile
+bbdir, name = sys.argv[1], sys.argv[2]
+os.umask(0o022)
+into = os.path.join(bbdir, name)
+if not os.path.isdir(into):
+    new = into + ".new"
+    shutil.rmtree(new, ignore_errors=True)
+    with tarfile.open(fileobj=sys.stdin.buffer, mode="r|*") as tar:
+        if hasattr(tarfile, "data_filter"):
+            tar.extractall(new, filter="data")
+        else:
+            tar.extractall(new)
+    os.chmod(os.path.join(new, "scripts", "aerie"), 0o755)
+    for x in ("bb-tty", "bb-work-note", "bb-prompt-relay"):
+        try:
+            os.chmod(os.path.join(new, "scripts", "dashboard", x), 0o755)
+        except OSError:
+            pass
+    os.rename(new, into)
+    print("unpacked")
+try:
+    tmp = os.path.join(bbdir, ".current.new")
+    if os.path.lexists(tmp):
+        os.unlink(tmp)
+    os.symlink(name, tmp)
+    os.replace(tmp, os.path.join(bbdir, "current"))
+except OSError:
+    pass
+"""
 
 
 def sessions_from(proc="/proc", root=None):
@@ -264,7 +303,11 @@ class WorkspaceMixin:
             return ""
         self.own_dir(store, who)
         bbdir = os.path.join(store, ".bb")
-        os.makedirs(bbdir, exist_ok=True)
+        try:
+            self._take_bb(store, who)
+        except OSError as e:
+            say(f"refused: the toolchain store's .bb folder could not be made ({e})\n")
+            return ""
         # What this node trusts, read from the file its console writes (as
         # an update's check does), not this process's copy.
         try:
@@ -346,28 +389,15 @@ class WorkspaceMixin:
             if root:
                 self._keep_root_tools(tar_path, hexd[:16] or "bundle", say, trust)
                 self._keep_root_bundle(tar_path, hexd[:16] or "bundle", say)
-            if not os.path.isdir(into):
-                with tarfile.open(tar_path) as tar:
-                    if hasattr(tarfile, "data_filter"):
-                        tar.extractall(into, filter="data")
-                    else:
-                        tar.extractall(into)
-                os.chmod(os.path.join(into, "scripts", "aerie"), 0o755)
-                for x in ("bb-tty", "bb-work-note", "bb-prompt-relay"):
-                    with contextlib.suppress(OSError):
-                        os.chmod(os.path.join(into, "scripts", "dashboard", x), 0o755)
+            # In the store by a process of the account it belongs to, never
+            # by root: the store is that account's to write, and a link left
+            # at the folder's name would be root's to follow.
+            made, why = self._unpack_in_store(tar_path, bbdir, hexd[:16] or "bundle", who)
+            if made is None:
+                say(f"could not unpack aerie into {into}: {why}\n")
+                return ""
+            if made:
                 say(f"aerie {hexd[:12]} unpacked into {into}\n")
-            with contextlib.suppress(OSError):
-                tmp = os.path.join(bbdir, ".current.new")
-                if os.path.lexists(tmp):
-                    os.unlink(tmp)
-                os.symlink(os.path.basename(into), tmp)
-                os.replace(tmp, os.path.join(bbdir, "current"))
-        if who:
-            for d, _dirs, files in os.walk(into):
-                for x in [d] + [os.path.join(d, f) for f in files]:
-                    with contextlib.suppress(OSError):
-                        os.lchown(x, who["user"], who["group"])
         # Fetched by a job while the terminals open an older copy: leave the
         # change to the loop's session_check, which owns the session half;
         # this may be a job's thread. Without this the terminals opened
@@ -573,6 +603,41 @@ class WorkspaceMixin:
             say(f"could not keep root's copy of the bundle: {e}\n")
 
     @staticmethod
+    def _take_bb(store, who):
+        """The store's .bb as a real folder of the account's: made when it
+        is not there, whatever else is at its name taken away, and given to
+        `who` by the folder itself. Root never follows the name: the store
+        is the account's to write."""
+        if os.geteuid() != 0 or not who:
+            os.makedirs(os.path.join(store, ".bb"), exist_ok=True)
+            return
+        sfd = open_dir(store)
+        try:
+            fd = dir_at(sfd, ".bb")
+            try:
+                os.fchown(fd, who["user"], who["group"])
+            finally:
+                os.close(fd)
+        finally:
+            os.close(sfd)
+
+    @staticmethod
+    def _unpack_in_store(tar_path, bbdir, name, who):
+        """The checked tar unpacked as `bbdir`/`name` and `current` pointed
+        at it, by a process of the account `who` (_STORE_UNPACK): (True,
+        "") when it unpacked one, (False, "") when the folder was there,
+        (None, why) when it could not."""
+        try:
+            with open(tar_path, "rb") as tar:
+                p = subprocess.run([sys.executable, "-I", "-c", _STORE_UNPACK, bbdir, name], stdin=tar,
+                                   capture_output=True, text=True, timeout=600, check=False, cwd="/", **(who or {}))
+        except (OSError, subprocess.SubprocessError) as e:
+            return None, str(e)
+        if p.returncode != 0:
+            return None, " ".join((p.stderr or "").split())[-300:] or f"exit {p.returncode}"
+        return "unpacked" in (p.stdout or ""), ""
+
+    @staticmethod
     def prune_bundles(bbdir, keep):
         """Drop the bundles nothing is going to run again.
 
@@ -582,23 +647,37 @@ class WorkspaceMixin:
         together.
 
         What has to survive: the newest, which the terminals run and `current`
-        names, and the three newest, which versions() probes for an SDK
-        inventory. A shell holds `current` on its PATH, never a digest, so
-        nothing older is run again.
+        names, and the five newest. A shell holds `current` on its PATH,
+        never a digest, so nothing older is run again.
+
+        By the folders themselves, from a descriptor on the store's .bb
+        (rm_at): the store is an account's to write, and this is root.
         """
         keep_n = 5
         try:
-            names = [d for d in os.listdir(bbdir) if len(d) == 16
-                     and all(c in "0123456789abcdef" for c in d)]
-            dirs = [os.path.join(bbdir, d) for d in names
-                    if os.path.isdir(os.path.join(bbdir, d))]
-            dirs.sort(key=os.path.getmtime, reverse=True)
+            sfd = open_dir(os.path.dirname(bbdir))
         except OSError:
             return
-        for d in dirs[keep_n:]:
-            with contextlib.suppress(OSError):
-                if d != keep:
-                    shutil.rmtree(d)
+        try:
+            fd = os.open(os.path.basename(bbdir), os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=sfd)
+        except OSError:
+            return
+        finally:
+            os.close(sfd)
+        try:
+            at = {}
+            for d in os.listdir(fd):
+                if len(d) == 16 and all(c in "0123456789abcdef" for c in d):
+                    st = os.stat(d, dir_fd=fd, follow_symlinks=False)
+                    if stat.S_ISDIR(st.st_mode):
+                        at[d] = st.st_mtime
+            for d in sorted(at, key=at.get, reverse=True)[keep_n:]:
+                if d != os.path.basename(keep):
+                    rm_at(fd, d)
+        except OSError:
+            return
+        finally:
+            os.close(fd)
 
     def artifact_dir(self, project, who=None, make=True):
         """This node's copy of one project's artifacts. Per project, because

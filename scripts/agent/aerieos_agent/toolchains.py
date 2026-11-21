@@ -10,6 +10,7 @@ from .base import (
     APT_CACHE_BIN,
     DNF_BIN,
     PACMAN_BIN,
+    ROOT_BUNDLE_DIR,
     XBPS_QUERY_BIN,
     ZYPPER_BIN,
     _probe,
@@ -587,6 +588,21 @@ def sdk_receipts(state):
     return out
 
 
+def jobs_who(state, env):
+    """Popen's keywords for the account this node's jobs run as, its home
+    put into `env`: who a root agent is when it asks anything of the
+    toolchain store, which is that account's to write. {} where there is
+    nobody to become (not root, or enrolled as root on purpose); KeyError
+    when the account is not on this machine."""
+    user = str(state.get("user") or "")
+    if os.geteuid() != 0 or not user or user == "root":
+        return {}
+    import pwd
+    pw = pwd.getpwnam(user)
+    env.update({"HOME": pw.pw_dir, "USER": user, "LOGNAME": user})
+    return {"user": pw.pw_uid, "group": pw.pw_gid, "extra_groups": []}
+
+
 def sdk_versions(state):
     """What `aerie toolchains versions` reports on this node: {name: version}.
 
@@ -597,29 +613,39 @@ def sdk_versions(state):
     name a version for, an unstripped "go version go1.27.0 linux/amd64", and
     nothing at all for the NDK. One store, two descriptions of it.
 
-    Run from a bundle already cached in the toolchain store, which a
-    toolchain job puts there: no round trip, no second copy of the probe
-    logic, and nothing reported at all until a job has run, which is the
-    honest answer rather than a summary standing in for an inventory.
+    A root agent runs root's own copy of aerie (ROOT_BUNDLE_DIR), as the
+    account its jobs run as: the store, its copy of the bundle and every
+    binary the probe starts are that account's to replace, so none of them
+    is run by root. An agent that is not root runs the copy a toolchain job
+    cached in the store, as itself. Nothing is reported until a bundle has
+    been fetched, which is the honest answer rather than a summary standing
+    in for an inventory.
     """
     store = tc_root(state)
     if not store:
         return {}
-    bbdir = os.path.join(store, ".bb")
-    try:
-        cands = [os.path.join(bbdir, d) for d in os.listdir(bbdir)]
-        cands.sort(key=lambda p: os.path.getmtime(p), reverse=True)
-    except OSError:
-        return {}
     env = dict(os.environ)
     env.update(sdk_env(state))
+    try:
+        who = jobs_who(state, env)
+    except KeyError:
+        return {}
+    if os.geteuid() == 0:
+        cands = [os.path.join(ROOT_BUNDLE_DIR, "current")]
+    else:
+        bbdir = os.path.join(store, ".bb")
+        try:
+            cands = [os.path.join(bbdir, d) for d in os.listdir(bbdir)]
+            cands.sort(key=lambda p: os.path.getmtime(p), reverse=True)
+        except OSError:
+            return {}
     for c in cands[:3]:
         bb = os.path.join(c, "scripts", "aerie")
         if not os.path.isfile(bb):
             continue
         try:
             p = subprocess.run(["bash", bb, "toolchains", "versions"], capture_output=True,
-                               text=True, timeout=120, check=False, env=env)
+                               text=True, timeout=120, check=False, env=env, cwd="/", **who)
         except (OSError, subprocess.SubprocessError):
             return {}
         out = {}

@@ -19,6 +19,8 @@ import os
 import re
 import subprocess
 
+from .base import fs_holds
+
 PACKAGE = re.compile(r"[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+")
 
 
@@ -54,12 +56,23 @@ def tools(store, need_build_tools):
 def private(work, name, data, who=None):
     """`data` into `work`/`name`, 0600, the enrolled account's."""
     path = os.path.join(work, name)
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
     with os.fdopen(fd, "wb") as f:
+        # Given away by the file itself: `work` is the account's, and a
+        # name in it is the account's to point elsewhere.
+        if who:
+            os.fchown(f.fileno(), who["user"], who["group"])
         f.write(data)
-    if who:
-        os.chown(path, who["user"], who["group"])
     return path
+
+
+def made(path, who=None):
+    """What a tool left at `path` in the job's folder, read as the account
+    the tool ran as: the folder is that account's, and root would read
+    whatever a name in it pointed at."""
+    with fs_holds(who):
+        with open(path, "rb") as f:
+            return f.read()
 
 
 def _run(argv, env, work, who, timeout=120):
@@ -120,8 +133,7 @@ def generate(kt, alias, cn, password, *, work, env, who=None):
         return b"", f"keytool did not run: {out}"
     if code != 0 or not os.path.isfile(ks):
         return b"", "keytool could not make it: " + _last(out, code)
-    with open(ks, "rb") as f:
-        return f.read(), ""
+    return made(ks, who), ""
 
 
 def wrap(kt, blob, store_pass, key_pass, alias, new_pass, *, work, env, who=None):
@@ -137,8 +149,7 @@ def wrap(kt, blob, store_pass, key_pass, alias, new_pass, *, work, env, who=None
         return b"", f"keytool did not run: {out}"
     if code != 0 or not os.path.isfile(dst):
         return b"", "keytool could not wrap it: " + _last(out, code)
-    with open(dst, "rb") as f:
-        return f.read(), ""
+    return made(dst, who), ""
 
 
 def rotate(apksigner, old, new, *, work, env, who=None):
@@ -158,8 +169,7 @@ def rotate(apksigner, old, new, *, work, env, who=None):
         return b"", f"apksigner did not run: {said}"
     if code != 0 or not os.path.isfile(out):
         return b"", "apksigner could not make the proof: " + _last(said, code)
-    with open(out, "rb") as f:
-        return f.read(), ""
+    return made(out, who), ""
 
 
 def package_of(aapt2, apk, *, env, work, who=None):
