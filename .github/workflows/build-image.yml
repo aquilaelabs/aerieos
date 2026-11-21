@@ -140,8 +140,8 @@ jobs:
       # branch's copy of the rule (tools/release-place.sh and the list it
       # reads, tools/release-branches), before the step that holds the key:
       # the tag's own copy is the tag's to write, and a tag on a commit no
-      # release branch holds would pass its own. Until the default branch
-      # carries the list, the tag's own copy is asked, and the run says so.
+      # release branch holds would pass its own. A default branch that
+      # does not carry the rule signs nothing: the tag's own is never asked.
       # What this cannot hold: the workflow a tag runs is the tag's own
       # file, so a tag that rewrites this job is stopped by the release
       # environment's rules on GitHub alone (docs/versions.md).
@@ -162,8 +162,8 @@ jobs:
           set -euo pipefail
           rule=trusted/tools
           if [ ! -f "$rule/release-branches" ] || [ ! -f "$rule/release-place.sh" ]; then
-            echo "::warning title=The tag's own rule was asked::the default branch does not carry tools/release-branches yet, so where $TAG may be cut from was read from the tag's own tree"
-            rule=tools
+            echo "::error title=No rule on the default branch::the default branch does not carry tools/release-place.sh and tools/release-branches, so nothing is signed for $TAG"
+            exit 1
           fi
           git fetch --no-tags origin '+refs/heads/*:refs/remotes/origin/*'
           bash "$rule/release-place.sh" "$TAG" "$GITHUB_SHA" origin/main "$rule/release-branches"

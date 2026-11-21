@@ -1,5 +1,7 @@
-# The branches a release may be cut from, one name or shell pattern a
-# line (tools/release-place.sh reads it): a tag's commit has to be on one
+# The branches a release may be cut from, one extended regular expression
+# a line that a branch's whole name matches (tools/release-place.sh reads
+# it; never a shell glob, whose * also matches a slash and whatever
+# follows): a tag's commit has to be on one
 # of them, as its remote holds it, or nothing is signed for it. A stable
 # release and a release candidate are cut from main alone, whatever is
 # listed here; a dev build (vX.Y.Z-dev.N) from any of these.
@@ -9,4 +11,4 @@
 # seal-release.yml), so a tag cannot name its own branch here.
 main
 # A release's working branch, named for the version it becomes.
-claude/[0-9]*.[0-9]*.[0-9]*
+claude/[0-9]+\.[0-9]+\.[0-9]+

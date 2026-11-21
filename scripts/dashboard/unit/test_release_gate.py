@@ -191,6 +191,9 @@ class Gate(unittest.TestCase):
             self.assertRegex(steps[took]["uses"], r"^actions/checkout@[0-9a-f]{40}$")
             run = steps[asked]["run"]
             self.assertIn("rule=trusted/tools", run)
+            # A default branch without the rule signs nothing: the tag's own copy is never asked.
+            self.assertNotIn("rule=tools", run, name)
+            self.assertIn("exit 1", run.split("fi")[0], name)
             self.assertIn('bash "$rule/release-place.sh" "$TAG" "$GITHUB_SHA" origin/main "$rule/release-branches"', run)
             self.assertIn("git fetch --no-tags origin '+refs/heads/*:refs/remotes/origin/*'", run, "the branches as the remote holds them")
             self.assertEqual(steps[asked]["env"], {"TAG": tag}, "the tag reaches the script by its environment")

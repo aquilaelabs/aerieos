@@ -64,7 +64,7 @@ class Place(unittest.TestCase):
         for commit in (self.on_stray, self.unpushed):
             rc, said = self.ask("v0.9.0-dev.5400", commit)
             self.assertEqual(rc, 1, said)
-            self.assertIn("is on no branch a release is cut from as origin holds them (main, claude/[0-9]*.[0-9]*.[0-9]*)", said)
+            self.assertIn("is on no branch a release is cut from as origin holds them (main, claude/[0-9]+\\.[0-9]+\\.[0-9]+)", said)
         # A branch is read as the remote holds it: a local one of a listed name is nobody's word.
         self.git("branch", "claude/1.0.0", self.unpushed)
         self.assertEqual(self.ask("v0.9.0-dev.5400", self.unpushed)[0], 1)
@@ -83,7 +83,21 @@ class Place(unittest.TestCase):
     def test_the_shipped_list_names_main_and_a_release_s_working_branch(self):
         with open(os.path.join(os.path.dirname(TOOL), "release-branches"), encoding="utf-8") as f:
             pats = [ln.strip() for ln in f if ln.strip() and not ln.startswith("#")]
-        self.assertEqual(pats, ["main", "claude/[0-9]*.[0-9]*.[0-9]*"])
+        self.assertEqual(pats, ["main", "claude/[0-9]+\\.[0-9]+\\.[0-9]+"])
+
+    def test_a_branch_s_whole_name_is_matched_never_a_glob_s_more(self):
+        # The audit of 21 Nov: bash's * matched a slash and any text, so a
+        # branch anybody may push met claude/[0-9]*.[0-9]*.[0-9]*.
+        for name in ("claude/1.2.3/x", "claude/1x.2.3", "claude/1.2.3-anything", "claude/1.2.3.4", "xmain", "main2", "claude/1.2", "Claude/1.2.3"):
+            self.git("update-ref", f"refs/remotes/origin/{name}", self.on_stray)
+            rc, said = self.ask("v0.9.0-dev.5400", self.on_stray)
+            self.assertEqual(rc, 1, (name, said))
+            self.git("update-ref", "-d", f"refs/remotes/origin/{name}")
+        for name in ("claude/1.2.3", "claude/10.20.300"):
+            self.git("update-ref", f"refs/remotes/origin/{name}", self.on_stray)
+            rc, said = self.ask("v0.9.0-dev.5400", self.on_stray)
+            self.assertEqual((rc, f"is on {name}" in said), (0, True), (name, said))
+            self.git("update-ref", "-d", f"refs/remotes/origin/{name}")
 
     def test_a_stable_release_and_a_candidate_only_from_main(self):
         for tag, word in (("v0.9.0", "a stable release"), ("v0.9.0-rc.2", "a rc pre-release"), ("v1.0.0-beta.1", "a beta pre-release")):
@@ -108,7 +122,8 @@ class Place(unittest.TestCase):
         self.assertEqual(self.ask("v0.9.0-dev.7", self.on_branch)[0], 0)
 
     def test_what_is_no_releases_name_is_said_as_that(self):
-        for tag in ("", "0.9.0", "v0.9", "vnext", "v0.9.0-dev", "v0.9.0-", "v0.9.0-DEV.1", "android-v1.2.3", "v0.9.0-dev.x"):
+        for tag in ("", "0.9.0", "v0.9", "vnext", "v0.9.0-dev", "v0.9.0-", "v0.9.0-DEV.1", "android-v1.2.3", "v0.9.0-dev.x",
+                    "v0.9.0-dev.1x", "v0.9.0-dev.1/2", "v0.9.0-rc.2x", "v0.9.0-rc1.2", "v0.9.0x", "v0.9.0.1"):
             rc, said = self.ask(tag, self.on_main)
             self.assertEqual(rc, 2, (tag, said))
             self.assertIn("not a release's tag", said)

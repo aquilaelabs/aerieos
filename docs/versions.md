@@ -129,8 +129,12 @@ push a `v*` tag writes the job that reads the key. The files hold what a
 file can: the job that holds the key asks, before the step that reads it,
 where the tag's commit is, by the default branch's copy of the rule
 (`tools/release-place.sh` and `tools/release-branches`: a dev build on
-`main` or a release's working branch, a stable release or a candidate on
-`main` alone), so a tag on a stray commit signs nothing; a release's files
+`main` or a release's working branch, each a pattern a branch's whole name
+matches, a stable release or a candidate on `main` alone), so a tag on a
+stray commit signs nothing, and a default branch that does not carry the
+two files signs nothing at all, the tag's own copy never asked in their
+place (the rehearsal says when `main` lacks them or holds other copies);
+a release's files
 are attested on hosted runners, and the seal holds each attestation to the
 tag's commit and to a hosted runner (`tools/release-sign.py`); the Android
 app a release carries is built on a hosted runner, not on the machine a
@@ -161,9 +165,11 @@ the widest of them leaves it:
   seal's commit check rests on.
 - **The branches a release is cut from.** Settings, Rules, Rulesets, a
   branch ruleset for `main` and the release branches
-  (`tools/release-branches`): restrict deletions and force pushes, and
-  require a pull request on `main`. The place check trusts what those
-  branches hold.
+  (`tools/release-branches`, `claude/*` for the working branches): restrict
+  creations, deletions and force pushes, bypass for whoever cuts releases,
+  and require a pull request on `main`. The place check trusts what those
+  branches hold, and a release branch's name is one anybody who may push
+  could otherwise make.
 - **Pull requests from forks.** Settings, Actions, General, **Approval for
   running fork pull request workflows from contributors**: Require approval
   for all external contributors. The self-hosted runner is a machine on

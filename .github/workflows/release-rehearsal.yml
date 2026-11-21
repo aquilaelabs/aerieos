@@ -123,6 +123,15 @@ jobs:
         run: |
           git fetch --no-tags origin '+refs/heads/*:refs/remotes/origin/*'
           base="$(head -1 VERSION | tr -d '[:space:]')"
+          # The jobs that hold the key ask main's copy of the rule and sign
+          # nothing without it: said here, before a tag finds it out.
+          for f in tools/release-place.sh tools/release-branches; do
+            if ! git cat-file -e "origin/main:$f" 2>/dev/null; then
+              echo "::warning title=Main does not carry $f::a tag's signing jobs would refuse every release until $f is merged to main"
+            elif ! git diff --quiet origin/main HEAD -- "$f"; then
+              echo "::notice title=Main's $f is not this commit's::a tag's signing jobs ask main's copy, which differs from this one"
+            fi
+          done
           bash tools/release-place.sh "v${base}-dev.1" "$GITHUB_SHA" origin/main \
             || echo "::notice title=No dev build from this commit::a dev build's tag here would be refused: its commit is on no branch a release is cut from (tools/release-branches)"
           if bash tools/release-place.sh "v${base}" "$GITHUB_SHA" origin/main; then

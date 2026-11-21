@@ -15,27 +15,33 @@
 # branch heads first: a branch is read as MAIN's remote holds it. Exit 0
 # and one line saying what the tag is and why it may go on; exit 1 and why
 # not; exit 2 for a name that is no release's.
+#
+# Every pattern here and in the list is an extended regular expression a
+# name matches whole, never a shell glob: a glob's * matches a slash and
+# any text after it, so claude/[0-9]*.[0-9]*.[0-9]* took claude/1.2.3/x and
+# claude/1x.2.3-anything, names anybody who may push a branch can make.
 set -u
 
 tag="${1:-}"
 commit="${2:-HEAD}"
 main="${3:-origin/main}"
 branches="${4:-$(dirname "$0")/release-branches}"
-case "$tag" in
-    v[0-9]*.[0-9]*.[0-9]*) ;;
-    *) echo "not a release's tag: ${tag:-nothing} (vX.Y.Z, vX.Y.Z-dev.N or vX.Y.Z-rc.N)" >&2; exit 2 ;;
-esac
+[[ "$tag" =~ ^v[0-9] ]] \
+    || { echo "not a release's tag: ${tag:-nothing} (vX.Y.Z, vX.Y.Z-dev.N or vX.Y.Z-rc.N)" >&2; exit 2; }
 ver="${tag#v}"
 base="${ver%%-*}"
-printf '%s' "$base" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' \
+[[ "$base" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
     || { echo "not a release's tag: $tag (its version is not MAJOR.MINOR.PATCH)" >&2; exit 2; }
 kind=stable
-case "$ver" in
-    "$base") ;;
-    "$base"-dev.[0-9]*) kind=dev ;;
-    "$base"-[a-z]*.[0-9]*) kind="a ${ver#"$base"-}"; kind="${kind%%.*} pre-release" ;;
-    *) echo "not a release's tag: $tag (after the version comes -dev.N or -NAME.N)" >&2; exit 2 ;;
-esac
+if [ "$ver" = "$base" ]; then
+    :
+elif [[ "${ver#"$base"}" =~ ^-dev\.[0-9]+$ ]]; then
+    kind=dev
+elif [[ "${ver#"$base"}" =~ ^-([a-z]+)\.[0-9]+$ ]]; then
+    kind="a ${BASH_REMATCH[1]} pre-release"
+else
+    echo "not a release's tag: $tag (after the version comes -dev.N or -NAME.N)" >&2; exit 2
+fi
 sha="$(git rev-parse --verify --quiet "$commit^{commit}")" \
     || { echo "$tag: no commit called $commit here" >&2; exit 1; }
 if [ "$kind" = dev ]; then
@@ -47,14 +53,11 @@ if [ "$kind" = dev ]; then
         listed="${listed:+$listed, }$pat"
         while IFS= read -r ref; do
             name="${ref#"$remote"/}"
-            # shellcheck disable=SC2254  # the line is a pattern, and is read as one
-            case "$name" in
-                $pat)
-                    if git merge-base --is-ancestor "$sha" "$ref" 2>/dev/null; then
-                        echo "$tag is a dev build, and its commit ${sha:0:7} is on $name"
-                        exit 0
-                    fi ;;
-            esac
+            # The whole name, by the line read as an extended regular expression.
+            if [[ "$name" =~ ^(${pat})$ ]] && git merge-base --is-ancestor "$sha" "$ref" 2>/dev/null; then
+                echo "$tag is a dev build, and its commit ${sha:0:7} is on $name"
+                exit 0
+            fi
         done < <(git for-each-ref --format='%(refname:short)' "refs/remotes/$remote/")
     done < "$branches"
     echo "$tag is a dev build, and its commit ${sha:0:7} is on no branch a release is cut from as $remote holds them ($listed): push the branch first, or tag a commit that is on one" >&2
