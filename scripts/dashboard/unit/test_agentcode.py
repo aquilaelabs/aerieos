@@ -446,6 +446,13 @@ PLACED = {"rev": 2, "fetch": [{"url": "https://x.example/{version}/codex-x64.tar
                               {"url": "https://x.example/{version}/codex-arm64.tar.gz", "version": "0.170.0", "sha256": H, "to": "dl/codex.tar.gz", "platform": "linux/arm64"}],
           "steps": [["mkdir", "-p", "{home}/.local/bin"], ["tar", "-xzf", "{dir}/dl/codex.tar.gz", "-C", "{home}/.local/bin"]],
           "pin": None, "env": {}, "bin": ".local/bin/codex", "also": [], "fresh": ""}
+# What a controller hands a node with a job in these tests, where a test's
+# own script stands in for the install (BUILDERBOT_<ID>_INSTALLER): a held
+# recipe, since a node takes no other.
+SENT = {"codex-update": HELD,
+        "opencode-update": {"rev": 2, "fetch": [{"url": "https://x.example/install", "sha256": H, "to": "dl/install"}], "online": SENTENCE,
+                            "steps": [["bash", "{dir}/dl/install", "--no-modify-path"]], "pin": ["VERSION", "{v}"],
+                            "env": {}, "bin": ".opencode/bin/opencode", "also": [".local/bin/opencode"], "fresh": ""}}
 BAD_HELD = (
     {"steps": [["bash", "-c", "curl -fsSL https://x.example/i | bash"]]},
     {"steps": [["curl", "-fsSL", "https://x.example/i"]]},
@@ -557,15 +564,15 @@ class NodeAgent(unittest.TestCase):
         return sorted(os.path.relpath(os.path.join(d, x), self.home) for d, dirs, files in os.walk(self.home) for x in dirs + files)
 
     def run_job(self, spec, type_="codex-update", stub=True, root=False, more=None):
-        # The recipe a controller hands over with every job: the older form
-        # unless the test names another, or none with None. With `root` the
+        # The recipe a controller hands over with every job: SENT's unless
+        # the test names another, or none with None. With `root` the
         # agent is root, as on a managed node: it drops to the session
         # account (this test's own, which is all a test may become) and
         # cuts the network through its helper, stood in for (self.netcut).
         # `more` is added to what an install's environment starts from.
         spec = dict(spec)
-        if "recipe" not in spec and type_ in OLD:
-            spec["recipe"] = OLD[type_]
+        if "recipe" not in spec and type_ in SENT:
+            spec["recipe"] = SENT[type_]
         elif spec.get("recipe", 0) is None:
             del spec["recipe"]
         said = []
@@ -837,14 +844,31 @@ class NodeAgent(unittest.TestCase):
         self.assertIn("fetching dl/codex.tar.gz", p.stdout)
         self.assertIn("this node cannot cut the network for a step", p.stdout)
 
-    def test_a_recipe_of_the_older_form_still_runs_and_says_nothing_held_it(self):
-        # An older catalog's row: a vendor's installer handed to a shell as
-        # it arrives. Run as it was, and said in one line.
-        got, log = self.run_job({"to": "0.163.0"}, stub=False)
-        self.assertEqual(got, ("succeeded", 0), log)
-        self.assertEqual(log.count("nothing holds what this fetches"), 1)
-        self.assertIn("stub installed 0.163.0", log)
-        self.assertIn("Codex CLI 0.163.0 is what a session here runs now", log)
+    def test_a_vendor_s_script_piped_to_a_shell_is_no_recipe(self):
+        # The form before held recipes: nothing held what it fetched. It is
+        # refused in one phrase, with or without a stand-in, and nothing runs.
+        marker = os.path.join(self.tmp.name, "ran")
+        with open(self.stub, "w") as f:
+            f.write(f'touch "{marker}"\n')
+        script = {"rev": 1, "script": "curl -fsSL https://x.example/codex/install.sh | sh", "pin": ["CODEX_RELEASE", "{v}"],
+                  "env": {"CODEX_INSTALL_DIR": "{home}/.local/bin"}, "bin": ".local/bin/codex", "also": [], "fresh": ""}
+        for stub in (True, False):
+            got, log = self.run_job({"to": "0.163.0", "recipe": script}, stub=stub)
+            self.assertEqual(got, ("failed", 78), log)
+            self.assertEqual(log, "refused: the install recipe the controller sent for Codex CLI is not one: "
+                                  "it is a vendor's script piped to a shell, which is no longer run\n")
+        self.assertFalse(os.path.exists(marker))
+        self.assertEqual(self.left(), [])
+
+    def test_a_stand_in_is_read_only_in_the_source_tree(self):
+        # An installed agent (a node's zip, an image's copy) reads no
+        # stand-in from its environment: a held recipe is what runs there.
+        base = self.mod.module("base")
+        with mock.patch.dict(os.environ, {"BUILDERBOT_CODEX_INSTALLER": "/tmp/planted"}):
+            self.assertEqual(base.installer_stub("codex"), "/tmp/planted")
+            with mock.patch.object(base, "IN_TREE", False):
+                self.assertEqual(base.installer_stub("codex"), "")
+        self.assertTrue(base.IN_TREE)
 
     def test_no_recipe_installs_nothing_and_still_takes_the_agent_off(self):
         # This agent keeps no installer of its own: a job with no recipe
@@ -923,12 +947,13 @@ class NodeAgent(unittest.TestCase):
             # the node takes, whole: what it fetches, what holds each
             # download, its steps or its script, and where the program is,
             # which is where the node's row says a removal finds it.
+            self.assertNotIn("script", a.install, a.id)
             sent, why = self.mod.recipe_checked(a.install)
             self.assertEqual(why, "", a.id)
             self.assertEqual(sent["bin"], how["bin"], a.id)
             self.assertLessEqual(set(how.get("also", ())), set(sent["also"]), f"{a.id}: the recipe clears every place the row would")
-            self.assertEqual({k: sent[k] for k in ("script", "steps", "online", "keyring", "pin", "env", "fresh")},
-                             {"script": a.install.get("script", ""), "steps": a.install.get("steps", []), "online": a.install.get("online", ""),
+            self.assertEqual({k: sent[k] for k in ("steps", "online", "keyring", "pin", "env", "fresh")},
+                             {"steps": a.install.get("steps", []), "online": a.install.get("online", ""),
                               "keyring": a.install.get("keyring", {}), "pin": tuple(a.install["pin"]) if a.install["pin"] else None,
                               "env": a.install["env"], "fresh": a.install["fresh"]}, a.id)
             self.assertEqual([{k: f[k] for k in f if k not in ("track", "found")} for f in a.install.get("fetch", [])], sent["fetch"], a.id)
@@ -960,8 +985,7 @@ class NodeAgent(unittest.TestCase):
             f.write('mkdir -p "$HOME/.codex/bin"\n'
                     'printf "#!/bin/sh\\necho codex-cli ${CODEX_VERSION:-0.0.0}\\n" > "$HOME/.codex/bin/codex"\n'
                     'chmod +x "$HOME/.codex/bin/codex"\n')
-        recipe = {"rev": 2, "script": "curl -fsSL https://x.example/install.sh | sh", "pin": ["CODEX_VERSION", "{v}"],
-                  "env": {}, "bin": ".codex/bin/codex", "also": [".local/bin/codex"], "fresh": ""}
+        recipe = HELD | {"pin": ["CODEX_VERSION", "{v}"], "env": {}, "bin": ".codex/bin/codex", "also": [".local/bin/codex"]}
         with mock.patch.dict(os.environ, {"BUILDERBOT_CODEX_INSTALLER": stub}):
             self.stub = stub
             got, log = self.run_job({"to": "0.170.0", "recipe": recipe, "recipe_from": "catalog"})
@@ -980,14 +1004,14 @@ class NodeAgent(unittest.TestCase):
         with open(self.stub, "w") as f:
             f.write(f'touch "{marker}"\n')
         for bad in BAD_RECIPES:
-            got, log = self.run_job({"to": "0.163.0", "recipe": GOOD | bad})
+            got, log = self.run_job({"to": "0.163.0", "recipe": HELD | bad})
             self.assertEqual(got, ("failed", 78), bad)
             self.assertIn("the install recipe the controller sent for Codex CLI is not one", log)
         got, log = self.run_job({"to": "0.163.0", "recipe": "curl https://x.example | sh"})
         self.assertEqual(got, ("failed", 78))
         self.assertFalse(os.path.exists(marker))
         # ...and the same shape is the controller's: what one takes the other does.
-        self.assertEqual(self.mod.recipe_checked(GOOD)[1], "")
+        self.assertEqual(self.mod.recipe_checked(HELD)[1], "")
 
 
 if __name__ == "__main__":

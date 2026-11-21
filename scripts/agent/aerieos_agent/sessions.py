@@ -27,6 +27,7 @@ from .base import (
     HELD_CHANGED,
     HELD_UNFETCHED,
     IDLE_UNIT,
+    installer_stub,
     NETCUT_BIN,
     NFT_BIN,
     recipe_checked,
@@ -1021,7 +1022,7 @@ class SessionsMixin:
             return "succeeded", 0
         # No recipe, no install: this agent carries no installer of its own
         # to run in its place, which nothing would hold.
-        if not (how.get("steps") or how.get("script")):
+        if not how.get("steps"):
             job.say(f"refused: the controller sent no install recipe for {product}, and an install is run from one alone: "
                     "what a recipe fetches is held to what the recipe carries, and this node keeps no installer of its own beside it\n")
             return "failed", 78
@@ -1032,15 +1033,15 @@ class SessionsMixin:
         # The version asked for. A held recipe whose steps run with no
         # network installs the program it declares, at the version that
         # says: the pin decides, whatever is newest at its vendor.
-        pins = recipe_version(how) if how.get("steps") and not how.get("online") else ""
+        pins = recipe_version(how) if not how.get("online") else ""
         want = pins or str(spec.get("to") or "")
         if want and how["pin"] and re.fullmatch(r"\d+\.\d+\.\d+", want):
             env[how["pin"][0]] = how["pin"][1].format(v=want)
-        stub = os.environ.get(f"BUILDERBOT_{how['id'].upper()}_INSTALLER")
+        stub = installer_stub(how["id"])
         job.say(f"installing {product} for {who_name}" + (f" ({want} is the version its recipe pins)" if pins else f" ({want} is out)" if want else "")
                 + (f", by the catalog's recipe (rev {how.get('rev')})" if how.get("by") == "catalog" else "") + "\n")
         cwd = home if os.path.isdir(home) else "/tmp"
-        held, top = bool(how.get("steps")) and not stub, ""
+        held, top = not stub, ""
         if held:
             argv, feed = self.held_install(job, how, who, home)
             if not argv:
@@ -1071,9 +1072,7 @@ class SessionsMixin:
                         ([netcut, "env", *(f"{k}={v}" for k, v in env.items()), *argv[:2], "--run", top, *argv[2:]], None,
                          self.held_cut_env(who), {})]
         else:
-            runs = [((["bash", stub] if stub else ["bash", "-c", how["script"]]), None, env, who)]
-            if not stub:
-                job.say("nothing holds what this fetches: its recipe is of the older kind, a vendor's installer handed to a shell as it arrives\n")
+            runs = [(["bash", stub], None, env, who)]
 
         def drop():
             """The directory a fetch left for a run that did not end by

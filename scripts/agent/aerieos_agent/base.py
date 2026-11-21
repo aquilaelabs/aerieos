@@ -161,7 +161,8 @@ AGENTS_DIR = os.environ.get("BUILDERBOT_AGENTS_DIR", "/usr/local/lib/builderbot/
 # below. Every controller that ships this agent sends one, so these rows
 # carry no installer of their own to fall back on: an install asked for
 # with no recipe is refused, never run from a copy here that nothing
-# holds. A test stands its own script in with BUILDERBOT_<ID>_INSTALLER.
+# holds. A test stands its own script in with BUILDERBOT_<ID>_INSTALLER,
+# which is read only where this package is the source tree's (IN_TREE).
 # Each coding agent's sign-in and sign-out jobs, by the controller's agent
 # table (agents.py login_job, logout_job), to the agent `aerie login --flow` and
 # `aerie login --out` are run for. Claude's are the claude-login and
@@ -207,7 +208,7 @@ CLAUDE_INSTALL = {"id": "claude", "command": "claude", "product": "Claude Code",
 # The recipe the controller hands over with an install, an update or a
 # removal (its agent table's `install`, or its catalog's where that is
 # newer), held to the shape the controller holds a manifest's to (agents.py
-# install_checked), in either of its two forms.
+# install_checked).
 #
 # A held recipe (pack format 5): what it fetches is declared (`fetch`: each
 # download's https address, the file it is kept as, and its sha256 or its
@@ -220,11 +221,10 @@ CLAUDE_INSTALL = {"id": "claude", "command": "claude", "product": "Claude Code",
 # from this node's bundle (scripts/lib/held-run.sh): nothing here checks a
 # digest or a signature a second way.
 #
-# The older form: one installer over https piped to sh or bash with plain
-# arguments (`script`). It is run as it was, for an older catalog's row,
-# and its job says that nothing held what it fetched.
+# A vendor's installer piped to a shell (`script`, the form before it) is
+# no recipe: nothing held what it fetched, and it is refused.
 #
-# Either way: an environment that names neither PATH nor the account, and
+# Beside those: an environment that names neither PATH nor the account, and
 # paths of two or more parts under the account's home.
 _RECIPE_URL = re.compile(r"https://[A-Za-z0-9.-]{1,253}(:\d{1,5})?/[\x21-\x7e]{0,1900}")
 _RECIPE_REL = re.compile(r"(?!/)(?!.*(?:^|/)\.\.?(?:/|$))[A-Za-z0-9._/-]{1,200}")
@@ -241,7 +241,6 @@ RECIPE_ARMOR = ("-----BEGIN PGP PUBLIC KEY BLOCK-----", "-----END PGP PUBLIC KEY
 # download that answered other bytes than the recipe holds, and one that
 # could not be fetched at all.
 HELD_CHANGED, HELD_UNFETCHED = 66, 65
-_RECIPE_SCRIPT = re.compile(r"curl -fsSL https://[A-Za-z0-9._~/@+%-]{3,200} \| (?:ba)?sh(?: -s --(?: [A-Za-z0-9_${}:=.,/-]{1,60}){1,6})?")
 _RECIPE_NAME = re.compile(r"[A-Z][A-Z0-9_]{1,40}")
 _RECIPE_VALUE = re.compile(r"[A-Za-z0-9._/{}:=-]{0,200}")
 _RECIPE_PATH = re.compile(r"\.?[A-Za-z0-9_-]{1,40}(/[A-Za-z0-9._{}-]{1,60}){1,5}")
@@ -322,37 +321,30 @@ def _recipe_steps(steps, fetch):
 
 def recipe_checked(r):
     """(recipe, why): an install recipe as agent_install reads it, or why
-    what was sent is not one. A held one keeps fetch, keyring, online and
-    steps, with script ""; the older form keeps script, with no steps.
-    Both keep pin, env, bin, also, fresh and rev."""
+    what was sent is not one: fetch, keyring, online and steps, with pin,
+    env, bin, also, fresh and rev. One that says `script` is refused."""
     if not isinstance(r, dict):
         return None, "it is not an object"
-    script = r.get("script")
-    how = {"script": "", "fetch": [], "keyring": {}, "online": "", "steps": []}
-    if script is None:
-        fetch = _recipe_fetch(r.get("fetch"))
-        if fetch is None:
-            return None, "its fetch is not a list of downloads, each an https address, the file it is kept as, and its sha256 or its publisher's signature"
-        keyring = r.get("keyring") or {}
-        if not (isinstance(keyring, dict) and len(keyring) <= 4 and all(
-                isinstance(k, str) and _RECIPE_KEY.fullmatch(k) and isinstance(v, str) and len(v) <= 32 * 1024 and v.isascii()
-                and v.strip().startswith(RECIPE_ARMOR[0]) and v.strip().endswith(RECIPE_ARMOR[1]) for k, v in keyring.items())):
-            return None, "its keyring is not a few armored public keys under plain names"
-        if any(f.get("signed") and f["signed"]["keys"] not in keyring for f in fetch):
-            return None, "it names a signature under keys its keyring does not carry"
-        online = r.get("online") or ""
-        if not (isinstance(online, str) and len(online) <= 300 and online.isprintable() and not any(c in online for c in "<>{}\\")
-                and (not online or len(online.strip()) >= 8)):
-            return None, "its online is not one plain sentence"
-        if not _recipe_steps(r.get("steps"), fetch):
-            return None, "its steps are not plain commands run from what it fetched"
-        how.update(fetch=fetch, keyring=dict(keyring), online=" ".join(online.split()), steps=[list(s) for s in r["steps"]])
-    elif any(r.get(k) is not None for k in ("fetch", "keyring", "online", "steps")):
-        return None, "it says script, and fetch or steps beside it"
-    elif not (isinstance(script, str) and len(script) <= 400 and _RECIPE_SCRIPT.fullmatch(script)):
-        return None, "its script is not one installer over https handed to a shell"
-    else:
-        how["script"] = script
+    if r.get("script") is not None:
+        return None, "it is a vendor's script piped to a shell, which is no longer run"
+    how = {"fetch": [], "keyring": {}, "online": "", "steps": []}
+    fetch = _recipe_fetch(r.get("fetch"))
+    if fetch is None:
+        return None, "its fetch is not a list of downloads, each an https address, the file it is kept as, and its sha256 or its publisher's signature"
+    keyring = r.get("keyring") or {}
+    if not (isinstance(keyring, dict) and len(keyring) <= 4 and all(
+            isinstance(k, str) and _RECIPE_KEY.fullmatch(k) and isinstance(v, str) and len(v) <= 32 * 1024 and v.isascii()
+            and v.strip().startswith(RECIPE_ARMOR[0]) and v.strip().endswith(RECIPE_ARMOR[1]) for k, v in keyring.items())):
+        return None, "its keyring is not a few armored public keys under plain names"
+    if any(f.get("signed") and f["signed"]["keys"] not in keyring for f in fetch):
+        return None, "it names a signature under keys its keyring does not carry"
+    online = r.get("online") or ""
+    if not (isinstance(online, str) and len(online) <= 300 and online.isprintable() and not any(c in online for c in "<>{}\\")
+            and (not online or len(online.strip()) >= 8)):
+        return None, "its online is not one plain sentence"
+    if not _recipe_steps(r.get("steps"), fetch):
+        return None, "its steps are not plain commands run from what it fetched"
+    how.update(fetch=fetch, keyring=dict(keyring), online=" ".join(online.split()), steps=[list(s) for s in r["steps"]])
     pin = r.get("pin")
     if pin is not None and not (isinstance(pin, (list, tuple)) and len(pin) == 2 and _recipe_name(pin[0]) and isinstance(pin[1], str)
                                 and re.fullmatch(r"[A-Za-z0-9._-]{0,12}\{v\}[A-Za-z0-9._-]{0,12}", pin[1])):
@@ -374,6 +366,24 @@ def recipe_checked(r):
     return {**how, "pin": tuple(pin) if pin is not None else None, "env": dict(env), "bin": r["bin"],
             "also": tuple(also), "fresh": fresh,
             "rev": rev if isinstance(rev, int) and not isinstance(rev, bool) else 0}, ""
+
+
+# Whether this package is AerieOS's own source tree's and not an install's
+# (a node's agent is a zip, an image's has no tree around it): the tree's
+# Dockerfile and its unit tests are beside it. It is where the package is,
+# which nothing in an environment says, and what a test stands in for a
+# check with is read only there.
+_PKG = os.path.dirname(os.path.realpath(__file__))
+IN_TREE = (os.path.isfile(os.path.join(_PKG, "..", "..", "..", "Dockerfile"))
+           and os.path.isdir(os.path.join(_PKG, "..", "..", "dashboard", "unit")))
+
+
+def installer_stub(agent_id):
+    """The script a test stands in for an agent's install recipe
+    (BUILDERBOT_<ID>_INSTALLER), or "": read only where this package is
+    the source tree's, so no environment swaps a held recipe for another
+    on a node."""
+    return (os.environ.get(f"BUILDERBOT_{str(agent_id).upper()}_INSTALLER") or "") if IN_TREE else ""
 
 
 SESSION_CONF = os.environ.get("BUILDERBOT_SESSION_CONF", "/etc/bb-session.conf")
