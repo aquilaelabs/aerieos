@@ -1276,6 +1276,9 @@ def _plan_in_tree(project, comp, dev, stable, label):
         return {"error": why}
     if why := _gaps_check(project, comp)[0]:
         return {"error": why}
+    # Every kind ships an install, and a fresh install's floor is the one it carries.
+    if why := floor_behind(project, comp):
+        return {"error": why}
     # A dev build is no release an install upgrades from, so it needs no
     # snapshot, as release() has it; planned with one, it was refused.
     if not dev and (why := no_upgrade_snapshot(project, comp, tgt)):
@@ -1314,6 +1317,41 @@ def no_upgrade_snapshot(project, comp, tgt):
         return (f"{tgt}'s /config snapshot in {UPGRADE_SNAPSHOTS}/{tgt}/ was taken at state {had} and this tree is at "
                 f"{now}: run tools/upgrade-snapshot.py again (it keeps the older one beside the new), commit, then release")
     return ""
+
+
+# A tree that ships a catalog floor (AerieOS's own, config/catalog-floor:
+# the oldest signed catalog index an install that holds none takes)
+# releases only with the floor at the newest index the catalog has signed:
+# the floor is moved by hand, and a release that carried an old one let a
+# fresh install take any index signed since. `catalog_made` is the server's
+# (catalogindex): () -> the `generated` of the signed index this controller
+# holds, read fresh where it can be, or "" where none is known.
+CATALOG_FLOOR = "config/catalog-floor"
+catalog_made = None
+
+
+def floor_behind(project, comp=""):
+    """Why this tree's catalog floor is older than the catalog's signed
+    index, or "": nothing is said where the tree ships no floor or no
+    index is known here."""
+    if comp or catalog_made is None:
+        return ""
+    f = root(project) / CATALOG_FLOOR
+    if not f.is_file():
+        return ""
+    try:
+        lines = [ln.strip() for ln in f.read_text(encoding="utf-8").splitlines() if ln.strip() and not ln.lstrip().startswith("#")]
+        newest = str(catalog_made() or "")
+    except Exception:  # noqa: BLE001 (an index that cannot be read says nothing here)
+        return ""
+    stamp = r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ"
+    if not re.fullmatch(stamp, newest):
+        return ""
+    floor = lines[0] if len(lines) == 1 and re.fullmatch(stamp, lines[0]) else ""
+    # The stamps are one fixed-width UTC form, so they order as text.
+    if floor and floor >= newest:
+        return ""
+    return f"{CATALOG_FLOOR} says {floor or 'no moment'} and the catalog's newest signed index was made at {newest}: move the floor to it, commit, then release"
 
 
 def _creds_c(project):
@@ -1423,6 +1461,8 @@ def _release_in_tree(project, comp, env, may_push, push, label):
         return {"error": f"{name} already exists, on {here}. A published tag is not "
                          f"moved from here: bump to the next number, or move it "
                          f"yourself in a terminal if it was never pushed."}
+    if why := floor_behind(project, comp):
+        return {"error": why}
     if not dev and (why := no_upgrade_snapshot(project, comp, tgt)):
         return {"error": why}
     # The commit that SHIPS is not always the commit you are standing on.

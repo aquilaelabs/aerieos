@@ -978,7 +978,9 @@ made is its `generated`, the stamp the catalog's tools write
 says none, or says it another way, is refused once a dated one is held. An
 install that holds none yet has nothing to compare with, so each release
 says the oldest index it takes (`config/catalog-floor`, the moment of the
-index it was prepared against) and one made before that is refused too. The file
+index it was prepared against) and one made before that is refused too. A
+release carrying a floor older than the newest index the catalog has signed
+is refused before its tag, until the floor moves to it. The file
 may name a spare key on a second line, and an index signed by either is
 read ([security.md](security.md#the-signing-keys-and-replacing-one)). Where it
 is read from is the **Address** in Controller settings' Vetted catalog group. A pack the

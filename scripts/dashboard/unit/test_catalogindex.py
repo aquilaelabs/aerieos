@@ -344,6 +344,38 @@ class Made(unittest.TestCase):
         self.assertLess(when, time.time())
         self.assertIn("COPY config/catalog-floor /opt/aerieos/config/catalog-floor\n", open(os.path.join(root, "Dockerfile")).read())
 
+    def test_a_release_carrying_a_floor_older_than_the_catalog_s_newest_index_is_refused(self):
+        # The floor is moved by hand: a release says so, before its tag,
+        # when the catalog has signed an index since the one it names.
+        import version
+        from pathlib import Path
+        tree = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tree, True)
+        newest = {"at": "2026-11-20T08:00:00Z"}
+        with mock.patch.object(version, "root", lambda _p: tree), mock.patch.object(version, "catalog_made", lambda: newest["at"]):
+            self.assertEqual(version.floor_behind("p"), "", "a tree that ships no floor")
+            (tree / "config").mkdir()
+            (tree / "config" / "catalog-floor").write_text("# the oldest taken\n2026-11-12T21:34:58Z\n")
+            said = version.floor_behind("p")
+            self.assertEqual(said, "config/catalog-floor says 2026-11-12T21:34:58Z and the catalog's newest signed index was made at "
+                                   "2026-11-20T08:00:00Z: move the floor to it, commit, then release")
+            self.assertEqual(version.floor_behind("p", "android"), "", "a component is its own")
+            (tree / "config" / "catalog-floor").write_text("2026-11-20T08:00:00Z\n")
+            self.assertEqual(version.floor_behind("p"), "", "at the newest index's moment")
+            for unknown in ("", "soon"):
+                newest["at"] = unknown
+                self.assertEqual(version.floor_behind("p"), "", "no index known here says nothing")
+            newest["at"] = "2026-11-21T00:00:00Z"
+            (tree / "config" / "catalog-floor").write_text("not a moment\n")
+            self.assertIn("says no moment", version.floor_behind("p"))
+        with mock.patch.object(version, "catalog_made", None):
+            self.assertEqual(version.floor_behind("p"), "", "outside the server nothing is known")
+        # Asked by the plan and by the release, every kind; the server hands it the index it holds.
+        src = open(version.__file__, encoding="utf-8").read()
+        self.assertEqual(src.count("if why := floor_behind(project, comp):"), 2)
+        server = open(os.path.join(os.path.dirname(version.__file__), "server.py"), encoding="utf-8").read()
+        self.assertIn("version.catalog_made = lambda: str((catalogindex.index(settings.get(\"catalog_url\") or None)", server)
+
 
 class Folders(unittest.TestCase):
     def test_an_entry_in_a_folder_keeps_its_path_and_a_bad_one_is_dropped(self):

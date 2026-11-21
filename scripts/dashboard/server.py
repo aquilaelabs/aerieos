@@ -5404,6 +5404,10 @@ changelog.component_dir = version._sub
 # Whether what the changelog owes refuses a release or goes out with it said:
 # the repository's Releases setting (R255).
 version.release_gate = lambda p: prefs.get(p).get("release_gate", "refuse")
+# The catalog's newest signed index this controller holds, read fresh where
+# the catalog answers: a release carrying an older config/catalog-floor is
+# refused until the floor moves to it.
+version.catalog_made = lambda: str((catalogindex.index(settings.get("catalog_url") or None).get("index") or {}).get("generated") or "")
 # Release's forge half (R123; Gitea and GitLab, R124): the release beside a pushed tag.
 import forgerelease                                              # noqa: E402
 # What each of a release's files is for, over its notes (R255).
