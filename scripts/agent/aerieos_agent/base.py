@@ -1466,26 +1466,45 @@ def _run(argv, timeout=5):
 _PROBE_SAID = set()
 
 
+def _root_alone(real):
+    """Whether the file at `real`, a path with no link in it, and every
+    folder above it are root's and nobody else may write them: what root
+    then runs there is what root put there, however long after the look."""
+    import stat
+    p = real
+    while True:
+        st = os.stat(p)
+        if st.st_uid != 0 or st.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
+            return False
+        up = os.path.dirname(p)
+        if up == p:
+            return True
+        p = up
+
+
 def _probe_as(exe):
-    """Who a version probe runs as, from root: the account that owns the
-    binary, or nobody where root owns it and another account may write it.
-    The agent is root, and the binaries it asked for a version (a toolchain
-    store's java, a session's own claude) are files a build or a session can
-    replace, which root then ran (B523). As whom they answer changes nothing
+    """How a version probe is started, from root: the file the name leads
+    to, found once and run by that real path (argv[0] stays the name, which
+    a tool that is a link to a multi-call binary reads), as the account that
+    owns it, as root only where it and every folder above it are root's
+    alone, and as nobody otherwise. The agent is root, and the binaries it
+    asks for a version (a toolchain store's java, a session's own claude)
+    are files a build or a session can replace or point elsewhere, which
+    root then ran (B523); a link looked at once and run by its name again
+    could lead somewhere else by then. As whom they answer changes nothing
     of what they print."""
     if os.geteuid() != 0:
         return {}
     import shutil
-    import stat
+    nobody = {"user": 65534, "group": 65534, "extra_groups": []}
     try:
-        st = os.stat(shutil.which(exe) or exe)
+        real = os.path.realpath(shutil.which(exe) or exe)
+        st = os.stat(real)
+        if st.st_uid != 0:
+            return {"executable": real, "user": st.st_uid, "group": st.st_gid, "extra_groups": []}
+        return {"executable": real} if _root_alone(real) else {"executable": real, **nobody}
     except OSError:
-        return {}
-    if st.st_uid != 0:
-        return {"user": st.st_uid, "group": st.st_gid, "extra_groups": []}
-    if st.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
-        return {"user": 65534, "group": 65534, "extra_groups": []}
-    return {}
+        return nobody
 
 
 def _probe(argv, timeout=5):
