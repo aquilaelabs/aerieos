@@ -19,6 +19,12 @@ stays as it is and its census says why. A node that pinned the certificate
 moves its pin to the key when that certificate is over the key named. An
 agent from before this is answered as it was.
 
+A connection held to a key's pin sends no server name, in all three copies:
+the controller answers a handshake that asks for its hostname with that
+name's certificate, which is over another key, and every other handshake
+with the install's own, so a node that pinned the install's key and dials
+by the hostname is answered with the key it pinned.
+
 Real sockets on loopback throughout, served by the dashboard's own tls.py."""
 import base64
 import datetime
@@ -257,6 +263,83 @@ class TheAgentsPin(Case):
         with self.assertRaises(session.Refused) as no:
             session._grant({"CONTROLLER": url, "CONTROLLER_PIN": "sha256:" + "0" * 64}, "web", TOKEN, False)
         self.assertIn("the controller's certificate is not the one this node pinned", str(no.exception))
+
+
+class NoNameUnderAKey(Case):
+    """A controller with a certificate for its hostname beside its own, as
+    tls.py serves the two: the name's to a handshake that asks for the
+    name, the install's own to every other."""
+
+    def setUp(self):
+        super().setUp()
+        own, named = tls.self_signed(["localhost"]), tls.self_signed(["localhost"])
+        self.own_pin, self.name_pin = tls.key_pin_of(own[0]), tls.key_pin_of(named[0])
+        self.own_cert = "sha256:" + hashlib.sha256(der_of(own[0])).hexdigest()
+        self.asked = []
+
+        def ctx(pair, tag):
+            c = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            cert, key = os.path.join(self.tmp, tag + "-cert.pem"), os.path.join(self.tmp, tag + "-key.pem")
+            with open(cert, "w") as f:
+                f.write(pair[0])
+            with open(key, "w") as f:
+                f.write(pair[1])
+            c.load_cert_chain(cert, key)
+            return c
+        mine, theirs = ctx(own, "own"), ctx(named, "name")
+
+        def pick(sock, name, _ctx):
+            self.asked.append(name)
+            if name:
+                sock.context = theirs
+        mine.sni_callback = pick
+        was = tls._ctx
+        tls._ctx = mine
+        self.addCleanup(lambda: setattr(tls, "_ctx", was))
+        self.srv = self.serve()
+        self.url = f"https://localhost:{self.srv.server_port}"
+
+    def agent_call(self, pin):
+        return self.controller.Controller(self.url, TOKEN, pin).call("beat", {}, timeout=10)
+
+    def session_call(self, pin):
+        with mock.patch.dict(os.environ, {"BB_CONTROLLER": self.url, "BB_CONTROLLER_PIN": pin, "BB_CONTROLLER_WAIT": "0"}):
+            got = bbapi.call("/api/v1/agent/beat", {}, auth="Bearer " + TOKEN)
+        return (200 if got.get("ok") else 0), got
+
+    def root_call(self, pin):
+        session = bb_session()
+        try:
+            return session._grant({"CONTROLLER": self.url, "CONTROLLER_PIN": pin}, "web", TOKEN, False)
+        except (session.Refused, OSError) as e:
+            return 0, {"error": str(e)}
+
+    def test_the_three_copies_send_no_name_under_a_key_s_pin(self):
+        for call in (self.agent_call, self.session_call, self.root_call):
+            self.asked.clear()
+            st, got = call(self.own_pin)
+            self.assertEqual(st, 200, (call.__name__, got))
+            self.assertEqual(self.asked, [None], f"{call.__name__} named nobody, and the install's own key answered")
+
+    def test_the_name_is_sent_as_before_under_a_certificate_s_pin_or_none(self):
+        for call in (self.agent_call, self.session_call, self.root_call):
+            for pin in (self.own_cert, ""):
+                self.asked.clear()
+                call(pin)
+                self.assertEqual(self.asked, ["localhost"], (call.__name__, pin))
+
+    def test_a_public_hostname_is_named_and_checked_by_the_authorities(self):
+        for call in (self.agent_call, self.session_call, self.root_call):
+            self.asked.clear()
+            st, _got = call("ca")
+            self.assertEqual(self.asked, ["localhost"], call.__name__)
+            self.assertNotEqual(st, 200, "a certificate no authority signed is refused there")
+
+    def test_another_key_is_refused_whatever_is_named(self):
+        for call in (self.agent_call, self.session_call, self.root_call):
+            st, got = call(self.name_pin)
+            self.assertEqual(st, 0, call.__name__)
+            self.assertIn("key", str(got.get("error")), call.__name__)
 
 
 class Enrolling(Case):

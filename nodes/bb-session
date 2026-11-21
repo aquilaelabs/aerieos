@@ -1947,10 +1947,21 @@ def _grant(c, target, tok, ro):
         else:
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE          # the pin below is the check, as bbapi's
-            conn = http.client.HTTPSConnection(u.hostname, port, timeout=20, context=ctx)
+            pin = c.get("CONTROLLER_PIN") or ""
+
+            class Unnamed(http.client.HTTPSConnection):
+                """A TLS connection that sends no server name, as the
+                agent's and bbapi's do under a key's pin: the controller
+                answers a handshake that names its hostname with that
+                name's certificate, which is another key's, and every
+                other with the install's own, the one this node pinned."""
+
+                def connect(self):
+                    http.client.HTTPConnection.connect(self)
+                    self.sock = self._context.wrap_socket(self.sock, server_hostname=None)
+            conn = (Unnamed if pin.startswith(KEY_PIN) else http.client.HTTPSConnection)(u.hostname, port, timeout=20, context=ctx)
             conn.connect()
             der = conn.sock.getpeercert(True)
-            pin = c.get("CONTROLLER_PIN") or ""
             # The controller's key where that is what this node pinned (any
             # certificate over it passes), else the certificate itself.
             seen = key_pin_of(der) if pin.startswith(KEY_PIN) else "sha256:" + hashlib.sha256(der).hexdigest()

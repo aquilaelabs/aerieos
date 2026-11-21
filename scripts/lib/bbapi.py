@@ -123,6 +123,20 @@ def url():
             or f"http://127.0.0.1:{os.environ.get('DASHBOARD_PORT', '7680')}").rstrip("/")
 
 
+class Unnamed(http.client.HTTPSConnection):
+    """A TLS connection that sends no server name: what a connection held
+    to a key's pin is. The controller answers a handshake that asks for its
+    hostname with that name's certificate, which is another key's, and
+    every other handshake with the install's own, the one a node pinned: a
+    node that dials by the hostname and said so was answered with a key it
+    refuses. The pin is the whole check, so nothing is lost by not naming
+    who is dialed."""
+
+    def connect(self):
+        http.client.HTTPConnection.connect(self)
+        self.sock = self._context.wrap_socket(self.sock, server_hostname=None)
+
+
 def _conn(timeout):
     u = urllib.parse.urlsplit(url())
     # A setting typed by hand with no scheme ("controller.lan:7680") parses
@@ -150,8 +164,10 @@ def _conn(timeout):
         return http.client.HTTPSConnection(u.hostname, port, timeout=timeout, context=ctx), u.path.rstrip("/")  # nosemgrep: python.lang.security.audit.httpsconnection-detected.httpsconnection-detected
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE                 # the pin below is the check
-    # Pinned on first use, see the agent.
-    c = http.client.HTTPSConnection(u.hostname, port, timeout=timeout, context=ctx)  # nosemgrep: python.lang.security.audit.httpsconnection-detected.httpsconnection-detected
+    # Pinned on first use, see the agent. A key's pin sends no server name
+    # (Unnamed), as the agent's connection does not.
+    c = (Unnamed if pin.startswith(KEY_PIN) else http.client.HTTPSConnection)(  # nosemgrep: python.lang.security.audit.httpsconnection-detected.httpsconnection-detected
+        u.hostname, port, timeout=timeout, context=ctx)
     c.connect()
     der = c.sock.getpeercert(True)
     if pin.startswith(KEY_PIN):

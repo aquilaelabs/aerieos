@@ -99,6 +99,20 @@ def key_pin_of(der):
 ADDRESS = re.compile(r"(https?)://(?:\[[0-9A-Fa-f:.]{2,45}\]|[A-Za-z0-9][A-Za-z0-9.-]{0,252})(?::[0-9]{1,5})?/?")
 
 
+class Unnamed(http.client.HTTPSConnection):
+    """A TLS connection that sends no server name: what a connection held
+    to a key's pin is. The controller answers a handshake that asks for its
+    hostname with that name's certificate, which is another key's, and
+    every other handshake with the install's own, the one a node pinned: a
+    node that dials by the hostname and said so was answered with a key it
+    refuses. The pin is the whole check, so nothing is lost by not naming
+    who is dialed."""
+
+    def connect(self):
+        http.client.HTTPConnection.connect(self)
+        self.sock = self._context.wrap_socket(self.sock, server_hostname=None)
+
+
 # The pin that is no pin: the name's certificate, by the system's authorities.
 CA_PIN = "ca"
 
@@ -162,9 +176,11 @@ class Controller:
         # The pin below is the check (_context made this one without a CA's).
         # The certificate is pinned on first use and any other refused; a CA
         # check would refuse the self-signed one a home proxy serves.
+        # A key's pin sends no server name (Unnamed); a certificate's, or
+        # none yet, names who is dialed as it did.
         # nosemgrep: httpsconnection-detected
-        c = http.client.HTTPSConnection(self.host, self.port, timeout=timeout,  # nosemgrep: python.lang.security.audit.httpsconnection-detected.httpsconnection-detected (its own CA, verified: ctx)
-                                        context=ctx)
+        c = (Unnamed if self.pin.startswith(KEY_PIN) else http.client.HTTPSConnection)(  # nosemgrep: python.lang.security.audit.httpsconnection-detected.httpsconnection-detected (its own CA, verified: ctx)
+            self.host, self.port, timeout=timeout, context=ctx)
         c.connect()
         der = c.sock.getpeercert(True)
         seen = "sha256:" + hashlib.sha256(der).hexdigest()
