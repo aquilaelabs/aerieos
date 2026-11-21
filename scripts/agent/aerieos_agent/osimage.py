@@ -21,6 +21,7 @@ import subprocess
 import tempfile
 import urllib.request
 from .base import env_or, write_atomic
+from .stores import path_plain
 
 RELEASE_FILE = "/usr/lib/aerieos-os/release"
 SLOT_TOOL = "/usr/lib/aerieos-os/slot"
@@ -541,6 +542,23 @@ def stick_status():
                            if isinstance(d.get("other_marks"), dict) else {}}
 
 
+# Where this machine's pools, its array and the disks it adopted are mounted
+# (pools.MOUNT_ROOT, array.MOUNT and its neighbours): the one place a system
+# pool or a folder of spaces is named in.
+DISKS_ROOT = "/mnt"
+
+
+def on_disks(path):
+    """Whether `path` names a place on this machine's disks: a plain path
+    (stores.path_plain) whose real place is under DISKS_ROOT. What the tool
+    is handed moves the machine's own folders there or gives the folder to
+    the controller's account, so it is never a folder of the system's."""
+    if not path_plain(path):
+        return False
+    real = os.path.realpath(path)
+    return real.startswith(DISKS_ROOT + "/")
+
+
 class OsImageMixin:
     def hostid_pass(self):
         """Once a minute, and nothing once it is done (pin_hostid)."""
@@ -675,7 +693,7 @@ class OsImageMixin:
         if not os.path.isfile(tool):
             job.say("refused: this machine does not run AerieOS, so it has no stick\n")
             return "failed", 77
-        if not path.startswith("/") or ".." in path.split("/"):
+        if not on_disks(path):
             job.say("refused: a pool is named by its mount point\n")
             return "failed", 64
         # Another install's folder there is set aside only when asked (the
@@ -701,7 +719,7 @@ class OsImageMixin:
             rc = self._sh(job, ["bash", tool, "projects", "--release"], timeout=600)
         else:
             path = str(cfg.get("path") or "")
-            if not path.startswith("/") or ".." in path.split("/"):
+            if not on_disks(path):
                 job.say("refused: a spaces folder is named by its path\n")
                 return "failed", 64
             names = [str(n) for n in (cfg.get("names") or []) if isinstance(n, str) and n and "/" not in n and not n.startswith(".")][:500]

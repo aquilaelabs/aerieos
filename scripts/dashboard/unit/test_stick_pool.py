@@ -381,6 +381,14 @@ class TheAgent(unittest.TestCase):
                 a = A()
                 self.assertEqual(a._apply_system_pool(Job(), {"path": "/mnt/fast"}), ("succeeded", 0))
                 self.assertEqual(a.ran[-2:], ["set", "/mnt/fast"])
+                # Only a place on the machine's disks: never a folder of the
+                # system's, by its name or through a link.
+                os.symlink("/etc", os.path.join(d, "link"))
+                for bad in ("/etc", "/", "/mnt", "/root", "/mnt/../etc", "/mnt/a b", "/mnt/$(id)", os.path.join(d, "link")):
+                    b = A()
+                    self.assertEqual(b._apply_system_pool(Job(), {"path": bad}), ("failed", 64), bad)
+                    self.assertEqual(b._apply_projects_folder(Job(), {"path": bad}), ("failed", 64), bad)
+                    self.assertFalse(hasattr(b, "ran"), bad)
 
 
 class TheAgentsProjectsFolder(unittest.TestCase):

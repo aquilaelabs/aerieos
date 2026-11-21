@@ -56,6 +56,19 @@ def _du_mb(path):
         return 0
 
 
+
+def under_roots(path):
+    """Whether `path` is a folder under one of ROOTS, or the controller's
+    state itself: by whole names, so a folder whose name only begins as a
+    root's does is not one."""
+    for root in ROOTS:
+        r = root.rstrip("/")
+        if path.startswith(r + "/") and path.rstrip("/") != r:
+            return True
+        if not root.endswith("/") and path.rstrip("/") == r:
+            return True
+    return False
+
 class BackupsMixin:
     """Agent's backup jobs: one of the parts class Agent (agent.py) is made of."""
 
@@ -82,7 +95,9 @@ class BackupsMixin:
         src, dest = str(rec.get("source") or ""), str(rec.get("dest") or "")
         keep = rec.get("keep") if isinstance(rec.get("keep"), int) and 1 <= rec.get("keep") <= 365 else 7
         for p in (src, dest):
-            if not (os.path.isabs(p) and p.startswith(ROOTS) and ".." not in p.split("/")):
+            # By its name and by where it really is: a link under a share is
+            # a share user's to make, and root copies what it points at.
+            if not (os.path.isabs(p) and under_roots(p) and ".." not in p.split("/") and under_roots(os.path.realpath(p))):
                 say(f"refused: {p or 'nothing'} is not a folder under /mnt, /srv or the controller's state\n")
                 return "failed", 64
         if not os.path.isdir(src):

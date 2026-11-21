@@ -68,6 +68,14 @@ SPINDOWN_MINUTES = (0, 5, 10, 15, 20, 30, 60, 120)
 SPINDOWN_CODE = {0: 0, 5: 60, 10: 120, 15: 180, 20: 240, 30: 241, 60: 242, 120: 244}
 
 
+# What a network job names, each the one shape it is taken in: the
+# controller sends these shapes (nodes._clean_config), and root writes them
+# into the network's own files.
+NET_IFACE = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,31}")
+NET_IP = re.compile(r"\d{1,3}(\.\d{1,3}){3}")
+NET_CIDR = re.compile(r"\d{1,3}(\.\d{1,3}){3}/\d{1,2}")
+
+
 class ConfigPlaneMixin:
     """Agent's configuration plane: one of the parts class Agent (agent.py) is made of."""
 
@@ -1261,6 +1269,19 @@ class ConfigPlaneMixin:
         mode = "static" if net.get("mode") == "static" else "dhcp"
         addr, gw = str(net.get("address") or ""), str(net.get("gateway") or "")
         dns = [str(d) for d in (net.get("dns") or []) if str(d)]
+        # Each is written into the backend's own file (an interfaces
+        # stanza, a file named for the interface) and handed to its tools,
+        # so each is held to what it is before any of that: a name, an
+        # address with its prefix, addresses.
+        if not NET_IFACE.fullmatch(iface):
+            job.say("refused: that is not an interface's name\n")
+            return "failed", 65
+        if mode == "static" and addr and not NET_CIDR.fullmatch(addr):
+            job.say("refused: a static address is written with its prefix, like 10.0.0.12/24\n")
+            return "failed", 65
+        if any(not NET_IP.fullmatch(x) for x in ([gw] if gw else []) + dns):
+            job.say("refused: a gateway and a resolver are each an address\n")
+            return "failed", 65
         # Static routes (the operator, 7 Oct), in either mode: a network
         # beyond this one and the router that reaches it.
         routes = [{"to": str(r.get("to") or ""), "via": str(r.get("via") or "")}
