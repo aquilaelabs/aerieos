@@ -858,8 +858,10 @@ await section("a bare-metal install's first run", async () => {
       await page.setViewportSize(vp);
       await page.evaluate(() => { const n = ownMachine(); [n.reported.adopted, state.firstboot] = window.__adWas; readMoved('nodes'); drawPanes(); });
     }
-    ok(!take.old.take.length && JSON.stringify(take.offered.take) === '["dry","go"]',
-       `an agent that has the takeover offers Check the takeover and Take the array over; an older one offers neither (${JSON.stringify([take.old.take, take.offered.take])})`);
+    // Every agent from 0.9.456 says whether it has taken the array over, so
+    // a record that names nothing is one not taken yet, and is offered both.
+    ok(JSON.stringify(take.old.take) === '["dry","go"]' && JSON.stringify(take.offered.take) === '["dry","go"]',
+       `an array not taken over offers Check the takeover and Take the array over (${JSON.stringify([take.old.take, take.offered.take])})`);
     ok(/taken over/.test(take.taken.status) && !take.taken.release && /parity sync that follows rebuilds/.test(take.taken.back)
        && /nothing on its data disks was written here/.test(take.old.back) && /never written/.test(take.old.back),
        `once taken over Release waits, and Going back says a parity sync there; read-only, it says nothing was written (${take.taken.back.slice(0, 160)})`);

@@ -3198,8 +3198,9 @@ await section("The tab at a glance", async () => {
     return text.trim() || r?.ended ? { arg: t.arg, inDock: panes[1] === t.id, ended: r?.ended || '', text: text.trim().slice(0, 60) } : null;
   }, null, { timeout: 20000 })).jsonValue();
   // A running container's streams from its node's relay, which the
-  // fixture's stub node does not run: the tab is the stream's, in the dock.
-  ok(logTab.inDock && /^log:ctr:ep\.silon:staging-two:/.test(logTab.arg) && (logTab.text || /did not answer/.test(logTab.ended)),
+  // fixture's stub node does not run and reports no certificate for: the
+  // tab is the stream's, in the dock, and nothing is opened unencrypted.
+  ok(logTab.inDock && /^log:ctr:ep\.silon:staging-two:/.test(logTab.arg) && (logTab.text || /did not answer|relay has no certificate/.test(logTab.ended)),
      `Log in its ⋯ opens a running container's log in a tab of the dock, streamed from its node (${JSON.stringify(logTab)})`);
   // ...and the dock put down after it, as it was: up, it is a phone's whole
   // page, and the checks below read the page.
