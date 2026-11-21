@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import shlex
+import socket
 import shutil
 import subprocess
 import sys
@@ -202,6 +203,55 @@ sdk_meta() {{
         self.assertEqual(rc, 0, out)
         self.assertIn("this node cannot cut the network for a step", out)
         self.assertIn("cut=0", out)
+
+    def groups_world(self, helper=True, writable=True):
+        """This account in a group besides its own (an `id` that says so),
+        that group's socket of a daemon's under the run folder, a node
+        whose account can make a namespace of its own (an `unshare` that
+        runs what it is handed), and the helper where asked for."""
+        env, _ = self.helper(sudo_ok=helper)
+        bin_ = env["PATH"].split(os.pathsep)[0]
+        run = os.path.join(self.root, "run")
+        os.makedirs(os.path.join(run, "daemon"))
+        s = socket.socket(socket.AF_UNIX)
+        s.bind(os.path.join(run, "daemon", "daemon.sock"))
+        s.close()
+        os.chmod(os.path.join(run, "daemon", "daemon.sock"), 0o660 if writable else 0o640)
+        for name, text in (("id", '#!/bin/sh\ncase "$1" in -g) echo 4000001 ;; -G) echo "4000001 %d" ;; *) exec /usr/bin/id "$@" ;; esac\n'
+                                   % os.getgid()),
+                           ("unshare", '#!/bin/sh\nwhile [ $# -gt 0 ]; do case "$1" in --*) shift ;; *) break ;; esac; done\n'
+                                       '[ $# -gt 0 ] || exit 0\nVIA=unshare exec "$@"\n')):
+            with open(os.path.join(bin_, name), "w") as f:
+                f.write(text)
+            os.chmod(os.path.join(bin_, name), 0o755)
+        return {**env, "BUILDERBOT_RUN_DIR": run}
+
+    CUT_BODY = 'sdk_net_cut hexkit {d}; cat {d}/.bb-net; "${{SDK_CUT[@]}}" sh -c \'echo "via=$VIA"\''
+
+    def test_where_a_group_reaches_a_daemon_the_helper_drops_it(self):
+        # In the docker group, a step a namespace of the account's own cut
+        # could still ask the docker daemon for a container with the network
+        # and the host's root: the helper, which drops every group, goes first.
+        rc, out = self.run_sh({}, self.CUT_BODY.format(d=self.d), env=self.groups_world())
+        self.assertEqual(rc, 0, out)
+        lines = out.splitlines()
+        self.assertIn("via=helper", lines)
+        self.assertIn("cut", lines)
+
+    def test_with_no_helper_it_is_still_cut_and_counted_as_with_the_network(self):
+        rc, out = self.run_sh({}, self.CUT_BODY.format(d=self.d), env=self.groups_world(helper=False))
+        self.assertEqual(rc, 0, out)
+        lines = out.splitlines()
+        self.assertIn("via=unshare", lines)
+        self.assertIn("open", lines, "the receipt says it had the network")
+        self.assertIn("this account's groups reach a daemon past the cut", out)
+
+    def test_a_group_that_reaches_nothing_keeps_the_namespace_of_its_own(self):
+        rc, out = self.run_sh({}, self.CUT_BODY.format(d=self.d), env=self.groups_world(writable=False))
+        self.assertEqual(rc, 0, out)
+        lines = out.splitlines()
+        self.assertIn("via=unshare", lines)
+        self.assertIn("cut", lines)
 
     def test_a_node_that_can_runs_a_step_with_no_network(self):
         probe = subprocess.run(["unshare", "--user", "--map-root-user", "--net", "true"], capture_output=True, check=False)

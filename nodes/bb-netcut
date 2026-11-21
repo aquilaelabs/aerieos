@@ -11,8 +11,11 @@ keeps user namespaces from unprivileged accounts), this makes it:
     sudo -n bb-netcut CMD [ARG...]
 
 A new network namespace, holding nothing but a loopback that is down; then
-the caller's own account again, for good (its groups, no_new_privs); then
-CMD. Nothing else: no mount, no file, no option.
+the caller's own account again, for good, with its own group and none of
+its others (no_new_privs); then CMD. Nothing else: no mount, no file, no
+option. None of its other groups, since a cut of the network alone leaves
+every socket on the disk in reach: in the docker group, a step could ask
+the docker daemon for a container with the network and the host's root.
 
 Root, and the one thing the account a node's jobs run as may run through
 sudo for it (the agent installs this and writes that rule). What it is
@@ -75,8 +78,8 @@ def main(argv):
     libc = ctypes.CDLL(None, use_errno=True)
     try:
         _call(libc, "unshare", ctypes.c_int(CLONE_NEWNET))
-        # The caller's own account again, for good.
-        os.initgroups(who.pw_name, who.pw_gid)
+        # The caller's own account again, for good, with no group but its own.
+        os.setgroups([])
         os.setgid(who.pw_gid)
         os.setuid(who.pw_uid)
         _call(libc, "prctl", ctypes.c_int(PR_SET_NO_NEW_PRIVS), ctypes.c_ulong(1), ctypes.c_ulong(0),
@@ -84,7 +87,7 @@ def main(argv):
     except OSError as e:
         print(f"bb-netcut: {e}", file=sys.stderr)
         return 71
-    if os.getuid() != who.pw_uid or os.geteuid() != who.pw_uid:
+    if os.getuid() != who.pw_uid or os.geteuid() != who.pw_uid or os.getgroups() not in ([], [who.pw_gid]):
         print("bb-netcut: the drop to the caller's account did not hold", file=sys.stderr)
         return 71
     try:

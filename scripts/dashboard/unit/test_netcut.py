@@ -86,6 +86,45 @@ class Helper(unittest.TestCase):
             got = netcut.plan(argv, environ, euid)
             self.assertTrue(isinstance(got, str) and said in got, (argv, environ, euid, got))
 
+    def test_the_step_keeps_no_group_but_its_own(self):
+        # A cut of the network alone leaves every socket on the disk in
+        # reach, and the jobs account of a node not beside its controller is
+        # in the docker group: a step that kept it could ask the docker
+        # daemon for a container with the network and the host's root.
+        who = ME if ME.pw_uid else pwd.getpwuid(1)
+        now = {"uid": 0, "groups": [0]}
+        ran = []
+
+        class Libc:
+            def unshare(self, flags):
+                ran.append(("unshare", flags.value))
+                return 0
+
+            def prctl(self, *a):
+                ran.append(("prctl", a[0].value))
+                return 0
+
+        def setuid(u):
+            now["uid"] = u
+
+        def setgroups(g):
+            now["groups"] = list(g)
+
+        def initgroups(name, gid):
+            now["groups"] = [gid, 999]          # the account's groups, docker's among them
+
+        def execvpe(path, argv, env):
+            ran.append(("exec", argv, list(now["groups"]), now["uid"]))
+
+        with mock.patch.object(netcut.ctypes, "CDLL", lambda *a, **k: Libc()), \
+                mock.patch.multiple(netcut.os, geteuid=lambda: now["uid"], getuid=lambda: now["uid"], setuid=setuid,
+                                    setgid=lambda g: None, setgroups=setgroups, initgroups=initgroups,
+                                    getgroups=lambda: list(now["groups"]), execvpe=execvpe), \
+                mock.patch.dict(netcut.os.environ, {"SUDO_UID": str(who.pw_uid)}):
+            netcut.main(["true"])
+        self.assertEqual(ran[0], ("unshare", netcut.CLONE_NEWNET))
+        self.assertEqual(ran[-1], ("exec", ["true"], [], who.pw_uid), "run as the caller, with none of its other groups")
+
     def test_run_by_an_account_it_does_nothing(self):
         if os.geteuid() == 0:
             self.skipTest("run as root")

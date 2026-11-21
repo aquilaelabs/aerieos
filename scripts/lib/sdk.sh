@@ -1845,6 +1845,15 @@ sdk_inside() {
 # same, its steps with the network, and says so here and on its receipt
 # (the operator, 13 Nov). DIR/.bb-net keeps which, for the receipt.
 #
+# A cut of the network alone leaves the step every socket on the disk, and
+# a namespace of the account's own keeps every group the account holds: in
+# the docker group (a node not beside its controller puts the jobs account
+# there), a step could ask the docker daemon for a container with the
+# network and the host's root. So where a group of the account's reaches a
+# daemon's socket (sdk_groups_reach), the helper is asked first, which
+# drops every group; with no helper the step still runs in a namespace of
+# its own and the receipt says it had the network.
+#
 # A caller that is root may have made the cut already and started this
 # inside it, as the account, with no way back to root (a node's agent
 # installing a coding agent for the session account, which has no rule for
@@ -1868,6 +1877,25 @@ sdk_net_none() {
 }
 SDK_NETCUT_BIN=/usr/local/sbin/bb-netcut
 [ -z "$SDK_IN_TREE" ] || SDK_NETCUT_BIN="${BUILDERBOT_NETCUT_BIN:-$SDK_NETCUT_BIN}"
+# Where the system's daemons keep their sockets, which a cut of the network
+# alone leaves in reach: a test's stand-in is read only in the source tree.
+SDK_RUN_DIR=/run
+[ -z "$SDK_IN_TREE" ] || SDK_RUN_DIR="${BUILDERBOT_RUN_DIR:-$SDK_RUN_DIR}"
+# sdk_groups_reach: whether a group this account holds besides its own may
+# write a socket of the system's (a daemon's under /run, which has the
+# network and may be root: the docker daemon's, where the account is in its
+# group). A user namespace keeps every group the account has and cannot drop
+# one, so a step it cuts still reaches that daemon; bb-netcut drops them.
+sdk_groups_reach() {
+    local own g
+    own="$(sdk_sys id -g)" || return 0
+    for g in $(sdk_sys id -G); do
+        [ "$g" != "$own" ] || continue
+        [ -z "$(sdk_sys find "$SDK_RUN_DIR" -xdev -maxdepth 3 -type s -group "$g" -perm -g=w -print -quit 2>/dev/null)" ] \
+            || return 0
+    done
+    return 1
+}
 # A step relayed through the helper: sudo starts it with a plain environment,
 # so the step's own is written to a file only this account reads and read
 # back by the step's shell, after the helper has dropped to this account.
@@ -1879,30 +1907,55 @@ export -p > "$f"
 rc=$?
 rm -f "$f"
 exit "$rc"'
+# sdk_net_helper SUDO: whether the node's helper cuts for this account, asked
+# for nothing through the one sudo rule for it.
+sdk_net_helper() {
+    [ -n "$1" ] && [ -x "$SDK_NETCUT_BIN" ] && "$1" -n "$SDK_NETCUT_BIN" true 2>/dev/null
+}
+# sdk_net_said SAID DIR REACH: the cut said in the log and kept in DIR/.bb-net
+# for the receipt. Where this account's groups reach past it (REACH), its
+# steps still run with no network of their own, and are counted as having
+# had the network.
+sdk_net_said() {
+    if [ -n "$3" ]; then
+        log "${1}: its steps run with no network, but this account's groups reach a daemon past the cut, so they count as run with it"
+        printf 'open\n' > "$2/.bb-net" 2>/dev/null || true
+    else
+        log "${1}: its steps run with no network"
+        printf 'cut\n' > "$2/.bb-net" 2>/dev/null || true
+    fi
+}
 sdk_net_cut() {
     local what="$1" d="$2" said="${3:-${1} declares its downloads}"
     SDK_CUT=()
+    local reach=""
+    if sdk_groups_reach; then reach=1; fi
     if [ -n "$SDK_CUT_MADE" ]; then
         sdk_net_none \
             || die "${what}: it was started as if the network had been cut for it, and this process still has one: nothing is run"
-        log "${said}: its steps run with no network"
-        printf 'cut\n' > "$d/.bb-net" 2>/dev/null || true
+        sdk_net_said "$said" "$d" "$reach"
         return 0
     fi
-    # The system's own unshare and sudo, by where they are (sdk_sys_path).
-    local un su
+    # The system's own unshare, sudo and id, by where they are (sdk_sys_path).
+    local un su me my
     un="$(sdk_sys_path unshare)" || un=""
     su="$(sdk_sys_path sudo)" || su=""
-    if [ -n "$un" ] && "$un" --user --map-user="$(id -u)" --map-group="$(id -g)" --net true 2>/dev/null; then
-        SDK_CUT=("$un" --user --map-user="$(id -u)" --map-group="$(id -g)" --net)
+    me="$(sdk_sys id -u)" && my="$(sdk_sys id -g)" || un=""
+    # The helper first where this account's groups reach past a namespace
+    # of its own: it drops them.
+    if [ -n "$reach" ] && sdk_net_helper "$su"; then
+        SDK_CUT=(bash -c "$SDK_NETCUT_RELAY" "$SDK_NETCUT_BIN" "$su")
+        reach=""
+    elif [ -n "$un" ] && "$un" --user --map-user="$me" --map-group="$my" --net true 2>/dev/null; then
+        SDK_CUT=("$un" --user --map-user="$me" --map-group="$my" --net)
     elif [ -n "$un" ] && "$un" --user --map-root-user --net true 2>/dev/null; then
         SDK_CUT=(env TAR_OPTIONS=--no-same-owner "$un" --user --map-root-user --net)
-    elif [ -n "$su" ] && [ -x "$SDK_NETCUT_BIN" ] && "$su" -n "$SDK_NETCUT_BIN" true 2>/dev/null; then
+    elif sdk_net_helper "$su"; then
         SDK_CUT=(bash -c "$SDK_NETCUT_RELAY" "$SDK_NETCUT_BIN" "$su")
+        reach=""
     fi
     if [ "${#SDK_CUT[@]}" != 0 ]; then
-        log "${said}: its steps run with no network"
-        printf 'cut\n' > "$d/.bb-net" 2>/dev/null || true
+        sdk_net_said "$said" "$d" "$reach"
     else
         log "${said}, but this node cannot cut the network for a step (this account may make no network namespace, and no bb-netcut makes one for it): its steps run with it"
         printf 'open\n' > "$d/.bb-net" 2>/dev/null || true

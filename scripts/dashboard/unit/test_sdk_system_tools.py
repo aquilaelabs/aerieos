@@ -101,7 +101,7 @@ class Installed(unittest.TestCase):
 
 
 class Seams(Installed):
-    ENV = {"BUILDERBOT_NET_DEV": "/tmp/planted-net-dev", "BUILDERBOT_NETCUT_BIN": "/tmp/planted-netcut",
+    ENV = {"BUILDERBOT_NET_DEV": "/tmp/planted-net-dev", "BUILDERBOT_NETCUT_BIN": "/tmp/planted-netcut", "BUILDERBOT_RUN_DIR": "/tmp/planted-run",
            "BB_TOOLCHAINS_JSON": "/tmp/planted-catalog.json", "BB_TOOLPACKS_FILE_URLS": "1", "BB_SEAMS": "1"}
 
     def sh(self, lib, script):
@@ -111,8 +111,8 @@ class Seams(Installed):
         return p.returncode, p.stdout, p.stderr
 
     def test_an_install_s_copy_reads_none_of_them(self):
-        rc, out, err = self.sh(self.lib, 'echo "$SDK_NET_DEV $SDK_NETCUT_BIN [$SDK_CATALOG]"')
-        self.assertEqual((rc, out.split()), (0, ["/proc/self/net/dev", "/usr/local/sbin/bb-netcut", "[]"]), err)
+        rc, out, err = self.sh(self.lib, 'echo "$SDK_NET_DEV $SDK_NETCUT_BIN $SDK_RUN_DIR [$SDK_CATALOG]"')
+        self.assertEqual((rc, out.split()), (0, ["/proc/self/net/dev", "/usr/local/sbin/bb-netcut", "/run", "[]"]), err)
         rc, out, err = self.sh(self.lib, 'sdk_https_only thing file:///etc/passwd; echo taken')
         self.assertNotEqual(rc, 0)
         self.assertIn("a declared download is fetched over https", err)
