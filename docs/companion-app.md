@@ -103,7 +103,9 @@ release APK on a node's runner: the JDK and the Android SDK come from the
 node's toolchain store, the same environment every `aerie` job gets, on a push
 to `main` that touches `apps/android/`, names it by `aerie version --file`, drops it
 into AerieOS's `dist/` where the runner's machine mounts the spaces
-share. For a release it is handed to the controller as the artifact
+share. A tag's own run builds it on a hosted runner instead, and so does a
+release rehearsal (the workflow's `hosted` input), so the first tag is not
+the first hosted build. For a release it is handed to the controller as the artifact
 `bb-release-apk-TAG`, which the controller has signed on AerieOS's node
 with its own sideload key and attaches to the release (docs/building.md, "A
 release's APK is signed on the space's node"); no key or password is a

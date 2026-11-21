@@ -211,8 +211,13 @@ class Gate(unittest.TestCase):
         # The runner a pull request's lint and suites run on built the APK
         # a release carries. A tag's own run builds it on a hosted runner.
         build = load("android-app.yml")["jobs"]["build"]
-        self.assertEqual(build["runs-on"], "${{ fromJSON((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) "
+        self.assertEqual(build["runs-on"], "${{ fromJSON(((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || inputs.hosted) "
                                            "&& '[\"ubuntu-24.04\"]' || '[\"self-hosted\", \"bb-sandbox\"]') }}")
+        # ...and a rehearsal builds it there too, so the first tag is not the first hosted build.
+        on = load("android-app.yml")["on"]
+        for how in ("workflow_dispatch", "workflow_call"):
+            self.assertEqual((on[how]["inputs"]["hosted"]["type"], on[how]["inputs"]["hosted"]["default"]), ("boolean", False), how)
+        self.assertEqual(load("release-rehearsal.yml")["jobs"]["android"]["with"], {"hosted": True})
         java = next(s for s in build["steps"] if "JAVA_HOME_17_X64" in str(s.get("run") or ""))
         self.assertEqual(java["if"], "runner.environment == 'github-hosted'")
         land = next(s for s in build["steps"] if s.get("name", "").startswith("Land it in"))

@@ -138,7 +138,8 @@ a release's files
 are attested on hosted runners, and the seal holds each attestation to the
 tag's commit and to a hosted runner (`tools/release-sign.py`); the Android
 app a release carries is built on a hosted runner, not on the machine a
-pull request's checks run on; and the image tags people follow move only
+pull request's checks run on, and a rehearsal builds it there too; and the
+image tags people follow move only
 onto the digest a published, sealed release's signed list names. None of
 that stops a tag that rewrites the workflow itself. These settings do,
 each made once on GitHub, and until they are made the key is as open as

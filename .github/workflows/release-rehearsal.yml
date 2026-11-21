@@ -24,10 +24,10 @@
 # ssh-keygen against the signers file written for that key and refused
 # against the committed one. So the tool, ssh-keygen and the pinned library
 # are proved on a runner before any tag needs them. It reads no secret,
-# attaches nothing, and what it signs no install takes. What only a tag
-# can prove stays unproved here: the build attestations, the Android
-# app's signature, the Windows code signing and the release environment's
-# key.
+# attaches nothing, and what it signs no install takes. The APK is built
+# on the hosted runner a tag's run builds it on. What only a tag can prove
+# stays unproved here: the build attestations, the Android app's
+# signature, the Windows code signing and the release environment's key.
 name: release rehearsal
 
 on:
@@ -93,8 +93,12 @@ jobs:
     # built as a release's is and left unsigned, which the build says. The
     # Windows certificate is a tag's run's alone.
 
+  # On the hosted runner a tag's own run builds the APK on, so that build
+  # is proved here and not first by a tag.
   android:
     uses: ./.github/workflows/android-app.yml
+    with:
+      hosted: true
     permissions:
       contents: read
 

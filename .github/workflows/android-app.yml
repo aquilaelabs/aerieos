@@ -39,20 +39,30 @@ on:
   # only from the tag's own run (releasesign.py), so a release whose APK
   # did not land (v0.5.0's, B117) gets it by that run's Re-run all jobs,
   # and what a run by hand uploads is refused there, saying so.
+  # `hosted` builds on the hosted runner a tag's own run builds on, so the
+  # build a release carries is proved before a tag needs it.
   workflow_dispatch:
     inputs:
       tag:
         description: "a release to build again from its tag, for dist/ (empty: a plain build); the controller signs only the tag's own run"
         required: false
         default: ""
+      hosted:
+        description: "build on the hosted runner a tag's run builds on, not the node"
+        type: boolean
+        default: false
   # Called by a tag's run (build-image.yml, R206 step 1) with the tag, as a
   # release's own build; and a release rehearsed (release-rehearsal.yml,
-  # R190 step 2): a plain build of the branch, handed to nobody.
+  # R190 step 2): a plain build of the branch on the hosted runner a tag's
+  # run builds on, handed to nobody.
   workflow_call:
     inputs:
       tag:
         type: string
         default: ""
+      hosted:
+        type: boolean
+        default: false
 
 # Read only: the controller attaches the signed APK with its own token.
 permissions:
@@ -68,9 +78,10 @@ concurrency:
 jobs:
   build:
     # A tag's own run on a hosted runner, which starts clean and which no
-    # pull request's job has touched; every other build (a push to main, a
-    # run by hand for dist/, a rehearsal) on the node.
-    runs-on: ${{ fromJSON((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) && '["ubuntu-24.04"]' || '["self-hosted", "bb-sandbox"]') }}
+    # pull request's job has touched, and so a rehearsal or a run by hand
+    # that asks for it (hosted); every other build (a push to main, a run
+    # by hand for dist/) on the node.
+    runs-on: ${{ fromJSON(((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || inputs.hosted) && '["ubuntu-24.04"]' || '["self-hosted", "bb-sandbox"]') }}
     timeout-minutes: 40
     # bash with pipefail (the default `bash -e` has it too, said here because
     # every step below pipes into tee, and a tee's success must not be the
