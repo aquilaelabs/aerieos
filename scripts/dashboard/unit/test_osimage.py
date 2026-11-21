@@ -87,14 +87,19 @@ class World:
                     "BB_OS_ESP": self.esp, "BB_OS_WORK": self.work, "BB_OS_RELEASE_URL": "file://" + os.path.join(self.d, "rel"),
                     "BB_OS_STATE": self.state, "BB_OS_ATTEST_URL": "file://" + os.path.join(self.d, "attestations.json"),
                     "BB_OS_TRUSTED_ROOT": os.path.join(self.d, "trusted-root.jsonl"),
-                    # An install that names no signer, whatever this machine's
-                    # own /opt/aerieos holds: the signed list's rules are
+                    # An install that names this test's own key as its
+                    # release's signer, whatever this machine's own
+                    # /opt/aerieos holds: the signed list's rules are
                     # test_release_signing.py's.
                     "BB_RELEASE_SIGNERS": os.path.join(self.d, "release-signers")}
         with open(os.path.join(self.d, "trusted-root.jsonl"), "w") as f:
             f.write("{}\n")
+        self.key = os.path.join(self.d, "release-key")
+        subprocess.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", "release", "-f", self.key], check=True, capture_output=True)
+        with open(self.key + ".pub", encoding="utf-8") as f:
+            kind, pub = f.read().split()[:2]
         with open(os.path.join(self.d, "release-signers"), "w") as f:
-            f.write("# no key\n")
+            f.write(f"aerieos-release {kind} {pub}\n")
 
     def publish(self, version, bad=False, without=""):
         """The release's ISO under rel/vVERSION with its sha256: here a tar
@@ -124,6 +129,13 @@ class World:
             json.dump({"attestations": [{"bundle": bundle}]}, f)
         with open(os.path.join(d, f"aerieos-os-{version}.attestation.jsonl"), "w") as f:
             f.write(json.dumps(bundle) + "\n")
+        # The list of its files, signed by the key this install names.
+        sums = os.path.join(d, "SHA256SUMS")
+        with open(sums, "w") as f:
+            f.write(f"{want}  aerieos-os-{version}.iso\n")
+        if os.path.exists(sums + ".sig"):
+            os.unlink(sums + ".sig")
+        subprocess.run(["ssh-keygen", "-Y", "sign", "-q", "-f", self.key, "-n", "aerieos-release", sums], check=True, capture_output=True)
         return d, files
 
 

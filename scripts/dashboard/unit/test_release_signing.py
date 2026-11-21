@@ -150,11 +150,16 @@ class Table(unittest.TestCase):
     # {case name: (taken, says)}.
     OWN = {}
 
+    def expects(self, case):
+        """(taken, what is said) for a case: the verifier's own word for it
+        (OWN), else the table's."""
+        return self.OWN.get(case.name, (case.taken, case.says))
+
     def run_table(self):
         for case in TABLE:
             with self.subTest(case.name):
-                want, says = self.OWN.get(case.name, (case.taken, case.says))
                 taken, said = self.verdict(case)
+                want, says = self.expects(case)
                 self.assertEqual(taken, want, f"{case.name}: {said}")
                 self.assertIn(says, said, case.name)
 
@@ -197,6 +202,9 @@ class TheOsUpdater(Table):
         d, _ = w.publish(ver)
         with open(os.path.join(d, f"aerieos-os-{ver}.iso"), "rb") as f:
             digest = sha(f.read())
+        # The list is the case's own: the one the world signed is taken away.
+        for f in ("SHA256SUMS", "SHA256SUMS.sig"):
+            os.unlink(os.path.join(d, f))
         case.publish(d, f"aerieos-os-{ver}.iso", digest)
         env = dict(w.env, BB_RELEASE_SIGNERS=self.signers_file(case, w.d))
         job = test_osimage.Job()
@@ -206,6 +214,13 @@ class TheOsUpdater(Table):
             written = f.read() != b"\0" * 4096
         self.assertEqual(written, state == "succeeded", "a refused update writes nothing to the other slot")
         return state == "succeeded", job.text()
+
+    def expects(self, case):
+        # An install that names no signer takes no update: every build
+        # ships the file that names them.
+        if not case.signers:
+            return False, "this install names nobody who may sign a release"
+        return case.taken, case.says
 
     def test_a_release_named_by_its_tag(self):
         self.verdict = lambda case: self.update(case, False)

@@ -794,11 +794,15 @@ class OsImageMixin:
         # repository or a release can build and attest an image and put a
         # sha256 beside it, not sign the list. The tag says who may have
         # signed (tag_namespaces); a list that is unsigned, or signed by
-        # somebody the tag may not have, is refused, and only an install
-        # that names no signer at all goes on without, and says so.
+        # somebody the tag may not have, is refused, and so is every
+        # release on an install that names no signer at all: every build
+        # ships the file that names them, so one without it has lost it.
         rtag = (tag if tag.startswith("v") else "v" + tag) if tag else "v" + ver
         at = f"{env_or('BB_OS_RELEASE_URL', RELEASE_URL)}/{rtag}"
         keys, listed, who = signers(), None, ""
+        if not keys:
+            say("refused: this install names nobody who may sign a release: nothing written\n")
+            return "failed", 69
         if keys:
             if why := unsignable(rtag, keys):
                 say(f"refused: {why}: nothing written\n")
@@ -822,8 +826,6 @@ class OsImageMixin:
             if fn not in listed:
                 say(f"refused: {unlisted(listed, fn, '', rtag)}: nothing written\n")
                 return "failed", 69
-        else:
-            say("this install holds no release key yet, so the release's signature is not checked\n")
         try:
             if src:
                 if why := _room(work, os.path.getsize(os.path.join(src, fn))):
