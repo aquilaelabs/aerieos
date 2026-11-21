@@ -106,12 +106,12 @@ def tc_users(path, limit=8):
 
 
 def tc_users_said(name, users):
-    """One sentence naming who is using a toolchain, for the job's log."""
-    who = ", ".join(f"{u['what']} (pid {u['pid']}{', ' + u['project'] + chr(39) + 's session' if u['project'] else ''})"
-                    for u in users)
-    return (f"refused: {name} is in use by {who}. Updating or removing it under them "
-            "replaces files they are running from; try again when they have finished, "
-            "or stop them first\n")
+    """Who is using a toolchain, for the job's log: each on a line of its
+    own with its pid and its space's session, then the refusal in one
+    sentence with neither, the line a page shows."""
+    who = "".join(f"  in use by {u['what']} (pid {u['pid']}{', ' + u['project'] + chr(39) + 's session' if u['project'] else ''})\n"
+                  for u in users)
+    return who + f"refused: {name} is in use, so it was left as it is: try again once that has finished\n"
 
 
 def share_images(store, say=None):

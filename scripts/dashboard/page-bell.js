@@ -392,8 +392,6 @@ function attRow(a){
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
           <a href="#" data-bag="${esc(a.id)}">Library</a></span></div></div>`;
   }
-  // A node's retired token presented again after its grace (R135 step 4): a
-  // copy of its credential is in use somewhere, and its tokens are revoked.
   // A node whose agent is turned away (B569): it is running and asking, and
   // the controller will not take its credential, so it is quiet for good.
   if (a.kind === "node-refused"){
@@ -404,10 +402,12 @@ function attRow(a){
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
           <a href="#" data-bnode="${esc(a.id)}" data-bwhat="node">Nodes page</a></span></div></div>`;
   }
+  // A node's retired token presented again after its grace (R135 step 4): a
+  // copy of its credential is in use somewhere, and its tokens are revoked.
   if (a.kind === "token-reuse"){
     return `<div class="bnote att bad">
       <div class="bt">${esc(a.node)} looks like a restored or copied machine</div>
-      <div class="bsum">it presented a token it had already replaced, which a machine put back from a snapshot or a backup does, and so does a copy of its disk in somebody else's hands. Every token of ${esc(a.node)} is revoked either way. If you restored it, Enroll script on its row brings it back; if you did not, treat that machine's disk as copied</div>
+      <div class="bsum">it presented a token it had already replaced, so every token of it is revoked: Enroll script on its row if you restored it, and treat its disk as copied if you did not</div>
       <div class="bfoot"><span>${esc(ago(a.at))}</span>
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
           <a href="#" data-bnode="${esc(a.id)}" data-bwhat="node">Nodes page</a></span></div></div>`;
@@ -460,7 +460,7 @@ function attRow(a){
   // step 2): to the Installed page, where Remove is.
   if (a.kind === "pack"){
     return `<div class="bnote att bad">
-      <div class="bt">The catalog withdrew ${esc(a.name)}</div>
+      <div class="bt">${a.unfit ? `${esc(a.name)} is switched off` : `The catalog withdrew ${esc(a.name)}`}</div>
       <div class="bsum">${esc(a.said)}</div>
       <div class="bfoot"><span>until it is removed</span>
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}

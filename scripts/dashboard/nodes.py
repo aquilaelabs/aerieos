@@ -3034,8 +3034,7 @@ def root_off(n):
     nothing here turns back on. Said before a person is asked to allow
     one, and before a schedule or an administrator sends one."""
     if n and (n.get("reported") or {}).get("root_off"):
-        return (f"{n['name']} runs no root command sent to it: that was switched off at its own console, "
-                "and is switched back on there (sudo aerieos-agent root-asks on)")
+        return f"{n['name']} runs no root command: only its own console switches it back on"
     return ""
 
 
@@ -4200,8 +4199,7 @@ def node_uninstall(principal, node_id, rings=None):
     if n.get("kind") != "agent":
         return {"error": "only an agent node can be uninstalled from here"}
     if not (n.get("reported") or {}).get("sandbox"):
-        return {"error": "only a node provisioned as an AerieOS sandbox can be uninstalled "
-                         "from here: on the machine, sudo bb-sandbox uninstall"}
+        return {"error": "only a node provisioned as an AerieOS sandbox can be uninstalled from here"}
     busy = node_in_use(n)
     if busy:
         return {"error": f"{n['name']} is in use: {busy} first"}

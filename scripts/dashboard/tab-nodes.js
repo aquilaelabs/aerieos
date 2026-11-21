@@ -926,7 +926,7 @@ function unenrollWhat(all){
         <li>Anything the provisioner installed for the machine itself.</li>
       </ul>
       The node leaves the Nodes page and its tokens stop working; to use the machine again, enroll it again.
-      A machine that is only removed here keeps AerieOS's pieces until <code>sudo bb-sandbox uninstall</code> is run on it.
+      A machine that is only removed here keeps AerieOS's pieces until it is uninstalled at its own console.
     </div>`;
 }
 
@@ -945,7 +945,7 @@ function openUnenroll(n){
     </div>
     ${dlgFoot(`<button type="button" id="ndUnCancel">Cancel</button>`, `<button type="button" class="danger" id="ndUnGo">Un-enroll</button>`)}`
   : `<div class="field">
-      <div class="hint bad">Are you sure? The machine cannot be cleaned from here: ${n.live ? "it was not provisioned by AerieOS" : "its agent is not dialing in"}. The node is removed here and its tokens revoked; AerieOS's pieces stay on the machine until <code>sudo bb-sandbox uninstall</code> is run there.</div>
+      <div class="hint bad">Are you sure? The machine cannot be cleaned from here: ${n.live ? "it was not provisioned by AerieOS" : "its agent is not dialing in"}. The node is removed here and its tokens revoked; AerieOS's pieces stay on the machine until it is uninstalled at its own console.</div>
     </div>
     ${dlgFoot(`<button type="button" id="ndUnCancel">Cancel</button>`, `<button type="button" class="danger" id="ndUnGo">Remove it here</button>`)}`);
   modal.hidden = false;
@@ -1124,7 +1124,7 @@ function nodeRootOffLine(n){
   // Docker here: the version the census reports, or the capability it was
   // enrolled with; a hosting-only node runs containers by what it is.
   const docker = n.config?.host_only || !!n.reported?.docker || (n.capabilities || []).includes("docker-host");
-  return `<div class="sub warn" data-rootoff>Switched off at this machine's own console: it refuses every root command sent to it, whatever is set here. <code>sudo aerieos-agent root-asks on</code> at the machine switches it back on.${docker ? " It runs containers, and Docker there is still root's." : ""}</div>`;
+  return `<div class="sub warn" data-rootoff>Switched off at this machine's own console, which alone switches it back on: it refuses every root command sent to it${docker ? ", and Docker there is still root's" : ""}.</div>`;
 }
 function nodeHostRootRow(n){
   const c = nodeDraft(n);
@@ -1991,12 +1991,12 @@ function ndUpdatesFact(n){
     return nodesAgent?.release_key ? "taken on this controller's word: no release key pinned (its first signed update pins it, or the Enroll script)" : "";
   }
   if (refused)
-    return `signed releases only (key ${key.slice(0, 8)}…): this controller's build is unsigned, so its update is refused there`;
+    return "signed releases only: this controller's build is unsigned, so its update is refused there";
   // The spare (R232): pinned with the key, or named by this build and not
   // pinned there yet. The node pins it by itself where this build carries
   // the release key's word for it (spare_said); else the Enroll script does.
   const spare = n.reported.release_spare || "";
-  const keys = (spare ? `key ${key.slice(0, 8)}…, spare ${spare.slice(0, 8)}…` : `key ${key.slice(0, 8)}…`)
+  const keys = (spare ? "the release key and its spare" : "the release key")
     + (also ? `; ${also} more ${also === 1 ? "key" : "keys"} added at its console` : "");
   const owed = !spare && nodesAgent?.release_spare ? (nodesAgent.spare_said ? "; no spare key pinned yet" : "; no spare key pinned (Enroll script pins it)") : "";
   return (n.reported.unsigned_ok

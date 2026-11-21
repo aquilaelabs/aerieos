@@ -31,8 +31,8 @@ class RootOff(unittest.TestCase):
         self.assertEqual(nodes.root_refused(n), "")
         nodes.hello(self.nid, {**CENSUS, "root_off": True}, "10.0.0.5")
         n = nodes.node(self.nid)
-        self.assertIn("switched off at its own console", nodes.root_off(n))
-        self.assertIn("sudo aerieos-agent root-asks on", nodes.root_off(n))
+        # One sentence, and no command to type (the rule for what a person reads).
+        self.assertEqual(nodes.root_off(n), "box runs no root command: only its own console switches it back on")
         self.assertEqual(nodes.root_refused(n), nodes.root_off(n), "a session's ask is refused with the same sentence")
         r = nodes.root_wait("user:ann", self.nid, ["true"], why="a test")
         self.assertEqual(r, {"error": nodes.root_off(n)}, "an administrator's own is not queued either")
