@@ -6,6 +6,7 @@ network. A managed node's root agent installs a helper (nodes/bb-netcut) and
 the one sudo rule for it; the helper makes the namespace and runs what it is
 handed as the caller again, never as root."""
 import importlib.machinery
+import io
 import importlib.util
 import os
 import pwd
@@ -95,10 +96,16 @@ class Helper(unittest.TestCase):
         now = {"uid": 0, "groups": [0]}
         ran = []
 
+        refuse = []
+
         class Libc:
             def unshare(self, flags):
                 ran.append(("unshare", flags.value))
                 return 0
+
+            def mount(self, src, at, kind, flags, data):
+                ran.append(("mount", at.value, kind.value, flags.value, data.value, now["uid"]))
+                return -1 if at.value in refuse else 0
 
             def prctl(self, *a):
                 ran.append(("prctl", a[0].value))
@@ -114,16 +121,37 @@ class Helper(unittest.TestCase):
             now["groups"] = [gid, 999]          # the account's groups, docker's among them
 
         def execvpe(path, argv, env):
-            ran.append(("exec", argv, list(now["groups"]), now["uid"]))
+            ran.append(("exec", argv, list(now["groups"]), now["uid"], env.get("BB_NETCUT_RUN")))
 
-        with mock.patch.object(netcut.ctypes, "CDLL", lambda *a, **k: Libc()), \
-                mock.patch.multiple(netcut.os, geteuid=lambda: now["uid"], getuid=lambda: now["uid"], setuid=setuid,
-                                    setgid=lambda g: None, setgroups=setgroups, initgroups=initgroups,
-                                    getgroups=lambda: list(now["groups"]), execvpe=execvpe), \
-                mock.patch.dict(netcut.os.environ, {"SUDO_UID": str(who.pw_uid)}):
-            netcut.main(["true"])
+        def run():
+            del ran[:]
+            now.update(uid=0, groups=[0])
+            with mock.patch.object(netcut.ctypes, "CDLL", lambda *a, **k: Libc()), \
+                    mock.patch.object(netcut.ctypes, "get_errno", lambda: 1), \
+                    mock.patch.multiple(netcut.os, geteuid=lambda: now["uid"], getuid=lambda: now["uid"], setuid=setuid,
+                                        setgid=lambda g: None, setgroups=setgroups, initgroups=initgroups,
+                                        getgroups=lambda: list(now["groups"]), execvpe=execvpe), \
+                    mock.patch.object(netcut.os.path, "islink", lambda p: p == "/var/run"), \
+                    mock.patch.dict(netcut.os.environ, {"SUDO_UID": str(who.pw_uid)}), \
+                    mock.patch.object(netcut.sys, "stderr", io.StringIO()) as said:
+                netcut.main(["true"])
+            return said.getvalue()
+        run()
         self.assertEqual(ran[0], ("unshare", netcut.CLONE_NEWNET))
-        self.assertEqual(ran[-1], ("exec", ["true"], [], who.pw_uid), "run as the caller, with none of its other groups")
+        self.assertEqual(ran[-1], ("exec", ["true"], [], who.pw_uid, "covered"), "run as the caller, with none of its other groups")
+        # The final audit's 5: a mount namespace of its own, private, with an
+        # empty tmpfs over /run, made as root before the drop; /var/run is a
+        # link to it here, and covered with it.
+        self.assertEqual(ran[1], ("unshare", netcut.CLONE_NEWNS))
+        self.assertEqual(ran[2], ("mount", b"/", None, netcut.MS_REC | netcut.MS_PRIVATE, None, 0))
+        self.assertEqual(ran[3], ("mount", b"/run", b"tmpfs", netcut.MS_NOSUID | netcut.MS_NODEV | netcut.MS_NOEXEC, b"mode=0755,size=1m", 0))
+        self.assertEqual([r[0] for r in ran[4:]], ["prctl", "exec"])
+        # A machine that refuses the mount: the step runs as it did before
+        # the cover, and is not told it was covered.
+        refuse.append(b"/run")
+        said = run()
+        self.assertEqual(ran[-1], ("exec", ["true"], [], who.pw_uid, None))
+        self.assertIn("/run is left as it is", said)
 
     def test_run_by_an_account_it_does_nothing(self):
         if os.geteuid() == 0:

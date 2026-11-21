@@ -510,16 +510,24 @@ resolver that supplies the file's address itself (`zig-index`, a
 `github-release` with `asset`) has the tool write that address into the row
 beside the digest.
 
-The cut is a network namespace of the step's own. The account a node's jobs
-run as makes it itself where the machine lets an account do that. Where it
-does not (a distribution that keeps user namespaces from unprivileged
-accounts), a managed node's agent makes it: it installs a small root helper,
-`bb-netcut`, with one sudo rule that lets the job account run it, and the
-helper makes the namespace and runs the step as that account again, never
-as root. A node that can do neither (its agent is not root, or it runs in a
+The cut is a network namespace of the step's own, and a mount namespace
+with an empty folder over `/run`: a network namespace alone leaves every
+socket on the disk in reach, and the system bus's and systemd-resolved's
+there, which any account may write, look names up past it. The account a
+node's jobs run as makes both itself where the machine lets an account do
+that. Where it does not (a distribution that keeps user namespaces from
+unprivileged accounts), a managed node's agent makes them: it installs a
+small root helper, `bb-netcut`, with one sudo rule that lets the job account
+run it, and the helper makes the namespaces and runs the step as that
+account again, never as root, with none of its other groups. Where `/run`
+cannot be covered, the step still runs with no network of its own, and
+counts as run with the network: the job and the pack's page on Installed
+say so. A node that can do neither (its agent is not root, or it runs in a
 container that forbids namespaces) still installs the pack: its downloads
 are fetched and checked the same way, its steps run with the network, and
-the job and the pack's page on Installed say so.
+the job and the pack's page on Installed say so. Sockets outside `/run`
+(an X server's under `/tmp`, an account database daemon's under
+`/var/lib`) stay in a step's reach.
 
 A coding agent's install is cut the same way and by the same helper, with
 one difference in who asks for it. Its steps run as the session account,

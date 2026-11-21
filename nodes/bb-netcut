@@ -10,12 +10,19 @@ keeps user namespaces from unprivileged accounts), this makes it:
 
     sudo -n bb-netcut CMD [ARG...]
 
-A new network namespace, holding nothing but a loopback that is down; then
+A new network namespace, holding nothing but a loopback that is down, and
+a mount namespace of its own with an empty tmpfs only root may write over
+/run (and over /var/run where that is a folder and not a link to it); then
 the caller's own account again, for good, with its own group and none of
-its others (no_new_privs); then CMD. Nothing else: no mount, no file, no
-option. None of its other groups, since a cut of the network alone leaves
-every socket on the disk in reach: in the docker group, a step could ask
-the docker daemon for a container with the network and the host's root.
+its others (no_new_privs); then CMD, told BB_NETCUT_RUN=covered. Nothing
+else: no file, no option. A cut of the network alone leaves every socket
+on the disk in reach: the system bus's and systemd-resolved's under /run,
+which any account may write and which look names up past the cut, and,
+in the docker group, the docker daemon's, which would make a container
+with the network and the host's root. Where /run cannot be covered (a
+machine that refuses the mount), CMD runs all the same, as it did before
+there was a cover, and is not told it was: the installer counts its steps
+as run with the network then (scripts/lib/sdk.sh sdk_net_cut).
 
 Root, and the one thing the account a node's jobs run as may run through
 sudo for it (the agent installs this and writes that rule). What it is
@@ -37,8 +44,12 @@ import pwd
 import sys
 
 CLONE_NEWNET = 0x40000000
+CLONE_NEWNS = 0x00020000
 PR_SET_NO_NEW_PRIVS = 38
+MS_NOSUID, MS_NODEV, MS_NOEXEC, MS_REC, MS_PRIVATE = 0x2, 0x4, 0x8, 0x4000, 0x40000
 PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+# What is covered, and whether each is a folder of its own there to cover.
+RUN = ("/run", "/var/run")
 
 
 def plan(argv, environ, euid):
@@ -69,6 +80,25 @@ def _call(libc, name, *args):
         raise OSError(e, f"{name}: {os.strerror(e)}")
 
 
+def cover_run(libc):
+    """A mount namespace of this process's own, private, with an empty tmpfs
+    over /run and over /var/run where that is a folder and not a link.
+    Whether it held; what refused it is said on stderr."""
+    try:
+        _call(libc, "unshare", ctypes.c_int(CLONE_NEWNS))
+        _call(libc, "mount", ctypes.c_char_p(b"none"), ctypes.c_char_p(b"/"), ctypes.c_char_p(None),
+              ctypes.c_ulong(MS_REC | MS_PRIVATE), ctypes.c_char_p(None))
+        for where in RUN:
+            if where != RUN[0] and (os.path.islink(where) or not os.path.isdir(where)):
+                continue
+            _call(libc, "mount", ctypes.c_char_p(b"tmpfs"), ctypes.c_char_p(where.encode()), ctypes.c_char_p(b"tmpfs"),
+                  ctypes.c_ulong(MS_NOSUID | MS_NODEV | MS_NOEXEC), ctypes.c_char_p(b"mode=0755,size=1m"))
+    except OSError as e:
+        print(f"bb-netcut: /run is left as it is ({e}): the step reaches the system's sockets", file=sys.stderr)
+        return False
+    return True
+
+
 def main(argv):
     got = plan(argv, os.environ, os.geteuid())
     if isinstance(got, str):
@@ -78,6 +108,8 @@ def main(argv):
     libc = ctypes.CDLL(None, use_errno=True)
     try:
         _call(libc, "unshare", ctypes.c_int(CLONE_NEWNET))
+        if cover_run(libc):
+            env["BB_NETCUT_RUN"] = "covered"
         # The caller's own account again, for good, with no group but its own.
         os.setgroups([])
         os.setgid(who.pw_gid)

@@ -164,14 +164,16 @@ sdk_meta() {{
         self.assertIn("cut=0", out)
         self.assertIn("open", out.splitlines()[-1])
 
-    def helper(self, sudo_ok=True):
+    def helper(self, sudo_ok=True, covers=True):
         """A stand-in for a managed node's helper and for sudo: sudo starts
         what it is handed with a plain environment, as the real one does, and
-        the helper says it was the way in."""
+        the helper says it was the way in, and that it covered /run where
+        `covers` (one from before the cover does not say it)."""
         bin_ = os.path.join(self.root, "bin")
         os.makedirs(bin_)
         tool = os.path.join(self.root, "bb-netcut")
-        for path, text in ((tool, '#!/bin/sh\nVIA=helper exec env "$@"\n'),
+        told = "BB_NETCUT_RUN=covered " if covers else ""
+        for path, text in ((tool, f'#!/bin/sh\nVIA=helper {told}exec env "$@"\n'),
                            (os.path.join(bin_, "sudo"),
                             '#!/bin/sh\n[ "$1" = -n ] && shift\n' + ('exec env -i PATH=/usr/bin:/bin "$@"\n' if sudo_ok else 'exit 1\n'))):
             with open(path, "w") as f:
@@ -204,11 +206,12 @@ sdk_meta() {{
         self.assertIn("this node cannot cut the network for a step", out)
         self.assertIn("cut=0", out)
 
-    def groups_world(self, helper=True, writable=True):
+    def groups_world(self, helper=True, writable=True, mount=True):
         """This account in a group besides its own (an `id` that says so),
         that group's socket of a daemon's under the run folder, a node
         whose account can make a namespace of its own (an `unshare` that
-        runs what it is handed), and the helper where asked for."""
+        runs what it is handed), a `mount` that covers /run in it where
+        `mount` and refuses otherwise, and the helper where asked for."""
         env, _ = self.helper(sudo_ok=helper)
         bin_ = env["PATH"].split(os.pathsep)[0]
         run = os.path.join(self.root, "run")
@@ -220,7 +223,8 @@ sdk_meta() {{
         for name, text in (("id", '#!/bin/sh\ncase "$1" in -g) echo 4000001 ;; -G) echo "4000001 %d" ;; *) exec /usr/bin/id "$@" ;; esac\n'
                                    % os.getgid()),
                            ("unshare", '#!/bin/sh\nwhile [ $# -gt 0 ]; do case "$1" in --*) shift ;; *) break ;; esac; done\n'
-                                       '[ $# -gt 0 ] || exit 0\nVIA=unshare exec "$@"\n')):
+                                       '[ $# -gt 0 ] || exit 0\nVIA=unshare exec "$@"\n'),
+                           ("mount", "#!/bin/sh\n" + ("echo \"$@\" >> \"$TMPDIR/mounted\"\n" if mount else "exit 32\n"))):
             with open(os.path.join(bin_, name), "w") as f:
                 f.write(text)
             os.chmod(os.path.join(bin_, name), 0o755)
@@ -238,13 +242,39 @@ sdk_meta() {{
         self.assertIn("via=helper", lines)
         self.assertIn("cut", lines)
 
-    def test_with_no_helper_it_is_still_cut_and_counted_as_with_the_network(self):
-        rc, out = self.run_sh({}, self.CUT_BODY.format(d=self.d), env=self.groups_world(helper=False))
+    def test_with_no_helper_its_own_namespace_covers_run_and_the_daemons_socket_with_it(self):
+        env = self.groups_world(helper=False)
+        rc, out = self.run_sh({}, self.CUT_BODY.format(d=self.d) + '; printf "%s\\n" "${SDK_CUT[@]}"', env=env)
         self.assertEqual(rc, 0, out)
         lines = out.splitlines()
         self.assertIn("via=unshare", lines)
-        self.assertIn("open", lines, "the receipt says it had the network")
-        self.assertIn("this account's groups reach a daemon past the cut", out)
+        self.assertIn("cut", lines)
+        self.assertIn("--mount", lines)
+        with open(os.path.join(env["TMPDIR"], "mounted")) as f:
+            self.assertIn("-t tmpfs -o mode=0755,nosuid,nodev,noexec,size=1m tmpfs /run", f.read())
+
+    def test_where_run_cannot_be_covered_it_is_still_cut_and_counted_as_with_the_network(self):
+        # The final audit's 5: the system bus's and systemd-resolved's sockets
+        # under /run, which any account may write, look names up past a cut
+        # of the network alone.
+        for writable in (True, False):
+            rc, out = self.run_sh({}, self.CUT_BODY.format(d=self.d), env=self.groups_world(helper=False, writable=writable, mount=False))
+            self.assertEqual(rc, 0, out)
+            lines = out.splitlines()
+            self.assertIn("via=unshare", lines)
+            self.assertIn("open", lines, "the receipt says it had the network")
+            self.assertIn("the system's sockets under /run stay in their reach here", out)
+            shutil.rmtree(self.root)
+            os.makedirs(self.d)
+
+    def test_a_helper_from_before_the_cover_counts_as_with_the_network(self):
+        env, _ = self.helper(covers=False)
+        rc, out = self.run_sh({}, f'sdk_net_cut hexkit {self.d}; cat {self.d}/.bb-net; "${{SDK_CUT[@]}}" sh -c \'echo "via=$VIA"\'',
+                              unshare="no", env=env)
+        self.assertEqual(rc, 0, out)
+        lines = out.splitlines()
+        self.assertIn("via=helper", lines)
+        self.assertIn("open", lines)
 
     def test_a_group_that_reaches_nothing_keeps_the_namespace_of_its_own(self):
         rc, out = self.run_sh({}, self.CUT_BODY.format(d=self.d), env=self.groups_world(writable=False))

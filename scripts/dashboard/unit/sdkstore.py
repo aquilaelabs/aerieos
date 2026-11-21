@@ -77,15 +77,18 @@ class Store:
     def can_cut(self):
         """A PATH whose `unshare` stands in for a node's that can cut the
         network for a step: it runs what it is handed with CUT=yes in its
-        environment, so a step can say whether it ran behind the cut.
-        Whether this machine lets an account make a network namespace is
-        not what these tests ask."""
+        environment, so a step can say whether it ran behind the cut, and
+        whose `mount` covers /run there. Whether this machine lets an
+        account make a network namespace is not what these tests ask."""
         d = os.path.join(self.root, "cutbin")
         os.makedirs(d, exist_ok=True)
         with open(os.path.join(d, "unshare"), "w") as f:
             f.write('#!/bin/sh\nwhile [ $# -gt 0 ]; do case "$1" in --*) shift ;; *) break ;; esac; done\n'
                     '[ $# -gt 0 ] || exit 0\nCUT=yes exec "$@"\n')
-        os.chmod(os.path.join(d, "unshare"), 0o755)
+        with open(os.path.join(d, "mount"), "w") as f:
+            f.write("#!/bin/sh\nexit 0\n")
+        for name in ("unshare", "mount"):
+            os.chmod(os.path.join(d, name), 0o755)
         return d + os.pathsep + os.environ.get("PATH", "/usr/bin:/bin")
 
     def dir(self, name):
