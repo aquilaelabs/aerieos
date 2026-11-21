@@ -474,8 +474,7 @@ need not be reachable at all; the domain must be on that account. The pair
 is kept like a pasted one, filed under its hostname, and renewed thirty
 days before it ends, the way it was first got; a renewal that fails is on
 the bell and tried again a few hours later. The client is `acme.py`,
-AerieOS's own on the `cryptography` library; `BB_ACME_DIRECTORY` points
-it at another ACME directory (a staging one, or a private CA).
+AerieOS's own on the `cryptography` library, and it asks Let's Encrypt.
 
 ## Scanners
 

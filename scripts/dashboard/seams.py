@@ -39,6 +39,7 @@ SEAMS = {
     "BB_TUNNEL_ROUTE_BASE": "where a tunnel's name is asked whether it reaches this controller",
     "BB_BIN": "the aerie program the toolchain worker runs",
     "BB_AGENT_DIR": "the agent's sources a test world's controller ships, a copy of its own in the tree's place",
+    "BB_ACME_DIRECTORY": "the ACME directory certificates are asked of (a staging one), Let's Encrypt's in an install's place",
 }
 # ...and one a coding agent: where its newest release is asked, a file://
 # stand-in for its registry's answer (BB_CLAUDE_LATEST_URL and the like).

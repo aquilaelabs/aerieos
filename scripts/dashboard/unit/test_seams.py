@@ -100,10 +100,11 @@ class Seams(unittest.TestCase):
         import agents
         import apps
         import imagecheck
+        import nginxproxy
         import releasecheck
         import services
         import tunnel
-        mods = (apps, releasecheck, imagecheck, services, tunnel)
+        mods = (apps, releasecheck, imagecheck, services, tunnel, nginxproxy)
         shipped_signers = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(apps.__file__))), "..", "config", "release-signers")
         try:
             with self.env(**env), mock.patch.object(seams, "IN_TREE", False):
@@ -127,6 +128,14 @@ class Seams(unittest.TestCase):
                 for got in (toolpacks.fetch("file:///tmp/no-such-pack", commit),
                             toolpacks.fetch_folder("file:///tmp/no-such-pack", commit, sha, "packs/x", ("bbtool.json",))):
                     self.assertNotIn("git repository's address", got.get("error", ""), "in the tree its address is taken, and the fetch is what fails")
+            # Certificates are asked of Let's Encrypt: an install's
+            # environment names no other authority, a test of the tree may.
+            with self.env(**env, BB_ACME_DIRECTORY="https://ca.example/directory"):
+                with mock.patch.object(seams, "IN_TREE", False):
+                    importlib.reload(nginxproxy)
+                    self.assertEqual(nginxproxy.ACME_DIRECTORY, "https://acme-v02.api.letsencrypt.org/directory")
+                importlib.reload(nginxproxy)
+                self.assertEqual(nginxproxy.ACME_DIRECTORY, "https://ca.example/directory")
         finally:
             for m in mods:
                 importlib.reload(m)

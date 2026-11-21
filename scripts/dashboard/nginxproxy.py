@@ -32,6 +32,7 @@ from pathlib import Path
 
 import nodeset
 import packformat
+import seams
 import services
 import statefile
 import syscontainer
@@ -616,15 +617,15 @@ def view(devapp, instance_state):
 
 
 # ---- certificates from an ACME directory (R150) -----------------------------
-# Let's Encrypt, or any ACME directory (BB_ACME_DIRECTORY for a test or a
-# private CA): a pair asked for on the nginx page by hostname, by an HTTP-01
+# Let's Encrypt (another ACME directory for a test of the tree's own,
+# seams.py): a pair asked for on the nginx page by hostname, by an HTTP-01
 # challenge the node's nginx answers on port 80 (the token's line written
 # into its config for the minutes it takes) or a DNS-01 record written
 # through the Cloudflare API token Settings holds; kept on the node as any
 # pasted pair is (set_cert) and renewed by renew_loop thirty days before it
 # ends, the result on the bell either way.
 
-ACME_DIRECTORY = os.environ.get("BB_ACME_DIRECTORY") or "https://acme-v02.api.letsencrypt.org/directory"
+ACME_DIRECTORY = seams.get("BB_ACME_DIRECTORY") or "https://acme-v02.api.letsencrypt.org/directory"
 RENEW_BEFORE = 30 * 86400
 RENEW_EVERY = 6 * 3600
 cf_token = None          # () -> the Cloudflare API token, set by the server (settings.secret)

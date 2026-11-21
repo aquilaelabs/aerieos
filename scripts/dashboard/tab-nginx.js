@@ -351,7 +351,7 @@ function nginxBody(n){
       <button type="button" data-ngacmeopen${nginxAcmeOpen ? " disabled" : ""}>Get one from Let's Encrypt</button>
       <button type="button" data-ngcertopen>Add a certificate</button></div></div>
     <div class="ngacmeform"${nginxAcmeOpen ? "" : " hidden"}>
-      <div class="field"><div class="hint">A certificate for one public name, from Let's Encrypt (or the directory BB_ACME_DIRECTORY names), kept here like a pasted pair and renewed thirty days before it ends.${helpIcon(
+      <div class="field"><div class="hint">A certificate for one public name, from Let's Encrypt, kept here like a pasted pair and renewed thirty days before it ends.${helpIcon(
         "HTTP-01: Let's Encrypt fetches a token from port 80 at the name, so the name must reach this node and 80 be open to the internet; this node's nginx answers it. DNS-01: a TXT record is written through the Cloudflare API token under Controller settings, so the node need not be reachable at all; the domain must be on that Cloudflare account.")}</div></div>
       <div class="field">
         ${lbl("ngAcmeHost", "Hostname")}
