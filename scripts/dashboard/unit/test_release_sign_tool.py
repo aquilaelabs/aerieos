@@ -160,11 +160,19 @@ class Tool(unittest.TestCase):
 
     def fake_apksigner(self):
         # What apksigner verify --print-certs prints: each signer's
-        # certificate, and a source stamp's, which is nobody's signature.
+        # certificate, and a source stamp's, which is nobody's signature; as
+        # build-tools up to 36 say it, or with FAKE_APS_FORM=37 as 37 does,
+        # the scheme first (what GitHub's runner said for v0.9.0-dev.6049).
         self.aps = self.stand_in("apksigner", '[ "${FAKE_APS_RC:-0}" = 0 ] || { echo "DOES NOT VERIFY" >&2; exit 1; }\n'
+                                 'if [ "${FAKE_APS_FORM:-}" = 37 ]; then\n'
+                                 'echo "V3.0 Signer: certificate DN: CN=AerieOS"\n'
+                                 f'echo "V3.0 Signer: certificate SHA-256 digest: ${{FAKE_APS_CERT:-{CERT}}}"\n'
+                                 f'echo "Source Stamp Signer: certificate SHA-256 digest: {"f" * 64}"\n'
+                                 'else\n'
                                  'echo "Signer #1 certificate DN: CN=AerieOS"\n'
                                  f'echo "Signer #1 certificate SHA-256 digest: ${{FAKE_APS_CERT:-{CERT}}}"\n'
-                                 f'echo "Source Stamp Signer certificate SHA-256 digest: {"f" * 64}"')
+                                 f'echo "Source Stamp Signer certificate SHA-256 digest: {"f" * 64}"\n'
+                                 'fi')
 
     def asked(self, name):
         with open(os.path.join(self.d, name + ".log")) as f:
@@ -358,6 +366,32 @@ class Seal(Tool):
         code, said = self.run_tool("seal", tag, "--out", self.out, env=self.env | {"FAKE_APS_CERT": OTHER_CERT})
         self.assertEqual(code, 1)
         self.assertIn("does not name", said)
+
+    def test_each_way_apksigner_says_a_signer_is_read_and_a_source_stamp_is_never_one(self):
+        tag, apk = "v0.9.1-dev.7", "aerieos-app-0.9.1-dev.7.apk"
+        RELEASES[tag] = release("0.9.1-dev.7")
+        self.fake_apksigner()
+        env = self.env | {"FAKE_APS_FORM": "37"}
+        code, said = self.run_tool("seal", tag, "--out", self.out, env=env)
+        self.assertEqual(code, 0, said)
+        self.assertIn(f"{apk}  ({apk}.sha256 matches and apksigner verifies it as signed by a certificate config/apk-signers names)", said)
+        os.remove(os.path.join(self.out, "SHA256SUMS"))
+        code, said = self.run_tool("seal", tag, "--out", self.out, env=env | {"FAKE_APS_CERT": OTHER_CERT})
+        self.assertEqual(code, 1)
+        self.assertIn(f"is signed by a certificate config/apk-signers does not name ({tool.fingerprint(OTHER_CERT)})", said)
+        # Lines as each build-tools prints them (35 and 36, then 37, for a
+        # key signed alone and one rotated to a successor), the scheme's
+        # other lines and a stamp's in either form taken by nothing.
+        a, b, stamp = "a" * 64, "b" * 64, "f" * 64
+        said = "\n".join([
+            "Signer #1 certificate DN: CN=AerieOS", f"Signer #1 certificate SHA-256 digest: {a}",
+            "Signer #1 certificate SHA-1 digest: " + "c" * 40,
+            f"Signer (minSdkVersion=33, maxSdkVersion=2147483647) certificate SHA-256 digest: {b}",
+            f"V3.0 Signer: certificate SHA-256 digest: {a.upper()}", f"V3.1 Signer: certificate SHA-256 digest: {b}",
+            f"V2 Signer: certificate SHA-256 digest: {a}",
+            f"Source Stamp Signer certificate SHA-256 digest: {stamp}",
+            f"Source Stamp Signer: certificate SHA-256 digest: {stamp}"])
+        self.assertEqual([m.group(1).lower() for m in tool.SIGNER_CERT.finditer(said)], [a, b, a, b, a])
 
     def test_apksigner_is_found_in_the_newest_build_tools_of_the_sdk_a_runner_carries(self):
         sdk = os.path.join(self.d, "sdk")

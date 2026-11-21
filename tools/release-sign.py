@@ -264,6 +264,14 @@ def apksigner():
     return max(found)[1] if found else ""
 
 
+# A signer's certificate as apksigner verify --print-certs says it: "Signer #1
+# certificate SHA-256 digest: HEX" up to build-tools 36, "V3.0 Signer:
+# certificate SHA-256 digest: HEX" from 37, the scheme first (the runner's
+# newest said only the second, and v0.9.0-dev.6049's seal found no signer).
+# A source stamp's line starts with its own words and is never one.
+SIGNER_CERT = re.compile(r"^(?:V\d+(?:\.\d+)? )?Signer\b[^\n]*?certificate SHA-256 digest:\s*([0-9a-fA-F]{64})\s*$", re.M)
+
+
 def fingerprint(hexes):
     """64 hex characters as a certificate's fingerprint is written."""
     return ":".join(re.findall("..", hexes)).upper()
@@ -280,8 +288,7 @@ def apk_signed(tool, path, named):
         return f"is not an APK apksigner verifies as signed: {(r.stderr or r.stdout).strip()[-300:] or 'it gave no reason'}"
     # Its signers' lines, never a source stamp's, which a device does not
     # hold an install to.
-    certs = [m.group(1).lower()
-             for m in re.finditer(r"^Signer [^\n]*certificate SHA-256 digest:\s*([0-9a-fA-F]{64})\s*$", r.stdout, re.M)]
+    certs = [m.group(1).lower() for m in SIGNER_CERT.finditer(r.stdout)]
     if not certs:
         return "is signed by no certificate apksigner names"
     other = [c for c in certs if c not in named]
