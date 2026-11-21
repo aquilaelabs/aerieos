@@ -107,6 +107,25 @@ class AutoUpdate(World):
             self.assertEqual(nodes.unsigned_refused(nodes.node(self.nid)), "")
 
 
+class AgentDir(unittest.TestCase):
+    def test_the_agent_shipped_is_another_folder_only_in_the_source_tree(self):
+        # Every node runs what this controller ships as root: a folder an
+        # install's environment names is never it.
+        import importlib
+        import seams
+        tree = os.path.normpath(os.path.join(HERE, "..", "..", "agent"))
+        try:
+            with mock.patch.dict(os.environ, {"BB_AGENT_DIR": "/tmp/planted-agent"}):
+                with mock.patch.object(seams, "IN_TREE", False):
+                    importlib.reload(nodes)
+                    self.assertEqual(os.path.normpath(str(nodes.AGENT_DIR)), tree)
+                with mock.patch.object(seams, "IN_TREE", True):
+                    importlib.reload(nodes)
+                    self.assertEqual(str(nodes.AGENT_DIR), "/tmp/planted-agent", "a test world's own copy, in the tree")
+        finally:
+            importlib.reload(nodes)
+
+
 class Newer(World):
     """A controller gone back to an older image (a backup restored under
     one), its nodes still on the signed agents the newer one sent them: a

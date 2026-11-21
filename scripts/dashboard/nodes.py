@@ -38,6 +38,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import names   # noqa: E402
 import agents  # noqa: E402
+import seams   # noqa: E402
 from fields import field   # noqa: E402
 import db   # noqa: E402
 import turns   # noqa: E402
@@ -8353,8 +8354,10 @@ def job_counts():
 # The agent's sources, beside the dashboard; a test world's own copy where
 # the harness names one (BB_AGENT_DIR), so a suite that makes its controller
 # ship a newer agent changes only its own world's, not the copy every worker
-# of a whole run serves from (B718, B751, B510).
-AGENT_DIR = Path(os.environ.get("BB_AGENT_DIR") or HERE.parent / "agent")
+# of a whole run serves from (B718, B751, B510). A controller's seam, read
+# only in the source tree (seams.get): the agent every node runs as root is
+# never another folder an install's environment names.
+AGENT_DIR = Path(seams.get("BB_AGENT_DIR") or HERE.parent / "agent")
 AGENT_VERSION_PY = AGENT_DIR / "aerieos_agent" / "__init__.py"
 _agent_cache = {}
 
