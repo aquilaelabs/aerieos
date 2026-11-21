@@ -391,7 +391,7 @@ SESSION_SUDOERS = os.environ.get("BUILDERBOT_SESSION_SUDOERS", "/etc/sudoers.d/b
 # The root helper that cuts the network for a declared pack's install steps
 # where the job account cannot make a network namespace itself (R234), and
 # the one sudo rule that lets that account run it.
-NETCUT_BIN = os.environ.get("BUILDERBOT_NETCUT_BIN", "/usr/local/sbin/bb-netcut")
+NETCUT_BIN = (os.environ.get("BUILDERBOT_NETCUT_BIN") if IN_TREE else "") or "/usr/local/sbin/bb-netcut"
 NETCUT_SUDOERS = os.environ.get("BUILDERBOT_NETCUT_SUDOERS", "/etc/sudoers.d/builderbot-netcut")
 # The wall the installer writes on a controller's own machine (docs/decisions.md),
 # and where the root agent keeps that machine's compose files: under /var/lib

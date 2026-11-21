@@ -1225,7 +1225,12 @@ sdk_install_cleanup() {
 # the image pointed at a new directory, and sdkmanager, which resolves its own
 # package ids. A table that could express all five would be a language.
 SDK_META="${BB_SCRIPTS:-$(dirname "$(readlink -f "$0")")}/lib/sdkmeta.py"
-sdk_meta() { sdk_sys python3 "$SDK_META" "$@"; }
+# SDK_CATALOG: the one catalog this run reads in place of the installed
+# one, where whoever sourced this file names it afterwards (held-run.sh,
+# for the row it was handed): a variable of this shell's, which no
+# environment sets, handed to sdkmeta.py as its first words.
+SDK_CATALOG=""
+sdk_meta() { sdk_sys python3 "$SDK_META" ${SDK_CATALOG:+--catalog "$SDK_CATALOG"} "$@"; }
 
 # Read a NUL-separated list from the catalog into an array named by $1.
 sdk_meta_into() {
@@ -1715,7 +1720,8 @@ sdk_https_only() {
     SDK_PROTO="=https"
     case "$2" in
         https://*) ;;
-        file:///*) [ "${BB_TOOLPACKS_FILE_URLS:-}" = 1 ] || die "${1}: a declared download is fetched over https, and ${2} is not"
+        file:///*) { [ -n "$SDK_IN_TREE" ] && [ "${BB_TOOLPACKS_FILE_URLS:-}" = 1 ]; } \
+                       || die "${1}: a declared download is fetched over https, and ${2} is not"
                    SDK_PROTO="=file" ;;
         *) die "${1}: a declared download is fetched over https, and ${2} is not" ;;
     esac
@@ -1848,7 +1854,8 @@ sdk_inside() {
 # stop it, and gives it nothing.
 SDK_CUT=()
 SDK_CUT_MADE=""
-SDK_NET_DEV="${BUILDERBOT_NET_DEV:-/proc/self/net/dev}"
+SDK_NET_DEV=/proc/self/net/dev
+[ -z "$SDK_IN_TREE" ] || SDK_NET_DEV="${BUILDERBOT_NET_DEV:-$SDK_NET_DEV}"
 # sdk_net_none: whether this process has no network: the interfaces of its
 # own network namespace, as the kernel lists them, are a loopback alone.
 sdk_net_none() {
@@ -1856,7 +1863,8 @@ sdk_net_none() {
     ifaces="$(awk -F: 'NR > 2 { gsub(/[ \t]/, "", $1); print $1 }' "$SDK_NET_DEV" 2>/dev/null | sort -u | tr '\n' ' ')" || return 1
     [ "$ifaces" = "lo " ]
 }
-SDK_NETCUT_BIN="${BUILDERBOT_NETCUT_BIN:-/usr/local/sbin/bb-netcut}"
+SDK_NETCUT_BIN=/usr/local/sbin/bb-netcut
+[ -z "$SDK_IN_TREE" ] || SDK_NETCUT_BIN="${BUILDERBOT_NETCUT_BIN:-$SDK_NETCUT_BIN}"
 # A step relayed through the helper: sudo starts it with a plain environment,
 # so the step's own is written to a file only this account reads and read
 # back by the step's shell, after the helper has dropped to this account.

@@ -68,11 +68,24 @@ def catalog_file(shipped):
     return newer if os.path.isfile(newer) else shipped
 
 
-# BB_TOOLCHAINS_JSON points this at another catalog. It exists so the install
-# machinery can be exercised against a fake one: five recipes fetched from
-# file:// URLs prove the fetching, unpacking, environment and verify steps
-# without spending gigabytes or touching the real toolchain store root.
-CATALOG = os.environ.get("BB_TOOLCHAINS_JSON") or catalog_file(os.path.join(
+# Whether this file is AerieOS's own source tree's, and not an install's
+# (sdk.sh's SDK_IN_TREE, by the same two neighbours): the tree's Dockerfile
+# and its unit tests are beside it, which no image, no bundle a node
+# fetches and no copy root keeps holds. It is where the file is, which
+# nothing in an environment says: what a test stands in for a check with
+# is read only there, so no job and no pack turns a check off by setting a
+# variable.
+_HERE = os.path.dirname(os.path.realpath(__file__))
+IN_TREE = os.path.isfile(os.path.join(_HERE, "..", "..", "Dockerfile")) and os.path.isdir(os.path.join(_HERE, "..", "dashboard", "unit"))
+
+# BB_TOOLCHAINS_JSON points this at another catalog, in the source tree
+# alone. It exists so the install machinery can be exercised against a fake
+# one: five recipes fetched from file:// URLs prove the fetching, unpacking,
+# environment and verify steps without spending gigabytes or touching the
+# real toolchain store root. An installed copy reads its own catalog, or
+# the one it is handed as its first words (--catalog FILE, which
+# held-run.sh hands it for the one row it runs: main).
+CATALOG = (os.environ.get("BB_TOOLCHAINS_JSON") if IN_TREE else "") or catalog_file(os.path.join(
     HERE, "..", "..", "config", "toolchains.json"))
 TIMEOUT = 30
 # Some of these hosts hand a bare urllib a different answer, or none: go.dev
@@ -711,12 +724,6 @@ KEYS_DIR = os.path.join(HERE, "..", "..", "config", "release-keys")
 
 KEY_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 
-# Whether this file is AerieOS's own source tree's, and not an install's
-# (sdk.sh's SDK_IN_TREE, by the same two neighbours): where it is, which
-# nothing in an environment says.
-_HERE = os.path.dirname(os.path.realpath(__file__))
-IN_TREE = os.path.isfile(os.path.join(_HERE, "..", "..", "Dockerfile")) and os.path.isdir(os.path.join(_HERE, "..", "dashboard", "unit"))
-
 # Where gpg and gpgv are looked for: the system's own folders, as sdk.sh
 # looks for every tool a download is checked with (its SDK_SYS_PATH), never
 # a PATH a pack's bin folder is ahead of. In the source tree it is the
@@ -1208,6 +1215,11 @@ def receipt(d, commit, name=""):
 
 
 def main(argv):
+    # --catalog FILE, before anything else: the catalog this run reads, said
+    # by whoever started it and by no environment.
+    if len(argv) >= 2 and argv[0] == "--catalog":
+        global CATALOG
+        CATALOG, argv = argv[1], argv[2:]
     if not argv:
         die("usage: sdkmeta.py names|flavors|images|field|argv|resolve|size ...")
     op = argv[0]

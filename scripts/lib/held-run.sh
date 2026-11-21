@@ -108,7 +108,9 @@ else
     cat > "$top/entry.json"
 fi
 export TMPDIR="$top/tmp"
-export BB_TOOLCHAINS_JSON="$top/entry.json"
+# The row this run was handed is the catalog it reads (sdk.sh SDK_CATALOG).
+# shellcheck disable=SC2034  # sdk.sh's own, which sdk_meta reads
+SDK_CATALOG="$top/entry.json"
 exec < /dev/null
 d="$top/dir"
 
