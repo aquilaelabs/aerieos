@@ -227,18 +227,16 @@ Containers page rather than leaving the line looking like it does something.
 
 ## Building it
 
-Two paths. The second needs no tooling on your side at all.
+Any machine that runs one of the systems below will do: a server installed
+from its ISO, as walked here, or a distribution's cloud image booted as it
+comes. Nothing has to be on it beforehand. It becomes a node by running its
+Enroll script: **Enroll node** on the Nodes page asks the machine's name and
+its system and answers with one script, the token inside. Run on the machine,
+it installs Docker from a package source held to a key the script carries,
+installs the agent and enrolls it
+([machines.md](machines.md#the-nodes-page)).
 
-### From a cloud image (automatic)
-
-Download an Ubuntu 26.04 **cloud** image (or a Debian **genericcloud** qcow2),
-resize it, and boot it with the seed in `nodes/cloud-init/` attached as a second
-drive labeled `cidata`. Fill in
-the ssh key and the share tags first. `growpart` sizes the root filesystem,
-cloud-init installs Docker and mounts the shares, and the machine is ready on
-first boot.
-
-### From an ordinary install (reliable)
+### From an ordinary install
 
 Install **Ubuntu Server 26.04 LTS** (`ubuntu-26.04-live-server-amd64.iso`),
 headless, no desktop. It is what most Docker instructions assume, it turns on
@@ -587,8 +585,8 @@ Then what differs from Unraid's placeholder, each for a reason:
 
   The `target dir` is the *tag*, not a path; `provision-linux.sh --share
   workspace:/workspace` is what mounts it.
-- **Guest agent.** `qemu-guest-agent` is installed by both paths so Unraid can
-  shut the VM down cleanly instead of pulling the plug.
+- **Guest agent.** `qemu-guest-agent` is installed by the provisioner so Unraid
+  can shut the VM down cleanly instead of pulling the plug.
 
 ## Pointing AerieOS at it
 
