@@ -137,7 +137,7 @@ def forget_token(project):
 def unscope(dest):
     """Take the credential helper back off a repository.
 
-    The other half of forgetting a token: `store --file=...` naming a file that
+    The other half of forgetting a token: a helper naming a token file that
     is no longer there does not fail loudly, it finds no credentials and lets
     git fall through to asking, which on a headless box is a push that hangs
     or fails with a message about a terminal. Reset it and https simply has no
@@ -159,27 +159,6 @@ def _scope_to_token(dest, helper):
          "--replace-all", "credential.helper", ""], timeout=15)
     run(["git", "-C", str(dest), "config", "--local",
          "--add", "credential.helper", helper], timeout=15)
-
-
-def rescope_store_helpers():
-    """Each checkout whose credential.helper still names git's own store on
-    its project's token file, from before tokens were sealed (R135) and kept
-    in a person's store (R154), pointed at AerieOS's helper instead: git's
-    store reads neither, so a push with the tree's own config (a release's
-    tag) went with no credential. At start; returns the projects moved."""
-    moved = []
-    try:
-        dirs = [d for d in WORKSPACE.iterdir() if d.is_dir() and (d / ".git").exists()]
-    except OSError:
-        return moved
-    for d in dirs:
-        if not gitcreds.path(d.name).is_file():
-            continue
-        vals = run(["git", "-C", str(d), "config", "--local", "--get-all", "credential.helper"], timeout=15)["out"]
-        if f"store --file={gitcreds.path(d.name)}" in vals:
-            _scope_to_token(d, gitcreds.helper(d.name))
-            moved.append(d.name)
-    return moved
 
 
 def keyname_ok(req):

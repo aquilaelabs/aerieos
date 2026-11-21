@@ -83,11 +83,15 @@ class Sealed(unittest.TestCase):
             t.join()
         self.assertEqual(sorted(u for u, _f in gitcreds.givers("web")), uids)
 
-    def test_a_repo_still_naming_gits_store_counts_as_scoped(self):
-        f = str(gitcreds.path("web"))
-        self.assertTrue(gitcreds.names_helper(f"store --file={f}\n", "web"))
-        self.assertTrue(gitcreds.names_helper(f"!{gitcreds.HELPER} {f}\n", "web"))
-        self.assertFalse(gitcreds.names_helper("store --file=/elsewhere\n", "web"))
+    def test_a_repository_is_scoped_to_aerieos_helper_on_its_own_token_file(self):
+        # The one form a checkout's credential.helper takes (the lab's forge
+        # suite reads it back): git's own store on a space's token file reads
+        # no sealed token and none in a person's store, so it is no form of a
+        # space's helper.
+        gitcreds.write_line("web", "https://oauth2:tok@github.com")
+        self.assertEqual(gitcreds.helper("web"), f"!{gitcreds.HELPER} {gitcreds.path('web')}")
+        with open(os.path.join(HERE, "..", "gitcreds.py"), encoding="utf-8") as f:
+            self.assertNotIn("store --file", f.read())
 
 
 if __name__ == "__main__":

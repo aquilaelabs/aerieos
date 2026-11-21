@@ -5491,13 +5491,6 @@ projects.configure(run=run, workspace=WORKSPACE, agent_keys=agent_keys,
                    state=STATE, home=os.environ.get("BUILDER_HOME", str(Path.home())),
                    write_json=write_json,
                    after_create=mapping.start)
-# A checkout still pointed at git's own store, which reads neither a
-# sealed token nor one in a person's store, pointed at AerieOS's helper.
-try:
-    if (_rescoped := projects.rescope_store_helpers()):
-        print(f"dashboard: {', '.join(_rescoped)} now ask AerieOS's credential helper", flush=True)
-except OSError as e:
-    print(f"dashboard: checkouts' credential helpers left as they were: {e}", flush=True)
 # The session network reaches the containers of the projects a project reads.
 devapp.reads_of = prefs.reads_trees
 # What an agent may do on a project's git host (R188): measured with the

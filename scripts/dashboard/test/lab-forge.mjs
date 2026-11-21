@@ -125,7 +125,7 @@ const made = [];   // owner/repo pairs to delete at the end
   ok(line === `${SCHEME}://${USER}:${token}@${HOST}`,
      `the credential line names the account the forge reported, the scheme and the host with its port (${line.replace(/:[^@]*@/, ':…@')})`);
   const cfg = readFileSync(`${DIR}/ws/beta/.git/config`, 'utf8');
-  ok(cfg.includes(`url = ${GITEA}/${repo}.git`) && /credential\]\s*\n\s*helper = \n\s*helper = store --file=/.test(cfg),
+  ok(cfg.includes(`url = ${GITEA}/${repo}.git`) && /credential\]\s*\n\s*helper = \n\s*helper = !\S*git-credential-bb \S*\/gitcreds\/beta\s*\n/.test(cfg),
      'the remote is spelled as asked and the repository is scoped to its own token and nothing else');
   // Release on the real forge (R124): a version, a changelog section and a
   // build of the commit, then the Artifacts tab's Release. The tag is pushed

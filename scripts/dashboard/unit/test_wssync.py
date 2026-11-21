@@ -197,7 +197,7 @@ class Sync(unittest.TestCase):
         stayed pending on every tick and every push from the node was
         refused as behind. The same bytes are already so; different ones
         that name a program are still refused."""
-        helper = b"[credential]\n\thelper = \n\thelper = store --file=/config/gitcreds/alpha\n"
+        helper = b"[credential]\n\thelper = \n\thelper = !/opt/aerieos/scripts/dashboard/git-credential-bb /config/gitcreds/alpha\n"
         os.makedirs(f"{self.ws}/alpha/.git", exist_ok=True)
         with open(f"{self.ws}/alpha/.git/config", "wb") as f:
             f.write(helper)
