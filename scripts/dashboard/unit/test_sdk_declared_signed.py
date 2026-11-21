@@ -133,6 +133,43 @@ class Signed(sdkstore.KitCase):
         self.assertTrue(rc != 0 and "does not carry its publisher's signature" in out, out)
         self.assertFalse(os.path.exists(self.s.dir("tool")))
 
+    def test_a_signed_row_that_says_its_version_installs_that_one_and_no_other(self):
+        """A signature says who published a file, not which release it is:
+        every release that publisher signed passes it. A row that carries
+        its version installs that one, whatever its vendor's index names
+        today, and nobody is asked."""
+        for v in ("1.0", "2.0"):
+            self.s.tarball(f"tool-{v}.tar.gz", {f"tool-{v}/bin/tool": f"#!/bin/sh\necho tool {v}\n"})
+        base = "file://" + self.s.files
+        newest = os.path.join(self.s.root, "newest")
+        sigs = {v: self.sign(f"tool-{v}.tar.gz") for v in ("1.0", "2.0")}
+        self.assertEqual(sigs["1.0"], f"{base}/tool-1.0.tar.gz.sig")
+        src = {"kind": "tarball", "url": base + "/tool-{version}.tar.gz", "strip": 1,
+               "version": {"resolver": "text", "url": "file://" + newest},
+               "checksum": {"from": "signature", "sig": "{url}.sig", "keys": "kit.asc", "version": "1.0"},
+               "keyring": {"kit.asc": self.pub_asc}, "verify": ["{dir}/bin/tool"]}
+        row = self.s.row("tool", src)
+        self.assertEqual(sdkmeta.signed_version(row), "1.0")
+        self.assertEqual(sdkmeta.offered(row), ("1.0", ""))
+        # Nobody is asked what is newest: the index is not even there.
+        rc, out = self.s.sh("sdk_install tool")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("tool 1.0", subprocess.run([os.path.join(self.s.dir("tool"), "bin", "tool")], capture_output=True, text=True, check=False).stdout)
+        # A row that says none is as before: its vendor is asked what is
+        # newest, and with the index away the install has no version to take.
+        self.s.sh("sdk_remove tool")
+        row = self.s.row("tool", {**src, "checksum": {"from": "signature", "sig": "{url}.sig", "keys": "kit.asc"}})
+        self.assertEqual((sdkmeta.signed_version(row), sdkmeta.offered(row)), ("", None))
+        rc, out = self.s.sh("sdk_install tool")
+        self.assertNotEqual(rc, 0, "it asked for the newest, which is not there")
+        self.assertFalse(os.path.exists(os.path.join(self.s.dir("tool"), "bin", "tool")))
+        # A signed list of digests carries its version the same way; a pin's is its own; what is no version is none.
+        self.assertEqual(sdkmeta.signed_version({"source": {"checksum": {"from": "file", "url": "{base}/SUMS", "version": "v24.1.0",
+                                                                           "signed": {"sig": "{base}/SUMS.sig", "keys": "k.asc"}}}}), "v24.1.0")
+        for ck in ({"from": "file", "url": "{base}/SUMS", "version": "v24.1.0"}, {"from": "pin", "version": "1.0", "sha256": "ab" * 32},
+                   {"from": "signature", "version": "../1.0"}, {"from": "signature", "version": 7}, {"from": "none", "version": "1.0"}):
+            self.assertEqual(sdkmeta.signed_version({"source": {"checksum": ck}}), "", ck)
+
     def test_swift_s_recipe_runs_its_verify_behind_the_cut(self):
         # The shipped row's own source: its address and its signature's
         # files on disk, its version not asked for, and the publisher's

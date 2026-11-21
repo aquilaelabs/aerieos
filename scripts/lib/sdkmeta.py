@@ -473,15 +473,37 @@ def pinned_digest(tc):
     return got if re.fullmatch(r"[0-9a-f]{64}", got) else ""
 
 
+HELD_VERSION = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,63}")
+
+
+def signed_version(tc):
+    """The version a row held by its publisher's signature carries, or "":
+    source.checksum.version, beside `from: signature` (the download itself
+    is signed) or `from: file` with `signed` (its list of digests is). A
+    signature says who published a file and not which release it is: every
+    release that publisher ever signed passes it. So a row that carries its
+    version installs that one and no other, as a pinned row installs its
+    pin's, and its resolver stays in the row as how a newer one is found."""
+    ck = (tc.get("source") or {}).get("checksum")
+    if not isinstance(ck, dict):
+        return ""
+    held = ck.get("from") == "signature" or (ck.get("from") == "file" and isinstance(ck.get("signed"), dict))
+    v = ck.get("version")
+    return v if held and isinstance(v, str) and HELD_VERSION.fullmatch(v) else ""
+
+
 def offered(tc):
     """What a row its entry pins has on offer, (version, sha256 for this
     machine), or None for a row whose version is whatever its vendor offers
-    at the moment: the pinned version and digest, or a git source's commit.
-    `aerie toolchains check` compares an installed copy with this, so a
-    pinned row is never measured against a vendor's latest."""
+    at the moment: the pinned version and digest, the version a signed row
+    carries (signed_version), or a git source's commit. `aerie toolchains
+    check` compares an installed copy with this, so a pinned row is never
+    measured against a vendor's latest."""
     pin = pin_of(tc)
     if pin is not None:
         return str(pin.get("version") or ""), pinned_digest(tc)
+    if signed_version(tc):
+        return signed_version(tc), ""
     src = tc.get("source") or {}
     if src.get("kind") == "git" and src.get("commit"):
         return str(src["commit"])[:8], ""
@@ -490,8 +512,8 @@ def offered(tc):
 
 def resolve(tc):
     """(version, url) for a toolchain: what its pin names where its entry
-    carries one, with nobody asked; otherwise what upstream currently
-    offers.
+    carries one, or the version a signed row carries, with nobody asked;
+    otherwise what upstream currently offers.
 
     Either may come back empty: a recipe that needs no version does not have a
     resolver, and one whose resolver supplies the download URL itself has no
@@ -508,6 +530,10 @@ def resolve(tc):
         version = str(pin.get("version") or "")
         if not pinned_digest(tc):
             die(f"{tc['name']}: the row offers no pinned download for {this_platform()}")
+    elif signed_version(tc):
+        # Held by its publisher's signature, and it says which release:
+        # that one, with nobody asked what is newest.
+        version = signed_version(tc)
     else:
         version, url = newest(tc)
 
