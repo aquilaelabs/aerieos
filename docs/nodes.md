@@ -2522,8 +2522,13 @@ above, in order:
    container's shell as the docker account), running bb-tty from the aerie
    bundle the controller ships (refetched when the bundle's digest moves in
    hello). The controller's `/termws` carries the browser's socket there
-   instead of to a pty of its own (phase 10b), signed with the node's screen
-   key, with the account, its name and a session token in bb-tty's words
+   instead of to a pty of its own (phase 10b), over TLS to the certificate
+   the node made for itself and reported, and to no other: a node that has
+   none (it has neither Python's cryptography library nor `openssl`) has no
+   terminal opened on it, its row says so, and it makes one by itself at
+   its next hello once either is there; a node with a certificate answers a
+   plain request with a refusal. The opening is signed with the node's
+   screen key, with the account, its name and a session token in bb-tty's words
    exactly as it gives them locally. On the node those words are only a
    claim, so bb-tty shows the token to the controller
    (`POST /api/v1/tty-grant`) before anything starts, and the account, its

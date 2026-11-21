@@ -10,8 +10,9 @@ The node's side makes itself a certificate once (cert: by the cryptography
 library where the node has it, else openssl's command line, since ssl
 cannot make one) and says its sha256 in the hello; the controller's side refuses any
 certificate but that one (connect: the pin), so nobody between them can take
-the TLS off. Shared by both ends: the controller loads this file from the
-agent's package, as it does term.py.
+the TLS off, and opens nothing on a node that said none. Shared by both
+ends: the controller loads this file from the agent's package, as it does
+term.py.
 """
 import hashlib
 import os
@@ -58,7 +59,11 @@ def once(sig, keep_s=600, now=None):
 
 
 class Refused(OSError):
-    """The other end is not the node the controller pinned, or would not speak TLS."""
+    """The other end is not the node the controller pinned, or would not
+    speak TLS, or the node has no certificate to pin."""
+
+
+NO_PIN = "this node's relay has no certificate, so nothing is opened there unencrypted"
 
 
 def fingerprint(cert_pem_path):
@@ -108,7 +113,8 @@ def cert(folder, name="relay"):
     self-signed, the key 0600): (cert path, key path, fingerprint). Made by
     itself, with nothing for a person to do: by the cryptography library a
     node has for sealing sign-ins, else by openssl's command line. ("", "",
-    "") only on a machine with neither, where the relay stays plain."""
+    "") only on a machine with neither, whose relay the controller then
+    does not open."""
     crt, key = os.path.join(folder, f"{name}.crt"), os.path.join(folder, f"{name}.key")
     if not (os.path.isfile(crt) and os.path.isfile(key) and fingerprint(crt)):
         try:
@@ -171,13 +177,14 @@ def accept(conn, ctx):
 
 
 def connect(host, port, pin="", timeout=15):
-    """A connection to a node's relay: over TLS where the node said it has a
-    certificate (`pin`, its sha256), refused when the one presented is
-    another; the plain socket itself where it said none. What comes back
-    reads and writes as a plain socket either way."""
-    up = socket.create_connection((host, port), timeout=timeout)
+    """A connection to a node's relay, over TLS to the certificate the node
+    said it has (`pin`, its sha256) and refused when the one presented is
+    another. A node that said none is refused before anything is sent:
+    what crosses the relay is a shell, a file or a screen. What comes back
+    reads and writes as a plain socket."""
     if not pin:
-        return up
+        raise Refused(NO_PIN)
+    up = socket.create_connection((host, port), timeout=timeout)
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     ctx.minimum_version = ssl.TLSVersion.TLSv1_2
     ctx.check_hostname = False

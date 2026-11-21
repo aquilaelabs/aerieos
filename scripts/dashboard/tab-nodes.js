@@ -1190,7 +1190,7 @@ function nodeSessFacts(n){
   const rl = n.reported?.relay;
   const relay = !rl ? pill("warn", "not yet") + why("this node's agent is from before it, and takes it up with its next update")
     : rl.tls ? pill("ok", "in force")
-    : pill("bad", "not in force") + why("this node could not make itself a certificate (it has neither Python's cryptography library nor openssl)");
+    : pill("bad", "not in force") + why("its terminals, files and screens stay shut until it has Python's cryptography library or openssl");
   return `<div class="field">${factGrid([
     ["Its own network", net && net + help(`Each session here reaches the internet, the controller and its own space's containers, and nothing else${own ? "; it is also what keeps a session off the controller's own ports" : ""}.`), {html: true}],
     ["Its own user", acct && acct + help("Each account here is a Unix user of its own: its home, its sign-ins and its terminals are its alone, and only root reaches them."), {html: true}],

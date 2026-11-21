@@ -29,6 +29,7 @@ from .vms import DOMAIN_RE, VIRSH
 
 SKEW_S = 120
 PREV_KEY_S = 300
+PLAIN_REFUSED = "this node's relay takes TLS alone"
 WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 
@@ -216,25 +217,37 @@ class ScreenRelay:
         self.agent = agent
         self.srv = None
         self.tls = None
+        self.securing = threading.Lock()
 
     def secure(self):
         """The relay's own certificate, made once beside the agent's data
-        (R243), and its sha256 said in the hello so the controller pins it;
-        without openssl the relay stays plain, and the node's page says so."""
-        data = ((self.agent.state.get("stores") or {}).get("data")) or VAR + "/data"
-        crt, key, fp = relaytls.cert(os.path.join(data, "relay"))
-        if not fp:
-            RELAY["tls"] = ""
-            log_once("relay-tls", "screen: no certificate could be made (neither python's cryptography library nor openssl "
-                                  "is on this machine), so terminals, files and VMs' screens cross the network unencrypted")
-            return
-        try:
-            self.tls = relaytls.server_context(crt, key)
-        except (OSError, ValueError) as e:
-            RELAY["tls"] = ""
-            log_once("relay-tls", f"screen: the relay's certificate could not be loaded ({e}), so it is served unencrypted")
-            return
-        RELAY["tls"] = fp
+        (R243), and its sha256 said in the hello so the controller pins it.
+        A node with neither the cryptography library nor openssl has none:
+        the controller opens nothing on its relay, and the node's page says
+        why. Asked again at each hello until there is one, so a library put
+        on the machine later is taken up without a restart."""
+        with self.securing:
+            if self.tls is not None:
+                return
+            data = ((self.agent.state.get("stores") or {}).get("data")) or VAR + "/data"
+            crt, key, fp = relaytls.cert(os.path.join(data, "relay"))
+            if not fp:
+                RELAY["tls"] = ""
+                log_once("relay-tls", "screen: no certificate could be made (neither python's cryptography library nor "
+                                      "openssl is on this machine), so the controller opens no terminal, file or VM screen here")
+                return
+            try:
+                self.tls = relaytls.server_context(crt, key)
+            except (OSError, ValueError) as e:
+                RELAY["tls"] = ""
+                log_once("relay-tls", f"screen: the relay's certificate could not be loaded ({e}), so the controller opens nothing here")
+                return
+            RELAY["tls"] = fp
+
+    def again(self):
+        """The certificate asked for again where the listener is up with none."""
+        if self.tls is None and self.srv is not None:
+            self.secure()
 
     def start(self):
         threading.Thread(target=self.run, name="screen", daemon=True).start()
@@ -296,13 +309,16 @@ class ScreenRelay:
 
     @staticmethod
     def _one(conn, key, kinds, tls=None):
-        # Over TLS where the controller opens with it (it does once this
-        # node has said it has a certificate); a plain request is still
-        # taken, told by its first byte, so a controller put back to an
-        # older build keeps its terminals.
+        # Over TLS alone once this node has a certificate, which it says in
+        # its hello so the controller opens TLS to it and to nothing else:
+        # a plain request, told by its first byte, is answered with why and
+        # served nothing.
         plain = conn
         try:
-            if tls is not None and relaytls.looks_tls(conn):
+            if tls is not None:
+                if not relaytls.looks_tls(conn):
+                    _refuse(conn, 426, PLAIN_REFUSED)
+                    return
                 plain = relaytls.accept(conn, tls)
             serve_one(plain, key, kinds)
         except OSError:

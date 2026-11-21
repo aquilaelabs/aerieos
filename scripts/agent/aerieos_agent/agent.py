@@ -421,6 +421,10 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             share_images((self.state.get("stores") or {}).get("toolchains") or "")
         except OSError as e:
             log(f"toolchain store: could not share the images ({e})")
+        # The relay's certificate, asked for again while there is none, so
+        # it is in this census once the machine can make one.
+        if getattr(self, "screen", None) is not None:
+            self.screen.again()
         said = census(self.state)
         # The roots the file explorer may be asked for are this census's own.
         files.note_roots(said)

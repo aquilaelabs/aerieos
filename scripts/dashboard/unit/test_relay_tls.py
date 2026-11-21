@@ -2,9 +2,10 @@
 of 13 Nov): terminals, the file explorer's requests and a VM's screen
 crossed the LAN as plain websockets, the opening request signed and good for
 two minutes with nothing remembering which had been used. The TLS layer on
-real sockets, the relay's own listener taking it (and a plain request
-still), the controller's side refusing any certificate but the one the node
-reported, and a request refused the second time."""
+real sockets, the relay's own listener taking it and refusing a plain
+request once it has a certificate, the controller's side refusing any
+certificate but the one the node reported and opening nothing on a node
+that reported none, and a request refused the second time."""
 import hashlib
 import hmac
 import os
@@ -104,7 +105,7 @@ class Relay(unittest.TestCase):
         relaytls.server_context(by_openssl[0], by_openssl[1])
         with mock.patch.object(relaytls, "_made_by_library", lambda crt, key: False), \
                 mock.patch.object(relaytls.subprocess, "run", side_effect=OSError("no openssl")):
-            self.assertEqual(relaytls.cert(os.path.join(self.d, "elsewhere")), ("", "", ""), "neither: no certificate, and the relay stays plain")
+            self.assertEqual(relaytls.cert(os.path.join(self.d, "elsewhere")), ("", "", ""), "neither: no certificate")
 
     def test_a_signed_request_is_served_over_tls_and_once(self):
         # Signed, with a value of its own: past the checks (no terminal programs here, so it says that).
@@ -124,11 +125,38 @@ class Relay(unittest.TestCase):
         forged = urllib.parse.urlencode({"a": blob, "t": when, "s": term.sign(KEY, relaytls.subject(blob, "dd44"), when), "n": "ee55"})
         self.assertIn("not signed", self.ask(f"GET /term?{forged} HTTP/1.1\r\nHost: node\r\n\r\n".encode()))
 
-    def test_a_controller_from_before_is_still_served_plain_and_unvalued(self):
-        # Put back to an older build, the controller speaks neither: its terminals still open.
-        req = self.term_request()
-        self.assertIn("this node's terminals are not up", self.ask(req, pin=""))
-        self.assertIn("this node's terminals are not up", self.ask(req, pin=""), "with no value there is nothing to remember, as before")
+    def test_a_plain_request_is_refused_once_the_node_has_a_certificate(self):
+        # Whoever speaks to the relay without TLS, signed or not, is told why
+        # and served nothing: no terminal, no file, no screen in the clear.
+        for req in (self.term_request(), self.term_request(nonce="ab12"),
+                    b"GET /files?a=x HTTP/1.1\r\nHost: node\r\n\r\n"):
+            c = socket.create_connection(("127.0.0.1", self.port), timeout=10)
+            c.sendall(req)
+            said = answer(c)
+            self.assertIn("426", said.split("\r\n")[0])
+            self.assertTrue(said.endswith(screen.PLAIN_REFUSED), said)
+            self.assertNotIn("terminals are not up", said)
+        # ...and a request with no value is still taken over TLS, as before.
+        self.assertIn("this node's terminals are not up", self.ask(self.term_request()))
+
+    def test_the_controller_opens_nothing_on_a_node_with_no_certificate(self):
+        # A node that reported none: refused before a byte is sent, in one
+        # phrase, which the terminal's close, the screen and the files show.
+        seen = []
+        quiet = socket.socket()
+        quiet.bind(("127.0.0.1", 0))
+        quiet.listen(1)
+        self.addCleanup(quiet.close)
+        quiet.settimeout(0.5)
+        with self.assertRaises(relaytls.Refused) as e:
+            relaytls.connect("127.0.0.1", quiet.getsockname()[1], "", timeout=10)
+        self.assertEqual(str(e.exception), relaytls.NO_PIN)
+        self.assertLessEqual(len(relaytls.NO_PIN), 120, "the terminal's close carries 120 characters")
+        try:
+            seen.append(quiet.accept())
+        except OSError:
+            pass
+        self.assertEqual(seen, [], "nothing dialed the node")
 
     def test_the_controller_takes_the_reported_certificate_and_no_other(self):
         with self.assertRaises(relaytls.Refused) as e:
@@ -221,6 +249,29 @@ class Relay(unittest.TestCase):
         c.close()
         self.assertEqual(len(got), 4096 * 256)
         self.assertEqual(bytes(got[:4096]), chunk[::-1])
+
+    def test_a_node_with_no_certificate_makes_one_at_its_next_census(self):
+        # Neither the library nor openssl at the listener's start: none, said
+        # as none. Either put on the machine later: made at the next census,
+        # with nothing for a person to do there.
+        class Agent:
+            state = {"stores": {"data": tempfile.mkdtemp(dir=self.d)}}
+        relay = screen.ScreenRelay(Agent())
+        relay.srv = object()
+        self.addCleanup(screen.RELAY.update, dict(screen.RELAY))
+        with mock.patch.object(relaytls, "_made_by_library", lambda crt, key: False), \
+                mock.patch.object(relaytls.subprocess, "run", side_effect=OSError("no openssl")), \
+                mock.patch.object(screen, "log_once", lambda *a: None):
+            relay.secure()
+            self.assertEqual((relay.tls, screen.RELAY["tls"]), (None, ""))
+            relay.again()
+            self.assertEqual((relay.tls, screen.RELAY["tls"]), (None, ""))
+        relay.again()
+        self.assertIsNotNone(relay.tls)
+        self.assertTrue(screen.RELAY["tls"].startswith("sha256:"))
+        made = relay.tls
+        relay.again()
+        self.assertIs(relay.tls, made, "made once")
 
 
 class Once(unittest.TestCase):
