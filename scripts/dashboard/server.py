@@ -630,9 +630,8 @@ bellseen.configure(state=STATE, write_json=write_json)
 import notices                                                   # noqa: E402
 notices.configure(state=STATE, write_json=write_json)
 # Scheduled scripts (R117): an administrator's cron, kept in the state and
-# never on the share; the built-in scan's script two levels above, as the
-# image and a checkout both keep it.
-import schedules                                                 # noqa: E402
+# never on the share.
+import schedules                                                # noqa: E402
 schedules.configure(state=STATE, write_json=write_json)
 # ...and AerieOS's own docs, read on the Help page: helpdocs.py (R258).
 import helpdocs                                                  # noqa: E402
