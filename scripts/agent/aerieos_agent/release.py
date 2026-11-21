@@ -93,10 +93,10 @@ and no spare, on a statement whose signature holds under the key it pinned,
 pins the spare named (spare_pin). The statement is the pinned key's and not
 the controller's: one under any other key pins nothing, a key added at the
 console among them, and so does one on a node that has a spare already or
-whose console chose to pin no key. A build's statement also signs the
-build that made it, and one below this agent's names nothing: a release
-after it may have retired that spare. One from before builds said theirs
-has no floor under it yet.
+whose console chose to pin no key. The statement signs the build that
+made it, and one below this agent's names nothing: a release after it may
+have retired that spare. One that names no build names nothing either, so
+no statement can be passed off as one with its build taken away.
 """
 import hashlib
 import io
@@ -118,13 +118,14 @@ TOOLS_MESSAGE = b"aerieos root tools v1\n"
 # line, then the digest of that list as the bundle carries it. A third line,
 # so no signature passes as another.
 BUNDLE_MESSAGE = b"aerieos bundle v1\n"
-# ...and for the release key's word that another key is its spare: this
-# line, then the spare as 64 hex characters. A fourth line, so a signature
-# over an agent, root's tools or a bundle's list never names a spare.
+# ...and for the release key's word that another key is its spare without
+# the build that said it, which names nothing (spare_said): this line, then
+# the spare as 64 hex characters. A fourth line, so a signature over an
+# agent, root's tools or a bundle's list never names a spare.
 SPARE_MESSAGE = b"aerieos release spare v1\n"
-# ...and for the same word with the build that said it: this line, the
-# spare, a line break and the build (spare_built). A fifth line, so neither
-# passes as the other.
+# ...and for the same word with the build that said it, the one a statement
+# is taken on: this line, the spare, a line break and the build
+# (spare_built). A fifth line, so neither passes as the other.
 SPARE_BUILT_MESSAGE = b"aerieos release spare v2\n"
 # What a controller adds to the bundle beside the files a release ships, so
 # what a release's list never names and a pinned node lets ride: a person's
@@ -365,33 +366,30 @@ def spare_built(spare_key, build):
 
 def spare_said(key, said, floor=0):
     """The spare `said` names, where it is `key`'s own word for it: `said`
-    is {"key": the spare, "sig": the signature} as a release's build writes
-    it (tools/sign-agent.py), signed by `key` over SPARE_MESSAGE and the
-    spare's 64 hex characters. A build's statement also says which build
-    made it ("build", and "build_sig" over spare_built): then that is the
-    signature checked, and a build below `floor` names nothing, since a
-    release after it may have retired that spare. One that says no build
-    has no floor under it yet. "" for anything else: no statement, one in
-    another shape, one that names `key` itself, one whose signature is not
-    `key`'s, and any where this node has no library to check it with."""
-    if not isinstance(said, dict) or not isinstance(said.get("key"), str) or not isinstance(said.get("sig"), str):
+    is {"key": the spare, "build": the build that said it, "build_sig": the
+    signature} as a release's build writes it (tools/sign-agent.py), signed
+    by `key` over spare_built, and a build below `floor` names nothing,
+    since a release after it may have retired that spare. "" for anything
+    else: no statement, one in another shape, one that names no build (a
+    statement from before builds said theirs, or one with its build taken
+    away), one that names `key` itself, one whose signature is not `key`'s,
+    and any where this node has no library to check it with. A "sig" beside
+    the build, the word without it, is not read."""
+    if not isinstance(said, dict) or not isinstance(said.get("key"), str):
         return ""
-    key, second, sig = clean_key(key), clean_key(said["key"]), said["sig"].strip().lower()
+    key, second = clean_key(key), clean_key(said["key"])
+    build, sig = said.get("build"), str(said.get("build_sig") or "").strip().lower()
     if not key or not second or second == key or not SIG_RE.fullmatch(sig):
         return ""
-    message = SPARE_MESSAGE + second.encode()
-    if "build" in said or "build_sig" in said:
-        build, sig = said.get("build"), str(said.get("build_sig") or "").strip().lower()
-        if not isinstance(build, int) or isinstance(build, bool) or build < 0 or not SIG_RE.fullmatch(sig) or build < floor:
-            return ""
-        message = spare_built(second, build)
+    if not isinstance(build, int) or isinstance(build, bool) or build < 0 or build < floor:
+        return ""
     try:
         from cryptography.exceptions import InvalidSignature
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
     except ImportError:
         return ""
     try:
-        Ed25519PublicKey.from_public_bytes(bytes.fromhex(key)).verify(bytes.fromhex(sig), message)
+        Ed25519PublicKey.from_public_bytes(bytes.fromhex(key)).verify(bytes.fromhex(sig), spare_built(second, build))
     except (InvalidSignature, ValueError):
         return ""
     return second

@@ -229,9 +229,10 @@ class Update(Case):
         return sorted(n for n in os.listdir(self.d) if n not in ("aerieos-agent", "node.json", ".node.json.lock"))
 
     def statement(self, by=None, names=None):
-        """The release key's own word that `names` is its spare."""
-        names = names or self.spare
-        return {"key": names, "sig": (by or self.k).sign(self.release.SPARE_MESSAGE + names.encode()).hex()}
+        """The release key's own word that `names` is its spare, as of this
+        agent's build."""
+        names, build = names or self.spare, self.release.own_build()
+        return {"key": names, "build": build, "build_sig": (by or self.k).sign(self.release.spare_built(names, build)).hex()}
 
     def test_the_first_signed_update_is_installed_and_pins_the_key_it_is_under(self):
         (state, code), job = self.update(sig=self.sign(self.k, digest(NEW)), release_keys=[self.pub, self.spare],

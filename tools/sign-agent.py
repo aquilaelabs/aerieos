@@ -15,11 +15,12 @@ the publishers' keys, root's tools, the hooks).
 
 A build the release key itself signs carries a fourth thing, where
 config/aerieos-release.pub names a spare: the release key's own statement
-that the second key is its spare, under a fourth line (release.SPARE_MESSAGE).
-A node that pinned the release key before the spare was named pins the
-spare from it, with nobody at its console (release.spare_pin). A build the
-spare signs makes none, and neither does a builder's: only the first key
-says what its spare is.
+that the second key is its spare as of this tree's agent build, under a
+line of its own (release.spare_built). A node that pinned the release key
+before the spare was named pins the spare from it, with nobody at its
+console (release.spare_pin), unless its own agent is past that build. A
+build the spare signs makes none, and neither does a builder's: only the
+first key says what its spare is.
 
     tools/sign-agent.py --keygen
         a new key pair, printed once: the private half for the build's
@@ -156,15 +157,14 @@ def _write(key, path, spare=""):
            # under a third line: the controller passes it on beside the list.
            "bundle": {"digest": b, "sig": key.sign(release.BUNDLE_MESSAGE + b.encode()).hex()}}
     if spare:
-        # The release key's word for its spare, under a fourth line: what a
-        # node that pinned this key alone pins the spare from. Of the keys
-        # and nothing in the tree, so every build this key signs says it.
-        # ...and the same word with this tree's agent build in it, under a
-        # fifth: a node takes none from a build older than its own agent,
-        # so a statement a later release retired is not taken again.
+        # The release key's word for its spare, with this tree's agent build
+        # in it, under a line of its own: what a node that pinned this key
+        # alone pins the spare from. Every build this key signs says it, and
+        # a node takes none from a build older than its own agent, so a
+        # statement a later release retired is not taken again. Never the
+        # word without the build, which could pass as any build's.
         build = agent_build()
-        out["spare"] = {"key": spare, "sig": key.sign(release.SPARE_MESSAGE + spare.encode()).hex(),
-                        "build": build, "build_sig": key.sign(release.spare_built(spare, build)).hex()}
+        out["spare"] = {"key": spare, "build": build, "build_sig": key.sign(release.spare_built(spare, build)).hex()}
     with open(path, "w", encoding="utf-8") as f:
         json.dump(out, f)
         f.write("\n")
@@ -190,10 +190,8 @@ def _spare_why(got, by):
         return f"it names another spare than {os.path.relpath(PUB)} does"
     if said.get("build") != agent_build():
         return "its statement of the spare is not of this tree's agent build"
-    # ...and the same word without the build, which an agent from before
-    # the build was said reads.
-    if release.spare_said(keys[0], {"key": said.get("key"), "sig": said.get("sig")}) != named:
-        return "its statement of the spare without the build is not signed by the release key"
+    if "sig" in said:
+        return "its statement of the spare carries the word without the build, which could pass as any build's"
     return ""
 
 
@@ -331,8 +329,8 @@ def main(argv):
             "it is for other files than this tree's bundle ships" if part.get("digest") != bundle_digest() else \
             release.verify(by or public_key(), part.get("digest"), part.get("sig"), release.BUNDLE_MESSAGE)
         print(f"{os.path.relpath(SIG)}: the bundle's files: " + (bwhy or f"signed by {(by or public_key())[:16]}… for {bundle_digest()[:19]}…"))
-        # ...and the release key's statement of its spare, under the fourth
-        # line: there in a build that key signed, and nowhere else.
+        # ...and the release key's statement of its spare, under a line of
+        # its own: there in a build that key signed, and nowhere else.
         swhy = _spare_why(got, by)
         if swhy or got.get("spare") is not None:
             print(f"{os.path.relpath(SIG)}: the spare: " + (swhy or f"named by {public_key()[:16]}… as {public_keys()[1][:16]}…"))

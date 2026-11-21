@@ -3988,28 +3988,25 @@ def agent_spare_said():
     """The release key's signed word for its spare, where this build's
     agent.sig carries one (tools/sign-agent.py writes it when the release
     key itself signs the build), passed on beside every agent update and in
-    every hello as release_spare_sig: {"key": the spare, "sig": the
-    signature}. A node that pinned the release key and no spare pins the
-    spare on it, when the signature is the key's it pinned (the agent's
-    release.spare_pin); every other node reads none of it. {} for a build
-    with none. Passed on as it is: this side holds no key and checks
-    nothing, and its own word adds no key anywhere."""
+    every hello as release_spare_sig: {"key": the spare, "build": the
+    build that said it, "build_sig": the signature over both}. A node that
+    pinned the release key and no spare pins the spare on it, when the
+    signature is the key's it pinned and the build is not below its own
+    agent's (the agent's release.spare_pin); every other node reads none
+    of it. {} for a build with none, and for a statement that names no
+    build. Passed on as it is, less anything else beside it: this side
+    holds no key and checks nothing, and its own word adds no key anywhere."""
     try:
         said = json.loads((AGENT_DIR / "agent.sig").read_text()).get("spare")
     except (OSError, ValueError, AttributeError):
         return {}
     if not isinstance(said, dict):
         return {}
-    key, sig = str(said.get("key") or "").lower(), str(said.get("sig") or "").lower()
-    if not re.fullmatch(r"[0-9a-f]{64}", key) or not re.fullmatch(r"[0-9a-f]{128}", sig):
+    key, build, bsig = str(said.get("key") or "").lower(), said.get("build"), str(said.get("build_sig") or "").lower()
+    if not re.fullmatch(r"[0-9a-f]{64}", key) or not isinstance(build, int) or isinstance(build, bool) or build < 0 \
+            or not re.fullmatch(r"[0-9a-f]{128}", bsig):
         return {}
-    out = {"key": key, "sig": sig}
-    # ...and the build that said it, where the build signed that too: a node
-    # takes none older than its own agent (the agent's release.spare_said).
-    build, bsig = said.get("build"), str(said.get("build_sig") or "").lower()
-    if isinstance(build, int) and not isinstance(build, bool) and build >= 0 and re.fullmatch(r"[0-9a-f]{128}", bsig):
-        out.update(build=build, build_sig=bsig)
-    return {"release_spare_sig": out}
+    return {"release_spare_sig": {"key": key, "build": build, "build_sig": bsig}}
 
 
 def agent_carried():
