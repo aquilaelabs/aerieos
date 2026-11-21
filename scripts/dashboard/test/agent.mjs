@@ -2529,10 +2529,11 @@ import toolchains as tc
 tc.nodes = types.SimpleNamespace(job_tail=lambda jid, n=4000: sys.stdin.read())
 print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: log, encoding: 'utf8' }));
       const why = parsed.graphics || '';
-      ok(/(^| )curl: \(22\)/.test(why) && /could not download/.test(why) && /exit 1/.test(why)
-         && /install failed on the node$/.test(why) && !/diagrams/.test(why) && !/did not install/.test(why)
-         && !/#=#|##O/.test(why),
-         `...and the reason is that toolchain's own section of the log, with the exit and without the frames (${why.slice(0, 120)})`);
+      // bb's ERROR is the row: curl's own words, the bar and the partial
+      // copy's removal stay in the log.
+      ok(why === 'ERROR: could not download https://example.invalid/ImageMagick-gcc-x86_64.AppImage · install failed on the node'
+         && !/diagrams/.test(why) && !/did not install/.test(why) && !/#=#|##O|curl:/.test(why),
+         `...and the reason is that toolchain's own error, from its own section of the log, without the frames (${why.slice(0, 120)})`);
     }
     // The store's own directories decide what is installed there, not the
     // census's placement summary, which named six toolchains and called four
