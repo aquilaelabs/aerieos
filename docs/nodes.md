@@ -534,7 +534,9 @@ the swap has three guards:
 - *Before it.* The new file is run once as `aerieos-agent selfcheck`, which
   loads the agent as `run` does, compiles every module and reads the node's
   state. A file that fails is not installed; the job says why and the node
-  carries on as it was.
+  carries on as it was. Nor is one that has no such verb to ask, a build
+  from before the check: nothing would put the old one back if it did not
+  start.
 - *Beside it.* The file being replaced is kept (`FILE.prev`), and the new
   one is on trial (`FILE.trial`) until the controller answers its first
   `hello`.

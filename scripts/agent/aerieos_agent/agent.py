@@ -1446,13 +1446,16 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             f.write(body)
         os.chmod(tmp, 0o755)
         # The new file asked to load itself here, before it is the one this
-        # node runs (R241): one that cannot is never installed.
+        # node runs (R241): one that cannot, or that has no way to be asked,
+        # is never installed, since nothing would put the old one back.
         ok, said = selfcheck(tmp)
-        if ok is False:
+        if not ok:
             with contextlib.suppress(OSError):
                 os.unlink(tmp)
-            job.why = f"the new agent does not start on this node, so it was not installed: {said}"
+            job.why = ("the new agent cannot check itself here, so it was not installed" if ok is None
+                       else f"the new agent does not start on this node, so it was not installed: {said}")
             job.say(job.why + "\n")
+            log(f"the agent update {got[:19]}… was not installed: {job.why}")
             return "failed", 78
         # ...and the file it replaces kept beside it, with the note that the
         # new one is on trial: the entry puts the old one back when the new
@@ -1460,8 +1463,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         try:
             shutil.copy2(me, me + ".prev.w")
             os.replace(me + ".prev.w", me + ".prev")
-            if ok:
-                trial_begin(got, own_digest())
+            trial_begin(got, own_digest())
         except OSError as e:
             for x in (tmp, me + ".prev.w"):
                 with contextlib.suppress(OSError):
@@ -1469,14 +1471,14 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             job.why = f"the agent this would replace could not be kept beside it ({e}), so nothing was installed"
             job.say(job.why + "\n")
             return "failed", 73
-        job.say((said + "\n") if ok else "this build is from before the start check: installed without it\n")
+        job.say(said + "\n")
         # A node that trusted no key pins the release's on this, its first
         # signed update, as the last thing before the file is the one it
         # runs: a pin that cannot be written installs nothing, and takes
         # the trial's note with it, since the agent here is still the old one.
         if pin:
             def undo(why, code):
-                for x in (tmp,) + ((me + ".trial",) if ok else ()):
+                for x in (tmp, me + ".trial"):
                     with contextlib.suppress(OSError):
                         os.unlink(x)
                 job.why = getattr(why, "cause", "") or why

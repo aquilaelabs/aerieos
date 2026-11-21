@@ -48,15 +48,16 @@ def version():
 
 def an_agent(said=None, note=""):
     """An agent's zip as a node is sent one, as small as one can be: the
-    line a program starts with, and the package's __init__.py saying its
-    version (`said`; this tree's when none is given). It carries no start
-    check, so a node installs it as a build from before that. `note` makes
-    two of them differ."""
+    line a program starts with, the package's __init__.py saying its
+    version (`said`; this tree's when none is given), and a start check
+    that passes, so a node takes it as it takes a build that loads. `note`
+    makes two of them differ."""
     buf = io.BytesIO()
     buf.write(b"#!/usr/bin/env python3\n")
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as z:
-        z.writestr("__main__.py", f"# {note}\n")
+        z.writestr("__main__.py", f"# {note}\nimport sys\nif sys.argv[1:] == [\"selfcheck\"]:\n    print(\"selfcheck ok\")\n")
         z.writestr("aerieos_agent/__init__.py", f'AGENT_VERSION = "{said or version()}"\n')
+        z.writestr("aerieos_agent/cli.py", '# answers "selfcheck" in __main__\n')
     return buf.getvalue()
 
 

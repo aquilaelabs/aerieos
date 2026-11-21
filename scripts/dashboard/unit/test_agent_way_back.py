@@ -252,14 +252,19 @@ class Update(unittest.TestCase):
         # ...and one that cannot be compiled does.
         self.assertEqual(self.update(out2.getvalue())[0], ("failed", 78))
 
-    def test_a_build_from_before_the_check_is_installed_as_every_build_was(self):
-        older = fake("OLDER BUILD")
-        (state, code), job = self.update(older)
-        self.assertEqual((state, code), ("succeeded", 0))
-        self.assertIn("from before the start check", job.said)
-        self.assertEqual(self.read(), older)
-        self.assertEqual(self.read(".prev"), self.old)
-        self.assertIsNone(self.note(".trial"), "its entry holds no way back, so nothing is on trial")
+    def test_a_build_that_cannot_be_asked_to_load_is_never_installed(self):
+        # One with no start check to ask (a build from before it, or a zip
+        # with no cli.py at all) would go in with no trial and nothing to
+        # put the old one back: refused in one phrase, as one that fails.
+        nocli = io.BytesIO()
+        with zipfile.ZipFile(nocli, "w") as z:
+            z.writestr("__main__.py", "print('hi')\n")
+        for body in (fake("OLDER BUILD"), nocli.getvalue(), b"not a zip at all"):
+            (state, code), job = self.update(body)
+            self.assertEqual((state, code, job.installed), ("failed", 78, False), job.said)
+            self.assertEqual(job.why, "the new agent cannot check itself here, so it was not installed")
+            self.assertEqual(self.read(), self.old)
+            self.assertEqual([n for n in os.listdir(self.d) if n not in ("aerieos-agent", "node.json")], [])
 
     def test_one_it_went_back_from_is_a_persons_to_send_again(self):
         with open(self.me + ".back", "w") as f:

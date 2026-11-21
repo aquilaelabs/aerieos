@@ -1435,8 +1435,8 @@ def back_note():
 def selfcheck(path):
     """The agent file at `path` asked to load itself, before it replaces the
     running one: (True, what it said) when it does, (False, why) when it
-    does not, and (None, "") for a build from before the check, which has no
-    such verb and is installed as every build was."""
+    does not, and (None, "") for a file with no such verb to ask, which is
+    refused as well: nothing would put the old one back if it did not start."""
     import zipfile
     try:
         with zipfile.ZipFile(path) as z:
