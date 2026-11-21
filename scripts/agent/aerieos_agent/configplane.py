@@ -746,8 +746,9 @@ class ConfigPlaneMixin:
         job.say("it is still running; this agent goes with it, so this is its last word\n")
         return "succeeded", 0
 
-    def _sh(self, job, argv, cwd=None, timeout=300):
-        """One command, its output into the job's log, its exit code back.
+    def _sh(self, job, argv, cwd=None, timeout=300, pass_fds=()):
+        """One command, its output into the job's log, its exit code back;
+        `pass_fds` the descriptors it is handed at their own numbers.
 
         `cwd` matters more than it looks: the runner's own svc.sh resolves
         everything relative to where it is invoked and refuses with "Must run
@@ -766,7 +767,7 @@ class ConfigPlaneMixin:
         began = time.monotonic()
         try:
             p = subprocess.Popen(argv, cwd=cwd, stdout=subprocess.PIPE,
-                                 stderr=subprocess.STDOUT, start_new_session=True)
+                                 stderr=subprocess.STDOUT, start_new_session=True, pass_fds=tuple(pass_fds))
         except OSError as e:
             job.say(f"{argv[0]}: {e}\n")
             return 1
