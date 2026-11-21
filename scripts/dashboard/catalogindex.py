@@ -268,6 +268,24 @@ def made(index):
         return None
 
 
+STAMP = r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ"
+
+
+def floor():
+    """(when, as said) of the oldest index this AerieOS takes, from the file
+    beside the maintainers' key (config/catalog-floor: one line, a moment
+    as an index says its own), or (None, "") where the install ships none
+    or it is not that."""
+    try:
+        with open(os.path.join(os.path.dirname(os.path.normpath(PUB_FILE)), "catalog-floor"), encoding="utf-8") as f:
+            lines = [ln.strip() for ln in f if ln.strip() and not ln.lstrip().startswith("#")]
+        if len(lines) != 1 or not re.fullmatch(STAMP, lines[0]):
+            return None, ""
+        return calendar.timegm(time.strptime(lines[0], "%Y-%m-%dT%H:%M:%SZ")), lines[0]
+    except (OSError, ValueError):
+        return None, ""
+
+
 def older(new, held, what="the index kept here"):
     """Why `new` is not taken in the place of `held` (`what`, in the
     refusal's words), or "": the one comparison of two signed indexes, for
@@ -279,15 +297,23 @@ def older(new, held, what="the index kept here"):
     updates. So one made before the one held is refused. One that does not
     say when it was made is refused too wherever the one held does, or
     leaving the date out would be the way round. One made at the same
-    moment is taken, the same bytes or not: an index signed before the
-    catalog's signing stamped each one can share its date with another, and
-    an install that refused the second would be kept from the catalog's
-    newest. Nothing held, or a held one with no date of its own, refuses
-    nothing: there is nothing to be older than."""
+    moment is taken: the catalog's signing stamps each index with the
+    moment, so two signed ones that differ do not share one, and the
+    indexes from before that stamp are older than any release's floor.
+
+    An install that holds none yet has nothing to be older than, so the
+    release says the oldest it takes (floor): one made before that, or one
+    that does not say when it was made, is refused whatever is held."""
+    now = made(new)
+    least, least_said = floor()
+    if least is not None:
+        if now is None:
+            return f"it does not say when it was made, and this AerieOS takes none made before {least_said}"
+        if now < least:
+            return f"it was made {new.get('generated')}, before the oldest this AerieOS takes ({least_said})"
     was = made(held)
     if was is None:
         return ""
-    now = made(new)
     if now is None:
         return f"it does not say when it was made, and {what} was made {held.get('generated')}"
     if now < was:

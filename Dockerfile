@@ -306,6 +306,9 @@ COPY config/toolchains.json /opt/aerieos/config/toolchains.json
 COPY config/release-keys/ /opt/aerieos/config/release-keys/
 # ...and the vetted catalog maintainers' key its signed index is checked against (R169).
 COPY config/catalog.pub /opt/aerieos/config/catalog.pub
+# ...and the oldest index this release takes, so an install that holds none
+# yet is not handed one from before it (catalogindex.floor).
+COPY config/catalog-floor /opt/aerieos/config/catalog-floor
 # ...and AerieOS's own release key, public half, which the Enroll script hands
 # a node to pin (R227): without it here no script carried one.
 COPY config/aerieos-release.pub /opt/aerieos/config/aerieos-release.pub

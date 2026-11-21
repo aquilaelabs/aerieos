@@ -5,6 +5,7 @@ each entry held to its shape, and a withdrawn pack the install holds put
 on the bell."""
 import json
 import os
+import time
 import shutil
 import sys
 import tempfile
@@ -277,6 +278,40 @@ class Made(unittest.TestCase):
         self.assertEqual(older(old, None), "")
         self.assertEqual(older(old, {"generated": "zzzz"}), "", "a kept index with no date refuses nothing")
         self.assertEqual(older({}, {}), "")
+
+    def test_a_release_says_the_oldest_index_it_takes(self):
+        # An install that holds none yet has nothing to be older than: the
+        # file beside the maintainers' key says the oldest it takes.
+        older, floor = catalogindex.older, catalogindex.floor
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d, True)
+        was = catalogindex.PUB_FILE
+        catalogindex.PUB_FILE = os.path.join(d, "catalog.pub")
+        self.addCleanup(setattr, catalogindex, "PUB_FILE", was)
+        self.assertEqual(floor(), (None, ""), "no file: no floor")
+        self.assertEqual(older({"generated": "2020-01-01T00:00:00Z"}, None), "")
+        with open(os.path.join(d, "catalog-floor"), "w") as f:
+            f.write("# the oldest taken\n2026-10-29T00:00:00Z\n")
+        self.assertEqual(floor()[1], "2026-10-29T00:00:00Z")
+        self.assertEqual(older({"generated": "2026-10-28T23:59:59Z"}, None),
+                         "it was made 2026-10-28T23:59:59Z, before the oldest this AerieOS takes (2026-10-29T00:00:00Z)")
+        self.assertIn("does not say when it was made", older({"packs": []}, None))
+        self.assertEqual(older({"generated": "2026-10-29T00:00:00Z"}, None), "", "the floor's own moment is taken")
+        self.assertEqual(older({"generated": "2026-10-30T00:00:00Z"}, {"generated": "2026-10-29T12:00:00Z"}), "")
+        for junk in ("", "soon\n", "2026-10-29T00:00:00Z\n2026-10-30T00:00:00Z\n", "2026-13-45T00:00:00Z\n"):
+            with open(os.path.join(d, "catalog-floor"), "w") as f:
+                f.write(junk)
+            self.assertEqual(floor(), (None, ""), junk)
+
+    def test_the_floor_this_tree_ships_is_a_moment_and_not_ahead_of_today(self):
+        root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        was = catalogindex.PUB_FILE
+        catalogindex.PUB_FILE = os.path.join(root, "config", "catalog.pub")
+        self.addCleanup(setattr, catalogindex, "PUB_FILE", was)
+        when, said = catalogindex.floor()
+        self.assertIsNotNone(when, "config/catalog-floor is one line, a moment as an index says its own")
+        self.assertLess(when, time.time())
+        self.assertIn("COPY config/catalog-floor /opt/aerieos/config/catalog-floor\n", open(os.path.join(root, "Dockerfile")).read())
 
 
 class Folders(unittest.TestCase):

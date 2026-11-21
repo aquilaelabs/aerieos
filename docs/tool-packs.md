@@ -955,7 +955,10 @@ says who made an index, never that it is the newest, and an old one served
 again would bring back what the catalog withdrew since. When an index was
 made is its `generated`, the stamp the catalog's tools write
 (`2026-11-12T21:34:58Z`): one of the same moment is taken, and one that
-says none, or says it another way, is refused once a dated one is held. The file
+says none, or says it another way, is refused once a dated one is held. An
+install that holds none yet has nothing to compare with, so each release
+says the oldest index it takes (`config/catalog-floor`, the moment of the
+index it was prepared against) and one made before that is refused too. The file
 may name a spare key on a second line, and an index signed by either is
 read ([security.md](security.md#the-signing-keys-and-replacing-one)). Where it
 is read from is the **Address** in Controller settings' Vetted catalog group. A pack the
