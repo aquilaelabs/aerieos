@@ -140,7 +140,10 @@ class TheAgent(unittest.TestCase):
         for mode in (0o777, 0o757):
             os.chmod(runs, mode)
             self.assertEqual(self.run_job(a, {"name": "media"}, "20261028-040000"), ("failed", 64), oct(mode))
-        if os.getgid() != 0:
+        # The test stands this account's uid in for root's; where its group
+        # has the same number (a runner's user and group often do), the
+        # folder's group is root's in this model and may write it.
+        if os.stat(runs).st_gid != os.getuid():
             os.chmod(runs, 0o775)
             self.assertEqual(self.run_job(a, {"name": "media"}, "20261028-040000"), ("failed", 64), "writable by a group not root's")
         self.assertEqual(self.ran, [], "rsync is not run")
