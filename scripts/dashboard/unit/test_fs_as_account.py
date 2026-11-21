@@ -127,6 +127,68 @@ class Bracket(unittest.TestCase):
                 mock.patch.object(base, "acting_as", lambda who: who):
             self.assertEqual(base.fs_holds({"user": 1001, "group": 1002}), (1001, 1002))
 
+    def test_a_no_is_asked_again_after_a_minute_and_a_yes_is_kept(self):
+        # A try that failed once for a reason that passes (/tmp full, the
+        # probe's time limit under load) refused every account's file work
+        # until the agent restarted.
+        answers, tried, said = [(False, "the probe did not finish"), (True, "")], [], []
+        clock = [1000.0]
+
+        def probe(who):
+            tried.append(who)
+            return answers[min(len(tried), len(answers)) - 1]
+        with mock.patch.object(base, "_FS_HOLDS", {}), mock.patch.object(base.os, "geteuid", lambda: 0, create=True), \
+                mock.patch.object(base, "fs_probe", probe), mock.patch.object(base, "log", said.append), \
+                mock.patch.object(base, "acting_as", lambda who: who), mock.patch.object(base.time, "monotonic", lambda: clock[0]):
+            self.assertEqual(base.fs_said(), "", "nothing tried yet")
+            with self.assertRaises(base.NotHeld):
+                base.fs_holds((1001, 1002))
+            self.assertEqual(base.fs_said(), "refused")
+            clock[0] += base.FS_AGAIN_S - 1
+            with self.assertRaises(base.NotHeld):
+                base.fs_holds((1001, 1002))
+            self.assertEqual(len(tried), 1, "within the minute the no stands")
+            clock[0] += 2
+            self.assertEqual(base.fs_holds((1001, 1002)), (1001, 1002))
+            self.assertEqual((len(tried), base.fs_said()), (2, "holds"))
+            clock[0] += 10 * base.FS_AGAIN_S
+            base.fs_holds((1001, 1002))
+            self.assertEqual(len(tried), 2, "a yes is kept")
+        self.assertEqual(len(said), 2, "the log says the no and the yes")
+        self.assertIn("the probe did not finish", said[0])
+
+    def test_one_try_at_a_time(self):
+        # Asked from many threads at once, one try runs and the rest wait for
+        # its answer; asked again while a later try runs, the answer before
+        # it stands.
+        started, release, tried = threading.Event(), threading.Event(), []
+
+        def probe(who):
+            tried.append(who)
+            started.set()
+            release.wait(5)
+            return False, "no"
+        got = []
+        with mock.patch.object(base, "_FS_HOLDS", {}), mock.patch.object(base.os, "geteuid", lambda: 0, create=True), \
+                mock.patch.object(base, "fs_probe", probe), mock.patch.object(base, "acting_as", lambda who: who):
+            ts = [threading.Thread(target=lambda: got.append(base._fs_answer((1001, 1002)))) for _ in range(4)]
+            for t in ts:
+                t.start()
+            started.wait(5)
+            release.set()
+            for t in ts:
+                t.join(5)
+            self.assertEqual((len(tried), got), (1, [False] * 4))
+            base._FS_HOLDS["at"] -= base.FS_AGAIN_S + 1
+            started.clear(), release.clear()
+            t = threading.Thread(target=lambda: base._fs_answer((1001, 1002)))
+            t.start()
+            started.wait(5)
+            self.assertIs(base._fs_answer((1001, 1002)), False, "the answer before stands while a try runs")
+            release.set()
+            t.join(5)
+            self.assertEqual(len(tried), 2)
+
     def test_a_tools_output_pointed_elsewhere_is_not_read_as_root(self):
         # A sign or key job reads what its tool left in the job's folder, the
         # account's: on a machine that does not hold the account's file

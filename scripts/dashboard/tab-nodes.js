@@ -169,8 +169,12 @@ function nodeInternet(n){
   // terminal from it included, which closed at once with nothing saying why.
   const noexec = n.reported?.store_noexec === true
     ? `<div class="actbar ndnoexec"><span class="state bad">the toolchain store is mounted noexec: aerie and every terminal here cannot run until it is remounted with exec</span></div>` : "";
-  if (n.reported?.internet !== false) return noexec;
-  return noexec + `<div class="actbar ndnet"><span class="state warn">no internet: toolchains, images and updates cannot download here</span></div>`;
+  // ...and file work in an account's folder refused until a try holds (the
+  // agent's fs_holds): a sync, a delivery or a key job here fails meanwhile.
+  const filework = n.reported?.file_work === "refused"
+    ? `<div class="actbar ndfilework"><span class="state bad">file work in an account's folder is refused here: this machine could not do it as the account</span></div>` : "";
+  if (n.reported?.internet !== false) return noexec + filework;
+  return noexec + filework + `<div class="actbar ndnet"><span class="state warn">no internet: toolchains, images and updates cannot download here</span></div>`;
 }
 // What this node's NVIDIA card is for (R102): two switches and one Apply.
 // The emulator renders on it or does not, which is the headless X server

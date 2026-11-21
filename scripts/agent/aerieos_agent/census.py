@@ -30,6 +30,7 @@ from .base import (
     _probe,
     _probe_died,
     _run,
+    fs_said,
     read_json,
 )
 from .stores import _stores, console_said, noexec, store_dirs, tc_root
@@ -433,6 +434,9 @@ def census(state):
         "release_unpinned": console_said().get("release_unpinned") is True,
         # ...and whether its console switched root commands off (R227 step 2).
         "root_off": console_said().get("root_off") is True,
+        # ...and whether file work in an account's folder is done as that
+        # account here, or refused until a try holds (base.fs_holds).
+        "file_work": fs_said(),
         # How this node reaches its controller: plain http or https, and
         # what an https channel is held to (the controller's key, its
         # certificate, the system's authorities for a public hostname, or

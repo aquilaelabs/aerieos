@@ -211,9 +211,14 @@ at that path, so the agent takes the account's file identity for that work
 groups; `base.acting_as` in the agent). The kernel then checks every path
 as that account, with none of root's file capabilities, and a planted link
 leads nowhere the account could not have gone itself. The agent tries this
-on the machine before relying on it and says in its log which it is; an
-update's job says it too (`file work as the account: holds`). Where a
-machine does not hold it, the work is root's as before and the log says so.
+on the machine before relying on it and says in its log which it is, and
+the node's row says so where it does not hold. Where a machine does not
+hold it, that work is refused, never done as root: a try that failed is
+made again a minute later, and the work goes on once one holds. A new
+agent tries it too before it is installed, and is not installed where it
+does not hold, so an update never leaves a node refusing work the agent
+before it did; the controller then sends that build again by itself once
+an hour.
 A folder the agent makes for an account above that account's own (a
 space's top, an account's conversations folder) is still root's to make,
 and nothing is made under a link on the way.

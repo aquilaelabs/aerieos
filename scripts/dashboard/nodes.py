@@ -2254,6 +2254,14 @@ def _c_root_off(c, out):
     out["root_off"] = c.get("root_off") is True
 
 
+def _c_file_work(c, out):
+    # Whether its agent does file work in an account's folder as that
+    # account, or refuses it until a try holds (the agent's base.fs_holds);
+    # absent where nothing was tried.
+    if c.get("file_work") in ("holds", "refused"):
+        out["file_work"] = c["file_work"]
+
+
 def _c_gpu(c, out):
     # The GPU (R20): the NVIDIA card by its PCI id, before any driver, and
     # what the display's unit last said; absent where there is no card.
@@ -2628,6 +2636,7 @@ CENSUS = (
     (("session",), _c_session),
     (("network",), _c_network),
     (("distro",), _c_distro),
+    (("file_work",), _c_file_work),
 )
 # Every census key a table reads; census_unknown is the rest.
 CENSUS_KEYS = frozenset(CENSUS_INTS + CENSUS_STRINGS + tuple(k for keys, _ in CENSUS for k in keys))
@@ -3510,6 +3519,25 @@ def unsigned_refused(n):
     return ""
 
 
+# What an agent's selfcheck says where file work as the account does not
+# hold on its node (the agent's base.FS_REFUSED): that build would refuse
+# the work, so the node keeps the agent it runs. Asked again by itself once
+# an hour rather than every two minutes: a passing cause has cleared by
+# then, and a lasting one is a failed job an hour.
+FS_REFUSED = "file work as the account does not hold on this node"
+FS_AGAIN_EVERY = 3600
+
+
+def fs_refused_at(n):
+    """When this node last refused the agent this controller ships because
+    file work as the account does not hold there; 0 where it did not."""
+    last = next(iter(jobs_for(node_id=n["id"], n=1, type="self-update")), None) if n else None
+    if last and last.get("state") == "failed" and last.get("exit_code") == 78 and FS_REFUSED in (last.get("error") or "") \
+            and (last.get("spec") or {}).get("digest") == agent_file()["digest"]:
+        return int(last.get("ended") or 0)
+    return 0
+
+
 def agent_stale(n):
     """"" if this node runs the agent this controller ships, else why that
     matters right now.
@@ -3895,6 +3923,8 @@ def auto_update(nid):
     if unsigned_refused(n):
         return None
     now = time.time()
+    if now - fs_refused_at(n) < FS_AGAIN_EVERY:
+        return None
     if now - _auto_tried.get(nid, 0) < AUTO_UPDATE_EVERY or jobs_for(node_id=nid, n=1, active=True):
         return None
     _auto_tried[nid] = now

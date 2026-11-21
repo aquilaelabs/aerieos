@@ -20,6 +20,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
 import zipfile
 from unittest import mock
@@ -266,6 +267,39 @@ class Update(unittest.TestCase):
             self.assertEqual(self.read(), self.old)
             self.assertEqual([n for n in os.listdir(self.d) if n not in ("aerieos-agent", "node.json")], [])
 
+    def test_a_build_that_would_refuse_an_accounts_file_work_is_never_installed(self):
+        # Where file work as the account does not hold, the new agent would
+        # refuse every piece of it (base.fs_holds): its selfcheck fails and
+        # the node keeps the agent it runs, which says so in one phrase.
+        base, cli = self.agent.module("base"), self.agent.module("cli")
+        import pwd
+        me = pwd.getpwuid(os.getuid())
+        state = {"node_id": "n_x", "controller": "http://127.0.0.1:1", "token": "t", "user": me.pw_name}
+        out = io.StringIO()
+        for ok, why in ((False, "a link to root's own file was followed and read"), (None, "this system has no per-thread file identity")):
+            out.truncate(0), out.seek(0)
+            with mock.patch.object(os, "geteuid", lambda: 0), mock.patch.object(base, "fs_probe", lambda who, ok=ok, why=why: (ok, why)), \
+                    mock.patch.object(base, "_ids", lambda who: (1001, 1002)), mock.patch.object(cli, "load_state", lambda: state), \
+                    mock.patch("sys.stdout", out):
+                with self.assertRaises(SystemExit) as ended:
+                    cli.cmd_selfcheck()
+            self.assertEqual(ended.exception.code, 3)
+            self.assertEqual(out.getvalue(), f"{base.FS_REFUSED}. {why}\n")
+        # Not root, or nobody to act as: nothing to try, and the check passes.
+        out.truncate(0), out.seek(0)
+        with mock.patch.object(base, "fs_probe", lambda who: (None, "this agent is not root")), mock.patch.object(cli, "load_state", lambda: state), \
+                mock.patch("sys.stdout", out):
+            cli.cmd_selfcheck()
+        self.assertIn("selfcheck ok", out.getvalue())
+        mod = self.agent.module("agent")
+        with mock.patch.object(mod, "selfcheck", lambda path: (False, f"{base.FS_REFUSED}. PermissionError: [Errno 1] x")):
+            (state, code), job = self.update(self.real)
+        self.assertEqual((state, code, job.installed), ("failed", 78, False))
+        self.assertEqual(job.why, f"{base.FS_REFUSED}, so the new agent was not installed")
+        self.assertIn("PermissionError", job.said, "the why on a line of its own in the job's log")
+        self.assertEqual(self.read(), self.old)
+        self.assertEqual([n for n in os.listdir(self.d) if n not in ("aerieos-agent", "node.json")], [])
+
     def test_one_it_went_back_from_is_a_persons_to_send_again(self):
         with open(self.me + ".back", "w") as f:
             json.dump({"digest": digest(self.real), "at": 5, "why": "could not be loaded"}, f)
@@ -391,6 +425,35 @@ class Controller(unittest.TestCase):
         self.assertIn("press Update agent again", nodes._update_again(self.nid))
         nodes._exec("UPDATE nodes SET agent = json_set(agent, '$.version', '0.1.1', '$.back', NULL) WHERE id = ?", (self.nid,))
         self.assertIn("press Update agent again", nodes._update_again(self.nid), "across a window it is a person's")
+
+    def test_a_build_refused_for_file_work_is_sent_again_once_an_hour(self):
+        # Sent every two minutes, a node where file work as the account does
+        # not hold would fail a job every two minutes; once an hour, a
+        # passing cause has cleared. An agent before this one says it after
+        # its own words, and the row's phrase holds the cause either way.
+        agent = agentpkg.load("aerieos_agent_wayback_fs")
+        self.assertEqual(nodes.FS_REFUSED, agent.module("base").FS_REFUSED)
+        self.hello()
+        self.assertTrue(nodes.auto_update(self.nid))
+        old_words = f"the new agent does not start on this node, so it was not installed: {nodes.FS_REFUSED}. OSError: x"
+        for words in (old_words, f"{nodes.FS_REFUSED}, so the new agent was not installed"):
+            self.assertIn(nodes.FS_REFUSED, nodes.refusal_phrase(words))
+            nodes._exec("UPDATE jobs SET state = 'failed', exit_code = 78, error = ?, ended = ? WHERE node = ? AND type = 'self-update'",
+                        (words, int(time.time()), self.nid))
+            nodes._auto_tried.clear()
+            self.assertIsNone(nodes.auto_update(self.nid))
+            nodes._exec("UPDATE jobs SET ended = ? WHERE node = ?", (int(time.time()) - nodes.FS_AGAIN_EVERY - 1, self.nid))
+            nodes._auto_tried.clear()
+            self.assertTrue(nodes.auto_update(self.nid), "an hour on, asked again")
+        # Any other failure is asked again in two minutes, as before.
+        nodes._exec("UPDATE jobs SET state = 'failed', exit_code = 78, error = 'the new agent does not start', ended = ? WHERE node = ?",
+                    (int(time.time()), self.nid))
+        nodes._auto_tried.clear()
+        self.assertTrue(nodes.auto_update(self.nid))
+
+    def test_the_census_carries_whether_file_work_holds(self):
+        for said, kept in (("holds", "holds"), ("refused", "refused"), ("", None), ("yes", None), (True, None)):
+            self.assertEqual(nodes._census({"file_work": said}).get("file_work"), kept, said)
 
 
 class Page(unittest.TestCase):

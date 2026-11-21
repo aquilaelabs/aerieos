@@ -1163,25 +1163,67 @@ class NotHeld(OSError):
     to do it as the account (fs_holds)."""
 
 
+# How long a "does not hold" stands before the machine is tried again: a try
+# can fail for a reason that passes (/tmp full, its own time limit under load),
+# and a "yes" is kept for the process's life.
+FS_AGAIN_S = 60
+_FS_LOCK = threading.Lock()
+# What an agent says where file work as the account does not hold: its
+# census, and a new agent's selfcheck that refuses to be installed so.
+FS_REFUSED = "file work as the account does not hold on this node"
+
+
+def _fs_answer(ids):
+    """Whether acting_as() holds on this machine, by fs_probe: a yes kept,
+    a no asked again once FS_AGAIN_S has passed. One try at a time; asked
+    while one runs, the answer before it stands where there is one."""
+    def fresh():
+        v = _FS_HOLDS
+        return "ok" in v and (v["ok"] or time.monotonic() - v.get("at", time.monotonic()) < FS_AGAIN_S)
+    if fresh():
+        return _FS_HOLDS["ok"]
+    if not _FS_LOCK.acquire(blocking="ok" not in _FS_HOLDS):
+        return _FS_HOLDS["ok"]
+    try:
+        if fresh():
+            return _FS_HOLDS["ok"]
+        # As root, whatever this thread is doing: the probe's own threads
+        # are whoever starts them.
+        with as_root():
+            ok, why = fs_probe(ids)
+        was = _FS_HOLDS.get("ok")
+        if ok is True and was is not True:
+            log("file work in an account's folder is done as that account")
+        elif ok is not True and (was is not False or why != _FS_HOLDS.get("why")):
+            log(f"file work in an account's folder is refused on this machine: it could not be done as the account ({why}); "
+                f"tried again in {FS_AGAIN_S} seconds")
+        _FS_HOLDS.update(ok=ok is True, why=why, at=time.monotonic())
+        return _FS_HOLDS["ok"]
+    finally:
+        _FS_LOCK.release()
+
+
+def fs_said():
+    """This machine's last answer for the census: "holds", "refused" (file
+    work in an account's folder is refused until a try holds), or "" where
+    nothing was tried (not root, no account, nothing asked yet)."""
+    v = _FS_HOLDS
+    return "" if "ok" not in v else "holds" if v["ok"] else "refused"
+
+
 def fs_holds(who):
-    """acting_as() for `who`, where this machine was seen to hold it (once a
-    process, by fs_probe). Where it was not (the check failed, or a root
+    """acting_as() for `who`, where this machine was seen to hold it (by
+    fs_probe, _fs_answer). Where it was not (the try failed, or a root
     agent's system has no per-thread file identity), the work is refused
-    with NotHeld, and the agent's log says why once: done as root instead,
-    it would follow whatever link the account left at a name in its own
-    folder (a job's output pointed at a file of root's, uploaded). An agent
-    that is not root, or work for nobody, is done as it is."""
+    with NotHeld until a later try holds, and the agent's log says why:
+    done as root instead, it would follow whatever link the account left at
+    a name in its own folder (a job's output pointed at a file of root's,
+    uploaded). An agent that is not root, or work for nobody, is done as it
+    is."""
     ids = _ids(who)
     if not ids or not hasattr(os, "geteuid") or os.geteuid() != 0:
         return acting_as(None)
-    if "ok" not in _FS_HOLDS:
-        ok, why = fs_probe(ids)
-        _FS_HOLDS["ok"], _FS_HOLDS["why"] = ok is True, why
-        if ok is True:
-            log("file work in an account's folder is done as that account")
-        else:
-            log(f"file work in an account's folder is refused on this machine: it could not be done as the account ({why})")
-    if not _FS_HOLDS["ok"]:
+    if not _fs_answer(ids):
         raise NotHeld("file work in the account's folder is refused: this machine could not do it as the account")
     return acting_as(ids)
 

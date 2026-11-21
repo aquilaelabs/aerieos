@@ -217,11 +217,13 @@ def cmd_selfcheck():
         src = m.module_finder.find_spec(name).loader.get_source(name)
         compile(src or "", name, "exec")
     state = load_state()
-    # Whether this machine holds file work as an account (base.acting_as):
-    # tried here as root, so an update's job says it before anything on the
-    # node relies on it. It never fails the check: the agent does that work
-    # as root, as before, where it does not hold.
-    from .base import fs_probe
+    # Whether this machine holds file work as an account (base.acting_as),
+    # tried here as root before anything on the node relies on it. Where a
+    # root agent with an account to act as could not, this agent would
+    # refuse every piece of that work (base.fs_holds), so the check fails
+    # and the update is not installed: the node keeps the agent it runs.
+    import os
+    from .base import FS_REFUSED, _ids, fs_probe
     who = None
     if state.get("user") and state.get("user") != "root":
         import pwd
@@ -231,7 +233,11 @@ def cmd_selfcheck():
         except KeyError:
             who = None
     ok, why = fs_probe(who)
-    fs = "holds" if ok else f"not tried ({why})" if ok is None else f"DOES NOT HOLD ({why})"
+    if ok is not True and _ids(who) and os.geteuid() == 0:
+        # One line: the job of an agent before this one makes its error of it.
+        print(f"{FS_REFUSED}. {why}")
+        sys.exit(3)
+    fs = "holds" if ok else f"not tried ({why})"
     print(f"selfcheck ok {AGENT_VERSION} {own_digest()[:19]}; file work as the account: {fs}")
 
 

@@ -14,7 +14,7 @@ import traceback
 from . import AGENT_VERSION, files
 from .coverage import _COV_OUT, _cov_write
 from .base import BEAT_S, CHANNEL, REFUSED, ROOT_BUNDLE_DIR, RUNNER_DIAG_KEEP, SESSION_BIN, SESSION_WALL, TRIAL_S
-from .base import NotHeld, cap_file, fs_holds, log, log_once, own_digest, own_path, prune_dir
+from .base import FS_REFUSED, NotHeld, cap_file, fs_holds, log, log_once, own_digest, own_path, prune_dir
 from .base import back_note, selfcheck, test_lock_ready, trial_begin, trial_give_way, trial_note, trial_passed
 from .controller import CA_PIN, KEY_PIN, Controller, address_ok
 from .stores import STATE_LOCK, console_said, load_state, pin_release, pin_spare, save_state, tc_root, use_scope
@@ -1469,10 +1469,17 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         if not ok:
             with contextlib.suppress(OSError):
                 os.unlink(tmp)
+            # One that would refuse the work this one does (base.fs_holds) is
+            # kept off this node the same way: said as that, its why on a
+            # line of its own and in the log.
+            fs = ok is False and FS_REFUSED in said
             job.why = ("the new agent cannot check itself here, so it was not installed" if ok is None
+                       else f"{FS_REFUSED}, so the new agent was not installed" if fs
                        else f"the new agent does not start on this node, so it was not installed: {said}")
+            if fs:
+                job.say(said + "\n")
             job.say(job.why + "\n")
-            log(f"the agent update {got[:19]}… was not installed: {job.why}")
+            log(f"the agent update {got[:19]}… was not installed: {said if fs else job.why}")
             return "failed", 78
         # ...and the file it replaces kept beside it, with the note that the
         # new one is on trial: the entry puts the old one back when the new

@@ -536,7 +536,10 @@ the swap has three guards:
   state. A file that fails is not installed; the job says why and the node
   carries on as it was. Nor is one that has no such verb to ask, a build
   from before the check: nothing would put the old one back if it did not
-  start.
+  start. Nor, on a root agent, one that finds file work in an account's
+  folder cannot be done as the account here: it would refuse that work,
+  so the node keeps the agent it runs (docs/security.md), and the
+  controller sends that build again by itself once an hour.
 - *Beside it.* The file being replaced is kept (`FILE.prev`), and the new
   one is on trial (`FILE.trial`) until the controller answers its first
   `hello`.
