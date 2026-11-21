@@ -34,7 +34,7 @@ services:
       memlock: -1
       core: 0
     # Same name the Unraid template uses, so every `docker exec -it
-    # AerieOS ...` command in the docs works under either install method.
+    # Aerie-Workshop ...` command in the docs works under either install method.
     container_name: Aerie-Workshop
     hostname: aerie-workshop
     # What the container prints, kept by Docker on the host: bounded, since
