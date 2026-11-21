@@ -59,9 +59,6 @@ class BootId(unittest.TestCase):
         with mock.patch.object(Path, "read_text", no_id):
             self.assertEqual(layout.boot_id(), old_shape())
 
-    def test_bb_tty_still_knows_an_older_agents_stamp(self):
-        self.assertEqual(bbtty("boot_id_by_btime"), old_shape())
-
 
 if __name__ == "__main__":
     unittest.main()

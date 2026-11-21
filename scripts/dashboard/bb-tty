@@ -1379,11 +1379,6 @@ boot_id() {
     else first="$(awk '/^btime /{print $2}' /proc/stat 2>/dev/null)"; fi
     [ -n "$start" ] && [ -n "$first" ] && printf '%s.%s' "$first" "$start"
 }
-# The same id as an agent from before it stopped reading btime stamps it, which
-# a node's census carries until that agent is updated.
-boot_id_by_btime() {
-    printf '%s.%s' "$(awk '/^btime /{print $2}' /proc/stat 2>/dev/null)" "$(sed 's/^.*) //' /proc/1/stat 2>/dev/null | awk '{print $20}')"
-}
 
 # A Gradle project's build folders on the node's own disk (B439): the init
 # script lib/gradle-local-build.gradle in the project's Gradle home, and the
@@ -1749,7 +1744,7 @@ agent_boot() {
     # First of the checks, so a tab that is going to be refused anyway
     # does not first fetch a login it will not use.
     if ! tmux has-session -t "=$(sess "${agent}-${proj//[.:]/_}${slot_tail}")" 2>/dev/null \
-       && [ "$want_boot" != "$(boot_id)" ] && [ "$want_boot" != "$(boot_id_by_btime)" ]; then
+       && [ "$want_boot" != "$(boot_id)" ]; then
         bad "This tab is from before ${BB_NODE:-the container} restarted." \
             "Its conversation is still on disk. Open ${agent_name} on ${proj} from" \
             "the dashboard's Spaces card to pick it up again. Starting a" \
