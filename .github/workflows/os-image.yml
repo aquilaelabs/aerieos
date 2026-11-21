@@ -94,7 +94,8 @@ jobs:
             done
             return 1
           }
-          apt_tools squashfs-tools dosfstools e2fsprogs fdisk grub-efi-amd64-bin grub-pc-bin grub-common xorriso mtools xz-utils qemu-utils python3-pip apt-utils
+          apt_tools squashfs-tools dosfstools e2fsprogs fdisk grub-efi-amd64-bin grub-pc-bin grub-common xorriso mtools xz-utils qemu-utils python3-pip apt-utils \
+            python3-setuptools python3-setuptools-scm
           # Debian 13's archive keys, newer than the runner's own keyring
           # package, from the same snapshot the image is pinned to.
           snap="$(tr -d '[:space:]' < image/SNAPSHOT)"
@@ -107,11 +108,15 @@ jobs:
           # A tag's archive was installed straight from its address, held
           # to nothing. The version is the one build.sh pins (MKOSI_PIN),
           # so a config key means the same here as there, and the two
-          # disagreeing stops here; mkosi is not published on PyPI.
+          # disagreeing stops here; mkosi is not published on PyPI. Its build
+          # backend (setuptools, setuptools-scm) is the distribution's, from
+          # apt above, and pip fetches nothing: no build environment of its
+          # own and no dependency, so nothing PyPI serves that day runs as
+          # root here.
           pin="$(grep -oE 'MKOSI_PIN:-[0-9.]+' image/build.sh | head -1 | cut -d- -f2)"
           held="$(bash scripts/lib/pin-fetch config/image-tools.json mkosi linux/amd64 "$RUNNER_TEMP/mkosi-${pin}.tar.gz")"
           [ "$held" = "$pin" ] || { echo "::error::image/build.sh pins mkosi $pin and config/image-tools.json pins $held: one of the two moved without the other"; exit 1; }
-          sudo pip install --break-system-packages "$RUNNER_TEMP/mkosi-${pin}.tar.gz"
+          sudo pip install --break-system-packages --no-build-isolation --no-deps --no-index "$RUNNER_TEMP/mkosi-${pin}.tar.gz"
           mkosi --version
       - name: The weekly rebuild takes yesterday's snapshot
         if: github.event_name == 'schedule'

@@ -196,9 +196,16 @@ class ShippedTable(unittest.TestCase):
         wf = text(".github", "workflows", "os-image.yml")
         self.assertIn('held="$(bash scripts/lib/pin-fetch config/image-tools.json mkosi linux/amd64 "$RUNNER_TEMP/mkosi-${pin}.tar.gz")"', wf)
         self.assertIn('[ "$held" = "$pin" ] ||', wf)
-        self.assertIn('sudo pip install --break-system-packages "$RUNNER_TEMP/mkosi-${pin}.tar.gz"', wf)
+        # ...and built with the distribution's setuptools and setuptools-scm,
+        # pip fetching nothing: a build environment of its own took both
+        # from PyPI unpinned and ran them as root (the audit of 21 Nov).
+        self.assertIn('sudo pip install --break-system-packages --no-build-isolation --no-deps --no-index "$RUNNER_TEMP/mkosi-${pin}.tar.gz"', wf)
+        self.assertRegex(wf, r"apt_tools [^\n]*\\\n\s+python3-setuptools python3-setuptools-scm\n")
         code = "\n".join(ln for ln in wf.splitlines() if not ln.lstrip().startswith("#"))
         self.assertNotRegex(code, r"pip install[^\n]*https?://")
+        for ln in code.splitlines():
+            if "pip install" in ln:
+                self.assertIn("--no-build-isolation --no-deps --no-index", ln, ln.strip())
         pin = re.search(r"MKOSI_PIN:-([0-9.]+)", text("image", "build.sh")).group(1)
         self.assertEqual(self.rows["mkosi"]["source"]["checksum"]["version"], pin, "the table and image/build.sh name one version")
 
