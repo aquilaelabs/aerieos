@@ -54,7 +54,7 @@ Runs anywhere Python 3.8+ is, with nothing installed:
     aerieos-agent enroll --controller URL --token bbe_… [--user bb]
                             [--session-user builder] [--store data=/path]
                             [--pin sha256//…]   # the controller's key, as the Enroll script carries it
-    aerieos-agent follow URL EXPECT   # after a controller moved while this node was off
+    aerieos-agent follow URL EXPECT [PIN]   # after a controller moved while this node was off
     aerieos-agent release-key [HEX[,HEX]]   # show or pin AerieOS's release key and its spare (release.py)
     aerieos-agent release-key none          # pin no release key, and have this node pin none by itself
     aerieos-agent release-key add|drop HEX  # trust, or stop trusting, the key a build of your own is signed with
@@ -81,4 +81,4 @@ Runs anywhere Python 3.8+ is, with nothing installed:
 # that "which of these two is newer" always has an answer. A reset would put
 # the same number on two different agents, and a number that cannot say which
 # is newer is the reason the flat protocol number this replaced was useless.
-AGENT_VERSION = "0.9.494"
+AGENT_VERSION = "0.9.495"

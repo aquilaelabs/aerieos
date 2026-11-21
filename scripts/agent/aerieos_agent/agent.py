@@ -16,7 +16,7 @@ from .coverage import _COV_OUT, _cov_write
 from .base import BEAT_S, CHANNEL, REFUSED, ROOT_BUNDLE_DIR, RUNNER_DIAG_KEEP, SESSION_BIN, SESSION_WALL, TRIAL_S
 from .base import cap_file, fs_holds, log, log_once, own_digest, own_path, prune_dir
 from .base import back_note, selfcheck, test_lock_ready, trial_begin, trial_give_way, trial_note, trial_passed
-from .controller import KEY_PIN, Controller
+from .controller import CA_PIN, KEY_PIN, Controller, address_ok
 from .stores import console_said, load_state, pin_release, pin_spare, save_state, tc_root, use_scope
 from .toolchains import share_images
 from .sessnet import SessionNet
@@ -49,22 +49,55 @@ from . import http80
 from . import storage
 
 
-def follow(state, url="", expect=""):
+# A key's pin, whole: KEY_PIN and the base64 of a sha256.
+KEY_PIN_WHOLE = re.compile(re.escape(KEY_PIN) + r"[A-Za-z0-9+/]{43}=")
+
+
+def follow(state, url="", expect="", pin=""):
     """The knock (R90 step 12, R175 step 3): `state["move"]` names where and
     what to expect, or `url` and `expect` do (the follow verb, run by hand
-    on a node that outlived the old controller). The new address is asked,
-    with the node's own token, for the answer only a holder of the move
-    key gives; right, the state takes the controller there (its address
-    and TLS pin) and is written. (True, "") or (False, why); an empty why
-    is nothing to knock on."""
+    on a node that outlived the old controller, which may name the new
+    home's key with `pin`). The new address is asked, with the node's own
+    token, for the answer only a holder of the move key gives; right, the
+    state takes the controller there (its address and TLS pin) and is
+    written. (True, "") or (False, why); an empty why is nothing to knock on.
+
+    A node that holds its controller to a key never knocks without one, and
+    never over plain http: its token, and on a refusal the tokens it held
+    before, go only to whoever answers a handshake under the key the move
+    named (the hello that armed it came down the pinned channel) or, with
+    none named, under the key this node holds, which a controller takes to
+    its new home with the rest of its state. An address the move names as
+    http is asked over TLS on the same port. From the answer such a node
+    takes an https address of the one shape and a key's pin, and nothing
+    else: no plain http and no other kind of pin is written into it. A node
+    reached through a public hostname knocks and stays under the system's
+    authorities. A node on plain http, or one from before key pins that
+    was named none, knocks as it did."""
     mv = dict(state.get("move") or {})
     if url and expect:
-        mv = {"url": str(url), "expect": str(expect)}
+        mv = {"url": str(url), "expect": str(expect), "pin": str(pin or "")}
     to = str(url or mv.get("url") or "").rstrip("/")
     if not to or not mv.get("expect"):
         return False, ""
+    held = str(state.get("pin") or "")
+    named = mv.get("pin") if isinstance(mv.get("pin"), str) and KEY_PIN_WHOLE.fullmatch(mv["pin"]) else ""
+    under = ""
+    if held == CA_PIN:
+        under = CA_PIN
+    elif held.startswith(KEY_PIN):
+        under = named or held
+    elif named and (to.startswith("https://") or held):
+        # The key the move named, for a node that pinned a certificate
+        # before keys were pinned or holds no pin yet.
+        under = named
+    if under:
+        if to.startswith("http://") and under != CA_PIN:
+            to = "https://" + to.split("://", 1)[1]
+        if not address_ok(to, https=True):
+            return False, f"the move's new address {to[:120]} is not https://host[:port], and this node knocks only under its pin: it stays"
     try:
-        ctl = Controller(to, state["token"], "")
+        ctl = Controller(to, state["token"], under)
         st, r = ctl.call("moved", {"node": state.get("node_id", "")}, timeout=20)
         # A token handed out after the bundle was packed is one the new
         # home never saw (B935): this node taken back there by one it held
@@ -76,6 +109,9 @@ def follow(state, url="", expect=""):
     if st == 401:
         return False, f"the move's new address {to} does not know this node by any token it holds: run the line its Nodes page gives it there"
     if st != 200 or not isinstance(r, dict):
+        if not st and under:
+            why = str(r.get("error") or "") if isinstance(r, dict) else ""
+            return False, f"the move's new address {to} did not answer under the pin this node knocks with ({why[:160]})"
         return False, f"the move's new address {to} answered {st}: not the controller yet"
     # The proof: the challenge the old controller told this node to
     # expect, which only a holder of the move key (the controller once
@@ -83,18 +119,30 @@ def follow(state, url="", expect=""):
     got = str(r.get("answer") or "")
     if not got or not hmac.compare_digest(got, str(mv.get("expect") or "")):
         return False, f"{to} answered the knock with the wrong answer: not the controller that moved"
-    state["controller"] = str(r.get("url") or to).rstrip("/") or to
-    if r.get("pin"):
-        state["pin"] = str(r.get("pin"))
-    elif not r.get("url"):
-        # The address knocked at is kept (B936), so its certificate is the
-        # one just met there, which answered the challenge; plain http has
-        # none.
-        seen = getattr(ctl, "seen_pin", "") or ""
-        if seen:
-            state["pin"] = seen
+    said = str(r.get("url") or "").rstrip("/")
+    if under:
+        # Knocked under a pin: only an https address of the one shape is
+        # taken from the answer, and only a key's pin; with neither, the
+        # address knocked at and the pin knocked under are kept.
+        state["controller"] = said if said and address_ok(said, https=True) else to
+        if under == CA_PIN:
+            state["pin"] = CA_PIN
         else:
-            state.pop("pin", None)
+            answered = r.get("pin") if isinstance(r.get("pin"), str) and KEY_PIN_WHOLE.fullmatch(r["pin"]) else ""
+            state["pin"] = answered or under
+    else:
+        state["controller"] = said if said and address_ok(said) else to
+        if r.get("pin"):
+            state["pin"] = str(r.get("pin"))
+        elif not r.get("url"):
+            # The address knocked at is kept (B936), so its certificate is the
+            # one just met there, which answered the challenge; plain http has
+            # none.
+            seen = getattr(ctl, "seen_pin", "") or ""
+            if seen:
+                state["pin"] = seen
+            else:
+                state.pop("pin", None)
     state.pop("move", None)
     save_state(state)
     return True, ""
@@ -545,6 +593,10 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             # controller goes quiet or says it moved, the node knocks there.
             mv = r.get("move") if isinstance(r.get("move"), dict) else {}
             want = {"url": str(mv.get("url") or ""), "expect": str(mv.get("expect") or "")} if mv.get("url") and mv.get("expect") else None
+            # ...and the new home's key, where the hello names it: this
+            # hello came down the channel this node holds its controller to.
+            if want and isinstance(mv.get("pin"), str) and KEY_PIN_WHOLE.fullmatch(mv["pin"]):
+                want["pin"] = mv["pin"]
             if want != self.state.get("move"):
                 if want:
                     self.state["move"] = want
@@ -738,6 +790,8 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         if not isinstance(mv, dict) or not mv.get("url") or not mv.get("expect") or self.state.get("move"):
             return False
         self.state["move"] = {"url": str(mv["url"]), "expect": str(mv["expect"])}
+        if isinstance(mv.get("pin"), str) and KEY_PIN_WHOLE.fullmatch(mv["pin"]):
+            self.state["move"]["pin"] = mv["pin"]
         save_state(self.state)
         log(f"the controller moved to {mv['url']} and handed this node its challenge: knocking there")
         return True

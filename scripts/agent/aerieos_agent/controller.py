@@ -99,6 +99,10 @@ def key_pin_of(der):
 ADDRESS = re.compile(r"(https?)://(?:\[[0-9A-Fa-f:.]{2,45}\]|[A-Za-z0-9][A-Za-z0-9.-]{0,252})(?::[0-9]{1,5})?/?")
 
 
+# The pin that is no pin: the name's certificate, by the system's authorities.
+CA_PIN = "ca"
+
+
 def address_ok(url, https=False):
     """Whether `url` is of the controller's one shape (ADDRESS); with
     `https`, of that scheme alone."""
@@ -126,7 +130,7 @@ class Controller:
     # The pin that means "no pin: the hostname's public certificate, by the
     # system's CAs" (R170): a controller behind Cloudflare presents the
     # edge's certificate, which changes under it and is not the controller's.
-    CA = "ca"
+    CA = CA_PIN
 
     def __init__(self, url, token, pin="", door="agent"):
         u = urllib.parse.urlsplit(url)

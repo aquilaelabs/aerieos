@@ -256,11 +256,12 @@ def cmd_follow(args):
     once the controller it had has stayed quiet for three hellos, or at
     once when its service is restarted. Nothing is enrolled again: the
     node keeps its id, its token, its containers and its synced copies."""
-    if len(args) != 2 or not args[0].startswith(("http://", "https://")):
-        raise SystemExit("follow takes the new controller's address and this node's challenge, as its Nodes page shows them")
+    if len(args) not in (2, 3) or not args[0].startswith(("http://", "https://")):
+        raise SystemExit("follow takes the new controller's address and this node's challenge, as its Nodes page shows them, "
+                         "and after them the pin of its key where it is another than the one this node holds")
     state = load_state()
     from .agent import follow
-    ok, why = follow(state, args[0], args[1])
+    ok, why = follow(state, args[0], args[1], args[2] if len(args) > 2 else "")
     if not ok:
         raise SystemExit(why or "nothing to knock on")
     print(f"this node follows the controller to {state['controller']}: the running agent takes it once the old "

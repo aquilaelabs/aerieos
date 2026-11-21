@@ -5947,6 +5947,11 @@ def hello(nid, census, addr, version="", digest="", running=None, keep=None, rot
     if own_machine(n) and st.get("ready") and st.get("install_id"):
         install_id_seen(st["install_id"])
     moving = move_for_node(nid)
+    # The key the node knocks under at the new home (the agent's follow):
+    # this controller's own, which goes there with the rest of its state.
+    # Said on this channel, which the node holds to that key already.
+    if moving and tls_pin():
+        moving = {**moving, "pin": tls_pin()}
     return {"ok": True, "transports": ["longpoll"],
             "poll": POLL_S, "node": {"id": nid, "name": n["name"],
                                      "state": n["state"],
