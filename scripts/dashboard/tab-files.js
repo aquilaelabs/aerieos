@@ -163,6 +163,12 @@ function renderFilesInto(i){
     drawHTML(d.list, noNodeYet("a node's disks, pools and shares are browsed here", "fxnone"));
     return;
   }
+  // Switched off at the node's own console: said in the tone of a thing
+  // switched off, and nothing is asked of the node.
+  if (fl.off){
+    patch(d.list, `<div class="field"><div class="notice warn" data-fxoff>${esc(fl.off)}</div></div>`);
+    return;
+  }
   if (fl.error && !fl.roots){
     patch(d.list, `<div class="field"><div class="notice bad">${esc("could not read the files: " + fl.error)}</div></div>`);
     return;

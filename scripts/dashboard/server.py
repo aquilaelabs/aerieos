@@ -9569,6 +9569,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": "no such node"}, 404)
         out = {"node": nid, "name": n.get("name") or nid, "roots": fileexplorer.roots(n),
                "serves": bool(((n.get("reported") or {}).get("files") or {}).get("port")), "live": n.get("live") is not False}
+        # A node whose console switched root asks off answers no file
+        # request: said once, as a thing switched off, and nothing asked.
+        if (n.get("reported") or {}).get("root_off"):
+            return self._json({**out, "roots": [], "off": fileexplorer.off_said(n)})
         if root:
             got, status = fileexplorer.act(self._principal(), True, nid, root, "list", path=q.get("path", [""])[0])
             if status != 200:

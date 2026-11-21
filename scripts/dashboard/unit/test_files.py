@@ -210,6 +210,14 @@ class Files(unittest.TestCase):
         self.root_off = False
         self.assertEqual(self.act("list", path="media")[1], 200)
 
+    def test_a_node_that_reports_root_asks_off_is_asked_nothing(self):
+        # Its census says so: the controller refuses before it dials, in the
+        # one sentence the Files page draws as a thing switched off.
+        self.node["reported"]["root_off"] = True
+        tg = fileexplorer._target(True, "n_1", self.pool)
+        self.assertEqual(tg, {"error": "nas has root asks switched off at its own console, so its files are not read from here"})
+        self.assertEqual(fileexplorer.off_said(self.node), tg["error"])
+
     def test_only_this_controller_and_only_an_administrator(self):
         got, status = fileexplorer.act("user:bob", False, "n_1", self.pool, "list")
         self.assertIn("administrator", got["error"])

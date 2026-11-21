@@ -75,6 +75,12 @@ def roots(n):
     return out
 
 
+def off_said(n):
+    """What a node whose console switched root asks off says to a file
+    request: its files are root's to read, and the node answers none."""
+    return f"{n.get('name') or n.get('id')} has root asks switched off at its own console, so its files are not read from here"
+
+
 def _target(principal_ok, node_id, root):
     """(node, host, port, key) for a request on `root`, or an error dict."""
     if not principal_ok:
@@ -94,6 +100,8 @@ def _target(principal_ok, node_id, root):
         return {"error": f"{n.get('name') or node_id} cannot be reached from here"}
     # How its relay is spoken to (R243): the certificate it reported, which
     # is the only one taken, and whether it takes a request once.
+    if (n.get("reported") or {}).get("root_off"):
+        return {"error": off_said(n)}
     relay = (n.get("reported") or {}).get("relay") or {}
     if not relay.get("tls"):
         return {"error": f"{n.get('name') or node_id}'s relay has no certificate yet, so no file is opened there"}
