@@ -394,7 +394,9 @@ class TheUpdatesFetch(unittest.TestCase):
     by its attestation read from GitHub's public API with --bundle (no
     sign-in) and held to the release workflow's identity, and a release that
     carries no bundle not taken, whatever its version. The install here
-    names no signer; the signed list's rules are test_release_signing.py's."""
+    names no signer, so a bundle that passed everything before the signed
+    list stops there, unpacked nowhere; the signed list's rules are
+    test_release_signing.py's."""
 
     def world(self, code, gh_ok=True):
         d = tempfile.mkdtemp()
@@ -445,21 +447,24 @@ case " $* " in *" --bundle "*) exit {0 if gh_ok else 1};; *) exit 1;; esac
 
     def test_a_bundle_is_verified_by_its_attestation_with_no_sign_in(self):
         r, log = self.fetch("v0.9.1", 200)
-        self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("verified by gh", r.stderr)
         self.assertIn("--bundle", log)
         # ...held to the release workflow on a version's tag, as the OS
         # updater holds an image: the repository alone passed any workflow.
         self.assertIn(r"--cert-identity-regex ^https://github\.com/aquilaelabs/aerieos/\.github/workflows/build-image\.yml@refs/tags/v", log)
-        self.assertIn("this install holds no release key yet, so the release's signature is not checked", r.stderr)
+        # ...and with no signer named the release is not taken, in one sentence.
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("this install names no release signer (its config/release-signers is missing or empty), "
+                      "so v0.9.1's signature cannot be checked: not taken", r.stderr)
+        self.assertEqual(r.stdout.strip(), "", "no tree is named")
 
     def test_no_tag_takes_the_newest_dev_build_that_carries_the_bundle(self):
         # No stable release: the newest dev build with an aerieos-controller
         # bundle, past a newer one whose bundle is named for the old product
         # (2 Nov, dev.4750 and before).
         r, _ = self.fetch("", 200)
-        self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("bundle aerieos-controller-0.9.0-dev.4724.tar.gz", r.stderr)
+        self.assertIn("so v0.9.0-dev.4724's signature cannot be checked", r.stderr)
 
     def test_a_bundle_that_does_not_verify_is_not_taken(self):
         r, _ = self.fetch("v0.9.1", 200, gh_ok=False)

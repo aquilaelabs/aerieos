@@ -146,12 +146,17 @@ class Table(unittest.TestCase):
             f.write("# who may sign a release\n" + "".join(ln + "\n" for ln in case.lines()))
         return path
 
+    # A verifier's own verdict for a case, where it is not the table's:
+    # {case name: (taken, says)}.
+    OWN = {}
+
     def run_table(self):
         for case in TABLE:
             with self.subTest(case.name):
+                want, says = self.OWN.get(case.name, (case.taken, case.says))
                 taken, said = self.verdict(case)
-                self.assertEqual(taken, case.taken, f"{case.name}: {said}")
-                self.assertIn(case.says, said, case.name)
+                self.assertEqual(taken, want, f"{case.name}: {said}")
+                self.assertIn(says, said, case.name)
 
 
 class TheOsUpdater(Table):
@@ -222,7 +227,20 @@ class TheOsUpdater(Table):
 
 class TheInstaller(Table):
     """install-controller.sh's fetch_tree, its own lines under bash, with
-    curl and gh stood in on the PATH."""
+    curl and gh stood in on the PATH. An update on a machine of its own
+    takes nothing where the install names no signer: its tree always ships
+    the file, so one without it is not a release's tree."""
+    OWN = {"a release with no signed list, the install naming no signer": (False, "names no release signer")}
+
+    def test_a_signed_release_is_not_taken_either_while_no_signer_is_named(self):
+        for signers in ((), None):
+            case = Case("a signed dev build, the install naming no signer", PRE, signers or (), ("dev", DEV), False, "names no release signer")
+            if signers is None:
+                # The file itself gone, not only empty.
+                self.signers_file = lambda case, d: os.path.join(d, "no-such-file")
+            taken, said = self.verdict(case)
+            self.assertEqual((taken, "names no release signer" in said, "not taken" in said), (False, True, True), said)
+            self.assertEqual(len([ln for ln in said.splitlines() if "names no release signer" in ln]), 1, "one sentence")
     def verdict(self, case):
         d = self.fresh()
         ver = case.tag[1:]

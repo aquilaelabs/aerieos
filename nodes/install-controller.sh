@@ -741,16 +741,16 @@ cmd_firstboot() {
 # publish themselves, can never sign a stable release. A list that is
 # unsigned, signed by nobody this install names or by somebody the tag may
 # not have, or one that does not name the file, stops the update with the
-# reason; only an install that names no signer at all goes on without, and
-# says so. The rule the OS updater (osimage.py), the stick maker
+# reason, and so does an install that names no signer at all: every tree
+# ships config/release-signers, so one without it is not a tree a release
+# made. The rule the OS updater (osimage.py), the stick maker
 # (tools/aerieos-stick.py) and the Library's downloads (apps.py) follow;
 # test_release_signing.py holds the four to one table of cases.
 release_signed() {
     local tag="$1" file="$2" name="$3" d="$4" keys may ns="" want have rel who
     keys="$(grep -v '^[[:space:]]*#' "$SIGNERS" 2>/dev/null | grep -c . || true)"
     if [ "${keys:-0}" -eq 0 ]; then
-        printf '   this install holds no release key yet, so the release'"'"'s signature is not checked\n' >&2
-        return 0
+        die "this install names no release signer (its config/release-signers is missing or empty), so ${tag}'s signature cannot be checked: not taken"
     fi
     if [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         may="aerieos-release"

@@ -11,8 +11,9 @@
 # -rc.N, -beta.N) takes a list signed in either namespace; a stable release
 # (vX.Y.Z) takes aerieos-release alone, so the key the release build holds
 # can never sign one. A release whose list is unsigned, or signed in a
-# namespace its tag may not use, is refused. Only with no key here at all
-# is nothing checked, and each update says so.
+# namespace its tag may not use, is refused. With no key here at all an
+# update of a controller on a machine of its own takes nothing
+# (nodes/install-controller.sh): every tree ships this file.
 #
 # Dev builds publish by themselves, so their signer is the key the release
 # build holds (its secret AERIEOS_RELEASE_KEY) and its spare:
