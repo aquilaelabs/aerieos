@@ -28,6 +28,8 @@
 - Docker apps come from the catalog alone: AerieOS ships no table of apps, so an app is added, fixed or re-pinned by a catalog commit with no release. A container already made from an app keeps running and keeps its Configure. With no catalog reachable and none kept, the Library's Apps say so (271fb5f)
 - The bell's container-update row names a container made from an app or a service once its entry names a newer image (79a8209)
 - A refused agent update, and a download that is not the file its entry pins, are each said in one line (aab77e7, b192d01)
+- A release is refused while config/catalog-floor is older than the catalog's newest signed index, a release rehearsal builds the Android app on the hosted runner a tag's run uses, and the OS image's build fetches nothing from PyPI (9dcbc9f, 6dddc02, 81c8e92)
+- A signature refusal, a stale agent's row and a pinned download each say one sentence (72925b6)
 
 ### Removed
 
@@ -110,6 +112,15 @@
 - The provisioner run again on an enrolled node fetches its agent under the node's pin, and the file explorer reaches a node's own folders by name and none where the node's console turned root asks off (e307631, e9f9147)
 - A signed toolchain that names its version installs that version and no other (71c92ac)
 - No app, stick image or OS update is taken while the install names no release signer (b75c9e3, 6c79d59)
+- An account that pointed a folder of its home at another account's no longer has that account's sign-in sealed as its own (690699a)
+- An install step with no network keeps none of the jobs account's other groups, docker's among them, and a toolchain's version is asked of the file the census looked at, never as root of a file an account controls (7747599, bda6dfc)
+- An app's compose, from the catalog or of your own, may use only keys that reach nothing of the machine past its ports and volumes: added capabilities, devices, the host's or another container's namespaces, a loosened profile, extends, include, env_file, and an external or host-bound volume are refused (1756f4a)
+- Node.js and Swift install the version their row names, held by their publisher's signature, and tools/pins.py checks and moves it; Node.js offers no musl build, since its publisher signs none (3172324)
+- A pack can no longer set a variable that loads code into, or redirects, the tools installs are checked with, and the installer's checks run on the system's own tools with none of a pack's variables (2f611dd, 5bece86)
+- A pinned node refuses an older release's signed bundle and an older spare statement, a pinned coding agent holds no link that leads out of its folder, and a backup is refused where its folder in the destination is a link (1fc73b6, aac7787, 052c587)
+- Test seams are read only in AerieOS's source tree: no variable in an install's environment changes who may sign a release or which programs run, and a bare-metal controller's own node reads none of the installer's (ca6c47a, c09384a)
+- The release's signing jobs read where a release may be cut from on the default branch alone and match branch names whole, the Windows code-signing certificate is read by a tag's run alone, and the Android app's dependencies are held to their sha256 (8960dd0, dbb6dcb, 049144e)
+- The .NET MAUI workload installs with its packages' signatures checked (9bab719)
 
 ## 0.9.0-dev.5641: 2026-11-18
 
