@@ -321,18 +321,130 @@ class Own(unittest.TestCase):
         self.assertTrue(self.kept("key.pem").startswith("bbseal:"))
         self.assertEqual(tls.seal_all(), 0)
 
-    def test_a_key_that_cannot_be_opened_is_the_one_case_a_new_one_is_made(self):
+    def quiet(self, settings, **kw):
         import contextlib
         import io
-        pin = tls.apply({"tls_mode": "http"}.get)["pin"]
-        signing.MASTER = bytes(range(2, 34))          # another install key, the old one gone
-        tls._ctx = None
         said = io.StringIO()
         with contextlib.redirect_stdout(said):
-            st = tls.apply({"tls_mode": "http"}.get)
+            st = tls.apply(settings.get, **kw)
+        return st, said.getvalue()
+
+    def test_a_start_without_the_install_key_keeps_the_key_and_the_pin_comes_back_with_it(self):
+        pin = tls.apply({"tls_mode": "self", "tls_host": "bb.example.com"}.get)["pin"]
+        key_file, cert = self.kept("key.pem"), self.kept("cert.pem")
+        for other in (None, bytes(range(2, 34))):     # no install key at this start, then another one
+            signing.MASTER = other
+            tls._ctx = None
+            st, said = self.quiet({"tls_mode": "self", "tls_host": "bb.example.com"})
+            self.assertEqual((st["pin"], st["on"], st["key_state"]), ("", False, "locked"), "no own pair is loaded: plain http")
+            self.assertIsNone(tls._ctx)
+            self.assertEqual((self.kept("key.pem"), self.kept("cert.pem")), (key_file, cert), "nothing was written over the pair")
+            self.assertIn("left as it is", said)
+            self.assertEqual(tls.seal_all(again=True), 0, "and a reseal does not touch what it cannot open")
+            self.assertEqual(self.kept("key.pem"), key_file)
+        # The install key as it was, at the next start: the same key, the same pin.
+        signing.MASTER = KEY
+        st = tls.apply({"tls_mode": "self", "tls_host": "bb.example.com"}.get)
+        self.assertEqual((st["pin"], st["on"], st["key_state"]), (pin, True, "open"))
+
+    def test_an_emptied_or_cut_short_key_file_is_not_replaced(self):
+        tls.apply({"tls_mode": "http"}.get)
+        whole = self.kept("key.pem")
+        for left in ("", whole[:len(whole) // 2], "bbseal:not base64 at all\n", "-----BEGIN PRIVATE KEY-----\nAAAA\n"):
+            with open(os.path.join(self.tmp, "tls", "key.pem"), "w") as f:
+                f.write(left)
+            tls._ctx = None
+            st, said = self.quiet({"tls_mode": "http"})
+            self.assertIn(st["key_state"], ("damaged", "locked"), left[:20])
+            self.assertEqual((st["pin"], self.kept("key.pem")), ("", left), "the file is as it was found, and nothing is pinned")
+            self.assertIsNone(tls._ctx)
+            self.assertIn("left as it is", said)
+        # Only a key file that is not there at all is one a key is made for.
+        os.unlink(os.path.join(self.tmp, "tls", "key.pem"))
+        st = tls.apply({"tls_mode": "http"}.get)
+        self.assertEqual(st["key_state"], "open")
         self.assertTrue(st["pin"])
-        self.assertNotEqual(st["pin"], pin)
-        self.assertIn("a new one is made", said.getvalue())
+
+    def test_a_start_cut_short_between_the_two_files_leaves_a_pair_that_loads(self):
+        # A first start that wrote the key and went down before the certificate.
+        _cert, key = tls.self_signed(["aerieos"])
+        os.makedirs(os.path.join(self.tmp, "tls"), mode=0o700)
+        tls._write(os.path.join(self.tmp, "tls", "key.pem"), "bbseal:" + base64.b64encode(signing.seal(key.encode())).decode() + "\n")
+        key_file = self.kept("key.pem")
+        st = tls.apply({"tls_mode": "http"}.get)
+        self.assertEqual(st["pin"], tls._spki(key), "the certificate is made over the key that was kept")
+        self.assertEqual(self.kept("key.pem"), key_file)
+        self.assertEqual(pin_of_der(self.presented(self.serve())), st["pin"])
+        # A certificate left beside a key that is not its own is made again over the key.
+        other, _k = tls.self_signed(["aerieos"])
+        with open(os.path.join(self.tmp, "tls", "cert.pem"), "w") as f:
+            f.write(other)
+        tls._ctx = None
+        again = tls.apply({"tls_mode": "http"}.get)
+        self.assertEqual((again["pin"], self.kept("key.pem")), (st["pin"], key_file))
+        self.assertIsNotNone(tls._ctx)
+
+    def test_a_write_that_fails_leaves_the_file_that_was_there(self):
+        st = tls.apply({"tls_mode": "http"}.get)
+        key_file, cert = self.kept("key.pem"), self.kept("cert.pem")
+        was = os.replace
+
+        def full(*a):
+            raise OSError(28, "No space left on device")
+        self.addCleanup(setattr, os, "replace", was)
+        os.replace = full
+        with self.assertRaises(OSError):
+            tls.apply({"tls_mode": "self", "tls_host": "new.example.com"}.get)
+        os.replace = was
+        self.assertEqual((self.kept("key.pem"), self.kept("cert.pem")), (key_file, cert))
+        self.assertEqual(sorted(os.listdir(os.path.join(self.tmp, "tls"))), ["cert.pem", "key.pem", "meta.json"], "no half-written file is left")
+        tls._ctx = None
+        self.assertEqual(tls.apply({"tls_mode": "http"}.get)["pin"], st["pin"])
+
+    def test_a_remake_that_keeps_the_key_leaves_the_key_file_alone(self):
+        tls.apply({"tls_mode": "http"}.get)
+        path = os.path.join(self.tmp, "tls", "key.pem")
+        before = (self.kept("key.pem"), os.stat(path).st_ino, os.stat(path).st_mtime_ns)
+        st = tls.apply({"tls_mode": "self", "tls_host": "bb.example.com"}.get)
+        self.assertIn("bb.example.com", st["names"])
+        self.assertEqual((self.kept("key.pem"), os.stat(path).st_ino, os.stat(path).st_mtime_ns), before)
+        self.assertEqual(os.stat(path).st_mode & 0o777, 0o600)
+
+    def test_the_names_pair_cut_short_between_its_files_is_asked_for_again(self):
+        tls.apply({"tls_mode": "acme", "tls_host": "bb.example.com"}.get)
+        self.named_pair("bb.example.com")
+        self.assertFalse(tls.renew_due())
+        _cert, key = tls.self_signed(["bb.example.com"])      # the new key landed, its certificate did not
+        tls._write(os.path.join(self.tmp, "tls", "acme-key.pem"), key)
+        self.assertTrue(tls.renew_due())
+        st, _said = self.quiet({"tls_mode": "acme", "tls_host": "bb.example.com"})
+        self.assertTrue(st["pin"], "the install's own answers meanwhile")
+
+    def test_the_doctor_says_a_key_that_cannot_be_opened_in_one_sentence(self):
+        probes = os.path.join(os.path.dirname(__file__), "..", "..", "lib", "doctor-probes.py")
+        secret = os.path.join(self.tmp, "install-key")
+
+        def doctor(key):
+            with open(secret, "wb") as f:
+                f.write(key)
+            env = dict(os.environ, DASHBOARD_STATE=self.tmp, BB_SIGNING_SECRET_FILE=secret,
+                       BB_INSTALL_KEY_PREVIOUS_FILE=os.path.join(self.tmp, "none"))
+            r = subprocess.run([sys.executable, probes, "tlskey", os.path.join(os.path.dirname(__file__), "..", "tls.py")],
+                               capture_output=True, text=True, timeout=60, check=False, env=env)
+            return r.returncode, r.stdout, r.stderr
+        self.assertEqual(doctor(KEY)[:2], (0, ""), "no pair yet: nothing to say")
+        tls.apply({"tls_mode": "http"}.get)
+        code, out, err = doctor(KEY)
+        self.assertEqual((code, out), (0, ""), err)
+        code, out, err = doctor(bytes(range(2, 34)))
+        self.assertEqual(code, 1, err)
+        self.assertRegex(out, r"^  \[FAIL\] the controller's own TLS key cannot be opened under this install key, so the nodes that pinned it wait")
+        self.assertEqual(out.count("\n"), 1)
+        with open(os.path.join(self.tmp, "tls", "key.pem"), "w") as f:
+            f.write("")
+        code, out, err = doctor(KEY)
+        self.assertEqual(code, 1, err)
+        self.assertIn("[FAIL] the controller's own TLS key file is damaged", out)
 
     def test_nothing_names_a_pin_while_nothing_is_loaded(self):
         self.assertEqual(tls.key_pin(), "")

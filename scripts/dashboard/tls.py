@@ -22,6 +22,14 @@ hostname setting, the tunnel's, the machine's name and addresses, else
 Its KEY is made once and kept through every remake, so what a node pins
 is the key (key_pin: the sha256 of its public half, as curl's
 --pinnedpubkey reads it) and a remade certificate changes nothing for it.
+A key file that is there and cannot be opened (sealed under an install key
+this start does not hold, emptied, cut short) is never replaced: no own
+pair is loaded, the port answers plain http, and the nodes that pinned the
+key wait for it to open again (key_state, said on the Doctor). A key is
+made only where there is no key file at all. Each file of a pair is
+written whole beside itself, synced and renamed into place, the key before
+the certificate, and a certificate that does not carry its key's public
+half is made again over the key.
 In the `acme` mode the name's certificate answers a handshake that asks
 for that name (SNI) and the install's own answers every other, so a node
 that pinned the install's key at an address is not cut off when a
@@ -83,35 +91,110 @@ def _meta():
         return {}
 
 
+def _write(path, text, mode=0o600):
+    """A file written whole or not at all: beside itself, synced, renamed
+    into place, and the folder synced, so a full disk or a start cut short
+    leaves the file that was there."""
+    path = Path(path)
+    tmp = path.with_name(path.name + ".tmp")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
+    try:
+        with os.fdopen(fd, "w") as fh:
+            fh.write(text)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            tmp.unlink()
+        raise
+    with contextlib.suppress(OSError):
+        dfd = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(dfd)
+        finally:
+            os.close(dfd)
+
+
 def _meta_save(d):
-    tmp = _dir() / "meta.json.tmp"
-    tmp.write_text(json.dumps(d))
-    os.replace(tmp, _dir() / "meta.json")
+    _write(_dir() / "meta.json", json.dumps(d), 0o644)
+
+
+NONE, OPEN, LOCKED, DAMAGED = "none", "open", "locked", "damaged"
+
+
+def _key_read(kind=OWN):
+    """(state, private key PEM) of a pair's key file: NONE where there is
+    no such file, OPEN with the key, LOCKED where it is sealed and this
+    start cannot open it (no install key, or another), DAMAGED where it is
+    there and holds no private key (emptied, cut short, unreadable). Only
+    NONE is a file a new key may be written over."""
+    try:
+        raw = (_dir() / FILES[kind][1]).read_text().strip()
+    except FileNotFoundError:
+        return NONE, ""
+    except (OSError, ValueError):
+        return DAMAGED, ""
+    if raw.startswith(SEALED):
+        try:
+            blob = base64.b64decode(raw[len(SEALED):], validate=True)
+        except ValueError:
+            return DAMAGED, ""
+        try:
+            raw = unseal(blob).decode() if unseal else ""
+        except Exception:                                   # noqa: BLE001 (Locked: another key, or none)
+            return LOCKED, ""
+        if not raw:
+            return LOCKED, ""
+    try:
+        from cryptography.hazmat.primitives import serialization  # noqa: PLC0415
+        serialization.load_pem_private_key(raw.encode(), None)
+    except (ValueError, TypeError):
+        return DAMAGED, ""
+    return OPEN, raw
+
+
+def key_state(kind=OWN):
+    """NONE, OPEN, LOCKED or DAMAGED: how a pair's key file stands (_key_read)."""
+    return _key_read(kind)[0]
 
 
 def _key_text(kind=OWN):
-    """A pair's private key, plain: opened where it was sealed."""
+    """A pair's private key, plain: opened where it was sealed, "" where
+    there is none or it cannot be opened."""
+    return _key_read(kind)[1]
+
+
+def _spki(key_pem):
+    """The pin of a private key's public half, as key_pin_of gives a
+    certificate's: the two are equal where the certificate is the key's."""
+    import hashlib                                          # noqa: PLC0415
+    from cryptography.hazmat.primitives import serialization  # noqa: PLC0415
+    pub = serialization.load_pem_private_key(key_pem.encode(), None).public_key().public_bytes(
+        serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
+    return PIN + base64.b64encode(hashlib.sha256(pub).digest()).decode()
+
+
+def _paired(cert_pem, key_pem):
+    """Whether a certificate carries this key's public half."""
     try:
-        raw = (_dir() / FILES[kind][1]).read_text().strip()
-    except OSError:
-        return ""
-    if raw.startswith(SEALED):
-        try:
-            return unseal(base64.b64decode(raw[len(SEALED):])).decode() if unseal else ""
-        except Exception:                                   # noqa: BLE001 (Locked: another key)
-            return ""
-    return raw
+        return bool(cert_pem and key_pem) and key_pin_of(cert_pem) == _spki(key_pem)
+    except Exception:                                       # noqa: BLE001 (a damaged file: not a pair)
+        return False
 
 
 def _keep(cert_pem, key_pem, kind, names):
     """A pair kept under its own two files: the certificate plain, the key
-    sealed where there is an install key."""
+    sealed where there is an install key. The key goes first, so a start
+    cut short between the two finds the new key under the certificate of
+    before, which is then made again over it (_own_kept) or asked for again
+    (renew_due); with no `key_pem` the certificate is one made over the key
+    kept, and the key file is left as it is."""
     d = _dir()
-    (d / FILES[kind][0]).write_text(cert_pem.strip() + "\n")
-    text = (SEALED + base64.b64encode(seal(key_pem.encode())).decode()) if (seal and sealing and sealing()) else key_pem
-    fd = os.open(d / FILES[kind][1], os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w") as fh:
-        fh.write(text + "\n")
+    if key_pem:
+        text = (SEALED + base64.b64encode(seal(key_pem.encode())).decode()) if (seal and sealing and sealing()) else key_pem
+        _write(d / FILES[kind][1], text.strip() + "\n")
+    _write(d / FILES[kind][0], cert_pem.strip() + "\n", 0o644)
     m = _meta()
     if kind == ACME:
         m["acme"] = {"names": list(names), "made": int(time.time())}
@@ -141,10 +224,7 @@ def seal_all(again=False):
             key = _key_text(kind)
             if not key:
                 continue
-            fd = os.open(str(path) + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-            with os.fdopen(fd, "w") as fh:
-                fh.write(SEALED + base64.b64encode(seal(key.encode())).decode() + "\n")
-            os.replace(str(path) + ".tmp", path)
+            _write(path, SEALED + base64.b64encode(seal(key.encode())).decode() + "\n")
             n += 1
     return n
 
@@ -332,7 +412,9 @@ def status(settings_get):
     browser is served over TLS as the mode says (`on`: the port answers a
     node's handshake in every mode, which is not what this says), the kind,
     names, fingerprint and expiry of the certificate a browser meets, an
-    ACME request going, and the pin of the install's own key."""
+    ACME request going, the pin of the install's own key, and how that
+    key's file stands (key_state: `locked` or `damaged` is a key the nodes
+    wait for)."""
     mode = mode_of(settings_get)
     kind = _shown(mode)
     pem = _cert_text(kind)
@@ -343,7 +425,7 @@ def status(settings_get):
     return {"mode": mode, "on": mode != "http" and _ctx is not None, "host": str(settings_get("tls_host") or "").strip(),
             "fingerprint": fingerprint(pem) if pem else "", "expires": facts.get("expires", 0),
             "names": facts.get("names", []), "issuer": facts.get("issuer", ""), "kind": kind if pem else "",
-            "pending": dict(_pending), "key_sealed": _key_sealed(), "pin": key_pin()}
+            "pending": dict(_pending), "key_sealed": _key_sealed(), "pin": key_pin(), "key_state": key_state()}
 
 
 def _key_sealed():
@@ -435,31 +517,29 @@ def _own_kept(want):
     """The install's own pair made where there is none, and remade over the
     same key where it is not self-signed, is within RENEW_BEFORE of its
     end, or does not name every one of `want` (the names it has are kept:
-    it only ever gains one). A key that cannot be opened (sealed under an
-    install key this install no longer holds) is the one case a new key is
-    made, said in the log: every node that pinned the old one is then one
-    whose channel is refused until it is enrolled again."""
-    pem, key = _cert_text(), _key_text()
+    it only ever gains one), or does not carry the key's public half (a
+    start cut short between the two files). A key is made only where there
+    is no key file: one that is there and cannot be opened is left as it
+    is with nothing written, said in the log, since a new key would be one
+    no node pinned. Whether the pair is there to load."""
+    state, key = _key_read()
+    if state in (LOCKED, DAMAGED):
+        print(f"dashboard: tls: the install's own key is {'sealed under an install key this start does not hold' if state == LOCKED else 'not a key any more'}"
+              ", so it is left as it is and no handshake is answered under it: a node that pinned it waits", flush=True)
+        return False
+    pem = _cert_text()
     facts = {}
-    if pem:
+    if pem and _paired(pem, key):
         with contextlib.suppress(Exception):                # noqa: BLE001
             facts = _cert_facts(pem)
-    if key:
-        try:
-            from cryptography.hazmat.primitives import serialization  # noqa: PLC0415
-            serialization.load_pem_private_key(key.encode(), None)
-        except (ValueError, TypeError):
-            key = ""
-    if pem and not key:
-        print("dashboard: tls: the install's own key cannot be opened, so a new one is made: a node that pinned the "
-              "old one is refused its channel until it is enrolled again", flush=True)
-    had = [n for n in facts.get("names", []) if n] if key and facts.get("self") else []
+    had = [n for n in facts.get("names", []) if n] if facts.get("self") else []
     names = list(dict.fromkeys(had + [n.strip().lower() for n in want if n and n.strip()])) or [DEFAULT_NAME]
-    if (pem and key and facts.get("self") and facts.get("expires", 0) - time.time() >= RENEW_BEFORE
+    if (facts.get("self") and facts.get("expires", 0) - time.time() >= RENEW_BEFORE
             and not set(names) - set(facts.get("names", []))):
-        return
-    cert, key = self_signed(names, key)
-    _keep(cert, key, OWN, names)
+        return True
+    cert, made = self_signed(names, key)
+    _keep(cert, "" if state == OPEN else made, OWN, names)
+    return True
 
 
 def apply(settings_get, names=()):
@@ -527,9 +607,11 @@ def own_due():
 
 
 def renew_due():
-    """Whether the name's certificate ends within RENEW_BEFORE: what Let's
-    Encrypt is asked again for."""
-    return _due(ACME)
+    """Whether Let's Encrypt is asked again for the name's certificate: it
+    ends within RENEW_BEFORE, or it is not the certificate of the key kept
+    beside it (a start cut short between the two files)."""
+    pem, key = _cert_text(ACME), _key_text(ACME)
+    return _due(ACME) or bool(pem and key and not _paired(pem, key))
 
 
 def wrap(sock, peek_timeout=5.0):

@@ -5982,6 +5982,12 @@ PY
             self) printf '  [ok]   the dashboard is served over https with the install'"'"'s own certificate (pinned by its fingerprint on the Connection section)\n' ;;
             acme) printf '  [ok]   the dashboard is served over https with a Let'"'"'s Encrypt certificate\n' ;;
         esac
+        # The key every node pins (tls.key_state): a file that is there and
+        # cannot be opened is kept, and said here, never made anew.
+        local tls_key
+        tls_key=$(DASHBOARD_STATE="${DASHBOARD_STATE:-/config}" python3 "$BB_LIB/doctor-probes.py" tlskey \
+            "$BB_SCRIPTS/dashboard/tls.py" 2>/dev/null) || true
+        [ -z "$tls_key" ] || { printf '%s\n' "$tls_key"; ok=1; }
         # What the dashboard's process does about the keys it holds (R158
         # step 6), as it said at its start.
         if [ -r /run/builderbot-hardening.json ]; then

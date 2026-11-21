@@ -345,9 +345,16 @@ met is over the key named. In the `acme` mode the name's certificate
 answers a handshake that asks for the name and the install's own answers
 every other, so a hostname added later cuts off no node that dials an
 address. The key is sealed under the install key and sealed again when
-that changes. It is made anew in one case, a key that can no longer be
-opened (an install key lost): every node that pinned it then refuses the
-controller, and comes back when its Enroll script is run on it again.
+that changes. A key file that is there and cannot be opened (a start
+without the install key it was sealed under, a file cut short) is kept as
+it is and never replaced: the controller answers no handshake under it,
+the Doctor says so, and the nodes that pinned it wait and come back when
+it opens again. A key is made only where there is no key file at all, the
+first start; each file of the pair is written whole and renamed into
+place, so a full disk or a start cut short leaves the pair that was there.
+With the install key lost for good, the key is lost with it: removing
+`tls/key.pem` from `/config` has a new one made at the next start, and
+every node then comes back when its Enroll script is run on it again.
 
 ## What a node takes on its controller's word
 
