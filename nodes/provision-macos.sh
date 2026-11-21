@@ -405,7 +405,9 @@ NODE_JSON="$FOOT/node.json"
 
 say "the agent, from ${CONTROLLER}"
 hdr="$(mktemp)"
-curl -fsSL ${CTL_KEY:+-k --pinnedpubkey "$CTL_KEY"} -D "$hdr" -H "Authorization: Bearer ${TOKEN}" \
+# The token on a descriptor of its own, never among curl's words, which
+# every account on the machine can list.
+curl -fsSL ${CTL_KEY:+-k --pinnedpubkey "$CTL_KEY"} -D "$hdr" -H @<(printf 'Authorization: Bearer %s\n' "${TOKEN}") \
      "${CONTROLLER%/}/api/v1/agent/download" -o "${AGENT}.new" \
     || { warn "could not download the agent from ${CONTROLLER}. Is that the dashboard's address, and is the token unused?"; rm -f "$hdr" "${AGENT}.new"; exit 1; }
 # Held to what the command carries before any of it runs (agent_proved); an

@@ -124,13 +124,15 @@ class CheckUpdate(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("not checked: no release key is pinned here", said)
         self.assertFalse(os.path.exists(self.nj))
-        # A record no agent could start on either is said, not guessed at.
-        for held in ("not json", "[]"):
+        # A record that is not one may be of a node that pinned a key:
+        # nothing is taken on it, with the exit a refusal has.
+        for held in ("[]", '"a string"', "7"):
             with open(self.nj, "w") as f:
                 f.write(held)
-            code, said = self.check(self.new)
-            self.assertEqual(code, 0)
-            self.assertIn("is not a node's record", said)
+            for args in ((self.new,), (self.new, self.sign(self.k))):
+                code, said = self.check(*args)
+                self.assertEqual(code, 77, held)
+                self.assertTrue(said.startswith("refused: ") and "is not a node's record" in said, said)
 
     def test_the_signature_may_be_a_file_that_holds_it(self):
         self.write(dict(RECORD, release_key=self.pub))

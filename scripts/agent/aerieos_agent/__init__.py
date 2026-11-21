@@ -32,9 +32,12 @@ Three rules the agent keeps that are worth knowing before changing it:
     kept and re-sent by sequence number, the result is retried until it is
     acknowledged, and a job started before the controller went away finishes
     and reports late.
-  * The node enforces its own capabilities (door 7). A job that requires a
-    capability this node was not enrolled with is refused HERE, whatever the
-    controller's row says. The row is a claim, the enrollment is the fact.
+  * The node keeps the capabilities it enrolled with (door 7), and refuses
+    an exec job that names one it does not hold. What a job names is its
+    `requires`, a field the controller writes: a job that names none is
+    held to none, so this is a check of the controller's own bookkeeping
+    and no fence against it. What fences a node is below: the accounts its
+    jobs run as, and what its console allows (release.py, root-asks).
   * Jobs never run as root. The unit runs the agent as root so that phase 5's
     system jobs (mounts, network) can, but an exec job drops to the account
     the provisioner enrolled (the same `aerie` that docker runs as) before it
@@ -60,6 +63,7 @@ Runs anywhere Python 3.8+ is, with nothing installed:
     aerieos-agent release-key add|drop HEX  # trust, or stop trusting, the key a build of your own is signed with
     aerieos-agent unsigned on|off     # take an agent no release signed, or not
     aerieos-agent older on|off        # take a signed agent older than the one running, or not
+    aerieos-agent record session-user NAME | tunnel ADDR   # what the provisioner writes into node.json on a later run
     aerieos-agent check-update FILE [SIG]   # would this node take FILE as its agent: exit 0, or 77 refused
     aerieos-agent root-asks [on|off]  # run a root command the controller sends, or refuse every one
     aerieos-agent run            # the loop; what the unit runs
@@ -81,4 +85,4 @@ Runs anywhere Python 3.8+ is, with nothing installed:
 # that "which of these two is newer" always has an answer. A reset would put
 # the same number on two different agents, and a number that cannot say which
 # is newer is the reason the flat protocol number this replaced was useless.
-AGENT_VERSION = "0.9.496"
+AGENT_VERSION = "0.9.497"

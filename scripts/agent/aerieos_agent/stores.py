@@ -472,6 +472,40 @@ def load_state():
 CONSOLE_KEYS = ("release_key", "release_spare", "release_also", "release_unpinned", "unsigned_ok", "older_ok", "root_off")
 
 
+# What the provisioner writes into the record on a run after the enrollment
+# (the session account it made, the tunnel it brought up), through
+# record_set and the console's own lock. Like the console's keys, a running
+# agent takes them from the file at every save and never from its own
+# older copy, so a save between the provisioner's write and the restart it
+# asks for does not take the change back.
+RECORD_KEYS = ("session_user", "tunnel")
+
+
+def record_set(key, value):
+    """One of RECORD_KEYS set in node.json, or taken out with nothing, under
+    the save's lock and through its whole-file write: read from the file,
+    changed, and written as the console's own save writes. Whether it
+    changed; an error where the record could not be read or written, which
+    leaves it as it was."""
+    if key not in RECORD_KEYS:
+        raise ValueError(f"{key} is not the provisioner's to set")
+    d = os.path.dirname(NODE_JSON)
+    with _save_lock, open(os.path.join(d, ".node.json.lock"), "a") as held:
+        fcntl.flock(held.fileno(), fcntl.LOCK_EX)
+        with open(NODE_JSON) as f:
+            cur = json.load(f)
+        if not isinstance(cur, dict):
+            raise ValueError(f"{NODE_JSON} does not hold a node's record")
+        if (cur.get(key) or None) == (value or None):
+            return False
+        if value:
+            cur[key] = value
+        else:
+            cur.pop(key, None)
+        _save(cur, True, d)
+    return True
+
+
 def console_said():
     """The console's keys as node.json has them now, {} when it has none."""
     try:
@@ -575,7 +609,7 @@ def _save(state, console, d):
         except (OSError, ValueError):
             cur = None
         if isinstance(cur, dict):
-            for k in CONSOLE_KEYS:
+            for k in CONSOLE_KEYS + RECORD_KEYS:
                 if k in cur:
                     state[k] = cur[k]
                 else:

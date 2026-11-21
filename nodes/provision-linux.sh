@@ -10,12 +10,19 @@
 # to make its own machine a node); this box is only ever a Docker host, and
 # keeping it only that is what makes it disposable.
 #
-# Run it inside the VM, once:
+# Run it inside the VM, once, as the Nodes page's Enroll node hands it: the
+# one file that page gives carries this script whole, as the controller's
+# own build ships it, with the controller's address, a token minted for
+# this one enrollment, the pin of the controller's key and the release key
+# the agent is held to, and runs it with them. Nothing is fetched from a
+# branch: the script a node runs is the one its controller's release
+# carries.
 #
-#   curl -fsSLO https://raw.githubusercontent.com/aquilaelabs/aerieos/main/nodes/provision-linux.sh
-#   sudo bash provision-linux.sh --key "ssh-ed25519 AAAA..."
+#   sudo bash THE-FILE-ENROLL-NODE-GAVE
 #
-# With --controller URL --token bbe_… (the Nodes tab mints the token) it also
+# By hand, from a copy of this file out of a release, it sets a machine up
+# as a Docker host alone (--key "ssh-ed25519 AAAA..."), and with
+# --controller URL --token bbe_… (the Nodes tab mints the token) it also
 # enrolls the machine as a node: the agent is fetched from the controller and
 # left running under systemd, dialing out.
 #
@@ -584,16 +591,62 @@ agent_proved() {
 # it pinned at its console.
 NODE_RECORD=/etc/aerieos/node.json
 
-# agent_pinned: the release key this node pinned, with its spare after a
-# comma, as its record holds them (the agent's release.keys); "none" for a
-# node that pinned none, and nothing at all where the record cannot be read,
-# which is not the same thing and is not taken for it.
+# agent_pinned: every key this node trusts, commas between: the release key
+# it pinned, its spare, and the keys added at its console (the agent's
+# release.trusted); "none" for a node that trusts none, and nothing at all
+# where that cannot be read, which is not the same thing and is not taken
+# for it. Asked of the installed agent, with the verb its console shows
+# them by (release-key), and read from the record it keeps where no agent
+# is left to ask: a node that trusts only a key added at its console is a
+# node that pinned one.
 agent_pinned() {
+    local said keys
+    if [ -x "$AGENT" ] && said="$("$AGENT" release-key 2>/dev/null)"; then
+        keys="$(printf '%s\n' "$said" | sed -n -E 's/^(release key|spare key|added here):[[:space:]]+([0-9a-f]{64})$/\2/p' | paste -sd, -)"
+        if [ -n "$keys" ]; then printf '%s\n' "$keys"; return 0; fi
+        case "$said" in "release key: none pinned"*) printf 'none\n'; return 0 ;; esac
+    fi
     python3 -c 'import json, re, sys
 d = json.load(open(sys.argv[1]))
-keys = [str(d.get(k) or "").strip().lower() for k in ("release_key", "release_spare")]
+also = d.get("release_also") if isinstance(d.get("release_also"), list) else []
+keys = [str(k or "").strip().lower() for k in [d.get("release_key"), d.get("release_spare"), *also]]
 keys = list(dict.fromkeys(k for k in keys if re.fullmatch("[0-9a-f]{64}", k)))
 print(",".join(keys) or "none")' "$NODE_RECORD" 2>/dev/null || true
+}
+
+# node_record_set KEY VALUE: one thing this script writes into an enrolled
+# node's record on a later run, session-user NAME or tunnel ADDR, written
+# the way the agent saves the record: by the agent's own verb (record),
+# under its lock and in one step, and kept by a running agent's next save.
+# An agent from before the verb is not asked: the record is then written
+# here under the same lock, beside itself and renamed. It prints "changed"
+# when the record moved.
+node_record_set() {
+    if [ -x "$AGENT" ] && "$AGENT" record "$1" "$2" 2>/dev/null; then return 0; fi
+    python3 - "$NODE_RECORD" "$1" "$2" <<'PY'
+import fcntl, json, os, sys, tempfile
+path, what, value = sys.argv[1:4]
+key = {"session-user": "session_user", "tunnel": "tunnel"}[what]
+want = ({"kind": "wireguard", "iface": "bb", "addr": value} if what == "tunnel" else value) or None
+d = os.path.dirname(path)
+with open(os.path.join(d, ".node.json.lock"), "a") as held:
+    fcntl.flock(held.fileno(), fcntl.LOCK_EX)
+    with open(path) as f:
+        cur = json.load(f)
+    if (cur.get(key) or None) != want:
+        if want:
+            cur[key] = want
+        else:
+            cur.pop(key, None)
+        fd, tmp = tempfile.mkstemp(prefix=".node.json.", dir=d)
+        with os.fdopen(fd, "w") as f:
+            os.fchmod(f.fileno(), 0o600)
+            json.dump(cur, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+        print("changed")
+PY
 }
 
 # agent_swap NEW SENT SIG: a newer agent, fetched on a run after the
@@ -4259,13 +4312,7 @@ if [ -n "$CONTROLLER" ]; then
     # The tunnel into the node's own record (R161): the agent binds the
     # screen relay to its address there, and reports it.
     if [ -n "$WG_ADDR" ]; then
-        python3 - "$WG_ADDR" <<'PY'
-import json, sys
-p = "/etc/aerieos/node.json"
-d = json.load(open(p))
-d["tunnel"] = {"kind": "wireguard", "iface": "bb", "addr": sys.argv[1]}
-json.dump(d, open(p, "w"), indent=2)
-PY
+        node_record_set tunnel "$WG_ADDR" >/dev/null
     fi
     svc_install aerieos-agent "$AGENT_DESC" "${AGENT} run" "$AGENT_KILLMODE"
     names_old_service
@@ -4346,11 +4393,21 @@ elif [ -f /etc/aerieos/node.json ]; then
         esac
     done
     say "agent: already enrolled; checking the controller for a newer agent"
-    ctl=""; tok=""
-    read -r ctl tok < <(python3 -c 'import json, sys; d = json.load(open(sys.argv[1])); print(d.get("controller", ""), d.get("token", ""))' "$NODE_RECORD" 2>/dev/null || true)
-    if [ -n "$ctl" ] && [ -n "$tok" ]; then
+    # ...and under what the node holds its controller to, as its record
+    # says it: the controller's key (curl's --pinnedpubkey, with -k leaving
+    # the authorities out, as the first enrollment fetches), the system's
+    # authorities for a public hostname, or nothing on plain http. A node
+    # that pinned a certificate from before keys were pinned has no form
+    # curl takes: its token is sent to nobody, and Update agent on its row
+    # is the way on.
+    ctl=""; tok=""; pin=""; held=""
+    read -r ctl tok pin < <(python3 -c 'import json, sys; d = json.load(open(sys.argv[1])); print(d.get("controller", ""), d.get("token", ""), d.get("pin") or "-")' "$NODE_RECORD" 2>/dev/null || true)
+    if [[ "$pin" =~ ^sha256//[A-Za-z0-9+/]{43}=$ ]]; then held="$pin"; fi
+    if [ -n "$ctl" ] && [ -n "$tok" ] && [[ "$pin" == sha256:* ]]; then
+        warn "this node holds its controller to a certificate, which this script cannot check a fetch against: the installed agent is left as it is. Update agent on the node's row updates it"
+    elif [ -n "$ctl" ] && [ -n "$tok" ]; then
         hdr="$(mktemp)"
-        if curl -fsSL -D "$hdr" -H @<(printf 'Authorization: Bearer %s\n' "${tok}") \
+        if curl -fsSL ${held:+-k --pinnedpubkey "$held"} -D "$hdr" -H @<(printf 'Authorization: Bearer %s\n' "${tok}") \
                 "${ctl%/}/api/v1/agent/download" -o "${AGENT}.new" 2>/dev/null; then
             agent_swap "${AGENT}.new" "$(agent_sent "$hdr" x-agent-digest)" "$(agent_sent "$hdr" x-agent-sig)"
         else
@@ -4367,17 +4424,7 @@ elif [ -f /etc/aerieos/node.json ]; then
     # reporting "no session account" and the dashboard keeps the button
     # dead. Written here rather than by re-enrolling: a re-enrollment is a
     # NEW node row, and every project bound to the old one would lose it.
-    if [ -n "$(python3 - "${SESSION_NAME:-}" <<'PY'
-import json, sys
-p = "/etc/aerieos/node.json"
-d = json.load(open(p))
-want = sys.argv[1]
-if d.get("session_user", "") != want:
-    d["session_user"] = want
-    json.dump(d, open(p, "w"), indent=2)
-    print("changed")
-PY
-    )" ]; then
+    if [ -n "$(node_record_set session-user "${SESSION_NAME:-}")" ]; then
         say "agent: sessions now run as ${SESSION_NAME:-nobody}; restarting the agent"
         svc_restart aerieos-agent 2>/dev/null || true
     fi

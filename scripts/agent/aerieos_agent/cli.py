@@ -5,7 +5,7 @@ import time
 from . import AGENT_VERSION
 from .base import DEFAULT_STORES, NODE_JSON, harden, log, own_digest
 from .controller import KEY_PIN, Controller
-from .stores import load_state, make_store, save_state, store_path_ok
+from .stores import load_state, make_store, record_set, save_state, store_path_ok
 from .census import Sampler, census
 from .agent import Agent
 
@@ -92,6 +92,11 @@ def cmd_enroll(args):
     ctl = Controller(opts["--controller"], opts["--token"], opts["--pin"])
     if opts["--reach"] == "public" and ctl.scheme != "https":
         raise SystemExit("through a public hostname the controller is an https hostname")
+    # A pin holds a TLS connection and plain http has none: the pair would
+    # send the token in the clear with the pin read by nothing.
+    if opts["--pin"] and ctl.scheme != "https":
+        raise SystemExit("--pin is what an https controller is held to, and --controller is plain http: "
+                         "nothing was sent. Give its https address, or enroll without a pin")
     state = {"controller": ctl.url, "user": opts["--user"], "stores": stores,
              "store_made": marks}
     if opts["--reach"]:
@@ -408,6 +413,34 @@ def cmd_older(args):
           else "this machine refuses a signed agent older than the one it runs")
 
 
+def cmd_record(args):
+    """record session-user NAME | record tunnel ADDR: what the provisioner
+    writes into this node's record on a run after its enrollment, written
+    as the agent's own save writes (stores.record_set): under its lock, in
+    one step, and kept by a running agent's next save. An empty NAME takes
+    the session account out. Says "changed" when the record moved."""
+    import ipaddress
+    import re
+    usage = "record takes session-user NAME, or tunnel ADDR (the WireGuard address the controller reaches this node at)"
+    if len(args) != 2 or args[0] not in ("session-user", "tunnel"):
+        raise SystemExit(usage)
+    if args[0] == "session-user":
+        if args[1] and not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.-]{0,31}", args[1]):
+            raise SystemExit("that is not an account's name")
+        key, value = "session_user", args[1]
+    else:
+        try:
+            ipaddress.ip_address(args[1])
+        except ValueError:
+            raise SystemExit(usage) from None
+        key, value = "tunnel", {"kind": "wireguard", "iface": "bb", "addr": args[1]}
+    try:
+        if record_set(key, value):
+            print("changed")
+    except (OSError, ValueError) as e:
+        raise SystemExit(f"the record could not be written: {e}") from None
+
+
 def _sig_given(text):
     """The signature check-update was handed: its 128 hex characters, or a
     file that holds them, bare or as the build's own agent.sig holds them
@@ -465,9 +498,10 @@ def cmd_check_update(args):
               "check-update is root's")
         sys.exit(77)
     if not isinstance(state, dict):
-        # No agent starts on such a record either: enrolling again writes a new one.
-        print(f"not checked: {NODE_JSON} is not a node's record, so no key pinned here can be read from it")
-        return
+        # No agent starts on such a record either: enrolling again writes a
+        # new one. What it pinned cannot be told, so nothing is taken on it.
+        print(f"refused: {NODE_JSON} is not a node's record, so what this node pinned is not known")
+        sys.exit(77)
     ok, said = release.may_install(state, digest, _sig_given(args[1] if len(args) > 1 else ""), body=body)
     print(said)
     if not ok:
@@ -507,6 +541,8 @@ def main(argv):
         cmd_unsigned(argv[1:])
     elif cmd == "older":
         cmd_older(argv[1:])
+    elif cmd == "record":
+        cmd_record(argv[1:])
     elif cmd == "check-update":
         cmd_check_update(argv[1:])
     elif cmd == "root-asks":
