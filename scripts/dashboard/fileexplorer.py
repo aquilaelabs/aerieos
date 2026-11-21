@@ -95,6 +95,8 @@ def _target(principal_ok, node_id, root):
     # How its relay is spoken to (R243): the certificate it reported, which
     # is the only one taken, and whether it takes a request once.
     relay = (n.get("reported") or {}).get("relay") or {}
+    if not relay.get("tls"):
+        return {"error": f"{n.get('name') or node_id}'s relay has no certificate yet, so no file is opened there"}
     return {"node": n, "host": host, "port": int(fs["port"]), "key": key,
             "pin": str(relay.get("tls") or ""), "once": bool(relay.get("once"))}
 

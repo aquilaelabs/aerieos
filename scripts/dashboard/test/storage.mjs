@@ -150,20 +150,11 @@ await section("The array's parity check", async () => {
       readMoved('storage'); drawPanes(); await new Promise(r => setTimeout(r, 150));
       out.found = [...document.querySelectorAll('.storagetab [data-poolfound]')].map(r => r.dataset.poolfound + ':' + !!r.querySelector('[data-stpool="import"]'));
     }
-    const { verify, ...older } = ARR;
-    lay(older);
-    // Until the redraw without it: the section is there throughout.
-    for (let i = 0; i < 30 && document.querySelector('.storagetab [data-starray="verify"]'); i++){
-      await new Promise(r => setTimeout(r, 100));
-      if (i === 10) lay(older);
-    }
-    out.older = !!document.querySelector('.storagetab details[data-sect="storage:array"]') && !document.querySelector('.storagetab [data-starray="verify"]');
     return out;
   });
   ok(got.bar === 45, `a run that says how far it is wears a bar at that mark (${got.bar})`);
   ok(got.btn && /parity check running, 45%, 120 MB\/s/.test(got.text) && /Last parity check.*3 differed, 2 corrected, 1 could not be/.test(got.text) && got.sched.includes('verify'),
      `the array offers Check parity, says its progress and its last result, and schedules it (${got.text.slice(0, 220) || JSON.stringify(got)})`);
-  ok(got.older, 'an agent from before Check parity is not offered it');
   ok(got.asks.includes('Check') && got.asks.includes('Check and correct'), `Check parity asks: Check, or Check and correct (${JSON.stringify(got.asks)})`);
   ok(JSON.stringify(got.found) === '["tank:true"]', `a pool another machine made is listed with Import (${JSON.stringify(got.found)})`);
 });

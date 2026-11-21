@@ -579,7 +579,7 @@ function storageArray(n){
         ${pctBar(a.running ? a.progress : "", `${a.running === "verify" ? "parity check" : a.running} progress`)}
         <div class="ndmeters">${meter("used", total ? usedT / total * 100 : 0, `${sgb(usedT)} / ${sgb(total)}`, `${(a.data || []).length} data, ${(a.parity || []).length} parity`)}</div>
         ${factGrid([["Last sync", when(a.last_sync)], ["Last scrub", when(a.last_scrub)], ["Last check", when(a.last_check)],
-                    ...("verify" in a ? [["Last parity check", arrayVerifyWord(a.verify), {cls: a.verify?.at && (!a.verify.ok || (a.verify.found && a.verify.fixed < a.verify.found)) ? "bad" : ""}]] : []),
+                    ["Last parity check", arrayVerifyWord(a.verify), {cls: a.verify?.at && (!a.verify.ok || (a.verify.found && a.verify.fixed < a.verify.found)) ? "bad" : ""}],
                     ["New files land on", (ARRAY_POLICIES.find(p => p[0] === a.policy) || [a.policy, a.policy])[1]]])}
         <div class="sub">${kinds}</div>
         ${a.status ? `<div class="sub dim">${esc(a.status)}</div>` : ""}
@@ -589,7 +589,7 @@ function storageArray(n){
         `<button type="button" data-starray="scrub" title="read a part of the array back against its parity">Scrub</button>`,
         `<button type="button" data-starray="check" title="SnapRAID's status: what is out of date and what it found">Check</button>`,
         ...(a.adopted ? [`<button type="button" data-starray="mover" title="each share's files from one place to another now, as its settings say">Move now</button>`] : []),
-        ...("verify" in a ? [`<button type="button" data-starray="verify" title="every block of every data disk read back against the parity; hours for a large array">Check parity</button>`] : []),
+        `<button type="button" data-starray="verify" title="every block of every data disk read back against the parity; hours for a large array">Check parity</button>`,
         `<button type="button" class="danger" data-starray="destroy" title="unmounted and forgotten; the disks keep their files">Destroy</button>`])}</span>` : ""}</div>
       <div class="rows">${(a.data || []).map(x => slotRow("d", x)).join("")}${(a.parity || []).map(x => slotRow("p", x)).join("")}</div>
       ${admin && !why ? `${a.adopted ? "" : `<div class="field stnewslot"><div class="hint">Add a data disk: it is wiped, takes the next slot, and the parity is synced after${free.length ? "" : "; no disk here is free"}.</div>

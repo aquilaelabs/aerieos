@@ -131,12 +131,12 @@ await section("A node's Updates line names the release key it pinned and its spa
               ndUpdatesFact(n({ release_unpinned: true, release_key: 'a'.repeat(16) })), coming];
     } finally { nodesAgent = was; }
   });
-  ok(said[0] === 'signed releases only (key aaaaaaaa…, spare bbbbbbbb…)'
-     && said[1] === 'signed releases only (key aaaaaaaa…); no spare key pinned (Enroll script pins it)'
-     && said[2] === 'signed releases only (key aaaaaaaa…)',
+  ok(said[0] === 'signed releases only (the release key and its spare)'
+     && said[1] === 'signed releases only (the release key); no spare key pinned (Enroll script pins it)'
+     && said[2] === 'signed releases only (the release key)',
      `a node's Updates line names its release key and its spare, and says when the spare is still to pin (${JSON.stringify(said)})`);
-  ok(said[3] === 'signed releases only (key aaaaaaaa…; 1 more key added at its console)'
-     && said[4] === 'signed releases (key aaaaaaaa…; 2 more keys added at its console), and unsigned builds, allowed at its console'
+  ok(said[3] === 'signed releases only (the release key; 1 more key added at its console)'
+     && said[4] === 'signed releases (the release key; 2 more keys added at its console), and unsigned builds, allowed at its console'
      && said[5] === 'signed builds only (2 keys added at its console); no release key pinned (Enroll script pins it)'
      && said[6] === said[2],
      `...and how many keys were added at its console, beside the release key or with none pinned (${JSON.stringify(said.slice(3))})`);
@@ -146,7 +146,7 @@ await section("A node's Updates line names the release key it pinned and its spa
      && said[9] === "signed builds only (1 key added at its console); no release key, by its console's choice"
      && said[10] === said[2],
      `...and one whose console dropped the release key says that it was its choice (${JSON.stringify(said.slice(8))})`);
-  ok(said[11] === 'signed releases only (key aaaaaaaa…); no spare key pinned yet',
+  ok(said[11] === 'signed releases only (the release key); no spare key pinned yet',
      `...and a spare this build's release key vouches for is one the node pins by itself: no Enroll script named (${said[11]})`);
 });
 ok(await page.evaluate(() => !document.querySelector('.nodestab [data-cap], .nodestab [data-encap]')),
@@ -1650,12 +1650,12 @@ print(f"{before} {kept} {rows} {other} {other_after} {m.JOB_LOG_KEEP}")`);
     await agent('hello', { census: { ...CENSUS, root_off: true }, version: shipped.version, digest: shipped.digest });
     const atConsole = await rootAsk();
     if (atConsole.id) await napi('/api/phone', { action: 'deny', id: atConsole.id });
-    ok(!atConsole.ok && /switched off at its own console/.test(atConsole.error || '') && /root-asks on/.test(atConsole.error || ''),
+    ok(!atConsole.ok && /runs no root command: only its own console switches it back on/.test(atConsole.error || ''),
        `a node whose console switched root commands off refuses the ask, saying where it is switched back on (${atConsole.error})`);
     await page.waitForFunction(sel => !!document.querySelector(sel + ' [data-rootoff]'), ROW, { timeout: 15000 }).catch(() => {});
     const offLine = await page.$eval(`${ROW} [data-rootoff]`, e => ({ text: e.textContent, warn: e.classList.contains('warn'),
                                                                      under: !!e.closest('.field')?.querySelector('[data-k="rootasks"]') })).catch(() => null);
-    ok(offLine && offLine.warn && offLine.under && /own console/.test(offLine.text) && /sudo aerieos-agent root-asks on/.test(offLine.text)
+    ok(offLine && offLine.warn && offLine.under && /own console/.test(offLine.text) && /which alone switches it back on/.test(offLine.text)
        && /Docker there is still root's/.test(offLine.text),
        `...and its row says so under the box, in the color of a thing switched off, with the limit on a node that runs containers (${JSON.stringify(offLine)})`);
     // The limit is said wherever the node runs containers, by what the
@@ -4041,8 +4041,8 @@ await section("Uninstall from the row", async () => {
     await hello(shed, { sandbox: true, gpu_card: card });
   }
   const no = await napi('/api/v1/nodes', { action: 'uninstall', id: plain.id });
-  ok(/only a node provisioned as an AerieOS sandbox/.test(no.error || '') && /sudo bb-sandbox uninstall/.test(no.error || ''),
-     `a node that is not a sandbox is refused, and told the command to run on the machine (${no.error})`);
+  ok(/only a node provisioned as an AerieOS sandbox/.test(no.error || ''),
+     `a node that is not a sandbox is refused (${no.error})`);
   const r = await napi('/api/v1/nodes', { action: 'uninstall', id: shed.id, stores: true, doors: true, configured: 'yes' });
   ok(r.ok && /^j_/.test(r.job || ''), `a sandbox node queues the uninstall as a system job (${r.error || r.job})`);
   const j = await napi(`/api/v1/jobs?id=${r.job}`);

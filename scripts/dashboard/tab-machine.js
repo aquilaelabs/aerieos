@@ -36,7 +36,7 @@ function machineHead(n){
   // check runs after the start, never holding it; an old system's array
   // adopted as it is waits until it is taken over, its parity not ours.
   const ar = r.array || {}, oldParity = (state?.firstboot?.adopt?.want?.parity || []).length;
-  const verify = !h.held ? "" : (ar.data || []).length && "verify" in ar
+  const verify = !h.held ? "" : (ar.data || []).length
     ? `<label class="ndcap"><input type="checkbox" id="heldVerify"> Check parity once the array is up</label>`
     : oldParity ? `<label class="ndcap"><input type="checkbox" disabled> Check parity <span class="sub dim">waits until the array is taken over: its parity is the old system's until then</span></label>` : "";
   const actions = h.held ? `${verify}<button type="button" class="primary" data-heldstart title="${esc((h.why || []).join("; "))}">Start</button>` : "";
@@ -346,7 +346,7 @@ function adoptParts(n, {take = true} = {}){
     // agent that has it, where the old parity disk is here.
     // The first-run walk leaves it out (the operator, 8 Nov): the parity
     // is built after the walk, from here, and the bell says so until it is.
-    const canTake = take && "taken" in had && !had.taken && (had.parity || []).length && !(n.reported?.array?.data || []).length && !adoptDegraded();
+    const canTake = take && !had.taken && (had.parity || []).length && !(n.reported?.array?.data || []).length && !adoptDegraded();
     return {id: "adopted", title: "Adopted disks", status: had.taken ? "taken over" : had.writable ? "writable" : "read-only",
       body: `<div class="field">${factGrid(rows, "adfacts")}<div class="hint">${had.taken
         ? "Taken over: SnapRAID keeps the parity on the old parity disk, and the array, its schedules and each share's places are on the Storage page. Going back to the old system takes its own parity sync."

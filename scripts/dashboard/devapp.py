@@ -2757,9 +2757,8 @@ def _build_env(project, instance=MAIN):
     # beside this one on the dashboard and absent in a module-level test.
     with contextlib.suppress(Exception):
         import version                                 # noqa: PLC0415
-        # The IDENTITY form, which is what tools/build-image-here.sh stamps a
-        # production image with, so one commit built either way answers with
-        # one string. It used to take `file`, the docker-tag-safe form, whose
+        # The IDENTITY form, which is what a production image is stamped
+        # with, so one commit built either way answers with one string. It used to take `file`, the docker-tag-safe form, whose
         # whole job is that it cannot carry `+`: the same build then read
         # 0.5.0-dev.1633+59d8912 on production and 0.5.0-dev.1633-59d8912 on
         # the dev instance, and the rule that makes this string the first

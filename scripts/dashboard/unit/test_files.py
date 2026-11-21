@@ -57,6 +57,9 @@ class Files(unittest.TestCase):
         port = srv.getsockname()[1]
         self.node = {"id": "n_1", "name": "nas", "kind": "agent", "state": "online", "live": True,
                      "reported": {"pools": [{"name": "fast", "mount": self.pool}], "files": {"port": port},
+                                  # A certificate reported, as every node's relay has one: the
+                                  # dial itself is plain here, with no connect function set.
+                                  "relay": {"tls": "sha256:" + "0" * 64},
                                   "shares": [{"name": "media", "path": os.path.join(self.pool, "media")}]}}
         # The node's own list, from the census it sent.
         self.files = self.agent.module("files")
@@ -69,6 +72,13 @@ class Files(unittest.TestCase):
 
     def act(self, op, **kw):
         return fileexplorer.act("user:ann", True, "n_1", self.pool, op, **kw)
+
+    def test_a_node_whose_relay_has_no_certificate_is_opened_nothing(self):
+        # Nothing is opened unencrypted: a node with no certificate yet is
+        # refused before anything is dialed, in one sentence.
+        self.node["reported"]["relay"] = {}
+        tg = fileexplorer._target(True, "n_1", self.pool)
+        self.assertEqual(tg, {"error": "nas's relay has no certificate yet, so no file is opened there"})
 
     def test_the_roots_come_from_the_census(self):
         got = fileexplorer.roots(self.node)

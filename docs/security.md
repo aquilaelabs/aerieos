@@ -23,7 +23,7 @@ controller can; nobody else reads anything whole.
 | **Root on a node** | the machine: every session there, every token file on it | the controller: a node has no credential to the controller beyond its own enrollment, which reaches its own space's work and nothing of another node's |
 | **Root on the controller** | everything the controller can read, the install key included | nothing is kept from root on the running controller; this is the host's own trust (`docker exec`, the machine's console) |
 | **A copy of a disk** (a backup, a stolen drive, a copy of `/config`) | nothing | the sealed stores open without the install key (kept outside `/config`), the node's sealed sign-ins open without the controller, the signing keys and git tokens are ciphertext |
-| **Someone on the LAN** | nothing | changing what the agent channel carries, or opening a terminal, a file request or a VM's screen on a node: each is signed with that node's own key, and a request to a node's relay is taken once. Reading what the relay carries (a shell's keys and output, a file, a VM's screen): it crosses in TLS to a certificate the node made for itself and reported over its channel, the only one the controller takes there; a node that could not make one (it has neither Python's cryptography library nor `openssl`) is served unencrypted and its page says so. The page's own traffic is theirs to read where the dashboard is served over http (step 2 below), and so is the channel of a node whose row says it is over plain http ([a node's channel](#a-nodes-channel-to-its-controller)) |
+| **Someone on the LAN** | nothing | changing what the agent channel carries, or opening a terminal, a file request or a VM's screen on a node: each is signed with that node's own key, and a request to a node's relay is taken once. Reading what the relay carries (a shell's keys and output, a file, a VM's screen): it crosses in TLS to a certificate the node made for itself and reported over its channel, the only one the controller takes there; a node that could not make one (it has neither Python's cryptography library nor `openssl`) has no terminal, file or screen opened on it, and its page says so. The page's own traffic is theirs to read where the dashboard is served over http (step 2 below), and so is the channel of a node whose row says it is over plain http ([a node's channel](#a-nodes-channel-to-its-controller)) |
 | **The page's own code** | drawing what the controller answers and asking it to act | holding a key: the page never holds a key (a key of a person's own is a passkey's or a companion's, R157), keeps no secret in local or session storage, and under the CSP of step 4 runs no script it did not ship |
 
 ## What each store protects, and what it does not
@@ -137,8 +137,8 @@ MD4 for a share's NT hash on a machine whose OpenSSL withholds it (the
 library has none; it is held to the RFC's answers), the reader for a
 passkey's CBOR, which parses and decides nothing, and the seals of the
 format before, which are opened and never made. A node that has not the
-library seals a coding agent's sign-in the older way, which the controller
-opens and seals again. Step 7 is the outside review.
+library seals no sign-in, says so on its row, and leaves them as they are.
+Step 7 is the outside review.
 
 ## What an unlock gives up
 
