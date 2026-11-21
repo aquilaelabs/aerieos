@@ -1058,6 +1058,21 @@ def for_node(nid):
     return {"url": node_url(nid, d.get("moved_to") or d["to"]), "expect": challenge(key, nid)}
 
 
+def moved_answer(nid, pin=""):
+    """The old controller's answer to a node's call once it moved (the 410
+    its agent door says): where to, and for a node it knows, that node's
+    challenge (for_node) with the key it knocks under there: `pin`, this
+    controller's own key, which went to the new home with the rest of its
+    state ("" where its port answers under none). Said down the channel the
+    node already holds, as the hello that armed the move said it, so a node
+    that pinned a certificate before keys were pinned knocks under the key
+    too, rather than with none."""
+    mv = for_node(nid) if nid else {}
+    if mv and pin:
+        mv = {**mv, "pin": pin}
+    return {"error": "this controller moved", "moved": True, "to": moved_to(), **({"move": mv} if mv else {})}
+
+
 def answer_for(nid):
     """The new controller's answer to a node's knock, once the bundle is
     restored here (the record came with it): the challenge the old

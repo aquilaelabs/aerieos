@@ -10741,8 +10741,7 @@ class Handler(BaseHTTPRequestHandler):
         # own challenge here (R175 step 2), so it knocks too.
         if move.moved_to():
             late = nodes.authenticate(bearer) if bearer else {}
-            mv = move.for_node(late["node"]) if late.get("node") else {}
-            return self._json({"error": "this controller moved", "moved": True, "to": move.moved_to(), **({"move": mv} if mv else {})}, 410)
+            return self._json(move.moved_answer(late.get("node") or "", tls.key_pin()), 410)
         auth = nodes.authenticate(bearer) if bearer else {"error": "no token"}
         q = self._q()
         # A hosting-only node (nodes.host_only) is held to what running the

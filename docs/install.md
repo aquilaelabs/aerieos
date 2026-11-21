@@ -447,8 +447,9 @@ container to a machine of its own, and back.
    controller then marks itself moved (or press **Mark as moved**, or just
    stop it): from then on it is read-only, saying where it went, and tells
    each node that comes to it that it moved, with that node's challenge in
-   the same answer, so a node that was off while the move was armed hears
-   it then. **If the new home fails before you trust it:** the old
+   the same answer and the key the new home answers under (its own, which
+   went with the state), so a node that was off while the move was armed
+   hears it then and knocks under that key. **If the new home fails before you trust it:** the old
    controller is read-only but still serves, so nothing of yours is gone,
    and **Download the bundle** still works there; land that bundle on a fresh
    install (or the same machine installed again) and the move finishes

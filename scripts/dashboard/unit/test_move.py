@@ -259,6 +259,17 @@ class Move(unittest.TestCase):
         fn2 = move.challenge(move.key_of(token), "n_2")
         self.assertEqual(move.for_node("n_2"), {"url": "https://new.example", "expect": fn2})
         self.assertEqual(move.answer_for("n_2"), "", "the old home answers no knock")
+        # Its 410 to a late node names the key to knock under, this
+        # controller's own, which went with its state: a node that pinned a
+        # certificate before keys were pinned knocked with no pin at all.
+        pin = "sha256//" + "A" * 43 + "="
+        self.assertEqual(move.moved_answer("n_2", pin), {"error": "this controller moved", "moved": True, "to": "https://new.example",
+                                                         "move": {"url": "https://new.example", "expect": fn2, "pin": pin}})
+        self.assertEqual(move.moved_answer("n_2", "")["move"], {"url": "https://new.example", "expect": fn2}, "a port under no key names none")
+        self.assertEqual(move.moved_answer("", pin), {"error": "this controller moved", "moved": True, "to": "https://new.example"},
+                         "a caller it does not know is told where, and nothing of a node's")
+        with open(os.path.join(os.path.dirname(__file__), "..", "server.py"), encoding="utf-8") as f:
+            self.assertIn('self._json(move.moved_answer(late.get("node") or "", tls.key_pin()), 410)', f.read())
         # A node enrolled at the home tunnel's public hostname is told that
         # hostname, never the new home's local address (the operator, 10 Nov:
         # a server elsewhere could not follow a move to a LAN address).
