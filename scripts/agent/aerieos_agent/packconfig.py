@@ -17,7 +17,7 @@ import pwd
 import re
 
 from .accounts import user_of
-from .base import dir_at, log, open_dir, write_at
+from .base import dir_at, give_fd, log, open_dir, write_at
 from .stores import tc_root
 
 ENV_NAME = re.compile(r"^[A-Z][A-Z0-9_]{0,40}$")
@@ -41,14 +41,14 @@ def _write_envs(base, packs, uid, gid, take_bb=False):
         os.close(top)
     try:
         if take_bb and uid is not None:
-            os.fchown(bb, uid, gid)
+            give_fd(bb, uid, gid)
         cfg = dir_at(bb, "config", 0o700)
     finally:
         os.close(bb)
     try:
         os.fchmod(cfg, 0o700)
         if uid is not None:
-            os.fchown(cfg, uid, gid)
+            give_fd(cfg, uid, gid)
         for name in os.listdir(cfg):
             if name.endswith(".env") and name[:-4] not in packs:
                 os.unlink(name, dir_fd=cfg)

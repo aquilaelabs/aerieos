@@ -207,6 +207,26 @@ class TakeBb(Tmp):
         self.assertNotIn(os.stat(elsewhere).st_ino, [o[0] for o in owned], "the link's target was not given away")
         self.assertEqual(os.listdir(elsewhere), [])
 
+    def test_a_share_that_keeps_no_owner_still_gives_a_folder(self):
+        # An NFS export with all_squash, or a FUSE share, refuses every
+        # chown: everything there is everybody's one account already, and
+        # the store's .bb is made and used as it is (the dev node's store).
+        import errno
+
+        def refuse(code):
+            def chown(fd, u, g):
+                raise OSError(code, os.strerror(code))
+            return chown
+        for code in (errno.EPERM, errno.EINVAL):
+            shutil.rmtree(os.path.join(self.store, ".bb"), ignore_errors=True)
+            with mock.patch.object(workspace.os, "geteuid", lambda: 0), mock.patch.object(workspace.os, "fchown", refuse(code)):
+                workspace.WorkspaceMixin._take_bb(self.store, WHO)
+            self.assertTrue(os.path.isdir(os.path.join(self.store, ".bb")), code)
+        # Anything else is said, as before.
+        with mock.patch.object(workspace.os, "geteuid", lambda: 0), mock.patch.object(workspace.os, "fchown", refuse(errno.EIO)), \
+                self.assertRaises(OSError):
+            workspace.WorkspaceMixin._take_bb(self.store, WHO)
+
     def test_a_store_that_is_a_link_is_refused(self):
         real = os.path.join(self.tmp, "real")
         os.makedirs(real)

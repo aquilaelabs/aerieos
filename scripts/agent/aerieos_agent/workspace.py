@@ -14,7 +14,7 @@ import threading
 import time
 from . import release
 from .base import (BUNDLE_LIST, BUNDLE_SIG, LIST_MOST, REFUSED, REFUSED_MOST, ROOT_BUNDLE_DIR, ROOT_TOOLS, TOOLS_DIR, TOOLS_SIG,
-                   dir_at, fs_holds, hello_again, log, open_dir, rm_at)
+                   dir_at, fs_holds, give_fd, hello_again, log, open_dir, rm_at)
 from .stores import dir_bytes, load_state, tc_root
 
 
@@ -615,7 +615,7 @@ class WorkspaceMixin:
         try:
             fd = dir_at(sfd, ".bb")
             try:
-                os.fchown(fd, who["user"], who["group"])
+                give_fd(fd, who["user"], who["group"])
             finally:
                 os.close(fd)
         finally:

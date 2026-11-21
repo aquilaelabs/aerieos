@@ -1,5 +1,6 @@
 """What every part of the agent shares: the constants naming the node's paths and tools, the log, a small file written or read whole, and the small runners of a command."""
 import contextlib
+import errno
 import json
 import hashlib
 import os
@@ -1166,6 +1167,24 @@ def fs_holds(who):
 # -- a folder an account owns, reached by root without following its links -----
 
 
+# What a share that maps every account to one answers a chown with: it
+# keeps no owner of its own (an NFS export with all_squash, a FUSE share),
+# so the folder or the file is the account's there already, as anybody's is.
+_CHOWN_REFUSED = (errno.EPERM, errno.EINVAL, errno.ENOSYS, errno.EOPNOTSUPP)
+
+
+def give_fd(fd, uid, gid):
+    """The folder or file `fd` is a descriptor on given to `uid`:`gid`, as
+    root gives one in a store or a home: by the thing itself. A share that
+    refuses an owner leaves it as it is, as own_dir does; anything else is
+    raised."""
+    try:
+        os.fchown(fd, -1 if uid is None else uid, -1 if gid is None else gid)
+    except OSError as e:
+        if e.errno not in _CHOWN_REFUSED:
+            raise
+
+
 def dir_at(parent, name, mode=0o755):
     """A descriptor on the real folder `name` inside the folder `parent` is
     a descriptor on: made when it is not there, and whatever else is at its
@@ -1202,7 +1221,7 @@ def write_at(folder, name, data, mode, uid=None, gid=None):
     with os.fdopen(fd, "wb") as f:
         os.fchmod(f.fileno(), mode)
         if uid is not None:
-            os.fchown(f.fileno(), uid, -1 if gid is None else gid)
+            give_fd(f.fileno(), uid, gid)
         f.write(data.encode("utf-8") if isinstance(data, str) else data)
     os.rename(tmp, name, src_dir_fd=folder, dst_dir_fd=folder)
 
