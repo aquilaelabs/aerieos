@@ -897,9 +897,11 @@ function wireChecks(root){
 }
 
 // The mirror's line and its two presses: Import takes an archive that
-// tools/catalog-mirror.py made on a machine with the network.
-function catalogIntro(s){
-  const m = s?.catalog_mirror, i = s?.catalog_index;
+// tools/catalog-mirror.py made on a machine with the network. The mirror and
+// the index in use are the status read's own keys, beside its settings part,
+// which is what the groups are handed.
+function catalogIntro(){
+  const m = state?.catalog_mirror, i = state?.catalog_index;
   // When the index in use was made: an address that keeps answering an
   // old one shows here, where nothing else would say it.
   const made = i ? `The index in use was made ${esc(i.made || "at an unknown time")}${i.read ? `, read ${esc(ago(i.read))}` : ""}.` : "No index has been read yet.";
@@ -913,8 +915,9 @@ function catalogIntro(s){
     <div class="addbar ctlrow"><input id="mirrorFile" type="file" hidden accept=".tar,.tgz,.tar.gz,application/gzip,application/x-tar">
       <button type="button" data-mirrorimport>${m ? "Import a newer mirror" : "Import a mirror"}</button></div>`;
 }
-function catalogStatus(s){
-  return s?.catalog_mirror ? `a mirror made ${s.catalog_mirror.generated || "earlier"} answers when the catalog does not · applies at once` : "applies at once";
+function catalogStatus(){
+  const m = state?.catalog_mirror;
+  return m ? `a mirror made ${m.generated || "earlier"} answers when the catalog does not · applies at once` : "applies at once";
 }
 function wireCatalogMirror(root){
   const file = root.querySelector("#mirrorFile");

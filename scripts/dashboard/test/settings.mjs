@@ -126,6 +126,24 @@ await section("The vetted catalog", async () => {
   await set({catalog_url: 'https://raw.githubusercontent.com/aquilaelabs/aerieos-catalog/main/', smtp_port: '', smtp_from: '', tls_email: ''});
   ok(/aerieos-catalog/.test(drawn.url) && /No mirror imported/.test(drawn.said) && good.ok && /an address like/.test(bad.error || '') && mail.ok,
      `Vetted catalog draws the catalog's address and says no mirror is held; an address saves, a port, a From line and an email too, and ftp is refused (${drawn.url}; ${bad.error}; ${mail.error || 'mail saved'})`);
+  // When the index in use was made, and a mirror held, are the status read's
+  // own keys: drawn from there, where the groups are handed its settings part.
+  const lines = await page.evaluate(() => {
+    const keep = [state.catalog_index, state.catalog_mirror];
+    const d = document.createElement('div');
+    const read = () => { d.innerHTML = catalogIntro(); return [d.querySelector('[data-catalogmade]')?.textContent || '', d.textContent.replace(/\s+/g, ' '), catalogStatus()]; };
+    state.catalog_index = null; state.catalog_mirror = null;
+    const none = read();
+    state.catalog_index = { made: '2026-10-29T00:00:00Z', read: Math.floor(Date.now() / 1000) - 7200 };
+    state.catalog_mirror = { packs: 3, repos: 2, generated: '2026-10-28T00:00:00Z' };
+    const some = read();
+    [state.catalog_index, state.catalog_mirror] = keep;
+    return { none, some };
+  });
+  ok(lines.none[0] === 'No index has been read yet.' && /No mirror imported/.test(lines.none[1]) && lines.none[2] === 'applies at once'
+     && /^The index in use was made 2026-10-29T00:00:00Z, read 2 ?h/.test(lines.some[0]) && /3 entries from 2 repositories, made 2026-10-28/.test(lines.some[1])
+     && /a mirror made 2026-10-28T00:00:00Z answers/.test(lines.some[2]),
+     `...and says when the index in use was made and what mirror is held, from the status read's own keys (${lines.some[0]} | ${lines.some[2]})`);
   const dir = `${DIR}/mirror-src/catalog-mirror`;
   mkdirSync(`${dir}/repos`, { recursive: true });
   writeFileSync(`${dir}/index.json`, JSON.stringify({ version: 1, generated: '2026-10-29T00:00:00Z', packs: [] }));
