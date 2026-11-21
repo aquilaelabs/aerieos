@@ -60,7 +60,6 @@ class Install(unittest.TestCase):
         self.b = os.path.join(t, "bundle")
         shutil.copytree(os.path.join(REPO, "scripts", "lib"), os.path.join(self.b, "scripts", "lib"))
         shutil.copy(os.path.join(REPO, "scripts", "aerie"), os.path.join(self.b, "scripts", "aerie"))
-        shutil.copy(os.path.join(REPO, "scripts", "bb"), os.path.join(self.b, "scripts", "bb"))
         os.makedirs(os.path.join(self.b, "config"))
         shutil.copy(os.path.join(REPO, "config", "toolchains.json"), os.path.join(self.b, "config"))
         with open(os.path.join(self.b, "config", "toolpacks.json"), "w") as f:
@@ -152,7 +151,6 @@ class MadeHere(unittest.TestCase):
         self.assertTrue(r.get("ok"), r)
         b = os.path.join(t, "bundle")
         shutil.copytree(os.path.join(REPO, "scripts", "lib"), os.path.join(b, "scripts", "lib"))
-        shutil.copy(os.path.join(REPO, "scripts", "bb"), os.path.join(b, "scripts", "bb"))
         shutil.copy(os.path.join(REPO, "scripts", "aerie"), os.path.join(b, "scripts", "aerie"))
         os.makedirs(os.path.join(b, "config"))
         shutil.copy(os.path.join(REPO, "config", "toolchains.json"), os.path.join(b, "config"))

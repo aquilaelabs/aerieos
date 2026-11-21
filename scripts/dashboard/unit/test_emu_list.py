@@ -7,7 +7,7 @@ import tempfile
 import time
 import unittest
 
-BB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "bb")
+BB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "aerie")
 
 
 class EmuList(unittest.TestCase):

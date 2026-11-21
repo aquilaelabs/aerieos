@@ -30,7 +30,7 @@ import os
 # rest of scripts/dashboard (the notebook modules, users.py, server.py),
 # because a node has no /config for them to read; the verbs that need them
 # are relayed back to the controller (server._bb_relay).
-PARTS = ("scripts/aerie", "scripts/bb", "scripts/lib", "config/toolchains.json",
+PARTS = ("scripts/aerie", "scripts/lib", "config/toolchains.json",
          # The publishers' release keys a download is checked against (R137).
          "config/release-keys",
          "nodes/provision-linux.sh", "nodes/families",

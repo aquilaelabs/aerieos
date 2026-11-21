@@ -542,8 +542,6 @@ export HOME="\$BUILDER_HOME" USER="${ACCOUNT}"
 exec /opt/aerieos/scripts/aerie "\$@"
 EOF
     chmod 0755 "$BB_BIN"
-    # The old name, while anything still calls it.
-    rm -f "$(dirname "$BB_BIN")/bb"   # the command's old name, on a machine that had it
 }
 
 # sudoers: the root helpers the account may run: the image's two, and on a
@@ -1019,7 +1017,7 @@ cmd_remove() {
         runit)   rm -f "/var/service/${SERVICE}"; rm -rf "/etc/sv/${SERVICE}" ;;
     esac
     wall_remove
-    rm -f "$BB_BIN" "$(dirname "$BB_BIN")/bb" "$SUDOERS"
+    rm -f "$BB_BIN" "$SUDOERS"
     rm -rf "$RELEASES" "$SHIM"
     rm -f "$OPT"
     if [ "$PURGE" = 1 ]; then

@@ -29,7 +29,6 @@ on:
       - "scripts/agent/**"
       - "scripts/lib/**"
       - "scripts/aerie"
-      - "scripts/bb"
       - "nodes/**"
       - "config/**"
       - "apps/vscode/**"

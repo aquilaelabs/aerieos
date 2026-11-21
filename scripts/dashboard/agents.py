@@ -240,8 +240,7 @@ _BY_ID = {a.id: a for a in TABLE}
 OWN_VERBS = ("version", "changelog", "roadmap", "bug", "rules", "design", "wiki", "memory", "report",
              "git", "forge", "devapp", "container", "vm", "tool", "sign", "pc", "root", "phone",
              "settings", "tidy")
-# The command by both of its names: bb forwards to aerie.
-OWN_NAMES = ("aerie", "bb")
+OWN_NAMES = ("aerie",)
 # How an agent takes the list, which its row here or its pack's manifest
 # says (agent.allow): a rule in the settings file its session starts with
 # (Claude Code), an option repeated on its command line (Grok, Copilot), a

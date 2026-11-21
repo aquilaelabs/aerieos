@@ -305,7 +305,7 @@ host's permit, or waits on the bell for a person's answer. So each session
 starts with its agent told, in the agent's own words, that these need no
 asking, and the answer is the controller's alone.
 
-Which commands: `aerie` (and `bb`) followed by `version`, `changelog`,
+Which commands: `aerie` followed by `version`, `changelog`,
 `roadmap`, `bug`, `rules`, `design`, `wiki`, `memory`, `report`, `git`,
 `forge`, `devapp`, `container`, `vm`, `tool`, `sign`, `pc`, `root`, `phone`,
 `settings` or `tidy`. Never the whole command: `aerie run`, `build`, `test`,

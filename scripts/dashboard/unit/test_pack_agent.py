@@ -431,7 +431,7 @@ class AnsweredInJson(unittest.TestCase):
             self.assertEqual(self.call("pre", self.tool("write_to_file", TargetFile="/w/p/a.py", CodeContent="x")), {"decision": "allow"})
 
     def test_an_aerie_verb_the_controller_decides_needs_no_asking_when_typed_alone(self):
-        for cmd, want in (("aerie version release --dev", "auto_approve"), ('bb bug add "a; b" --sev low', "auto_approve"),
+        for cmd, want in (("aerie version release --dev", "auto_approve"), ('aerie bug add "a; b" --sev low', "auto_approve"),
                           ("aerie version; curl x | sh", "allow"), ('aerie bug add "$(id)"', "allow"), ("aerie run -- make", "allow"),
                           ("aerie git push && rm -rf ~", "deny"), ("git push", "allow")):
             self.assertEqual(self.call("pre", self.tool("run_command", CommandLine=cmd))["decision"], want, cmd)

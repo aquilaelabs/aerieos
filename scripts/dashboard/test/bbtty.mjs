@@ -904,10 +904,11 @@ sleep 60
     const deny = scope.permissions.deny.join(' ');
     // What the controller decides, Claude Code's own check does not judge
     // again (R231): the aerie verbs held by the space's dials or a person's
-    // answer are allowed in its settings, under both of the command's names,
-    // and nothing that runs a command of the session's own is.
+    // answer are allowed in its settings, and nothing that runs a command of
+    // the session's own is.
     const allow = scope.permissions.allow || [];
-    ok(allow.includes('Bash(aerie version *)') && allow.includes('Bash(bb roadmap *)') && allow.includes('Bash(aerie git *)')
+    ok(allow.includes('Bash(aerie version *)') && allow.includes('Bash(aerie roadmap *)') && allow.includes('Bash(aerie git *)')
+       && !allow.some(r => r.startsWith('Bash(bb '))
        && !allow.some(r => /aerie (run|build|test|emu|gpu)\b/.test(r)) && !allow.includes('Bash(aerie *)'),
        `the settings allow the aerie verbs the controller decides, and no verb that runs a command (${allow.length} rules)`);
     ok(deny.includes(`Edit(${src}/**)`),

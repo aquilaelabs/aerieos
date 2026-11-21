@@ -15,7 +15,8 @@ class Allow(unittest.TestCase):
     def test_each_shipped_agent_is_told_in_its_own_words(self):
         claude = agents.allow_plan("claude")
         self.assertIn("Bash(aerie version *)", claude["settings"])
-        self.assertIn("Bash(bb bug *)", claude["settings"])
+        self.assertIn("Bash(aerie bug *)", claude["settings"])
+        self.assertFalse([r for r in claude["settings"] if r.startswith("Bash(bb ")], "a name no PATH carries is allowed nothing")
         self.assertEqual((claude["args"], claude["file"]), ([], None))
         grok = agents.allow_plan("grok")["args"]
         self.assertEqual(grok[:2], ["--allow", "Bash(aerie version:*)"])
