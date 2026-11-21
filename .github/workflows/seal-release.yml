@@ -1,0 +1,186 @@
+# A release's signed list of its files (R199): SHA256SUMS, every file of the
+# release with the sha256 of its bytes, and SHA256SUMS.sig, its signature in
+# the namespace aerieos-dev by the release build's key. Every install holds
+# a file it takes from a release to this list and the list to its own
+# config/release-signers, so a release without it is not whole and a dev
+# build is not published until it is here.
+#
+# Its own workflow, started for a tag, because the list cannot be made in
+# the tag's run: the Android app is built there unsigned, and the controller
+# signs it with the app's own key and attaches it afterwards, minutes to
+# hours later (scripts/dashboard/releasesign.py). The list is made over
+# every file, so it is made once the app has landed. The controller starts
+# this then, with the tag, on the tag; a person starts it the same way when
+# the controller was down: Actions, seal release, Run workflow, Use workflow
+# from the tag, and the tag typed again.
+#
+# What the seal checks before it signs (tools/release-sign.py seal
+# --attested): the release carries every file .release-files names; the tag
+# still names the commit this run is on; each file's bytes hash to the
+# sha256 beside it; each file has a build attestation by the workflow that
+# builds it, run on this tag; and the Android app, which no build attests,
+# verifies with apksigner as signed by a certificate config/apk-signers
+# names. A stable release is not sealed here: its key's holder signs it on
+# their own machine, and it stays a draft for that.
+#
+# Run again for a release that is sealed, it makes the same list and the
+# same signature, and a published release is left published. Run after a
+# file of the release was replaced (the app signed again), it says what
+# changed in a warning on the run and replaces the list, each file vouched
+# for as above.
+name: seal release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "the release to seal: its tag, vX.Y.Z-dev.N, the same tag this is run from (Use workflow from)"
+        required: true
+
+permissions:
+  contents: read
+
+# One seal a release at a time, a second waiting for the first. The group's
+# name is also how the controller finds this workflow (releasesign.py's
+# SEAL): a space's workflow that can be started by hand and names this
+# group outside a comment is started with the tag, as its `tag` input, once
+# that release's signed APK is attached, as the workflow whose APK is signed
+# is found by the name of the artifact it hands over.
+concurrency:
+  group: bb-release-seal-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  seal:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    # Where the release key is kept: an environment the repository limits
+    # to v* tags, whose secrets GitHub hands only to a job that names it
+    # and whose reviewers approve each run (docs/versions.md, The release
+    # key on GitHub). A run from a branch is refused there before a step
+    # starts. Those rules are GitHub's settings: this file is the tag's own
+    # copy when it runs, so it can promise nothing about a tag that
+    # rewrites it.
+    environment: release
+    permissions:
+      # The draft read, the two files attached, a dev build published.
+      contents: write
+      # Each file's build attestation read to be verified.
+      attestations: read
+      # publish-release.yml started for a dev build this publishes.
+      actions: write
+    steps:
+      - name: The tag this is run from is the release's, and a pre-release's
+        id: tag
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          if [ "$GITHUB_REF" != "refs/tags/$TAG" ]; then
+            echo "::error::this run is on $GITHUB_REF and was asked to seal $TAG: start it from the tag itself (Run workflow, Use workflow from: Tags, $TAG), so the tools and the signers it reads are that release's own"
+            exit 1
+          fi
+          case "$TAG" in
+            v[0-9]*.[0-9]*.[0-9]*-*)
+              echo "seal=true" >> "$GITHUB_OUTPUT" ;;
+            v[0-9]*.[0-9]*.[0-9]*)
+              echo "::notice title=A stable release is not sealed here::$TAG is signed by the stable key's holder on their own machine (tools/release-sign.py sign) and stays a draft until then."
+              echo "seal=false" >> "$GITHUB_OUTPUT" ;;
+            *)
+              echo "::error::$TAG is not a release's tag"
+              exit 1 ;;
+          esac
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (R206)
+        if: steps.tag.outputs.seal == 'true'
+        with:
+          fetch-depth: 0
+          sparse-checkout: |
+            tools
+            config
+            .release-files
+          sparse-checkout-cone-mode: false
+      # Where the tag may be cut from, asked again here by the DEFAULT
+      # branch's copy of the rule (tools/release-place.sh and the list it
+      # reads, tools/release-branches), before the step that holds the key:
+      # the tag's own copy is the tag's to write, and a tag on a commit no
+      # release branch holds would pass its own. A default branch that
+      # does not carry the rule signs nothing: the tag's own is never asked.
+      # What this cannot hold: the workflow a tag runs is the tag's own
+      # file, so a tag that rewrites this job is stopped by the release
+      # environment's rules on GitHub alone (docs/versions.md).
+      - name: The default branch's copy of where a release is cut from
+        if: steps.tag.outputs.seal == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (R206)
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: trusted
+          sparse-checkout: |
+            tools/release-place.sh
+            tools/release-branches
+          sparse-checkout-cone-mode: false
+      - name: The tag's commit is on a branch a release is cut from
+        if: steps.tag.outputs.seal == 'true'
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          rule=trusted/tools
+          if [ ! -f "$rule/release-branches" ] || [ ! -f "$rule/release-place.sh" ]; then
+            echo "::error title=No rule on the default branch::the default branch does not carry tools/release-place.sh and tools/release-branches, so nothing is signed for $TAG"
+            exit 1
+          fi
+          git fetch --no-tags origin '+refs/heads/*:refs/remotes/origin/*'
+          bash "$rule/release-place.sh" "$TAG" "$GITHUB_SHA" origin/main "$rule/release-branches"
+      # The library the key is written for ssh-keygen with, each file held
+      # to its hash, in a step that holds no secret.
+      - name: The pinned library the key is used with
+        if: steps.tag.outputs.seal == 'true'
+        run: bash tools/release-lib.sh "$RUNNER_TEMP/release-lib"
+      - name: Sign the list of the release's files
+        if: steps.tag.outputs.seal == 'true'
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+          AERIEOS_RELEASE_KEY: ${{ secrets.AERIEOS_RELEASE_KEY }}
+          PYTHONPATH: ${{ runner.temp }}/release-lib
+        run: |
+          # A few minutes' wait for a file still landing; the tool uploads
+          # nothing and leaves the two files in the folder named.
+          rc=0
+          python3 tools/release-sign.py seal "$TAG" --commit "$GITHUB_SHA" --attested --wait 600 --out "$RUNNER_TEMP/sealed" || rc=$?
+          if [ "$rc" = 3 ]; then
+            echo "::error::$TAG is not whole yet, so its list is not signed: run this again once the file named above is on the release"
+          fi
+          exit "$rc"
+      - name: Attach the list and its signature
+        if: steps.tag.outputs.seal == 'true'
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: bash tools/release-attach.sh "$TAG" "$RUNNER_TEMP/sealed/SHA256SUMS" "$RUNNER_TEMP/sealed/SHA256SUMS.sig"
+      # A dev build's release goes out by itself, here, and only once every
+      # file .release-files names is on it (the operator, 11 Nov): two were
+      # published by hand from the git host's page minutes after their
+      # tags, and one never got its image. The list just attached was the
+      # last of them, so this finds the release whole; one that is not
+      # stays a draft, the missing file named. One published already is
+      # left as it is. A pre-release of another name stays a draft for its
+      # owner to read.
+      - name: A dev build's release goes out once it is whole
+        if: steps.tag.outputs.seal == 'true' && contains(inputs.tag, '-dev.')
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_WAIT_S: "120"
+        run: |
+          bash tools/release-attach.sh "$TAG" --publish-when-whole .release-files | tee whole.log
+          # A release this job's own token publishes starts no workflow
+          # (GitHub's rule), so what follows a publication, the image tags
+          # people follow moved onto this build, is started by name.
+          if grep -q " published: whole" whole.log; then
+            gh workflow run publish-release.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG" -f tag="$TAG"
+          fi
