@@ -295,12 +295,29 @@ class TheProvisioner(Case):
                 # A run again on an enrolled node holds it to the pin its record keeps.
                 self.assertTrue('--pinnedpubkey "$CTL_KEY"' in ln or '--pinnedpubkey "$held"' in ln, f"{name}: {ln.strip()[:120]}")
                 # ...and a fetch held to a key dials the address, the name as its Host header.
-                if name == "provision-linux.sh":
-                    self.assertIn('${PIN_HOST[@]+"${PIN_HOST[@]}"}', ln, ln.strip()[:120])
+                self.assertIn('${PIN_HOST[@]+"${PIN_HOST[@]}"}', ln, f"{name}: {ln.strip()[:120]}")
             enrolls = len(re.findall(r'(?m)^\s*(?:BUILDERBOT_NODE_JSON="\$\w+" )?(?:python3 )?"\$(?:AGENT|agent)" enroll\b', text))
             self.assertEqual((enrolls, text.count('${CONTROLLER_PIN:+--pin "$CONTROLLER_PIN"}')),
                              ((1, 1) if name.endswith("macos.sh") else (2, 2)), f"{name}: every enroll is handed the pin")
             self.assertIn("--controller-pin) CONTROLLER_PIN=", text)
+
+    def test_a_macs_fetch_under_a_pin_sends_no_server_name(self):
+        # The final audit's 9: a name the controller holds a public
+        # certificate for is answered with that certificate, whose key is not
+        # the pinned one. A Mac has no getent; python3 answers for its resolver.
+        helper = re.search(r"^pinned_at\(\) \{\n.*?^\}\n", self.text("provision-macos.sh"), re.M | re.S).group(0)
+        show = 'pinned_at "$1" "$2"; printf "%s|%s\\n" "$PIN_URL" "${PIN_HOST[*]+${PIN_HOST[*]}}"'
+        for url, pin, want in (("https://localhost:7680/x", self.pin, ("https://127.0.0.1:7680/x", "-H Host: localhost:7680")),
+                               ("https://localhost:7680", "", ("https://localhost:7680", "")),
+                               ("https://192.0.2.1:7680", self.pin, ("https://192.0.2.1:7680", "")),
+                               ("https://no-such-name.invalid", self.pin, ("https://no-such-name.invalid", ""))):
+            r = subprocess.run(["bash", "-euo", "pipefail", "-c", helper + show, "_", url, pin], capture_output=True, text=True,
+                               timeout=60, check=False, cwd=self.tmp)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            got = tuple(r.stdout.strip().split("|"))
+            if url.startswith("https://localhost") and pin and got[0].startswith("https://[::1]"):
+                want = ("https://[::1]:7680/x", want[1])
+            self.assertEqual(got, want, url)
 
     def test_a_pin_that_goes_with_nothing_or_is_no_pin_is_said_before_anything_runs(self):
         for name in ("provision-linux.sh", "provision-macos.sh"):

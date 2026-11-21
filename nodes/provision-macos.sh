@@ -273,6 +273,32 @@ release_sig_ok() {
     return 2
 }
 
+# pinned_at URL PIN: where a fetch from the controller dials. Held to its
+# key (PIN), it sends no server name, as the node's agent does: a name the
+# controller holds a public certificate for (Let's Encrypt) is answered with
+# that certificate, whose key is not the one pinned. So the URL's host name
+# is replaced by its address (PIN_URL) and said as the Host header instead
+# (PIN_HOST, curl's words for it); with no pin, or a URL that names an
+# address already, PIN_URL is URL and PIN_HOST is empty. A Mac has no
+# getent: the system's resolver is asked through python3, isolated from
+# whatever folder this is run in.
+pinned_at() {
+    local url="$1" pin="$2" scheme rest hostport host port path addr
+    PIN_URL="$url"; PIN_HOST=()
+    [ -n "$pin" ] || return 0
+    scheme="${url%%://*}"; rest="${url#*://}"
+    hostport="${rest%%/*}"; path="${rest#"$hostport"}"
+    host="${hostport%:*}"; port="${hostport#"$host"}"
+    [ "$host" != "$hostport" ] || port=""
+    case "$host" in ""|\[*|*[!A-Za-z0-9.-]*) return 0 ;; esac
+    [[ "$host" =~ ^[0-9.]+$ ]] && return 0
+    addr="$(python3 -I -c 'import socket, sys; print(socket.getaddrinfo(sys.argv[1], None)[0][4][0])' "$host" 2>/dev/null)" || addr=""
+    [ -n "$addr" ] || return 0
+    case "$addr" in *:*) addr="[$addr]" ;; esac
+    PIN_URL="${scheme}://${addr}${port}${path}"
+    PIN_HOST=(-H "Host: ${hostport}")
+}
+
 # agent_sent HEADERS NAME: what the controller's answer says under NAME
 # (x-agent-digest, x-agent-sig), from the headers curl kept; nothing for none.
 agent_sent() {
@@ -384,7 +410,8 @@ if [ -n "$avail" ]; then
     else chk warn "only ${avail}G free in $HOME; Xcode alone wants 15"; fi
 fi
 if [ -n "$CONTROLLER" ]; then
-    if curl -fsk ${CTL_KEY:+--pinnedpubkey "$CTL_KEY"} --max-time 10 -o /dev/null "${CONTROLLER%/}/" 2>/dev/null; then chk ok "controller ${CONTROLLER} answers"
+    pinned_at "$CONTROLLER" "${CTL_KEY:-}"
+    if curl -fsk ${CTL_KEY:+--pinnedpubkey "$CTL_KEY"} ${PIN_HOST[@]+"${PIN_HOST[@]}"} --max-time 10 -o /dev/null "${PIN_URL%/}/" 2>/dev/null; then chk ok "controller ${CONTROLLER} answers"
     else chk warn "${CONTROLLER} does not answer from here, so enrollment will fail until it does"; fi
 fi
 if [ "$FAILED" = 1 ]; then
@@ -407,8 +434,9 @@ say "the agent, from ${CONTROLLER}"
 hdr="$(mktemp)"
 # The token on a descriptor of its own, never among curl's words, which
 # every account on the machine can list.
-curl -fsSL ${CTL_KEY:+-k --pinnedpubkey "$CTL_KEY"} -D "$hdr" -H @<(printf 'Authorization: Bearer %s\n' "${TOKEN}") \
-     "${CONTROLLER%/}/api/v1/agent/download" -o "${AGENT}.new" \
+pinned_at "$CONTROLLER" "${CTL_KEY:-}"
+curl -fsSL ${CTL_KEY:+-k --pinnedpubkey "$CTL_KEY"} ${PIN_HOST[@]+"${PIN_HOST[@]}"} -D "$hdr" -H @<(printf 'Authorization: Bearer %s\n' "${TOKEN}") \
+     "${PIN_URL%/}/api/v1/agent/download" -o "${AGENT}.new" \
     || { warn "could not download the agent from ${CONTROLLER}. Is that the dashboard's address, and is the token unused?"; rm -f "$hdr" "${AGENT}.new"; exit 1; }
 # Held to what the command carries before any of it runs (agent_proved); an
 # answer with no digest was taken as it came here, and is refused.
