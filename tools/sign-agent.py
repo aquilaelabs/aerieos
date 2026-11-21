@@ -50,8 +50,8 @@ says what its spare is.
         the key in FILE, whatever config/aerieos-release.pub names: a node
         takes the build
         once a person has added the key at its console (aerieos-agent
-        release-key add), and no other node does. tools/build-image-here.sh
-        runs this after its build.
+        release-key add), and no other node does. Run after the image is
+        built from this tree.
 
 The key never goes on a command line and is never printed after --keygen.
 The bytes signed are release.MESSAGE and the digest the controller's hello

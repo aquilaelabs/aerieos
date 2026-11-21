@@ -79,6 +79,15 @@ class BuilderKey(unittest.TestCase):
         self.assertEqual(r.returncode, 2)
         self.assertFalse(os.path.exists(out))
 
+    def test_the_usage_names_no_script_the_repository_lacks(self):
+        # A builder reads the usage to know what to run: a script named there
+        # that is not in the repository sends them looking for nothing.
+        with open(SIGNER, encoding="utf-8") as f:
+            usage = f.read().split('"""', 2)[1]
+        import re
+        for name in set(re.findall(r"\btools/[\w.-]+\.(?:sh|py)\b", usage)):
+            self.assertTrue(os.path.isfile(os.path.join(REPO, name)), name)
+
     def test_a_release_key_is_not_a_builders(self):
         # The release's own key signs in the release's build, and nowhere else.
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
