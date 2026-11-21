@@ -80,8 +80,7 @@ The page says three more things when the receipt shows them:
 A receipt leaves out git's own directory, AerieOS's marks and compiled
 python, which carries the moment it was compiled. It records what landed;
 it does not stop an install. A pack installed before receipts were kept
-has none until it is installed again, and a node says one once its agent
-is 0.9.433 or newer.
+has none until it is installed again.
 
 ### Declared downloads
 
@@ -186,9 +185,7 @@ and its steps then keep the network; the job, the receipt (`.bb-receipt`,
 and `.bb-net` beside it) and the pack's entry say so in the pack's own
 sentence. Without it, a pack that declares its downloads runs its steps
 with no network. `online` is the one way to keep it. A node tells the
-controller that an install kept the network, with the sentence, once its
-agent is 0.9.478 or newer; from an earlier agent the receipt arrives
-without that word.
+controller that an install kept the network, with the sentence.
 
 **A pack that downloads nothing.** A pack whose steps only build from what
 its repository carries says so with an empty list, and its steps and its
@@ -980,7 +977,7 @@ install that holds none yet has nothing to compare with, so each release
 says the oldest index it takes (`config/catalog-floor`, the moment of the
 index it was prepared against) and one made before that is refused too. A
 release carrying a floor older than the newest index the catalog has signed
-is refused before its tag, until the floor moves to it. The file
+is refused before its tag, until the floor moves to it. `config/catalog.pub`
 may name a spare key on a second line, and an index signed by either is
 read ([security.md](security.md#the-signing-keys-and-replacing-one)). Where it
 is read from is the **Address** in Controller settings' Vetted catalog group. A pack the

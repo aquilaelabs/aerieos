@@ -67,7 +67,7 @@ update cannot touch. See [the toolchain store lives outside the image](toolchain
   commands: `mint-runner-token`, which only emits 1-hour tokens, and
   `deploy-key`, which keeps a space's deploy key root-only and loads it
   into the agent.
-- **Your root door** is host-side: `docker exec -it -u 0 AerieOS bash`.
+- **Your root door** is host-side: `docker exec -it -u 0 Aerie-Workshop bash`.
 - Don't attach the runner to public repos; treat container-produced commits
   and packages with normal review.
 

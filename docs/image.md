@@ -208,12 +208,13 @@ the dev channel for its updates. It asks for Administrator once at start, since
 writing a disk needs it, and every step in it is the stick maker's own.
 
 `tools/aerieos-stick.py` writes a release's stick image onto a USB
-stick on Windows, a Mac or Linux with nothing but Python's own library: `list`
+stick on Windows, a Mac or Linux with Python's own library and the
+system's `ssh-keygen` (OpenSSH, which checks the release's signature): `list`
 names the removable disks here (the system disk marked, and never written),
 `write DISK` fetches the newest release's `aerieos-os-VERSION.stick.raw.xz`
-(or `--release vX.Y.Z`'s, or writes `--image FILE`) with its sha256, checks
-it, says what is on the stick is lost, writes the disk whole and reads it
-back; `verify` reads a stick back against an image. `--set KEY=VALUE`, as
+(or `--release vX.Y.Z`'s, or writes `--image FILE`) with its sha256 and the
+release's signed list of its files, checks it against both, says what is on
+the stick is lost, writes the disk whole and reads it back; `verify` reads a stick back against an image. `--set KEY=VALUE`, as
 often as needed, writes a line into the stick's `aerieos.env`, the file on
 the ESP each boot reads: `TZ` (`Europe/Berlin`) and `BB_RELEASE_LINE` (the
 release line updates follow, `0.9`) for the controller, and the stick's
@@ -654,9 +655,8 @@ from, and one that does not come up restarts into it by itself. If the
 configuration has moved on further than that version reads, its copy is used and
 yours is set aside, and comes back when the visit ends; what the visit changed
 is set aside in `/var/lib/aerieos-os/rolled-back-TIME-visit/`. Updates wait
-until a visit ends. An image built before this feature cannot boot from files,
-so it is said and not kept, and a version kept already is never replaced by
-what the slot holds later. The menu on the ESP follows the image running, so a
+until a visit ends. A version kept already is never replaced by what the
+slot holds later. The menu on the ESP follows the image running, so a
 disk laid by an older image takes the entry with its first update.
 
 **The short address.** On a controller's own machine the dashboard stays on its

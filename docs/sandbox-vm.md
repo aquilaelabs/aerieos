@@ -605,7 +605,7 @@ leaves it, because a rebuilt VM and something worth looking at produce the
 same message. If the machine really was rebuilt, clear its line:
 
 ```bash
-docker exec -u builder AerieOS ssh-keygen -R <vm-ip>
+docker exec -u builder Aerie-Workshop ssh-keygen -R <vm-ip>
 ```
 
 `bb-sandbox sdk` is the one verb that reads rather than configures, and the

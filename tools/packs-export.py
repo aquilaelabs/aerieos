@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """The official packs (R169 step 1): every shipped toolchain
 (config/toolchains.json) and every coding agent (agents.py's table) written
-as a pack in bbtool.json's format under packs/, tagged official and
-bundled with the release for an install with no network. One manifest
+as a pack in bbtool.json's format under packs/, tagged official, and
+carried by the vetted catalog (--catalog), whose mirror is how an install
+with no network takes them. One manifest
 for everything: the installer and the agents' adapters still read their
 own tables; the packs are those tables in the one format, and this
 script's --check holds the two to each other in aerie lint.

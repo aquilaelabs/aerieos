@@ -338,10 +338,7 @@ Connection section says, and is not changed by any of this.
 
 **A renewed certificate, and a replaced key.** The controller remakes its
 own certificate a month before it ends, and when a name is added, over the
-same key, so a node that pinned the key sees nothing. A node that pinned
-the certificate itself (enrolled over https before this, on first use)
-moves its pin to the key at its next hello, when the certificate it just
-met is over the key named. In the `acme` mode the name's certificate
+same key, so a node that pinned the key sees nothing. In the `acme` mode the name's certificate
 answers a handshake that asks for the name and the install's own answers
 every other, so a hostname added later cuts off no node that dials an
 address. The key is sealed under the install key and sealed again when

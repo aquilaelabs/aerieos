@@ -223,6 +223,9 @@ services:
     restart: unless-stopped
     stdin_open: true
     tty: true
+    ulimits:
+      memlock: -1         # the dashboard keeps the keys it holds out of swap
+      core: 0
     environment:
       PUID: 1000          # the owner of the folders above
       PGID: 1000

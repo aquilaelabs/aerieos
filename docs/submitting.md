@@ -39,7 +39,7 @@ scripts it runs:
 ```
 hexkit/
   bbtool.json
-  install.sh      fetches the tool's own release and checks it
+  install.sh      unpacks the download the manifest declares
   GUIDE.md        tells a session when and how to use it
 ```
 
@@ -49,11 +49,20 @@ hexkit/
   "label": "Hex kit",
   "about": "Looks inside binaries: dumps, strings, headers.",
   "maker": "Hexkit Project",
-  "framework": "2.1",
+  "format": 5,
+  "framework": "5.2",
   "platforms": ["linux/amd64", "linux/arm64"],
   "terms": [{"label": "MIT", "url": "https://opensource.org/license/mit"}],
   "touches": {"hosts": ["github.com", "objects.githubusercontent.com"]},
   "install": {
+    "fetch": [
+      {"url": "https://github.com/hexkit/hexkit/releases/download/v1.4.2/hexkit-1.4.2-linux-amd64.tar.gz",
+       "sha256": "3f1c0a9e5b7d2c4e6f8a1b3c5d7e9f0a2b4c6d8e0f1a3b5c7d9e1f2a4b6c8de9",
+       "to": "dl/hexkit.tgz", "platform": "linux/amd64"},
+      {"url": "https://github.com/hexkit/hexkit/releases/download/v1.4.2/hexkit-1.4.2-linux-arm64.tar.gz",
+       "sha256": "a07b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f904d",
+       "to": "dl/hexkit.tgz", "platform": "linux/arm64"}
+    ],
     "steps": [["sh", "{dir}/install.sh"]],
     "verify": ["{dir}/bin/hexkit", "--version"]
   },
@@ -66,30 +75,30 @@ hexkit/
 }
 ```
 
-`install.sh` is where the tool comes from its maker, at a version you pin,
-held to the checksum its maker publishes:
+The tool comes from its maker at a version you pin: each platform's file
+is a row of `install.fetch`, held to the sha256 of what its address
+answers. AerieOS fetches the one for the node's platform, checks it and
+keeps it in the pack as `dl/hexkit.tgz` before any step runs, and the
+steps then run with no network, so `install.sh` only unpacks it:
 
 ```sh
 #!/bin/sh
 set -eu
-v=1.4.2
-case "$(uname -m)" in x86_64) a=amd64 s=3f1c...e9 ;; aarch64) a=arm64 s=a07b...4d ;; esac
-curl -fsSL -o hexkit.tgz "https://github.com/hexkit/hexkit/releases/download/v$v/hexkit-$v-linux-$a.tar.gz"
-echo "$s  hexkit.tgz" | sha256sum -c -
-mkdir -p "$(dirname "$0")/bin" && tar -xzf hexkit.tgz -C "$(dirname "$0")/bin" hexkit && rm hexkit.tgz
+d="$(dirname "$0")"
+mkdir -p "$d/bin" && tar -xzf "$d/dl/hexkit.tgz" -C "$d/bin" hexkit && rm "$d/dl/hexkit.tgz"
 ```
 
 Every field is in [Writing one](tool-packs.md#writing-one); what a verb may
 run is in [Verbs](tool-packs.md#verbs). A new version of the tool is a new
 commit of your pack, and a new pin in the catalog.
 
-**Every download is held.** A script that fetches for itself, as the one
-above does, is held by nothing AerieOS can see, and the pack's card says
-**open**. From pack format 5 the manifest declares each file instead
-(`install.fetch`: its address, the sha256 of what the address answers or
-its publisher's signature, and where in the pack it is kept); AerieOS
-fetches and checks each one, and the steps then run with no network. The
-card of such a pack says **pinned**. One whose pinned installer has to
+**Every download is held.** A script that fetches for itself is held by
+nothing AerieOS can see, and the pack's card says **open**. A manifest that
+declares each file instead (`install.fetch`, pack format 5, as above: its
+address, the sha256 of what the address answers or its publisher's
+signature, and where in the pack it is kept) has each one fetched and
+checked, and its steps run with no network. The card of such a pack says
+**pinned**. One whose pinned installer has to
 download the rest from its vendor says so in one sentence
 (`install.online`), and its card says **installer**, with the sentence.
 The word is on the card before anybody adds the pack, and **Look** shows

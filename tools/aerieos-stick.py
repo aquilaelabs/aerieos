@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The AerieOS USB stick maker (R161 step 5): one tool for Windows, a Mac
-and Linux, nothing but Python's own library, that writes a release's stick
-image onto a USB stick and checks it.
+and Linux, Python's own library and the system's ssh-keygen, that writes a
+release's stick image onto a USB stick and checks it.
 
     aerieos-stick.py list                      the removable disks here
     aerieos-stick.py write DISK [--image FILE | --release vX.Y.Z | --latest [--channel dev]] [--set KEY=VALUE ...] [--config FILE] [--mirror FILE] [--yes]

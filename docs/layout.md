@@ -395,7 +395,7 @@ scripts/
     cli.py                       enroll, run, status, sample
     coverage.py                  function coverage under aerie tests coverage only
   agent/ruff.toml                the linter's settings for the agent, pinned to the python a Rocky node carries
-packs/                           the official packs (R169 step 1): every shipped toolchain and every coding agent as a pack in bbtool.json's format, tagged official and bundled for an install with no network, written by tools/packs-export.py from the tables and held to them by aerie lint
+packs/                           the official packs (R169 step 1): every shipped toolchain and every coding agent as a pack in bbtool.json's format, tagged official, written by tools/packs-export.py from the tables and held to them by aerie lint; the vetted catalog carries them (packs-export.py --catalog), and its mirror is how an install with no network takes them
 tools/catalog-mirror.py          makes the vetted catalog's mirror on a machine with the network: the signed index and a git bundle per repository at every commit it pins, for a controller that cannot reach the catalog (R169 step 6)
     official/                    one folder per shipped toolchain (a colon in its name a hyphen), its bbtool.json carrying the recipe config/toolchains.json has under shipped
     agents/                      one folder per coding agent, its bbtool.json carrying the adapter agents.py's table has under agent

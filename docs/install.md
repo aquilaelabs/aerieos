@@ -246,8 +246,11 @@ breaking change is held until it is updated, and says so. The Android app
 tells you when it and the controller are too far apart.
 
 **Read the release notes first.** A release that needs anything from you
-(a setting that moved, a node to update) says so under **Upgrading** in its
-notes, and anything removed was marked deprecated a release before.
+(a setting that moved, a node to update) says so in its notes, on a line
+that begins **Upgrading**. Nothing is marked deprecated a release ahead of
+its removal: the next release is a clean break, which takes out what
+earlier builds kept for the ones before them, and its notes' Upgrading line
+says what that asks of you.
 
 **Rolling back.** Stop the container, put the image back to the release you
 came from, replace `/config` with `/config/backups/before-VERSION`, and start
@@ -288,7 +291,7 @@ container install. The setup page's first step is then **This machine**,
 the node the installer set up, with where it stands, and Finish waits for
 it to answer rather than for a node you enroll; Enroll another machine is
 there for more, and none is needed. `sudo aerie ...` is the container's `docker exec -it
-AerieOS aerie ...`.
+Aerie-Workshop aerie ...`.
 
 Options worth knowing: `--workspace PATH` (the spaces folder, by default
 `/srv/aerieos/projects`), `--port N`, `--no-node` (the controller alone),
@@ -313,7 +316,7 @@ controller and its job account stays out of the docker group. The reasons and th
 
 ```bash
 sudo bash /opt/aerieos/nodes/install-controller.sh --update                 # the newest release
-sudo bash /opt/aerieos/nodes/install-controller.sh --update --release v0.7.0
+sudo bash /opt/aerieos/nodes/install-controller.sh --update --release vX.Y.Z   # a release named by its tag
 ```
 
 An update fetches the release's controller bundle
