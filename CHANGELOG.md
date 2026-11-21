@@ -30,10 +30,15 @@
 - A refused agent update, and a download that is not the file its entry pins, are each said in one line (aab77e7, b192d01)
 - A release is refused while config/catalog-floor is older than the catalog's newest signed index, a release rehearsal builds the Android app on the hosted runner a tag's run uses, and the OS image's build fetches nothing from PyPI (9dcbc9f, 6dddc02, 81c8e92)
 - A signature refusal, a stale agent's row and a pinned download each say one sentence (72925b6)
+- A move or backup bundle from a build before its outer details were held, or one naming no state version, is refused before it lands, and a bundle is an .aeriemove alone (4df62ba)
+- The static analysis scan's old schedule row leaves schedules.json. Upgrading: this release moves /config from state 28 to state 29, so once it has started on a /config, an earlier build no longer starts on that one (bfe2989)
+- A start no longer rewrites checkouts' credential helpers or a line of the home's .bashrc, and its banner names AerieOS; with no stable release, the bare-metal installer takes the newest published release (14aa76b, 1429a5b, f6a5ff3)
+- Container, nginx and scanner rows name an image by name and tag, a toolchain row's failure leaves its digests to the log, and release, container and move refusals, the CI, cut-landing and switched-off pack rows, two toasts and the Doctor's lines are each one sentence with no commit, key or command (a471b89, 6c70b3c, 308bf8f)
 
 ### Removed
 
 - Upgrading: nothing updates from 0.9.0-dev.5641 or earlier. Install fresh, with a new /config, and add your spaces again from their repositories; a controller started on an older /config stops and says so, and a backup or a move from one is refused before it lands (41e85a7)
+- Certificates are asked of Let's Encrypt alone. Upgrading: an install that set BB_ACME_DIRECTORY to another certificate authority asks Let's Encrypt (d6ab365)
 
 ### Fixed
 
@@ -79,6 +84,7 @@
 - `aerie tool install NAME` installs the tool on the node the session runs on once a person allows it (or at once where the space's setting is auto), as the person who allowed it, and the request on the bell names the node; it only added the pack to the catalog, so Allow installed nothing and nobody was told. A toolchain AerieOS ships is asked for as the toolchain, and answers at once when the node has it. Upgrading: this release moves /config from state 26 to state 27, so once it has started on a /config, an earlier build no longer starts on that one (7906bf6, 4fd4fea, 6e112a3)
 - Your coding agent's sign-in on a node is no longer lost when a terminal is opened for you while a session of yours is running: the open put the sealed copy back over a sign-in the session had just refreshed, and the next session started signed out, most likely right after a controller update (b7b4aed)
 - Controller settings' Vetted catalog said no mirror was imported even with one held (e5c3da6)
+- A stick whose aerieos.env names BB_RELEASE_LINE is offered that line's releases and dev builds alone, where 0.10 was offered to a 0.9 stick (e7dabfb)
 
 ### Security
 
