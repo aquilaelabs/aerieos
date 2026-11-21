@@ -228,6 +228,13 @@ def extract_sandbox_tool(text):
     return (m.group(1) + "\n") if m else ""
 
 
+def root_catalog(into):
+    """read_catalog() for what root does on a recipe's word (its system
+    packages): from root's own copy of the bundle where this agent is root,
+    since the copy in the store at `into` is the jobs account's to write."""
+    return read_catalog(os.path.join(ROOT_BUNDLE_DIR, "current") if os.geteuid() == 0 else into)
+
+
 def read_catalog(into):
     """The catalog the bundle carries, or {} when it cannot be read, with the
     tool packs a person added (R77, config/toolpacks.json beside it) among
@@ -257,6 +264,34 @@ def read_catalog(into):
     return cat
 
 
+# A system package's name, the one shape a recipe's is held to before a
+# package manager is handed it: a letter or digit, then letters, digits and
+# . + : _ -, not ending in - or + (apt reads a trailing one as "remove" or
+# "install"). Nothing that begins with a dash, no path, no address. Portage
+# alone names a package category/name, each half of that shape, and never a
+# file of its own kinds.
+PKG_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9.+:_-]*")
+EMERGE_FILES = (".ebuild", ".tbz2", ".gpkg.tar", ".xpak")
+
+
+def pkg_name_ok(fam, name):
+    """Whether `name` is a package's name for the family `fam` (PKG_NAME)."""
+    name = str(name)
+    parts = name.split("/") if fam == "emerge" else [name]
+    if len(parts) > 2 or (fam == "emerge" and name.endswith(EMERGE_FILES)):
+        return False
+    return all(PKG_NAME.fullmatch(x) and x[-1] not in "-+" for x in parts)
+
+
+def sysdeps_refused(cat, name, fam):
+    """The entries of a recipe's system packages for `fam` that are not
+    package names (pkg_name_ok), an alternative of one among them: what a
+    job refuses the recipe's packages for."""
+    recipe = next((p for p in cat.get("toolchains") or [] if p.get("name") == name), {})
+    want = [str(x) for x in ((recipe.get("system") or {}).get(fam) or []) if x][:SYSDEPS_MAX] if fam else []
+    return [e for e in want if not all(pkg_name_ok(fam, a) for a in e.split("|") if a)]
+
+
 def pkg_available(fam, name):
     """Whether this machine's repositories carry `name`: how a recipe entry
     naming alternatives picks the one this release has. A library renamed
@@ -265,12 +300,14 @@ def pkg_available(fam, name):
     that fails the whole install on every release but one: apt refuses the
     lot when one name is unknown. True when it cannot tell, so the first
     alternative is tried and its failure is the package manager's to say."""
-    argv = {"apt": [APT_CACHE_BIN, "show", "-q", name],
-            "dnf": [DNF_BIN, "-q", "info", name],
-            "zypper": [ZYPPER_BIN, "-q", "-n", "search", "-x", name],
-            "pacman": [PACMAN_BIN, "-Si", name],
-            "apk": [APK_BIN, "search", "-x", name],
-            "xbps": [XBPS_QUERY_BIN, "-R", name]}.get(fam)
+    argv = {"apt": [APT_CACHE_BIN, "show", "-q", "--", name],
+            "dnf": [DNF_BIN, "-q", "info", "--", name],
+            "zypper": [ZYPPER_BIN, "-q", "-n", "search", "-x", "--", name],
+            "pacman": [PACMAN_BIN, "-Si", "--", name],
+            "apk": [APK_BIN, "search", "-x", "--", name],
+            "xbps": [XBPS_QUERY_BIN, "-R", "--", name]}.get(fam)
+    if not pkg_name_ok(fam, name):
+        return False
     if not argv or not _have(argv[0]):
         return True
     try:
@@ -294,17 +331,20 @@ def sysdeps_missing(cat, name, fam, query):
     names) when its recipe lists them for another family only). Asked by
     exit code, never by output: dpkg -s and pacman -Q both print a sentence
     on stderr for a missing package, which read as "installed" when the
-    text was the test, and rpm -q prints "not installed" on stdout."""
+    text was the test, and rpm -q prints "not installed" on stdout. An
+    entry that is not a package's name (sysdeps_refused) is asked of nothing
+    and is in no answer."""
     recipe = next((p for p in cat.get("toolchains") or [] if p.get("name") == name), {})
     system = recipe.get("system") or {}
     want = [str(x) for x in (system.get(fam) or []) if x][:SYSDEPS_MAX] if fam else []
+    want = [e for e in want if all(pkg_name_ok(fam, a) for a in e.split("|") if a)]
     if not want:
         other = next((k for k in ("apt", "dnf", "pacman", "zypper", "apk", "xbps", "emerge")
                       if k != fam and system.get(k)), "")
         return [], ((other, [str(x) for x in system[other][:SYSDEPS_MAX]]) if other else None)
     def installed(x):
         try:
-            return subprocess.run(query + [x], capture_output=True, timeout=30,
+            return subprocess.run(query + ["--", x], capture_output=True, timeout=30,
                                   check=False).returncode == 0
         except (OSError, subprocess.SubprocessError):
             return False
@@ -359,7 +399,7 @@ def sysdeps_now(state):
     into = os.path.join(store, ".bb", "current") if store else ""
     if not into or not os.path.isdir(into):
         return {}
-    cat = read_catalog(into)
+    cat = root_catalog(into)
     fam, query, _ = pkg_backend()
     if not fam or not cat:
         return {}

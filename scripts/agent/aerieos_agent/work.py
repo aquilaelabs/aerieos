@@ -15,7 +15,8 @@ from . import keyops, storage
 from .base import DRIVER, OWN_COMPOSE, SANDBOX_BIN, SIGN_WORK, TOOLKIT, fs_holds, root_docker_env
 from .stores import tc_root, tc_scope
 from .backends import pkg_backend
-from .toolchains import held_recipes, read_catalog, sdk_env, sysdeps_missing, tc_dir, tc_users, tc_users_said, tc_verbs
+from .toolchains import (held_recipes, pkg_name_ok, read_catalog, root_catalog, sdk_env, sysdeps_missing, sysdeps_refused, tc_dir,
+                         tc_users, tc_users_said, tc_verbs)
 from .gpu import DRIVER_PKG, _gpu_card
 
 
@@ -875,9 +876,15 @@ class WorkMixin:
         False when the install was tried and failed; a missing package on a
         node this cannot administer is a warning, not a refusal: the
         download is still worth having, and the tool names what is missing
-        when it is used."""
-        cat = read_catalog(into)
+        when it is used. The catalog read is root's own copy where this
+        agent is root (root_catalog), and a recipe naming anything that is
+        not a package's name has none of its packages installed."""
+        cat = root_catalog(into)
         fam, query, install = pkg_backend()
+        bad = sysdeps_refused(cat, name, fam)
+        if bad:
+            job.say(f"refused: {name}'s recipe names a system package that is not a package's name ({bad[0][:60]!r})\n")
+            return False
         missing, other = sysdeps_missing(cat, name, fam, query)
         # Which family this machine is decides which list applies. A recipe
         # that names packages for the other family only is not wrong, it is
@@ -911,7 +918,7 @@ class WorkMixin:
         node enrolled afterwards has dotnet and not libicu, and the only
         gesture that installed libicu was reinstalling dotnet onto the share
         for everybody. Named recipes, or every held one when none are."""
-        cat = read_catalog(into)
+        cat = root_catalog(into)
         fam, query, install = pkg_backend()
         if not fam:
             job.say("refused: no package manager this agent knows is on this machine\n")
@@ -921,8 +928,13 @@ class WorkMixin:
         if names and not want:
             job.say(f"none of {' '.join(names)} is on this node's store, so nothing here needs anything\n")
             return "succeeded", 0
-        needed = {}
+        needed, refused = {}, 0
         for name in want:
+            bad = sysdeps_refused(cat, name, fam)
+            if bad:
+                job.say(f"refused: {name}'s recipe names a system package that is not a package's name ({bad[0][:60]!r})\n")
+                refused += 1
+                continue
             missing, other = sysdeps_missing(cat, name, fam, query)
             if other:
                 job.say(f"{name}: its recipe names packages for {other[0]} only, not {fam}; "
@@ -930,6 +942,8 @@ class WorkMixin:
             if missing:
                 needed[name] = missing
         if not needed:
+            if refused:
+                return "failed", 65
             job.say(f"every system package the held recipes need is installed here ({fam})\n")
             return "succeeded", 0
         if not self.administers():
@@ -937,7 +951,7 @@ class WorkMixin:
                     "installs these: "
                     + "; ".join(f"{n}: {' '.join(m)}" for n, m in needed.items()) + "\n")
             return "failed", 77
-        bad = 0
+        bad = refused
         for name, missing in needed.items():
             job.step(name)
             job.say(f"== system packages for {name}: {' '.join(missing)}\n")
@@ -945,16 +959,22 @@ class WorkMixin:
                 bad += 1
         self.hello()
         if bad:
-            job.say(f"{bad} of {len(needed)} did not install\n")
+            job.say(f"{bad} of {len(needed) + refused} did not install\n")
             return "failed", 1
         return "succeeded", 0
 
     def _install_system(self, job, name, fam, install, missing):
+        """The package manager, as root, handed `missing` after `--`: every
+        one a package's name (pkg_name_ok) or none of them is installed."""
+        bad = [m for m in missing if not pkg_name_ok(fam, m)]
+        if bad:
+            job.say(f"refused: {name}'s recipe names a system package that is not a package's name ({bad[0][:60]!r})\n")
+            return False
         env = dict(os.environ, DEBIAN_FRONTEND="noninteractive")
         try:
             # emerge builds from source: fifteen minutes is a package
             # manager's clock, not a compiler's.
-            p = subprocess.run([*install, *missing], env=env, capture_output=True, text=True,
+            p = subprocess.run([*install, "--", *missing], env=env, capture_output=True, text=True, cwd="/",
                                timeout=4 * 3600 if fam == "emerge" else 900, check=False)
         except (OSError, subprocess.SubprocessError) as e:
             job.say(f"{install[0]}: {e}\n")
