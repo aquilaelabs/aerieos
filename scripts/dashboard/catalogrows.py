@@ -168,6 +168,13 @@ def checked(row, shipped):
         return None, packformat.source_refused(src)
     if not isinstance(row.get("layout"), dict):
         return None, "it has no layout"
+    # What it sets on every job of a node, and what it has a node's package
+    # manager install as root, are held to the format's two shapes.
+    env = row["layout"].get("env")
+    if env is not None and not (isinstance(env, dict) and all(packformat.env_name_ok(k) for k in env)):
+        return None, f"its layout.env sets variables of the tool's own, each {packformat.ENV_SAID}"
+    if packformat.system_refused(row.get("system")):
+        return None, packformat.system_refused(row.get("system"))
     if rev_of(row) <= rev_of(shipped):
         return None, "it is no newer than the shipped row"
     # A higher rev is the catalog's word alone, so it never buys a weaker

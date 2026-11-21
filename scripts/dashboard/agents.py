@@ -338,9 +338,8 @@ def allow_plan(agent_id, spec=None):
 _INSTALL_NAME = re.compile(r"[A-Z][A-Z0-9_]{1,40}")
 _INSTALL_VALUE = re.compile(r"[A-Za-z0-9._/{}:=-]{0,200}")
 _INSTALL_PATH = re.compile(r"\.?[A-Za-z0-9_-]{1,40}(/[A-Za-z0-9._{}-]{1,60}){1,5}")
-# What an installer's environment never sets: where programs and libraries
-# are found, and who the account is.
-_INSTALL_ENV_KEPT = ("PATH", "HOME", "USER", "LOGNAME", "SHELL", "IFS", "ENV", "BASH_ENV")
+# What an installer's environment never sets is the format's one rule for
+# a variable an entry may set (packformat.env_name_ok).
 # A step of a held recipe: a few plain words. What it runs is a file the
 # recipe fetched ({dir}/...), sh or bash on one, or one of the tools that
 # only put files in place; so a step is never a line of shell, and nothing
@@ -455,13 +454,13 @@ def install_checked(spec):
     pin = spec.get("pin")
     if pin is not None:
         if not (isinstance(pin, (list, tuple)) and len(pin) == 2 and all(isinstance(x, str) for x in pin)
-                and _INSTALL_NAME.fullmatch(pin[0]) and pin[0] not in _INSTALL_ENV_KEPT and not pin[0].startswith("LD_")
+                and _INSTALL_NAME.fullmatch(pin[0]) and packformat.env_name_ok(pin[0])
                 and re.fullmatch(r"[A-Za-z0-9._-]{0,12}\{v\}[A-Za-z0-9._-]{0,12}", pin[1])):
             return None, "agent.install.pin is the variable a version is handed through and how it is written, e.g. [\"VERSION\", \"v{v}\"], or null"
         pin = [pin[0], pin[1]]
     env = spec.get("env") or {}
     if not (isinstance(env, dict) and len(env) <= 8 and all(
-            isinstance(k, str) and _INSTALL_NAME.fullmatch(k) and k not in _INSTALL_ENV_KEPT and not k.startswith("LD_")
+            isinstance(k, str) and _INSTALL_NAME.fullmatch(k) and packformat.env_name_ok(k)
             and isinstance(v, str) and _INSTALL_VALUE.fullmatch(v) and ".." not in v
             and "{" not in v.replace("{home}", "") and "}" not in v.replace("{home}", "") for k, v in env.items())):
         return None, "agent.install.env is the installer's own variables, each a plain value with {home} for the account's home"

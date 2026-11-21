@@ -646,6 +646,64 @@ def files_checked(raw, what="source.files"):
     return dict(raw), []
 
 
+# ---- a variable an entry may set, and a system package it may name ------------
+# An entry sets variables in three places: a pack's or a row's layout.env,
+# which reaches every job on the node; a row's source.env and an agent's
+# install env, which an installer runs with; and an agent's env, which its
+# sessions and its sign-in run with. One rule for all of them: a name of
+# capitals, digits and underscores that is none of the ones a loader, a
+# shell, an interpreter, git, ssh or AerieOS itself reads at its start to
+# find code to run, or to know who and where the account is.
+ENV_NAME = re.compile(r"[A-Z][A-Z0-9_]{0,40}")
+ENV_KEPT = frozenset(("PATH", "HOME", "USER", "LOGNAME", "SHELL", "TMPDIR", "IFS", "ENV", "BASH_ENV", "PROMPT_COMMAND",
+                      "PYTHONSTARTUP", "PYTHONPATH", "PERL5OPT", "RUBYOPT", "NODE_OPTIONS", "GIT_EXEC_PATH"))
+ENV_KEPT_PREFIXES = ("LD_", "DYLD_", "GIT_SSH", "GIT_CONFIG", "SSH_", "BB_", "BUILDERBOT_", "AERIEOS_")
+ENV_SAID = ("a name of capitals, digits and underscores, never one a loader, a shell, an interpreter, git, ssh or AerieOS "
+            "reads at its start (PATH, HOME, LD_*, BASH_ENV, PYTHONPATH, NODE_OPTIONS, GIT_SSH*, SSH_*, BB_* and their like)")
+
+
+def env_name_ok(name):
+    """Whether an entry may set the variable `name` (ENV_NAME, ENV_KEPT,
+    ENV_KEPT_PREFIXES): the one rule for every place an entry sets one."""
+    return isinstance(name, str) and bool(ENV_NAME.fullmatch(name)) and name not in ENV_KEPT and not name.startswith(ENV_KEPT_PREFIXES)
+
+
+# What a recipe may list for a node's package manager to install as root (a
+# row's or a pack's `system`) is a package's name and nothing a package
+# manager reads as anything else: it starts with a letter or a digit, never
+# a dash (an option), and ends in neither `-` nor `+` (apt's suffixes for
+# remove and install). An entry may give alternatives, NAME|NAME, of which
+# a node installs the first its release carries, and a portage name is
+# CATEGORY/NAME; each part is held to the shape.
+SYSTEM_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9.+:_-]*")
+SYSTEM_NAME_MAX = 80
+SYSTEM_SLASHED = ("emerge",)
+SYSTEM_MANAGER = re.compile(r"[a-z]{2,12}")
+SYSTEM_MOST = 120
+
+
+def system_name_ok(name, manager=""):
+    """Whether `name` is an entry of a `system` list for `manager`: one
+    package name, or alternatives, each of SYSTEM_NAME's shape."""
+    if not (isinstance(name, str) and 1 <= len(name) <= SYSTEM_NAME_MAX):
+        return False
+    for alt in name.split("|"):
+        parts = alt.split("/") if manager in SYSTEM_SLASHED else [alt]
+        if len(parts) > 2 or not all(SYSTEM_NAME.fullmatch(p) and p[-1] not in "-+" for p in parts):
+            return False
+    return True
+
+
+def system_refused(sysd):
+    """Why a row's `system` is not {package manager: [package names]}, or ""."""
+    if sysd is None:
+        return ""
+    if not (isinstance(sysd, dict) and all(isinstance(k, str) and SYSTEM_MANAGER.fullmatch(k) and isinstance(v, list) and len(v) <= SYSTEM_MOST
+                                           and all(system_name_ok(n, k) for n in v) for k, v in sysd.items())):
+        return "its system packages are not package names: each starts with a letter or a digit and ends in neither - nor +"
+    return ""
+
+
 def source_refused(src):
     """Why a row's source says something of its downloads that the format
     does not write, or "": its pin, its declared downloads, the keys it
@@ -671,6 +729,8 @@ def source_refused(src):
         errors += lock_checked(src["lock"], "source.lock")[1]
     if src.get("files") is not None:
         errors += files_checked(src["files"], "source.files")[1]
+    if src.get("env") is not None and not (isinstance(src["env"], dict) and all(env_name_ok(k) and isinstance(v, str) for k, v in src["env"].items())):
+        errors.append(f"source.env maps the installer's own variables to their values, each {ENV_SAID}")
     # A repository's pin: the commit, the tag it is fetched under, and how
     # the commit to pin is found.
     git = src.get("kind") == "git"

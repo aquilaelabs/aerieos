@@ -636,7 +636,7 @@ same code, and get the same word.
 | `command` | The program a session runs, on `PATH` from the pack's own `layout.bin`. |
 | `briefing` | How it takes AerieOS's briefing: `flag-text` (the text after `flag`), `flag-file` (the file's path after `flag`), `env-file` (a variable naming the file), `hook` (handed to the model by its own hooks, at its `start` event and again on the first prompt after a restart changed it; its `hooks.answers` says how, below) or `none`. |
 | `hooks` | Its hooks file under the account's home, written by AerieOS at each start. `shape` is `grouped` (`{hooks: {EVENT: [{hooks: [{type, command, timeout}]}]}}`, as Claude Code, Codex CLI and Grok Build read) or `flat` (`{version: 1, hooks: {EVENT: [{type, bash, timeoutSec}]}}`, as Copilot CLI reads). `payload` is the fields its hooks send: `snake` (`tool_name`, `tool_input`, `session_id`) or `camel` (`toolName`, `toolInput`, `sessionId`). `events` names its own event for AerieOS's `pre` (before a tool), `prompt`, `stop`, and optionally `recall` (after a summary), `asking` (its permission prompt) and `start` (a conversation's start, for a briefing handed over by `hook`). `tools` adds its own names for a shell, an edit and a search where they are not the usual ones. An agent whose hooks are neither shape says its own as data: [A protocol of its own](#a-protocol-of-its-own). |
-| `env` | Up to eight fixed words its sessions start with (an updater or telemetry off). Never a path, `PATH`, `HOME`, `LD_*` or a `BB_` name. |
+| `env` | Up to eight fixed words its sessions start with (an updater or telemetry off). Never a path, and each name held to [the one rule for a variable an entry sets](#a-variable-an-entry-sets). |
 | `respawn` | The arguments that resume its newest conversation, when a session comes back. |
 | `first_prompt` | How a new space's brief is handed over: after `--`, after a `flag`, or not at all. |
 | `signin` | Where its sign-in is kept (`file`, under the account's home, or `env`, a variable such as an API key): with either, a session does not start until one is there. `login` is the command that starts its sign-in, and `flow` says how that sign-in goes, so the page can run it: [A sign-in from the page](#a-sign-in-from-the-page). |
@@ -877,6 +877,16 @@ a shell (`agent.install.script`), which held nothing; an install that
 meets one keeps the recipe it shipped with. The catalog's own check holds every entry to each AerieOS
 release still supported, so an entry is signed only when the oldest install
 that reads its format takes it as the newest does.
+
+### A variable an entry sets
+
+An entry sets variables in a few places: a pack's or a shipped row's
+`layout.env`, which every job on the node runs with; a shipped row's
+`source.env` and a coding agent's `agent.install.env` and `pin`, which an
+installer runs with; an agent's `env` and `signin.env`, and a config
+field's `env`. One rule holds every one of them, in one function
+(`packformat.env_name_ok`): a name of capitals, digits and underscores, and never one a loader, a shell, an interpreter, git, ssh or AerieOS reads at its start: `PATH`, `HOME`, `USER`, `LOGNAME`, `SHELL`, `TMPDIR`, `IFS`, `ENV`, `BASH_ENV`, `PROMPT_COMMAND`, `PYTHONSTARTUP`, `PYTHONPATH`, `PERL5OPT`, `RUBYOPT`, `NODE_OPTIONS`, `GIT_EXEC_PATH`, or any name that begins `LD_`, `DYLD_`, `GIT_SSH`, `GIT_CONFIG`, `SSH_`, `BB_`, `BUILDERBOT_` or `AERIEOS_`. A manifest
+or a catalog's row that sets one is refused.
 
 ### An entry's older pins
 
@@ -1199,8 +1209,8 @@ the scripts it runs:
 | `install.lock` | Pack format 5. What the install asks a package manager for, up to four, each `{"kind", "to", "requirements"}`: `pip` or `npm`, the directory inside the pack the manager's files are kept in, and what it is asked for; pip adds `python` and `for`. The files themselves are rows of `install.fetch` under that directory, and no install reads the lock ([Declared downloads](#declared-downloads)). |
 | `install.steps` | What runs after the repository is fetched into the store, each a list of words; `{dir}` is the pack's directory. A pack that declares no downloads fetches its binaries here; one that declares them (`install.fetch`) unpacks and builds here, with no network. |
 | `install.verify` | One command that must succeed for the install to count. |
-| `layout` | `bin`: directories inside the pack to put on `PATH`. `env`: variables to set, each a path inside the pack or `=VALUE`. `tool`: a file whose presence means it is installed. |
-| `system.apt`, `system.dnf`, `system.pacman`, `system.zypper`, `system.apk` | The system packages the node needs, in each package manager's own names, installed first where the node lets AerieOS administer it. A node's family installs its own manager's list; a pack that names lists, but none for a node's manager, is not offered on that node, its card and an Install there saying which managers it names. A pack with no system packages fits every family. |
+| `layout` | `bin`: directories inside the pack to put on `PATH`. `env`: variables to set, each a path inside the pack or `=VALUE`, each name held to [the one rule for a variable an entry sets](#a-variable-an-entry-sets). `tool`: a file whose presence means it is installed. |
+| `system.apt`, `system.dnf`, `system.pacman`, `system.zypper`, `system.apk` | The system packages the node needs, in each package manager's own names, installed first where the node lets AerieOS administer it. A name is a package's name and nothing a package manager reads as more: letters, digits and `.` `+` `:` `_` `-`, starting with a letter or a digit and ending in neither `-` nor `+`; alternatives are written `NAME|NAME`, and the node installs the first its release carries. A node's family installs its own manager's list; a pack that names lists, but none for a node's manager, is not offered on that node, its card and an Install there saying which managers it names. A pack with no system packages fits every family. |
 | `verbs` | The commands a session calls as `aerie tool NAME VERB`. |
 | `works_with` | The AerieOS release lines it works with, e.g. `["0.9", "0.10"]`; none named is every one. A pack that does not name this install's line is not added, and a catalog entry that repeats the list is not shown on such an install at all. One held that stops fitting after an upgrade is switched off until a version that names the new line is kept ([What is not for this AerieOS](#what-is-not-for-this-aerieos)). |
 | `touches` | What it touches: `hosts`, up to 16 host names its install fetches from, and `root`, true when it needs root on the node to install. Look shows both before it is added, and a pack that needs root is added by an administrator alone (R169 step 4). |

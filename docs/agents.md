@@ -184,7 +184,7 @@ a shell from the network as it arrives.
 | `online` | One sentence, where its pinned installer downloads the rest by itself: what, from where, and what it checks. With it the steps keep the network; without it they run with none. |
 | `steps` | What runs once the downloads are held, each a list of plain words and never a line a shell reads: a file the recipe fetched (`{dir}/...`), `sh` or `bash` on one, or one of `mkdir`, `tar`, `unzip`, `install`, `ln` and `chmod`. `{dir}` is where the downloads landed, `{home}` the account's home, `{version}` the version the downloads say. |
 | `pin` | The variable a version is handed to an installer through and how it is written (`["VERSION", "v{v}"]`), or `null` for a recipe that takes none. |
-| `env` | Up to eight of the installer's own variables, with `{home}` for the account's home. Never `PATH`, `HOME`, the account's name or an `LD_` name. |
+| `env` | Up to eight of the installer's own variables, with `{home}` for the account's home. Each name is held to [the one rule for a variable an entry sets](tool-packs.md#a-variable-an-entry-sets): never `PATH`, `HOME`, the account's name, a loader's, a shell's or an interpreter's start-up names, or one of AerieOS's own. |
 | `bin` | Where the program is left, under the account's home. |
 | `also` | Other places a removal clears, under the account's home. |
 | `fresh` | The folder a named version is read from, with `{v}` (Claude Code's `versions` folder), or empty. |

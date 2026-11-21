@@ -213,10 +213,9 @@ def signin_checked(si, command, errors):
     if login and login[0] != command:
         errors.append("agent.signin.login runs the agent's own command, e.g. [\"foo\", \"login\"]")
     env = si.get("env") if si.get("env") is not None else {}
-    if not (isinstance(env, dict) and len(env) <= 8 and all(ENV_NAME.fullmatch(str(k)) and isinstance(v, str) and re.fullmatch(r"[A-Za-z0-9._:,-]{0,80}", v)
-                                                          for k, v in env.items())
-            and not any(k.startswith("BB_") or k in ("PATH", "HOME", "LD_PRELOAD", "LD_LIBRARY_PATH") for k in env)):
-        errors.append("agent.signin.env maps up to 8 NAME to plain words its sign-in runs with (an updater off), none of PATH, HOME, LD_* or AerieOS's own BB_ names")
+    if not (isinstance(env, dict) and len(env) <= 8 and all(packformat.env_name_ok(k) and isinstance(v, str) and re.fullmatch(r"[A-Za-z0-9._:,-]{0,80}", v)
+                                                          for k, v in env.items())):
+        errors.append(f"agent.signin.env maps up to 8 NAME to plain words its sign-in runs with (an updater off), each {packformat.ENV_SAID}")
         env = {}
     flow = _signin_flow(si.get("flow"), {"command": command, "login": list(login)}, errors) if si.get("flow") is not None else None
     if len(errors) != bad:
@@ -417,7 +416,7 @@ def _pack_agent(name, a, errors, newer=False):
             errors.append(f"agent.briefing.flag is the option {how} hands the briefing with, e.g. --rules")
         out["briefing"]["flag"] = str(b.get("flag") or "")
     elif how == "env-file":
-        if not (isinstance(b.get("env"), str) and ENV_NAME.fullmatch(b["env"])):
+        if not (isinstance(b.get("env"), str) and packformat.env_name_ok(b["env"])):
             errors.append("agent.briefing.env is the variable that names the briefing's file")
         out["briefing"]["env"] = str(b.get("env") or "")
     h = a.get("hooks")
@@ -464,12 +463,12 @@ def _pack_agent(name, a, errors, newer=False):
     if fires == "each-call":
         out["hooks"]["prompt_fires"] = fires
     env = a.get("env") if a.get("env") is not None else {}
-    if not (isinstance(env, dict) and len(env) <= 8 and all(ENV_NAME.fullmatch(str(k)) and isinstance(v, str) and re.fullmatch(r"[A-Za-z0-9._:,-]{0,80}", v)
+    if not (isinstance(env, dict) and len(env) <= 8 and all(isinstance(k, str) and ENV_NAME.fullmatch(k) and isinstance(v, str) and re.fullmatch(r"[A-Za-z0-9._:,-]{0,80}", v)
                                                           for k, v in env.items())):
         errors.append("agent.env maps up to 8 NAME to plain words (an updater off, a telemetry switch), never a path or a secret")
         env = {}
-    if any(k.startswith("BB_") or k in ("PATH", "HOME", "LD_PRELOAD", "LD_LIBRARY_PATH") for k in env):
-        errors.append("agent.env sets none of PATH, HOME, LD_* or AerieOS's own BB_ names")
+    if not all(packformat.env_name_ok(k) for k in env):
+        errors.append(f"agent.env sets variables of the agent's own, each {packformat.ENV_SAID}")
     out["env"] = dict(env)
     si = a.get("signin") if isinstance(a.get("signin"), dict) else {}
     for k, v in (("respawn", a.get("respawn")), ("signin.login", si.get("login"))):
@@ -491,7 +490,7 @@ def _pack_agent(name, a, errors, newer=False):
     sf, se = si.get("file", ""), si.get("env", "")
     if sf and not (isinstance(sf, str) and REL.fullmatch(sf)):
         errors.append("agent.signin.file is where its sign-in is kept, under the account's home")
-    if se and not (isinstance(se, str) and ENV_NAME.fullmatch(se)):
+    if se and not (isinstance(se, str) and packformat.env_name_ok(se)):
         errors.append("agent.signin.env is a variable whose presence signs it in (an API key)")
     out["signin"] = {"file": str(sf or ""), "env": str(se or "")}
     if si.get("flow") is not None:
@@ -728,7 +727,7 @@ def _config(c, errors, depth=0):
         if scope == "person":
             field["scope"] = "person"
         env = str(f.get("env") or "")
-        if env and not ENV_NAME.fullmatch(env):
+        if env and not packformat.env_name_ok(env):
             errors.append(f"config field {name}: env is a NAME a verb reads it as")
         elif env:
             field["env"] = env
@@ -985,9 +984,14 @@ def validate(m, shipped=(), official=False):
         errors.append("layout.tool is a file inside the pack whose presence says it is installed")
         tool = ""
     env = lay.get("env") or {}
-    if not isinstance(env, dict) or not all(re.fullmatch(r"[A-Z][A-Z0-9_]{0,40}", k) and isinstance(v, str)
+    if not isinstance(env, dict) or not all(isinstance(k, str) and re.fullmatch(r"[A-Z][A-Z0-9_]{0,40}", k) and isinstance(v, str)
                                             for k, v in env.items()):
         errors.append("layout.env maps NAME to a path inside the pack (\"\" for the pack itself) or =VALUE")
+        env = {}
+    # What it sets reaches every job on the node, so the names are held to
+    # the one rule (packformat.env_name_ok).
+    if not all(packformat.env_name_ok(k) for k in env):
+        errors.append(f"layout.env sets variables of the tool's own, each {packformat.ENV_SAID}")
         env = {}
     out["layout"] = {"bin": bins, "env": env, "tool": tool or MANIFEST}
     # System packages per package manager (R171), as the shipped recipes
@@ -995,12 +999,12 @@ def validate(m, shipped=(), official=False):
     # and a node whose manager the pack names none for is not offered it.
     sysd = m.get("system") if isinstance(m.get("system"), dict) else {}
     keep = {}
-    for mgr, shape in SYSTEM_NAMES.items():
+    for mgr in SYSTEM_NAMES:
         names = sysd.get(mgr)
         if names is None:
             continue
-        if not (isinstance(names, list) and len(names) <= 60 and all(isinstance(a, str) and shape.fullmatch(a) for a in names)):
-            errors.append(f"system.{mgr} lists {SYSTEM_WORDS[mgr]} package names")
+        if not (isinstance(names, list) and len(names) <= 60 and all(packformat.system_name_ok(a, mgr) for a in names)):
+            errors.append(f"system.{mgr} lists {SYSTEM_WORDS[mgr]} package names, each starting with a letter or a digit and ending in neither - nor +")
             continue
         if names:
             keep[mgr] = names
@@ -1452,11 +1456,9 @@ def packs():
         return _load()["packs"]
 
 
-# The package managers a node's family runs (provision-linux.sh's families),
-# each with the shape of its package names.
-SYSTEM_NAMES = {"apt": re.compile(r"[a-z0-9.+|-]{1,80}"), "dnf": re.compile(r"[A-Za-z0-9._+|-]{1,80}"),
-                "pacman": re.compile(r"[a-z0-9@._+|-]{1,80}"), "zypper": re.compile(r"[A-Za-z0-9._+|-]{1,80}"),
-                "apk": re.compile(r"[a-z0-9._+|-]{1,80}")}
+# The package managers a pack may name packages for (provision-linux.sh's
+# families); the shape of a name is the format's (packformat.system_name_ok).
+SYSTEM_NAMES = ("apt", "dnf", "pacman", "zypper", "apk")
 SYSTEM_WORDS = {"apt": "Debian and Ubuntu", "dnf": "Fedora and Red Hat", "pacman": "Arch", "zypper": "openSUSE", "apk": "Alpine"}
 
 
