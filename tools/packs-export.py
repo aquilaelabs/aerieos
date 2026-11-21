@@ -247,8 +247,9 @@ def entry_at(root, folder, commit, was=None, tier="", url="", topics=None):
     # A Docker app is the folder with a bbapp.json; any other is a pack.
     kind = "app" if _git(root, "cat-file", "-e", f"{commit}:{folder}/bbapp.json").returncode == 0 else "pack"
     # The checkout is read in a pack's place, which the controller's fetch
-    # allows beside its seams' marker alone (scripts/dashboard/seams.py).
-    os.environ.update(BB_TOOLPACKS_FILE_URLS="1", BB_SEAMS="1")
+    # allows in the source tree alone (scripts/dashboard/seams.py): this
+    # tool runs from one.
+    os.environ.update(BB_TOOLPACKS_FILE_URLS="1")
     pin, own, why = catalogentry.said_at("file://" + os.path.abspath(root), commit, hashlib.sha256(tar.stdout).hexdigest(), folder, kind,
                                          official=tier == "official")
     if why:

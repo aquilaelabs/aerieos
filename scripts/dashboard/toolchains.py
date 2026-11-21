@@ -33,6 +33,7 @@ from names import agent_sessions, tmux_name  # noqa: E402
 import agents  # noqa: E402
 import catalogrows  # noqa: E402
 import packformat  # noqa: E402
+import seams  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 
@@ -318,9 +319,10 @@ _sdk_root_cache = []
 # image, the checkout's copy under `aerie dashboard dev`. Same relative position
 # either way, and it keeps the pair in step: a page offering a subcommand
 # the bb beside it does not have would be a button that cannot work.
-# BB_BIN exists for the test harness, which points it at a stub: the suite
-# must be able to drive install and remove without downloading gigabytes.
-BB = os.environ.get("BB_BIN") or str(HERE.parent / "aerie")
+# BB_BIN exists for the test harness, which points it at a stub in the
+# source tree alone (seams.py): the suite must be able to drive install and
+# remove without downloading gigabytes.
+BB = seams.get("BB_BIN") or str(HERE.parent / "aerie")
 
 
 def sdk_root_path():

@@ -42,6 +42,7 @@ import urllib.request
 import agents
 import checks
 import packformat
+import seams
 from vers import vkey
 
 VER = re.compile(r"(\d+\.\d+\.\d+)")
@@ -192,10 +193,9 @@ def _say(a, key, **names):
 
 def latest_url(a):
     """Where this agent's newest release is asked: its registry's answer or
-    its installer's own `latest` file, or a test's file:// stand-in
-    (BB_CLAUDE_LATEST_URL, BB_CODEX_LATEST_URL, BB_COPILOT_LATEST_URL,
-    BB_GROK_LATEST_URL)."""
-    return os.environ.get(f"BB_{a.id.upper()}_LATEST_URL") or a.latest_url or a.latest_file
+    its installer's own `latest` file, or a test's file:// stand-in in the
+    source tree alone (BB_CLAUDE_LATEST_URL and the like, seams.py)."""
+    return seams.latest_url(a.id) or a.latest_url or a.latest_file
 
 
 def check(agent_id):

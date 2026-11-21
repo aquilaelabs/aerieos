@@ -57,7 +57,7 @@ KINDS = tuple(TABLE)
 # the digest of what is pulled, and a service's module reads its own by
 # the names the file gives them: nothing of an image is a constant in code.
 # The seam BB_SERVICE_IMAGES_FILE names another file, for the harness alone
-# (seams.py: honored beside its marker), and the file is read again when it
+# (seams.py: read in the source tree alone), and the file is read again when it
 # changes.
 IMAGES_FILE = seams.get("BB_SERVICE_IMAGES_FILE") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "service-images.json")
 _images = {"at": None, "rows": {}}

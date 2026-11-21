@@ -1106,7 +1106,7 @@ def fetch(url, commit="", shipped=(), sha256="", path="", official=False):
     counts only beside that pin's sha256; a request never says it."""
     url = str(url or "").strip()
     # A suite's pack is a repository on disk (the seam BB_TOOLPACKS_FILE_URLS,
-    # honored beside the harness's marker alone: seams.py); a controller
+    # read in the source tree alone: seams.py); a controller
     # only ever fetches one over the network.
     local = seams.get("BB_TOOLPACKS_FILE_URLS") == "1" and url.startswith("file:///")
     if not (URL.fullmatch(url) or local):

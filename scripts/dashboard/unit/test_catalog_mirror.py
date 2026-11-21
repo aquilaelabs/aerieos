@@ -56,7 +56,7 @@ class Mirror(unittest.TestCase):
         was = catalogindex.PUB_FILE
         catalogindex.PUB_FILE = pubfile
         self.addCleanup(setattr, catalogindex, "PUB_FILE", was)
-        for seam in ("BB_TOOLPACKS_FILE_URLS", "BB_SEAMS"):
+        for seam in ("BB_TOOLPACKS_FILE_URLS",):
             os.environ[seam] = "1"
             self.addCleanup(os.environ.pop, seam, None)
         self.state = os.path.join(self.d, "state")

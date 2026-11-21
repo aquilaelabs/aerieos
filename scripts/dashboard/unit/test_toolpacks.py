@@ -90,7 +90,7 @@ class Repository(unittest.TestCase):
         os.makedirs(self.repo)
         git("init", "-q", cwd=self.repo)
         self.commit(GOOD, "Look before you leap.")
-        for seam in ("BB_TOOLPACKS_FILE_URLS", "BB_SEAMS"):
+        for seam in ("BB_TOOLPACKS_FILE_URLS",):
             os.environ[seam] = "1"
             self.addCleanup(os.environ.pop, seam, None)
         toolpacks.configure(state=self.tmp.name, write_json=statefile.write_json)

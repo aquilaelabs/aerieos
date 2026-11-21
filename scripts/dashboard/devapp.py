@@ -64,12 +64,14 @@ import threading
 import time
 from pathlib import Path
 
-# The compose reader an app's check shares (packformat.service_reach),
-# found beside this file where a verb loads it by its path.
+# The compose reader an app's check shares (packformat.service_reach) and
+# the test seams (seams.py), found beside this file where a verb loads it
+# by its path.
 _here = os.path.dirname(os.path.abspath(__file__))
 if _here not in sys.path:
     sys.path.append(_here)
 import packformat  # noqa: E402
+import seams  # noqa: E402
 
 # The request's timing parts (server.py's trace), where there is a request:
 # a suite or a verb loads this file by its path, outside the dashboard's
@@ -98,7 +100,8 @@ gpu_why = None
 room_why = None         # set by server.py: (node id) -> why a build there would run out of disk, or "" (R110)
 container_mem_gb = None  # set by server.py: () -> the memory limit in GB a container with none gets, 0 for none (R110)
 
-DOCKER = os.environ.get("BB_DOCKER_BIN", "docker")
+# docker, or the harness's stub in the source tree alone (seams.py).
+DOCKER = seams.get("BB_DOCKER_BIN", "docker")
 
 # The instance a project has always had, before instances were a thing. Every
 # call that does not name one means this, which is what keeps the migration

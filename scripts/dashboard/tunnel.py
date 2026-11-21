@@ -27,8 +27,11 @@ import time
 import urllib.error
 import urllib.request
 
-# Which binary: the image's, or a stub the harness points at.
-BIN = os.environ.get("BB_CLOUDFLARED", "cloudflared")
+import seams
+
+# Which binary: the image's, or a stub the harness points at in the source
+# tree alone (seams.py).
+BIN = seams.get("BB_CLOUDFLARED", "cloudflared")
 API = "https://api.cloudflare.com/client/v4"
 # The dashboard's own port inside the container, which is where cloudflared
 # forwards to: it runs beside the server in the same network.
@@ -174,7 +177,7 @@ def _read(p):
 ROUTE_EVERY = 60
 # Where the name is asked: https://HOST, or the harness's own server, which
 # stands in for a tunnel whose name nobody owns.
-ROUTE_BASE = os.environ.get("BB_TUNNEL_ROUTE_BASE", "")
+ROUTE_BASE = seams.get("BB_TUNNEL_ROUTE_BASE")
 _route = {"at": 0, "ok": None, "said": "", "host": ""}
 
 

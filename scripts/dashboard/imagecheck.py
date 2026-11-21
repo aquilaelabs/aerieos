@@ -31,7 +31,8 @@ The registry is asked over its v2 API with an anonymous token
 (imageregistry.py, the one client for that protocol), which is what a
 public image answers on any host that speaks it; a private one says it
 could not be read, on the row, rather than guessing. The harness points
-BB_IMAGE_DIGESTS_FILE at {ref: digest} instead.
+BB_IMAGE_DIGESTS_FILE at {ref: digest} instead, in the source tree alone
+(seams.py).
 """
 import hashlib
 import json
@@ -41,6 +42,7 @@ import time
 from pathlib import Path
 
 import imageregistry
+import seams
 import releasecheck
 
 STATE = None
@@ -51,7 +53,7 @@ _checking = {"on": False}
 
 CHECK_DELAY = float(os.environ.get("BB_IMAGE_CHECK_DELAY") or 300)
 AUTOCHECK = os.environ.get("BB_IMAGE_AUTOCHECK", "1") != "0"
-DIGESTS_FILE = os.environ.get("BB_IMAGE_DIGESTS_FILE") or ""
+DIGESTS_FILE = seams.get("BB_IMAGE_DIGESTS_FILE")
 
 
 def configure(*, state, write_json, devapp_module):

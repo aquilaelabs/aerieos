@@ -48,9 +48,11 @@ import urllib.request
 from pathlib import Path
 
 import releasecheck
+import seams
 
-# The releases are AerieOS's own on GitHub; a test points this at a file.
-RELEASES_URL = (os.environ.get("BB_APPS_RELEASES_URL")
+# The releases are AerieOS's own on GitHub; a test in the source tree
+# points this at a file (seams.py).
+RELEASES_URL = (seams.get("BB_APPS_RELEASES_URL")
                 or "https://api.github.com/repos/aquilaelabs/aerieos/releases")
 BOOT_DELAY = float(os.environ.get("BB_APPS_BOOT_DELAY") or 30)
 EVERY = 24 * 3600
@@ -76,8 +78,8 @@ APPS = {
 SAFE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,120}$")
 # Who may sign a release: this build's own copy of config/release-signers,
 # so a key is trusted because the install held it, never because a release
-# names it. A test names another file.
-SIGNERS = os.environ.get("BB_RELEASE_SIGNERS") or os.path.join(
+# names it. A test in the source tree names another file (seams.py).
+SIGNERS = seams.get("BB_RELEASE_SIGNERS") or os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "config", "release-signers")
 SIG_RELEASE, SIG_DEV = "aerieos-release", "aerieos-dev"
 SIGNED_BY = {SIG_RELEASE: "AerieOS's release key", SIG_DEV: "the key AerieOS's dev builds are signed with"}

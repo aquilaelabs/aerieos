@@ -1741,7 +1741,7 @@ rm -rf "$S/agentsrc"; cp -r "$DASH/../agent" "$S/agentsrc"
     BB_SERVICE_IMAGES_FILE="$S/service-images.json" BB_NGINX_CHECK_DELAY=3600 \
     BB_APPS_RELEASES_URL="file://$S/releases.json" BB_APPS_BOOT_DELAY=3600 \
     BB_RELEASE_SIGNERS="$S/release-signers" \
-    BB_TOOLPACKS_FILE_URLS=1 BB_SEAMS=1 \
+    BB_TOOLPACKS_FILE_URLS=1 \
     BB_IMAGE_DIGESTS_FILE="$S/image-digests.json" BB_IMAGE_CHECK_DELAY=3600 \
     BUILDERBOT_IDLE_UNIT=1 \
     BB_COMPAT_SWEEP=1 \
