@@ -713,8 +713,9 @@ class RunnersMixin:
                 env["HOME"] = pwd.getpwuid(who["user"]).pw_dir
         logf = os.path.join((self.state.get("stores") or {}).get("data") or "/tmp", "runner.log")
         try:
-            # By no link at its name: the data store may be the jobs account's.
-            out = os.fdopen(os.open(logf, os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW, 0o640), "ab")
+            # By no link at its name, and waiting on nothing: the data store
+            # may be the jobs account's, and a FIFO there held root's open.
+            out = os.fdopen(os.open(logf, os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK, 0o640), "ab")
             self.runner_procs[d] = subprocess.Popen(argv, cwd=d, env=env,
                                                     stdin=subprocess.DEVNULL, stdout=out, stderr=out,
                                                     start_new_session=True, **who)

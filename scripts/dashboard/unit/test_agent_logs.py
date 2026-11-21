@@ -61,6 +61,44 @@ class Files(unittest.TestCase):
         self.assertEqual(os.path.getsize(f + ".1"), 100)
         self.assertEqual(os.path.getsize(f), 0)
 
+    def in_time(self, fn, *args, **kw):
+        """What `fn` returned, run on a thread given three seconds; fails
+        where it is still waiting then (an open held by a FIFO)."""
+        import threading
+        got = []
+        t = threading.Thread(target=lambda: got.append(fn(*args, **kw)), daemon=True)
+        t.start()
+        t.join(3)
+        self.assertFalse(t.is_alive(), f"{fn.__name__} still waits")
+        return got[0]
+
+    def test_a_fifo_left_at_a_name_root_writes_holds_nothing(self):
+        # The final audit's 7: an account made a FIFO at the opened copy's
+        # temporary name in its own folder, and root's write waited for a
+        # reader, holding the one token pass every account waits on; the
+        # same at a log's earlier generation held the hello.
+        of = os.path.join(self.d, "claude.json")
+        os.mkfifo(of + ".new")
+        self.in_time(agent.write_atomic, of, b"{}", mode=0o600)
+        with open(of, "rb") as f:
+            self.assertEqual(f.read(), b"{}")
+        self.assertFalse(os.path.exists(of + ".new"))
+        self.assertEqual(os.stat(of).st_mode & 0o777, 0o600)
+        # ...and a link there is taken away, never written through.
+        elsewhere = os.path.join(self.d, "roots-own")
+        with open(elsewhere, "w") as f:
+            f.write("root's own")
+        os.symlink(elsewhere, of + ".new")
+        agent.write_atomic(of, "{}")
+        with open(elsewhere) as f:
+            self.assertEqual(f.read(), "root's own")
+        log = os.path.join(self.d, "runner.log")
+        with open(log, "w") as out:
+            out.write("x" * 100)
+        os.mkfifo(log + ".1")
+        self.assertTrue(self.in_time(agent.cap_file, log, 10))
+        self.assertEqual(os.path.getsize(log + ".1"), 100)
+
     def test_a_directory_keeps_its_newest(self):
         for i in range(5):
             p = os.path.join(self.d, f"Worker_{i}.log")

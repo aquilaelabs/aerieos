@@ -816,10 +816,11 @@ def cap_file(path, limit=NODE_LOG_MAX):
         st = os.fstat(fd)
         if not stat.S_ISREG(st.st_mode) or st.st_size <= limit:
             return False
+        # Made new, waiting on nothing: whatever is at the name (a link, a
+        # FIFO that would hold the hello this runs in) is taken away first.
         with contextlib.suppress(FileNotFoundError):
-            if os.path.islink(path + ".1"):
-                os.remove(path + ".1")
-        out = os.open(path + ".1", os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o640)
+            os.remove(path + ".1")
+        out = os.open(path + ".1", os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_NONBLOCK, 0o640)
         try:
             with open(fd, "rb", closefd=False) as src, open(out, "wb", closefd=False) as dst:
                 shutil.copyfileobj(src, dst)
@@ -1370,17 +1371,15 @@ def write_atomic(path, data, *, mode=None, uid=None, gid=None, makedirs=False, t
         os.makedirs(os.path.dirname(path), exist_ok=True)
     tmp = path + tmp_suffix
     how = {"mode": "w", "encoding": "utf-8"} if isinstance(data, str) else {"mode": "wb"}
-    # Through no link: the folder may be an account's (a home, a store), and
-    # a link left at the temporary name is taken away, never written or
-    # owned through.
-    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
-    try:
-        fd = os.open(tmp, flags, 0o666 if mode is None else mode)
-    except OSError:
-        if not os.path.islink(tmp):
-            raise
+    # Made new, through no link and waiting on nothing: the folder may be an
+    # account's (a home, a store, its folder of the opened sign-ins), and
+    # whatever was left at the temporary name is taken away first, never
+    # written or owned through. A FIFO there held root's open until a
+    # reader came, and with it the one pass every account's sign-in waits on.
+    with contextlib.suppress(FileNotFoundError):
         os.unlink(tmp)
-        fd = os.open(tmp, flags | os.O_EXCL, 0o666 if mode is None else mode)
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    fd = os.open(tmp, flags, 0o666 if mode is None else mode)
     with os.fdopen(fd, **how) as f:
         # Asked for only where the file is not as it was created: under a
         # umask that took bits away, or over a file already at this name.
