@@ -88,8 +88,8 @@ checkpoint = lambda: None     # noqa: E731 (configured: db.checkpoint)
 
 
 
-# What a bundle is called: .aeriemove, and .bbmove from an install older than the name.
-BUNDLE_SUFFIXES = (".aeriemove", ".bbmove")
+# What a bundle is called.
+BUNDLE_SUFFIX = ".aeriemove"
 
 
 def _key_beside_state(key, state_dir):
@@ -646,9 +646,9 @@ def split_form(src, content_type, file_field, dest, small=64 << 10):
 
 # The manifest line is plain, read before anything is opened, so it is held
 # to the body by a MAC under the bundle's key, checked once the body is
-# unpacked and before anything here changes (B724). A bundle that carries
-# the mark below as its first sealed entry has one, so a MAC taken off the
-# line is caught too; a bundle made before (no mark) lands as it did.
+# unpacked and before anything here changes (B724). Every bundle carries
+# the mark below as its first sealed entry, so a MAC taken off the line is
+# caught too, and a body with no mark is refused.
 MANIFEST_MARK = "bundle.json"
 
 
@@ -659,13 +659,13 @@ def _manifest_mac(key, m):
 
 def _manifest_held(path, key, work):
     """Why the manifest line is not the one the bundle was sealed with, or
-    "" when it is (or the bundle is from before manifests were held)."""
+    "" when it is."""
     try:
         mark = json.loads((Path(work) / MANIFEST_MARK).read_text())
     except (OSError, ValueError):
         mark = None
     if not isinstance(mark, dict) or not mark.get("mac"):
-        return ""
+        return "the bundle comes from a build too old to land here: nothing here was changed"
     try:
         with open(path, "rb") as f:
             f.readline()
@@ -840,9 +840,7 @@ def prepare(principal, to, repos=False, carry_key=False, stores=None):
     # nodes' knocks from the key kept here, under the state that moved.
     with _lock:
         d = _load()
-        for old in (STATE / "move").glob("*"):
-            if old.suffix not in BUNDLE_SUFFIXES:
-                continue
+        for old in (STATE / "move").glob("*" + BUNDLE_SUFFIX):
             old.unlink(missing_ok=True)
         d = {k: v for k, v in d.items() if k in ("moved_to", "moved_at")}
         d.update(made_at=made_at, to=to, bundle="", size=0, used=False, repos=bool(repos), carries_key=bool(carry_key),
@@ -904,9 +902,7 @@ def pack_bundle():
     out_dir.mkdir(parents=True, exist_ok=True)
     # Named to the millisecond: two packs in one second are two bundles.
     stamp = time.strftime("%Y%m%d-%H%M%S") + f"-{int(time.time() * 1000) % 1000:03d}"
-    # .aeriemove since the name moved; a .bbmove an older install packed
-    # still lands (only its contents are read), and is cleaned up as one.
-    name = f"aerieos-move-{stamp}.aeriemove"
+    name = f"aerieos-move-{stamp}{BUNDLE_SUFFIX}"
     tmp = out_dir / (name + ".partial")
 
     def manifest_of(counts):
@@ -918,7 +914,7 @@ def pack_bundle():
     # what moves, and kept while the new one was packed it took its room
     # twice over on a disk the bundle may only just fit.
     for old in out_dir.glob("*"):
-        if old.suffix in BUNDLE_SUFFIXES or old.name.endswith((".partial", ".body")):
+        if old.suffix == BUNDLE_SUFFIX or old.name.endswith((".partial", ".body")):
             old.unlink(missing_ok=True)
     try:
         manifest, counts = write_bundle(tmp, HEADER, manifest_of, key, repos=bool(d.get("repos")), carry_key=bool(d.get("carries_key")),
@@ -1006,9 +1002,7 @@ def forget(principal):
             return {"error": "no move is prepared"}
         if d.get("moved_to"):
             return {"error": "this controller has moved; the move is not withdrawn after it landed"}
-        for old in (STATE / "move").glob("*"):
-            if old.suffix not in BUNDLE_SUFFIXES:
-                continue
+        for old in (STATE / "move").glob("*" + BUNDLE_SUFFIX):
             old.unlink(missing_ok=True)
         d = {k: v for k, v in d.items() if k in ("moved_to", "moved_at")}
         _save(d)
@@ -1380,7 +1374,7 @@ def read_manifest(path):
         m = json.loads(line)
         if isinstance(m, dict) and head == BACKUP_HEADER:
             m["kind"] = "backup"
-        return (m, "") if isinstance(m, dict) and m.get("format") in (1, FORMAT) else (None, "a bundle of a format this build does not read")
+        return (m, "") if isinstance(m, dict) and m.get("format") == FORMAT else (None, "a bundle of a format this build does not read")
     except (OSError, ValueError) as e:
         return None, f"could not read the bundle: {e}"
 
@@ -1504,7 +1498,12 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
     m, why = read_manifest(path)
     if not m:
         return {"error": why}
-    if int(m.get("state_version") or 0) > here_ver:
+    # A bundle names the state it carries; one that names none is not landed.
+    try:
+        m["state_version"] = int(m.get("state_version") or 0)
+    except (TypeError, ValueError):
+        m["state_version"] = 0
+    if m["state_version"] > here_ver:
         # Named both ways, with what to do (B961): a stick cannot update
         # itself before a landing, so it is written again from a newer one.
         return {"error": f"the bundle comes from AerieOS {m.get('version') or 'a newer build'}, whose state (version {m.get('state_version')}) "
@@ -1512,7 +1511,7 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
                          f"Write this stick again from {m.get('version') or 'that release'} or newer with the USB maker (or update this install), then land it"}
     # ...nor a state this build does not read: it would land, and the next
     # start refuse it (B600).
-    if m.get("state_version") and int(m["state_version"]) < stateversion.SUPPORTED_FROM:
+    if m["state_version"] < stateversion.SUPPORTED_FROM:
         made_by = f"AerieOS {m['version']}" if m.get("version") else "an older build"
         return {"error": f"the bundle comes from {made_by}, which nothing updates from, so it cannot land here"}
     # A backup opens under the key its password derives (backup.py); a
@@ -1526,27 +1525,14 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
     wrong = "the bundle did not open under that " + ("password" if m.get("kind") == "backup" else "token")
     fh = open(path, "rb")
     fh.readline(); fh.readline()
-    if m.get("format") == 1:
-        # The format before was opened whole in memory; a bundle that big
-        # was never one of them (B724: the format is read from the plain line).
-        if os.path.getsize(path) > (2 << 30):
-            fh.close()
-            return {"error": "the bundle says it is of the format before, which was never this big: not opened"}
-        try:
-            src, mode = io.BytesIO(open_with(key, fh.read())), "r:gz"
-        except Exception:                                          # noqa: BLE001 (any failure to open is one answer)
-            fh.close()
-            return {"error": wrong}
+    # A piece at a time; the first opened here, so a wrong token is said as
+    # one before anything is unpacked.
+    src, mode = _Opener(fh, key), "r|gz"
+    try:
+        src._next()
+    except ValueError:
         fh.close()
-    else:
-        # A piece at a time; the first opened here, so a wrong token is said
-        # as one before anything is unpacked.
-        src, mode = _Opener(fh, key), "r|gz"
-        try:
-            src._next()
-        except ValueError:
-            fh.close()
-            return {"error": wrong}
+        return {"error": wrong}
     # Unpacked inside the state, or where the caller says (`work_root`: on a
     # stick, the projects folder on the machine's disks, never the stick).
     work = Path(tempfile.mkdtemp(prefix=".move-", dir=str(work_root or state_dir)))

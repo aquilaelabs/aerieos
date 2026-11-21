@@ -79,7 +79,7 @@ class Move(unittest.TestCase):
         head, pieces = self._pieces(path)
         self.assertEqual(json.loads(head.split(b"\n")[1])["format"], 2)
         self.assertGreater(len(pieces), 10)
-        bad = self.tmp / "bad.bbmove"
+        bad = self.tmp / "bad.aeriemove"
         for why, body in (("a piece dropped", pieces[:3] + pieces[4:]), ("two pieces swapped", [pieces[1], pieces[0]] + pieces[2:]),
                           ("the last piece missing", pieces[:-1]), ("junk after the last", pieces + [b"junk"])):
             bad.write_bytes(head + b"".join(body))
@@ -134,7 +134,7 @@ class Move(unittest.TestCase):
         # one its content does not hold) and line endings.
         blob = (os.urandom((1 << 20) - 7) + b"\r\n--XY" + b"\r\n" * 9 + os.urandom(3 << 20)).replace(b"XYZ", b"XYQ") * 2
         form = (b"--XYZ\r\nContent-Disposition: form-data; name=\"token\"\r\n\r\n tok-1 \r\n"
-                b"--XYZ\r\nContent-Disposition: form-data; name=\"bundle\"; filename=\"b.bbmove\"\r\n"
+                b"--XYZ\r\nContent-Disposition: form-data; name=\"bundle\"; filename=\"b.aeriemove\"\r\n"
                 b"Content-Type: application/octet-stream\r\n\r\n" + blob + b"\r\n"
                 b"--XYZ\r\nContent-Disposition: form-data; name=\"from\"\r\n\r\n\r\n--XYZ--\r\n")
         src, dest = self.tmp / "form", self.tmp / "file"
@@ -159,18 +159,29 @@ class Move(unittest.TestCase):
         with mock.patch.object(move.shutil, "disk_usage", return_value=mock.Mock(free=20 << 30)):
             self.assertEqual(move.room_for(5 << 30, self.tmp), "")
 
-    def test_a_bundle_of_the_format_before_still_lands(self):
+    def test_a_bundle_from_before_the_held_manifest_is_refused(self):
+        # A bundle of the format before, one whose body carries no mark, and
+        # one whose manifest names no state: each refused, nothing changed.
         r = move.prepare("user:ann", "https://new.example")
         token = r["token"]
         raw, counts = move.pack()
         m = {"format": 1, "version": "0.9.0", "state_version": 27, "made_at": 1, "packed_at": 1, "from": "https://old.example/",
              "to": "https://new.example", "repos": False, "carries_key": False, "nodes": ["n_1"], "bare_metal": False, "counts": counts,
              "token_hash": move.token_hash(token)}
-        old = self.tmp / "old.bbmove"
+        old = self.tmp / "old.aeriemove"
         old.write_bytes(move.HEADER + json.dumps(m).encode() + b"\n" + signing.seal(raw, move.key_of(token)))
-        got = self._land(old, token)
-        self.assertTrue(got.get("ok"), got)
-        self.assertTrue((self.tmp / "new-config" / "users.json").is_file())
+        self.assertIn("format this build does not read", self._land(old, token).get("error", ""))
+        with mock.patch.object(move, "MANIFEST_MARK", "elsewhere.json"):
+            r = move.prepare("user:ann", "https://new.example")
+        got = self._land(move.bundle_path(), r["token"])
+        self.assertIn("too old to land here", got.get("error", ""))
+        with mock.patch.object(move, "state_version", lambda: 0):
+            r = move.prepare("user:ann", "https://new.example")
+        self.assertEqual(json.loads(move.bundle_path().read_bytes().split(b"\n")[1])["state_version"], 0)
+        got = self._land(move.bundle_path(), r["token"])
+        self.assertIn("nothing updates from", got.get("error", ""))
+        self.assertFalse((self.tmp / "new-config" / "users.json").exists(), "nothing here changed")
+        self.assertEqual([p.suffix for p in (self.state / "move").iterdir()], [".aeriemove"], "the bundle before went with the next")
 
     def test_a_manifest_changed_after_the_bundle_was_made_is_refused(self):
         # B724: the plain line's origin, kind and versions were believed.
@@ -183,7 +194,7 @@ class Move(unittest.TestCase):
                           ("mac taken off", lambda x: x.pop("mac"))):
             changed = dict(m)
             edit(changed)
-            bad = self.tmp / f"bad-{len(why)}.bbmove"
+            bad = self.tmp / f"bad-{len(why)}.aeriemove"
             bad.write_bytes(head + b"\n" + json.dumps(changed).encode() + b"\n" + body)
             got = self._land(bad, r["token"])
             self.assertIn("outer details were changed", got.get("error", ""), why)
