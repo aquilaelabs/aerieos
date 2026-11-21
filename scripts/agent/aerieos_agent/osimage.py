@@ -801,7 +801,7 @@ class OsImageMixin:
         at = f"{env_or('BB_OS_RELEASE_URL', RELEASE_URL)}/{rtag}"
         keys, listed, who = signers(), None, ""
         if not keys:
-            say("refused: this install names nobody who may sign a release: nothing written\n")
+            say("refused: this install names no release signer: nothing written\n")
             return "failed", 69
         if keys:
             if why := unsignable(rtag, keys):

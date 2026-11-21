@@ -336,12 +336,11 @@ def signed_list(tag, name):
     """({file: sha256}, who signed it) for release `tag`'s SHA256SUMS, fetched
     and verified against this tool's signers, with the file `name` in it;
     stops when the list is unsigned, signed by nobody this tool names or by
-    somebody the tag may not have, or does not name the file. (None, "")
-    only while this tool holds no key at all, which is said."""
+    somebody the tag may not have, or does not name the file, and when this
+    tool names no signer at all: every release's copy of it carries them."""
     keys = signers()
     if not keys:
-        say("no release key is set in this tool, so the release's signature is not checked")
-        return None, ""
+        die("this tool names no release signer, so the release's signature cannot be checked: not written")
     if not tag:
         die(f"{name} does not name its release, so its signature cannot be checked: use the release's own file name")
     may = tag_namespaces(tag)
@@ -394,11 +393,9 @@ def signed(tag, path, got=None):
     """The image's own bytes are the ones its release's signed list names,
     whatever the sha256 beside it says; stops when they are not. `got` is
     signed_list's answer where the list was read before the image was
-    fetched. Said and passed over only while this tool holds no key at all."""
+    fetched."""
     name = os.path.basename(path)
     listed, who = got if got is not None else signed_list(tag, name)
-    if listed is None:
-        return
     h = hashlib.sha256()
     with open(path, "rb") as f:
         for chunk in iter(lambda: f.read(CHUNK), b""):

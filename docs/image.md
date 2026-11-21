@@ -607,9 +607,9 @@ release. A release whose list is missing (every release made before
 releases were signed, and a stable one its holder has not signed yet),
 signed by no key the install names, or signed in a namespace its tag may
 not use is refused with the reason, and so is a stable release while
-`config/release-signers` names no stable signer yet. Only an install whose
-file holds no key at all skips the check, and says so, which is how a
-build from before the file reached an install behaves. Both signing modes
+`config/release-signers` names no stable signer yet. An install whose
+file names no signer at all takes no release: every build ships the file,
+so one without it has lost it. Both signing modes
 make the list from the files themselves, downloaded and hashed, never from
 the sha256 files the release carries. The stable key's fingerprint is
 published on aerieos.org to check the file against.

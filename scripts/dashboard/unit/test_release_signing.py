@@ -110,7 +110,8 @@ TABLE = [
     Case("a stable release while no stable signer is named", STABLE, (("dev", DEV),), ("release", REL), False,
          "no stable signer is named yet"),
     Case("a release with no signed list, the install naming a signer", PRE, BOTH, None, False, "made before releases were signed"),
-    Case("a release with no signed list, the install naming no signer", PRE, (), None, True, "signature is not checked"),
+    Case("a release with no signed list, the install naming no signer", PRE, (), None, False, "names no release signer"),
+    Case("a signed dev build, the install naming no signer", PRE, (), ("dev", DEV), False, "names no release signer"),
     Case("a list signed by a key the install does not name", PRE, BOTH, ("stranger", DEV), False, "signed by no key"),
     Case("the release build's key signing as the stable key", STABLE, BOTH, ("dev", REL), False, "signed by no key"),
     Case("a list changed after it was signed", PRE, BOTH, ("dev", DEV), False, "signed by no key", changed=True),
@@ -146,22 +147,13 @@ class Table(unittest.TestCase):
             f.write("# who may sign a release\n" + "".join(ln + "\n" for ln in case.lines()))
         return path
 
-    # A verifier's own verdict for a case, where it is not the table's:
-    # {case name: (taken, says)}.
-    OWN = {}
-
-    def expects(self, case):
-        """(taken, what is said) for a case: the verifier's own word for it
-        (OWN), else the table's."""
-        return self.OWN.get(case.name, (case.taken, case.says))
 
     def run_table(self):
         for case in TABLE:
             with self.subTest(case.name):
                 taken, said = self.verdict(case)
-                want, says = self.expects(case)
-                self.assertEqual(taken, want, f"{case.name}: {said}")
-                self.assertIn(says, said, case.name)
+                self.assertEqual(taken, case.taken, f"{case.name}: {said}")
+                self.assertIn(case.says, said, case.name)
 
 
 class TheOsUpdater(Table):
@@ -215,12 +207,6 @@ class TheOsUpdater(Table):
         self.assertEqual(written, state == "succeeded", "a refused update writes nothing to the other slot")
         return state == "succeeded", job.text()
 
-    def expects(self, case):
-        # An install that names no signer takes no update: every build
-        # ships the file that names them.
-        if not case.signers:
-            return False, "this install names nobody who may sign a release"
-        return case.taken, case.says
 
     def test_a_release_named_by_its_tag(self):
         self.verdict = lambda case: self.update(case, False)
@@ -245,7 +231,6 @@ class TheInstaller(Table):
     curl and gh stood in on the PATH. An update on a machine of its own
     takes nothing where the install names no signer: its tree always ships
     the file, so one without it is not a release's tree."""
-    OWN = {"a release with no signed list, the install naming no signer": (False, "names no release signer")}
 
     def test_a_signed_release_is_not_taken_either_while_no_signer_is_named(self):
         for signers in ((), None):
@@ -446,38 +431,6 @@ class TheLibrarysDownloads(Table):
             v = apps.check()
         self.assertIn("carries no signed list of its files (SHA256SUMS and SHA256SUMS.sig): it was made before releases were signed", v["problem"])
         self.assertNotIn("'", v["problem"].split("its key's holder")[0])
-
-    def test_a_file_held_from_before_the_list_was_asked_goes_when_the_list_names_other_bytes(self):
-        # An install that came from a build with no signer holds what the
-        # sha256 beside the file passed; the first look with a signer holds
-        # it to the list.
-        d = Path(self.fresh())
-
-        def write(path, data):
-            Path(path).parent.mkdir(parents=True, exist_ok=True)
-            Path(path).write_text(json.dumps(data))
-        apps.configure(state=d / "state", version=lambda: PRE[1:], setting={"apps_android": True}.get, write_json=write)
-        rel = d / "rel"
-        rel.mkdir()
-        name = f"aerieos-app-{PRE[1:]}.apk"
-        (rel / name).write_bytes(b"not the app")
-        (rel / (name + ".sha256")).write_text(sha(b"not the app") + f"  {name}\n")
-
-        def look(case):
-            assets = [{"name": p.name, "browser_download_url": f"file://{p}"} for p in sorted(rel.iterdir())]
-            (d / "releases.json").write_text(json.dumps([{"tag_name": PRE, "assets": assets}]))
-            with mock.patch.multiple(apps, RELEASES_URL=f"file://{d / 'releases.json'}", SIGNERS=self.signers_file(case, str(d)),
-                                     unvetted_ok=lambda: False):
-                return apps.check(), apps.path("android", name)
-        v, held = look(TABLE[6])
-        self.assertTrue(held, v)
-        self.assertEqual(v["signature"], apps.UNCHECKED)
-        TABLE[0].publish(str(rel), name, sha(b"an apk"))
-        v, held = look(TABLE[0])
-        self.assertIsNone(held)
-        self.assertFalse((d / "state" / "apps" / "android" / name).exists())
-        self.assertIn("is not the file", v["problem"])
-
 
 class OneRule(unittest.TestCase):
     """What the four must agree on before any signature is read."""

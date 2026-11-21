@@ -81,7 +81,7 @@ SIGNERS = os.environ.get("BB_RELEASE_SIGNERS") or os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "config", "release-signers")
 SIG_RELEASE, SIG_DEV = "aerieos-release", "aerieos-dev"
 SIGNED_BY = {SIG_RELEASE: "AerieOS's release key", SIG_DEV: "the key AerieOS's dev builds are signed with"}
-UNCHECKED = "this install holds no release key yet, so the release's signature is not checked"
+NO_SIGNER = "this install names no release signer, so the release's signature cannot be checked"
 
 # Each set by configure(); the defaults are the container's own paths.
 DIR = Path("/config") / "apps"
@@ -214,12 +214,13 @@ def signers():
 def _signed_list(rel):
     """({file: sha256}, what to say of it, "") for release `rel`'s SHA256SUMS
     when its signature is one the tag may carry, by a key this install
-    names; (None, the sentence, "") when this install names no signer, so
-    nothing is checked; (None, "", why) when the release is refused."""
+    names; (None, "", why) when the release is refused, as it is when this
+    install names no signer: every build ships the file that names them,
+    so an install without one has lost it."""
     keys = signers()
     tag = str(rel.get("tag_name") or "")
     if not keys:
-        return None, UNCHECKED, ""
+        return None, "", NO_SIGNER
     kind = releasecheck.tag_kind(tag)
     if not kind:
         return None, "", f"{tag} is not a release's tag (vX.Y.Z, or vX.Y.Z-dev.N for a pre-release), so who may sign it cannot be told"
