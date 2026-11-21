@@ -13,6 +13,7 @@ pack, a shipped row, a catalog's newer row and a coding agent's recipe."""
 import copy
 import json
 import os
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -70,6 +71,20 @@ class Families(unittest.TestCase):
         self.assertTrue(packformat.system_name_ok("dev-libs/icu", "emerge"))
         for bad, mgr in (("dev-libs/icu", "apt"), ("dev-libs/icu", ""), ("a/b/c", "emerge"), ("-a/b", "emerge"), ("a/b-", "emerge"), ("a/", "emerge")):
             self.assertFalse(packformat.system_name_ok(bad, mgr), (bad, mgr))
+
+    def test_no_shipped_step_turns_its_installer_s_own_checks_off(self):
+        # The .NET row's workload step ran with --skip-sign-check: on a
+        # node that cannot cut its network it fetched with the packs'
+        # signatures unchecked while the card read pinned (the audit of 21
+        # Nov). A row that says its installer downloads the rest leaves
+        # that installer's own checks on.
+        off = re.compile(r"^--?(skip-sign|no-verify|insecure|allow-unauthenticated|nogpgcheck|no-check-certificate|disable-signature)", re.I)
+        for r in SHIPPED:
+            for step in (r.get("source") or {}).get("then") or []:
+                for word in step.get("run") or []:
+                    self.assertIsNone(off.match(str(word)), (r["name"], word))
+        dotnet = next(r for r in SHIPPED if r["name"] == "dotnet")
+        self.assertEqual(dotnet["source"]["then"][0]["run"], ["{dir}/dotnet", "workload", "install", "maui-android"])
 
     def test_every_shipped_row_s_system_packages_are_names_and_a_catalog_s_row_is_held_to_them(self):
         for r in SHIPPED:

@@ -782,8 +782,7 @@
               "{dir}/dotnet",
               "workload",
               "install",
-              "maui-android",
-              "--skip-sign-check"
+              "maui-android"
             ],
             "env": {
               "DOTNET_ROOT": "{dir}",
@@ -815,7 +814,7 @@
           "url": "https://github.com/dotnet/maui/blob/main/LICENSE.txt"
         }
       ],
-      "rev": 2
+      "rev": 3
     },
     {
       "name": "node",

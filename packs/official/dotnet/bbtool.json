@@ -21,7 +21,7 @@
  "shipped": {
   "probe": "dotnet",
   "reports": "dotnet",
-  "rev": 2,
+  "rev": 3,
   "source": {
    "checksum": {
     "from": "pin",
@@ -47,8 +47,7 @@
       "{dir}/dotnet",
       "workload",
       "install",
-      "maui-android",
-      "--skip-sign-check"
+      "maui-android"
      ]
     }
    ],
