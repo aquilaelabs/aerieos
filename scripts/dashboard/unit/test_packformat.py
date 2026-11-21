@@ -273,8 +273,8 @@ class Images(unittest.TestCase):
         self.assertIn("not pinned", packformat.image_refused("web:latest"))
         self.assertIn("no image reference", packformat.image_refused("web:1@sha256:abc"))
 
-    def test_a_person_reads_the_tag_and_a_short_prefix_of_the_digest(self):
-        self.assertEqual(packformat.image_said(f"ghcr.io/example/web:2@{self.D}"), "ghcr.io/example/web:2 (4f4f4f4f4f4f)")
+    def test_a_person_reads_the_name_and_tag_and_never_the_digest(self):
+        self.assertEqual(packformat.image_said(f"ghcr.io/example/web:2@{self.D}"), "ghcr.io/example/web:2")
         self.assertEqual(packformat.image_said("web:2"), "web:2")
 
     def test_an_entry_s_images_are_each_a_tag_and_a_digest_under_a_plain_name(self):

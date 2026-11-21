@@ -57,6 +57,7 @@ class FarNodes(unittest.TestCase):
         self.assertEqual(move.far_nodes("http://192.168.1.15:7680", nodes), ["vps2"], "one enrolled at the public hostname keeps it")
         said = move.far_said(["vps2"], "http://192.168.1.15:7680")
         self.assertIn("Reach from outside", said)
+        self.assertNotIn(". ", said, "one sentence")
         self.assertNotIn("the line the new home", said, "that line names the new home's local address too")
 
     def test_a_public_name_or_address_names_none(self):

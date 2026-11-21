@@ -893,7 +893,7 @@ def far_said(far, to):
     one = len(far) == 1
     return (f"{', '.join(far)} {'dials' if one else 'dial'} in from outside this network, so {to} cannot be reached from "
             f"{'it' if one else 'them'}: prepare the move with an address {'it reaches' if one else 'they reach'}, or enroll "
-            f"{'it' if one else 'them'} again at a public hostname first")
+            f"{'it' if one else 'them'} again first at the hostname Reach from outside gives this controller")
 
 
 def pack_bundle():
