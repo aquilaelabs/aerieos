@@ -1,6 +1,6 @@
 """Every account a Unix user of its own on every node, and the coding
 agents' sign-ins sealed there (R125 step 11 and R126 step 6, the operator,
-26 Oct): the two switches went in 0.9.0, a key an older build left reads as
+26 Oct): there is no switch for either, a key an older build left reads as
 on, and a hosting-only node, which runs no sessions, is neither."""
 import sys
 import tempfile
@@ -28,8 +28,15 @@ class AlwaysOn(unittest.TestCase):
         # ...and sealing waits on an install key to make each account's key from.
         nodes.can_seal = lambda: False
         self.assertEqual((nodes.account_users_on("a"), nodes.token_seal_on("a")), (True, False))
-        self.assertIn("went in 0.9.0", nodes.node_account_users("user:t", "a", False).get("error", ""))
-        self.assertIn("went in 0.9.0", nodes.node_token_seal("user:t", "a", True).get("error", ""))
+
+    def test_no_switch_is_left_to_ask_for(self):
+        # The switches' verbs answered "went in 0.9.0" for a page from 0.8;
+        # they are unknown actions now, with no handler behind them.
+        import nodes
+        for name in ("node_account_users", "node_token_seal", "node_session_net", "node_container_net"):
+            self.assertFalse(hasattr(nodes, name), name)
+        for act in ("account-users", "token-seal"):
+            self.assertEqual(nodes.verb("user:t", {"action": act, "id": "a", "on": True}), ({"error": "unknown action"}, 400))
 
 
 class Hello(unittest.TestCase):

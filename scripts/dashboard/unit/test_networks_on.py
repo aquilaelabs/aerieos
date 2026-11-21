@@ -42,8 +42,6 @@ class ReadsAsOn(unittest.TestCase):
         self.assertEqual((nodes.session_net_on("h"), nodes.container_net_on("h")), (False, True))
         # The switches went in 0.9.0 (R146): a key an older build left reads as on.
         self.assertEqual((nodes.session_net_on("x"), nodes.container_net_on("x")), (True, True))
-        self.assertIn("went in 0.9.0", nodes.node_session_net("user:t", "x", False).get("error", ""))
-        self.assertIn("went in 0.9.0", nodes.node_container_net("user:t", "x", False).get("error", ""))
 
 
 if __name__ == "__main__":

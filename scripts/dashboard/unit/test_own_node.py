@@ -61,9 +61,7 @@ class OwnRow(unittest.TestCase):
     def test_its_session_network_stays_on_and_it_hosts_no_containers(self):
         mint(self.state, "nas", "--own")
         n = self.row("nas")
-        # The switch went in 0.9.0 (R146): its sessions' own network is a fact.
-        r = self.nodes.node_session_net("user:t", n["id"], False)
-        self.assertIn("went in 0.9.0", r.get("error", ""))
+        # Its sessions' own network is a fact (R146), with no switch.
         self.assertTrue(self.nodes.session_net_on(n["id"]))
         r = self.nodes.node_update("user:t", n["id"], {"capabilities": ["package-build", "docker-host"]})
         self.assertIn("root agent", r.get("error", ""))

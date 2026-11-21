@@ -2939,14 +2939,6 @@ def node_turn_limit(principal, node_id, limit):
     return {"ok": True, "limit": want}
 
 
-def node_session_net(principal, node_id, on):
-    """The switch that kept each session to its own project's network went
-    in 0.9.0 (R146, the operator, 26 Oct): every session is, on every node
-    that runs them."""
-    del principal, node_id, on
-    return {"error": "every session is kept to its own space's network now: the switch went in 0.9.0"}
-
-
 def node_vm_of(node_id, host_id):
     """A node that is a VM AerieOS made on another node (R91 step 14),
     said on its row; retired with the VM."""
@@ -2993,27 +2985,12 @@ def node_root_asks(principal, node_id, on):
     return {"ok": True, "on": bool(on)}
 
 
-def node_account_users(principal, node_id, on):
-    """The switch that ran each account as a Unix user of its own went in
-    0.9.0 (R125 step 11, the operator, 26 Oct): every account is, on every
-    node that runs sessions."""
-    del principal, node_id, on
-    return {"error": "every account runs as a user of its own on every node now: the switch went in 0.9.0"}
-
-
 def account_users_on(nid):
     """Each account a Unix user of its own on this node (R125): on wherever
     sessions run, which is every node but a hosting-only one. The config's
     switch, a dev feature in 0.8.x, is gone (R125 step 11) and a key an
     older build left is read as on."""
     return not host_only(nid)
-
-
-def node_token_seal(principal, node_id, on):
-    """The switch that kept the coding agents' sign-ins sealed went in 0.9.0
-    (R126 step 6): they are, on every node that runs sessions."""
-    del principal, node_id, on
-    return {"error": "the coding agents' sign-ins are sealed on every node now: the switch went in 0.9.0"}
 
 
 def token_seal_on(nid):
@@ -3081,13 +3058,6 @@ def container_net_on(node_id):
     left is read as on."""
     del node_id
     return True
-
-
-def node_container_net(principal, node_id, on):
-    """The switch went in 0.9.0 (R146): every project's containers are kept
-    to their own network on every node."""
-    del principal, node_id, on
-    return {"error": "every space's containers are kept to their own network now: the switch went in 0.9.0"}
 
 
 def ports_local_on(node_id):
@@ -4490,8 +4460,6 @@ def node_storage_array(principal, node_id, req):
             return {"error": "nothing is adopted on the machine: adopt the old system's disks first"}
         if ad.get("taken"):
             return {"error": "the adopted array is taken over already"}
-        if "taken" not in ad:
-            return {"error": f"{n['name']}'s agent is from before the takeover: it updates itself within the hour"}
         why = _degraded_why("taking the array over formats the old parity, which holds their only copy") or _takeover_gaps_why(ad)
         if why:
             return {"error": why}
@@ -4520,8 +4488,6 @@ def node_storage_array(principal, node_id, req):
     elif action == "moves":
         if not have.get("adopted"):
             return {"error": "a share's places are for an array taken over from another system"}
-        if not isinstance(have.get("moves"), list):
-            return {"error": f"{n['name']}'s agent is from before a share's places could be set: it updates itself within the hour"}
         ad = rep.get("adopted") if isinstance(rep.get("adopted"), dict) else {}
         cfg["moves"], err = moves_cfg(req.get("moves"), _adopted_pools(ad))
         if err:
@@ -4529,10 +4495,8 @@ def node_storage_array(principal, node_id, req):
         if not cfg["moves"]:
             return {"error": "no share's places to set"}
     elif action == "verify":
-        # Check parity (R163 step 15): an agent that has it says its last
-        # one in the census, even as none yet.
-        if "verify" not in have:
-            return {"error": f"{n['name']}'s agent is from before Check parity: it updates itself within the hour"}
+        # Check parity (R163 step 15), and with `correct` the blocks that
+        # differ written back.
         cfg["correct"] = req.get("correct") is True
     why = _reachable(n)
     if why:
@@ -4949,8 +4913,6 @@ def node_storage_pool(principal, node_id, req):
         cfg["confirm"] = name
     elif action == "import":
         # A pool another machine made (R163 step 1), as the census lists it.
-        if "pools_importable" not in rep:
-            return {"error": f"{n['name']}'s agent is from before importing a pool: it updates itself within the hour"}
         found = next((x for x in rep.get("pools_importable") or [] if x.get("name") == name), None)
         if not found:
             return {"error": f"no pool called {name} is waiting to be imported on {n['name']}"}
@@ -8583,14 +8545,6 @@ def verb(principal, req):
         # all. An administrator's, like the rest.
         return node_root_asks(principal, nid, req.get("on") is True)
 
-    def account_users():
-        # Each account a Unix user of its own there (R125).
-        return node_account_users(principal, nid, req.get("on") is True)
-
-    def token_seal():
-        # Its coding agents' sign-ins sealed there (R126).
-        return node_token_seal(principal, nid, req.get("on") is True)
-
     def apply():
         return node_apply(principal, nid, field(req, "what"))
 
@@ -8743,7 +8697,7 @@ def verb(principal, req):
              "gpu-compute": gpu_compute,
              "config": config, "turns": turns,
              "test-workers": test_workers, "ports-local": ports_local,
-             "root-asks": root_asks, "account-users": account_users, "token-seal": token_seal, "apply": apply, "to-sync": to_sync, "sync-stop": sync_stop,
+             "root-asks": root_asks, "apply": apply, "to-sync": to_sync, "sync-stop": sync_stop,
              "host-only": host_on, "host-off": host_off,
              "door": lambda: node_door(principal, nid, req.get("on")),
              "lockdown": lambda: node_lockdown(principal, nid),

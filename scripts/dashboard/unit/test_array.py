@@ -589,9 +589,9 @@ class TheController(unittest.TestCase):
                 nodes.node_storage_array("user:t", "n1", {"array": "takeover", "dry": True})
             self.assertEqual(add.call_args[0][3]["config"]["moves"], [{"share": "TV Shows", "land": "cache", "from": "cache", "to": "array"}])
             # Later, one share at a time, from an agent that has it.
-            n["reported"]["array"] = {"data": [{"slot": 1}], "adopted": True, "moves": 3}
-            self.assertIn("from before", nodes.node_storage_array("user:t", "n1", {"array": "moves", "moves": mv[:1]})["error"])
-            n["reported"]["array"]["moves"] = []
+            # Every agent in this window says its places, as none or not:
+            # no word on the agent's age.
+            n["reported"]["array"] = {"data": [{"slot": 1}], "adopted": True}
             r = nodes.node_storage_array("user:t", "n1", {"array": "moves", "moves": mv[1:]})
             self.assertEqual(add.call_args[0][3]["config"], {"array": "moves", "moves": mv[1:]}, r)
             self.assertIn("no share's places", nodes.node_storage_array("user:t", "n1", {"array": "moves", "moves": []})["error"])
@@ -621,8 +621,9 @@ class TheController(unittest.TestCase):
             self.assertIn("typed again", nodes.node_storage_array("user:t", "n1", {"array": "destroy"})["error"])
             r = nodes.node_storage_array("user:t", "n1", {"array": "check"})
             self.assertEqual(add.call_args[0][3]["timeout"], 900)
-            self.assertIn("from before Check parity", nodes.node_storage_array("user:t", "n1", {"array": "verify"})["error"])
-            n["reported"]["array"]["verify"] = {}
+            # Every agent in this window has Check parity, its last result
+            # in the census or not: no word on the agent's age.
+            self.assertNotIn("verify", n["reported"]["array"])
             r = nodes.node_storage_array("user:t", "n1", {"array": "verify", "correct": True})
             self.assertTrue(r.get("ok"), r)
             self.assertEqual((add.call_args[0][3]["config"], add.call_args[0][3]["timeout"]), ({"array": "verify", "correct": True}, 172800))

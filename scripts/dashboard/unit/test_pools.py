@@ -327,8 +327,10 @@ class TheController(unittest.TestCase):
             self.assertIn("name typed again", nodes.node_storage_pool("user:t", "n1", {"pool": "import", "name": "nas", "force": True, "confirm": "na"})["error"])
             r = nodes.node_storage_pool("user:t", "n1", {"pool": "import", "name": "nas", "force": True, "confirm": "nas"})
             self.assertEqual(add.call_args[0][3]["config"], {"pool": "import", "name": "nas", "id": "123", "force": True, "confirm": "nas"})
+            # A census with no list says no pool waits: no word on the agent's age.
             del n["reported"]["pools_importable"]
-            self.assertIn("from before importing", nodes.node_storage_pool("user:t", "n1", {"pool": "import", "name": "nas"})["error"])
+            self.assertEqual(nodes.node_storage_pool("user:t", "n1", {"pool": "import", "name": "nas"})["error"],
+                             "no pool called nas is waiting to be imported on box")
 
     def test_the_census_keeps_each_pools_snapshots_to_their_shape(self):
         import nodes
