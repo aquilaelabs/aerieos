@@ -537,6 +537,6 @@ docs/design-language.md          what the dashboard's surfaces owe each other: h
   dashboard.yml                  the dashboard's browser suites, on a pull request that changes what they test and before a release's tag publishes, on this runner
   android-app.yml                the companion app's build: on a push to main that touches it, as a job of a tag's run (the unsigned APK handed to the controller to sign), or by hand
   companion-app.yml              the Windows companion's .exe, the .pyz and the VS Code extension: as a job of a tag's run, its files attested and handed to that run's last job, or by hand for a release that exists, attached to it
-  release-rehearsal.yml          every build a release's tag runs and every check it is held to, on a branch by hand or aerie version rehearse, publishing nothing; and the seal's steps dry, with a key made in the job
+  release-rehearsal.yml          every build a release's tag runs and every check it is held to, on a branch by hand or aerie version rehearse, publishing nothing; and the seal's steps dry, with a key made in the job, the Android app among the files, signed with a key of the job's and held to it by the runner's apksigner
   runner-smoke-test.yml          proves this runner picks up jobs, carries its toolchain and cannot see the shielded PAT (manual)
 ```

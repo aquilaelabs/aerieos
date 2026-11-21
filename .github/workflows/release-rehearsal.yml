@@ -99,6 +99,7 @@ jobs:
     uses: ./.github/workflows/android-app.yml
     with:
       hosted: true
+      rehearse: true
     permissions:
       contents: read
 
@@ -168,6 +169,13 @@ jobs:
           pattern: release-*
           path: rel
           merge-multiple: true
+      # The unsigned APK, which a release's controller signs and attaches
+      # before the seal: signed below with a key of this run's.
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0, pinned by commit (R206)
+        if: needs.android.result == 'success'
+        with:
+          name: rehearsal-apk
+          path: ${{ runner.temp }}/apk
       # The seal, dry (seal-release.yml's own steps, over what this run
       # built): the pinned library in a step of its own, then the list made
       # and signed with a key of this run's. Where the bundle was built at
@@ -182,6 +190,7 @@ jobs:
         shell: bash
         env:
           PYTHONPATH: ${{ runner.temp }}/release-lib
+          ANDROID: ${{ needs.android.result }}
         run: |
           set -euo pipefail
           dry="$RUNNER_TEMP/dry"
@@ -195,7 +204,46 @@ jobs:
           python3 tools/release-sign.py signer > "$dry/release-signers"
           # A dev build's tag by its shape; nothing is looked up by it.
           tag="v$(head -1 VERSION | tr -d '[:space:]')-dev.0"
-          python3 tools/release-sign.py seal "$tag" --from "$dry/files" --signers "$dry/release-signers" --out "$dry/sealed"
+          # The Android app signed as a release's is, with a key of this
+          # run's, and its certificate the one the seal may take: so the
+          # seal's check of the app runs on this runner's own apksigner, as
+          # a tag's does (v0.9.0-dev.6049's found no signer in the newer
+          # build-tools' way of saying one).
+          apk="" signers=()
+          for f in "$RUNNER_TEMP"/apk/*.apk; do
+            if [ -e "$f" ]; then apk="$f"; fi
+          done
+          if [ -n "$apk" ]; then
+            aps="$(command -v apksigner || find "$ANDROID_HOME"/build-tools -mindepth 2 -maxdepth 2 -name apksigner | sort -V | tail -1)"
+            align="$(command -v zipalign || find "$ANDROID_HOME"/build-tools -mindepth 2 -maxdepth 2 -name zipalign | sort -V | tail -1)"
+            keytool -genkeypair -keystore "$RUNNER_TEMP/rehearsal.ks" -storepass rehearsal -keypass rehearsal -alias rehearsal \
+              -keyalg RSA -keysize 2048 -validity 1 -dname "CN=AerieOS rehearsal" >/dev/null 2>&1
+            "$align" -p -f 4 "$apk" "$RUNNER_TEMP/aligned.apk"
+            # Signed beside the files, not among them: apksigner writes a v4
+            # signature file next to what it signs, which no release carries.
+            "$aps" sign --ks "$RUNNER_TEMP/rehearsal.ks" --ks-pass pass:rehearsal --out "$RUNNER_TEMP/signed.apk" \
+              "$RUNNER_TEMP/aligned.apk"
+            cp "$RUNNER_TEMP/signed.apk" "$dry/files/aerieos-app-rehearsal.apk"
+            keytool -list -v -keystore "$RUNNER_TEMP/rehearsal.ks" -storepass rehearsal \
+              | sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' > "$dry/apk-signers"
+            signers=(--apk-signers "$dry/apk-signers")
+          elif [ "$ANDROID" = success ]; then
+            echo "::error::the Android build passed and handed no APK to the dry seal"
+            exit 1
+          fi
+          python3 tools/release-sign.py seal "$tag" --from "$dry/files" --signers "$dry/release-signers" --out "$dry/sealed" \
+            "${signers[@]}" | tee "$dry/seal.log"
+          if [ -n "$apk" ]; then
+            grep -q "aerieos-app-rehearsal.apk  (apksigner verifies it as signed by a certificate config/apk-signers names)" "$dry/seal.log" \
+              || { echo "::error::the dry seal listed the Android app without apksigner holding it to the certificate it was signed with"; exit 1; }
+            # ...and one it was not signed with is refused, naming the certificate apksigner said.
+            if python3 tools/release-sign.py seal "$tag" --from "$dry/files" --signers "$dry/release-signers" --out "$dry/refused" \
+                 > "$dry/refused.log" 2>&1 || ! grep -q "is signed by a certificate config/apk-signers does not name" "$dry/refused.log"; then
+              cat "$dry/refused.log"
+              echo "::error::the dry seal took an Android app signed by a certificate config/apk-signers does not name"
+              exit 1
+            fi
+          fi
           # ssh-keygen takes the signature against the file written for the
           # key, as an install takes a release's against its own...
           ssh-keygen -Y verify -f "$dry/release-signers" -I aerieos-dev -n aerieos-dev \

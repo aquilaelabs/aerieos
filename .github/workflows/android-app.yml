@@ -54,13 +54,18 @@ on:
   # Called by a tag's run (build-image.yml, R206 step 1) with the tag, as a
   # release's own build; and a release rehearsed (release-rehearsal.yml,
   # R190 step 2): a plain build of the branch on the hosted runner a tag's
-  # run builds on, handed to nobody.
+  # run builds on, handed to nobody but the rehearsal's own dry seal
+  # (`rehearse`), which signs it with a key of its own and seals it as a
+  # release's signed APK is sealed.
   workflow_call:
     inputs:
       tag:
         type: string
         default: ""
       hosted:
+        type: boolean
+        default: false
+      rehearse:
         type: boolean
         default: false
 
@@ -224,6 +229,17 @@ jobs:
           name: bb-release-apk-${{ steps.name.outputs.tag }}
           path: release-apk/*.apk
           retention-days: 3
+          if-no-files-found: error
+
+      # A rehearsal's: the unsigned APK to its own dry seal, under a name the
+      # controller never fetches, for a day.
+      - name: Hand the unsigned APK to the rehearsal's dry seal
+        if: inputs.rehearse && steps.name.outputs.tag == ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9   # v7.0.2, pinned by commit (B274)
+        with:
+          name: rehearsal-apk
+          path: ${{ steps.name.outputs.file }}
+          retention-days: 1
           if-no-files-found: error
 
       - name: Close the log

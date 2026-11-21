@@ -533,7 +533,11 @@ runs (the controller bundle packed, the OS image built and booted, the
 Android app, the companion and the VS Code extension built) on the pushed
 branch, publishing nothing, with the checks a tag is held to; its last job
 gathers what was built as a tag's does, and its summary says which of the
-files the release must carry were built; a release is then tagged once. GitHub starts it only once the
+files the release must carry were built. That job also seals what was
+built, dry: the Android app signed with a key made in the job, as the
+controller signs a release's, and the seal's own check of it run on the
+runner's apksigner, so a change in what apksigner prints is met here and
+not by a tag's seal. A release is then tagged once. GitHub starts it only once the
 repository's default branch carries `.github/workflows/release-rehearsal.yml`.
 
 **The files a release carries.** `.release-files` at the tree's root lists

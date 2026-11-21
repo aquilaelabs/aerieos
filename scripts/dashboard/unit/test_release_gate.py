@@ -217,7 +217,21 @@ class Gate(unittest.TestCase):
         on = load("android-app.yml")["on"]
         for how in ("workflow_dispatch", "workflow_call"):
             self.assertEqual((on[how]["inputs"]["hosted"]["type"], on[how]["inputs"]["hosted"]["default"]), ("boolean", False), how)
-        self.assertEqual(load("release-rehearsal.yml")["jobs"]["android"]["with"], {"hosted": True})
+        self.assertEqual(load("release-rehearsal.yml")["jobs"]["android"]["with"], {"hosted": True, "rehearse": True})
+        # ...and hands its unsigned APK to the rehearsal's dry seal alone,
+        # under a name the controller never fetches, which signs it with a
+        # key of its own and has the seal hold it to that key on the
+        # runner's apksigner, as a tag's seal does (v0.9.0-dev.6049's found
+        # no signer in build-tools 37's way of saying one).
+        steps = load("android-app.yml")["jobs"]["build"]["steps"]
+        given = next(x for x in steps if x.get("name") == "Hand the unsigned APK to the rehearsal's dry seal")
+        self.assertEqual((given["if"], given["with"]["name"]), ("inputs.rehearse && steps.name.outputs.tag == ''", "rehearsal-apk"))
+        self.assertNotIn("bb-release-apk-", given["with"]["name"])
+        seal = next(x for x in load("release-rehearsal.yml")["jobs"]["manifest"]["steps"] if x.get("id") == "seal")
+        for said in ('"$aps" sign --ks "$RUNNER_TEMP/rehearsal.ks"', 'signers=(--apk-signers "$dry/apk-signers")',
+                     "(apksigner verifies it as signed by a certificate config/apk-signers names)",
+                     "is signed by a certificate config/apk-signers does not name"):
+            self.assertIn(said, seal["run"])
         # Every file the build resolves is held to its sha256 (the audit of
         # 21 Nov: nothing held the release APK's Gradle dependencies to
         # their bytes): each plugin and library the build files name is in
