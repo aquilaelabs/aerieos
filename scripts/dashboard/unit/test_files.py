@@ -67,8 +67,12 @@ class Files(unittest.TestCase):
         self.root_off = False
         self.files.console_said = lambda: {"root_off": True} if self.root_off else {}
         self.audits = []
+        # The node's relay here speaks plain: the dial is a stand-in for
+        # relaytls.connect, which the server hands in (test_relay_tls.py
+        # holds that one to the certificate).
         fileexplorer.configure(node=lambda nid: self.node if nid == "n_1" else None, host=lambda nid: "127.0.0.1",
-                               key=lambda nid: self.key, audit=lambda *a: self.audits.append(a))
+                               key=lambda nid: self.key, audit=lambda *a: self.audits.append(a),
+                               connect=lambda host, port, pin, timeout=15: socket.create_connection((host, port), timeout=timeout))
 
     def act(self, op, **kw):
         return fileexplorer.act("user:ann", True, "n_1", self.pool, op, **kw)

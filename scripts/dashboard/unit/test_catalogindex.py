@@ -364,7 +364,7 @@ class Made(unittest.TestCase):
             self.assertEqual(version.floor_behind("p"), "", "at the newest index's moment")
             for unknown in ("", "soon"):
                 newest["at"] = unknown
-                self.assertEqual(version.floor_behind("p"), "", "no index known here says nothing")
+                self.assertIn("could not be read", version.floor_behind("p"), "no index known: not released unseen")
             newest["at"] = "2026-11-21T00:00:00Z"
             (tree / "config" / "catalog-floor").write_text("not a moment\n")
             self.assertIn("says no moment", version.floor_behind("p"))

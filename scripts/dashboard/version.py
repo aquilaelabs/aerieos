@@ -1329,21 +1329,24 @@ catalog_made = None
 
 def floor_behind(project, comp=""):
     """Why this tree's catalog floor is older than the catalog's signed
-    index, or "": nothing is said where the tree ships no floor or no
-    index is known here."""
+    index, or cannot be held to it, or "": nothing is said where the tree
+    ships no floor. A tree that ships one is not released while the
+    catalog's newest signed index cannot be read: an old floor would go
+    out unseen."""
     if comp or catalog_made is None:
         return ""
     f = root(project) / CATALOG_FLOOR
     if not f.is_file():
         return ""
+    unread = f"the catalog's newest signed index could not be read, so whether {CATALOG_FLOOR} is behind it cannot be told: release once it answers"
     try:
         lines = [ln.strip() for ln in f.read_text(encoding="utf-8").splitlines() if ln.strip() and not ln.lstrip().startswith("#")]
         newest = str(catalog_made() or "")
-    except Exception:  # noqa: BLE001 (an index that cannot be read says nothing here)
-        return ""
+    except Exception:  # noqa: BLE001 (any failure to read is the refusal's one reason)
+        return unread
     stamp = r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ"
     if not re.fullmatch(stamp, newest):
-        return ""
+        return unread
     floor = lines[0] if len(lines) == 1 and re.fullmatch(stamp, lines[0]) else ""
     # The stamps are one fixed-width UTC form, so they order as text.
     if floor and floor >= newest:

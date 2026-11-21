@@ -15,7 +15,6 @@ import hmac
 import json
 import re
 import secrets
-import socket
 import time
 
 node_fn = None          # nodes.node
@@ -122,10 +121,7 @@ def _request_line(key, spec, once=False):
 def open_request(tg, spec, method="GET", length=None):
     """A connection to the agent with the request's head sent: the socket,
     over TLS to the certificate the node reported where it reported one."""
-    if connect_fn:
-        up = connect_fn(tg["host"], tg["port"], tg.get("pin") or "", timeout=15)
-    else:
-        up = socket.create_connection((tg["host"], tg["port"]), timeout=15)
+    up = connect_fn(tg["host"], tg["port"], tg.get("pin") or "", timeout=15)
     head = [f"{method} {_request_line(tg['key'], spec, tg.get('once'))} HTTP/1.1", f"Host: {tg['host']}:{tg['port']}", "Connection: close"]
     if length is not None:
         head.append(f"Content-Length: {int(length)}")

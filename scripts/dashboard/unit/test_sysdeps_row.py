@@ -60,6 +60,17 @@ class Reason(unittest.TestCase):
         got = self.why("refused: this agent does not administer the machine, so its owner installs these: playwright: libXtst\n")
         self.assertIn("does not administer the machine", got)
 
+    def test_a_signature_refusal_is_its_error_alone(self):
+        # As a vendor's changed key reads in the log: curl's bar, gpgv's own
+        # lines, bb's ERROR, the partial copy removed. The row is the ERROR.
+        tail = toolchains._job_tail("######################################################################## 100.0%\n"
+                                    "gpgv: using EDDSA key 0016B9E1A994\n"
+                                    "gpgv: Can't check signature: No public key\n"
+                                    "[builderbot] ERROR: kit: dl/data.bin does not carry its publisher's signature under kit.asc: nothing is installed\n"
+                                    "[builderbot] WARN: install failed (exit 1); removing the partial /srv/tc/kit\n")
+        got = toolchains._reason(tail, "install failed (exit 1)")
+        self.assertEqual(got, "ERROR: kit: dl/data.bin does not carry its publisher's signature under kit.asc: nothing is installed · install failed (exit 1)")
+
     def test_a_refusal_after_its_detail_is_the_reason_alone(self):
         # The agent says what holds a toolchain, pid and all, on lines of
         # their own, then the refusal in one sentence: the row takes that.

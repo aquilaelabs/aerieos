@@ -48,7 +48,7 @@ PRE_TAG = re.compile(r"v\d+\.\d+\.\d+-[a-z][a-z0-9]*\.\d+")
 # AerieOS's own container image, as a registry names it, and the tags of it
 # people follow: publishing a release moves :dev onto it, and a stable
 # release :latest too (publish-release.yml).
-IMAGE = os.environ.get("BB_RELEASE_IMAGE") or "ghcr.io/aquilaelabs/aerieos"
+IMAGE = seams.get("BB_RELEASE_IMAGE") or "ghcr.io/aquilaelabs/aerieos"
 FOLLOWED = ("dev", "latest")
 # The one line of a release's aerieos-image-VER.digest: the image by digest.
 IMAGE_LINE = re.compile(r"([a-z0-9][a-z0-9._/:-]{0,200})@(sha256:[0-9a-f]{64})")

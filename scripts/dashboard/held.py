@@ -17,10 +17,11 @@ stick's prepared configuration asked its first start to hold).
 """
 import json
 import threading
-import os
 import sys
 import time
 from pathlib import Path
+
+import seams
 
 STATE = Path("/config")
 _lock = threading.Lock()
@@ -62,7 +63,7 @@ def _safe_mode():
     """Safe mode on AerieOS (R161 step 2): aeriesafe=1 on the kernel's
     command line, which GRUB's Safe mode entry adds."""
     try:
-        with open(os.environ.get("BB_CMDLINE") or "/proc/cmdline", encoding="utf-8", errors="replace") as f:
+        with open(seams.get("BB_CMDLINE") or "/proc/cmdline", encoding="utf-8", errors="replace") as f:
             return "aeriesafe=1" in f.read().split()
     except OSError:
         return False

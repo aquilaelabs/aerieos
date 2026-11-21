@@ -40,6 +40,9 @@ SEAMS = {
     "BB_BIN": "the aerie program the toolchain worker runs",
     "BB_AGENT_DIR": "the agent's sources a test world's controller ships, a copy of its own in the tree's place",
     "BB_ACME_DIRECTORY": "the ACME directory certificates are asked of (a staging one), Let's Encrypt's in an install's place",
+    "BB_RELEASE_IMAGE": "AerieOS's own image as a registry names it, held to the signed release's digest",
+    "BB_SECRETS_CARRY": "the root helper a move asks for root's secrets, run with no sudo and on any machine",
+    "BB_CMDLINE": "the kernel's command line Safe mode is read from, /proc/cmdline's in an install's place",
 }
 # ...and one a coding agent: where its newest release is asked, a file://
 # stand-in for its registry's answer (BB_CLAUDE_LATEST_URL and the like).

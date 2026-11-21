@@ -606,7 +606,7 @@ def is_mount(path):
 # meaning any more; they are simply noise that would otherwise fill the sixteen
 # lines kept from a job, since sdkmanager redraws its bar with carriage returns
 # and playwright draws its own with box characters.
-_PROGRESS_FRAME = re.compile(r"^(\[[=\s]*\]\s*\d+%|\|[\u25a0\s]*\|\s*\d+%)")
+_PROGRESS_FRAME = re.compile(r"^(\[[=\s]*\]\s*\d+%|\|[\u25a0\s]*\|\s*\d+%|#+\s+\d+(\.\d)?%)")
 
 # The decimal matters: on "100.0%" a bare \d{1,3} match lands on the 0 after
 # the point and reports nought percent for a finished download.
@@ -637,7 +637,11 @@ def _reason(said, last, cap=400):
     refused = [s for s in lines if s.startswith("refused:")]
     if refused:
         return " · ".join([refused[-1][:cap], last])
-    parts = [s for s in lines if s and not _GIT_NOISE.match(s) and not _DIGEST.search(s)][-4:] + [last]
+    # ...and so is bb's ERROR, the one sentence of why it failed: the lines
+    # after it (the partial copy removed) and before it (a tool's own words,
+    # a progress bar) stay in the log.
+    errors = [s for s in lines if s.startswith("ERROR:") and not _DIGEST.search(s)]
+    parts = (errors[-1:] or [s for s in lines if s and not _GIT_NOISE.match(s) and not _DIGEST.search(s)][-4:]) + [last]
     while len(parts) > 2 and len(" · ".join(parts)) > cap:
         # bb's ERROR is the reason, so the lines around it go first.
         parts.pop(next((i for i, s in enumerate(parts[:-1]) if not s.startswith("ERROR:")), 0))

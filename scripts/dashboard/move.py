@@ -55,6 +55,7 @@ import urllib.parse
 import urllib.request
 import zlib
 
+import seams
 import statefile
 import stateversion
 from pathlib import Path
@@ -365,7 +366,7 @@ SECRETS_LEAVE = {"install-key"}
 # since the controller's start reads those files as root). A coding agent's
 # session runs as another account, which may not run it, and a move is the
 # owner's alone. A test names a stand-in with BB_SECRETS_CARRY.
-CARRY = os.environ.get("BB_SECRETS_CARRY") or str(Path(__file__).resolve().parent.parent / "secrets-carry")
+CARRY = seams.get("BB_SECRETS_CARRY") or str(Path(__file__).resolve().parent.parent / "secrets-carry")
 CARRY_MAX = 4 << 20
 # What the helper hands over and takes: a *.env file, or a plain file under ssh/.
 _CARRIED = re.compile(r"(?:[A-Za-z0-9][A-Za-z0-9._-]{0,99}\.env|ssh/[A-Za-z0-9][A-Za-z0-9._-]{0,99})")
@@ -374,7 +375,7 @@ _CARRIED = re.compile(r"(?:[A-Za-z0-9][A-Za-z0-9._-]{0,99}\.env|ssh/[A-Za-z0-9][
 def _carry(verb, data=None, timeout=60):
     """The root helper run with `verb`: (exit code, stdout bytes, stderr
     text), (127, b"", why) where it cannot be run at all."""
-    stand_in = bool(os.environ.get("BB_SECRETS_CARRY"))
+    stand_in = bool(seams.get("BB_SECRETS_CARRY"))
     # Only on a machine of its own, as its account: the helper serves root's
     # folder there and nowhere else, and a process that is root already (a
     # test run as root) must never be the one to ask it.
