@@ -368,5 +368,38 @@ class Private(Tmp):
         self.assertFalse(os.path.exists(os.path.join(self.tmp, "elsewhere")))
 
 
+class WriteAtomic(Tmp):
+    """base.write_atomic in a folder an account may write (a home, a
+    store): a link left at the temporary name is taken away, never written
+    or owned through."""
+
+    def test_a_link_at_the_temporary_name_is_not_written_or_owned_through(self):
+        target = os.path.join(self.tmp, "roots-own")
+        with open(target, "w") as f:
+            f.write("as it was\n")
+        path = os.path.join(self.store, "claude.json")
+        os.symlink(target, path + ".new")
+        owned = []
+        with mock.patch.object(base.os, "fchown", lambda fd, u, g: owned.append((os.fstat(fd).st_ino, u, g))), \
+                mock.patch.object(base.os, "chown", side_effect=AssertionError("owned by name")):
+            base.write_atomic(path, "the token\n", mode=0o600, uid=1234, gid=1234)
+        with open(target) as f:
+            self.assertEqual(f.read(), "as it was\n")
+        self.assertFalse(os.path.islink(path))
+        with open(path) as f:
+            self.assertEqual(f.read(), "the token\n")
+        self.assertEqual(owned, [(os.stat(path).st_ino, 1234, 1234)])
+        self.assertNotEqual(os.stat(target).st_ino, owned[0][0])
+        self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o600)
+
+    def test_a_plain_write_is_as_before(self):
+        path = os.path.join(self.store, "x.json")
+        base.write_atomic(path, b"one")
+        base.write_atomic(path, "two")
+        with open(path) as f:
+            self.assertEqual(f.read(), "two")
+        self.assertFalse(os.path.exists(path + ".new"))
+
+
 if __name__ == "__main__":
     unittest.main()

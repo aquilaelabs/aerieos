@@ -1223,24 +1223,31 @@ def write_atomic(path, data, *, mode=None, uid=None, gid=None, makedirs=False, t
     file will be, and the file has exactly that mode whatever the umask and
     whatever was left at the temporary name; without it the mode is what
     the umask gives a new file. `uid` and `gid` are given to the temporary
-    file before the rename. `makedirs` makes the file's folder first. A
+    file, by the file itself, before the rename. `makedirs` makes the file's folder first. A
     failure raises with the file as it was; the temporary file may be left."""
     if makedirs:
         os.makedirs(os.path.dirname(path), exist_ok=True)
     tmp = path + tmp_suffix
     how = {"mode": "w", "encoding": "utf-8"} if isinstance(data, str) else {"mode": "wb"}
-    if mode is None:
-        f = open(tmp, **how)
-    else:
-        f = os.fdopen(os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode), **how)
-    with f:
+    # Through no link: the folder may be an account's (a home, a store), and
+    # a link left at the temporary name is taken away, never written or
+    # owned through.
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        fd = os.open(tmp, flags, 0o666 if mode is None else mode)
+    except OSError:
+        if not os.path.islink(tmp):
+            raise
+        os.unlink(tmp)
+        fd = os.open(tmp, flags | os.O_EXCL, 0o666 if mode is None else mode)
+    with os.fdopen(fd, **how) as f:
         # Asked for only where the file is not as it was created: under a
         # umask that took bits away, or over a file already at this name.
         if mode is not None and os.fstat(f.fileno()).st_mode & 0o7777 != mode:
             os.fchmod(f.fileno(), mode)
+        if uid is not None or gid is not None:
+            os.fchown(f.fileno(), -1 if uid is None else uid, -1 if gid is None else gid)
         f.write(data)
-    if uid is not None or gid is not None:
-        os.chown(tmp, -1 if uid is None else uid, -1 if gid is None else gid)
     os.replace(tmp, path)
 
 
