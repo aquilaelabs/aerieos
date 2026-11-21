@@ -17,7 +17,7 @@ from .base import BEAT_S, CHANNEL, REFUSED, ROOT_BUNDLE_DIR, RUNNER_DIAG_KEEP, S
 from .base import NotHeld, cap_file, fs_holds, log, log_once, own_digest, own_path, prune_dir
 from .base import back_note, selfcheck, test_lock_ready, trial_begin, trial_give_way, trial_note, trial_passed
 from .controller import CA_PIN, KEY_PIN, Controller, address_ok
-from .stores import console_said, load_state, pin_release, pin_spare, save_state, tc_root, use_scope
+from .stores import STATE_LOCK, console_said, load_state, pin_release, pin_spare, save_state, tc_root, use_scope
 from .toolchains import share_images
 from .sessnet import SessionNet
 from .runners import RunnersMixin, runner_dirs
@@ -120,31 +120,34 @@ def follow(state, url="", expect="", pin=""):
     if not got or not hmac.compare_digest(got, str(mv.get("expect") or "")):
         return False, f"{to} answered the knock with the wrong answer: not the controller that moved"
     said = str(r.get("url") or "").rstrip("/")
-    if under:
-        # Knocked under a pin: only an https address of the one shape is
-        # taken from the answer, and only a key's pin; with neither, the
-        # address knocked at and the pin knocked under are kept.
-        state["controller"] = said if said and address_ok(said, https=True) else to
-        if under == CA_PIN:
-            state["pin"] = CA_PIN
-        else:
-            answered = r.get("pin") if isinstance(r.get("pin"), str) and KEY_PIN_WHOLE.fullmatch(r["pin"]) else ""
-            state["pin"] = answered or under
-    else:
-        state["controller"] = said if said and address_ok(said) else to
-        if r.get("pin"):
-            state["pin"] = str(r.get("pin"))
-        elif not r.get("url"):
-            # The address knocked at is kept (B936), so its certificate is the
-            # one just met there, which answered the challenge; plain http has
-            # none.
-            seen = getattr(ctl, "seen_pin", "") or ""
-            if seen:
-                state["pin"] = seen
+    # The new address, its pin and the move's end written as one change
+    # with their save (stores.STATE_LOCK): no other save lands half of it.
+    with STATE_LOCK:
+        if under:
+            # Knocked under a pin: only an https address of the one shape is
+            # taken from the answer, and only a key's pin; with neither, the
+            # address knocked at and the pin knocked under are kept.
+            state["controller"] = said if said and address_ok(said, https=True) else to
+            if under == CA_PIN:
+                state["pin"] = CA_PIN
             else:
-                state.pop("pin", None)
-    state.pop("move", None)
-    save_state(state)
+                answered = r.get("pin") if isinstance(r.get("pin"), str) and KEY_PIN_WHOLE.fullmatch(r["pin"]) else ""
+                state["pin"] = answered or under
+        else:
+            state["controller"] = said if said and address_ok(said) else to
+            if r.get("pin"):
+                state["pin"] = str(r.get("pin"))
+            elif not r.get("url"):
+                # The address knocked at is kept (B936), so its certificate is the
+                # one just met there, which answered the challenge; plain http has
+                # none.
+                seen = getattr(ctl, "seen_pin", "") or ""
+                if seen:
+                    state["pin"] = seen
+                else:
+                    state.pop("pin", None)
+        state.pop("move", None)
+        save_state(state)
     return True, ""
 
 
@@ -163,11 +166,12 @@ def _recover_at(ctl, state):
         st, r = ctl.call("recover", {"node": nid, "tokens": held[i:i + RECOVER_CHUNK]}, timeout=30)
         if st == 200 and isinstance(r.get("token"), str) and r["token"].startswith("bbn_"):
             now = int(time.time())
-            old = state.get("token") or ""
-            past = [p for p in (state.get("past_tokens") or []) if isinstance(p, list) and len(p) == 2 and p[0] != old]
-            state["past_tokens"] = ([[old, now]] if old else []) + past[:PAST_MOST - 1]
-            state["token"] = r["token"]
-            save_state(state)
+            with STATE_LOCK:
+                old = state.get("token") or ""
+                past = [p for p in (state.get("past_tokens") or []) if isinstance(p, list) and len(p) == 2 and p[0] != old]
+                state["past_tokens"] = ([[old, now]] if old else []) + past[:PAST_MOST - 1]
+                state["token"] = r["token"]
+                save_state(state)
             ctl.token = r["token"]
             log("the move's new address knew this node by a token from before its newest: taken back there")
             return True
@@ -340,24 +344,27 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             return
         # Written first and used only once it is: a node.json that kept the
         # old token past a restart would present a retired one, which reads
-        # as a stolen copy and revokes this node.
+        # as a stolen copy and revokes this node. Under STATE_LOCK from the
+        # copy to the record's own change, so no other save writes the old
+        # token over the new between the two.
         # The tokens of the last month kept, newest first: a controller
         # restored from a backup knows one of them (the operator, 6 Nov).
         now = int(time.time())
-        old = self.state.get("token") or ""
-        past = [p for p in (self.state.get("past_tokens") or []) if isinstance(p, list) and len(p) == 2
-                and isinstance(p[0], str) and isinstance(p[1], int) and now - p[1] < PAST_KEEP_S]
-        # A token already among them (the one token_back went back to)
-        # keeps its place: the newer one it stood in for stays ahead of it.
-        past = ([[old, now]] if old and old not in [p[0] for p in past] else []) + past
-        try:
-            save_state(dict(self.state, token=new, past_tokens=past[:PAST_MOST]))
-        except OSError as e:
-            log(f"the controller's next token was not kept, so the current one stays: {e}")
-            return
-        self.prev_token = (old, time.monotonic())
-        self.state["token"] = new
-        self.state["past_tokens"] = past[:PAST_MOST]
+        with STATE_LOCK:
+            old = self.state.get("token") or ""
+            past = [p for p in (self.state.get("past_tokens") or []) if isinstance(p, list) and len(p) == 2
+                    and isinstance(p[0], str) and isinstance(p[1], int) and now - p[1] < PAST_KEEP_S]
+            # A token already among them (the one token_back went back to)
+            # keeps its place: the newer one it stood in for stays ahead of it.
+            past = ([[old, now]] if old and old not in [p[0] for p in past] else []) + past
+            try:
+                save_state(dict(self.state, token=new, past_tokens=past[:PAST_MOST]))
+            except OSError as e:
+                log(f"the controller's next token was not kept, so the current one stays: {e}")
+                return
+            self.prev_token = (old, time.monotonic())
+            self.state["token"] = new
+            self.state["past_tokens"] = past[:PAST_MOST]
         self.ctl.token = new
 
     def recover_token(self):
@@ -397,17 +404,18 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         # a controller that refused it may not be the one that issued it (a
         # move's new home, B759), and the one that did takes this node back
         # by it once it is here again.
-        newest = self.state.get("token") or ""
-        past = [p for p in (self.state.get("past_tokens") or []) if isinstance(p, list) and len(p) == 2 and p[0] != newest]
-        past = ([[newest, int(time.time())]] if newest else []) + past
-        try:
-            save_state(dict(self.state, token=prev, past_tokens=past[:PAST_MOST]))
-        except OSError as e:
-            log(f"the token before was not kept, so the newest stays: {e}")
-            return False
+        with STATE_LOCK:
+            newest = self.state.get("token") or ""
+            past = [p for p in (self.state.get("past_tokens") or []) if isinstance(p, list) and len(p) == 2 and p[0] != newest]
+            past = ([[newest, int(time.time())]] if newest else []) + past
+            try:
+                save_state(dict(self.state, token=prev, past_tokens=past[:PAST_MOST]))
+            except OSError as e:
+                log(f"the token before was not kept, so the newest stays: {e}")
+                return False
+            self.state["past_tokens"] = past[:PAST_MOST]
+            self.state["token"] = prev
         log("the controller does not know this node's newest token; the one it handed out before is tried")
-        self.state["past_tokens"] = past[:PAST_MOST]
-        self.state["token"] = prev
         self.ctl.token = prev
         self.prev_token = None
         return True
@@ -649,9 +657,10 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             pubs2 = r.get("token_pubs2") if isinstance(r.get("token_pubs2"), dict) else {}
             if ts != bool(self.state.get("token_seal")) or pubs2 != (self.state.get("token_pubs2") or {}) \
                     or "token_pubs" in self.state:
-                self.state["token_seal"], self.state["token_pubs2"] = ts, pubs2
-                self.state.pop("token_pubs", None)
-                save_state(self.state)
+                with STATE_LOCK:
+                    self.state["token_seal"], self.state["token_pubs2"] = ts, pubs2
+                    self.state.pop("token_pubs", None)
+                    save_state(self.state)
                 if ts != bool(self.state.get("token_seal_said")):
                     self.state["token_seal_said"] = ts
                     log("the coding agents' sign-ins are kept sealed here" if ts else "sign-ins are no longer sealed here")
@@ -783,10 +792,11 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             return False
         if not isinstance(fresh, dict) or not fresh.get("controller") or fresh.get("controller") == self.state.get("controller"):
             return False
-        self.state["controller"] = fresh["controller"]
-        if fresh.get("pin"):
-            self.state["pin"] = fresh["pin"]
-        self.state.pop("move", None)
+        with STATE_LOCK:
+            self.state["controller"] = fresh["controller"]
+            if fresh.get("pin"):
+                self.state["pin"] = fresh["pin"]
+            self.state.pop("move", None)
         self.ctl = Controller(self.state["controller"], self.state["token"], self.state.get("pin", ""))
         self.quiet = 0
         self.hello_at = 0
@@ -800,9 +810,11 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         was taken."""
         if not isinstance(mv, dict) or not mv.get("url") or not mv.get("expect") or self.state.get("move"):
             return False
-        self.state["move"] = {"url": str(mv["url"]), "expect": str(mv["expect"])}
+        # Made whole before it is in the record: a dump never meets it growing.
+        move = {"url": str(mv["url"]), "expect": str(mv["expect"])}
         if isinstance(mv.get("pin"), str) and KEY_PIN_WHOLE.fullmatch(mv["pin"]):
-            self.state["move"]["pin"] = mv["pin"]
+            move["pin"] = mv["pin"]
+        self.state["move"] = move
         save_state(self.state)
         log(f"the controller moved to {mv['url']} and handed this node its challenge: knocking there")
         return True

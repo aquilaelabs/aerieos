@@ -7,7 +7,6 @@ import re
 import subprocess
 import tempfile
 import threading
-import time
 from . import names
 from . import release
 from .base import NODE_JSON, STORE_DENY_EXACT, STORE_DENY_UNDER, StatTimeout, _run, log, statvfs_within
@@ -450,10 +449,62 @@ def store_dirs(state):
 # ---------------------------------------------------------------------------
 # node.json
 
+# The record in memory is changed by the agent's loop, its job threads and
+# the configuration plane, and saved by each of them. Every change takes
+# STATE_LOCK (State takes it for each of its own), and save_state holds it
+# while it reads the console's keys into the record, dumps it and writes it:
+# a dump never walks a record another thread is changing, and a change and
+# the save that follows it are one step where the caller holds it around
+# both. Reentrant for that. Taken before _save_lock, never after it.
+STATE_LOCK = threading.RLock()
+
+
+class State(dict):
+    """node.json as the running agent holds it: a dict whose every change
+    takes STATE_LOCK, and whose copy is taken under it."""
+
+    def __setitem__(self, k, v):
+        with STATE_LOCK:
+            super().__setitem__(k, v)
+
+    def __delitem__(self, k):
+        with STATE_LOCK:
+            super().__delitem__(k)
+
+    def __ior__(self, other):
+        with STATE_LOCK:
+            return super().__ior__(other)
+
+    def pop(self, *a):
+        with STATE_LOCK:
+            return super().pop(*a)
+
+    def popitem(self):
+        with STATE_LOCK:
+            return super().popitem()
+
+    def setdefault(self, *a):
+        with STATE_LOCK:
+            return super().setdefault(*a)
+
+    def update(self, *a, **kw):
+        with STATE_LOCK:
+            super().update(*a, **kw)
+
+    def clear(self):
+        with STATE_LOCK:
+            super().clear()
+
+    def copy(self):
+        with STATE_LOCK:
+            return dict(self)
+
+
 def load_state():
     try:
         with open(NODE_JSON) as f:
-            return json.load(f)
+            got = json.load(f)
+        return State(got) if isinstance(got, dict) else got
     except OSError as e:
         raise SystemExit(f"{NODE_JSON} is missing; enroll this node first: "
                          f"{names.command()} enroll --controller URL --token …") from e
@@ -521,29 +572,21 @@ def console_said():
 # them), and by the console's own commands in another process. Two saves
 # through one fixed .tmp could interleave into a file that is not JSON,
 # after which no start reads it and the node has to be enrolled again at its
-# console. The thread lock orders this process's saves; the file lock, on a
-# file beside node.json, orders them against the console's.
+# console. The thread lock orders this process's saves of a copy read from
+# the file (record_set, pin_release, pin_spare); the file lock, on a file
+# beside node.json, orders them against the console's.
 _save_lock = threading.Lock()
 
 
-def _dumps(state):
-    """The state as JSON, taken while other threads may be changing it: a
-    walk that meets a change is taken again."""
-    for _ in range(20):
-        try:
-            return json.dumps(state, indent=2)
-        except RuntimeError:          # changed size during the walk
-            time.sleep(0.01)
-    return json.dumps(state, indent=2)
-
-
 def save_state(state, console=False):
-    """node.json written whole. `console` is a person at the machine saying
-    what it trusts (enroll, release-key, unsigned): only then are the
-    console's keys taken from `state`; otherwise the file's own are kept."""
+    """node.json written whole, under STATE_LOCK: nothing changes `state`
+    while the console's keys are read into it, it is dumped and it is
+    written. `console` is a person at the machine saying what it trusts
+    (enroll, release-key, unsigned): only then are the console's keys taken
+    from `state`; otherwise the file's own are kept."""
     d = os.path.dirname(NODE_JSON)
     os.makedirs(d, mode=0o700, exist_ok=True)
-    with _save_lock, open(os.path.join(d, ".node.json.lock"), "a") as held:
+    with STATE_LOCK, _save_lock, open(os.path.join(d, ".node.json.lock"), "a") as held:
         fcntl.flock(held.fileno(), fcntl.LOCK_EX)
         _save(state, console, d)
 
@@ -614,7 +657,7 @@ def _save(state, console, d):
                     state[k] = cur[k]
                 else:
                     state.pop(k, None)
-    text = _dumps(state)
+    text = json.dumps(state, indent=2)
     fd, tmp = tempfile.mkstemp(prefix=".node.json.", dir=d)
     try:
         with os.fdopen(fd, "w") as f:

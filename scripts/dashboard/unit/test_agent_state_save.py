@@ -24,13 +24,16 @@ class Saves(unittest.TestCase):
         stores.NODE_JSON = self.was
 
     def test_many_threads_saving_at_once_leave_one_whole_file(self):
-        state = {"node_id": "n_1", "token": "bbn_0", "jobs": {}}
+        state = stores.State({"node_id": "n_1", "token": "bbn_0", "jobs": {}})
         bad = []
 
         def saver(i):
             for k in range(40):
                 state["token"] = f"bbn_{i}_{k}"
-                state["jobs"][f"{i}-{k}"] = k          # changed while another walks it
+                # Changed while another walks it: a value inside the record
+                # changed in place takes the record's lock as its own do.
+                with stores.STATE_LOCK:
+                    state["jobs"][f"{i}-{k}"] = k
                 try:
                     stores.save_state(state)
                 except Exception as e:                  # noqa: BLE001
