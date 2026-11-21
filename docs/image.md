@@ -524,7 +524,8 @@ A newer release is found the way a bare-metal install's is (checked weekly
 unless Controller settings' Update checks says otherwise, and on **Check
 now** under Controller settings, Updates, and said on the bell). It follows
 the release line the install is on (`BB_RELEASE_LINE`, which the stick
-maker's `--set` writes) and the releases as published; the dev builds'
+maker's `--set` writes: `0.9` is offered 0.9's releases and dev builds alone,
+and a stick that names none every release) and the releases as published; the dev builds'
 channel is in [versions.md](versions.md#two-channels). On AerieOS **Update** does not run the installer: the own
 node's root agent reads the release's signed list of its files (below, The
 release keys; a release it may not take is refused before the image is

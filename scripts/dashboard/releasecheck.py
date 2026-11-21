@@ -54,6 +54,11 @@ FOLLOWED = ("dev", "latest")
 IMAGE_LINE = re.compile(r"([a-z0-9][a-z0-9._/:-]{0,200})@(sha256:[0-9a-f]{64})")
 # How many of the newest releases are asked for one that names its image.
 IMAGE_LOOK = 3
+# The release line updates follow, X.Y, when the install names one
+# (BB_RELEASE_LINE, a stick's aerieos.env line the boot hands the
+# controller's environment): releases and dev builds of that line alone are
+# offered. Anything else named there is no line, and every release is.
+LINE = re.compile(r"v?(\d+)\.(\d+)")
 
 _lock = threading.Lock()
 _latest = {"version": "", "tag": "", "at": 0, "error": "", "checking": False, "url": "", "dev": {"version": "", "tag": "", "url": ""}}
@@ -156,6 +161,18 @@ def rank(v):
     return parse_dev(v)
 
 
+def line():
+    """The release line this install follows, "0.9", or "" for every one."""
+    m = LINE.fullmatch(os.environ.get("BB_RELEASE_LINE", "").strip())
+    return f"{int(m.group(1))}.{int(m.group(2))}" if m else ""
+
+
+def on_line(tag, want):
+    """Whether a release's tag is of the line `want` ("" takes every one)."""
+    r = rank(str(tag or "").lstrip("v"))
+    return bool(r) and (not want or f"{r[0]}.{r[1]}" == want)
+
+
 def _read():
     """What the releases list says now, for the record: ({version, tag, url}
     of the newest release when there is one, with the dev channel's newest
@@ -163,6 +180,7 @@ def _read():
     picks from and the drafts' files are kept as it reads."""
     version, tag, url, error = "", "", "", ""
     token = _token()
+    follow = line()
     try:
         # A page long enough that dev builds never push the newest release off it.
         url_ = RELEASES_URL + ("?per_page=100" if RELEASES_URL.startswith("https://") else "")
@@ -175,20 +193,22 @@ def _read():
         # (tag_kind), whatever the pre-release flag beside it says. The flag
         # is the git host's, flipped by whoever can edit a release; the tag
         # is what the release's files are signed for. A stable release's
-        # draft too where asked with the token.
-        live = [x for x in rows if isinstance(x, dict) and (token or not x.get("draft")) and tag_kind(x.get("tag_name")) == "stable"]
+        # draft too where asked with the token. Both channels keep to the
+        # release line the install follows, where it names one.
+        live = [x for x in rows if isinstance(x, dict) and (token or not x.get("draft")) and tag_kind(x.get("tag_name")) == "stable"
+                and on_line(x.get("tag_name"), follow)]
         live.sort(key=lambda x: parse(x.get("tag_name")), reverse=True)
         if live:
             tag = str(live[0].get("tag_name") or "")
             version = ".".join(str(n) for n in parse(tag))
             url = str(live[0].get("html_url") or "")
         else:
-            error = "no published release"
+            error = f"no published release on the {follow} line" if follow else "no published release"
         # The dev channel's newest (R179): a pre-release whose tag is a dev
         # build's, never taken on the normal channel; a draft only where
         # it was asked with the token (debug mode, the dev channel).
         dev = [x for x in rows if isinstance(x, dict) and (token or not x.get("draft")) and parse_dev(x.get("tag_name"))
-               and (x.get("prerelease") or x.get("draft"))]
+               and (x.get("prerelease") or x.get("draft")) and on_line(x.get("tag_name"), follow)]
         dev.sort(key=lambda x: parse_dev(x.get("tag_name")), reverse=True)
         devrec = {"version": str(dev[0]["tag_name"]).lstrip("v"), "tag": str(dev[0]["tag_name"]), "url": str(dev[0].get("html_url") or ""),
                   "draft": dev[0].get("draft") is True} if dev else {"version": "", "tag": "", "url": "", "draft": False}

@@ -93,6 +93,36 @@ class ReleaseCheck(unittest.TestCase):
         for tag, kind in (("v1.0.1", "stable"), ("v1.1.0-dev.7", "pre"), ("v1.1.0-rc.8", "pre"), ("1.0.1", ""), ("junk", "")):
             self.assertEqual(releasecheck.tag_kind(tag), kind, tag)
 
+    def test_a_named_release_line_is_followed_on_both_channels(self):
+        # A stick written with BB_RELEASE_LINE=0.9 is offered 0.9's releases
+        # and dev builds alone, never 0.10's; no line, or none that reads as
+        # one, follows every release.
+        rows = [{"tag_name": "v0.10.0", "html_url": "https://example/v0.10.0"},
+                {"tag_name": "v0.10.1-dev.20", "prerelease": True},
+                {"tag_name": "v0.9.3", "html_url": "https://example/v0.9.3"},
+                {"tag_name": "v0.9.4-dev.12", "prerelease": True}]
+        d = tempfile.mkdtemp()
+        with open(os.path.join(d, "releases.json"), "w") as f:
+            json.dump(rows, f)
+        releasecheck.RELEASES_URL = "file://" + os.path.join(d, "releases.json")
+        for named, stable, dev in (("0.9", "0.9.3", "0.9.4-dev.12"), ("v0.10", "0.10.0", "0.10.1-dev.20"),
+                                   ("", "0.10.0", "0.10.1-dev.20"), ("junk", "0.10.0", "0.10.1-dev.20")):
+            with mock.patch.dict(os.environ, {"BB_RELEASE_LINE": named}):
+                releasecheck.configure(version=lambda: "0.9.2", bare_metal=lambda: True, channel=lambda: "normal")
+                got = releasecheck.check()
+                self.assertEqual((got["version"], got["dev"]["version"]), (stable, dev), named)
+                self.assertEqual(releasecheck.newer(), stable, named)
+                releasecheck.configure(version=lambda: "0.9.2", bare_metal=lambda: True, channel=lambda: "dev")
+                self.assertEqual(releasecheck.newer(), dev, named)
+        # A line is the environment's, the same for the life of the process:
+        # the record is new as a start's.
+        releasecheck._latest.update(version="", tag="", at=0, error="", url="", dev={"version": "", "tag": "", "url": ""})
+        with mock.patch.dict(os.environ, {"BB_RELEASE_LINE": "0.8"}):
+            releasecheck.configure(version=lambda: "0.9.2", bare_metal=lambda: True, channel=lambda: "normal")
+            got = releasecheck.check()
+            self.assertEqual(got["error"], "no published release on the 0.8 line")
+            self.assertEqual(releasecheck.newer(), "")
+
 
     def test_the_dev_channel_takes_pre_releases_and_debug_mode_picks_any(self):
         # R179: the normal channel passes a pre-release over; the dev
