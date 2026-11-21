@@ -563,6 +563,16 @@ browser, the build its own version names, from its own download service
 over https, so the lock that holds Playwright holds which builds are asked
 for, and nothing here holds the archives' bytes.
 
+**The Android app a release carries is built from files held to their
+bytes.** Its Gradle build resolves its plugins and libraries from Google's
+repository and Maven Central, and `apps/android/gradle/verification-metadata.xml`
+names the sha256 of every file the release build resolves, so Gradle
+refuses one that is not those bytes before the build runs it, on a hosted
+runner and on a node alike. The Gradle distribution is held to the sha256
+in `apps/android/gradle/wrapper/gradle-wrapper.properties`. A dependency
+added or moved is the file written again in the same change
+([companion-app.md](companion-app.md)).
+
 **A CI runner's program is held to a pin.** The runner a node installs
 (GitHub's Actions runner, or the one Gitea and Forgejo share) is a
 version this build names, with the sha256 of the exact file for each

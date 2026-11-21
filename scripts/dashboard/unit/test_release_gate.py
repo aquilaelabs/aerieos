@@ -218,6 +218,34 @@ class Gate(unittest.TestCase):
         for how in ("workflow_dispatch", "workflow_call"):
             self.assertEqual((on[how]["inputs"]["hosted"]["type"], on[how]["inputs"]["hosted"]["default"]), ("boolean", False), how)
         self.assertEqual(load("release-rehearsal.yml")["jobs"]["android"]["with"], {"hosted": True})
+        # Every file the build resolves is held to its sha256 (the audit of
+        # 21 Nov: nothing held the release APK's Gradle dependencies to
+        # their bytes): each plugin and library the build files name is in
+        # the verification metadata, each artifact with a sha256 and none
+        # trusted by a rule in its place.
+        import re
+        import xml.etree.ElementTree as ET
+        android = os.path.join(WF, "..", "..", "apps", "android")
+        meta = ET.parse(os.path.join(android, "gradle", "verification-metadata.xml")).getroot()
+        ns = {"v": "https://schema.gradle.org/dependency-verification"}
+        self.assertEqual(meta.find("v:configuration/v:verify-metadata", ns).text, "true")
+        self.assertIsNone(meta.find("v:configuration/v:trusted-artifacts", ns), "no artifact trusted by a pattern")
+        held = {(c.get("group"), c.get("name"), c.get("version")) for c in meta.find("v:components", ns)}
+        for c in meta.find("v:components", ns):
+            for a in c.findall("v:artifact", ns):
+                self.assertTrue(a.findall("v:sha256", ns), f"{c.get('name')} {a.get('name')} is held to a sha256")
+        named = ""
+        for f in ("build.gradle.kts", os.path.join("app", "build.gradle.kts")):
+            with open(os.path.join(android, f), encoding="utf-8") as fh:
+                named += fh.read()
+        plugins = re.findall(r'id\("([\w.]+)"\) version "([\w.-]+)"', named)
+        self.assertTrue(plugins)
+        for pid, ver in plugins:
+            self.assertIn((pid, f"{pid}.gradle.plugin", ver), held, pid)
+        libs = re.findall(r'implementation\("([\w.-]+):([\w.-]+):([\w.-]+)"\)', named)
+        self.assertTrue(libs)
+        for lib in libs:
+            self.assertIn(lib, held, ":".join(lib))
         java = next(s for s in build["steps"] if "JAVA_HOME_17_X64" in str(s.get("run") or ""))
         self.assertEqual(java["if"], "runner.environment == 'github-hosted'")
         land = next(s for s in build["steps"] if s.get("name", "").startswith("Land it in"))

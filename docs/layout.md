@@ -402,7 +402,7 @@ tools/catalog-mirror.py          makes the vetted catalog's mirror on a machine 
     services/                    one folder per deployed thing of AerieOS's that is a pack (R172): the model router, its service block and its config block, what its Installed row asks for per node
 apps/                            the companions a person installs (R98 step 1): the phone app, the editor extension and the
                                  Windows companion, each released by its own workflow and offered as a card in the Library
-  android/                         the companion app: api-surface.json is its contract with the dashboard, each field's type pinned, app/ the Kotlin
+  android/                         the companion app: api-surface.json is its contract with the dashboard, each field's type pinned, app/ the Kotlin, gradle/verification-metadata.xml the sha256 of every file its release build resolves
   vscode/                          AerieOS for VS Code (R159): plain JavaScript, no build step and no dependencies
     package.json                   the extension's manifest: its commands, its settings, and aerieosApi, the Files API it speaks
     extension.js                   the builderbot: file system, the sign-in, open project, search and the session's terminal
