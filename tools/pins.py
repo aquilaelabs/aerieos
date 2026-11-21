@@ -53,6 +53,14 @@ version and digest back there and raises the recipe's rev: an installer with a v
 address moves with its track, a program a platform moves as one set, and a vendor's one moving
 script, which has nothing to track, is asked for the bytes it answers today.
 
+Two things of the controller's image are pinned where they lie, and are rows here too. The
+programs it takes from npm (config/image-npm, a folder a program: its package.json names the one
+version asked for, and its package-lock.json every package under it with the address of its
+tarball and its integrity, which is what `npm ci` installs by and holds each tarball to): check
+asks npm what each program's newest version is and what the lock for it would be, and move writes
+both files. And the image it is built FROM, named in the Dockerfile by its tag and the digest of
+its list (name:tag@sha256:DIGEST): its FROM line is a row of images like any other.
+
 A container image is held the same way, by the digest of what is pulled: name:tag@sha256:DIGEST.
 A row that names images (the services AerieOS deploys, scripts/dashboard/service-images.json) is
 asked through the registry each image names, by the registry protocol and its anonymous token
@@ -72,7 +80,10 @@ for several platforms, which covers each of them; a row may name the platforms i
                     image takes from their vendors' releases as it is built (cloudflared, the
                     linters, uv and mise) in config/image-tools.json, which the Dockerfile reads;
                     --file with any of those paths checks, moves, pins and verifies them. A move
-                    of the shipped services' images writes packs/services again.
+                    of the shipped services' images writes packs/services again. Two paths are
+                    read as what they are: a Dockerfile, as one row of the images its FROM lines
+                    name (image-base), and a folder of npm programs (config/image-npm), a row
+                    a program (npm-NAME).
     --compose FILE  the images a compose file names, in the table's place: a Docker app's
                     compose.yml in the catalog. The file is one row, named for its folder, and a
                     move or a pin rewrites its image lines and nothing else of it.
@@ -134,9 +145,16 @@ RUNNERS = os.path.join(ROOT, "scripts", "dashboard", "runner-pins.json")
 # The programs the controller's image takes from their vendors' releases as
 # it is built, the one copy of them (the Dockerfile, scripts/lib/pin-fetch).
 IMAGE_TOOLS = os.path.join(ROOT, "config", "image-tools.json")
+# What the controller's image takes from npm, a folder a program, and the
+# Dockerfile whose FROM line names the image it is built on.
+IMAGE_NPM = os.path.join(ROOT, "config", "image-npm")
+DOCKERFILE = os.path.join(ROOT, "Dockerfile")
 # Everything this tree ships that carries a pin: each table, and the file
-# of the coding agents' recipes read beside the toolchains'.
+# of the coding agents' recipes read beside the toolchains'; then what is
+# pinned where it lies, each path read as what it is (path_doc): the
+# image's npm programs and the Dockerfile's base image.
 SHIPPED = ((TABLE, AGENTS), (RUNNERS, ""), (SERVICES, ""), (IMAGE_TOOLS, ""))
+SHIPPED_WHERE_IT_LIES = (IMAGE_NPM, DOCKERFILE)
 # The name a table's document lists its rows under: the toolchains', the
 # CI runners' (scripts/dashboard/runner-pins.json) and the image's own
 # tools' (config/image-tools.json), whose rows are written as a toolchain's
@@ -767,6 +785,8 @@ def image_parts(row, waiting=False):
 def row_refused(row):
     """Why a row is not one its format takes, or "": its source, or the
     images it names."""
+    if row.get("npm"):
+        return npm_refused(row)
     if image_rows(row) or "images" in row:
         loose = [ref for _, ref in image_rows(row) if not packformat.image_digest(ref)]
         return f"{loose[0]} names no digest" if loose else ("" if image_rows(row) else "it names no image")
@@ -778,10 +798,179 @@ def row_refused(row):
     return packformat.source_refused(src)
 
 
+# ---- the programs the image takes from npm ------------------------------------
+# A folder of config/image-npm is one program: package.json names it at one
+# exact version, and package-lock.json every package that version brings,
+# each with the address of its tarball and its integrity. `npm ci` installs
+# by the lock and nothing else, holds each tarball to its integrity, and
+# with --ignore-scripts runs nobody's code, so an image built again holds
+# the same files until the lock moves. A row here is that folder: {"name":
+# "npm-FOLDER", "npm": {"dir", "manifest", "lock"}}.
+def npm_wanted(row):
+    """{package: version} a program's package.json asks for."""
+    deps = (row["npm"].get("manifest") or {}).get("dependencies")
+    return {str(k): str(v) for k, v in deps.items()} if isinstance(deps, dict) else {}
+
+
+def npm_packages(lock):
+    """{path: (version, address, integrity)} for every package a lock names."""
+    packages = lock.get("packages") if isinstance(lock, dict) else None
+    return {p: (str(v.get("version") or ""), str(v.get("resolved") or ""), str(v.get("integrity") or ""))
+            for p, v in (packages or {}).items() if p and isinstance(v, dict) and not v.get("link")}
+
+
+def npm_refused(row):
+    """Why a program's two files do not hold what npm installs, or "": each
+    package it asks for at one exact version, the lock written for that
+    package.json, and every package of the lock a tarball over https with a
+    sha512 beside it."""
+    want, lock = npm_wanted(row), row["npm"].get("lock") or {}
+    if not want:
+        return "its package.json asks for nothing"
+    loose = [f"{n}@{v}" for n, v in want.items() if not re.fullmatch(r"\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?", v)]
+    if loose:
+        return f"its package.json asks for {loose[0]}, which is no one version"
+    packages = npm_packages(lock)
+    if not packages:
+        return "it has no package-lock.json"
+    if ((lock.get("packages") or {}).get("") or {}).get("dependencies") != want:
+        return "its package-lock.json was not written for its package.json"
+    for path, (_version, url, integrity) in packages.items():
+        if not url.startswith("https://") or not integrity.startswith("sha512-"):
+            return f"{path.removeprefix('node_modules/')} is held to nothing in its lock: no https address, or no sha512"
+    return ""
+
+
+def npm_newest(name):
+    """The newest version of a package its registry names, as npm reads it."""
+    p = subprocess.run([_tool("npm", "what npm is asked for"), "view", "--json", "--", name, "version"], capture_output=True, text=True, timeout=120, check=False)
+    try:
+        got = json.loads(p.stdout)
+    except ValueError:
+        got = None
+    if p.returncode or not isinstance(got, str) or not got:
+        raise Refused(f"npm could not say what the newest {name} is: {' '.join((p.stderr or p.stdout).split())[-200:] or 'it failed'}")
+    return got
+
+
+def npm_project(manifest):
+    """package-lock.json as npm writes it for a project whose package.json
+    is `manifest`, with nothing installed and nobody's script run."""
+    npm = _tool("npm", "what npm is asked for")
+    with tempfile.TemporaryDirectory() as t:
+        d = os.path.join(t, "project")
+        os.mkdir(d)
+        with open(os.path.join(d, "package.json"), "w", encoding="utf-8") as f:
+            f.write(json.dumps(manifest, indent=2) + "\n")
+        _ran([npm, "install", "--package-lock-only", "--ignore-scripts", "--no-audit", "--no-fund", "--loglevel=error"], d,
+             f"npm could not resolve {', '.join(f'{n}@{v}' for n, v in (manifest.get('dependencies') or {}).items())}")
+        return load(os.path.join(d, "package-lock.json"))
+
+
+def npm_parts(row, version="", stay=False):
+    """plan's parts for a program npm installs: each package it asks for,
+    at the version held against the newest its registry names (or
+    `version`; with `stay`, the version it asks for now, which is a first
+    pin's), and its lock, the set held against the one npm writes for what
+    it would ask for then."""
+    want = npm_wanted(row)
+    if version and len(want) != 1:
+        raise Refused("--version names one package's version, and its package.json asks for several")
+    parts, new = [], dict(want)
+    for name, have in want.items():
+        new[name] = version or (have if stay else npm_newest(name))
+        part = {"what": name, "old": have, "new": new[name]}
+        if new[name] != have:
+            part["apply"] = lambda r, name=name, to=new[name]: r["npm"]["manifest"]["dependencies"].__setitem__(name, to)
+        parts.append(part)
+    lock = npm_project({**row["npm"]["manifest"], "dependencies": new})
+    was, now = npm_packages(row["npm"].get("lock") or {}), npm_packages(lock)
+    part = {"what": "its lock", "old": f"{len(was)} package(s)" if was else "", "new": f"{len(now)} package(s)"}
+    if was != now or new != want:
+        short = lambda p: p.rsplit("node_modules/", 1)[-1]  # noqa: E731
+        moved_ = [f"{short(p)} {was[p][0]} to {v[0]}" if p in was else f"{short(p)} {v[0]} added" for p, v in now.items() if was.get(p) != v]
+        moved_ += [f"{short(p)} {v[0]} gone" for p, v in was.items() if p not in now]
+        if was and moved_:
+            part["note"] = "; ".join(moved_[:8]) + (f"; and {len(moved_) - 8} more" if len(moved_) > 8 else "")
+        part["apply"] = lambda r, lock=lock: r["npm"].__setitem__("lock", lock)
+    else:
+        part["new"], part["note"] = part["old"], "npm writes the lock it holds"
+    return parts + [part]
+
+
+def npm_doc(root):
+    """A folder of npm programs in a table's place: every folder of it that
+    holds a package.json is a row, read from its two files and written
+    back to them."""
+    rows = []
+    for folder in sorted(os.listdir(root)):
+        d = os.path.join(root, folder)
+        if not os.path.isfile(os.path.join(d, "package.json")):
+            continue
+        lock = os.path.join(d, "package-lock.json")
+        rows.append({"name": f"npm-{folder}", "npm": {"dir": d, "manifest": load(os.path.join(d, "package.json")),
+                                                     "lock": load(lock) if os.path.isfile(lock) else {}}})
+    if not rows:
+        raise ValueError("no folder of it holds a package.json")
+    return {LISTS[3]: rows, "_list": LISTS[3], "_npm": root, "_file": root, "_agents": [], "_recipes": {"recipes": {}}, "_moved": set()}
+
+
+def npm_written(doc):
+    """Each program's two files as its row holds them now."""
+    for row in table(doc):
+        for name, what in (("package.json", row["npm"]["manifest"]), ("package-lock.json", row["npm"]["lock"])):
+            with open(os.path.join(row["npm"]["dir"], name), "w", encoding="utf-8") as f:
+                f.write(json.dumps(what, indent=2, ensure_ascii=False) + "\n")
+
+
+# ---- the image a Dockerfile is built FROM --------------------------------------
+# A Dockerfile's FROM lines, read and written as text so the file keeps
+# everything else: each names an image, held by its digest as any image is.
+FROM_LINE = re.compile(r"^(?P<head>FROM[ \t]+(?:--platform=\S+[ \t]+)?)(?P<ref>[^\s#]+)(?P<tail>(?:[ \t]+[Aa][Ss][ \t]+\S+)?[ \t]*)$", re.M)
+
+
+def dockerfile_doc(path, plats=("linux/amd64",)):
+    """A Dockerfile in a table's place: one row, image-base, of the images
+    its FROM lines name, each under the reference its line had, held for
+    `plats` (the platform the image is built for)."""
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+    stages = {m.group("tail").split()[-1].lower() for m in FROM_LINE.finditer(text) if m.group("tail").strip()}
+    refs = list(dict.fromkeys(m.group("ref") for m in FROM_LINE.finditer(text) if m.group("ref").lower() not in ({"scratch"} | stages)))
+    if not refs:
+        raise ValueError("it is built FROM no image")
+    row = {"name": "image-base", "compose": True, "images": {ref: ref for ref in refs}, "platforms": list(plats)}
+    return {LISTS[2]: [row], "_list": LISTS[2], "_dockerfile": path, "_text": text, "_file": path, "_agents": [], "_recipes": {"recipes": {}}, "_moved": set()}
+
+
+def dockerfile_repinned(text, moved_):
+    """A Dockerfile with each FROM line's image in `moved_` ({old: new})
+    written as its new one, and nothing else of it changed."""
+    return FROM_LINE.sub(lambda m: m.group("head") + moved_.get(m.group("ref"), m.group("ref")) + m.group("tail"), text)
+
+
+def path_doc(path, recipes=""):
+    """What a path is read as in a table's place: a Dockerfile, a folder of
+    npm programs, or a table."""
+    if os.path.isdir(path):
+        return npm_doc(path)
+    if os.path.basename(path).startswith("Dockerfile"):
+        return dockerfile_doc(path)
+    return table_doc(path, recipes)
+
+
+def shipped_docs():
+    """Every document of this tree that carries a pin: the tables, the
+    image's npm programs and the image it is built FROM."""
+    return [table_doc(path, recipes) for path, recipes in SHIPPED] + [path_doc(path) for path in SHIPPED_WHERE_IT_LIES]
+
+
 # ---- what a row is, and what would move ---------------------------------------
 def is_pinned(row):
     """Whether a row has anything pinned for check and move to ask about. A
     row with a download still waiting for its first pin is `pin`'s."""
+    if row.get("npm"):
+        return not npm_refused(row)
     if image_rows(row):
         return all(packformat.image_digest(ref) for _, ref in image_rows(row))
     src = row.get("source") or {}
@@ -795,6 +984,8 @@ def plan(row, version=""):
     own download, its commit, a declared download). `apply` writes the part
     into a copy of the row. A part that is as its entry pins it is listed
     with old and new alike."""
+    if row.get("npm"):
+        return npm_parts(row, version)
     if image_rows(row):
         return image_parts(row)
     src = row.get("source") or {}
@@ -968,7 +1159,7 @@ def agent_rows(recipes):
 # What this tool keeps in the table's document beside the table: the
 # agents' rows, the file they came from, which of the two files moved, and
 # the name the table lists its rows under.
-BESIDE = ("_agents", "_recipes", "_moved", "_list", "_compose", "_text", "_file", "_agents_file", "_pack")
+BESIDE = ("_agents", "_recipes", "_moved", "_list", "_compose", "_text", "_file", "_agents_file", "_pack", "_npm", "_dockerfile")
 
 
 def agents_written(doc):
@@ -1092,6 +1283,22 @@ def cmd_pin(doc, names, opts, out):
 def pin_row(doc, row, opts, out):
     name, src = row["name"], row.get("source") or {}
     new = copy.deepcopy(row)
+    # A program npm installs, with no lock yet: the lock npm writes for
+    # the version its package.json asks for.
+    if row.get("npm"):
+        if is_pinned(row):
+            raise Refused(f"it is pinned already: tools/pins.py move {name} --file {os.path.dirname(row['npm']['dir'])} moves it")
+        parts = npm_parts(row, opts.get("version", ""), stay=True)
+        for p in parts:
+            if p.get("apply"):
+                p["apply"](new)
+        why = row_refused(new)
+        if why:
+            raise Refused(f"what it would become is refused: {why}")
+        for line in lines(name, [p for p in parts if p.get("apply")]):
+            out(line)
+        put(doc, row, new)
+        return finish(doc, opts, out, 1, 0)
     # The images it names with no digest yet: every one of them, or the
     # row is left as it was.
     if image_rows(row) or "images" in row:
@@ -1151,7 +1358,7 @@ def has_rev(doc, row):
     """Whether a row carries a rev that a move raises: a table's row, a
     recipe. A compose file has none, nor a pack that is pinned by the
     commit it is at."""
-    return not (row.get("compose") or (doc.get("_pack") or {}).get("kind") in ("pack", "service"))
+    return not (row.get("compose") or row.get("npm") or (doc.get("_pack") or {}).get("kind") in ("pack", "service"))
 
 
 def finish(doc, opts, out, changed, failed):
@@ -1166,6 +1373,14 @@ def finish(doc, opts, out, changed, failed):
         except Refused as e:
             out(f"{doc['_pack']['name']}: its manifest is left as it was: {e}")
             failed += 1
+        return 1 if failed else 0
+    if changed and doc.get("_npm"):
+        npm_written(doc)
+        return 1 if failed else 0
+    if changed and doc.get("_dockerfile"):
+        # A Dockerfile: its FROM lines rewritten, and nothing else of it.
+        with open(doc["_dockerfile"], "w", encoding="utf-8") as f:
+            f.write(dockerfile_repinned(doc["_text"], table(doc)[0]["images"]))
         return 1 if failed else 0
     if changed and doc.get("_compose"):
         # A compose file: its image lines rewritten, and nothing else of it.
@@ -1218,6 +1433,18 @@ def verify_rows(doc, names, opts, out):
             else:
                 out(f"{name}: {what} is its pin ({'a list for ' + ', '.join(plats) if plats else 'one image'}, sha256 {digest[7:19]})")
         if image_rows(row):
+            continue
+        if row.get("npm"):
+            # Every tarball its lock names, held to the integrity beside it:
+            # what npm ci does as it installs.
+            for path, (version, url, integrity) in npm_packages(row["npm"]["lock"]).items():
+                seen += 1
+                try:
+                    npm_hashed(url, integrity)
+                except ERRORS as e:
+                    out(f"{name}: NOT ITS PIN: {path.rsplit('node_modules/', 1)[-1]} {version}: {said(e)}")
+                    bad += 1
+            out(f"{name}: its lock's {len(npm_packages(row['npm']['lock']))} package(s) asked for")
             continue
         files = []
         try:
@@ -1520,13 +1747,11 @@ def main(argv, out=print):
         if verb == "check" and not names and not any(k in opts for k in ("file", "compose", "agents")):
             # Everything this tree ships that carries a pin: the toolchains
             # with the coding agents' recipes, the CI runners, the services'
-            # images, the image's own tools.
-            docs = []
-            for reading, recipes in SHIPPED:
-                docs.append(table_doc(reading, recipes))
-            return run(verb, docs, names, opts, out)
+            # images, the image's own tools, what it takes from npm and the
+            # image it is built FROM.
+            return run(verb, shipped_docs(), names, opts, out)
     except (OSError, ValueError, AttributeError) as e:
-        out(f"pins: cannot read {reading or opts.get('catalog')}: {said(e)}")
+        out(f"pins: cannot read {reading or opts.get('catalog') or 'what this tree ships'}: {said(e)}")
         return 1
     except ERRORS as e:
         out(f"pins: {said(e)}")
@@ -1538,7 +1763,7 @@ def main(argv, out=print):
             # lines name, each under the reference it had.
             doc = compose_doc(opts["compose"], [opts["platform"]] if opts.get("platform") else ())
         else:
-            doc = table_doc(opts["file"])
+            doc = path_doc(opts["file"])
     except (OSError, ValueError, AttributeError) as e:
         out(f"pins: cannot read {opts['file']}: {said(e)}")
         return 1

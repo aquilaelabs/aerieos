@@ -1,0 +1,7 @@
+{
+  "name": "aerieos-image-playwright",
+  "private": true,
+  "dependencies": {
+    "playwright": "1.65.1"
+  }
+}

@@ -17,7 +17,10 @@
 # AerieOS: a Claude Code workstation and the controller for build nodes,
 # the machines where builds, tests, CI and the Android emulator actually run.
 ##############################################################################
-FROM ubuntu:24.04
+# The base image by its tag and the digest of its list, so an image built
+# again starts from the same bytes until the digest moves (tools/pins.py
+# check and move --file Dockerfile, with the other pins).
+FROM ubuntu:24.04@sha256:9c7f200c07e3d4a03e7249d2c16bf66a51120fb876aa2242cf31451412543289
 
 LABEL org.opencontainers.image.title="AerieOS" \
       org.opencontainers.image.description="Claude Code workstation and build-node controller" \
@@ -26,15 +29,6 @@ LABEL org.opencontainers.image.title="AerieOS" \
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG NODE_MAJOR=22
-# noVNC draws a VM's screen in the dock (R99): pinned, and checked by digest.
-ARG NOVNC_VERSION=1.7.0
-ARG NOVNC_SHA256=b1003a11b6e6e8d8f7f5e5586daae7f8ca651d8aee0aa155ff9ac841c48f52c6
-# The two programs the image takes from npm, each at one version: an image
-# built again holds the same release until the number here moves. (Their
-# own dependencies are npm's to resolve: Playwright names its one exactly,
-# web-ext names ranges.)
-ARG PLAYWRIGHT_VERSION=1.65.1
-ARG WEB_EXT_VERSION=10.8.0
 ARG TARGETARCH
 
 # --- Playwright build knob -------------------------------------------------
@@ -54,10 +48,11 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # Deliberately NOT disabling `npm audit`: that one is a real signal.
 # PYTHONDONTWRITEBYTECODE: a session that runs `python3 -m py_compile` (or any
 # script) in a mounted project should not leave __pycache__ litter in the
-# repo. NODE_PATH: the image's global modules (Playwright above all) resolve
-# from a `require()` in any directory, instead of every session symlinking
-# them into a scratch node_modules first. (ESM `import` ignores NODE_PATH;
-# use createRequire, as scripts/dashboard/test/lib.mjs does.)
+# repo. NODE_PATH: the image's global modules (Playwright above all, linked
+# there from the prefix its lock installs it into) resolve from a
+# `require()` in any directory, instead of every session symlinking them
+# into a scratch node_modules first. (ESM `import` ignores NODE_PATH; use
+# createRequire, as scripts/dashboard/test/lib.mjs does.)
 ENV DEBIAN_FRONTEND=noninteractive \
     LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \
@@ -192,6 +187,16 @@ RUN set -eux; \
 # The env var keeps its value for the same reason: every project's playwright,
 # the dashboard's tests and `bb shot` name that directory, and it is now a
 # link rather than a directory.
+#
+# The module is installed by its lock (config/image-npm/playwright: the one
+# version its package.json names, and package-lock.json with every package's
+# tarball and integrity): `npm ci` installs exactly the lock's set, holds
+# each tarball to its integrity, and with --ignore-scripts runs nobody's
+# install script, as root or otherwise. It lands in a prefix of its own and
+# is linked into the global modules and onto the PATH, so NODE_PATH and the
+# `playwright` command are where they were. tools/pins.py moves the lock
+# (check, move --file config/image-npm). The browsers themselves are not
+# npm's: Playwright fetches, for each, the build its own version names.
 # ---------------------------------------------------------------------------
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers
 # A project's own Playwright installing its browsers here (or into the store
@@ -203,9 +208,12 @@ ENV PLAYWRIGHT_SKIP_BROWSER_GC=1
 # install-deps`, which runs apt-get install itself in this same layer; the
 # scanner only recognizes a literal install and reports the update as alone.
 #trivy:ignore:AVD-DS-0017
+COPY config/image-npm /usr/local/lib/aerieos-npm
 RUN set -eux; \
     if [ "${INSTALL_PLAYWRIGHT}" != "true" ]; then echo "skipping Playwright"; exit 0; fi; \
-    npm install -g --foreground-scripts "playwright@${PLAYWRIGHT_VERSION}"; \
+    npm ci --ignore-scripts --no-audit --prefix /usr/local/lib/aerieos-npm/playwright; \
+    ln -s /usr/local/lib/aerieos-npm/playwright/node_modules/playwright "$(npm root -g)/playwright"; \
+    ln -s /usr/local/lib/aerieos-npm/playwright/node_modules/.bin/playwright /usr/local/bin/playwright; \
     apt-get update; \
     playwright install-deps chromium firefox webkit; \
     npm cache clean --force; \
@@ -251,10 +259,15 @@ RUN set -eux; \
 #
 # web-ext (MPL) is here: the controller carries what it needs in the image,
 # and there is no package list at boot (R29, then the operator's call:
-# everything else is a toolchain installed on a node).
+# everything else is a toolchain installed on a node). Installed by its
+# lock as Playwright is (config/image-npm/web-ext), every package of its
+# tree at the version and the integrity the lock names.
 # ---------------------------------------------------------------------------
 RUN set -eux; \
-    npm install -g --foreground-scripts "web-ext@${WEB_EXT_VERSION}"; \
+    npm ci --ignore-scripts --no-audit --prefix /usr/local/lib/aerieos-npm/web-ext; \
+    ln -s /usr/local/lib/aerieos-npm/web-ext/node_modules/web-ext "$(npm root -g)/web-ext"; \
+    ln -s /usr/local/lib/aerieos-npm/web-ext/node_modules/.bin/web-ext /usr/local/bin/web-ext; \
+    web-ext --version; \
     corepack enable; \
     npm cache clean --force
 
@@ -263,15 +276,15 @@ RUN set -eux; \
 # ---------------------------------------------------------------------------
 # noVNC: the browser's half of a VM's screen (R99), the page and the RFB
 # client it imports, served by the dashboard under /novnc/. MPL-2.0, its
-# license kept beside it.
+# license kept beside it. Its release's source as config/image-tools.json
+# pins it, held to the pinned sha256 (scripts/lib/pin-fetch) like every
+# other tool the image takes.
 RUN set -eux; \
-    curl -fsSL -o /tmp/novnc.tar.gz \
-        "https://github.com/novnc/noVNC/archive/refs/tags/v${NOVNC_VERSION}.tar.gz"; \
-    echo "${NOVNC_SHA256}  /tmp/novnc.tar.gz" | sha256sum -c -; \
+    v="$(bb-pin-fetch /opt/aerieos/config/image-tools.json novnc linux/amd64 /tmp/novnc.tar.gz)"; \
     mkdir -p /opt/aerieos/novnc; \
     tar xzf /tmp/novnc.tar.gz -C /opt/aerieos/novnc --strip-components=1 \
-        "noVNC-${NOVNC_VERSION}/core" "noVNC-${NOVNC_VERSION}/vendor" \
-        "noVNC-${NOVNC_VERSION}/vnc_lite.html" "noVNC-${NOVNC_VERSION}/LICENSE.txt"; \
+        "noVNC-${v}/core" "noVNC-${v}/vendor" \
+        "noVNC-${v}/vnc_lite.html" "noVNC-${v}/LICENSE.txt"; \
     rm -f /tmp/novnc.tar.gz; \
     test -f /opt/aerieos/novnc/core/rfb.js
 

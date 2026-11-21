@@ -439,8 +439,9 @@ tools/pins.py check --catalog DIR   # the same four verbs over a checkout of the
 - **check** reads the network and writes nothing. It exits 0 when nothing
   would move, 3 when something would, 1 on an error. With nothing named it
   asks everything this tree ships that carries a pin, the toolchains, the
-  coding agents' recipes, the CI runners and the services' images, so a
-  release's pass is this one command. A file with no version
+  coding agents' recipes, the CI runners, the services' images, the
+  controller image's own tools, what it takes from npm and the image it is
+  built from, so a release's pass is this one command. A file with no version
   in its address has nothing to track: check downloads it and says when its
   bytes are no longer the pinned ones, which is the day an install of it
   starts being refused. A newer release that is not out for every platform
@@ -465,6 +466,22 @@ tools/pins.py check --catalog DIR   # the same four verbs over a checkout of the
   and never keeps it; `--platform linux/arm64` asks for one platform and
   `--all` for every one. For a repository it says whether the tag the row
   names is still at the pinned commit.
+
+**What the controller's image is built from** is pinned where it lies,
+and each is a row of the tool. Its tools from their vendors' releases, and
+noVNC's source, are a table (`config/image-tools.json`, `--file` with that
+path). What it takes from npm is a folder a program (`config/image-npm`:
+Playwright and web-ext): `package.json` names the one version asked for
+and `package-lock.json` every package under it with its tarball's address
+and integrity, which `npm ci --ignore-scripts` installs by, holding each
+tarball to its integrity and running nobody's install script. `check
+--file config/image-npm` asks npm for each program's newest version and
+for the lock it would write, and says when either differs (a range
+somewhere under web-ext moved, a new Playwright is out); `move` writes
+both files. The image it is built on is named in the Dockerfile's `FROM`
+line by its tag and the digest of its list, a row of images like any
+other: `check --file Dockerfile` says when the tag serves another digest,
+and `move` rewrites that line and nothing else.
 
 **The CI runners a node installs** are pinned the same way, in a table of
 their own: `scripts/dashboard/runner-pins.json` lists a row for each kind

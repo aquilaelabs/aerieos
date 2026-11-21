@@ -1,12 +1,14 @@
 # One config for CI and `aerie lint`, so the two can never disagree about what a
 # clean Dockerfile is. hadolint loads this file from the directory it runs in.
 #
-# DL3008/DL3013/DL3016: a rolling dev image deliberately tracks the newest
-#   apt/pip/npm packages rather than pinning them.
+# DL3008: the image takes the distribution's and three vendors' own apt
+#   packages at the version each source offers the day it is built.
 # SC1091: shellcheck cannot follow `. /etc/os-release`, which only exists
 #   inside the image being built.
+#
+# Nothing is installed by pip, and what npm installs is its lock's set
+# (config/image-npm, `npm ci`), so the two rules that ask for a pinned
+# version there (DL3013, DL3016) are in force.
 ignored:
   - DL3008
-  - DL3013
-  - DL3016
   - SC1091

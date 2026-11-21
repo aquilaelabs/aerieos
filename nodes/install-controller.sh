@@ -186,12 +186,6 @@ tree_stamp() {
     printf '%s %s' "${target:-unstamped}" "${rev:-unstamped}"
 }
 
-# dockerfile_arg NAME [TREE]: an ARG's default in the tree's Dockerfile, the
-# one place the image's pins are kept (noVNC and its checksum).
-dockerfile_arg() {
-    sed -n "s/^ARG $1=//p" "${2:-$TREE}/Dockerfile" | head -1
-}
-
 # ---- the release, laid out as the image lays it out -------------------------
 # copy_as_copy TREE SRC DEST: one Dockerfile COPY line, done here: a folder
 # (SRC/) is its contents into DEST/, a glob each file into DEST/, a file to
@@ -221,7 +215,7 @@ copy_as_copy() {
 # the image's RUN lines add there (noVNC, the scripts made executable) and
 # the stamp the image carries in its ENV (build.env).
 lay_out() {
-    local t="$1" dir="$2" ver="$3" rev="$4" src dest n=0 nv sha
+    local t="$1" dir="$2" ver="$3" rev="$4" src dest n=0 nv
     rm -rf "$dir.partial"
     install -d -m 0755 "$dir.partial"
     while read -r src dest; do
@@ -232,7 +226,8 @@ lay_out() {
     [ "$n" -gt 5 ] || die "the Dockerfile in $t names nothing to lay out ($n COPY lines)"
     # ...and what a machine of its own needs that the image does not: the
     # installer itself (for --update and --remove from here), its
-    # env file's template and the Dockerfile's pins.
+    # env file's template and the Dockerfile, whose COPY lines the next
+    # layout is read from.
     install -m 0755 "$t/nodes/install-controller.sh" "$dir.partial/nodes/install-controller.sh"
     install -m 0644 "$t/config/controller.env" "$dir.partial/config/controller.env"
     install -m 0644 "$t/Dockerfile" "$dir.partial/Dockerfile"
@@ -248,18 +243,17 @@ lay_out() {
         python3 -m compileall -q "$dir.partial/scripts" >/dev/null 2>&1 \
             || warn "the scripts did not all compile ahead of time: they run, and compile as they load"
     fi
-    # noVNC: a VM's screen in the dock (R99), the image's pinned release,
-    # checked by the image's digest.
+    # noVNC: a VM's screen in the dock (R99), the release the tree's
+    # config/image-tools.json pins, held to the pinned sha256 (pin-fetch)
+    # as the image takes it.
     if [ "${NO_FETCH:-0}" != 1 ]; then
-        nv="$(dockerfile_arg NOVNC_VERSION "$t")"; sha="$(dockerfile_arg NOVNC_SHA256 "$t")"
-        if [ -n "$nv" ] && curl -fsSL -o "$dir.partial/novnc.tar.gz" \
-                "https://github.com/novnc/noVNC/archive/refs/tags/v${nv}.tar.gz" \
-           && echo "${sha}  $dir.partial/novnc.tar.gz" | sha256sum -c - >/dev/null 2>&1; then
+        if nv="$(bash "$t/scripts/lib/pin-fetch" "$t/config/image-tools.json" novnc linux/amd64 "$dir.partial/novnc.tar.gz" 2>/dev/null)" \
+                && [ -n "$nv" ]; then
             install -d -m 0755 "$dir.partial/novnc"
             tar xzf "$dir.partial/novnc.tar.gz" -C "$dir.partial/novnc" --strip-components=1 \
                 "noVNC-${nv}/core" "noVNC-${nv}/vendor" "noVNC-${nv}/vnc_lite.html" "noVNC-${nv}/LICENSE.txt"
         else
-            warn "noVNC ${nv:-?} did not download or did not match its checksum: a VM's screen will not draw until an update brings it"
+            warn "noVNC did not download or was not its pinned file: a VM's screen will not draw until an update brings it"
         fi
         rm -f "$dir.partial/novnc.tar.gz"
     fi
@@ -366,9 +360,31 @@ pick_python() {
     printf '%s' "$best"
 }
 
+# npm_program TREE NAME: one of the image's npm programs (Playwright,
+# web-ext) as the image installs it: by the lock the tree carries
+# (config/image-npm/NAME, every package's tarball and integrity), with
+# `npm ci --ignore-scripts`, so exactly the lock's set lands, each tarball
+# held to its integrity, and nobody's install script runs as root. It goes
+# into a prefix of its own and is linked into npm's global modules, where
+# NODE_PATH finds it, and onto the PATH.
+NPM_PREFIX="$P/usr/local/lib/aerieos-npm"
+npm_program() {
+    local t="$1" name="$2" src d root
+    src="$t/config/image-npm/$name"
+    d="$NPM_PREFIX/$name"
+    [ -f "$src/package-lock.json" ] || return 1
+    install -d -m 0755 "$d"
+    install -m 0644 "$src/package.json" "$src/package-lock.json" "$d/"
+    npm ci --ignore-scripts --no-audit --no-fund --prefix "$d" >/dev/null 2>&1 || return 1
+    root="$(npm root -g 2>/dev/null)" || return 1
+    install -d -m 0755 "$root" "$P/usr/local/bin"
+    ln -sfn "$d/node_modules/$name" "$root/$name"
+    ln -sfn "$d/node_modules/.bin/$name" "$P/usr/local/bin/$name"
+}
+
 # extras: what the image fetches from each vendor beside the packages, the
 # same way and as best it can: the linters `aerie lint` runs, uv and mise,
-# Playwright and web-ext through npm, the home tunnel's cloudflared. Each
+# Playwright and web-ext by their locks, the home tunnel's cloudflared. Each
 # one that does not land is said, and nothing waits on it. The terminals
 # need none of them: each is a pty of the dashboard's own.
 extras() {
@@ -403,7 +419,7 @@ extras() {
     command -v mise >/dev/null 2>&1 || miss+=(mise)
     if command -v npm >/dev/null 2>&1; then
         for bin in playwright web-ext; do
-            command -v "$bin" >/dev/null 2>&1 || npm install -g --foreground-scripts "$bin" >/dev/null 2>&1 || miss+=("$bin")
+            npm_program "$TREE" "$bin" || miss+=("$bin")
         done
         command -v corepack >/dev/null 2>&1 && corepack enable >/dev/null 2>&1 || true
         # Playwright's system libraries are an apt list of its own; the

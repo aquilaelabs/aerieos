@@ -131,9 +131,10 @@ class Shipped(Case):
         for name, doc in self.paths.items():
             pins.save(os.path.join(self.d, name + ".json"), doc)
         at = lambda name: os.path.join(self.d, name + ".json")  # noqa: E731
-        p = mock.patch.object(pins, "SHIPPED", ((at("toolchains"), at("agents")), (at("runners"), ""), (at("services"), "")))
-        p.start()
-        self.addCleanup(p.stop)
+        for p in (mock.patch.object(pins, "SHIPPED", ((at("toolchains"), at("agents")), (at("runners"), ""), (at("services"), ""))),
+                  mock.patch.object(pins, "SHIPPED_WHERE_IT_LIES", ())):
+            p.start()
+            self.addCleanup(p.stop)
 
     def test_check_with_nothing_named_asks_every_table_this_tree_ships(self):
         rc, out = self.tool("check")
@@ -171,6 +172,10 @@ class Shipped(Case):
         for table, recipes in real.SHIPPED:
             doc = real.table_doc(table, recipes)
             self.assertTrue(real.table(doc), table)
+        # ...and what is pinned where it lies: what the image takes from npm, and the image it is built FROM.
+        self.assertEqual([os.path.relpath(p, REPO) for p in real.SHIPPED_WHERE_IT_LIES], ["config/image-npm", "Dockerfile"])
+        self.assertEqual([[r["name"] for r in real.table(real.path_doc(p))] for p in real.SHIPPED_WHERE_IT_LIES],
+                         [["npm-playwright", "npm-web-ext"], ["image-base"]])
         # A name, or a table named, is asked of that table alone, as before.
         rc, out = self.tool("check", "--file", os.path.join(self.d, "runners.json"))
         self.assertEqual((rc, out.splitlines()), (0, ["forge: its download is at the pinned bytes (its address still answers the pinned bytes)", "nothing would move"]))

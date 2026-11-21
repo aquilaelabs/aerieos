@@ -28,7 +28,7 @@ def sh(body, env=None, root=""):
     """bash with the installer sourced for its functions, under a scratch
     prefix; nothing is root, and nothing outside the prefix is written."""
     pre = f'set -euo pipefail\nBB_CONTROLLER_LIB=1 . "{INSTALLER}"\n'
-    e = dict(os.environ, BB_INSTALL_ROOT=root, NO_FETCH="1", **(env or {}))
+    e = {**os.environ, "BB_INSTALL_ROOT": root, "NO_FETCH": "1", **(env or {})}
     return subprocess.run(["bash", "-c", pre + body], capture_output=True, text=True, timeout=120,
                           check=False, env=e)
 
@@ -143,11 +143,41 @@ class LaidOutAsTheImage(unittest.TestCase):
         r = sh(f'tree_stamp "{t}"')
         self.assertEqual(r.stdout.split(), ["0.9.0", "f" * 40])
 
-    def test_the_images_pins_are_read_from_its_dockerfile(self):
-        r = sh("dockerfile_arg NOVNC_VERSION; dockerfile_arg NOVNC_SHA256")
-        ver, sha = r.stdout.split()
-        self.assertRegex(ver, r"^\d+\.\d+\.\d+$")
-        self.assertRegex(sha, r"^[0-9a-f]{64}$")
+    def test_novnc_is_laid_out_from_the_file_the_trees_table_pins(self):
+        # lay_out with the tree's pin-fetch stood in: what it is asked for
+        # is noVNC's row of the tree's own table, the version it prints
+        # names the folders taken out of the archive, and a file that is
+        # not the pinned one leaves no noVNC and says so.
+        tree = os.path.join(self.root, "tree")
+        for d in ("scripts/lib", "config", "nodes"):
+            os.makedirs(os.path.join(tree, d))
+        names = [*(f"config/f{i}" for i in range(6)), "nodes/provision-linux.sh"]
+        for name in (*names, "config/controller.env", "config/image-tools.json", "nodes/install-controller.sh"):
+            with open(os.path.join(tree, name), "w") as f:
+                f.write("x\n")
+        with open(os.path.join(tree, "Dockerfile"), "w") as f:
+            f.write("FROM x\nCOPY scripts/ /opt/aerieos/scripts/\n" + "".join(f"COPY {n} /opt/aerieos/{n}\n" for n in names))
+        src = os.path.join(self.root, "noVNC-9.9.9")
+        for part in ("core", "vendor"):
+            os.makedirs(os.path.join(src, part))
+        for name in ("core/rfb.js", "vendor/x.js", "vnc_lite.html", "LICENSE.txt", "README.md"):
+            with open(os.path.join(src, name), "w") as f:
+                f.write("x\n")
+        subprocess.run(["tar", "czf", os.path.join(self.root, "novnc.tgz"), "-C", self.root, "noVNC-9.9.9"], check=True)
+        fake = os.path.join(tree, "scripts", "lib", "pin-fetch")
+        with open(fake, "w") as f:
+            f.write(f'#!/bin/bash\necho "$*" >> "{self.root}/asked"\n[ -z "${{REFUSE:-}}" ] || {{ echo "pin-fetch: not the pinned file" >&2; exit 1; }}\ncp "{self.root}/novnc.tgz" "$4"\necho 9.9.9\n')
+        rel = os.path.join(self.root, "opt", "aerieos-releases", "1.2.3")
+        os.makedirs(os.path.dirname(rel))
+        r = sh(f'lay_out "{tree}" "{rel}" 1.2.3 abc123', env={"NO_FETCH": "0"}, root=self.root)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(open(os.path.join(self.root, "asked")).read().split()[:3], [os.path.join(tree, "config", "image-tools.json"), "novnc", "linux/amd64"])
+        self.assertEqual(sorted(os.listdir(os.path.join(rel, "novnc"))), ["LICENSE.txt", "core", "vendor", "vnc_lite.html"])
+        self.assertFalse(os.path.exists(os.path.join(rel, "novnc.tar.gz")))
+        r = sh(f'lay_out "{tree}" "{rel}" 1.2.3 abc123', env={"NO_FETCH": "0", "REFUSE": "1"}, root=self.root)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertFalse(os.path.exists(os.path.join(rel, "novnc")))
+        self.assertIn("noVNC did not download or was not its pinned file", r.stderr + r.stdout)
 
 
 class TheEnvironment(unittest.TestCase):
@@ -260,7 +290,8 @@ class TheImagesOtherTools(unittest.TestCase):
             self.assertIn(tool, dockerfile(), tool)
             self.assertIn(tool, body, tool)
         self.assertNotIn("ttyd", text)
-        self.assertIn("NOVNC_SHA256", text)
+        self.assertIn("novnc", dockerfile())
+        self.assertIn(" novnc linux/amd64 ", text)
 
 
 class Updates(unittest.TestCase):
