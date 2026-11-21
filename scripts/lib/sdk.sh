@@ -957,16 +957,14 @@ sdk_update() {
         return 0
     fi
     # What is left is a row with nothing on offer, whose version is what its
-    # own tooling gives at the moment: swift (held to its publisher's
-    # signature, version in its address), playwright (the module's own
+    # own tooling gives at the moment: playwright (the module's own
     # browsers) and the android packages (sdkmanager's, held by its
-    # repository). flutter and dotnet are rows with an offer and went above.
+    # repository). flutter, dotnet and swift (the version its publisher's
+    # signature holds) are rows with an offer and went above.
     case "$what" in
-        swift|playwright)
-            # Both are "unpack the current thing": swift is a tarball with the
-            # version in its path, and playwright fetches whatever revisions
-            # the module now wants, leaving the old ones alone.
-            [ "$what" = swift ] && sdk_remove swift
+        playwright)
+            # "Unpack the current thing": playwright fetches whatever
+            # revisions the module now wants, leaving the old ones alone.
             sdk_install "$what"
             ;;
         android:*)
@@ -985,7 +983,7 @@ sdk_update() {
             log "updating ${what#android:}"
             sdkmgr --update
             ;;
-        *) die "usage: aerie toolchains update NAME: a toolchain its entry pins, or playwright|swift|android:<package>" ;;
+        *) die "usage: aerie toolchains update NAME: a toolchain its entry pins, or playwright|android:<package>" ;;
     esac
 }
 

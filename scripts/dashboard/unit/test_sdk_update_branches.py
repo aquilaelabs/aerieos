@@ -47,7 +47,7 @@ class UpdateBranches(unittest.TestCase):
         return [m for m in re.findall(r"^        ([a-z:*|-]+)\)$", case, re.M)]
 
     def test_the_branches_left_are_the_rows_with_nothing_on_offer(self):
-        self.assertEqual(self.branches(), ["swift|playwright", "android:*"])
+        self.assertEqual(self.branches(), ["playwright", "android:*"])
         rows = shipped()
         for name in ("playwright",):
             self.assertIsNone(sdkmeta.offered(rows[name]), f"{name} has no pinned version of its own: its branch is how it updates")
