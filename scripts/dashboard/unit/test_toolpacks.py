@@ -350,7 +350,7 @@ class Repository(unittest.TestCase):
         toolpacks.add(self.url, toolpacks.fetch(self.url)["commit"], "operator")
         r = toolpacks.remove("hexkit", ["bb-dev-sandbox"])
         self.assertEqual(r["installed"], ["bb-dev-sandbox"])
-        self.assertIn("hexkit is installed on bb-dev-sandbox: uninstall it there first", r["error"])
+        self.assertEqual(r["error"], "hexkit is installed on bb-dev-sandbox: uninstall it there first", "one sentence, and no walk through the page")
         self.assertEqual([x["name"] for x in toolpacks.recipes()], ["hexkit"], "still in the catalog")
 
 

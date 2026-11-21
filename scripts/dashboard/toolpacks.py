@@ -1630,9 +1630,7 @@ def where_said(name, where):
     """The refusal for removing a pack still installed (B84): its files
     would stay in those stores with no row left to uninstall them from, and
     a pack added back would read as installed with no install run."""
-    return {"error": f"{name} is installed on {', '.join(where)}: uninstall it there first "
-                     f"(pick that node in the Library and press Remove on its card), "
-                     f"then remove the pack", "installed": list(where)}
+    return {"error": f"{name} is installed on {', '.join(where)}: uninstall it there first", "installed": list(where)}
 
 
 def remove(name, where=()):

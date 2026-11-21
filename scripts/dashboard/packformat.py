@@ -327,9 +327,9 @@ def fetch_checked(raw, what="install.fetch", reserved=()):
         return [], [f"{what} lists up to {FETCH_MAX} downloads, each {{url, sha256, to}}"], set()
     clean, errors, new = [], [], set()
     for i, f in enumerate(raw):
-        said = (f"{what} {i + 1} is {{url, sha256, to}}: an https address, the sha256 of what it answers (64 hex digits), "
-                "and the file inside the pack it is kept as, each named once; from pack format 5 it may name the platform it is for, "
-                "and signed ({sig, keys}: its publisher's signature and the keys it is checked with) in the sha256's place")
+        # One sentence: what each key is, and what format 5 adds, is the
+        # doc's to say (docs/tool-packs.md, Declared downloads).
+        said = f"{what} {i + 1} is {{url, sha256, to}}, each named once, as Declared downloads in docs/tool-packs.md writes one"
         if not isinstance(f, dict) or set(f) - FETCH_KEYS:
             errors.append(said)
             continue
