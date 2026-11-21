@@ -2490,8 +2490,7 @@ button[aria-busy="true"]{opacity:.75}
    outranks it there. */
 .setgrid{margin:6px 0 2px}
 @media (max-width:600px){
-  .ndnet,.ndstore{grid-template-columns:minmax(0,1fr)}
-  .ndstore .sub{grid-column:1}
+  .ndnet{grid-template-columns:minmax(0,1fr)}
 }
 
 /* The wiring fold. Its lines wrap rather than scroll: a host path is long, and
