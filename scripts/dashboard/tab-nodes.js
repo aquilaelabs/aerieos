@@ -1185,6 +1185,7 @@ function nodeSessFacts(n){
     : pill("ok", "in force");
   const sealed = Object.values(n.reported?.tokseal?.sealed || {}).reduce((t, a) => t + Object.keys(a).length, 0);
   const seal = !n.reported?.tokseal ? ""
+    : n.reported.tokseal.nolib ? pill("bad", "not in force") + why("this node has no Python cryptography library to seal with")
     : !sealed ? pill("note", "nothing signed in yet")
     : pill("ok", "in force") + why(`${sealed} sealed${n.tokseal_stale ? `, ${n.tokseal_stale} under an older key until its person opens a terminal here` : ""}`);
   const rl = n.reported?.relay;

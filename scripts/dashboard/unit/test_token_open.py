@@ -73,7 +73,7 @@ class Node(tok.TokensMixin):
     account has a session running is what the test says."""
 
     def __init__(self, pubs, seal=True):
-        self.state = {"token_seal": seal, "token_pubs": {}, "token_pubs2": dict(pubs)}
+        self.state = {"token_seal": seal, "token_pubs2": dict(pubs)}
         self.live = True
         self.said = []
 
@@ -214,6 +214,47 @@ class Case(unittest.TestCase):
                     out[rel] = ("link", os.path.relpath(os.readlink(p), self.d)) if os.path.islink(p) \
                         else ("folder" if os.path.isdir(p) else "file", oct(mode(p)))
         return out, sorted((os.path.relpath(p, self.d), m, u, g) for p, m, u, g in asked)
+
+
+class NoLibrary(Case):
+    """A node with no cryptography library seals nothing new: a sign-in
+    stays the plain file it is, said once in the agent's log and on the
+    node's row. A seal of the format before that it holds still opens in a
+    terminal, its boot key the old group's."""
+
+    def setUp(self):
+        super().setUp()
+        nts, base = agent.module("tokenseal"), agent.module("base")
+        for p in (mock.patch.object(nts, "HAVE", False), mock.patch.dict(base._said, {}, clear=True)):
+            p.start()
+            self.addCleanup(p.stop)
+        self.logged = []
+        p = mock.patch.object(base, "log", self.logged.append)
+        p.start()
+        self.addCleanup(p.stop)
+        self.node = Node(self.pubs())
+
+    def test_a_plain_sign_in_stays_as_it_is_and_it_says_so_once(self):
+        self.wrote_plain(FIRST)
+        ino = os.lstat(self.hf).st_ino
+        for _ in range(3):
+            self.passes()
+        self.assertFalse(os.path.lexists(self.seal), "no seal made")
+        self.assertFalse(os.path.islink(self.hf))
+        self.assertEqual(os.lstat(self.hf).st_ino, ino, "the very file, untouched")
+        self.assertEqual(self.logged, ["tokens: this node has no cryptography library, so no sign-in is sealed here"])
+        census = self.node.token_census()
+        self.assertIs(census.get("nolib"), True)
+        self.assertGreater(len(census["E"]), 64, "its boot key is the old group's")
+
+    def test_a_seal_from_before_it_holds_still_opens(self):
+        pub1 = self.ts.public(self.ts.secret1(INSTALL_KEY, NODE, ACCT))
+        about = {"agent": "claude", "K": self.ts.rid(pub1)}
+        os.makedirs(os.path.dirname(self.seal))
+        with open(self.seal, "wb") as f:
+            f.write(agentpkg.seal_the_way_before(self.ts, pub1, FIRST, about))
+        self.opens()
+        self.assertEqual((self.linked(), self.opened()), (True, FIRST))
 
 
 class PlainFile(Case):
@@ -451,7 +492,7 @@ class OnePath(Case):
 
 class SwitchOff(Case):
     def off(self):
-        self.node.state.update(token_seal=False, token_pubs={}, token_pubs2={})
+        self.node.state.update(token_seal=False, token_pubs2={})
 
     def test_an_opened_copy_comes_back_as_the_plain_file(self):
         self.signed_in()
@@ -534,7 +575,7 @@ class ThroughNoLink(Case):
         self.untouched(bf)
         self.assertEqual(self.sealed(), (FIRST, False), "the account's own seal is as it was")
         self.assertEqual(self.opened(), FIRST, "and so is its opened copy")
-        self.node.state.update(token_seal=False, token_pubs={}, token_pubs2={})
+        self.node.state.update(token_seal=False, token_pubs2={})
         self.passes()
         self.untouched(bf)
 
@@ -547,7 +588,7 @@ class ThroughNoLink(Case):
         self.opens()
         self.untouched(bf)
         self.assertEqual(self.sealed(), (FIRST, False), "the link's file is not sealed as this account's")
-        self.node.state.update(token_seal=False, token_pubs={}, token_pubs2={})
+        self.node.state.update(token_seal=False, token_pubs2={})
         self.passes()
         self.untouched(bf)
         with open(self.hf, "rb") as f:

@@ -45,7 +45,7 @@ import time
 
 from . import tokenseal
 from .accounts import UID_RE, user_of
-from .base import SIGNINS, held_folder, log, pack_signins, wipe, write_at, write_atomic
+from .base import SIGNINS, held_folder, log, log_once, pack_signins, wipe, write_at, write_atomic
 from .names import VAR
 
 SEAL_DIR = VAR + "/tokens"
@@ -281,7 +281,7 @@ class TokensMixin:
                             h = tokenseal.header(f.read(8192))
                         sealed.setdefault(acct, {})[agent] = {"R": h.get("R", ""), "K": h.get("K", ""),
                                                              "email": h.get("email", ""), "plan": h.get("plan", "")}
-        return {"E": self.token_boot_public(), "sealed": sealed}
+        return {"E": self.token_boot_public(), "sealed": sealed, **({} if tokenseal.HAVE else {"nolib": True})}
 
     def _open_mounted(self):
         """OPEN_DIR a tmpfs of its own, mounted once: noswap where the kernel
@@ -305,11 +305,14 @@ class TokensMixin:
         return d
 
     def _seal(self, acct, agent, data, home):
-        # The X25519 public where this node has the library (R158 step 3),
-        # else the public before, which seals the old way.
-        pub = ((self.state.get("token_pubs2") or {}).get(acct) if tokenseal.HAVE else None) \
-            or (self.state.get("token_pubs") or {}).get(acct)
+        # The X25519 public (R158 step 3), with the library to seal with:
+        # a node with none seals nothing, said once, and its sign-ins stay
+        # as they are, as they do before an account has a key here.
+        pub = (self.state.get("token_pubs2") or {}).get(acct)
         if not pub:
+            return False
+        if not tokenseal.HAVE:
+            log_once("tokseal-nolib", f"tokens: {tokenseal.NO_LIBRARY}")
             return False
         d = os.path.join(SEAL_DIR, acct)
         os.makedirs(SEAL_DIR, mode=0o700, exist_ok=True)

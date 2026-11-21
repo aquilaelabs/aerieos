@@ -7,10 +7,12 @@ finds the name wherever the package defines it; agent.NAME = value sets it
 in every module that holds it, which is where the code under test looks it
 up (a module that did `from .base import log` has its own `log`).
 """
+import hashlib
 import importlib
 import importlib.util
 import io
 import itertools
+import json
 import os
 import re
 import sys
@@ -59,6 +61,18 @@ def an_agent(said=None, note=""):
         z.writestr("aerieos_agent/__init__.py", f'AGENT_VERSION = "{said or version()}"\n')
         z.writestr("aerieos_agent/cli.py", '# answers "selfcheck" in __main__\n')
     return buf.getvalue()
+
+
+def seal_the_way_before(ts, pub, data, about=None):
+    """A seal of the format before (BBTOK1, the 2048-bit group), made as a
+    node made one before tokenseal stopped making them, so a test can hold
+    one where a node may still hold one. `ts` is a loaded tokenseal."""
+    A = ts.element(pub)
+    r = int.from_bytes(os.urandom(32), "big") % (ts.Q - 1) + 1
+    R = pow(ts.G, r, ts.P)
+    k = hashlib.sha256(ts._b(pow(A, r, ts.P)) + ts._b(R) + ts._b(A)).digest()
+    head = json.dumps(dict(about or {}, R=format(R, "x")), sort_keys=True).encode()
+    return ts._close(k, ts.MAGIC1, head, data)
 
 
 def load(tag="agent"):

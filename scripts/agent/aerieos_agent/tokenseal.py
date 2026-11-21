@@ -18,11 +18,12 @@ node's disk, with the traffic captured, opens it.
 
 The format before (BBTOK1: Diffie-Hellman in RFC 3526's 2048-bit group, a
 HMAC-SHA256 counter-mode stream and a HMAC tag, built from the standard
-library alone) is still opened here for one release, so a seal a node made
-under 0.8.x opens in the terminal its person next opens there and is sealed
-again the new way. A key is told apart by its width: 64 hex characters is
-X25519, 512 the old group. A node without the library (a 0.8.x node not yet
-provisioned with it) seals the old way, which the controller still opens.
+library alone) is opened and never made: a seal a node holds from before
+opens in the terminal its person next opens there and is sealed again the
+new way. A key is told apart by its width: 64 hex characters is X25519, 512
+the old group. A node without the library seals nothing (seal refuses), and
+the sign-ins there stay as they are; its boot key is still the old group's,
+so a seal it holds from before can be opened there.
 
 A seal: MAGIC, one line of JSON (the agent, the account, R, and what the
 login said of itself: email, plan), the nonce, the ciphertext with its tag.
@@ -39,7 +40,7 @@ try:
     from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
     from cryptography.hazmat.primitives.kdf.hkdf import HKDF
     HAVE = True
-except ImportError:                                         # a node provisioned before the library
+except ImportError:                                         # a node with no library: it seals nothing
     HAVE = False
 
 MAGIC = b"BBTOK2\n"
@@ -48,7 +49,7 @@ MAGIC1 = b"BBTOK1\n"
 WRAP1 = b"BBWRAP1\n"
 
 # RFC 3526 group 14: the 2048-bit MODP group, g = 2, a safe prime (the
-# format before; kept to open what 0.8.x nodes sealed).
+# format before; kept to open the seals made in it, never to make one).
 P = int(
     "FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A08798E3404DD"
     "EF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7ED"
@@ -114,7 +115,7 @@ def secret(key, node, account):
 
 
 def secret1(key, node, account):
-    """The format before's secret exponent, for the seals 0.8.x nodes made."""
+    """The format before's secret exponent, for the seals made in it."""
     raw = hmac.new(bytes(key), b"bb agent token v1|" + str(node).encode() + b"|" + str(account).encode(),
                    hashlib.sha256).digest()
     return int.from_bytes(raw, "big") % (Q - 1) + 1
@@ -152,7 +153,8 @@ def _xor(a, b):
 
 def _close(k, magic, head, data):
     """`data` under K: ChaCha20-Poly1305 with the header as associated
-    data for the new magics, the format before's stream and tag for the old."""
+    data for the new magics, the format before's stream and tag for a wrap
+    to a boot key of the old kind (a node with no library)."""
     if magic in (MAGIC, WRAP):
         _need()
         nonce = os.urandom(12)
@@ -202,27 +204,24 @@ def header(blob):
         raise Refused("not a seal") from None
 
 
+NO_LIBRARY = "this node has no cryptography library, so no sign-in is sealed here"
+
+
 def seal(pub, data, about=None):
     """`data` (bytes) sealed for the holder of pub's secret: the node's side,
     which needs nothing secret. `about`: what may be read without opening
     it (the agent, the account, the login's email). An X25519 public (64
-    hex) seals the new way; the format before's public, or no library here,
-    the old way."""
-    if is_v2(pub) and HAVE:
-        A = _pub2(pub)
-        r = X25519PrivateKey.generate()
-        R = r.public_key().public_bytes_raw()
-        k = _kdf(r.exchange(A), R + A.public_bytes_raw())
-        head = json.dumps(dict(about or {}, R=R.hex()), sort_keys=True).encode()
-        return _close(k, MAGIC, head, data)
-    if is_v2(pub):
-        raise Refused("this node has no cryptography library: it seals the old way with the old public key")
-    A = element(pub)
-    r = int.from_bytes(os.urandom(32), "big") % (Q - 1) + 1
-    R = pow(G, r, P)
-    k = hashlib.sha256(_b(pow(A, r, P)) + _b(R) + _b(A)).digest()
-    head = json.dumps(dict(about or {}, R=format(R, "x")), sort_keys=True).encode()
-    return _close(k, MAGIC1, head, data)
+    hex) alone, with the library: anything else is Refused."""
+    if not HAVE:
+        raise Refused(NO_LIBRARY)
+    if not is_v2(pub):
+        raise Refused("not a public key of the kind a seal is made with")
+    A = _pub2(pub)
+    r = X25519PrivateKey.generate()
+    R = r.public_key().public_bytes_raw()
+    k = _kdf(r.exchange(A), R + A.public_bytes_raw())
+    head = json.dumps(dict(about or {}, R=R.hex()), sort_keys=True).encode()
+    return _close(k, MAGIC, head, data)
 
 
 def _exchange(me, pub):

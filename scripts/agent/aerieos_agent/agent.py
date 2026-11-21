@@ -643,13 +643,14 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             if isinstance(r.get("pool_keys"), list):
                 self.pool_keys_want(r["pool_keys"])
             # The coding agents' sign-ins sealed (R126): the controller's
-            # switch, and each account's public key here, kept in node.json.
-            ts, pubs = bool(r.get("token_seal")), r.get("token_pubs") if isinstance(r.get("token_pubs"), dict) else {}
-            # ...and the X25519 publics a seal is made with here (R158 step 3).
+            # switch, and each account's X25519 public here (R158 step 3),
+            # kept in node.json. The format before's publics are not kept.
+            ts = bool(r.get("token_seal"))
             pubs2 = r.get("token_pubs2") if isinstance(r.get("token_pubs2"), dict) else {}
-            if ts != bool(self.state.get("token_seal")) or pubs != (self.state.get("token_pubs") or {}) \
-                    or pubs2 != (self.state.get("token_pubs2") or {}):
-                self.state["token_seal"], self.state["token_pubs"], self.state["token_pubs2"] = ts, pubs, pubs2
+            if ts != bool(self.state.get("token_seal")) or pubs2 != (self.state.get("token_pubs2") or {}) \
+                    or "token_pubs" in self.state:
+                self.state["token_seal"], self.state["token_pubs2"] = ts, pubs2
+                self.state.pop("token_pubs", None)
                 save_state(self.state)
                 if ts != bool(self.state.get("token_seal_said")):
                     self.state["token_seal_said"] = ts

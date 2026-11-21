@@ -444,6 +444,12 @@ class Table(unittest.TestCase):
         got = nodes._census({"tokseal": {"E": "ab", "sealed": {"u_0123abcd": seals}}})["tokseal"]["sealed"]
         self.assertEqual(sorted(got["u_0123abcd"]), ["claude", "codex", "copilot", "grok", "kimi"])
 
+    def test_a_node_with_no_library_to_seal_with_says_so(self):
+        tk = nodes._census({"tokseal": {"E": "ab", "sealed": {}, "nolib": True}})["tokseal"]
+        self.assertIs(tk.get("nolib"), True)
+        for v in (False, "yes", 1, None):
+            self.assertNotIn("nolib", nodes._census({"tokseal": {"E": "ab", "sealed": {}, "nolib": v}})["tokseal"], v)
+
     def test_a_mounts_long_reason_ends_on_a_word(self):
         # The agent's stale-handle reason ends on what to do and ran past
         # the 200 kept, so the row read 'then Apply s' (B914).

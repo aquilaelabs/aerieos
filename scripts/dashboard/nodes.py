@@ -1697,7 +1697,8 @@ def _c_tokseal(c, out):
                     sealed.setdefault(acct, {})[ag] = {"R": v["R"], "K": re.sub(r"[^0-9a-f]", "", str(v.get("K") or ""))[:24],
                                                        "email": str(v.get("email") or "")[:120],
                                                        "plan": str(v.get("plan") or "")[:40]}
-        out["tokseal"] = {"E": tk["E"], "sealed": sealed}
+        # ...and that it has no library to seal with, where it has none.
+        out["tokseal"] = {"E": tk["E"], "sealed": sealed, **({"nolib": True} if tk.get("nolib") is True else {})}
 
 
 def _c_toolchain_verified(c, out):
@@ -6077,11 +6078,8 @@ def hello(nid, census, addr, version="", digest="", running=None, keep=None, rot
             "pool_keys": (pool_keys({p["name"] for p in (n.get("reported") or {}).get("pools") or [] if not p.get("locked")})
                           if pool_keys and own_machine(n) else []),
             # ...and its coding agents' sign-ins sealed there (R126), with
-            # each account's public key to seal them with.
+            # each account's X25519 public to seal them with (R158 step 3).
             "token_seal": token_seal_on(nid),
-            "token_pubs": (token_pubs(nid, True) if token_pubs and token_seal_on(nid) else {}),
-            # The X25519 publics a 0.9 agent seals with (R158 step 3); a
-            # 0.8.x agent reads token_pubs, the format before's.
             "token_pubs2": (token_pubs(nid) if token_pubs and token_seal_on(nid) else {}),
             # The idle rule for Claude sessions (idle.py): the node enforces
             # it itself, so it holds while this controller is down.
