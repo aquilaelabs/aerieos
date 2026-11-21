@@ -541,9 +541,29 @@ sdk_fetch() {
 # `aerie toolchains check <name>` once per toolchain, so a per-process memo would still
 # have asked six times. Two minutes is long enough for one sweep to ask once
 # and short enough that pressing "check for updates" again means what it says.
+#
+# /tmp is every account's, and the table read back is taken as sdkmanager's
+# own, so the file lives in a directory of this account's: made 0700, and
+# used only while it is a real directory this account owns that nobody else
+# may read or write (sdk_cache_dir, the directory sdkmeta.py keeps its
+# documents in). Where it is anything else nothing is kept, and sdkmanager
+# is asked every time.
 SDK_LIST_CACHE_TTL=120
+sdk_cache_dir() {
+    local d
+    d="${TMPDIR:-/tmp}/bb-sdk-cache-$(id -u)" || return 1
+    mkdir -m 700 "$d" 2>/dev/null || true
+    [ -d "$d" ] && [ ! -L "$d" ] && [ -O "$d" ] || return 1
+    case "$(stat -c %a "$d" 2>/dev/null || stat -f %Lp "$d" 2>/dev/null)" in 700) ;; *) return 1 ;; esac
+    printf '%s\n' "$d"
+}
 sdk_android_list() {
-    local f="${TMPDIR:-/tmp}/bb-sdk-list.cache" age
+    local f age
+    if ! f="$(sdk_cache_dir)"; then
+        timeout 120 sdkmanager "$(sdk_root_flag)" --list 2>/dev/null
+        return 0
+    fi
+    f="${f}/sdk-list.cache"
     if [ -s "$f" ]; then
         age=$(( $(date +%s) - $(stat -c %Y "$f" 2>/dev/null || echo 0) ))
         if [ "$age" -lt "$SDK_LIST_CACHE_TTL" ]; then cat "$f"; return 0; fi
@@ -561,7 +581,7 @@ sdk_android_list() {
 }
 # After anything that changes what is installed: the table is a statement
 # about both halves, and the installed half just moved.
-sdk_android_list_forget() { rm -f "${TMPDIR:-/tmp}/bb-sdk-list.cache"; }
+sdk_android_list_forget() { local d; d="$(sdk_cache_dir)" && rm -f "${d}/sdk-list.cache"; return 0; }
 
 # The newest package sdkmanager offers for a bare name, as `id<TAB>version`.
 # ndk and cmake ship as versioned ids (ndk;30.0.15729638) and a bare name
@@ -1333,15 +1353,18 @@ sdk_verify_download() {
         # The publisher signs the download itself (Swift): its signature
         # checked with the publisher's keys the row carries, or the ones
         # shipped beside the catalog under that name.
-        local sig keyring signer
-        sig="$(mktemp "${TMPDIR:-/tmp}/bb-sig.XXXXXX")"
-        sdk_fetch "$want" "$sig" >/dev/null 2>&1 || { rm -f "$file" "$sig"; die "could not fetch ${what}'s signature (${want})"; }
-        keyring="$(sdk_meta keyring "$where" "$what")" || { rm -f "$file" "$sig"; die "${what}: no keys to check its signature with"; }
+        # The keys made into a keyring for this one check, in a directory
+        # of its own that goes with it: never one found from a run before.
+        local sig keyring signer kd
+        kd="$(mktemp -d "${TMPDIR:-/tmp}/bb-sig.XXXXXX")" || { rm -f "$file"; die "${what}: no place to check its signature in"; }
+        sig="${kd}/sig"
+        sdk_fetch "$want" "$sig" >/dev/null 2>&1 || { rm -rf "$file" "$kd"; die "could not fetch ${what}'s signature (${want})"; }
+        keyring="$(sdk_meta keyring "$where" "$what" "$kd")" || { rm -rf "$file" "$kd"; die "${what}: no keys to check its signature with"; }
         if ! signer="$(gpgv --keyring "$keyring" "$sig" "$file" 2>&1)"; then
-            rm -f "$file" "$sig"
+            rm -rf "$file" "$kd"
             die "${what}'s download does not carry its publisher's signature: $(printf '%s' "$signer" | tail -2 | tr '\n' ' ')nothing was installed"
         fi
-        rm -f "$sig"
+        rm -rf "$kd"
         signer="$(printf '%s' "$signer" | sed -n 's/.*Good signature from "\([^"]*\)".*/\1/p' | head -1)"
         [ -n "$signer" ] || signer="a key of its publisher"
         log "verified: signed by ${signer}"
@@ -1680,7 +1703,7 @@ sdk_https_only() {
 # which sources this file: nothing here reads it).
 SDK_NOT_HELD=""
 sdk_fetch_declared() {
-    local what="$1" d="$2" plan tag url want to tmp got sig keys sigf keyring signer
+    local what="$1" d="$2" plan tag url want to tmp got sig keys sigf keyring signer kd
     if [ "$#" -ge 3 ]; then plan="$3"; else plan="$(sdk_meta declared "$what")"; fi
     # On a descriptor of its own: nothing a line runs can read the rest.
     while IFS=$'\037' read -r tag url want to sig keys <&3; do
@@ -1717,21 +1740,24 @@ sdk_fetch_declared() {
             command -v gpgv >/dev/null 2>&1 \
                 || { rm -f "$tmp"; die "${what}: there is no gpgv here to check the signature of ${to} with: nothing is installed"; }
             sdk_https_only "$what" "$sig"
-            sigf="$(mktemp "${d}/.bb-fetch.XXXXXX")"
+            # The signature and the keyring made of the keys, in a
+            # directory of this one check's own that goes with it.
+            kd="$(mktemp -d "${TMPDIR:-/tmp}/bb-sig.XXXXXX")" || { rm -f "$tmp"; die "${what}: no place to check the signature of ${to} in"; }
+            sigf="${kd}/sig"
             if ! curl -fsL --proto "$SDK_PROTO" --proto-redir '=https' --connect-timeout 30 --max-time 120 \
                     --retry 2 --retry-delay 5 -o "$sigf" "$sig"; then
-                rm -f "$tmp" "$sigf"
+                rm -rf "$tmp" "$kd"
                 die "${what}: the signature of ${to} (${sig}) could not be fetched: nothing is installed"
             fi
-            keyring="$(sdk_meta keyring "$keys" "$what")" \
-                || { rm -f "$tmp" "$sigf"; die "${what}: no keys named ${keys} to check ${to} with: nothing is installed"; }
+            keyring="$(sdk_meta keyring "$keys" "$what" "$kd")" \
+                || { rm -rf "$tmp" "$kd"; die "${what}: no keys named ${keys} to check ${to} with: nothing is installed"; }
             if ! signer="$(gpgv --keyring "$keyring" "$sigf" "$tmp" 2>&1)"; then
-                rm -f "$tmp" "$sigf"
+                rm -rf "$tmp" "$kd"
                 # shellcheck disable=SC2034  # held-run.sh reads it on the way out
                 SDK_NOT_HELD="$to"
                 die "${what}: ${url} answered a file that does not carry its publisher's signature under ${keys}: $(printf '%s' "$signer" | tail -2 | tr '\n' ' ')nothing is installed"
             fi
-            rm -f "$sigf"
+            rm -rf "$kd"
             signer="$(printf '%s' "$signer" | sed -n 's/.*Good signature from "\([^"]*\)".*/\1/p' | head -1)"
             log "verified: ${to} is signed by ${signer:-a key of its publisher} (${keys})"
         fi

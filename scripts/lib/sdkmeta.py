@@ -350,15 +350,42 @@ def declared_plan(tc):
 #
 # It is a cache and not a store: /tmp is cleared on every container start, and
 # a missing or stale entry simply means fetching again.
-CACHE_DIR = os.path.join(os.environ.get("TMPDIR", "/tmp"), "bb-sdkmeta-cache")
+#
+# /tmp is every account's, and what is read back from here is taken as what
+# an upstream published (an index a version is resolved from, a checksum
+# document). So the directory is this account's own: made 0700, and used
+# only while it is a real directory this account owns that nobody else may
+# read or write (cache_dir). One that is anything else, made first by
+# another account, is not used at all, and every document is fetched.
+CACHE_DIR = os.path.join(os.environ.get("TMPDIR", "/tmp"), f"bb-sdk-cache-{os.getuid()}")
 CACHE_TTL = int(os.environ.get("BB_SDK_CACHE_TTL", "900"))
 
 
+def cache_dir():
+    """CACHE_DIR where it is this account's own (made 0700 when it is not
+    there; a real directory, its owner this process, no bit for anybody
+    else), or "" where it is not: then nothing is kept and nothing read."""
+    import stat  # noqa: PLC0415
+    try:
+        try:
+            os.mkdir(CACHE_DIR, 0o700)
+        except FileExistsError:
+            pass
+        st = os.lstat(CACHE_DIR)
+    except OSError:
+        return ""
+    if not stat.S_ISDIR(st.st_mode) or st.st_uid != os.geteuid() or st.st_mode & 0o077:
+        return ""
+    return CACHE_DIR
+
+
 def _cached(key, produce):
-    """produce()'s bytes, remembered for CACHE_TTL by key."""
-    if CACHE_TTL <= 0:
+    """produce()'s bytes, remembered for CACHE_TTL by key in this account's
+    own directory (cache_dir), or produced every time where it has none."""
+    kept = cache_dir() if CACHE_TTL > 0 else ""
+    if not kept:
         return produce()
-    path = os.path.join(CACHE_DIR, hashlib.sha256(key.encode()).hexdigest()[:32])
+    path = os.path.join(kept, hashlib.sha256(key.encode()).hexdigest()[:32])
     try:
         if time.time() - os.path.getmtime(path) < CACHE_TTL:
             with open(path, "rb") as f:
@@ -367,7 +394,6 @@ def _cached(key, produce):
         pass
     body = produce()
     try:
-        os.makedirs(CACHE_DIR, exist_ok=True)
         # Written aside and moved, so a reader never sees half a document.
         tmp = f"{path}.{os.getpid()}"
         with open(tmp, "wb") as f:
@@ -686,14 +712,18 @@ KEYS_DIR = os.path.join(HERE, "..", "..", "config", "release-keys")
 KEY_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 
 
-def keyring(name, tc=None):
+def keyring(name, tc=None, into=None):
     """The publisher's keys `name`, as a keyring file gpgv reads: dearmored
-    once into this run's cache. One rule for every entry: the armored key
-    the entry `tc` carries under that name (source.keyring, a pack's
-    install.keyring) where it carries one, which wins, so a publisher's key
-    that changes is a catalog commit; otherwise the file of that name
-    AerieOS ships (config/release-keys). Never the machine's own keyring,
-    which anybody with a shell may have added to."""
+    every time it is asked for, into `into`, the caller's own directory for
+    this one check (one made here, 0700, when none is given, which the
+    caller removes). Never a file kept from another run: a keyring found
+    lying at a known name is whoever made it first's, and a signature would
+    verify under it. One rule for every entry: the armored key the entry
+    `tc` carries under that name (source.keyring, a pack's install.keyring)
+    where it carries one, which wins, so a publisher's key that changes is
+    a catalog commit; otherwise the file of that name AerieOS ships
+    (config/release-keys). Never the machine's own keyring, which anybody
+    with a shell may have added to."""
     name = os.path.basename(str(name or ""))
     carried = ((tc or {}).get("source") or {}).get("keyring")
     armored = carried.get(name) if isinstance(carried, dict) else None
@@ -707,15 +737,16 @@ def keyring(name, tc=None):
             die(f"no release keys named {name!r} beside the catalog" + (", and its entry carries none" if tc else ""))
         with open(src, "rb") as f:
             armored = f.read()
-    out = os.path.join(CACHE_DIR, "keys-" + hashlib.sha256(armored).hexdigest()[:16] + ".gpg")
-    if not os.path.isfile(out):
-        os.makedirs(CACHE_DIR, exist_ok=True)
-        p = subprocess.run(["gpg", "--batch", "--dearmor"], input=armored, capture_output=True, check=False)
-        if p.returncode or not p.stdout:
-            die(f"gpg could not read the release keys {name}: {p.stderr.decode(errors='replace')[:200]}")
-        with open(out + ".tmp", "wb") as f:
-            f.write(p.stdout)
-        os.replace(out + ".tmp", out)
+    import tempfile  # noqa: PLC0415
+    p = subprocess.run(["gpg", "--batch", "--dearmor"], input=armored, capture_output=True, check=False)
+    if p.returncode or not p.stdout:
+        die(f"gpg could not read the release keys {name}: {p.stderr.decode(errors='replace')[:200]}")
+    if into is None:
+        into = tempfile.mkdtemp(prefix="bb-keys.")
+    # A file of its own in the directory, made here and nowhere before.
+    fd, out = tempfile.mkstemp(prefix="keys-", suffix=".gpg", dir=into)
+    with os.fdopen(fd, "wb") as f:
+        f.write(p.stdout)
     return out
 
 
@@ -731,7 +762,7 @@ def signed_by(data, sig, keys, tc=None):
         with open(sp, "wb") as f:
             f.write(sig)
         try:
-            p = subprocess.run(["gpgv", "--keyring", keyring(keys, tc), sp, dp], capture_output=True, text=True,
+            p = subprocess.run(["gpgv", "--keyring", keyring(keys, tc, d), sp, dp], capture_output=True, text=True,
                                timeout=60, check=False)
         except FileNotFoundError:
             die("there is no gpgv here to check the publisher's signature with")
@@ -1179,10 +1210,12 @@ def main(argv):
         return
 
     if op == "keyring":
-        # keyring KEYS [NAME]: the keyring file gpgv reads for one
+        # keyring KEYS [NAME [DIR]]: the keyring file gpgv reads for one
         # publisher's keys (R137), the ones the entry NAME carries where it
-        # carries them.
-        print(keyring(argv[1] if len(argv) > 1 else "", toolchain(argv[2]) if len(argv) > 2 else None))
+        # carries them, made in DIR, the caller's own directory for this
+        # one check.
+        print(keyring(argv[1] if len(argv) > 1 else "", toolchain(argv[2]) if len(argv) > 2 and argv[2] else None,
+                      argv[3] if len(argv) > 3 else None))
         return
 
 

@@ -88,10 +88,20 @@ class Signed(sdkstore.KitCase):
         with open(os.path.join(shipped, "kit.asc"), "w") as f:
             f.write(self.other_asc)
         row = {"name": "kit", "source": {"keyring": {"kit.asc": self.pub_asc}}}
+        rings = os.path.join(self.root, "rings")
+        os.makedirs(rings)
+
+        def ring(*a):
+            with open(sdkmeta.keyring(*a, into=rings), "rb") as f:
+                return f.read()
         with mock.patch.multiple(sdkmeta, KEYS_DIR=shipped, CACHE_DIR=os.path.join(self.root, "cache")):
-            carried, theirs = sdkmeta.keyring("kit.asc", row), sdkmeta.keyring("kit.asc")
+            carried, theirs = ring("kit.asc", row), ring("kit.asc")
             self.assertNotEqual(carried, theirs, "the entry's own key wins over the shipped file of that name")
-            self.assertEqual(sdkmeta.keyring("kit.asc", {"name": "plain", "source": {}}), theirs, "an entry that carries none reads the shipped one")
+            self.assertEqual(ring("kit.asc", {"name": "plain", "source": {}}), theirs, "an entry that carries none reads the shipped one")
+            # Made each time it is asked for, in the caller's own directory:
+            # never a file found from a run before.
+            self.assertEqual(len(os.listdir(rings)), 3)
+            self.assertFalse(os.path.exists(os.path.join(self.root, "cache")))
             # The same keys hold a checksum file's signature (checksum.file.signed).
             data = b"ab" * 32 + b"  kit.tar.gz\n"
             with open(os.path.join(self.root, "sums"), "wb") as f:
@@ -104,7 +114,7 @@ class Signed(sdkstore.KitCase):
             with self.assertRaises(SystemExit):
                 sdkmeta.signed_by(data, sig, "kit.asc")
             # A name is a plain file name: a path's last part is what is read.
-            self.assertEqual(sdkmeta.keyring("../elsewhere/kit.asc", row), carried)
+            self.assertEqual(ring("../elsewhere/kit.asc", row), carried)
             for bad in ("", "no such.asc", "missing.asc"):
                 with self.assertRaises(SystemExit):
                     sdkmeta.keyring(bad, row)
