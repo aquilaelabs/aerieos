@@ -69,14 +69,16 @@ def catalog_file(shipped):
 
 
 # Whether this file is AerieOS's own source tree's, and not an install's
-# (sdk.sh's SDK_IN_TREE, by the same two neighbors): the tree's Dockerfile
-# and its unit tests are beside it, which no image, no bundle a node
-# fetches and no copy root keeps holds. It is where the file is, which
-# nothing in an environment says: what a test stands in for a check with
-# is read only there, so no job and no pack turns a check off by setting a
-# variable.
+# (sdk.sh's SDK_IN_TREE and the controller's seams.py, by the same two
+# neighbors): the tree's Dockerfile and its tools/ are beside it, which no
+# image, no bare-metal install (it holds the Dockerfile and scripts/, unit
+# tests and all, and none of tools/), no bundle a node fetches and no copy
+# root keeps holds. It is where the file is, which nothing in an
+# environment says. A job's seam, each one that reads IN_TREE: what a test
+# stands in for a check with is read only there, so no job and no pack
+# turns a check off by setting a variable.
 _HERE = os.path.dirname(os.path.realpath(__file__))
-IN_TREE = os.path.isfile(os.path.join(_HERE, "..", "..", "Dockerfile")) and os.path.isdir(os.path.join(_HERE, "..", "dashboard", "unit"))
+IN_TREE = os.path.isfile(os.path.join(_HERE, "..", "..", "Dockerfile")) and os.path.isdir(os.path.join(_HERE, "..", "..", "tools"))
 
 # BB_TOOLCHAINS_JSON points this at another catalog, in the source tree
 # alone. It exists so the install machinery can be exercised against a fake

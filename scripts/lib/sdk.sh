@@ -34,13 +34,17 @@ SDK_TOOLCHAINS="android node jdk playwright flutter dotnet swift go rust zig"
 # can drift. config/toolchains.json sits at the same place relative to this
 # script in the image and in a checkout.
 # Whether this file is AerieOS's own source tree's, and not an install's:
-# the tree's Dockerfile and its unit tests are beside it, which no image, no
+# the tree's Dockerfile and its tools/ are beside it (the controller's
+# seams.py asks the same), which no image, no bare-metal install (it holds
+# the Dockerfile and scripts/, unit tests and all, and none of tools/), no
 # bundle a node fetches and no copy root keeps holds. It is where the file
-# is, which nothing in an environment says: what a test stands in for (a
-# tool on its PATH, the files named below with each) is read only there.
+# is, which nothing in an environment says. A job's seam, every one below
+# that reads SDK_IN_TREE: what a test stands in for (a tool on its PATH,
+# the files named below with each) is read only there, since a job's
+# environment reaches this file.
 SDK_IN_TREE=""
 SDK_HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)" || SDK_HERE=""
-if [ -n "$SDK_HERE" ] && [ -f "${SDK_HERE}/../../Dockerfile" ] && [ -d "${SDK_HERE}/../dashboard/unit" ]; then
+if [ -n "$SDK_HERE" ] && [ -f "${SDK_HERE}/../../Dockerfile" ] && [ -d "${SDK_HERE}/../../tools" ]; then
     SDK_IN_TREE=1
 fi
 

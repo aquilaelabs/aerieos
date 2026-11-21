@@ -172,7 +172,7 @@ class Installed(unittest.TestCase):
 
 class Seams(Installed):
     ENV = {"BUILDERBOT_NET_DEV": "/tmp/planted-net-dev", "BUILDERBOT_NETCUT_BIN": "/tmp/planted-netcut", "BUILDERBOT_RUN_DIR": "/tmp/planted-run",
-           "BB_TOOLCHAINS_JSON": "/tmp/planted-catalog.json", "BB_TOOLPACKS_FILE_URLS": "1", "BB_SEAMS": "1"}
+           "BB_TOOLCHAINS_JSON": "/tmp/planted-catalog.json", "BB_TOOLPACKS_FILE_URLS": "1"}
 
     def sh(self, lib, script):
         p = subprocess.run(["bash", "-c", f'set -euo pipefail\n. "{lib}/common.sh"\n. "{lib}/sdk.sh"\n' + script],
@@ -190,6 +190,23 @@ class Seams(Installed):
         p = subprocess.run([sys.executable, "-c", "import sdkmeta; print(sdkmeta.CATALOG)"], capture_output=True, text=True, check=False,
                            cwd=self.lib, env={"PATH": "/usr/bin:/bin", "PYTHONPATH": self.lib, **self.ENV})
         self.assertEqual(os.path.realpath(p.stdout.strip()), os.path.realpath(os.path.join(self.d, "opt", "config", "toolchains.json")), p.stderr)
+
+    def test_a_bare_metal_install_s_copy_is_no_source_tree(self):
+        # A controller on a machine of its own lays out what the Dockerfile
+        # copies, the Dockerfile with it and scripts/ whole, unit tests and
+        # all: no tools/ beside them, so its node's seams stay shut.
+        top = os.path.join(self.d, "opt")
+        shutil.copy(os.path.join(REPO, "Dockerfile"), top)
+        os.makedirs(os.path.join(top, "scripts", "dashboard", "unit"))
+        rc, out, err = self.sh(self.lib, 'echo "tree=[$SDK_IN_TREE] $SDK_NETCUT_BIN"')
+        self.assertEqual((rc, out.split()), (0, ["tree=[]", "/usr/local/sbin/bb-netcut"]), err)
+        p = subprocess.run([sys.executable, "-c", "import sdkmeta; print(sdkmeta.IN_TREE)"], capture_output=True, text=True, check=False,
+                           cwd=self.lib, env={"PATH": "/usr/bin:/bin", "PYTHONPATH": self.lib, **self.ENV})
+        self.assertEqual(p.stdout.strip(), "False", p.stderr)
+        # ...and with tools/ beside it, it is the tree's.
+        os.makedirs(os.path.join(top, "tools"))
+        rc, out, err = self.sh(self.lib, 'echo "tree=[$SDK_IN_TREE] $SDK_NETCUT_BIN"')
+        self.assertEqual((rc, out.split()), (0, ["tree=[1]", "/tmp/planted-netcut"]), err)
 
     def test_the_source_tree_s_copy_reads_them(self):
         rc, out, err = self.sh(LIB, 'echo "$SDK_NET_DEV $SDK_NETCUT_BIN"; sdk_https_only thing file:///etc/passwd; echo taken')
@@ -225,7 +242,7 @@ class Seams(Installed):
         away = os.path.join(self.d, "node", "agent")
         shutil.copytree(os.path.join(pkg, "aerieos_agent"), os.path.join(away, "aerieos_agent"), ignore=shutil.ignore_patterns("__pycache__"))
         ask = "from aerieos_agent import base; print(base.NETCUT_BIN, base.installer_stub('codex') or '-')"
-        env = {"PATH": "/usr/bin:/bin", "BUILDERBOT_NETCUT_BIN": "/tmp/planted-netcut", "BUILDERBOT_CODEX_INSTALLER": "/tmp/planted.sh", "BB_SEAMS": "1"}
+        env = {"PATH": "/usr/bin:/bin", "BUILDERBOT_NETCUT_BIN": "/tmp/planted-netcut", "BUILDERBOT_CODEX_INSTALLER": "/tmp/planted.sh"}
         for where, want in ((away, "/tmp/planted-netcut /tmp/planted.sh"), (pkg, "/tmp/planted-netcut /tmp/planted.sh")):
             p = subprocess.run([sys.executable, "-c", ask], capture_output=True, text=True, check=False, cwd=where,
                                env=dict(env, PYTHONPATH=where))
