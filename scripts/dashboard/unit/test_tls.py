@@ -12,6 +12,7 @@ an install that kept the name's pair in cert.pem has it carried to its own
 files; the key is sealed again when the install key changes; and curl's
 --pinnedpubkey takes the pin for real."""
 import base64
+import contextlib
 import hashlib
 import http.client
 import json
@@ -19,6 +20,7 @@ import os
 import shutil
 import socket
 import ssl
+import struct
 import subprocess
 import sys
 import tempfile
@@ -123,6 +125,54 @@ class Pair(unittest.TestCase):
             quick.request("GET", "/")
             self.assertEqual(json.loads(quick.getresponse().read()), {"tls": False})
             self.assertLess(time.monotonic() - t0, 2.0)
+
+    def test_a_held_poll_whose_client_went_is_seen_gone_over_tls_as_over_plain(self):
+        # A node's poll is held on this side until a job comes. Over TLS the
+        # peek that sees its client go was refused and read as still there,
+        # so the poll of an agent restarted by its own update was handed the
+        # next job, which was lost.
+        tls.apply({"tls_mode": "self", "tls_host": "localhost"}.get, names=["127.0.0.1"])
+        cctx = ssl.create_default_context()
+        cctx.check_hostname = False
+        cctx.verify_mode = ssl.CERT_NONE
+        for how in ("plain", "close", "close_notify", "reset"):
+            with self.subTest(how=how):
+                lst = socket.create_server(("127.0.0.1", 0))
+                self.addCleanup(lst.close)
+                raw = socket.create_connection(lst.getsockname(), timeout=5)
+                conn, _ = lst.accept()
+                conn.settimeout(5)
+                if how == "plain":
+                    srv, cli = conn, raw
+                else:
+                    took = {}
+                    t = threading.Thread(target=lambda c=conn, out=took: out.setdefault("s", tls._ctx.wrap_socket(c, server_side=True)))
+                    t.start()
+                    # TLS 1.2 says close_notify in the clear; 1.3 hides it.
+                    if how == "close_notify":
+                        cctx12 = ssl.create_default_context()
+                        cctx12.check_hostname = False
+                        cctx12.verify_mode = ssl.CERT_NONE
+                        cctx12.maximum_version = ssl.TLSVersion.TLSv1_2
+                    cli = (cctx12 if how == "close_notify" else cctx).wrap_socket(raw, server_hostname="localhost")
+                    t.join(5)
+                    srv = took["s"]
+                self.addCleanup(srv.close)
+                # The request has crossed and the poll is held: the client is there.
+                cli.sendall(b"x")
+                self.assertEqual(srv.recv(1), b"x")
+                self.assertFalse(tls.client_gone(srv))
+                if how == "close_notify":
+                    cli.settimeout(0.5)
+                    with contextlib.suppress(OSError, ssl.SSLError):
+                        cli.unwrap()
+                if how == "reset":
+                    cli.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
+                cli.close()
+                end = time.monotonic() + 3
+                while not tls.client_gone(srv) and time.monotonic() < end:
+                    time.sleep(0.05)
+                self.assertTrue(tls.client_gone(srv), f"a client gone by {how} still reads as there")
 
 
 class H(BaseHTTPRequestHandler):

@@ -47,6 +47,7 @@ import contextlib
 import datetime
 import json
 import os
+import selectors
 import socket
 import ssl
 import threading
@@ -652,3 +653,39 @@ class WrapOnItsThread:
 
 def over_tls(connection):
     return isinstance(connection, ssl.SSLSocket)
+
+
+def client_gone(sock):
+    """Whether the peer of a held request has closed: readable with nothing
+    to read is EOF. Only a positive answer counts: a socket that cannot be
+    peeked reads as still there, so a held poll is never dropped on a guess.
+
+    A TLS socket's own recv takes no flags, and while that refusal read as
+    still there a node's poll over TLS outlived the agent that made it: an
+    agent restarted by its own update left its last poll held here, the
+    next job queued was handed to it and lost. So the bytes are peeked on
+    the plain socket under the TLS one. A held poll's client sends nothing
+    after its request, so what can be read there is its end: the close, a
+    reset, or under TLS 1.2 the alert ahead of a close. An agent that
+    restarts closes its socket and says nothing first. A client that ends
+    TLS 1.3 politely sends its alert as an encrypted record, which reads as
+    data, so its poll is held to its end as any poll is."""
+    try:
+        sel = selectors.DefaultSelector()
+        try:
+            sel.register(sock, selectors.EVENT_READ)
+            ready = sel.select(0)
+        finally:
+            sel.close()
+        if not ready:
+            return False
+        if isinstance(sock, ssl.SSLSocket):
+            if sock.pending():
+                return False
+            # 21 is a record of the alert type, which TLS 1.2 sends in the clear.
+            return socket.socket.recv(sock, 1, socket.MSG_PEEK) in (b"", b"\x15")
+        return sock.recv(1, socket.MSG_PEEK) == b""
+    except ConnectionResetError:
+        return True
+    except (OSError, ValueError):
+        return False

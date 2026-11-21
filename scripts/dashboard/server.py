@@ -5697,25 +5697,6 @@ def _container_age():
         return float("inf")     # cannot tell: treat it as "not booting"
 
 
-def client_gone(sock):
-    """Whether the peer of a held request has closed: readable with nothing
-    to read is EOF. Only a positive answer counts: an exception (a socket
-    that cannot be peeked) reads as still there, so a held poll is never
-    dropped on a guess."""
-    try:
-        sel = selectors.DefaultSelector()
-        try:
-            sel.register(sock, selectors.EVENT_READ)
-            ready = sel.select(0)
-        finally:
-            sel.close()
-        if not ready:
-            return False
-        return sock.recv(1, socket.MSG_PEEK) == b""
-    except (OSError, ValueError):
-        return False
-
-
 # ---- aerie doctor, cached for the Doctor card: doctor.py ----------------------
 import doctor                                                    # noqa: E402
 
@@ -10798,7 +10779,7 @@ class Handler(BaseHTTPRequestHandler):
         # Settings); a node's own X-Forwarded-For named any address it liked.
         addr = self._peer()
         if verb == "work":
-            got = channel.work(auth, req, addr, alive=lambda: not client_gone(self.connection))
+            got = channel.work(auth, req, addr, alive=lambda: not tls.client_gone(self.connection))
             if got is None:
                 self.send_response(204)
                 self.send_header("Content-Length", "0")

@@ -3021,7 +3021,7 @@ print(json.dumps(tc._node_errors("j_x", ["graphics"], "install")))`], { input: l
     const ej = await api('/api/v1/nodes', { action: 'exec', id: minted.id, argv: ['sh', '-c', 'echo alive after the update'] });
     const efin = await jobEnd(ej.job, { ms: 30000, step: 200 });
     ok(efin?.state === 'succeeded' && /alive after the update/.test(efin.log || ''),
-       `...and the new agent takes a job (${efin?.state})`);
+       `...and the new agent takes a job (${efin?.state}${efin?.state === 'succeeded' ? '' : ': ' + (efin?.error || '') + ' / agent log: ' + agentLog().trim().split('\n').slice(-12).join(' | ')})`);
     // The status command, the one the docs tell a person to run on a node.
     const st = execFileSync('python3', [AGENT_RUN, 'status'], { env: agentEnv, encoding: 'utf8' });
     ok(st.length > 0 && new RegExp(minted.id).test(st), `\`builderbot-agent status\` names the node (${st.trim().split('\n')[0].slice(0, 80)})`);
@@ -3592,7 +3592,7 @@ open(sys.argv[2], "wb").write(b.build(sys.argv[1]))`, `${R}/scripts/agent`, OLD]
            `...takes this controller's agent by its own update and dials in on it (${cur?.agent?.version || readFileSync(`${R}/agent.log`, 'utf8').trim().split('\n').slice(-2).join(' / ').slice(0, 160)})`);
         const j = await api('/api/v1/nodes', { action: 'exec', id: m.id, argv: ['sh', '-c', `echo updated from ${tag}`] });
         const fin = j.job ? await jobEnd(j.job, { ms: 30000, step: 200 }) : null;
-        ok(fin?.state === 'succeeded' && new RegExp(`updated from ${tag}`).test(fin.log || ''), `...and then takes a job (${fin?.state || j.error})`);
+        ok(fin?.state === 'succeeded' && new RegExp(`updated from ${tag}`).test(fin.log || ''), `...and then takes a job (${fin?.state || j.error}${fin && fin.state !== 'succeeded' ? ': ' + (fin.error || '') + ' / agent log: ' + readFileSync(`${R}/agent.log`, 'utf8').trim().split('\n').slice(-12).join(' | ') : ''})`);
       } finally {
         proc.kill('SIGTERM');
         await api('/api/v1/nodes', { action: 'retire', id: m.id });
