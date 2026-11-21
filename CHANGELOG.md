@@ -9,6 +9,7 @@
 - Pack format 5: an entry says what each of its downloads is held to, a sha256 or its publisher's signature under a key the entry carries, for one platform or all; a pack may declare that it downloads nothing; what an entry runs after its downloads runs with no network unless its installer must fetch the rest itself, which the entry says in one sentence. A toolchain's row may pin its download to a version and a sha256 for each platform, and an install then asks no vendor what is newest. An entry's Details page says in one line whether its downloads are pinned, and Look and an install's receipt say how each was held. What a package manager installs is held the same way: an entry says what it asks pip or npm for, each file of that set is a declared download, and its steps install from them with no index and no network. Every toolchain AerieOS ships holds what it fetches: the lint tools, the graphics tools, the document readers, speech, PyTorch, the file access server, the diagram renderers and the language servers install with no network from files pinned in their rows, and Playwright from pinned packages, with its browsers downloaded by Playwright itself (5ec3484, e32d1a2, 0f32645, 20e3daf, e32bf0c, 7c52a43, 4f1eb7a, cb6e890)
 - Test on a node's row also says whether the node takes what this controller ships: signed by the release key, its spare or a key added at its console, unchecked where its console allows unsigned builds, or not at all and why (6c78f2b)
 - A catalog entry that moves to a newer pack format keeps the pin of each earlier one, and an install takes the newest pin whose format it reads: an entry no longer disappears for an AerieOS that reads only the older format. An offer in the Library says what its downloads are held to before it is added (45ea48c, 1d79f17)
+- Controller settings says when the catalog's index in use was made (9875c09)
 
 ### Changed
 
@@ -94,6 +95,12 @@
 - Nothing a node or the image sets up takes a key or a tool from the network unchecked: Docker's package source on a node is held to a key the provisioner carries, and the image's package sources, its build tools and linters are held to keys and pins in the tree (b2f1869, 61dcf7b, 3999b5a)
 - An app's compose file is refused when it uses an anchor, an alias, a merge key, a tag or a mapping in braces, or names an image anywhere but on an image line of its own: what Look shows is then what Docker runs (babb869)
 - A release says the oldest catalog index it takes, so a new install is not handed an old signed index with its withdrawn packs back (ba3ce80)
+- A controller that starts without the install key its TLS key was sealed under keeps that key and waits, where it made a new one that every node then refused (88f30c1)
+- A catalog's newer recipe for a shipped toolchain or coding agent is taken only where its downloads are held to as much as the shipped one's, each one taken is in the audit, and a recipe that hands its vendor's installer to a shell is refused (02a0457)
+- A pack's layout can no longer set a loader's, a shell's, an interpreter's or AerieOS's own variables, and a system package's name can no longer be an option or carry apt's remove suffix (be671fa)
+- An update on a machine of its own takes nothing while the install names no release signer (67508b9)
+- The controller's image installs Playwright and web-ext from a committed lock with no install script run, is built from a base image named by its digest, and takes noVNC as a pinned row; an update on a machine of its own replaces the copies an earlier install took by name (8b68194, fc0dea5)
+- A dev build's tag is refused unless its commit is on main or a release's branch, a release's Android app is built on a hosted runner, and the image tags people follow move only onto a published, sealed release's own digest (2a1ed22)
 
 ## 0.9.0-dev.5641: 2026-11-18
 

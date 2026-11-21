@@ -217,7 +217,8 @@
           "resolver": "github-release",
           "repo": "systemd/mkosi",
           "trim_prefix": "v",
-          "numeric": true
+          "numeric": true,
+          "tag": "^v25\\."
         },
         "checksum": {
           "from": "pin",
