@@ -99,7 +99,7 @@ class Update(first.Update):
         self.assertEqual((state, code, job.installed), ("failed", 77, False))
         self.assertEqual(self.installed(), b"OLD")
         self.assertEqual(self.beside(), [], "nothing is left beside the agent")
-        self.assertEqual(job.why.cause, "older than the agent this node runs")
+        self.assertEqual(job.why, "older than the agent this node runs", "the job's error is the cause alone")
         self.assertIn(f"refused: this agent ({WINDOW}.{BUILD - 1}) is older than the agent this node runs ({VERSION})", job.said)
 
     def test_a_newer_one_and_one_the_console_let_back_are_installed(self):

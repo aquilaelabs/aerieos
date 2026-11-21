@@ -73,7 +73,7 @@ class Beside(unittest.TestCase):
         self.assertEqual(os.path.realpath(self.sh("sdk_meta_file")), os.path.realpath(self.newer))
         self.assertEqual(self.sh("sdk_checkable").split(), ["zig", "go"], "and what reads the catalog through it still does")
 
-    def test_the_python_half_reads_them_too_and_the_override_still_wins(self):
+    def test_the_python_half_reads_them_too_and_a_catalog_is_named_by_words(self):
         show = "import json; print(json.dumps([sdkmeta.CATALOG, sdkmeta.catalog()]))"
         path, rows = json.loads(self.py(show))
         self.assertEqual((os.path.realpath(path), self.revs(rows)), (os.path.realpath(self.shipped), {"zig": 1, "go": 1}))
@@ -83,8 +83,13 @@ class Beside(unittest.TestCase):
         other = os.path.join(self.b, "other.json")
         with open(other, "w") as f:
             json.dump({"toolchains": [{"name": "fake", "rev": 9}]}, f)
+        # An install's copy reads no catalog an environment names: it is
+        # handed one as its first words, as held-run.sh hands it a row.
         path, rows = json.loads(self.py(show, BB_TOOLCHAINS_JSON=other))
-        self.assertEqual((path, self.revs(rows)), (other, {"fake": 9}), "BB_TOOLCHAINS_JSON names the catalog outright")
+        self.assertEqual(os.path.realpath(path), os.path.realpath(self.newer))
+        r = subprocess.run([sys.executable, os.path.join(self.b, "scripts", "lib", "sdkmeta.py"), "--catalog", other, "names"],
+                           capture_output=True, text=True, env=self.env(), timeout=60, check=False)
+        self.assertEqual((r.returncode, r.stdout.split()), (0, ["fake"]), r.stderr)
 
     def test_the_file_is_chosen_by_what_is_beside_the_shipped_one(self):
         self.assertEqual(sdkmeta.catalog_file(self.shipped), self.shipped)

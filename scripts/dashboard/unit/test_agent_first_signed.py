@@ -349,7 +349,9 @@ class Update(Case):
             self.write(dict(RECORD, **held))
             (state, code), job = self.update(sig=self.sign(t, digest(NEW)), release_keys=[theirs])
             self.assertEqual((state, code, job.installed), ("failed", 77, False), job.said)
-            self.assertIn("refused", job.why)
+            # The job's error is the refusal's cause, and its log the whole of it.
+            self.assertIn(job.why, ("its signature is not the pinned release key's", "its signature is under no key this node trusts"))
+            self.assertIn("refused: " + job.why, job.said)
             self.assertEqual(self.installed(), b"OLD")
             self.assertEqual(self.read(), dict(RECORD, **held))
             self.assertEqual(self.beside(), [])

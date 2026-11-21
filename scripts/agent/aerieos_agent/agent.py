@@ -421,7 +421,10 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             share_images((self.state.get("stores") or {}).get("toolchains") or "")
         except OSError as e:
             log(f"toolchain store: could not share the images ({e})")
-        return census(self.state)
+        said = census(self.state)
+        # The roots the file explorer may be asked for are this census's own.
+        files.note_roots(said)
+        return said
 
     def hello_step(self):
         """The loop's ten-minute hello, with its census taken on a thread

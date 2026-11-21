@@ -2189,6 +2189,8 @@ def _c_release(c, out):
     out["release_also"] = [x[:16] for x in (also if isinstance(also, list) else [])
                            if isinstance(x, str) and re.fullmatch(r"[0-9a-f]{16,64}", x)][:4]
     out["unsigned_ok"] = c.get("unsigned_ok") is True
+    # ...and whether it said an older signed agent may be put back (older on).
+    out["older_ok"] = c.get("older_ok") is True
     out["release_unpinned"] = c.get("release_unpinned") is True
 
 
@@ -2581,7 +2583,7 @@ CENSUS = (
     (("vm_host",), _c_vm_host),
     (("vm_isos",), _c_vm_isos),
     (("sandbox",), _c_sandbox),
-    (("release_key", "release_spare", "release_also", "unsigned_ok", "release_unpinned"), _c_release),
+    (("release_key", "release_spare", "release_also", "unsigned_ok", "older_ok", "release_unpinned"), _c_release),
     (("bundle_refused",), _c_bundle_refused),
     (("channel",), _c_channel),
     (("root_off",), _c_root_off),

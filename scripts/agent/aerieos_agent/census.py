@@ -49,7 +49,6 @@ from .gpu import (
 )
 from .sessnet import SESSNET_STATUS, isolation_now
 from .runners import _runner_state, runner_dirs
-from . import files
 from . import release
 from . import storage
 from . import vmhw
@@ -336,7 +335,7 @@ def census(state):
     tot, _ = _mem()
     tc = _toolchains(state)
     gpu = _gpu_name()
-    said = {
+    return {
         "cpu": os.cpu_count() or 0, "mem_mb": tot,
         "os": f"{platform.system().lower()} {platform.machine()} "
               f"{_os_release()}".strip(),
@@ -507,9 +506,6 @@ def census(state):
         # one taken here, since a walk of a big store is minutes.
         "storage": storage.last(),
     }
-    # The roots the file explorer may be asked for are this census's own.
-    files.note_roots(said)
-    return said
 
 
 def _agent_version(spec, home):
