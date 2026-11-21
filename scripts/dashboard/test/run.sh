@@ -1704,14 +1704,14 @@ fresh
 # its own asynchronously was "wait_for: No record of process", which ended
 # the whole run now and then. Their pids come back through a file outside $S.
 PIDF="$(mktemp "${TMPDIR:-/tmp}/dashboard-test-pid.XXXXXX")"
-# Who may sign a release, for this world: nobody. The tree's own
-# config/release-signers names the release build's key, and with a signer
-# named a release the Library takes its apps from must carry a list signed
-# by it; the fake release devices.mjs writes carries the sha256 files alone,
-# so this world is the install that names no signer, which checks those and
-# says the signature was not checked. The signed list's rules are the unit
-# tier's (test_release_signing.py), with real keys.
-printf '# no signer: the fake releases of the browser suites are not signed\n' > "$S/release-signers"
+# Who may sign a release, for this world: a key of its own, made here. An
+# install that names no signer takes no release, so the fake release
+# devices.mjs writes carries a list of its files signed by this key
+# ($S/release-key), as a release's carries one signed by AerieOS's. The
+# signed list's other rules are the unit tier's (test_release_signing.py).
+rm -f "$S/release-key" "$S/release-key.pub"
+ssh-keygen -q -t ed25519 -N "" -C aerieos-release -f "$S/release-key" </dev/null
+printf 'aerieos-release namespaces="aerieos-release" %s aerieos-release\n' "$(cut -d' ' -f1,2 "$S/release-key.pub")" > "$S/release-signers"
 start_server() {
 # The agent this world's controller ships, a copy of its own made fresh for
 # each suite: agent.mjs appends to it to make its controller ship a newer

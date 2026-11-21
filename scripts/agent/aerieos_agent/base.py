@@ -162,7 +162,8 @@ AGENTS_DIR = os.environ.get("BUILDERBOT_AGENTS_DIR", "/usr/local/lib/builderbot/
 # carry no installer of their own to fall back on: an install asked for
 # with no recipe is refused, never run from a copy here that nothing
 # holds. A test stands its own script in with BUILDERBOT_<ID>_INSTALLER,
-# which is read only where this package is the source tree's (IN_TREE).
+# read from this agent's own environment, which on a node is the service
+# unit root writes and nothing a job or a pack sets.
 # Each coding agent's sign-in and sign-out jobs, by the controller's agent
 # table (agents.py login_job, logout_job), to the agent `aerie login --flow` and
 # `aerie login --out` are run for. Claude's are the claude-login and
@@ -371,8 +372,11 @@ def recipe_checked(r):
 # Whether this package is AerieOS's own source tree's and not an install's
 # (a node's agent is a zip, an image's has no tree around it): the tree's
 # Dockerfile and its unit tests are beside it. It is where the package is,
-# which nothing in an environment says, and what a test stands in for a
-# check with is read only there.
+# which nothing in an environment says. The agent's own environment is its
+# service unit's, root's alone, so what it reads from there it reads
+# wherever it runs; the installer it starts as a job's account
+# (scripts/lib/sdk.sh, sdkmeta.py) reads a test's stand-ins only in the
+# tree, since a job's environment reaches it.
 _PKG = os.path.dirname(os.path.realpath(__file__))
 IN_TREE = (os.path.isfile(os.path.join(_PKG, "..", "..", "..", "Dockerfile"))
            and os.path.isdir(os.path.join(_PKG, "..", "..", "dashboard", "unit")))
@@ -380,10 +384,10 @@ IN_TREE = (os.path.isfile(os.path.join(_PKG, "..", "..", "..", "Dockerfile"))
 
 def installer_stub(agent_id):
     """The script a test stands in for an agent's install recipe
-    (BUILDERBOT_<ID>_INSTALLER), or "": read only where this package is
-    the source tree's, so no environment swaps a held recipe for another
-    on a node."""
-    return (os.environ.get(f"BUILDERBOT_{str(agent_id).upper()}_INSTALLER") or "") if IN_TREE else ""
+    (BUILDERBOT_<ID>_INSTALLER), or "": from this agent's own environment,
+    which a job never sets. The browser suite runs the agent as a node
+    keeps it, a zip, and stands its installers in this way."""
+    return os.environ.get(f"BUILDERBOT_{str(agent_id).upper()}_INSTALLER") or ""
 
 
 SESSION_CONF = os.environ.get("BUILDERBOT_SESSION_CONF", "/etc/bb-session.conf")
@@ -391,7 +395,7 @@ SESSION_SUDOERS = os.environ.get("BUILDERBOT_SESSION_SUDOERS", "/etc/sudoers.d/b
 # The root helper that cuts the network for a declared pack's install steps
 # where the job account cannot make a network namespace itself (R234), and
 # the one sudo rule that lets that account run it.
-NETCUT_BIN = (os.environ.get("BUILDERBOT_NETCUT_BIN") if IN_TREE else "") or "/usr/local/sbin/bb-netcut"
+NETCUT_BIN = os.environ.get("BUILDERBOT_NETCUT_BIN") or "/usr/local/sbin/bb-netcut"
 NETCUT_SUDOERS = os.environ.get("BUILDERBOT_NETCUT_SUDOERS", "/etc/sudoers.d/builderbot-netcut")
 # The wall the installer writes on a controller's own machine (docs/decisions.md),
 # and where the root agent keeps that machine's compose files: under /var/lib

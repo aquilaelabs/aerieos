@@ -863,15 +863,15 @@ class NodeAgent(unittest.TestCase):
         self.assertFalse(os.path.exists(marker))
         self.assertEqual(self.left(), [])
 
-    def test_a_stand_in_is_read_only_in_the_source_tree(self):
-        # An installed agent (a node's zip, an image's copy) reads no
-        # stand-in from its environment: a held recipe is what runs there.
+    def test_a_stand_in_is_the_agent_s_own_environment_s(self):
+        # Read from the agent's own environment, which on a node is the
+        # unit root writes: the same in the tree and in a node's zip.
         base = self.mod.module("base")
         with mock.patch.dict(os.environ, {"BUILDERBOT_CODEX_INSTALLER": "/tmp/planted"}):
             self.assertEqual(base.installer_stub("codex"), "/tmp/planted")
             with mock.patch.object(base, "IN_TREE", False):
-                self.assertEqual(base.installer_stub("codex"), "")
-        self.assertTrue(base.IN_TREE)
+                self.assertEqual(base.installer_stub("codex"), "/tmp/planted")
+        self.assertEqual(base.installer_stub("codex"), "")
 
     def test_no_recipe_installs_nothing_and_still_takes_the_agent_off(self):
         # This agent keeps no installer of its own: a job with no recipe

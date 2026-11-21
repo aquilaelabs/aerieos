@@ -9,7 +9,7 @@
 // devices and Disconnect signs one out. No browser.
 import { ok, done, sleep, until, DIR, URL, OWNER as ADMIN, asUser, asSession, section, REPO, aerie } from './lib.mjs';
 import { execFileSync, spawn } from 'node:child_process';
-import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, rmSync } from 'node:fs';
 
 const base = URL.replace(/\/$/, '');
 const admin = async (path, body) => {
@@ -242,6 +242,15 @@ await section("the apps this controller offers, from its release", async () => {
   };
   const assets = [...asset('aerieos-app-0.4.0.apk', 'an apk'), ...asset('aerieos-vscode-0.4.0.vsix', 'a vsix'),
                   ...asset('aerieos-companion-0.4.0.exe', 'an exe'), ...asset('aerieos-companion-0.4.0.pyz', 'a pyz', '0'.repeat(64))];
+  // ...and its list of files, by their own bytes, signed by the key this
+  // world names (run.sh): an install that names no signer takes nothing.
+  const files = { 'aerieos-app-0.4.0.apk': 'an apk', 'aerieos-vscode-0.4.0.vsix': 'a vsix',
+                  'aerieos-companion-0.4.0.exe': 'an exe', 'aerieos-companion-0.4.0.pyz': 'a pyz' };
+  writeFileSync(`${rel}/SHA256SUMS`, Object.entries(files).map(([n, b]) => `${createHash('sha256').update(b).digest('hex')}  ${n}\n`).join(''));
+  rmSync(`${rel}/SHA256SUMS.sig`, { force: true });
+  execFileSync('ssh-keygen', ['-Y', 'sign', '-q', '-f', `${DIR}/release-key`, '-n', 'aerieos-release', `${rel}/SHA256SUMS`], { stdio: 'ignore' });
+  assets.push({ name: 'SHA256SUMS', browser_download_url: `file://${rel}/SHA256SUMS` },
+              { name: 'SHA256SUMS.sig', browser_download_url: `file://${rel}/SHA256SUMS.sig` });
   writeFileSync(`${DIR}/releases.json`, JSON.stringify([{ tag_name: 'v0.5.0', assets: [] }, { tag_name: 'v0.4.0', assets }]));
   // The companion and the extension are dev features (the operator, 20 Oct):
   // on for this block, and checked gone with them off at its end.
