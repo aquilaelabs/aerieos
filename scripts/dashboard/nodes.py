@@ -1463,6 +1463,28 @@ def agent_window(version):
     """
     m = re.match(r"^(\d+\.\d+)\.", str(version or ""))
     return m.group(1) if m else ""
+
+
+def agent_order(version):
+    """(major, minor, BUILD) of a WINDOW.BUILD version, to say which of two
+    is newer; None for anything else, which is never read as either."""
+    m = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)", str(version or ""))
+    return tuple(int(x) for x in m.groups()) if m else None
+
+
+def agent_newer(n):
+    """"window" where this node's agent is from a newer window than the
+    one this controller ships, "build" where it is a newer build in the
+    same one, "" otherwise: a controller gone back to an older image (a
+    backup restored under one), its nodes still on the agents the newer one
+    sent them. A node that pinned a release key refuses the older agent
+    this controller ships (its release.may_install), so sending it is a
+    failed job and nothing more."""
+    mine = agent_order((n.get("agent") or {}).get("version"))
+    ours = agent_order(agent_file()["version"])
+    if not mine or not ours or mine <= ours:
+        return ""
+    return "build" if mine[:2] == ours[:2] else "window"
 # Held below the 30s most proxies allow. Settable only so the suite can stop
 # waiting on it: an agent does its housekeeping (reporting a session that
 # appeared) once per turn of this loop, so a test
@@ -3485,6 +3507,11 @@ def refusal_phrase(said, most=120):
     return s or "it was refused"
 
 
+# What an agent says of an update refused for its age (the agent's
+# release.OLDER, held to it by unit/test_agent_way_back.py).
+AGENT_OLDER = "older than the agent this node runs"
+
+
 def unsigned_refused(n):
     """Why this node refuses the agent this controller ships for want of a
     release's signature, "" where it would take it: the build is not sent
@@ -3523,6 +3550,12 @@ def agent_stale(n):
     compose plans, bb verbs, store listings), and an older agent meets an
     unknown one with a shrug rather than an error. So the rule is: an agent
     that is behind takes nothing but its own update.
+
+    A node ahead of it inside the window (agent_newer) is current: within
+    a window nothing is removed, so it works with this controller as one
+    on the shipped build does, and the older build would only be refused.
+    One from a newer window is held as one from an older is, and said as
+    newer.
     """
     if not n or n["kind"] != "agent":
         return ""
@@ -3530,7 +3563,12 @@ def agent_stale(n):
     theirs = (n.get("agent") or {}).get("digest") or ""
     if not ours["digest"] or not theirs or theirs == ours["digest"]:
         return ""
+    newer = agent_newer(n)
+    if newer == "build":
+        return ""
     mine = (n.get("agent") or {}).get("version") or "?"
+    if newer == "window":
+        return f"{n['name']} runs agent {mine}, newer than this controller works with"
     if agent_gap(n):
         return (f"{n['name']} runs agent {mine}, too old for this controller to work with: "
                 "update it from the Nodes page")
@@ -3664,6 +3702,9 @@ def attention(project_nodes):
         out.append({"kind": "agent", "node": n["name"], "id": n["id"],
                     "from": (n.get("agent") or {}).get("version") or "?",
                     "to": ours["version"], "window": agent_gap(n), "auto": auto, "back": back, "held": held,
+                    # Newer than this controller's: from a newer window, or
+                    # refusing this build for its age.
+                    "newer": agent_newer(n) == "window", "older": AGENT_OLDER in held,
                     "failed": refusal_phrase(last.get("error") or "it failed") if last and last.get("state") == "failed" else "",
                     "projects": sorted(p for p, nid in project_nodes.items() if nid == n["id"])})
     return out

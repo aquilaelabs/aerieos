@@ -1324,9 +1324,15 @@ function nodeAdvancedSection(n, stale, inflight){
                     n.state === "draining" ? "draining" : n.config?.lock ? "locked" : "",
                     body, {cls: n.state === "draining" ? "warn" : ""});
 }
+// A node whose agent is not the one this controller ships, and not a newer
+// build of the same window: a controller gone back to an older image has
+// its nodes on the agents the newer one sent, and inside a window nothing is
+// removed, so those work with it as current ones do (nodes.agent_stale).
 function nodeStale(n){
-  return n.kind === "agent" && n.agent?.digest && nodesAgent?.digest
-    && n.agent.digest !== nodesAgent.digest;
+  if (!(n?.kind === "agent" && n.agent?.digest && nodesAgent?.digest && n.agent.digest !== nodesAgent.digest)) return false;
+  const order = v => (/^(\d+)\.(\d+)\.(\d+)$/.exec(String(v || "")) || []).slice(1).map(Number);
+  const a = order(n.agent.version), b = order(nodesAgent.version);
+  return !(a.length && b.length && a[0] === b[0] && a[1] === b[1] && a[2] > b[2]);
 }
 
 // The window a version promises: "0.4" of "0.4.27", empty for anything that
@@ -1351,6 +1357,13 @@ function staleWhy(n){
   if (back && back.digest === nodesAgent?.digest)
     return `${n.name} took ${mine === ship ? `a newer build of agent ${ship} (${short(nodesAgent?.digest)})` : `agent ${ship}`} and went back to ${
       mine === ship ? `the one it had (${short(n.agent?.digest)})` : mine}: it ${back.why || "did not start there"}. Update agent tries it again`;
+  // From a newer window than this controller's (one gone back to an older
+  // image): an update would send it back, which a node that pinned a key
+  // refuses, so the row says which is newer and no press.
+  const win = v => (/^(\d+)\.(\d+)\./.exec(String(v || "")) || []).slice(1).map(Number);
+  const [a, b] = [win(mine), win(ship)];
+  if (windowGap(n) && a.length && b.length && (a[0] > b[0] || (a[0] === b[0] && a[1] > b[1])))
+    return `${n.name} runs agent ${mine}, newer than this controller works with`;
   return windowGap(n)
     ? `${n.name} runs agent ${mine} and this controller needs ${ship}: press Update agent before using this node`
     : mine === ship

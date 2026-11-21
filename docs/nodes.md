@@ -391,6 +391,18 @@ than an error, which is the worst of the three possible answers. So
 say why before the press. It is one rule in `nodes.agent_stale` and the UI
 only mirrors it.
 
+*A node can be ahead.* A controller gone back to an older image (the
+backup an upgrade made, restored under the release before) has nodes on
+the agents the newer one sent them. A node that pinned a release key takes
+no signed agent older than the one it runs: the update is refused, and the
+job fails saying so. So a newer build inside the same window counts as
+current (within a window nothing is removed, and it works with this
+controller as the shipped build does) and is sent nothing. One from a newer
+window is held as one from an older window is, and its row and the bell say
+it is newer. To put the older agent back on such a node anyway, its console
+allows older agents (`sudo aerieos-agent older on`, until `older off`) and
+**Update agent** sends it.
+
 *Compose moved to the agent (2 Sep, roadmap #18):* a node enrolled with a
 token needed an ssh key on top of it, because `runner_of` kept compose on the
 controller and it reached the node's daemon over ssh. It does not any more.

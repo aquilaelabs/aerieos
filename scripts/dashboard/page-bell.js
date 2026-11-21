@@ -530,11 +530,14 @@ function attRow(a){
         <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
           <a href="#" data-bnode="${esc(a.id)}" data-bwhat="sessions">Nodes page</a></span></div></div>`;
   }
+  // A node from a newer window than this controller's (one gone back to an
+  // older image) is held as one from an older is, and said as newer: an
+  // update would send it back, which a node that pinned a key refuses.
   return `<div class="bnote att${a.window ? " bad" : ""}">
     <div class="bt">${a.window ? `${esc(a.node)}'s agent is out of window` : `Agent update on ${esc(a.node)}`}</div>
-    <div class="bsum">runs agent ${esc(a.from)} and this controller ships ${esc(a.to)}${a.window
+    <div class="bsum">runs agent ${esc(a.from)}${a.newer ? ", newer than" : " and"} this controller ships ${esc(a.to)}${a.window
       ? `: ${a.projects.length ? `${a.projects.length} space${a.projects.length === 1 ? "" : "s"} cannot build, test or use the emulator there`
-                               : "nothing works there"} until it is updated` : ""}</div>
+                               : "nothing works there"} until ${a.newer ? "the two agree" : "it is updated"}` : ""}</div>
     ${a.window && a.projects.length ? `<details class="bdetail chev"${sectAttr("bell:agent:" + a.id)}><summary>projects</summary><pre>${
       a.projects.map(esc).join(", ")}</pre></details>` : ""}
     ${a.back ? `<div class="bsum bad">it took the update and went back to the agent it had: it ${esc(a.back)}</div>` : ""}
@@ -542,7 +545,7 @@ function attRow(a){
     ${a.held && !a.failed && !a.back ? `<div class="bsum">${esc(a.held)}</div>` : ""}
     <div class="bfoot"><span>${a.window ? "work on it is stopped"
       : a.back ? "not sent again by itself: Update agent there tries it again"
-      : a.held ? "not sent by itself: it waits for a signed build"
+      : a.held ? (a.older ? "not sent by itself: that node keeps the newer agent it runs" : "not sent by itself: it waits for a signed build")
       : a.auto ? (a.failed ? "tried again once the node is idle, or press Update agent there" : "updates itself once the node is idle")
       : "on the Nodes page"}</span>
       <span class="acts">${a.key ? `<a href="#" data-bdismiss="${esc(a.key)}">Dismiss</a>` : ""}
