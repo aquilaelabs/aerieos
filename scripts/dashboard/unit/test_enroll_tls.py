@@ -283,15 +283,20 @@ class TheProvisioner(Case):
             # A line that runs curl (not one that names it in a sentence) against the controller: its
             # address on the line, or the line after for a fetch written over two.
             lines = text.splitlines()
+            at = ("${CONTROLLER%/}", "${PIN_URL%/}")
             fetches = [ln for i, ln in enumerate(lines)
                        if re.match(r'\s*(if |\|\| |code="\$\()?curl ', ln)
-                       and ("${CONTROLLER%/}" in ln or (ln.rstrip().endswith("\\") and "${CONTROLLER%/}" in lines[i + 1]))]
+                       and (any(a in ln for a in at) or (ln.rstrip().endswith("\\") and any(a in lines[i + 1] for a in at)))]
             self.assertGreaterEqual(len(fetches), 2 if name.endswith("macos.sh") else 5, name)
             for ln in fetches:
                 # The one fetch that is a public hostname's own check is by the system's authorities.
                 if 'curl -s -o /dev/null -D "$rhdr"' in ln:
                     continue
-                self.assertIn('--pinnedpubkey "$CTL_KEY"', ln, f"{name}: {ln.strip()[:120]}")
+                # A run again on an enrolled node holds it to the pin its record keeps.
+                self.assertTrue('--pinnedpubkey "$CTL_KEY"' in ln or '--pinnedpubkey "$held"' in ln, f"{name}: {ln.strip()[:120]}")
+                # ...and a fetch held to a key dials the address, the name as its Host header.
+                if name == "provision-linux.sh":
+                    self.assertIn('${PIN_HOST[@]+"${PIN_HOST[@]}"}', ln, ln.strip()[:120])
             enrolls = len(re.findall(r'(?m)^\s*(?:BUILDERBOT_NODE_JSON="\$\w+" )?(?:python3 )?"\$(?:AGENT|agent)" enroll\b', text))
             self.assertEqual((enrolls, text.count('${CONTROLLER_PIN:+--pin "$CONTROLLER_PIN"}')),
                              ((1, 1) if name.endswith("macos.sh") else (2, 2)), f"{name}: every enroll is handed the pin")
@@ -312,16 +317,17 @@ class TheProvisioner(Case):
         srv = self.serve()
         text = self.text("provision-linux.sh")
         # The managed node's download, as the provisioner writes it, run as it runs it.
-        m = re.search(r"\n(    curl -fsSL \$\{CTL_KEY:\+-k --pinnedpubkey \"\$CTL_KEY\"\} --retry 6 [^\n]*\\\n[^\n]*-o \"\$\{AGENT\}\.new\")", text)
+        m = re.search(r"\n(    pinned_at [^\n]*\n    curl -fsSL \$\{CTL_KEY:\+-k --pinnedpubkey \"\$CTL_KEY\"\} [^\n]*--retry 6 [^\n]*\\\n[^\n]*-o \"\$\{AGENT\}\.new\")", text)
         self.assertTrue(m, "the provisioner's download of the agent")
-        fetch = m.group(1).replace("--retry 6 --retry-delay 3 --retry-connrefused", "--max-time 10")
+        helper = re.search(r"^pinned_at\(\) \{\n.*?^\}\n", text, re.M | re.S).group(0)
+        fetch = helper + m.group(1).replace("--retry 6 --retry-delay 3 --retry-connrefused", "--max-time 10")
 
-        def run(key):
+        def run(key, host="127.0.0.1"):
             out, hdr = os.path.join(self.tmp, "agent"), os.path.join(self.tmp, "hdr")
             for f in (out + ".new", hdr):
                 if os.path.exists(f):
                     os.unlink(f)
-            env = dict(os.environ, CTL_KEY=key, TOKEN="bbe_once", CONTROLLER=f"https://127.0.0.1:{srv.server_port}", AGENT=out, hdr=hdr)
+            env = dict(os.environ, CTL_KEY=key, TOKEN="bbe_once", CONTROLLER=f"https://{host}:{srv.server_port}", AGENT=out, hdr=hdr)
             r = subprocess.run(["bash", "-euo", "pipefail", "-c", fetch], env=env, capture_output=True, text=True, timeout=60, check=False)
             return r, out + ".new"
         r, got = run(self.pin)
@@ -339,6 +345,19 @@ class TheProvisioner(Case):
         r, got = run("")
         self.assertNotEqual(r.returncode, 0)
         self.assertEqual(len(srv.asked), 1)
+        # A name the controller holds a public certificate for: asked by that
+        # name, it answers with that certificate, whose key is not the one
+        # pinned. Dialed by its address with no server name, it is the
+        # install's own key that answers.
+        if not subprocess.run(["getent", "ahosts", "localhost"], capture_output=True, check=False).stdout.startswith(b"127.0.0.1"):
+            return
+        cert, key = tls.self_signed(["localhost"])
+        tls._keep(cert, key, tls.ACME, ["localhost"])
+        tls.apply({"tls_mode": "acme", "tls_host": "localhost"}.get, names=["127.0.0.1"])
+        self.assertEqual(tls.key_pin(), self.pin, "the install's own key is unchanged")
+        r, got = run(self.pin, host="localhost")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(srv.asked[-1], ("/api/v1/agent/download", "Bearer bbe_once", True))
 
 
 if __name__ == "__main__":

@@ -85,7 +85,8 @@ class TheFetch(Bash):
         script = (f'NODE_RECORD="{self.record}"; AGENT="{self.d}/agent"\n'
                   'warn() { printf "!! %s\\n" "$*"; }\n'
                   'agent_sent() { :; }\nagent_swap() { echo swapped; }\n'
-                  'curl() { printf "%s\\n" "$@" > "$OUT"; for a in "$@"; do case "$a" in @*) cat "${a#@}" >> "$OUT.header" ;; esac; done; }\n'
+                  + function(self.src, "pinned_at")
+                  + 'curl() { printf "%s\\n" "$@" > "$OUT"; for a in "$@"; do case "$a" in @*) cat "${a#@}" >> "$OUT.header" ;; esac; done; }\n'
                   + piece)
         out = os.path.join(self.d, "curl-words")
         for f in (out, out + ".header"):
@@ -105,6 +106,21 @@ class TheFetch(Bash):
         self.assertIn("https://controller.example:7680/api/v1/agent/download", words)
         self.assertEqual(header, "Authorization: Bearer bbn_the-nodes-own\n")
         self.assertNotIn("bbn_the-nodes-own", " ".join(words), "the token is on a descriptor, never among curl's words")
+
+    def test_under_a_key_s_pin_the_controller_is_dialed_by_its_address(self):
+        # Asked by its name, a controller with a public certificate for that
+        # name answers with it, whose key is not the one pinned.
+        if not subprocess.run(["getent", "ahosts", "localhost"], capture_output=True, check=False).stdout.startswith(b"127.0.0.1"):
+            self.skipTest("localhost is not 127.0.0.1 first here")
+        words, _header, said = self.fetch(dict(RECORD, pin=KEY, controller="https://localhost:7680"))
+        self.assertIn("swapped", said)
+        self.assertIn("https://127.0.0.1:7680/api/v1/agent/download", words)
+        at = words.index("-H")
+        self.assertEqual(words[at + 1], "Host: localhost:7680", "the name goes as the Host header, never as the server name")
+        # With no key's pin it is fetched by its name, as it was.
+        words, _header, _said = self.fetch(dict(RECORD, pin="ca", controller="https://localhost:7680"))
+        self.assertIn("https://localhost:7680/api/v1/agent/download", words)
+        self.assertNotIn("Host: localhost:7680", words)
 
     def test_a_public_hostname_and_plain_http_are_fetched_as_they_were(self):
         for state in (dict(RECORD, pin="ca"), dict(RECORD, controller="http://10.0.0.5:7680"), dict(RECORD, pin="")):

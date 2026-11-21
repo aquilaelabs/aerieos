@@ -533,6 +533,30 @@ release_sig_ok() {
     return 2
 }
 
+# pinned_at URL PIN: where a fetch from the controller dials. Held to its
+# key (PIN), it sends no server name, as the node's agent does: a name the
+# controller holds a public certificate for (Let's Encrypt) is answered with
+# that certificate, whose key is not the one pinned. So the URL's host name
+# is replaced by its address (PIN_URL) and said as the Host header instead
+# (PIN_HOST, curl's words for it); with no pin, or a URL that names an
+# address already, PIN_URL is URL and PIN_HOST is empty.
+pinned_at() {
+    local url="$1" pin="$2" scheme rest hostport host port path addr
+    PIN_URL="$url"; PIN_HOST=()
+    [ -n "$pin" ] || return 0
+    scheme="${url%%://*}"; rest="${url#*://}"
+    hostport="${rest%%/*}"; path="${rest#"$hostport"}"
+    host="${hostport%:*}"; port="${hostport#"$host"}"
+    [ "$host" != "$hostport" ] || port=""
+    case "$host" in ""|\[*|*[!A-Za-z0-9.-]*) return 0 ;; esac
+    [[ "$host" =~ ^[0-9.]+$ ]] && return 0
+    addr="$(getent ahosts "$host" 2>/dev/null | awk 'NR == 1 { print $1 }')" || addr=""
+    [ -n "$addr" ] || return 0
+    case "$addr" in *:*) addr="[$addr]" ;; esac
+    PIN_URL="${scheme}://${addr}${port}${path}"
+    PIN_HOST=(-H "Host: ${hostport}")
+}
+
 # agent_sent HEADERS NAME: what the controller's answer says under NAME
 # (x-agent-digest, x-agent-sig), from the headers curl kept; nothing for none.
 agent_sent() {
@@ -815,8 +839,9 @@ guest_run() {
     hdr="$(mktemp)"
     # Tried again on a transient answer: a stick's first boot asks its own
     # dashboard the moment it answers at all, and once got a 500 (B747).
-    curl -fsSL ${CTL_KEY:+-k --pinnedpubkey "$CTL_KEY"} --retry 6 --retry-delay 3 --retry-connrefused -D "$hdr" -H @<(printf 'Authorization: Bearer %s\n' "${TOKEN}") \
-         "${CONTROLLER%/}/api/v1/agent/download" -o "${agent}.new" \
+    pinned_at "$CONTROLLER" "${CTL_KEY:-}"
+    curl -fsSL ${CTL_KEY:+-k --pinnedpubkey "$CTL_KEY"} ${PIN_HOST[@]+"${PIN_HOST[@]}"} --retry 6 --retry-delay 3 --retry-connrefused -D "$hdr" -H @<(printf 'Authorization: Bearer %s\n' "${TOKEN}") \
+         "${PIN_URL%/}/api/v1/agent/download" -o "${agent}.new" \
         || { warn "could not download the agent from ${CONTROLLER}: is that the dashboard's address, and is the token unused?"
              rm -f "$hdr" "${agent}.new"; exit 1; }
     # Held to what the script carries before any of it runs (agent_proved);
@@ -1305,8 +1330,9 @@ if command -v curl >/dev/null 2>&1; then
         # closed port 22 for a door and then could not enroll, and the
         # person came back in through the KVM. Nothing below is worth doing
         # when the controller cannot be reached.
-        if curl -fsk ${CTL_KEY:+--pinnedpubkey "$CTL_KEY"} --max-time 10 -o /dev/null "${CONTROLLER%/}/api/v1/agent/download" 2>/dev/null \
-           || curl -sk ${CTL_KEY:+--pinnedpubkey "$CTL_KEY"} --max-time 10 -o /dev/null -w '%{http_code}' "${CONTROLLER%/}/" 2>/dev/null | grep -q '^[234]'; then
+        pinned_at "$CONTROLLER" "${CTL_KEY:-}"
+        if curl -fsk ${CTL_KEY:+--pinnedpubkey "$CTL_KEY"} ${PIN_HOST[@]+"${PIN_HOST[@]}"} --max-time 10 -o /dev/null "${PIN_URL%/}/api/v1/agent/download" 2>/dev/null \
+           || curl -sk ${CTL_KEY:+--pinnedpubkey "$CTL_KEY"} ${PIN_HOST[@]+"${PIN_HOST[@]}"} --max-time 10 -o /dev/null -w '%{http_code}' "${PIN_URL%/}/" 2>/dev/null | grep -q '^[234]'; then
             chk ok "controller: ${CONTROLLER} answers"
         else chk fail "controller ${CONTROLLER} does not answer from here${CTL_KEY:+ under the key this enrollment carries}, so enrollment would fail: check the address and that the dashboard is up"; fi
     fi
@@ -1533,8 +1559,9 @@ if [ -n "$WG_CONF" ]; then
     # Through the tunnel or not at all: any HTTP answer is the controller
     # answering. A handshake can take a few seconds after the interface.
     reached=""
+    pinned_at "$CONTROLLER" "${CTL_KEY:-}"
     for _ in $(seq 1 15); do
-        code="$(curl -s ${CTL_KEY:+-k --pinnedpubkey "$CTL_KEY"} -o /dev/null -m 4 -w '%{http_code}' "${CONTROLLER%/}/api/v1/agent/download" || true)"
+        code="$(curl -s ${CTL_KEY:+-k --pinnedpubkey "$CTL_KEY"} ${PIN_HOST[@]+"${PIN_HOST[@]}"} -o /dev/null -m 4 -w '%{http_code}' "${PIN_URL%/}/api/v1/agent/download" || true)"
         case "$code" in 000|"") sleep 2 ;; *) reached=1; break ;; esac
     done
     if [ -z "$reached" ]; then
@@ -4286,8 +4313,9 @@ if [ -n "$CONTROLLER" ]; then
     pkg $(pkg_names pycrypto)
     hdr="$(mktemp)"
     # Tried again on a transient answer (B747), as the own node's download is.
-    curl -fsSL ${CTL_KEY:+-k --pinnedpubkey "$CTL_KEY"} --retry 6 --retry-delay 3 --retry-connrefused -D "$hdr" -H @<(printf 'Authorization: Bearer %s\n' "${TOKEN}") \
-         "${CONTROLLER%/}/api/v1/agent/download" -o "${AGENT}.new" \
+    pinned_at "$CONTROLLER" "${CTL_KEY:-}"
+    curl -fsSL ${CTL_KEY:+-k --pinnedpubkey "$CTL_KEY"} ${PIN_HOST[@]+"${PIN_HOST[@]}"} --retry 6 --retry-delay 3 --retry-connrefused -D "$hdr" -H @<(printf 'Authorization: Bearer %s\n' "${TOKEN}") \
+         "${PIN_URL%/}/api/v1/agent/download" -o "${AGENT}.new" \
         || { warn "could not download the agent from ${CONTROLLER}. Is that the dashboard's address, and is the token unused?"; rm -f "$hdr" "${AGENT}.new"; exit 1; }
     # Held to what the Enroll script carries, before any of it runs as root
     # (agent_proved): the script's digest, and the release's signature under
@@ -4407,8 +4435,9 @@ elif [ -f /etc/aerieos/node.json ]; then
         warn "this node holds its controller to a certificate, which this script cannot check a fetch against: the installed agent is left as it is. Update agent on the node's row updates it"
     elif [ -n "$ctl" ] && [ -n "$tok" ]; then
         hdr="$(mktemp)"
-        if curl -fsSL ${held:+-k --pinnedpubkey "$held"} -D "$hdr" -H @<(printf 'Authorization: Bearer %s\n' "${tok}") \
-                "${ctl%/}/api/v1/agent/download" -o "${AGENT}.new" 2>/dev/null; then
+        pinned_at "$ctl" "$held"
+        if curl -fsSL ${held:+-k --pinnedpubkey "$held"} ${PIN_HOST[@]+"${PIN_HOST[@]}"} -D "$hdr" -H @<(printf 'Authorization: Bearer %s\n' "${tok}") \
+                "${PIN_URL%/}/api/v1/agent/download" -o "${AGENT}.new" 2>/dev/null; then
             agent_swap "${AGENT}.new" "$(agent_sent "$hdr" x-agent-digest)" "$(agent_sent "$hdr" x-agent-sig)"
         else
             warn "could not fetch the agent from ${ctl}. Is the controller up? The installed agent is left as it is"
