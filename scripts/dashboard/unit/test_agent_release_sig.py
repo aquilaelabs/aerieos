@@ -144,7 +144,7 @@ class Enrolling(unittest.TestCase):
         def census(state):
             stores.save_state(state)            # as a census that writes midway did
             return {}
-        cli.Controller, cli.census, cli.make_store, cli.store_path_ok = Ctl, census, lambda p: {}, lambda p: ""
+        cli.Controller, cli.census, cli.make_store, cli.store_path_ok = Ctl, census, lambda p: {}, lambda p, **kw: ""
         _, pub = pair()
         import contextlib
         import io

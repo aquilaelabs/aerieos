@@ -35,7 +35,7 @@ def stores_kept(stores, given, had):
     out = dict(stores)
     for role, path in kept.items():
         if role in DEFAULT_STORES and role not in given and isinstance(path, str) and path.startswith("/") \
-                and out.get(role) == DEFAULT_STORES[role] and not store_path_ok(path):
+                and out.get(role) == DEFAULT_STORES[role] and not store_path_ok(path, shape=False):
             out[role] = path
     return out
 
@@ -52,7 +52,11 @@ def cmd_enroll(args):
             role, _, path = next(it, "").partition("=")
             if role not in DEFAULT_STORES:
                 raise SystemExit("--store takes " + ", ".join(f"{r}=/path" for r in DEFAULT_STORES))
-            why = store_path_ok(path)
+            # Held to a store's one shape, unless it is where this node's
+            # record already has that store: a script run again with the
+            # flags it was first run with does not refuse the node its own.
+            mine = (had_state().get("stores") or {}).get(role) == path
+            why = store_path_ok(path, shape=not mine)
             if why:
                 raise SystemExit(f"--store {role}: {why}")
             stores[role] = path

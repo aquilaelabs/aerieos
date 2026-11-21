@@ -267,7 +267,7 @@ class Enrolling(Case):
         import io
         cli = self.agent.module("cli")
         self.agent.NODE_JSON = os.path.join(self.tmp, "node.json")
-        cli.census, cli.make_store, cli.store_path_ok = (lambda state: {}), (lambda path: {}), (lambda path: "")
+        cli.census, cli.make_store, cli.store_path_ok = (lambda state: {}), (lambda path: {}), (lambda path, **kw: "")
         said = io.StringIO()
         with contextlib.redirect_stdout(said):
             cli.cmd_enroll(["--controller", f"https://127.0.0.1:{port}", "--token", "bbe_once", *more])

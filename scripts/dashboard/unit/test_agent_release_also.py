@@ -220,7 +220,7 @@ class Console(Case):
 
         def enroll(*more):
             with mock.patch.object(cli, "Controller", Ctl), mock.patch.object(cli, "census", lambda state: {}), \
-                    mock.patch.object(cli, "make_store", lambda p: {}), mock.patch.object(cli, "store_path_ok", lambda p: ""), \
+                    mock.patch.object(cli, "make_store", lambda p: {}), mock.patch.object(cli, "store_path_ok", lambda p, **kw: ""), \
                     contextlib.redirect_stdout(io.StringIO()):
                 cli.cmd_enroll(["--controller", "http://c", "--token", "bbe_t", *more])
             return self.read()
@@ -284,7 +284,7 @@ class Console(Case):
                 return 200, {"node_id": "n_1", "token": "bbn_x", "name": "box", "capabilities": []}
 
         with mock.patch.object(cli, "Controller", Ctl), mock.patch.object(cli, "census", lambda state: {}), \
-                mock.patch.object(cli, "make_store", lambda p: {}), mock.patch.object(cli, "store_path_ok", lambda p: ""), \
+                mock.patch.object(cli, "make_store", lambda p: {}), mock.patch.object(cli, "store_path_ok", lambda p, **kw: ""), \
                 contextlib.redirect_stdout(io.StringIO()):
             cli.cmd_enroll(["--controller", "http://c", "--token", "bbe_t", "--release-key", f"{self.pub},{self.spare}"])
         got = self.read()

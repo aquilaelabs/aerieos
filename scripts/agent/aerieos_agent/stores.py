@@ -38,16 +38,33 @@ def _can_chown(path):
             os.remove(probe)
 
 
-def store_path_ok(path, what="a store"):
+# A store's path, the one shape a new one is taken in and the only one
+# written where a shell reads it (/etc/profile.d): letters, digits and
+# . _ / + @ -, with no .. part. Nothing a shell reads as more than a word.
+STORE_PATH = re.compile(r"/[A-Za-z0-9._/+@-]+")
+
+
+def path_plain(path):
+    """Whether `path` is of a store's one shape (STORE_PATH)."""
+    p = str(path or "")
+    return bool(STORE_PATH.fullmatch(p)) and ".." not in p.split("/")
+
+
+def store_path_ok(path, what="a store", shape=True):
     """"" if this is a safe place for a store, else why not. A bare
     top-level directory is refused as well as a system one: /mnt is where
     mounts live, not a store, and putting one there scatters directories
-    across the mount root."""
+    across the mount root. A path is held to a store's one shape
+    (path_plain) unless `shape` is off, which is for the path a node's own
+    record already holds: a store enrolled before the shape was held stays
+    where it is, and is only left out of what a shell reads."""
     p = str(path or "").rstrip("/") or "/"
     if not p.startswith("/"):
         return f"{path!r} is not an absolute path"
     if " " in p or ".." in p.split("/"):
         return f"{path!r} must be a plain absolute path, with no spaces or .."
+    if shape and not path_plain(p):
+        return f"{path!r} must be a plain absolute path: letters, digits and . _ / + @ - alone"
     if p in STORE_DENY_EXACT:
         return (f"{p} is a system directory (or the root of the mounts): "
                 f"{what} is a directory of its own, like /var/lib/aerieos/x "
@@ -59,7 +76,7 @@ def store_path_ok(path, what="a store"):
     # points at /etc passed as text, and root then copied a store's tree
     # into /etc. A link to somewhere a store may be (macOS's /tmp) is fine.
     real = os.path.realpath(p)
-    if real != p and (why := store_path_ok(real, what)):
+    if real != p and (why := store_path_ok(real, what, shape)):
         return f"{p} is a link to {real}, and {why}"
     return ""
 def make_store(path):

@@ -2085,20 +2085,26 @@ else
     # current under the toolchain store. That is what makes proving the node
     # by hand (ssh in, run bb-tty, run aerie roadmap) the same path the
     # dashboard takes, rather than a second one.
-    cat > /etc/profile.d/builderbot-session.sh <<EOF
-# Written by AerieOS's provision-linux.sh. A session on this node, at a console.
-case "\$(id -un)" in
-    ${SESSION_NAME})
-        export BUILDERBOT_ROLE=node WORKSPACE=/workspace
-        export BB_NODE="\$(hostname)"
-        ${CONTROLLER:+export BB_CONTROLLER="${CONTROLLER%/}"}
-        ${CTL_KEY:+export BB_CONTROLLER_PIN="${CTL_KEY}"}
-        [ -d "${STORE_TOOLCHAINS}/.bb/current/scripts" ] \\
-            && PATH="${STORE_TOOLCHAINS}/.bb/current/scripts:\$PATH"
-        PATH="\$HOME/.local/bin:\$PATH"
-        ;;
-esac
-EOF
+    # A login shell reads the file, so each value goes into it as one word in
+    # single quotes, and only in its plain shape: an address that is
+    # http(s)://host[:port] alone, a store's path of letters, digits and
+    # . _ / + @ - with no .. part. One of another shape is left out.
+    prof_ctl="${CONTROLLER%/}"; prof_store="$STORE_TOOLCHAINS"
+    [[ "$prof_ctl" =~ ^https?://(\[[0-9A-Fa-f:.]+\]|[A-Za-z0-9][A-Za-z0-9.-]*)(:[0-9]{1,5})?$ ]] || prof_ctl=""
+    [[ "$prof_store" =~ ^/[A-Za-z0-9._/+@-]+$ && "/$prof_store/" != */../* ]] || prof_store=""
+    if [[ "$SESSION_NAME" =~ ^[A-Za-z_][A-Za-z0-9_.-]*$ ]]; then
+        # shellcheck disable=SC2016
+        {
+            printf '%s\n' "# Written by AerieOS's provision-linux.sh. A session on this node, at a console." \
+                'case "$(id -un)" in' "    ${SESSION_NAME})" \
+                '        export BUILDERBOT_ROLE=node WORKSPACE=/workspace' \
+                '        export BB_NODE="$(hostname)"'
+            [ -z "$prof_ctl" ] || printf "        export BB_CONTROLLER='%s'\n" "$prof_ctl"
+            [ -z "$prof_ctl" ] || [ -z "$CTL_KEY" ] || printf "        export BB_CONTROLLER_PIN='%s'\n" "$CTL_KEY"
+            [ -z "$prof_store" ] || printf '        [ -d '\''%s/.bb/current/scripts'\'' ] \\\n            && PATH='\''%s/.bb/current/scripts'\'':"$PATH"\n' "$prof_store" "$prof_store"
+            printf '%s\n' '        PATH="$HOME/.local/bin:$PATH"' '        ;;' 'esac'
+        } > /etc/profile.d/builderbot-session.sh
+    fi
 fi
 
 say "bb-sandbox"

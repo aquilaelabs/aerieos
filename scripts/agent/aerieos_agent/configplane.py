@@ -26,6 +26,7 @@ from .base import (
     UNIT_DROPIN,
     _run,
     log,
+    log_once,
     write_atomic,
     write_json,
 )
@@ -38,10 +39,12 @@ from .stores import (
     prune_made,
     save_state,
     store_here,
+    path_plain,
     store_path_ok,
     tc_root,
 )
 from .backends import net_backend
+from .controller import address_ok
 from .toolchains import extract_sandbox_tool, netcut_sudoers
 from .sessnet import session_conf, session_sudoers
 from .runners import runner_dirs, runner_slot
@@ -829,6 +832,23 @@ class ConfigPlaneMixin:
         who = self.session_account()
         root = tc_root(self.state)
         ctl = (self.ctl.url or "").rstrip("/")
+        # A login shell reads this file, so nothing goes into it but words
+        # of a known shape, each in single quotes: an account's name, a
+        # store's path (path_plain), the controller's address (address_ok).
+        # One this node's record holds in another shape is left out and
+        # said: the node keeps its store and its controller, and a shell at
+        # its console is without that line.
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.-]{0,31}", who or ""):
+            log_once("profile-who", f"{self.SESSION_PROFILE} is left as it is: the session account's name is not a plain one")
+            return
+        if root and not path_plain(root):
+            log_once("profile-store", f"{self.SESSION_PROFILE} names no store: this node's toolchain store is at a path that is "
+                                      "not letters, digits and . _ / + @ - alone")
+            root = ""
+        if ctl and not address_ok(ctl):
+            log_once("profile-ctl", f"{self.SESSION_PROFILE} names no controller: this node's is at an address that is not "
+                                    "http(s)://host[:port] alone")
+            ctl = ""
         # The controller's key where this node pinned it, so a shell at the
         # console holds the controller to it as a session does. Only that
         # form: it is made of base64's characters, and it outlives the
@@ -841,10 +861,10 @@ class ConfigPlaneMixin:
             f"    {who})\n"
             "        export BUILDERBOT_ROLE=node WORKSPACE=/workspace\n"
             '        export BB_NODE="$(hostname)"\n'
-            + (f'        export BB_CONTROLLER="{ctl}"\n' if ctl else "")
-            + (f'        export BB_CONTROLLER_PIN="{pin}"\n' if ctl and pin else "")
-            + (f'        [ -d "{root}/.bb/current/scripts" ] \\\n'
-               f'            && PATH="{root}/.bb/current/scripts:$PATH"\n' if root else "")
+            + (f"        export BB_CONTROLLER='{ctl}'\n" if ctl else "")
+            + (f"        export BB_CONTROLLER_PIN='{pin}'\n" if ctl and pin else "")
+            + (f"        [ -d '{root}/.bb/current/scripts' ] \\\n"
+               f"            && PATH='{root}/.bb/current/scripts':\"$PATH\"\n" if root else "")
             + '        PATH="$HOME/.local/bin:$PATH"\n'
             "        ;;\n"
             "esac\n")
@@ -978,7 +998,9 @@ class ConfigPlaneMixin:
             for role, path in stores.items():
                 if role not in DEFAULT_STORES:
                     continue
-                why = store_path_ok(path)
+                # A new place is held to a store's one shape; where the
+                # store already is, it stays whatever its path.
+                why = store_path_ok(path, shape=mine.get(role) != path)
                 if why:
                     job.say(f"refused {role} store: {why}\n")
                     bad += 1

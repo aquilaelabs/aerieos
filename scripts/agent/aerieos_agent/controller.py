@@ -4,6 +4,7 @@ import hashlib
 import http.client
 import json
 import os
+import re
 import shutil
 import ssl
 import urllib.request
@@ -88,6 +89,21 @@ def key_pin_of(der):
     """The pin of the key a DER certificate carries (KEY_PIN's form), or ""."""
     spki = spki_of(der)
     return KEY_PIN + base64.b64encode(hashlib.sha256(spki).digest()).decode() if spki else ""
+
+
+# The controller's address, the one shape taken from another's word (a
+# move's answer) and the only one written where a shell reads it
+# (/etc/profile.d): http or https, a host of letters, digits, dots and
+# hyphens or an IPv6 literal in brackets, a port or none, and no path past
+# a single slash.
+ADDRESS = re.compile(r"(https?)://(?:\[[0-9A-Fa-f:.]{2,45}\]|[A-Za-z0-9][A-Za-z0-9.-]{0,252})(?::[0-9]{1,5})?/?")
+
+
+def address_ok(url, https=False):
+    """Whether `url` is of the controller's one shape (ADDRESS); with
+    `https`, of that scheme alone."""
+    m = ADDRESS.fullmatch(url) if isinstance(url, str) else None
+    return bool(m) and (not https or m.group(1) == "https")
 
 
 class Controller:
