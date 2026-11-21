@@ -209,8 +209,9 @@ root, its session's view, and is given no second:
   agent makes the cut. The install is two runs as the session account: the
   first, with the network, fetches and holds the downloads; the second is
   started by the agent through its root helper, `bb-netcut`, which makes a
-  network namespace holding nothing, becomes the session account for good
-  and only then starts the steps. No sudo rule is involved. The account is
+  network namespace holding nothing, covers `/run` with an empty folder so
+  no daemon's socket there is reached, becomes the session account for good
+  with no group but its own, and only then starts the steps. No sudo rule is involved. The account is
   the one the node's own enrollment names for sessions, never a word of the
   job's, and the second run checks for itself that it has no network before
   it runs anything.

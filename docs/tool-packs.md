@@ -886,7 +886,8 @@ that reads its format takes it as the newest does.
 ### A variable an entry sets
 
 An entry sets variables in a few places: a pack's or a shipped row's
-`layout.env`, which every job on the node runs with; a shipped row's
+`layout.env`, which every job on a node that holds that toolchain runs
+with, and no other row's installer, steps or check; a shipped row's
 `source.env` and a coding agent's `agent.install.env` and `pin`, which an
 installer runs with; an agent's `env` and `signin.env`, and a config
 field's `env`. One rule holds every one of them, in one function

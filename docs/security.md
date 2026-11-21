@@ -661,10 +661,13 @@ release then names the spare as its first key and a new spare beside it.
 Two is the most either file names: every key held is one more that can
 sign. A node enrolled before a spare was named pins it by itself: a build
 the release key signed carries that key's own statement of which key is
-its spare (`tools/sign-agent.py` writes it into `scripts/agent/agent.sig`
-under a line of its own, and the controller passes it on with its hello and
-with an update), and a node that holds the release key and no spare pins
-the one named when the statement is signed by the key it pinned. A
+its spare, with the build that said it (`tools/sign-agent.py` writes it
+into `scripts/agent/agent.sig` under a line of its own, and the controller
+passes it on with its hello and with an update), and a node that holds the
+release key and no spare pins the one named when the statement is signed
+by the key it pinned and its build is not older than the agent the node
+runs, so an older statement cannot be sent again once its spare is
+retired. A
 controller's word alone adds no key, a statement under any other key pins
 nothing (a key added at the console among them), and a node that has a
 spare, or whose console chose to pin no key, is left as it is. Its row
