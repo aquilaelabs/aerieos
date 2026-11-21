@@ -1258,6 +1258,15 @@ sdk_step() {
     en="$(sdk_sys_path env)" || { printf 'there is no env among this system'\''s own tools\n' >&2; return 127; }
     "$en" "$@"
 }
+# sdk_said_by TOOL TEXT: what a checking tool said, a line of the log each,
+# before the one sentence a refusal is: a key's fingerprint and the tool's
+# own words are the log's, never the job's failure line.
+sdk_said_by() {
+    local ln
+    while IFS= read -r ln; do
+        [ -z "$ln" ] || log "${1}: ${ln#"${1}": }"
+    done <<< "$2"
+}
 sdk_meta() { sdk_sys python3 "$SDK_META" ${SDK_CATALOG:+--catalog "$SDK_CATALOG"} "$@"; }
 
 # Read a NUL-separated list from the catalog into an array named by $1.
@@ -1425,7 +1434,8 @@ sdk_verify_download() {
         keyring="$(sdk_meta keyring "$where" "$what" "$kd")" || { rm -rf "$file" "$kd"; die "${what}: no keys to check its signature with"; }
         if ! signer="$(sdk_sys gpgv --keyring "$keyring" "$sig" "$file" 2>&1)"; then
             rm -rf "$file" "$kd"
-            die "${what}'s download does not carry its publisher's signature: $(printf '%s' "$signer" | tail -2 | tr '\n' ' ')nothing was installed"
+            sdk_said_by gpgv "$signer"
+            die "${what}'s download does not carry its publisher's signature: nothing was installed"
         fi
         rm -rf "$kd"
         signer="$(printf '%s' "$signer" | sed -n 's/.*Good signature from "\([^"]*\)".*/\1/p' | head -1)"
@@ -1835,7 +1845,8 @@ sdk_fetch_declared() {
                 rm -rf "$tmp" "$kd"
                 # shellcheck disable=SC2034  # held-run.sh reads it on the way out
                 SDK_NOT_HELD="$to"
-                die "${what}: ${url} answered a file that does not carry its publisher's signature under ${keys}: $(printf '%s' "$signer" | tail -2 | tr '\n' ' ')nothing is installed"
+                sdk_said_by gpgv "$signer"
+                die "${what}: ${to} does not carry its publisher's signature under ${keys}: nothing is installed"
             fi
             rm -rf "$kd"
             signer="$(printf '%s' "$signer" | sed -n 's/.*Good signature from "\([^"]*\)".*/\1/p' | head -1)"

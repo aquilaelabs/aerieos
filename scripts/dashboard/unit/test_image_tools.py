@@ -117,7 +117,11 @@ class PinFetch(unittest.TestCase):
         Fake.pages["/dl/v9.1/tool-9.1-amd64"] = b"another release under the same name"
         p, dest = self.run_it()
         self.assertEqual(p.returncode, 1)
-        self.assertIn("tool 9.1 for linux/amd64 is not the pinned file", p.stderr)
+        self.assertIn("tool 9.1 for linux/amd64 is not the pinned file: not kept", p.stderr)
+        # The sentence names no digest: they are on lines of their own above it.
+        said = p.stderr.strip().splitlines()
+        self.assertNotRegex(said[-1], r"[0-9a-f]{16}")
+        self.assertIn("pin-fetch: answered: " + hashlib.sha256(b"another release under the same name").hexdigest(), said)
         with open(dest) as f:
             self.assertEqual(f.read(), "what was there")
         del Fake.pages["/dl/v9.1/tool-9.1-amd64"]

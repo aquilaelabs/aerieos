@@ -63,8 +63,15 @@ class Signed(sdkstore.KitCase):
         self.signed_kit({"kit.asc": self.other_asc})
         rc, out = self.s.sh("sdk_install kit; echo went-on", PATH=self.s.can_cut())
         self.assertNotEqual(rc, 0)
-        self.assertIn("answered a file that does not carry its publisher's signature under kit.asc", out)
-        self.assertIn("nothing is installed", out)
+        self.assertIn("kit: dl/data.bin does not carry its publisher's signature under kit.asc: nothing is installed", out)
+        # One sentence for the job's failure line; what gpgv said, a key's
+        # fingerprint among it, on lines of the log's own before it.
+        failure = next(ln for ln in out.splitlines() if "ERROR:" in ln)
+        self.assertNotIn("gpgv", failure)
+        self.assertNotRegex(failure, r"[0-9A-F]{16}")
+        said = [ln for ln in out.splitlines() if ln.startswith("[builderbot] gpgv: ")]
+        self.assertTrue(said, out)
+        self.assertLess(out.index(said[-1]), out.index(failure))
         self.assertFalse(os.path.exists(self.mark) or os.path.exists(self.s.dir("kit")) or "went-on" in out)
         # The right key, and a file changed since it was signed.
         self.signed_kit({"kit.asc": self.pub_asc})

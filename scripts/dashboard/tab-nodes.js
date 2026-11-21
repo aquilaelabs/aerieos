@@ -1339,7 +1339,6 @@ function nodeStale(n){
 // is not WINDOW.BUILD (a node that has not said hello yet). Empty means
 // "cannot say" and is never read as a mismatch.
 const agentWindow = v => (/^(\d+\.\d+)\./.exec(String(v || "")) || [])[1] || "";
-const short = d => String(d || "").split(":").pop().slice(0, 8) || "?";
 
 // A node whose agent is from ANOTHER window. Inside one, any agent works with
 // any controller and being behind is routine; across one, that promise was
@@ -1353,10 +1352,10 @@ function staleWhy(n){
   const mine = n.agent?.version || "?", ship = nodesAgent?.version;
   // It took this controller's agent and went back to the one it had (R241):
   // not sent again by itself, so the row says what happened and what asks.
+  // One phrase, as every row is: why it went back is the bell's to say.
   const back = n.agent?.back;
   if (back && back.digest === nodesAgent?.digest)
-    return `${n.name} took ${mine === ship ? `a newer build of agent ${ship} (${short(nodesAgent?.digest)})` : `agent ${ship}`} and went back to ${
-      mine === ship ? `the one it had (${short(n.agent?.digest)})` : mine}: it ${back.why || "did not start there"}. Update agent tries it again`;
+    return `${n.name} took ${mine === ship ? "a newer build of its agent" : `agent ${ship}`} and went back to the one it had`;
   // From a newer window than this controller's (one gone back to an older
   // image): an update would send it back, which a node that pinned a key
   // refuses, so the row says which is newer and no press.
@@ -1369,7 +1368,7 @@ function staleWhy(n){
     : mine === ship
     // The same number and a different file: the agent moved without its
     // version constant, and "runs 0.6.92 and ships 0.6.92" read as nonsense.
-    ? `${n.name} has an older build of agent ${mine} (${short(n.agent?.digest)}, this controller ships ${short(nodesAgent?.digest)}): press Update agent first`
+    ? `${n.name} has an older build of agent ${mine}: press Update agent first`
     : `${n.name} runs agent ${mine} and this controller ships ${ship}: press Update agent first`;
 }
 

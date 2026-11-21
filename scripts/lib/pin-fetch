@@ -51,9 +51,12 @@ PY
 read -r version want url < "$tmp/pin"
 
 curl -fsSL --retry 3 -o "$tmp/file" "$url" || { echo "pin-fetch: could not download ${url}" >&2; exit 1; }
-got="$(sha256sum "$tmp/file" | cut -d' ' -f1)"
+got="$(sha256sum "$tmp/file")"
+got="${got%% *}"
 if [ "$got" != "$want" ]; then
-    echo "pin-fetch: ${name} ${version} for ${plat} is not the pinned file (sha256 ${got}, pinned ${want}): not kept" >&2
+    # The two digests on lines of their own, then one sentence a person reads.
+    printf 'pin-fetch: answered: %s\npin-fetch: sha256 expected: %s\n' "$got" "$want" >&2
+    echo "pin-fetch: ${name} ${version} for ${plat} is not the pinned file: not kept" >&2
     exit 1
 fi
 mv -f "$tmp/file" "$dest"
