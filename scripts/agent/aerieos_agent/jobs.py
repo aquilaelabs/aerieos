@@ -14,7 +14,7 @@ import traceback
 import urllib.request
 
 from . import http80
-from .base import AGENT_INSTALLS, AGENT_LOGINS, AGENT_LOGOUTS, ROOT_BUNDLE_DIR, fs_holds, log, pack_signins, root_docker_env
+from .base import AGENT_INSTALLS, AGENT_LOGINS, AGENT_LOGOUTS, ROOT_BUNDLE_DIR, NotHeld, fs_holds, log, pack_signins, root_docker_env
 from .toolchains import sdk_env
 
 
@@ -397,6 +397,11 @@ class Job(threading.Thread):
                 state, code = self.agent.agent_update(self, spec)
             else:
                 state, code = self.exec(spec)
+        except NotHeld as e:
+            # Work in the account's folder this machine does not do as the
+            # account (base.fs_holds): the row says that, and nothing ran as root.
+            self.say(f"{e}\n")
+            state, code, error = "failed", 70, str(e)
         except Exception as e:                       # noqa: BLE001 (reported, not raised)
             # Broad because a runner's bug is this job's failure, not the
             # agent's: the row carries the sentence, the journal the traceback.

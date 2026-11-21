@@ -18,6 +18,7 @@ from .base import (
     ACT_RUNNER_BIN,
     RUNNER_DIR,
     RUNNER_TARBALL,
+    NotHeld,
     _run,
     as_root,
     fs_holds,
@@ -297,7 +298,10 @@ class RunnersMixin:
         the service cycled so the runner reads it, only while it is idle: a
         restart under a running job would kill the job."""
         for d, _rec in runner_dirs():
-            self._runner_env_sync(d)
+            # Left as it is where this machine does not write it as the
+            # account (fs_holds says why in the log): the hello goes on.
+            with contextlib.suppress(NotHeld):
+                self._runner_env_sync(d)
 
     def _runner_env_sync(self, d):
         want = runner_env_text(self.state)

@@ -34,7 +34,7 @@ import tarfile
 import threading
 import time
 import urllib.parse
-from .base import as_root, fs_holds, hello_again, SHARE, log, log_once, write_json
+from .base import NotHeld, as_root, fs_holds, hello_again, SHARE, log, log_once, write_json
 from .names import VAR
 
 # What is not synced, the same set as the controller's (wssync.SKIP_DIRS
@@ -525,8 +525,15 @@ class WorkspaceSync:
         """One project brought in step, its file work done as the tree's
         owner and not as root (base.acting_as): a session writes this tree,
         and root opening a path in it followed whatever the session had put
-        there, a link at .bbsync-NAME.part above all (the audit of 13 Nov)."""
-        with fs_holds(self.owner()):
+        there, a link at .bbsync-NAME.part above all (the audit of 13 Nov).
+        Where this machine does not do that as the owner, nothing is done
+        and the project says why (fs_holds)."""
+        try:
+            held = fs_holds(self.owner())
+        except NotHeld as ex:
+            p.error = str(ex)[:200]
+            return
+        with held:
             self._one(p)
             # Refused as the owner: something in the tree is root's (a
             # container wrote it, or this agent did before it worked as the

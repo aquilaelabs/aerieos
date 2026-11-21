@@ -1146,22 +1146,32 @@ def fs_probe(who):
     return (not said), "; ".join(said)
 
 
+class NotHeld(OSError):
+    """File work in an account's folder refused: this machine was not seen
+    to do it as the account (fs_holds)."""
+
+
 def fs_holds(who):
     """acting_as() for `who`, where this machine was seen to hold it (once a
-    process, by fs_probe); else a block that changes nothing, said once: the
-    file work is then root's as it was before, and the agent's log says why."""
+    process, by fs_probe). Where it was not (the check failed, or a root
+    agent's system has no per-thread file identity), the work is refused
+    with NotHeld, and the agent's log says why once: done as root instead,
+    it would follow whatever link the account left at a name in its own
+    folder (a job's output pointed at a file of root's, uploaded). An agent
+    that is not root, or work for nobody, is done as it is."""
     ids = _ids(who)
     if not ids or not hasattr(os, "geteuid") or os.geteuid() != 0:
         return acting_as(None)
     if "ok" not in _FS_HOLDS:
         ok, why = fs_probe(ids)
-        _FS_HOLDS["ok"] = ok is True
-        if ok is False:
-            log(f"file work in an account's folder is done as root on this machine, as before: the check of "
-                f"doing it as the account failed ({why})")
-        elif ok is True:
+        _FS_HOLDS["ok"], _FS_HOLDS["why"] = ok is True, why
+        if ok is True:
             log("file work in an account's folder is done as that account")
-    return acting_as(ids if _FS_HOLDS["ok"] else None)
+        else:
+            log(f"file work in an account's folder is refused on this machine: it could not be done as the account ({why})")
+    if not _FS_HOLDS["ok"]:
+        raise NotHeld("file work in the account's folder is refused: this machine could not do it as the account")
+    return acting_as(ids)
 
 
 # -- a folder an account owns, reached by root without following its links -----

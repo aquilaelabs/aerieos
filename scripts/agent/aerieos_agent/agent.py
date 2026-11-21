@@ -14,7 +14,7 @@ import traceback
 from . import AGENT_VERSION, files
 from .coverage import _COV_OUT, _cov_write
 from .base import BEAT_S, CHANNEL, REFUSED, ROOT_BUNDLE_DIR, RUNNER_DIAG_KEEP, SESSION_BIN, SESSION_WALL, TRIAL_S
-from .base import cap_file, fs_holds, log, log_once, own_digest, own_path, prune_dir
+from .base import NotHeld, cap_file, fs_holds, log, log_once, own_digest, own_path, prune_dir
 from .base import back_note, selfcheck, test_lock_ready, trial_begin, trial_give_way, trial_note, trial_passed
 from .controller import CA_PIN, KEY_PIN, Controller, address_ok
 from .stores import console_said, load_state, pin_release, pin_spare, save_state, tc_root, use_scope
@@ -759,7 +759,10 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         cut = [f for f in files if cap_file(f)]
         # Each runner's _diag is the jobs account's, and pruned as it: a CI
         # job that made it a link had root delete through it (R247 step 5).
-        with fs_holds(self.drop_privileges({})):
+        # Left as they are where this machine does not do that as the
+        # account (fs_holds says why in the log): the hello goes on.
+        trimmed = 0
+        with contextlib.suppress(NotHeld), fs_holds(self.drop_privileges({})):
             trimmed = sum(prune_dir(os.path.join(d, "_diag"), RUNNER_DIAG_KEEP) for d, _ in runner_dirs())
         if cut or trimmed:
             log(f"logs: kept to size: {', '.join(os.path.basename(f) for f in cut) or 'nothing'} cut, "

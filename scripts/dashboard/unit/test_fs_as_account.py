@@ -104,19 +104,44 @@ class Bracket(unittest.TestCase):
             pass
         self.assertEqual(lib.calls, [] if os.geteuid() else lib.calls)
 
-    def test_a_machine_that_does_not_hold_it_does_the_work_as_before_and_says_so(self):
+    def test_a_machine_that_does_not_hold_it_refuses_the_work_and_says_so(self):
+        # Done as root instead, the work would follow whatever link the
+        # account left at a name in its own folder: a sign job's output
+        # pointed at a file of root's was uploaded to the controller.
         said = []
-        with mock.patch.object(base, "_FS_HOLDS", {}), mock.patch.object(base.os, "geteuid", lambda: 0, create=True), \
-                mock.patch.object(base, "fs_probe", lambda who: (False, "a link to root's own file was followed and read")), \
-                mock.patch.object(base, "log", said.append), mock.patch.object(base, "acting_as", lambda who: who):
-            self.assertIsNone(base.fs_holds((1001, 1002)))
-            self.assertIsNone(base.fs_holds((1001, 1002)))
-        self.assertEqual(len(said), 1)
-        self.assertIn("done as root on this machine, as before", said[0])
+        for ok, why in ((False, "a link to root's own file was followed and read"),
+                        (None, "this system has no per-thread file identity")):
+            del said[:]
+            with mock.patch.object(base, "_FS_HOLDS", {}), mock.patch.object(base.os, "geteuid", lambda: 0, create=True), \
+                    mock.patch.object(base, "fs_probe", lambda who, ok=ok, why=why: (ok, why)), \
+                    mock.patch.object(base, "log", said.append), mock.patch.object(base, "acting_as", lambda who: who):
+                for _ in range(2):
+                    with self.assertRaises(base.NotHeld) as refused:
+                        base.fs_holds((1001, 1002))
+                    self.assertIn("refused", str(refused.exception))
+                self.assertIsNone(base.fs_holds(None), "work for nobody is done as it is")
+            self.assertEqual(len(said), 1, "the log says why once")
+            self.assertIn(why, said[0])
         with mock.patch.object(base, "_FS_HOLDS", {}), mock.patch.object(base.os, "geteuid", lambda: 0, create=True), \
                 mock.patch.object(base, "fs_probe", lambda who: (True, "")), mock.patch.object(base, "log", said.append), \
                 mock.patch.object(base, "acting_as", lambda who: who):
             self.assertEqual(base.fs_holds({"user": 1001, "group": 1002}), (1001, 1002))
+
+    def test_a_tools_output_pointed_elsewhere_is_not_read_as_root(self):
+        # A sign or key job reads what its tool left in the job's folder, the
+        # account's: on a machine that does not hold the account's file
+        # identity, root read whatever a link at that name led to.
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d, True)
+        secret = os.path.join(d, "roots-own")
+        with open(secret, "wb") as f:
+            f.write(b"root's secret")
+        os.symlink(secret, os.path.join(d, "out.apk"))
+        keyops = agent.module("keyops")
+        with mock.patch.object(base, "_FS_HOLDS", {"ok": False, "why": "the check failed"}), \
+                mock.patch.object(base.os, "geteuid", lambda: 0, create=True):
+            with self.assertRaises(base.NotHeld):
+                keyops.made(os.path.join(d, "out.apk"), {"user": 1001, "group": 1002})
 
     def test_not_root_there_is_nothing_to_try(self):
         if os.geteuid() == 0:
