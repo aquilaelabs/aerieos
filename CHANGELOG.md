@@ -34,7 +34,7 @@
 - The static analysis scan's old schedule row leaves schedules.json. (bfe2989)
 - A start no longer rewrites checkouts' credential helpers or a line of the home's .bashrc, and its banner names AerieOS; with no stable release, the bare-metal installer takes the newest published release (14aa76b, 1429a5b, f6a5ff3)
 - Container, nginx and scanner rows name an image by name and tag, a toolchain row's failure leaves its digests to the log, and release, container and move refusals, the CI, cut-landing and switched-off pack rows, two toasts and the Doctor's lines are each one sentence with no commit, key or command (a471b89, 6c70b3c, 308bf8f)
-- A node's root-off line, Un-enroll dialog, Updates fact, reused-token bell row and in-use toolchain refusal each say one sentence, with no key characters or commands; a switched-off pack is titled as switched off (aaa2257, 06cbd0a)
+- A node's root-off line, Un-enroll dialog, Updates fact, reused-token bell row, in-use toolchain refusal and agent-is-behind notice each say one sentence, with no key characters or commands; a switched-off pack is titled as switched off (aaa2257, 06cbd0a, 68c76fe)
 - A toolchain row's failure is bb's error alone, and three more switches are honored only in AerieOS's source tree (e592c6c)
 
 ### Removed
@@ -92,6 +92,8 @@
 - aerie toolchains check answers for a pack and every other catalog row, and offers its pin as an update (2bda815)
 - Wiping a one-byte key or sign-in file no longer turns that byte to zero everywhere else in a node's agent or the controller until it restarts (ce35e43)
 - The controller's own certificate loads in its container, where a certificate set under Connection had its port answer plain http to a TLS handshake (2d63f2d)
+- Revert on a space's Build and test puts Tests run back, where Revert on Where it runs did and Build and test's own left it changed (96ca639)
+- A toolchain whose first run of its vendor's tool outlives its time limit, as Flutter's can, is ended whole, where it went on holding its folder and every later install on that node was refused as in use (dd2ae86)
 
 ### Security
 
@@ -141,6 +143,7 @@
 - A toolchain's installer, steps and verify start with none of the variables another pack set for every job, a layout's own value is set only where its toolchain is installed, and a pinned repository's check reads no account's git configuration (a89e37e)
 - A pack's install steps cut from the network no longer reach the system bus's or the resolver's sockets under /run, and a cut that cannot cover /run is counted as run with the network (7d16922)
 - One account can no longer freeze every account's sign-in pass, or the node's hello, by leaving a FIFO where root writes in its folder (e82e424)
+- File work in an account's folder on a node is refused where the node cannot do it as that account, where it fell back to root and could follow a link the account left there (ccefa6f)
 
 ## 0.9.0-dev.5641: 2026-11-18
 
