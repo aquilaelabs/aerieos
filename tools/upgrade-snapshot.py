@@ -212,7 +212,7 @@ def fill(c):
                           "perms": {"projects": "read", "files": "read"}, "note": "reads, never writes"})
     c.call("/api/roles", {"action": "set", "name": "builder", "scope": "projects",
                           "perms": {"projects": "write", "files": "write"}})
-    c.call("/api/users", {"action": "projects", "name": "ada", "projects": ["gamma"]})
+    c.call("/api/users", {"action": "edit", "name": "ada", "projects": ["gamma"]})
     c.call("/api/roles", {"action": "assign", "name": "bea", "project_roles": {"alpha": ["reviewer"],
                                                                               "beta": ["builder"]}})
     c.call("/api/roles", {"action": "assign", "name": "cy", "project_roles": {"beta": ["reviewer"]}})

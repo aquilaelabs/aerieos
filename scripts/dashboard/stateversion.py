@@ -17,8 +17,8 @@ a briefed session reads:
     it is a fresh install, stamped current with nothing to run.
   * At start, before anything writes, gate() refuses a /config NEWER than
     this build (a downgrade: restore the copy taken before the upgrade) and
-    one OLDER than SUPPORTED_FROM (go through the release named for it
-    first), each in one sentence, and the controller does not start. The
+    one OLDER than SUPPORTED_FROM (nothing updates from it: install fresh),
+    each in one sentence, and the controller does not start. The
     entrypoint asks the same question (`stateversion.py check`) before its
     hooks run, so a refused container writes nothing at all.
   * When the state is to move, the copy of /config is taken first
@@ -28,8 +28,9 @@ a briefed session reads:
 
 A migration is statemigrations/NNNN_name.py with run(ctx): idempotent, so a
 start cut short runs it again safely, and never edited once a release has
-shipped it (`aerie lint` holds every one present at the newest v* tag
-byte-for-byte). Adding one moves CURRENT, since CURRENT is the newest file.
+shipped it (`aerie lint` holds every one above SUPPORTED_FROM that the
+newest v* tag carries, byte-for-byte). Adding one moves CURRENT, since
+CURRENT is the newest file.
 Stdlib only, and importable on its own: the entrypoint runs it as a script.
 """
 import contextlib
@@ -48,11 +49,10 @@ FILE = "state.json"
 BACKUPS = "backups"
 KEEP = 3
 
-# The oldest state this build reads: AerieOS starts here, and nothing upgrades
-# from the releases before it (the operator, 1 Nov: 0.6, 0.7 and 0.8 have no
-# path, and the migrations below this number are gone from the tree). A move
-# from a controller already at this state still lands.
-SUPPORTED_FROM = 19
+# The oldest state this build reads, and the state the first migration in
+# the tree runs from: a /config under it is refused, and one at it runs every
+# migration there is. A move from a controller at this state lands.
+SUPPORTED_FROM = 27
 
 # What the copy before a migration leaves out: what grows and is not state
 # (each kind paths.py lets the Settings page move: logs, the trees jobs ran
@@ -193,10 +193,9 @@ def refusal(state, version=None):
                 f"AerieOS {by or 'a newer build'}, and this build reads state {cur} and older. "
                 f"Downgrades are not supported: start {by or 'the newer build'} again, or {where}.")
     if n < SUPPORTED_FROM:
-        return (f"AerieOS {version} will not start: this /config is at state {n}"
-                f"{f', written by {by}' if by else ''}, and this build reads state "
-                f"{SUPPORTED_FROM} on. Nothing upgrades from a build before it: install fresh, "
-                f"with a new /config (docs/install.md#upgrading).")
+        return (f"AerieOS {version} will not start: this /config is from "
+                f"{f'AerieOS {by}' if by else 'an older build'}, which nothing updates from, "
+                f"so install fresh with a new /config.")
     return ""
 
 

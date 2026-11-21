@@ -192,8 +192,8 @@ repository cannot open them.
 Each release says how far back it reaches, in two numbers.
 
 - **The state floor** is the oldest `/config` it reads (`SUPPORTED_FROM` in
-  `scripts/dashboard/stateversion.py`). AerieOS starts at 0.9, and nothing
-  upgrades from a build before it: an older `/config` is refused at start, and
+  `scripts/dashboard/stateversion.py`). Nothing updates from
+  `0.9.0-dev.5641` or earlier: such a `/config` is refused at start, and
   the way on is a fresh install.
 - **The agent's window** is the minor of `AGENT_VERSION`. A node whose agent is
   from another window takes nothing but its own update, and its spaces'

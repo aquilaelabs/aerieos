@@ -55,7 +55,8 @@ class Judgment(unittest.TestCase):
         for name in sorted(os.listdir(SNAPS)):
             with open(os.path.join(SNAPS, name, "manifest.json")) as f:
                 self.states[name] = json.load(f)["state"]
-        self.now = max(self.states.values())
+        # The image is a state past the newest snapshot, so every one of them moves.
+        self.now = max(self.states.values()) + 1
 
     def run_it(self, *snaps, **fake):
         env = {"PATH": self.d + os.pathsep + os.environ.get("PATH", "/usr/bin:/bin"), "TMPDIR": self.d,

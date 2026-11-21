@@ -776,7 +776,8 @@ entrypoint and again in the dashboard:
   the lock (`/config/.server.pid`), which is how the supervisor knows the
   dashboard runs and which process to stop.
 - **An older state than this build migrates from**: the container stops,
-  saying which release to start on it first.
+  saying to install fresh, with a new `/config`. Nothing updates from a
+  release that old.
 - **A newer state** (a rollback past an upgrade): the container stops, saying
   that downgrades are not supported. Start the newer build again, or stop
   the container and put the copy back: the contents of

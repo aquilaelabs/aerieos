@@ -2,8 +2,7 @@
 than the build or older than it migrates from is refused in one sentence,
 one about to move is copied first (the newest three kept, what grows left
 out), and the numbered migrations past the stamp run once, in order, each
-stamped as it lands. And migration 0001, the one-off migrators that ran at
-every start before the stamp, folded into one that runs once."""
+stamped as it lands."""
 import io
 import json
 import os
@@ -49,9 +48,9 @@ class Gate(unittest.TestCase):
         return db
 
     def test_this_build_writes_its_newest_migration(self):
-        self.assertGreaterEqual(self.cur, 1, "0.5.0 is state 1")
         self.assertEqual(self.cur, sv.migrations()[-1][0])
         self.assertLessEqual(sv.SUPPORTED_FROM, self.cur)
+        self.assertGreater(sv.migrations()[0][0], sv.SUPPORTED_FROM, "a migration at or under the floor never runs")
 
     def test_a_fresh_config_is_stamped_current_with_nothing_copied(self):
         self.assertEqual(sv.gate(self.state, "0.5.0"), self.cur)
@@ -142,14 +141,16 @@ class Gate(unittest.TestCase):
         self.assertEqual(sv.read(self.state)[0], self.cur + 1, "nothing written")
 
     def test_nothing_older_than_the_floor_starts_and_it_says_to_install_fresh(self):
-        # The operator, 1 Nov: AerieOS starts here, and 0.6, 0.7 and 0.8 have no path.
         self.stamp(sv.SUPPORTED_FROM, "0.9.0")
         self.assertEqual(sv.refusal(self.state, "0.9.0"), "", "the floor is what the controller moving over holds")
-        for n, by in ((sv.SUPPORTED_FROM - 1, "0.8.2"), (2, "0.6.0"), (0, "")):
+        for n, by in ((sv.SUPPORTED_FROM - 1, "0.9.0-dev.5641"), (2, "0.6.0"), (0, "")):
             self.stamp(n, by)
             why = sv.refusal(self.state, "0.9.0")
             self.assertIn("install fresh", why)
-            self.assertIn("install.md#upgrading", why)
+            self.assertIn(f"AerieOS {by}" if by else "an older build", why)
+            # One sentence, with nothing to type in it.
+            self.assertEqual(why.count(". "), 0, why)
+            self.assertTrue(why.endswith("with a new /config."), why)
         (self.state / "state.json").unlink()
         self.lived_in().close()
         self.assertIn("install fresh", sv.refusal(self.state, "0.9.0"), "a lived-in /config from before the stamp is state 0")

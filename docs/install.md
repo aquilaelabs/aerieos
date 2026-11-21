@@ -217,10 +217,12 @@ and move it on when you choose to upgrade.
 
 **What is supported:**
 
-- From any release to any later release, in one step, from 0.9 on.
-- **Nothing before 0.9.** AerieOS starts at 0.9 and has no path from any version
-  before it: install fresh, with a new `/config`, and add your spaces
-  again from their repositories.
+- From any release to any later release, in one step, from the first one
+  after `0.9.0-dev.5641` on.
+- **Nothing from `0.9.0-dev.5641` or earlier.** No release updates from one of
+  those: install fresh, with a new `/config`, and add your spaces again from
+  their repositories. A controller started on such a `/config` stops and says
+  so.
 - **No downgrades.** Going back is restoring the backup the upgrade made,
   below, with the older image.
 

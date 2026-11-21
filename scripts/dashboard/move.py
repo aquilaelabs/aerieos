@@ -1495,11 +1495,11 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
         return {"error": f"the bundle comes from AerieOS {m.get('version') or 'a newer build'}, whose state (version {m.get('state_version')}) "
                          f"is newer than this install's build {build_version() or ''} reads (up to {here_ver}): a move never lands on an older build. "
                          f"Write this stick again from {m.get('version') or 'that release'} or newer with the USB maker (or update this install), then land it"}
-    # ...nor a state this build no longer upgrades from: it would land, and the
-    # next start refuse it (B600).
+    # ...nor a state this build does not read: it would land, and the next
+    # start refuse it (B600).
     if m.get("state_version") and int(m["state_version"]) < stateversion.SUPPORTED_FROM:
-        return {"error": f"the bundle's state is at version {m['state_version']}, and this build upgrades from "
-                         f"{stateversion.SUPPORTED_FROM} on: move it through a release between them first"}
+        made_by = f"AerieOS {m['version']}" if m.get("version") else "an older build"
+        return {"error": f"the bundle comes from {made_by}, which nothing updates from, so it cannot land here"}
     # A backup opens under the key its password derives (backup.py); a
     # move under its token's.
     if key is None:
