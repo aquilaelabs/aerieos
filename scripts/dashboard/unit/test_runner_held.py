@@ -292,6 +292,36 @@ class TheAgent(unittest.TestCase):
         self.assertEqual(os.listdir(self.root), [], "not the archive, not a file of it, not the folder made for it")
         self.assertEqual(self.node.ctl.calls, [], "and no token was asked for")
 
+    # -- the slot ---------------------------------------------------------------
+    def test_a_slot_is_one_an_address_maps_to_or_nothing_is_made(self):
+        """A job's slot names the folder root makes and gives to the jobs
+        account: an absolute path, a dotted one or any other shape is
+        refused before anything is made or asked."""
+        outside = os.path.join(self.tmp, "outside")
+        for slot in (outside, "/etc/cron.d", "..", ".", "../outside", "a/b", ".hidden", "-x", "Git.Example", "a--b", "a b",
+                     "ends-", "ends.", "x" * 61):
+            cfg = {"want": True, "url": "https://github.com/acme", "forge": "github", "slot": slot, "name": "box",
+                   "pin": self.pin(archive(), "https://github.com/x/r.tar.gz")}
+            with self.subTest(slot=slot):
+                self.assertEqual(self.node._apply_runner(self.job, cfg), ("failed", 64))
+                self.assertEqual(self.job.said[-1], "refused: that is not a runner's slot\n")
+                self.assertEqual(self.node._apply_runner(self.job, dict(cfg, want=False)), ("failed", 64))
+        self.assertEqual((self.asked, os.listdir(self.root), self.node.ctl.calls), ([], [], []))
+        self.assertFalse(os.path.lexists(outside))
+        # No slot and no address to map one from is no slot either.
+        self.assertEqual(self.node._apply_runner(self.job, {"want": False}), ("failed", 64))
+
+    def test_every_slot_an_address_maps_to_is_taken(self):
+        for url in ("https://github.com/acme", "https://github.com/Acme/Some_Repo.git", "https://git.example.org:3000/a/b/",
+                    "https://github.com/" + "long-organization-name/" * 4, "https://h/x.git.git", "http://10.0.0.5/r"):
+            slot = runners.runner_slot(url)
+            self.assertTrue(runners.slot_ok(slot), (url, slot))
+            self.assertEqual(slot, nodes.runner_slot(url), "the controller's maps it the same")
+        # Cut at sixty on a dash: still the slot that address maps to.
+        cut = runners.runner_slot("https://github.com/" + "a" * 48 + "-bcd")
+        self.assertEqual((len(cut), cut[-1]), (60, "-"))
+        self.assertTrue(runners.slot_ok(cut))
+
     def test_an_install_handed_no_pin_fetches_nothing(self):
         cfg = {"want": True, "url": "https://github.com/acme", "forge": "github", "slot": "github.com-acme", "name": "box"}
         self.assertEqual(self.node._apply_runner(self.job, cfg), ("failed", 65))

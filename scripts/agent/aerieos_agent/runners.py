@@ -38,6 +38,17 @@ def runner_slot(url):
     return re.sub(r"-+", "-", re.sub(r"[^a-z0-9.]+", "-", rest)).strip("-.")[:60]
 
 
+def slot_ok(slot):
+    """Whether `slot` is one runner_slot() answers for some address: what a
+    job's slot is held to before it names a folder under RUNNER_DIR, which
+    root makes and gives to the jobs account. Lowercase letters, digits,
+    dots and single dashes, a letter or digit first, sixty at most, a dash
+    or dot last only where the sixty cut it there: never empty, never a
+    path, never a dotted name."""
+    s = slot if isinstance(slot, str) else ""
+    return bool(re.fullmatch(r"[a-z0-9][a-z0-9.-]{0,59}", s)) and "--" not in s and (len(s) == 60 or s[-1] not in "-.")
+
+
 # A runner's folder is the jobs account's, and so is everything a CI job run
 # there leaves in it: root reads a file there only as a regular file, through
 # no link, and only so much of it; writes there as that account; and never
@@ -398,6 +409,9 @@ class RunnersMixin:
         user = self.state.get("user") or "root"
         url = str(cfg.get("url") or "")
         slot = str(cfg.get("slot") or "") or runner_slot(url)
+        if not slot_ok(slot):
+            job.say("refused: that is not a runner's slot\n")
+            return "failed", 64
         # This runner's directory, one per git host: the one already
         # registered for this address (RUNNER_DIR itself for a runner from
         # before a node could hold several), else RUNNER_DIR/<slot>.
