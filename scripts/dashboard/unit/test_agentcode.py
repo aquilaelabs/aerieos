@@ -978,32 +978,17 @@ class NodeAgent(unittest.TestCase):
         self.assertEqual((self.mod.recipe_version(HELD), agents.install_version(HELD), agents.install_pins(HELD), agents.install_pins(PLACED)),
                          ("0.170.0", "0.170.0", "", "0.170.0"))
 
-    # Names the node refuses a recipe and the controller does not yet: each
-    # loads code into, or points elsewhere, a tool a check or a download
-    # runs (the re-audit of 21 Nov), handed to packformat.env_name_ok to
-    # refuse as well. Once it does, this is empty in effect.
-    ENV_PENDING = frozenset(("PYTHONHOME", "PYTHONUSERBASE", "PERL5LIB", "PERLLIB", "RUBYLIB", "JAVA_TOOL_OPTIONS",
-                             "JDK_JAVA_OPTIONS", "OPENSSL_CONF", "OPENSSL_MODULES", "OPENSSL_ENGINES", "SSL_CERT_FILE",
-                             "SSL_CERT_DIR", "CURL_HOME", "CURL_CA_BUNDLE", "WGETRC", "GNUPGHOME", "TAR_OPTIONS", "GCONV_PATH",
-                             "LOCPATH", "NLSPATH", "XDG_CONFIG_HOME", "HOSTALIASES", "RES_OPTIONS", "LOCALDOMAIN",
-                             "GLIBC_TUNABLES", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY"))
-    # ...and every name beginning so (GIT_DIR, GIT_TEMPLATE_DIR, GIT_ASKPASS, MALLOC_CHECK_ among them).
-    ENV_PENDING_PREFIXES = ("GIT_", "MALLOC_")
-
     def test_a_recipe_s_environment_is_held_to_the_controller_s_one_rule(self):
         # The node held a recipe's names to a list of its own, narrower than
-        # the one every entry is held to on the controller.
+        # the one every entry is held to on the controller (packformat.
+        # env_name_ok): the two are one rule, name for name.
         base = self.mod.module("base")
-        names = set(packformat.ENV_KEPT) | set(self.ENV_PENDING) | {p + "X" for p in packformat.ENV_KEPT_PREFIXES + self.ENV_PENDING_PREFIXES} \
-            | {p + "X" for p in base._RECIPE_ENV_KEPT_PREFIXES} | set(base._RECIPE_ENV_KEPT) \
-            | {"A", "X1", "JAVA_HOME", "NODE_PATH", "CARGO_HOME", "CODEX_INSTALL_DIR", "COPILOT_AUTO_UPDATE", "lower", "1X", "A" * 42}
-        for name in sorted(names):
-            node, ctl = base._recipe_name(name), packformat.env_name_ok(name)
-            if not ctl:
-                self.assertFalse(node, f"{name}: the controller refuses it, and so does the node")
-            elif not node:
-                self.assertTrue(name in self.ENV_PENDING or name.startswith(self.ENV_PENDING_PREFIXES),
-                                f"{name}: the node refuses what the controller takes")
+        self.assertEqual(base._RECIPE_NAME.pattern, packformat.ENV_NAME.pattern)
+        self.assertEqual(set(base._RECIPE_ENV_KEPT), set(packformat.ENV_KEPT))
+        self.assertEqual(tuple(base._RECIPE_ENV_KEPT_PREFIXES), tuple(packformat.ENV_KEPT_PREFIXES))
+        for name in sorted(set(packformat.ENV_KEPT) | {p + "X" for p in packformat.ENV_KEPT_PREFIXES}
+                           | {"A", "JAVA_HOME", "NODE_PATH", "CARGO_HOME", "CODEX_INSTALL_DIR", "lower", "1X", "A" * 42}):
+            self.assertEqual(base._recipe_name(name), packformat.env_name_ok(name), name)
 
     def test_the_recipe_the_controller_hands_over_is_what_runs(self):
         # R169 step 13: where the program lands is the recipe's word, not
