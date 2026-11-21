@@ -14,11 +14,12 @@ start, the reason is kept and said once, and nothing else changes.
 import contextlib
 import ctypes
 import os
+import stat
 import struct
 import threading
 import time
 
-from .base import SIGNINS, log, pack_signins
+from .base import SIGNINS, folder_at, log, pack_signins
 
 # The folder in an account's home, and the file in it that is the sign-in:
 # the shipped agents', from where each row says its own is kept.
@@ -41,7 +42,6 @@ FAN_CLASS_NOTIF = 0x0
 FAN_MARK_ADD = 0x1
 FAN_OPEN = 0x20
 FAN_EVENT_ON_CHILD = 0x08000000
-AT_FDCWD = -100
 META = struct.Struct("=IBBHQii")      # event_len, vers, reserved, metadata_len, mask, fd, pid
 KEEP = 32                             # reads kept for the hello
 SAY_S = 7 * 86400                     # ...for a week
@@ -120,21 +120,44 @@ class TokenWatch:
         replaced, which every agent does when it refreshes a token)."""
         for d, name in watched().items():
             folder = os.path.join(home, d)
-            f = os.path.join(folder, name)
-            with contextlib.suppress(OSError):
-                st = os.lstat(f)
-                if not os.path.islink(f) and (st.st_mode & 0o077 or st.st_uid != pw.pw_uid):
-                    os.chown(f, pw.pw_uid, pw.pw_gid, follow_symlinks=False)
-                    os.chmod(f, 0o600)
-            if self.fd < 0 or not os.path.isdir(folder) or os.path.islink(folder):
+            # The folder reached from the home through no link: one the
+            # account pointed elsewhere (another account's home among them)
+            # is neither held nor marked.
+            try:
+                fd, _ = folder_at(home, os.path.join(d, name))
+            except OSError:
                 continue
-            key = os.stat(folder).st_ino, folder
-            if key in self.marked:
-                continue
-            if self.libc.fanotify_mark(self.fd, FAN_MARK_ADD, FAN_OPEN | FAN_EVENT_ON_CHILD,
-                                       AT_FDCWD, folder.encode()) == 0:
-                self.marked.add(key)
-                self.names[folder] = name
+            try:
+                self._hold(fd, name, pw)
+                if self.fd < 0:
+                    continue
+                key = os.fstat(fd).st_ino, folder
+                if key in self.marked:
+                    continue
+                # Marked by the descriptor itself, never by its name again.
+                if self.libc.fanotify_mark(self.fd, FAN_MARK_ADD, FAN_OPEN | FAN_EVENT_ON_CHILD, fd, None) == 0:
+                    self.marked.add(key)
+                    self.names[folder] = name
+            finally:
+                os.close(fd)
+
+    @staticmethod
+    def _hold(fd, name, pw):
+        """The sign-in `name` in the folder `fd` is a descriptor on held at
+        600 and the account's: only a plain file with one name, changed by
+        the file itself."""
+        with contextlib.suppress(OSError):
+            st = os.stat(name, dir_fd=fd, follow_symlinks=False)
+            if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1 \
+                    or not (st.st_mode & 0o077 or st.st_uid != pw.pw_uid):
+                return
+            f = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=fd)
+            try:
+                if os.fstat(f).st_ino == st.st_ino:
+                    os.fchown(f, pw.pw_uid, pw.pw_gid)
+                    os.fchmod(f, 0o600)
+            finally:
+                os.close(f)
 
     def loop(self):
         while True:

@@ -1210,6 +1210,50 @@ def open_dir(path):
     return os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
 
 
+def folder_at(top, rel, make=None):
+    """(a descriptor on the folder that holds `rel`'s last part, that part's
+    name), reached from the folder `top` one part at a time with no link
+    followed at any of them, `top`'s own name included. Root's way to a file
+    in an account's home, where any folder on the way may be the account's
+    link to somewhere else, another account's home among them: a link, or a
+    part that is not a folder, raises and is left where it is. With `make`,
+    a (uid, gid), a folder that is not there is made 0700 and given to it.
+    The caller closes the descriptor."""
+    parts = rel.split("/")
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    fd = os.open(top, flags)
+    try:
+        for p in parts[:-1]:
+            try:
+                nfd = os.open(p, flags, dir_fd=fd)
+            except FileNotFoundError:
+                if make is None:
+                    raise
+                os.mkdir(p, 0o700, dir_fd=fd)
+                nfd = os.open(p, flags, dir_fd=fd)
+                try:
+                    give_fd(nfd, *make)
+                except OSError:
+                    os.close(nfd)
+                    raise
+            os.close(fd)
+            fd = nfd
+    except BaseException:
+        os.close(fd)
+        raise
+    return fd, parts[-1]
+
+
+@contextlib.contextmanager
+def held_folder(top, rel, make=None):
+    """folder_at as a block: the descriptor closed when it ends."""
+    fd, name = folder_at(top, rel, make)
+    try:
+        yield fd, name
+    finally:
+        os.close(fd)
+
+
 def write_at(folder, name, data, mode, uid=None, gid=None):
     """`data` as the file `name` in the folder `folder` is a descriptor on,
     replaced in one step, with `mode` and (given) the owner: made beside

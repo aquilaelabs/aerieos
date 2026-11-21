@@ -38,13 +38,14 @@ import contextlib
 import json
 import os
 import pwd
+import stat
 import subprocess
 import threading
 import time
 
 from . import tokenseal
 from .accounts import UID_RE, user_of
-from .base import SIGNINS, log, pack_signins, wipe, write_atomic
+from .base import SIGNINS, held_folder, log, pack_signins, wipe, write_at, write_atomic
 from .names import VAR
 
 SEAL_DIR = VAR + "/tokens"
@@ -124,9 +125,13 @@ def about(agent, data, home):
     with contextlib.suppress(OSError, ValueError, TypeError, AttributeError):
         if who.get("file") and who["file"] != row["kept"]:
             # Another file says who (Claude Code's own record beside its
-            # credential): read from the home.
-            with open(os.path.join(home, who["file"]), "rb") as f:
-                data = f.read(1 << 20)
+            # credential): read from the home through no link.
+            with held_folder(home, who["file"]) as (fd, name):
+                f = os.open(name, os.O_RDONLY | _NOFOLLOW, dir_fd=fd)
+                with os.fdopen(f, "rb") as fh:
+                    if not stat.S_ISREG(os.fstat(fh.fileno()).st_mode):
+                        return out
+                    data = fh.read(1 << 20)
         try:
             d = _jsonc(data)
         except (ValueError, TypeError):
@@ -147,25 +152,77 @@ def about(agent, data, home):
     return out
 
 
-def _shred(path):
-    """A plain sign-in file overwritten and removed: what overwriting can do
-    on the disk it is on (nothing on a copy-on-write one, or a snapshot)."""
-    with contextlib.suppress(OSError):
-        n = os.path.getsize(path)
-        with open(path, "r+b") as f:
-            f.write(b"\0" * n)
-            f.flush()
-            os.fsync(f.fileno())
-    with contextlib.suppress(OSError):
-        os.unlink(path)
+# Every file of an account's this module reads, shreds, links or writes is
+# reached without following a link: a sign-in in the home from the home down,
+# one folder at a time (base.folder_at), and an opened copy in the account's
+# own folder of the tmpfs by its last name. Each is taken only where it is a
+# file of the account's own. The account may point any folder of its home
+# anywhere, another account's home among them, and every touch here is root's.
+_NOFOLLOW = os.O_NOFOLLOW | os.O_NONBLOCK
 
 
-def plain(home_file):
-    """Whether the home's file is a sign-in in the clear: a file of its own
-    with something in it, not the link to an opened copy. A login wrote it,
-    or a refresh that renamed a new file over the link, so it is newer than
-    the seal and than any copy open."""
-    return os.path.isfile(home_file) and not os.path.islink(home_file) and os.path.getsize(home_file) > 0
+def _own(st, uid):
+    """Whether a file's stat is a plain file of the account `uid`'s, with
+    one name: not a link, a device or a folder, and not another account's
+    file hard-linked into this one's folder."""
+    return stat.S_ISREG(st.st_mode) and st.st_uid == uid and st.st_nlink == 1
+
+
+def _read_own(name, uid, dir_fd=None):
+    """(stamp, bytes) of the account's own file `name`, opened through no
+    link; OSError where it is anything else."""
+    fd = os.open(name, os.O_RDONLY | _NOFOLLOW, dir_fd=dir_fd)
+    with os.fdopen(fd, "rb") as f:
+        st = os.fstat(f.fileno())
+        if not _own(st, uid):
+            raise OSError(f"{name} is not the account's own file")
+        return _stamp(st), f.read()
+
+
+def _shred_at(fd, name, was):
+    """The home's plain sign-in `name` in the folder `fd` overwritten and
+    removed, where it is still the file `was` stamps: what overwriting can
+    do on the disk it is on (nothing on a copy-on-write one, or a
+    snapshot)."""
+    try:
+        f = os.open(name, os.O_WRONLY | _NOFOLLOW, dir_fd=fd)
+    except OSError:
+        return
+    try:
+        st = os.fstat(f)
+        if not stat.S_ISREG(st.st_mode) or _stamp(st) != was:
+            return
+        with contextlib.suppress(OSError):
+            os.write(f, b"\0" * st.st_size)
+            os.fsync(f)
+        with contextlib.suppress(OSError):
+            if os.stat(name, dir_fd=fd, follow_symlinks=False).st_ino == st.st_ino:
+                os.unlink(name, dir_fd=fd)
+    finally:
+        os.close(f)
+
+
+def plain(home, rel, uid):
+    """Whether the home's sign-in file `rel` is one in the clear: a file of
+    the account `uid`'s own with something in it, reached from the home
+    through no link, so not the link to an opened copy. A login wrote it, or
+    a refresh that renamed a new file over the link, so it is newer than the
+    seal and than any copy open."""
+    try:
+        with held_folder(home, rel) as (fd, name):
+            st = os.stat(name, dir_fd=fd, follow_symlinks=False)
+    except OSError:
+        return False
+    return _own(st, uid) and st.st_size > 0
+
+
+def _opened(of, uid):
+    """Whether the opened copy `of` is there as the account's own file (the
+    account may put anything at its name in its own folder of the tmpfs)."""
+    try:
+        return _own(os.lstat(of), uid)
+    except OSError:
+        return False
 
 
 def _stamp(st):
@@ -174,12 +231,15 @@ def _stamp(st):
     return (st.st_ino, st.st_size, st.st_mtime_ns)
 
 
-def link_left(home_file, opened, seal):
-    """Whether the home's file is a link to an opened copy that is not there
-    with no seal left to open it from: a sign-out, or a seal wiped, after
-    the link was made."""
-    return os.path.islink(home_file) and os.readlink(home_file) == opened \
-        and not os.path.lexists(opened) and not os.path.exists(seal)
+def link_left(fd, name, opened, seal):
+    """Whether the home's file `name`, in the folder `fd` is a descriptor
+    on, is a link to an opened copy that is not there with no seal left to
+    open it from: a sign-out, or a seal wiped, after the link was made."""
+    try:
+        words = os.readlink(name, dir_fd=fd)
+    except OSError:
+        return False
+    return words == opened and not os.path.lexists(opened) and not os.path.exists(seal)
 
 
 class TokensMixin:
@@ -265,26 +325,33 @@ class TokensMixin:
             again(f"{acct}'s {agent} sign-in was sealed")
         return True
 
-    def _link(self, home_file, target, pw):
-        """The home's file a link to the opened copy, the account's user's.
-        Never in the place of a sign-in in the clear: one that landed since
-        the caller looked is newer than what the link leads to, and stays
-        for the next look to seal."""
+    def _link(self, home, rel, target, pw):
+        """The home's sign-in file `rel` a link to the opened copy, the
+        account's user's, its folders made for the account where they are
+        not there. Never in the place of a sign-in in the clear: one that
+        landed since the caller looked is newer than what the link leads
+        to, and stays for the next look to seal."""
+        with held_folder(home, rel, make=(pw.pw_uid, pw.pw_gid)) as (fd, name):
+            self._link_at(fd, name, target, pw)
+
+    @staticmethod
+    def _link_at(fd, name, target, pw):
+        """_link's work in the folder `fd` is a descriptor on."""
         with contextlib.suppress(FileNotFoundError):
-            if os.path.islink(home_file) and os.readlink(home_file) == target:
+            st = os.stat(name, dir_fd=fd, follow_symlinks=False)
+            if stat.S_ISLNK(st.st_mode) and os.readlink(name, dir_fd=fd) == target:
                 return
-            if plain(home_file):
+            if stat.S_ISREG(st.st_mode) and st.st_size > 0:
                 return
-            os.unlink(home_file)
-        os.makedirs(os.path.dirname(home_file), exist_ok=True)
-        os.symlink(target, home_file)
-        os.lchown(home_file, pw.pw_uid, pw.pw_gid)
+            os.unlink(name, dir_fd=fd)
+        os.symlink(target, name, dir_fd=fd)
+        os.chown(name, pw.pw_uid, pw.pw_gid, dir_fd=fd, follow_symlinks=False)
 
     def _live(self, acct):
         user = user_of(acct)
         return bool((self._tmux_as(user, ["list-sessions", "-F", "#{session_name}"], quiet=True) or "").strip())
 
-    def _seal_plain(self, acct, agent, hf, home, pw, opening=False):
+    def _seal_plain(self, acct, agent, home, rel, pw, opening=False):
         """A plain sign-in in the home (a login, a refresh renamed over the
         link, or one from before the switch) sealed, kept open while the
         account works here or, with `opening`, for the terminal about to
@@ -292,40 +359,41 @@ class TokensMixin:
         one path the pass and a terminal's open both take (B1043): the file
         is newer than whatever is sealed or open, so both are written from
         it. False with no public key to seal it with yet, and the file then
-        stays exactly as it is."""
-        with open(hf, "rb") as f:
-            was = _stamp(os.fstat(f.fileno()))
-            data = f.read()
-        if not self._seal(acct, agent, data, home):
-            return False
-        odir = os.path.join(OPEN_DIR, acct)
-        of = os.path.join(odir, agent + ".json")
-        if opening or os.path.isdir(odir) or self._live(acct):
-            self._acct_open_dir(acct, pw)
-            write_atomic(of, data, mode=0o600, uid=pw.pw_uid, gid=pw.pw_gid)
-            self._tok_state()[0][(acct, agent)] = _stamp(os.stat(of))
-        # Written again while this one was being sealed: that file is newer
-        # still, and is left whole for the next look to take.
-        with contextlib.suppress(FileNotFoundError):
-            if _stamp(os.lstat(hf)) != was:
-                return True
-        _shred(hf)
-        self._link(hf, of, pw)
+        stays exactly as it is; OSError where the file is not the account's
+        own, reached through no link."""
+        with held_folder(home, rel) as (fd, name):
+            was, data = _read_own(name, pw.pw_uid, dir_fd=fd)
+            if not self._seal(acct, agent, data, home):
+                return False
+            odir = os.path.join(OPEN_DIR, acct)
+            of = os.path.join(odir, agent + ".json")
+            if opening or os.path.isdir(odir) or self._live(acct):
+                self._acct_open_dir(acct, pw)
+                write_atomic(of, data, mode=0o600, uid=pw.pw_uid, gid=pw.pw_gid)
+                self._tok_state()[0][(acct, agent)] = _stamp(os.lstat(of))
+            # Written again while this one was being sealed: that file is
+            # newer still, and is left whole for the next look to take.
+            with contextlib.suppress(FileNotFoundError):
+                if _stamp(os.stat(name, dir_fd=fd, follow_symlinks=False)) != was:
+                    return True
+            _shred_at(fd, name, was)
+            self._link_at(fd, name, of, pw)
         log(f"tokens: {acct}'s {agent} sign-in sealed")
         return True
 
-    def _seal_changed(self, acct, agent, of, home, anyway=False):
+    def _seal_changed(self, acct, agent, of, home, pw, anyway=False):
         """An opened copy sealed again when it is not the one last sealed (a
         refresh written into it), or `anyway`. The stamp is kept only once
         it is sealed, so a copy that changed before its account had a
-        public key here is sealed when the key comes."""
+        public key here is sealed when the key comes. Read only as the
+        account's own file, through no link."""
         seen = self._tok_state()[0]
-        key = _stamp(os.stat(of))
+        key = _stamp(os.lstat(of))
         if seen.get((acct, agent)) == key and not anyway:
             return
-        with open(of, "rb") as f:
-            if self._seal(acct, agent, f.read(), home):
-                seen[(acct, agent)] = key
+        key, data = _read_own(of, pw.pw_uid)
+        if self._seal(acct, agent, data, home):
+            seen[(acct, agent)] = key
 
     def token_pass_early(self):
         """The pass ahead of what waits on the controller, where node.json
@@ -377,20 +445,23 @@ class TokensMixin:
             return
         odir = os.path.join(OPEN_DIR, acct)
         for agent, rel in files():
-            hf, of = os.path.join(home, rel), os.path.join(odir, agent + ".json")
+            of = os.path.join(odir, agent + ".json")
             with contextlib.suppress(OSError):
-                if plain(hf):
+                if plain(home, rel, pw.pw_uid):
                     # A login, a refresh renamed over the link, or a
                     # sign-in from before the switch: sealed, kept open
                     # while the account works here, and the plain file gone.
-                    self._seal_plain(acct, agent, hf, home, pw)
-                elif os.path.isfile(of):
-                    self._seal_changed(acct, agent, of, home)
-                elif acct not in live and link_left(hf, of, os.path.join(SEAL_DIR, acct, agent + ".seal")):
-                    # No seal behind the home's link and nothing open: the
-                    # link goes, so a terminal here says to sign in rather
-                    # than that a sign-in is waiting to be opened (B386).
-                    os.unlink(hf)
+                    self._seal_plain(acct, agent, home, rel, pw)
+                elif _opened(of, pw.pw_uid):
+                    self._seal_changed(acct, agent, of, home, pw)
+                elif acct not in live:
+                    with held_folder(home, rel) as (fd, name):
+                        if link_left(fd, name, of, os.path.join(SEAL_DIR, acct, agent + ".seal")):
+                            # No seal behind the home's link and nothing
+                            # open: the link goes, so a terminal here says
+                            # to sign in rather than that a sign-in is
+                            # waiting to be opened (B386).
+                            os.unlink(name, dir_fd=fd)
         if not os.path.isdir(odir):
             return
         if self._live(acct):
@@ -424,18 +495,17 @@ class TokensMixin:
                 home = os.path.join(users_dir, acct)
                 for agent, rel in files():
                     of = os.path.join(OPEN_DIR, acct, agent + ".json")
-                    if not os.path.isfile(of):
+                    if not _opened(of, pw.pw_uid):
                         continue
-                    hf = os.path.join(home, rel)
                     # A plain file already in the home is a refresh renamed
                     # over the link since: newer than the copy, and already
                     # what this puts back, so it stays as it is (B1043).
-                    if not plain(hf):
-                        with open(of, "rb") as f:
-                            data = f.read()
-                        with contextlib.suppress(FileNotFoundError):
-                            os.unlink(hf)
-                        write_atomic(hf, data, mode=0o600, uid=pw.pw_uid, gid=pw.pw_gid)
+                    if not plain(home, rel, pw.pw_uid):
+                        data = _read_own(of, pw.pw_uid)[1]
+                        with held_folder(home, rel, make=(pw.pw_uid, pw.pw_gid)) as (fd, name):
+                            with contextlib.suppress(FileNotFoundError):
+                                os.unlink(name, dir_fd=fd)
+                            write_at(fd, name, data, 0o600, pw.pw_uid, pw.pw_gid)
                     self.token_forget(acct, agent)
                     log(f"tokens: {acct}'s {agent} sign-in is a plain file again")
                 with contextlib.suppress(OSError):
@@ -500,20 +570,20 @@ class TokensMixin:
         odir = os.path.join(OPEN_DIR, acct)
         some = False
         for agent, rel in files():
-            hf, of = os.path.join(home, rel), os.path.join(odir, agent + ".json")
+            of = os.path.join(odir, agent + ".json")
             sealf = os.path.join(SEAL_DIR, acct, agent + ".seal")
             with contextlib.suppress(OSError, tokenseal.Refused):
-                if plain(hf):
+                if plain(home, rel, pw.pw_uid):
                     if not on:
                         # The switch off: the plain file is how the sign-in
                         # is kept now, and the seal left from while it was
                         # on is behind it, as _tokens_back would leave them.
                         self.token_forget(acct, agent)
-                    elif self._seal_plain(acct, agent, hf, home, pw, opening=True):
+                    elif self._seal_plain(acct, agent, home, rel, pw, opening=True):
                         some = True
                     continue
-                if os.path.isfile(of):
-                    self._link(hf, of, pw)
+                if _opened(of, pw.pw_uid):
+                    self._link(home, rel, of, pw)
                     some = True
                     # A seal only the key from before opens is sealed again
                     # from the copy, so the rotation still completes.
@@ -522,7 +592,7 @@ class TokensMixin:
                         with open(sealf, "rb") as f:
                             was, old = self._open_seal(f.read(), keys)
                         wipe(was)
-                    self._seal_changed(acct, agent, of, home, anyway=old)
+                    self._seal_changed(acct, agent, of, home, pw, anyway=old)
                     continue
                 with open(sealf, "rb") as f:
                     data, old = self._open_seal(f.read(), keys)
@@ -535,8 +605,8 @@ class TokensMixin:
                 self._acct_open_dir(acct, pw)
                 write_atomic(of, data, mode=0o600, uid=pw.pw_uid, gid=pw.pw_gid)
                 wipe(data)
-                seen[(acct, agent)] = _stamp(os.stat(of))
-                self._link(hf, of, pw)
+                seen[(acct, agent)] = _stamp(os.lstat(of))
+                self._link(home, rel, of, pw)
                 some = True
         return some
 

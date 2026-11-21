@@ -277,7 +277,7 @@ class PlainFile(Case):
     def test_the_link_never_takes_a_plain_files_place(self):
         self.signed_in()
         self.wrote_plain(NEWER)
-        self.node._link(self.hf, self.of, tok.pwd.getpwnam("x"))
+        self.node._link(self.home, REL, self.of, tok.pwd.getpwnam("x"))
         self.assertFalse(os.path.islink(self.hf))
         with open(self.hf, "rb") as f:
             self.assertEqual(f.read(), NEWER)
@@ -499,6 +499,80 @@ class SwitchOff(Case):
         with open(self.hf, "rb") as f:
             self.assertEqual(f.read(), NEWER)
         self.assertFalse(os.path.islink(self.hf) or os.path.exists(self.seal) or os.path.lexists(self.of))
+
+
+class ThroughNoLink(Case):
+    """The pass and a terminal's open are root's, and the account may point
+    any folder of its home, or the opened copy's name in its own folder of
+    the tmpfs, anywhere: at another account's home among them. Neither
+    follows one: the other account's sign-in is never read, sealed, opened,
+    shredded or linked over, and the watch neither holds nor marks it."""
+    OTHER = b'{"made up": "another account\'s sign-in"}'
+
+    def others(self):
+        """Another account's .claude, beside this one's home."""
+        b = os.path.join(os.path.dirname(self.home), "u_00000002", ".claude")
+        os.makedirs(b)
+        bf = os.path.join(b, ".credentials.json")
+        with open(bf, "wb") as f:
+            f.write(self.OTHER)
+        os.chmod(bf, 0o600)
+        return b, bf
+
+    def untouched(self, bf):
+        self.assertFalse(os.path.islink(bf), "nothing linked in its place")
+        with open(bf, "rb") as f:
+            self.assertEqual(f.read(), self.OTHER, "neither shredded nor written")
+
+    def test_a_folder_of_the_home_linked_to_another_home(self):
+        self.signed_in()
+        b, bf = self.others()
+        shutil.rmtree(os.path.join(self.home, ".claude"))
+        os.symlink(b, os.path.join(self.home, ".claude"))
+        self.passes()
+        self.opens()
+        self.untouched(bf)
+        self.assertEqual(self.sealed(), (FIRST, False), "the account's own seal is as it was")
+        self.assertEqual(self.opened(), FIRST, "and so is its opened copy")
+        self.node.state.update(token_seal=False, token_pubs={}, token_pubs2={})
+        self.passes()
+        self.untouched(bf)
+
+    def test_a_link_where_the_opened_copy_was(self):
+        self.signed_in()
+        _, bf = self.others()
+        os.unlink(self.of)
+        os.symlink(bf, self.of)
+        self.passes()
+        self.opens()
+        self.untouched(bf)
+        self.assertEqual(self.sealed(), (FIRST, False), "the link's file is not sealed as this account's")
+        self.node.state.update(token_seal=False, token_pubs={}, token_pubs2={})
+        self.passes()
+        self.untouched(bf)
+        with open(self.hf, "rb") as f:
+            self.assertEqual(f.read(), FIRST, "the account's own sign-in is what comes back, never the link's file")
+
+    def test_the_watch_holds_only_what_it_reaches_through_no_link(self):
+        tw = agent.module("tokenwatch")
+        b, bf = self.others()
+        os.rmdir(os.path.join(self.home, ".claude"))
+        os.symlink(b, os.path.join(self.home, ".claude"))
+        changed = []
+        record = lambda *a, **k: changed.append(a)  # noqa: E731
+        someone = SimpleNamespace(pw_uid=ME + 1, pw_gid=MY_GROUP)
+        with mock.patch.multiple(tw.os, chown=record, fchown=record, chmod=record, fchmod=record), \
+                mock.patch.object(tw, "pack_signins", lambda: {}):
+            tw.TokenWatch().watch(self.home, someone)
+        self.assertEqual(changed, [], "another account's file is given to nobody")
+        # The account's own, through no link, still is.
+        os.unlink(os.path.join(self.home, ".claude"))
+        os.makedirs(os.path.join(self.home, ".claude"))
+        self.wrote_plain(FIRST)
+        os.chmod(self.hf, 0o644)
+        with mock.patch.multiple(tw.os, fchown=record, fchmod=record), mock.patch.object(tw, "pack_signins", lambda: {}):
+            tw.TokenWatch().watch(self.home, someone)
+        self.assertEqual(len(changed), 2, "held at 600 and the account's")
 
 
 class FirstPass(Case):

@@ -20,25 +20,30 @@ class LinkLeft(unittest.TestCase):
         os.makedirs(j("seal"))
         self.home, self.opened, self.seal = j("credentials.json"), j("open", "claude.json"), j("seal", "claude.seal")
         os.symlink(self.opened, self.home)
+        self.fd = os.open(self.d.name, os.O_RDONLY | os.O_DIRECTORY)
+        self.addCleanup(os.close, self.fd)
+
+    def left(self):
+        return link_left(self.fd, "credentials.json", self.opened, self.seal)
 
     def test_a_link_with_nothing_behind_it_is_left_over(self):
-        self.assertTrue(link_left(self.home, self.opened, self.seal))
+        self.assertTrue(self.left())
 
     def test_a_seal_not_yet_opened_keeps_it(self):
         open(self.seal, "wb").close()
-        self.assertFalse(link_left(self.home, self.opened, self.seal))
+        self.assertFalse(self.left())
 
     def test_an_opened_copy_keeps_it(self):
         open(self.opened, "wb").close()
-        self.assertFalse(link_left(self.home, self.opened, self.seal))
+        self.assertFalse(self.left())
 
     def test_a_plain_file_or_another_link_is_not_ours(self):
         os.unlink(self.home)
         open(self.home, "wb").close()
-        self.assertFalse(link_left(self.home, self.opened, self.seal))
+        self.assertFalse(self.left())
         os.unlink(self.home)
         os.symlink(self.opened + ".other", self.home)
-        self.assertFalse(link_left(self.home, self.opened, self.seal))
+        self.assertFalse(self.left())
 
 
 if __name__ == "__main__":
