@@ -34,7 +34,8 @@ import nodes  # noqa: E402
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey  # noqa: E402
 
 DIGEST = "sha256:" + "ab" * 32
-NEW = b"#!/bin/sh\n# an agent build from before the start check\n"
+# An update as a node is sent one: this tree's agent by its version, with no start check in it.
+NEW = agentpkg.an_agent()
 RECORD = {"node_id": "n_1", "token": "bbn_1", "controller": "http://127.0.0.1:1", "stores": {"data": "/srv/data"}}
 
 

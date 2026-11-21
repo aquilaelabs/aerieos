@@ -9,9 +9,12 @@ up (a module that did `from .base import log` has its own `log`).
 """
 import importlib
 import importlib.util
+import io
 import itertools
 import os
+import re
 import sys
+import zipfile
 
 PKG = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "agent", "aerieos_agent"))
 _seq = itertools.count()
@@ -35,6 +38,26 @@ class Agent:
     def module(self, name):
         """One module of the package (base, census, sessions, ...)."""
         return next(m for m in self._mods if m.__name__.rsplit(".", 1)[-1] == name)
+
+
+def version():
+    """The agent's version as this tree's package says it."""
+    with open(os.path.join(PKG, "__init__.py"), encoding="utf-8") as f:
+        return re.search(r'^AGENT_VERSION = "([0-9.]+)"', f.read(), re.M).group(1)
+
+
+def an_agent(said=None, note=""):
+    """An agent's zip as a node is sent one, as small as one can be: the
+    line a program starts with, and the package's __init__.py saying its
+    version (`said`; this tree's when none is given). It carries no start
+    check, so a node installs it as a build from before that. `note` makes
+    two of them differ."""
+    buf = io.BytesIO()
+    buf.write(b"#!/usr/bin/env python3\n")
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as z:
+        z.writestr("__main__.py", f"# {note}\n")
+        z.writestr("aerieos_agent/__init__.py", f'AGENT_VERSION = "{said or version()}"\n')
+    return buf.getvalue()
 
 
 def load(tag="agent"):

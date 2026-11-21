@@ -20,7 +20,8 @@ import agentpkg  # noqa: E402
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey  # noqa: E402
 
 SRC = os.path.normpath(os.path.join(HERE, "..", "..", "agent"))
-NEW = b"#!/bin/sh\n# the agent a provisioner downloaded\n"
+# An update as a node is sent one: this tree's agent by its version, with no start check in it.
+NEW = agentpkg.an_agent()
 DIGEST = "sha256:" + hashlib.sha256(NEW).hexdigest()
 RECORD = {"node_id": "n_1", "token": "bbn_1", "controller": "http://127.0.0.1:1"}
 

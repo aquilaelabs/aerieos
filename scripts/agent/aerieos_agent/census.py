@@ -428,6 +428,8 @@ def census(state):
         "release_spare": str(console_said().get("release_spare") or "")[:16],
         "release_also": [k[:16] for k in release.also(console_said())],
         "unsigned_ok": console_said().get("unsigned_ok") is True,
+        # ...and whether it said an older agent may be put back (older on).
+        "older_ok": console_said().get("older_ok") is True,
         "release_unpinned": console_said().get("release_unpinned") is True,
         # ...and whether its console switched root commands off (R227 step 2).
         "root_off": console_said().get("root_off") is True,

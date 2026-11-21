@@ -66,6 +66,18 @@ added key, or a bundle whose list one signed, is taken as one the release
 signed, and said as what it is. Nothing a controller sends adds, changes or
 drops one.
 
+A signature says who made an agent, not when: every agent the release key
+ever signed carries a good one, and an old agent put back on a node reopens
+what the ones after it closed. So a node that trusts a key takes a signed
+update only when the agent in it is not older than the one running: the
+zip's own version is under the signature (AGENT_VERSION in the package it
+holds, whose last number only ever goes up), read from the bytes that were
+checked, and one whose number is below this agent's, or that names none, is
+refused. A person who means to go back says so at the node's console
+(`aerieos-agent older on`, kept in node.json like the word for unsigned
+builds, and `older off` again afterwards). The agent a failed update puts
+back by itself is the file it kept beside it, which no controller sends.
+
 A node enrolled before the release named a spare holds the first key alone.
 It pins the spare on the release key's own word: a release's build signs,
 with the first key, a statement that names the spare, under a line of its
@@ -78,9 +90,12 @@ console among them, and so does one on a node that has a spare already or
 whose console chose to pin no key.
 """
 import hashlib
+import io
 import re
+import zipfile
 
-from . import names
+from . import AGENT_VERSION, names
+from .bundle import PACKAGE
 
 # What is signed: this line, then the agent zip's digest as hello names it
 # ("sha256:" and 64 hex characters). The line keeps a signature made for
@@ -164,6 +179,37 @@ def trusted(state):
 
 def unsigned_ok(state):
     return (state or {}).get("unsigned_ok") is True
+
+
+def older_ok(state):
+    """Whether this node's console said an older agent may be put back
+    (`older on`)."""
+    return (state or {}).get("older_ok") is True
+
+
+# The agent's version as its package says it, and the line that says it.
+VERSION_LINE = re.compile(r'^AGENT_VERSION = "(\d+)\.(\d+)\.(\d+)"[ \t]*$', re.M)
+# What a page says of an update refused for its age.
+OLDER = "older than the agent this node runs"
+
+
+def agent_build(body):
+    """(BUILD, version) of the agent the zip `body` holds, as the package
+    in it says them (AGENT_VERSION, whose last number is the BUILD), or
+    (None, "") where the bytes are no agent's zip or its package names no
+    version. Read from the very bytes a signature was checked over."""
+    try:
+        with zipfile.ZipFile(io.BytesIO(body)) as z:
+            text = z.read(f"{PACKAGE}/__init__.py").decode("utf-8", "replace")
+    except (KeyError, OSError, ValueError, zipfile.BadZipFile, TypeError):
+        return None, ""
+    m = VERSION_LINE.search(text)
+    return (int(m.group(3)), ".".join(m.groups())) if m else (None, "")
+
+
+def own_build():
+    """This agent's BUILD: the last number of its AGENT_VERSION."""
+    return int(AGENT_VERSION.rsplit(".", 1)[-1])
 
 
 def unpinned(state):
@@ -359,7 +405,21 @@ def _no_key(state, digest, sig, named):
     return f"not checked: no release key is pinned here, and {why}"
 
 
-def may_install(state, digest, sig, named=None):
+class Refusal(str):
+    """A refusal's words as a job's log and this node's own log say them,
+    whole: what was wrong, which keys this node takes and what its console
+    can do. `cause` is the first of those alone, a phrase: what a page says
+    of it, where the rest is a paragraph nobody reads on a bell."""
+    cause = ""
+
+
+def _refusal(cause, words):
+    said = Refusal(words)
+    said.cause = cause
+    return said
+
+
+def may_install(state, digest, sig, named=None, body=None):
     """(ok, words) for an update of `digest` carrying `sig`: taken with no
     key trusted here and said as unchecked (for want of a signature, or
     because the console chose to pin no key), or as signed by a release key
@@ -367,11 +427,23 @@ def may_install(state, digest, sig, named=None):
     taken when the signature is under a key this node trusts (the release
     key, its spare, or one added at its console, said as which), taken
     unsigned only where this node's console said so, refused otherwise.
-    `named` is read only by a node that trusts no key."""
+    `named` is read only by a node that trusts no key.
+
+    `body` is the update itself, the bytes `digest` is of. With it, a
+    signed update is taken only when the agent in it is not older than
+    this one (agent_build against own_build), unless this node's console
+    said an older one may be put back (older_ok). A refusal for its age is
+    a Refusal, its cause OLDER."""
     if not trusted(state):
         return True, _no_key(state, digest, sig, named)
     who, why = _signer(state, digest, sig, MESSAGE)
     if who:
+        if body is not None and not older_ok(state):
+            build, version = agent_build(body)
+            if build is None or build < own_build():
+                return False, _refusal(OLDER, f"refused: this agent ({version or 'which names no version'}) is {OLDER} "
+                                              f"({AGENT_VERSION}). At this machine's own console: sudo {names.command()} "
+                                              "older on lets an older agent be put back")
         return True, f"signed by {who}"
     if unsigned_ok(state):
         return True, f"not checked ({why}): this node's console allows unsigned builds"
@@ -394,20 +466,6 @@ def may_keep_tools(state, digest, sig):
         return True, f"root's tools not checked ({why}): this node's console allows unsigned builds"
     return False, (f"refused: the tools root installs from this bundle are not signed by a key this node trusts ({why}), so "
                    f"root keeps the copy it has. This node takes only what is signed by {_named(state)}. {_console_can()}")
-
-
-class Refusal(str):
-    """A refusal's words as a job's log and this node's own log say them,
-    whole: what was wrong, which keys this node takes and what its console
-    can do. `cause` is the first of those alone, a phrase: what a page says
-    of it, where the rest is a paragraph nobody reads on a bell."""
-    cause = ""
-
-
-def _refusal(cause, words):
-    said = Refusal(words)
-    said.cause = cause
-    return said
 
 
 def may_keep_bundle(state, text, sig, members):

@@ -1361,7 +1361,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         # update: read only by a node that trusts no key, which pins them
         # when this update's signature is under one (release.first_pin).
         named = spec.get("release_keys") or getattr(self, "controller_keys", None)
-        ok, said = release.may_install(trust, got, sig, named)
+        ok, said = release.may_install(trust, got, sig, named, body)
         if said:
             job.say(said + "\n")
         if not ok:
@@ -1436,7 +1436,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
                     trust = load_state()
                 except SystemExit:
                     trust = self.state
-                allowed, said = release.may_install(trust, got, sig, named)
+                allowed, said = release.may_install(trust, got, sig, named, body)
                 if not allowed:
                     return undo(said, 77)
                 job.say(said + "\n")

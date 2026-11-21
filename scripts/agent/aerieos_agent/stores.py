@@ -462,13 +462,14 @@ def load_state():
 
 
 # What this machine's console alone decides: the release key pinned here,
-# the keys added beside it, whether an unsigned agent is taken and whether
-# a person chose to pin no key (release.py), and whether a root
+# the keys added beside it, whether an unsigned agent is taken, whether an
+# older one may be put back and whether a person chose to pin no key
+# (release.py), and whether a root
 # command the controller sends is run at all (root_off, R227 step 2). A running agent holds
 # node.json in memory and writes it whole at every token it is handed, so
 # what the console wrote is read back from the file and kept, never the
 # agent's older copy of it.
-CONSOLE_KEYS = ("release_key", "release_spare", "release_also", "release_unpinned", "unsigned_ok", "root_off")
+CONSOLE_KEYS = ("release_key", "release_spare", "release_also", "release_unpinned", "unsigned_ok", "older_ok", "root_off")
 
 
 def console_said():

@@ -301,6 +301,8 @@ def cmd_release_key(args):
             print(f"added here:  {k}")
         print("unsigned builds: " + ("allowed here" if release.unsigned_ok(state) else "refused" if release.trusted(state)
                                      else "not asked, with no key pinned"))
+        print("older agents:    " + ("allowed here" if release.older_ok(state) else "refused" if release.trusted(state)
+                                     else "not asked, with no key pinned"))
         return
     if args[0] in ("add", "drop"):
         _release_also(state, args[0], args[1:])
@@ -388,6 +390,23 @@ def cmd_unsigned(args):
            + ("" if release.trusted(state) else "; none is pinned yet, so that applies once one is")))
 
 
+def cmd_older(args):
+    """older on|off: whether this machine takes a signed agent older than
+    the one it runs (release.may_install): a person's word that they mean
+    to go back, kept until they say off."""
+    if not args or args[0] not in ("on", "off"):
+        raise SystemExit("older takes on or off")
+    _at_console("letting an older agent be put back")
+    state = load_state()
+    if args[0] == "on":
+        state["older_ok"] = True
+    else:
+        state.pop("older_ok", None)
+    save_state(state, console=True)
+    print("this machine takes a signed agent older than the one it runs, until older off" if args[0] == "on"
+          else "this machine refuses a signed agent older than the one it runs")
+
+
 def _sig_given(text):
     """The signature check-update was handed: its 128 hex characters, or a
     file that holds them, bare or as the build's own agent.sig holds them
@@ -425,7 +444,8 @@ def cmd_check_update(args):
         sys.exit(64)
     try:
         with open(args[0], "rb") as f:
-            digest = "sha256:" + hashlib.sha256(f.read()).hexdigest()
+            body = f.read()
+        digest = "sha256:" + hashlib.sha256(body).hexdigest()
     except OSError as e:
         print(f"refused: {args[0]} could not be read ({e.strerror or e})")
         sys.exit(77)
@@ -447,7 +467,7 @@ def cmd_check_update(args):
         # No agent starts on such a record either: enrolling again writes a new one.
         print(f"not checked: {NODE_JSON} is not a node's record, so no key pinned here can be read from it")
         return
-    ok, said = release.may_install(state, digest, _sig_given(args[1] if len(args) > 1 else ""))
+    ok, said = release.may_install(state, digest, _sig_given(args[1] if len(args) > 1 else ""), body=body)
     print(said)
     if not ok:
         sys.exit(77)
@@ -484,6 +504,8 @@ def main(argv):
         cmd_release_key(argv[1:])
     elif cmd == "unsigned":
         cmd_unsigned(argv[1:])
+    elif cmd == "older":
+        cmd_older(argv[1:])
     elif cmd == "check-update":
         cmd_check_update(argv[1:])
     elif cmd == "root-asks":
