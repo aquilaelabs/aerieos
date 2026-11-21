@@ -293,8 +293,6 @@ def check():
         listed, signature, refused = _signed_list(rel)
         if refused:
             err = f"{refused}: no app is taken from it"
-        elif listed is None:
-            print(f"[dashboard] apps: {signature}", flush=True)
     # An app the release carries no file of at all is said on its own row,
     # not as a look that did not work: a release may go out without one.
     absent = {}
@@ -305,8 +303,7 @@ def check():
             continue
         if not rel or refused:
             continue
-        if listed is not None:
-            _unhold(name, held, rel, listed)
+        _unhold(name, held, rel, listed)
         files, missing = [], []
         for prefix, suffix in a["files"]:
             asset = _asset(rel, prefix, suffix)
@@ -359,23 +356,23 @@ def _unhold(name, held, rel, listed):
         held.pop(name, None)
 
 
-def _keep(name, asset, sha_asset, was, listed=None, tag=""):
+def _keep(name, asset, sha_asset, was, listed, tag=""):
     """One file of an app: kept as it is when the sha256 has not moved,
     else downloaded and checked, against the release's signed list
-    (`listed`, None where nothing is signed for this install to check) and
-    the sha256 beside it. Its index entry, or a sentence."""
+    (`listed`, {file: sha256}) and the sha256 beside it. Its index entry,
+    or a sentence."""
     try:
         want = _get(_where(sha_asset), 4096).decode("ascii", "replace").split()[0].lower()
     except (OSError, ValueError, IndexError, KeyError) as e:
         return f"{sha_asset.get('name')} ({e})"
     if not re.fullmatch(r"[0-9a-f]{64}", want):
         return f"{sha_asset.get('name')} is not a sha256"
-    if listed is not None and asset["name"] not in listed:
+    if asset["name"] not in listed:
         return f"{asset['name']} is not in the list of files {tag} signed"
     dest = DIR / name / asset["name"]
     for f in was.get("files") or []:
         if (f.get("file") == asset["name"] and f.get("sha256") == want and dest.is_file()
-                and (listed is None or listed[asset["name"]] == want)):
+                and listed[asset["name"]] == want):
             return f
     try:
         body = _get(_where(asset))
@@ -383,7 +380,7 @@ def _keep(name, asset, sha_asset, was, listed=None, tag=""):
         return f"{asset['name']} ({e})"
     have = hashlib.sha256(body).hexdigest()
     # The file's own bytes against the list, whatever the sha256 beside it says.
-    if listed is not None and listed[asset["name"]] != have:
+    if listed[asset["name"]] != have:
         return f"{asset['name']} is not the file {tag} signed: its bytes are not the ones the signed list names"
     if have != want:
         return f"{asset['name']} does not match its sha256"

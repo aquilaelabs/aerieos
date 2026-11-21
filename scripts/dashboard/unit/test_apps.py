@@ -137,6 +137,25 @@ class Apps(unittest.TestCase):
         self.assertTrue((self.tmp / "seed.json.applied").exists())
         self.assertEqual(apps.seed(got.update), {})
 
+    def test_a_release_is_taken_on_its_signed_list_or_refused_never_unchecked(self):
+        # _signed_list answers a list or a refusal with its reason, so
+        # nothing reads a release whose files were checked against nothing
+        # (the audit of 21 Nov: the branches for one were dead code).
+        rel = {"tag_name": "v1.2.3-dev.4", "assets": []}
+        with mock.patch.object(apps, "signers", lambda: []):
+            self.assertEqual(apps._signed_list(rel), (None, "", apps.NO_SIGNER))
+        with mock.patch.object(apps, "signers", lambda: ["aerieos-dev namespaces=\"aerieos-dev\" ssh-ed25519 AAAA aerieos-dev"]):
+            listed, said, why = apps._signed_list(rel)
+            self.assertEqual((listed, said), (None, ""))
+            self.assertIn("carries no signed list", why)
+        import releasecheck
+        for mod in (apps, releasecheck):
+            with open(mod.__file__, encoding="utf-8") as f:
+                code = "\n".join(ln for ln in f.read().splitlines() if not ln.lstrip().startswith("#"))
+            self.assertNotIn("listed is not None", code, mod.__name__)
+            self.assertNotIn("refused or signature", code, mod.__name__)
+        self.assertNotIn("listed is None or", open(apps.__file__, encoding="utf-8").read())
+
 
 if __name__ == "__main__":
     unittest.main()

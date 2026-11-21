@@ -318,9 +318,8 @@ def signed_image(follow):
         tag = str(rel["tag_name"])
         listed, signature, refused = apps._signed_list(rel)
         if listed is None:
-            # Not taken, or nothing here to check it with: said if no
-            # release before it answers either.
-            why = refused or signature
+            # Not taken: said if no release before it answers either.
+            why = refused
             continue
         name = f"aerieos-image-{tag.lstrip('v')}.digest"
         asset = next((a for a in rel.get("assets") or [] if isinstance(a, dict) and a.get("name") == name), None)
