@@ -607,7 +607,7 @@ class NodeAgent(unittest.TestCase):
                 os.environ.pop("BUILDERBOT_CODEX_INSTALLER", None)
             for m in self.mod._mods:
                 if "sdk_env" in vars(m):
-                    vars(m)["sdk_env"] = lambda state: {"HOME": self.home, "PATH": f"{self.bin}:/usr/bin:/bin", "FAKE_WEB": self.web, **(more or {})}
+                    vars(m)["sdk_env"] = lambda state, **kw: {"HOME": self.home, "PATH": f"{self.bin}:/usr/bin:/bin", "FAKE_WEB": self.web, **(more or {})}
                 # Root's own copy of the bundle is this machine's, if it has one: the checkout's is what runs here.
                 if "ROOT_BUNDLE_DIR" in vars(m):
                     vars(m)["ROOT_BUNDLE_DIR"] = os.path.join(self.tmp.name, "no-root-bundle")

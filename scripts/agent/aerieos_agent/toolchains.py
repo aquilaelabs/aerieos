@@ -477,11 +477,14 @@ def _listdir(path):
         return []
 
 
-def sdk_env(state, who=None):
+def sdk_env(state, who=None, layout_env=True):
     """The environment a job runs with on this node: the toolchain store as
     the toolchain store root, its android/ directory as ANDROID_HOME, its jdk as
     JAVA_HOME, every toolchain it holds on PATH, and AVDs under the data
     store. What the image gets from its Dockerfile, a node gets from here.
+    Without `layout_env`, none of the variables the toolchains' layouts set
+    (JAVA_HOME and its like): an installer's environment, where one a pack
+    set would steer what it downloads.
 
     EVERY job, not only a bb verb. It used to be applied in the bb branch of
     Job.exec alone, so `aerie build` and `aerie test` (a plain exec) ran with a
@@ -507,12 +510,15 @@ def sdk_env(state, who=None):
                 d = _lay_path(store, entry, rel)
                 if os.path.isdir(d) and d not in front:
                     front.append(d)
-            for k, v in (entry.get("env") or {}).items():
+            for k, v in (entry.get("env") or {}).items() if layout_env else ():
                 # `=VALUE` is the value itself, not a path: what a toolchain
                 # needs set beside where it is (B548: Playwright told not to
                 # sweep browsers another install of it did not ask for).
+                # Where that toolchain is installed here and nowhere else: a
+                # pack's reaches no job on a node that does not hold it.
                 if v.startswith("="):
-                    env.setdefault(k, v[1:])
+                    if os.path.isdir(_lay_path(store, entry, "")):
+                        env.setdefault(k, v[1:])
                     continue
                 d = _lay_path(store, entry, v)
                 if os.path.exists(d):

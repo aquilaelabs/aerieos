@@ -1242,6 +1242,32 @@ def receipt(d, commit, name=""):
     return said + (f"; the same commit made {before[:12]} here before" if before else "")
 
 
+ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,63}")
+
+
+def layout_dir(tc):
+    """The folder a row lands in under the store: its name, and android/ for
+    every android: row."""
+    return "android" if tc["name"].startswith("android:") else tc["name"]
+
+
+def layout_env(tc, root):
+    """[(name, value)] the row's layout sets for a job: `=VALUE` the value
+    itself, `root:REL` under the store `root`, anything else under the
+    row's own folder there. A name no shell could take is left out."""
+    out = []
+    for k, v in ((tc.get("layout") or {}).get("env") or {}).items():
+        if not ENV_NAME.fullmatch(str(k)) or not isinstance(v, str):
+            continue
+        if v.startswith("="):
+            out.append((k, v[1:]))
+        elif v.startswith("root:"):
+            out.append((k, os.path.join(root, v[5:])))
+        else:
+            out.append((k, os.path.join(root, layout_dir(tc), v) if v else os.path.join(root, layout_dir(tc))))
+    return out
+
+
 def main(argv):
     # --catalog FILE, before anything else: the catalog this run reads, said
     # by whoever started it and by no environment.
@@ -1310,6 +1336,14 @@ def main(argv):
         subs = dict(a.split("=", 1) for a in argv[3:] if "=" in a)
         for k, v in (dig(tc, argv[2]) or {}).items():
             sys.stdout.write(f"{k}={fill(str(v), subs)}\0")
+
+    elif op == "layout_env":
+        # layout_env NAME root=ROOT: the variables the row's layout sets for
+        # every job where it is installed, KEY=VALUE NUL-terminated, as a
+        # step of its own install is started with them (sdk.sh sdk_row_env).
+        subs = dict(a.split("=", 1) for a in argv[2:] if "=" in a)
+        for k, v in layout_env(tc, subs.get("root") or ""):
+            sys.stdout.write(f"{k}={v}\0")
 
     elif op == "reach":
         # Exit 0 quietly when the source's host answers, or when the catalog

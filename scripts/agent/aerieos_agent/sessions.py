@@ -981,7 +981,9 @@ class SessionsMixin:
         so."""
         product, cmd = how["product"], how["command"]
         who_name = self.session_account()
-        env = dict(sdk_env(self.state))
+        # The store's toolchains on PATH, and none of the variables their
+        # layouts set: one a pack set would steer what an installer fetches.
+        env = dict(sdk_env(self.state, layout_env=False))
         try:
             who = self.as_user(env, who_name)
         except RuntimeError as e:
