@@ -90,6 +90,8 @@
 - The node agent saves its record under one lock every change takes, so a save never meets it half changed (f1857cf)
 - Update agent no longer warns that a node's sessions end: they outlive the agent's restart (6414ccd)
 - aerie toolchains check answers for a pack and every other catalog row, and offers its pin as an update (2bda815)
+- Wiping a one-byte key or sign-in file no longer turns that byte to zero everywhere else in a node's agent or the controller until it restarts (ce35e43)
+- The controller's own certificate loads in its container, where a certificate set under Connection had its port answer plain http to a TLS handshake (2d63f2d)
 
 ### Security
 
