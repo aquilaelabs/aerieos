@@ -266,11 +266,12 @@ def read_catalog(into):
 
 # A system package's name, the one shape a recipe's is held to before a
 # package manager is handed it: a letter or digit, then letters, digits and
-# . + : _ -, not ending in - or + (apt reads a trailing one as "remove" or
-# "install"). Nothing that begins with a dash, no path, no address. Portage
-# alone names a package category/name, each half of that shape, and never a
-# file of its own kinds.
-PKG_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9.+:_-]*")
+# . + : _ -, eighty at most, not ending in - or + (apt reads a trailing one
+# as "remove" or "install"). Nothing that begins with a dash, no path, no
+# address. Portage alone names a package category/name, each half of that
+# shape, and never a file of its own kinds. The controller holds a
+# recipe's names to the same (packformat.system_name_ok).
+PKG_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9.+:_-]{0,79}")
 EMERGE_FILES = (".ebuild", ".tbz2", ".gpkg.tar", ".xpak")
 
 
