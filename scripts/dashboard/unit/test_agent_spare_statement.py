@@ -112,6 +112,27 @@ class Decided(Case):
                      {"key": "nope", "sig": sig}, {"sig": sig}):
             self.assertEqual(self.release.spare_pin(state, said), "", said)
 
+    def built(self, build, by=None, names=None):
+        """A build's statement: the words, and the same with `build` in them."""
+        said = self.statement(by, names)
+        said.update(build=build, build_sig=(by or self.k).sign(self.release.spare_built(said["key"], build)).hex())
+        return said
+
+    def test_a_statement_older_than_this_agent_names_no_spare(self):
+        # Key A and no spare here; spare B later retired as compromised and
+        # another named: a controller replaying "A says B" pinned B.
+        own, state = self.release.own_build(), {"release_key": self.pub}
+        self.assertEqual(self.release.spare_pin(state, self.built(own)), self.spare)
+        self.assertEqual(self.release.spare_pin(state, self.built(own + 3)), self.spare)
+        self.assertEqual(self.release.spare_pin(state, self.built(own - 1)), "", "a later release may have retired it")
+        # The build is under the signature: one moved after the signing,
+        # or said with no signature over it, names nothing.
+        self.assertEqual(self.release.spare_pin(state, dict(self.built(own - 1), build=own)), "")
+        self.assertEqual(self.release.spare_pin(state, dict(self.statement(), build=own)), "")
+        self.assertEqual(self.release.spare_pin(state, dict(self.built(own), build="9999")), "")
+        # A statement from before builds said theirs has no floor under it yet.
+        self.assertEqual(self.release.spare_pin(state, self.statement()), self.spare)
+
     def test_a_signature_made_for_anything_else_names_no_spare(self):
         # The release key's signature over an agent, root's tools or a
         # bundle's list whose "digest" were the spare's hex is no statement.
@@ -313,6 +334,14 @@ class Controller(unittest.TestCase):
             for bad in ("x", [], {"key": self.spare}, {"key": "nope", "sig": "cd" * 64}, {"key": self.spare, "sig": "cd"}):
                 self.sig_file(spare=bad)
                 self.assertEqual(nodes.agent_spare_said(), {}, bad)
+            # ...and the build that said it, with its own signature, beside
+            # the words: passed on where both are there and in shape.
+            built = {**said, "build": 514, "build_sig": "ef" * 64}
+            self.sig_file(spare=built)
+            self.assertEqual(nodes.agent_spare_said(), {"release_spare_sig": built})
+            for odd in ({"build": "514"}, {"build": True}, {"build": -1}, {"build_sig": "ef"}):
+                self.sig_file(spare={**built, **odd})
+                self.assertEqual(nodes.agent_spare_said(), {"release_spare_sig": said}, odd)
 
     def test_the_hello_and_the_update_carry_it_beside_what_they_carried(self):
         said = {"release_spare_sig": {"key": self.spare, "sig": "cd" * 64}}
@@ -348,7 +377,7 @@ class Signer(unittest.TestCase):
             os.makedirs(os.path.dirname(os.path.join(self.t, name)), exist_ok=True)
             shutil.copy(path, os.path.join(self.t, name))
         shutil.copytree(os.path.join(REPO, "scripts", "agent"), os.path.join(self.t, "scripts", "agent"),
-                        ignore=shutil.ignore_patterns("__pycache__", "agent.sig"))
+                        ignore=shutil.ignore_patterns("__pycache__", "agent.sig"), dirs_exist_ok=True)
         os.makedirs(os.path.join(self.t, "tools"))
         shutil.copy(os.path.join(REPO, "tools", "sign-agent.py"), os.path.join(self.t, "tools"))
         self.sig = os.path.join(self.t, "scripts", "agent", "agent.sig")
@@ -389,9 +418,17 @@ class Signer(unittest.TestCase):
         self.assertEqual(self.release.spare_said(self.pub, said), self.spare)
         self.assertEqual(self.release.spare_pin({"release_key": self.pub}, said), self.spare)
         self.assertEqual(self.release.spare_pin({"release_key": self.spare}, said), "", "the spare's holder is told nothing by it")
+        # The build that said it is under a signature of its own, and the
+        # words an agent from before that reads are there beside it.
+        self.assertEqual(said["build"], self.release.own_build())
+        self.assertEqual(self.release.spare_said(self.pub, said, said["build"] + 1), "", "a node past this build takes none")
+        self.assertEqual(self.release.spare_said(self.pub, {"key": said["key"], "sig": said["sig"]}), self.spare)
         r = self.signer("--check")
         self.assertEqual(r.returncode, 0, r.stdout)
         self.assertIn(f"the spare: named by {self.pub[:16]}… as {self.spare[:16]}…", r.stdout)
+        for wrong in ({"build": said["build"] - 1}, {"sig": self.s.sign(self.release.SPARE_MESSAGE + self.spare.encode()).hex()}):
+            self.put_sig({**self.read_sig(), "spare": {**said, **wrong}})
+            self.assertEqual(self.signer("--check").returncode, 1, wrong)
 
     def test_check_fails_a_release_keys_build_whose_statement_is_missing_or_wrong(self):
         self.assertEqual(self.signer(key=self.k).returncode, 0)

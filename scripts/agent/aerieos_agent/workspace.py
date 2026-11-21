@@ -457,7 +457,7 @@ class WorkspaceMixin:
         before; one that does and cannot read the tar refuses it."""
         if not release.trusted(trust or {}):
             return True, ""
-        text, sig, members = b"", "", {}
+        text, sig, members, build = b"", "", {}, None
         try:
             with tarfile.open(tar_path) as tar:
                 for m in tar:
@@ -477,7 +477,8 @@ class WorkspaceMixin:
                         members[m.name] = "a link" if m.issym() or m.islnk() else "not a plain file"
                         continue
                     h, keep = hashlib.sha256(), []
-                    wanted = (m.name == BUNDLE_LIST and m.size <= LIST_MOST) or (m.name == BUNDLE_SIG and m.size <= 4096)
+                    wanted = (m.name == BUNDLE_LIST and m.size <= LIST_MOST) or (m.name == BUNDLE_SIG and m.size <= 4096) \
+                        or (m.name == release.BUNDLE_BUILD and m.size <= 1 << 16)
                     while True:
                         chunk = src.read(1 << 20)
                         if not chunk:
@@ -488,12 +489,16 @@ class WorkspaceMixin:
                     members[m.name] = h.hexdigest()
                     if wanted and m.name == BUNDLE_LIST:
                         text = b"".join(keep)
+                    elif wanted and m.name == release.BUNDLE_BUILD:
+                        # Which build its files are: the bytes just hashed,
+                        # which the list then holds to the ones signed.
+                        build = b"".join(keep)
                     elif wanted:
                         with contextlib.suppress(ValueError, AttributeError):
                             sig = str(json.loads(b"".join(keep).decode("utf-8", "replace")).get("sig") or "")
         except (OSError, tarfile.TarError, EOFError) as e:
             return False, f"refused: the bundle cannot be read as a tar ({e}), so this node keeps the bundle it has"
-        return release.may_keep_bundle(trust, text, sig, members)
+        return release.may_keep_bundle(trust, text, sig, members, build)
 
     @staticmethod
     def _keep_root_tools(tar_path, name, say, trust=None):

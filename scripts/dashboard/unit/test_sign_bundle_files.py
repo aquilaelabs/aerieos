@@ -44,7 +44,7 @@ class Signed(unittest.TestCase):
             os.makedirs(os.path.dirname(os.path.join(self.t, name)), exist_ok=True)
             shutil.copy(path, os.path.join(self.t, name))
         shutil.copytree(os.path.join(REPO, "scripts", "agent"), os.path.join(self.t, "scripts", "agent"),
-                        ignore=shutil.ignore_patterns("__pycache__", "agent.sig"))
+                        ignore=shutil.ignore_patterns("__pycache__", "agent.sig"), dirs_exist_ok=True)
         os.makedirs(os.path.join(self.t, "tools"))
         shutil.copy(os.path.join(REPO, "tools", "sign-agent.py"), os.path.join(self.t, "tools"))
         self.sig = os.path.join(self.t, "scripts", "agent", "agent.sig")

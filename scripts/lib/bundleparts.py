@@ -61,7 +61,12 @@ PARTS = ("scripts/aerie", "scripts/lib", "config/toolchains.json",
          # roadmap --format print, which the verbs in scripts/lib
          # import from beside the dashboard (B426: a node's bb
          # had no records module).
-         "scripts/dashboard/records.py")
+         "scripts/dashboard/records.py",
+         # ...and the agent package's __init__.py, whose AGENT_VERSION says
+         # which build these files are: a node that pinned a release key
+         # takes none older than its own agent (the agent's
+         # release.BUNDLE_BUILD, may_keep_bundle).
+         "scripts/agent/aerieos_agent/__init__.py")
 
 # What is under a part and is not one of its files: Python's caches, which
 # an image holds and a checkout does not, and a Mac's folder file.

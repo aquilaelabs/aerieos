@@ -78,6 +78,11 @@ refused. A person who means to go back says so at the node's console
 (`aerieos-agent older on`, kept in node.json like the word for unsigned
 builds, and `older off` again afterwards). The agent a failed update puts
 back by itself is the file it kept beside it, which no controller sends.
+The same holds for a bundle, and with it root's tools, which come out of
+the same checked tar: it ships the agent package's __init__.py of the tree
+it was built from (BUNDLE_BUILD), listed and signed with the rest, and a
+signed bundle whose build is below this agent's is refused the same way.
+A bundle from before it names no build and has no floor under it yet.
 
 A node enrolled before the release named a spare holds the first key alone.
 It pins the spare on the release key's own word: a release's build signs,
@@ -88,7 +93,10 @@ and no spare, on a statement whose signature holds under the key it pinned,
 pins the spare named (spare_pin). The statement is the pinned key's and not
 the controller's: one under any other key pins nothing, a key added at the
 console among them, and so does one on a node that has a spare already or
-whose console chose to pin no key.
+whose console chose to pin no key. A build's statement also signs the
+build that made it, and one below this agent's names nothing: a release
+after it may have retired that spare. One from before builds said theirs
+has no floor under it yet.
 """
 import hashlib
 import io
@@ -114,6 +122,10 @@ BUNDLE_MESSAGE = b"aerieos bundle v1\n"
 # line, then the spare as 64 hex characters. A fourth line, so a signature
 # over an agent, root's tools or a bundle's list never names a spare.
 SPARE_MESSAGE = b"aerieos release spare v1\n"
+# ...and for the same word with the build that said it: this line, the
+# spare, a line break and the build (spare_built). A fifth line, so neither
+# passes as the other.
+SPARE_BUILT_MESSAGE = b"aerieos release spare v2\n"
 # What a controller adds to the bundle beside the files a release ships, so
 # what a release's list never names and a pinned node lets ride: a person's
 # tool packs and the packs made on that install, which are theirs and differ
@@ -192,6 +204,21 @@ def older_ok(state):
 VERSION_LINE = re.compile(r'^AGENT_VERSION = "(\d+)\.(\d+)\.(\d+)"[ \t]*$', re.M)
 # What a page says of an update refused for its age.
 OLDER = "older than the agent this node runs"
+# ...and of a bundle refused for its age.
+BUNDLE_OLDER = "its files are older than the agent this node runs"
+# The member of the bundle that says which build its files are: the agent
+# package's __init__.py of the tree the release was built from, a file its
+# list names and its signature covers like any other (scripts/lib/
+# bundleparts.py ships it). A bundle from before it carries none, and has
+# no floor under it.
+BUNDLE_BUILD = "scripts/agent/aerieos_agent/__init__.py"
+
+
+def version_of(text):
+    """(BUILD, version) the AGENT_VERSION line in `text` names, or (None,
+    "") where it names none."""
+    m = VERSION_LINE.search(str(text or ""))
+    return (int(m.group(3)), ".".join(m.groups())) if m else (None, "")
 
 
 def agent_build(body):
@@ -204,8 +231,7 @@ def agent_build(body):
             text = z.read(f"{PACKAGE}/__init__.py").decode("utf-8", "replace")
     except (KeyError, OSError, ValueError, zipfile.BadZipFile, TypeError):
         return None, ""
-    m = VERSION_LINE.search(text)
-    return (int(m.group(3)), ".".join(m.groups())) if m else (None, "")
+    return version_of(text)
 
 
 def own_build():
@@ -329,11 +355,23 @@ def verify(key, digest, sig, message=MESSAGE):
     return ""
 
 
-def spare_said(key, said):
+def spare_built(spare_key, build):
+    """What a release signs to name `spare_key` its spare as of `build`
+    (the BUILD of the agent its tree holds): SPARE_BUILT_MESSAGE, the spare
+    and the build, so a statement a later build retired cannot be passed off
+    as one a node has not outgrown."""
+    return SPARE_BUILT_MESSAGE + f"{spare_key}\n{int(build)}".encode()
+
+
+def spare_said(key, said, floor=0):
     """The spare `said` names, where it is `key`'s own word for it: `said`
     is {"key": the spare, "sig": the signature} as a release's build writes
     it (tools/sign-agent.py), signed by `key` over SPARE_MESSAGE and the
-    spare's 64 hex characters. "" for anything else: no statement, one in
+    spare's 64 hex characters. A build's statement also says which build
+    made it ("build", and "build_sig" over spare_built): then that is the
+    signature checked, and a build below `floor` names nothing, since a
+    release after it may have retired that spare. One that says no build
+    has no floor under it yet. "" for anything else: no statement, one in
     another shape, one that names `key` itself, one whose signature is not
     `key`'s, and any where this node has no library to check it with."""
     if not isinstance(said, dict) or not isinstance(said.get("key"), str) or not isinstance(said.get("sig"), str):
@@ -341,13 +379,19 @@ def spare_said(key, said):
     key, second, sig = clean_key(key), clean_key(said["key"]), said["sig"].strip().lower()
     if not key or not second or second == key or not SIG_RE.fullmatch(sig):
         return ""
+    message = SPARE_MESSAGE + second.encode()
+    if "build" in said or "build_sig" in said:
+        build, sig = said.get("build"), str(said.get("build_sig") or "").strip().lower()
+        if not isinstance(build, int) or isinstance(build, bool) or build < 0 or not SIG_RE.fullmatch(sig) or build < floor:
+            return ""
+        message = spare_built(second, build)
     try:
         from cryptography.exceptions import InvalidSignature
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
     except ImportError:
         return ""
     try:
-        Ed25519PublicKey.from_public_bytes(bytes.fromhex(key)).verify(bytes.fromhex(sig), SPARE_MESSAGE + second.encode())
+        Ed25519PublicKey.from_public_bytes(bytes.fromhex(key)).verify(bytes.fromhex(sig), message)
     except (InvalidSignature, ValueError):
         return ""
     return second
@@ -363,7 +407,9 @@ def spare_pin(state, said):
     for a build and never for this: a statement under one names nothing."""
     if unpinned(state) or spare(state) or not pinned(state):
         return ""
-    return spare_said(pinned(state), said)
+    # A statement made by a build older than this agent may name a spare a
+    # release since retired: under the floor that this agent is.
+    return spare_said(pinned(state), said, own_build())
 
 
 def named_keys(named):
@@ -475,13 +521,20 @@ def may_keep_tools(state, digest, sig):
                    f"root keeps the copy it has. This node takes only what is signed by {_named(state)}. {_console_can()}")
 
 
-def may_keep_bundle(state, text, sig, members):
+def may_keep_bundle(state, text, sig, members, build=None):
     """(ok, words) for a bundle the controller sent, before any of it is
     unpacked: `text` is the list of its files the tar carries (bytes, or ""
     with none), `sig` the signature that came with it, and `members` every
     member of the tar that is not a folder, {name: the sha256 of its bytes},
     or for one that is no plain file the words for what it is (a link, a
-    device, a name there twice).
+    device, a name there twice). `build` is the bytes of its BUNDLE_BUILD
+    member, None where it has none.
+
+    A signature says who made a bundle, not when, as of an agent: so a
+    signed bundle whose BUNDLE_BUILD names a build below this agent's is
+    refused unless this node's console said an older one may be put back
+    (older_ok), and with it root's tools, which come out of the same
+    checked tar. A bundle that names no build has no floor under it yet.
 
     Kept with nothing said by a node that trusts no key. Otherwise kept
     when the signature over the list's digest is under a key this node
@@ -507,6 +560,13 @@ def may_keep_bundle(state, text, sig, members):
     if who:
         why = bundle_wrong(raw.decode("utf-8", "replace"), members)
         if not why:
+            # Its build, from the member the signed list held to its bytes.
+            at, version = version_of(build.decode("utf-8", "replace") if isinstance(build, bytes) else build)
+            if at is not None and at < own_build() and not older_ok(state):
+                return False, _refusal(BUNDLE_OLDER, f"refused: this bundle's files are from agent {version}, "
+                                                     f"{OLDER} ({AGENT_VERSION}), so this node keeps the bundle it has. "
+                                                     f"At this machine's own console: sudo {names.command()} older on "
+                                                     "lets an older one be put back")
             return True, f"the bundle's files are signed by {who}"
     why = why.replace("the update names no digest to check", "the bundle carries no list of its files")
     if unsigned_ok(state):

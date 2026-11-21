@@ -3996,7 +3996,13 @@ def agent_spare_said():
     key, sig = str(said.get("key") or "").lower(), str(said.get("sig") or "").lower()
     if not re.fullmatch(r"[0-9a-f]{64}", key) or not re.fullmatch(r"[0-9a-f]{128}", sig):
         return {}
-    return {"release_spare_sig": {"key": key, "sig": sig}}
+    out = {"key": key, "sig": sig}
+    # ...and the build that said it, where the build signed that too: a node
+    # takes none older than its own agent (the agent's release.spare_said).
+    build, bsig = said.get("build"), str(said.get("build_sig") or "").lower()
+    if isinstance(build, int) and not isinstance(build, bool) and build >= 0 and re.fullmatch(r"[0-9a-f]{128}", bsig):
+        out.update(build=build, build_sig=bsig)
+    return {"release_spare_sig": out}
 
 
 def agent_carried():

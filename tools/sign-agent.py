@@ -85,6 +85,12 @@ def digest():
     return "sha256:" + hashlib.sha256(_load("bundle").build(AGENT)).hexdigest()
 
 
+def agent_build():
+    """The BUILD of the agent this tree holds (AGENT_VERSION's last number),
+    which the release key's statement of its spare is signed with."""
+    return _load("release").own_build()
+
+
 def tools_digest():
     """The digest of the tools root installs from the bundle, as this tree
     holds them and as a node works it out from the bundle it was sent
@@ -153,7 +159,12 @@ def _write(key, path, spare=""):
         # The release key's word for its spare, under a fourth line: what a
         # node that pinned this key alone pins the spare from. Of the keys
         # and nothing in the tree, so every build this key signs says it.
-        out["spare"] = {"key": spare, "sig": key.sign(release.SPARE_MESSAGE + spare.encode()).hex()}
+        # ...and the same word with this tree's agent build in it, under a
+        # fifth: a node takes none from a build older than its own agent,
+        # so a statement a later release retired is not taken again.
+        build = agent_build()
+        out["spare"] = {"key": spare, "sig": key.sign(release.SPARE_MESSAGE + spare.encode()).hex(),
+                        "build": build, "build_sig": key.sign(release.spare_built(spare, build)).hex()}
     with open(path, "w", encoding="utf-8") as f:
         json.dump(out, f)
         f.write("\n")
@@ -175,7 +186,15 @@ def _spare_why(got, by):
     named = release.spare_said(keys[0], said)
     if not named:
         return "its statement of the spare is not signed by the release key"
-    return "" if named == keys[1] else f"it names another spare than {os.path.relpath(PUB)} does"
+    if named != keys[1]:
+        return f"it names another spare than {os.path.relpath(PUB)} does"
+    if said.get("build") != agent_build():
+        return "its statement of the spare is not of this tree's agent build"
+    # ...and the same word without the build, which an agent from before
+    # the build was said reads.
+    if release.spare_said(keys[0], {"key": said.get("key"), "sig": said.get("sig")}) != named:
+        return "its statement of the spare without the build is not signed by the release key"
+    return ""
 
 
 def _console(pub):

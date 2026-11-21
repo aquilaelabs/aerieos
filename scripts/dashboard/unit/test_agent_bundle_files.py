@@ -280,7 +280,7 @@ class Checked(Case):
         self.assertIn("the controller sent no signature with it", said)
 
 
-class Fetched(Case):
+class FetchWorld(Case):
     """bundle() end to end against a controller that serves what a test hands it."""
 
     def setUp(self):
@@ -357,6 +357,9 @@ class Fetched(Case):
         def say(self, text):
             self.out.append(text)
 
+
+
+class Fetched(FetchWorld):
     def test_a_signed_bundle_is_unpacked_and_said_once(self):
         digest = self.serve(FILES)
         into = self.a.bundle(None, None)
@@ -587,6 +590,71 @@ class Fetched(Case):
         into = self.a.bundle(None, None)
         self.assertEqual(into, os.path.join(self.bb, bad[7:23]))
         self.assertFalse([ln for ln in self.logged if "refused" in ln or "signed" in ln or "checked" in ln], self.logged)
+
+
+class Floor(FetchWorld):
+    """A signature says who made a bundle, not when: once two signed
+    releases exist, a controller taken over could serve the older one's
+    bundle, and with it root's copies of the provisioner, bb-session,
+    bb-netcut and sdk.sh. The bundle says its build (the agent package's
+    __init__.py, listed and signed with the rest), and a pinned node takes
+    none below its own agent's unless its console said so."""
+
+    def built(self, delta):
+        """The files with the build member of an agent `delta` builds from this one."""
+        major, minor, build = self.agent.AGENT_VERSION.split(".")
+        line = f'"""The agent."""\nAGENT_VERSION = "{major}.{minor}.{int(build) + delta}"\n'
+        return {**FILES, self.release.BUNDLE_BUILD: line.encode()}
+
+    def test_the_bundle_ships_the_member_that_says_its_build(self):
+        self.assertIn(self.release.BUNDLE_BUILD, bundleparts.PARTS)
+        self.assertEqual(self.release.version_of(pathlib.Path(HERE, "..", "..", "agent", "aerieos_agent", "__init__.py").read_text())[1],
+                         self.agent.AGENT_VERSION)
+
+    def test_an_older_builds_signed_bundle_is_refused_and_root_keeps_its_tools(self):
+        kept = []
+        self.agent.TOOLS_DIR = os.path.join(self.store, "root-tools")
+        for name in ("_keep_root_tools", "_keep_root_bundle"):
+            p = mock.patch.object(type(self.a), name, staticmethod(lambda *a, _n=name, **k: kept.append(_n)))
+            p.start()
+            self.addCleanup(p.stop)
+        with mock.patch.object(os, "geteuid", lambda: 0):
+            self.serve(self.built(0))
+            before = self.a.bundle(None, None)
+            self.assertTrue(before)
+            del kept[:]
+            self.serve(self.built(-1))
+            self.assertEqual(self.a.bundle(None, None), before, "the node goes on with the bundle it had")
+        self.assertEqual(kept, [], "neither root's tools nor root's bundle is made of it")
+        self.assertEqual(self.a.bundle_refused["cause"], self.release.BUNDLE_OLDER)
+
+    def test_the_console_lets_an_older_one_back(self):
+        self.trust["older_ok"] = True
+        self.serve(self.built(-5))
+        self.assertTrue(self.a.bundle(None, None))
+        self.assertIsNone(self.a.bundle_refused)
+
+    def test_the_same_or_a_newer_build_and_one_from_before_the_floor_are_taken(self):
+        for files in (self.built(0), self.built(2), FILES):
+            self.serve(files)
+            self.assertTrue(self.a.bundle(None, None), files.get(self.release.BUNDLE_BUILD))
+            self.assertIsNone(self.a.bundle_refused)
+
+    def test_the_build_is_the_one_the_list_signed(self):
+        # The member changed after the signing names its file, whatever build it says.
+        files = self.built(-1)
+        good = tar_bytes(files, self.sign(listing(files)))
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=io.BytesIO(good)) as src, tarfile.open(fileobj=buf, mode="w") as out:
+            for m in src:
+                data = src.extractfile(m).read()
+                if m.name == self.release.BUNDLE_BUILD:
+                    data = self.built(9)[self.release.BUNDLE_BUILD]
+                    m.size = len(data)
+                out.addfile(m, io.BytesIO(data))
+        self.serving = buf.getvalue()
+        self.assertEqual(self.a.bundle(None, None), "")
+        self.assertIn(f"{self.release.BUNDLE_BUILD} is changed", self.a.bundle_refused["why"])
 
 
 class Hello(Case):
