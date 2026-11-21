@@ -60,6 +60,15 @@ class Reason(unittest.TestCase):
         got = self.why("refused: this agent does not administer the machine, so its owner installs these: playwright: libXtst\n")
         self.assertIn("does not administer the machine", got)
 
+    def test_a_refusal_after_its_detail_is_the_reason_alone(self):
+        # The agent says what holds a toolchain, pid and all, on lines of
+        # their own, then the refusal in one sentence: the row takes that.
+        got = toolchains._reason(["  in use by node (pid 4242, ann's session)", "  in use by java (pid 4250, ann's session)",
+                                  "refused: jdk is in use, so it was left as it is: try again once that has finished"],
+                                 "install failed on the node")
+        self.assertEqual(got, "refused: jdk is in use, so it was left as it is: try again once that has finished · install failed on the node")
+        self.assertNotIn("pid", got)
+
     def test_a_long_reason_starts_at_a_line_not_mid_word(self):
         # B83: a tool pack's install, as bb-dev-sandbox logged it; the row
         # was cut by characters from the end and began '3pack · * branch'.

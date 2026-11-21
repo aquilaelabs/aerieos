@@ -632,6 +632,11 @@ def _reason(said, last, cap=400):
     word: a cut by characters from the end began mid-word, '3pack · *
     branch' (B83)."""
     lines = [re.sub(r"^\[builderbot\]\s*", "", s.strip()) for s in said]
+    # A refusal is its own one sentence, said after the lines that are its
+    # detail (what holds a toolchain in use, and its pid): taken alone.
+    refused = [s for s in lines if s.startswith("refused:")]
+    if refused:
+        return " · ".join([refused[-1][:cap], last])
     parts = [s for s in lines if s and not _GIT_NOISE.match(s) and not _DIGEST.search(s)][-4:] + [last]
     while len(parts) > 2 and len(" · ".join(parts)) > cap:
         # bb's ERROR is the reason, so the lines around it go first.
