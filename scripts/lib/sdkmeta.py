@@ -711,6 +711,26 @@ KEYS_DIR = os.path.join(HERE, "..", "..", "config", "release-keys")
 
 KEY_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 
+# Whether this file is AerieOS's own source tree's, and not an install's
+# (sdk.sh's SDK_IN_TREE, by the same two neighbours): where it is, which
+# nothing in an environment says.
+_HERE = os.path.dirname(os.path.realpath(__file__))
+IN_TREE = os.path.isfile(os.path.join(_HERE, "..", "..", "Dockerfile")) and os.path.isdir(os.path.join(_HERE, "..", "dashboard", "unit"))
+
+# Where gpg and gpgv are looked for: the system's own folders, as sdk.sh
+# looks for every tool a download is checked with (its SDK_SYS_PATH), never
+# a PATH a pack's bin folder is ahead of. In the source tree it is the
+# caller's PATH, where a test stands its tools in.
+SYS_PATH = (os.environ.get("PATH") or "") if IN_TREE else \
+    ("/opt/homebrew/bin:/usr/local/bin:" if sys.platform == "darwin" else "") + "/usr/sbin:/usr/bin:/sbin:/bin"
+
+
+def sys_tool(name):
+    """`name` among the system's own tools, or the bare name where it is
+    not there (which then fails as a missing program does)."""
+    import shutil  # noqa: PLC0415
+    return shutil.which(name, path=SYS_PATH) or name
+
 
 def keyring(name, tc=None, into=None):
     """The publisher's keys `name`, as a keyring file gpgv reads: dearmored
@@ -738,7 +758,7 @@ def keyring(name, tc=None, into=None):
         with open(src, "rb") as f:
             armored = f.read()
     import tempfile  # noqa: PLC0415
-    p = subprocess.run(["gpg", "--batch", "--dearmor"], input=armored, capture_output=True, check=False)
+    p = subprocess.run([sys_tool("gpg"), "--batch", "--dearmor"], input=armored, capture_output=True, check=False)
     if p.returncode or not p.stdout:
         die(f"gpg could not read the release keys {name}: {p.stderr.decode(errors='replace')[:200]}")
     if into is None:
@@ -762,7 +782,7 @@ def signed_by(data, sig, keys, tc=None):
         with open(sp, "wb") as f:
             f.write(sig)
         try:
-            p = subprocess.run(["gpgv", "--keyring", keyring(keys, tc, d), sp, dp], capture_output=True, text=True,
+            p = subprocess.run([sys_tool("gpgv"), "--keyring", keyring(keys, tc, d), sp, dp], capture_output=True, text=True,
                                timeout=60, check=False)
         except FileNotFoundError:
             die("there is no gpgv here to check the publisher's signature with")

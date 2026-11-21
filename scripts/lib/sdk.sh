@@ -33,6 +33,35 @@ SDK_TOOLCHAINS="android node jdk playwright flutter dotnet swift go rust zig"
 # rather than repeated here, so adding a toolchain is one edit and not two that
 # can drift. config/toolchains.json sits at the same place relative to this
 # script in the image and in a checkout.
+# Whether this file is AerieOS's own source tree's, and not an install's:
+# the tree's Dockerfile and its unit tests are beside it, which no image, no
+# bundle a node fetches and no copy root keeps holds. It is where the file
+# is, which nothing in an environment says: what a test stands in for (a
+# tool on its PATH, the files named below with each) is read only there.
+SDK_IN_TREE=""
+SDK_HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)" || SDK_HERE=""
+if [ -n "$SDK_HERE" ] && [ -f "${SDK_HERE}/../../Dockerfile" ] && [ -d "${SDK_HERE}/../dashboard/unit" ]; then
+    SDK_IN_TREE=1
+fi
+
+# The tools a download is fetched, checked and unpacked with (curl,
+# sha256sum and its kin, gpgv, tar, python3 for sdkmeta.py) and the ones
+# the network is cut with (unshare, sudo), from the system's own folders
+# and never from the caller's PATH: a pack's bin folder is ahead of the
+# system's there for every job, and a sha256sum a pack shipped would check
+# every install after it. A recipe's own steps keep the PATH they are
+# handed. sdk_sys TOOL [ARG...] runs one; sdk_sys_path TOOL says where it is.
+SDK_SYS_PATH="/usr/sbin:/usr/bin:/sbin:/bin"
+case "$(uname -s 2>/dev/null)" in Darwin) SDK_SYS_PATH="/opt/homebrew/bin:/usr/local/bin:${SDK_SYS_PATH}" ;; esac
+[ -z "$SDK_IN_TREE" ] || SDK_SYS_PATH="$PATH"
+sdk_sys_path() { PATH="$SDK_SYS_PATH" type -P "$1"; }
+sdk_sys() {
+    local tool
+    tool="$(sdk_sys_path "$1")" || { printf 'there is no %s among this system'\''s own tools\n' "$1" >&2; return 127; }
+    shift
+    "$tool" "$@"
+}
+
 # The catalog, at the one place it sits relative to this file in both the
 # image and a checkout. On a node the bundle may carry a second file beside
 # it, the shipped rows with the vetted catalog's newer ones in their places
@@ -527,7 +556,7 @@ sdk_builds_with() {
 # rather than holding the job until its step's hour is up, and a server
 # that never answers fails in thirty seconds; two retries for a blip.
 sdk_fetch() {
-    curl -fL --progress-bar --connect-timeout 30 --speed-limit 1024 --speed-time 120 \
+    sdk_sys curl -fL --progress-bar --connect-timeout 30 --speed-limit 1024 --speed-time 120 \
         --retry 2 --retry-delay 5 -o "$2" "$1"
 }
 
@@ -1196,7 +1225,7 @@ sdk_install_cleanup() {
 # the image pointed at a new directory, and sdkmanager, which resolves its own
 # package ids. A table that could express all five would be a language.
 SDK_META="${BB_SCRIPTS:-$(dirname "$(readlink -f "$0")")}/lib/sdkmeta.py"
-sdk_meta() { python3 "$SDK_META" "$@"; }
+sdk_meta() { sdk_sys python3 "$SDK_META" "$@"; }
 
 # Read a NUL-separated list from the catalog into an array named by $1.
 sdk_meta_into() {
@@ -1360,7 +1389,7 @@ sdk_verify_download() {
         sig="${kd}/sig"
         sdk_fetch "$want" "$sig" >/dev/null 2>&1 || { rm -rf "$file" "$kd"; die "could not fetch ${what}'s signature (${want})"; }
         keyring="$(sdk_meta keyring "$where" "$what" "$kd")" || { rm -rf "$file" "$kd"; die "${what}: no keys to check its signature with"; }
-        if ! signer="$(gpgv --keyring "$keyring" "$sig" "$file" 2>&1)"; then
+        if ! signer="$(sdk_sys gpgv --keyring "$keyring" "$sig" "$file" 2>&1)"; then
             rm -rf "$file" "$kd"
             die "${what}'s download does not carry its publisher's signature: $(printf '%s' "$signer" | tail -2 | tr '\n' ' ')nothing was installed"
         fi
@@ -1377,7 +1406,7 @@ sdk_verify_download() {
         return 0
     fi
     case "$algo" in sha1|sha256|sha512) ;; *) rm -f "$file"; die "${what}: unknown checksum kind ${algo}" ;; esac
-    got="$("${algo}sum" "$file" | cut -d' ' -f1)"
+    got="$(sdk_sys "${algo}sum" "$file" | cut -d' ' -f1)"
     if [ "$got" != "$want" ]; then
         rm -f "$file"
         die "${what}'s download is not what ${where} says it is (${algo} ${got}, expected ${want}): nothing was installed"
@@ -1406,7 +1435,7 @@ sdk_install_tarball() {
     sdk_verify_download "$what" "$tmp" "$url" "$version" "$d"
     # -a: tar picks the decompressor from the file, so the catalog does not
     # have to say whether a release ships .gz or .xz this year.
-    tar -xaf "$tmp" -C "$d" --strip-components="$strip" || { rm -f "$tmp"; die "could not unpack ${url}"; }
+    sdk_sys tar -xaf "$tmp" -C "$d" --strip-components="$strip" || { rm -f "$tmp"; die "could not unpack ${url}"; }
     rm -f "$tmp"
     # Unpacking is AerieOS's own; nothing of the entry has run yet. What it
     # declares it downloads besides is fetched and checked here, and its
@@ -1719,13 +1748,13 @@ sdk_fetch_declared() {
             || die "${what}: ${to} is held to nothing: a declared download names its sha256, or its publisher's signature"
         log "fetching ${to} from ${url}"
         tmp="$(mktemp "${d}/.bb-fetch.XXXXXX")"
-        if ! curl -fL --proto "$SDK_PROTO" --proto-redir '=https' --progress-bar --connect-timeout 30 \
+        if ! sdk_sys curl -fL --proto "$SDK_PROTO" --proto-redir '=https' --progress-bar --connect-timeout 30 \
                 --speed-limit 1024 --speed-time 120 --retry 2 --retry-delay 5 -o "$tmp" "$url"; then
             rm -f "$tmp"
             die "${what}: ${url} could not be fetched: nothing is installed"
         fi
         if [ -n "$want" ]; then
-            got="$(sha256sum "$tmp" | cut -d' ' -f1)"
+            got="$(sdk_sys sha256sum "$tmp" | cut -d' ' -f1)"
             if [ "$got" != "$want" ]; then
                 rm -f "$tmp"
                 # shellcheck disable=SC2034  # held-run.sh reads it on the way out
@@ -1737,21 +1766,21 @@ sdk_fetch_declared() {
             # Held by its publisher's signature, under keys the entry
             # carries or names: never a keyring of this machine's.
             [ -n "$keys" ] || { rm -f "$tmp"; die "${what}: ${to} is signed, and its entry names no keys to check it with"; }
-            command -v gpgv >/dev/null 2>&1 \
+            sdk_sys_path gpgv >/dev/null 2>&1 \
                 || { rm -f "$tmp"; die "${what}: there is no gpgv here to check the signature of ${to} with: nothing is installed"; }
             sdk_https_only "$what" "$sig"
             # The signature and the keyring made of the keys, in a
             # directory of this one check's own that goes with it.
             kd="$(mktemp -d "${TMPDIR:-/tmp}/bb-sig.XXXXXX")" || { rm -f "$tmp"; die "${what}: no place to check the signature of ${to} in"; }
             sigf="${kd}/sig"
-            if ! curl -fsL --proto "$SDK_PROTO" --proto-redir '=https' --connect-timeout 30 --max-time 120 \
+            if ! sdk_sys curl -fsL --proto "$SDK_PROTO" --proto-redir '=https' --connect-timeout 30 --max-time 120 \
                     --retry 2 --retry-delay 5 -o "$sigf" "$sig"; then
                 rm -rf "$tmp" "$kd"
                 die "${what}: the signature of ${to} (${sig}) could not be fetched: nothing is installed"
             fi
             keyring="$(sdk_meta keyring "$keys" "$what" "$kd")" \
                 || { rm -rf "$tmp" "$kd"; die "${what}: no keys named ${keys} to check ${to} with: nothing is installed"; }
-            if ! signer="$(gpgv --keyring "$keyring" "$sigf" "$tmp" 2>&1)"; then
+            if ! signer="$(sdk_sys gpgv --keyring "$keyring" "$sigf" "$tmp" 2>&1)"; then
                 rm -rf "$tmp" "$kd"
                 # shellcheck disable=SC2034  # held-run.sh reads it on the way out
                 SDK_NOT_HELD="$to"
@@ -1805,8 +1834,9 @@ SDK_NETCUT_BIN="${BUILDERBOT_NETCUT_BIN:-/usr/local/sbin/bb-netcut}"
 # back by the step's shell, after the helper has dropped to this account.
 # shellcheck disable=SC2016  # the words are for the bash -c that runs them
 SDK_NETCUT_RELAY='f="$(mktemp)" || exit 1
+su="$1"; shift
 export -p > "$f"
-sudo -n "$0" bash -c '\''. "$0"; rm -f "$0"; exec "$@"'\'' "$f" "$@"
+"$su" -n "$0" bash -c '\''. "$0"; rm -f "$0"; exec "$@"'\'' "$f" "$@"
 rc=$?
 rm -f "$f"
 exit "$rc"'
@@ -1820,12 +1850,16 @@ sdk_net_cut() {
         printf 'cut\n' > "$d/.bb-net" 2>/dev/null || true
         return 0
     fi
-    if unshare --user --map-user="$(id -u)" --map-group="$(id -g)" --net true 2>/dev/null; then
-        SDK_CUT=(unshare --user --map-user="$(id -u)" --map-group="$(id -g)" --net)
-    elif unshare --user --map-root-user --net true 2>/dev/null; then
-        SDK_CUT=(env TAR_OPTIONS=--no-same-owner unshare --user --map-root-user --net)
-    elif [ -x "$SDK_NETCUT_BIN" ] && sudo -n "$SDK_NETCUT_BIN" true 2>/dev/null; then
-        SDK_CUT=(bash -c "$SDK_NETCUT_RELAY" "$SDK_NETCUT_BIN")
+    # The system's own unshare and sudo, by where they are (sdk_sys_path).
+    local un su
+    un="$(sdk_sys_path unshare)" || un=""
+    su="$(sdk_sys_path sudo)" || su=""
+    if [ -n "$un" ] && "$un" --user --map-user="$(id -u)" --map-group="$(id -g)" --net true 2>/dev/null; then
+        SDK_CUT=("$un" --user --map-user="$(id -u)" --map-group="$(id -g)" --net)
+    elif [ -n "$un" ] && "$un" --user --map-root-user --net true 2>/dev/null; then
+        SDK_CUT=(env TAR_OPTIONS=--no-same-owner "$un" --user --map-root-user --net)
+    elif [ -n "$su" ] && [ -x "$SDK_NETCUT_BIN" ] && "$su" -n "$SDK_NETCUT_BIN" true 2>/dev/null; then
+        SDK_CUT=(bash -c "$SDK_NETCUT_RELAY" "$SDK_NETCUT_BIN" "$su")
     fi
     if [ "${#SDK_CUT[@]}" != 0 ]; then
         log "${said}: its steps run with no network"
