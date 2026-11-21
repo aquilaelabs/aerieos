@@ -27,6 +27,10 @@
 - Docker apps come from the catalog alone: AerieOS ships no table of apps, so an app is added, fixed or re-pinned by a catalog commit with no release. A container already made from an app keeps running and keeps its Configure. With no catalog reachable and none kept, the Library's Apps say so (271fb5f)
 - The bell's container-update row names a container made from an app or a service once its entry names a newer image (79a8209)
 
+### Removed
+
+- Upgrading: nothing updates from 0.9.0-dev.5641 or earlier. Install fresh, with a new /config, and add your spaces again from their repositories; a controller started on an older /config stops and says so, and a backup or a move from one is refused before it lands (41e85a7)
+
 ### Fixed
 
 - A node's CI runner that has updated itself shows as listening, where its row said not listening and asked for Reinstall runner while it took jobs (d02e808)
@@ -88,6 +92,8 @@
 - A node talks to its controller over TLS under the controller's own key, which it pins when it is enrolled: the Enroll script and the token commands name the controller as https with the pin, and a node enrolled over plain http moves by itself once it has updated. The controller keeps its key when its certificate is remade, so a renewal cuts no node off. A node that cannot reach its controller over TLS stays on http and its row says so (a1c04e5, 1deaead, 41bb6ad)
 - A node that pinned the release key pins the spare key by itself, from a statement the release key signed: no Enroll script is run again for it (3f2101e)
 - Nothing a node or the image sets up takes a key or a tool from the network unchecked: Docker's package source on a node is held to a key the provisioner carries, and the image's package sources, its build tools and linters are held to keys and pins in the tree (b2f1869, 61dcf7b, 3999b5a)
+- An app's compose file is refused when it uses an anchor, an alias, a merge key, a tag or a mapping in braces, or names an image anywhere but on an image line of its own: what Look shows is then what Docker runs (babb869)
+- A release says the oldest catalog index it takes, so a new install is not handed an old signed index with its withdrawn packs back (ba3ce80)
 
 ## 0.9.0-dev.5641: 2026-11-18
 
