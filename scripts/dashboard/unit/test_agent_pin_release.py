@@ -154,6 +154,25 @@ class ReadAsTheAccount(unittest.TestCase):
             import shutil
             shutil.rmtree(new, ignore_errors=True)
 
+    def test_a_chain_of_links_each_inside_by_its_words_is_refused(self):
+        # A link deep in the folder back to its top, and a link whose words
+        # go down through it and up again: each reads as inside, and the
+        # second leads out once the first is followed.
+        outside = os.path.join(self.tmp, "home", "writable-by-account")
+        os.makedirs(outside)
+        deep = [f"d{i}" for i in range(12)]
+        members = [("./bin", "dir", None)] + [("./" + "/".join(deep[:i + 1]), "dir", None) for i in range(12)]
+        members.append(("./" + "/".join(deep) + "/L", "link", "/".join([".."] * 12)))
+        new = os.path.join(self.tmp, "pin", ".release.new")
+        up = "/".join([".."] + deep + ["L"] + [".."] * 13)
+        members.append(("./bin/codex-helper", "link", up + outside + "/codex-helper"))
+        os.makedirs(os.path.dirname(new))
+        _asked, patched = self.started(self.a_tar(members))
+        with patched, self.assertRaises(OSError) as said:
+            self.sessions._tree_as(self.WHO, "/home/builder/rel", new)
+        self.assertIn("leads outside the folder", str(said.exception))
+        self.assertFalse(os.path.lexists(new), "and nothing of it is left for a pin to take")
+
 
 class ReleaseRoot(unittest.TestCase):
     """Only a link into a vendor's own folder pins a release whole (B262):

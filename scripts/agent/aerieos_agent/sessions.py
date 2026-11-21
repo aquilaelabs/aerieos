@@ -126,6 +126,17 @@ def _tree_as(who, root, new):
         code = p.wait()
     if code != 0:
         raise OSError(f"{root} could not be read as the account it was installed for")
+    # A link's words are checked as it is made, and a chain of links that
+    # each read as inside can still lead out once one is followed: each is
+    # held to where it really leads, now that all of them are there.
+    for folder, dirs, files in os.walk(top):
+        for name in dirs + files:
+            at = os.path.join(folder, name)
+            if os.path.islink(at):
+                real = os.path.realpath(at)
+                if real != top and not real.startswith(top + os.sep):
+                    shutil.rmtree(new, ignore_errors=True)
+                    raise OSError(f"{os.path.relpath(at, top)} leads outside the folder")
 
 
 def _pin_release(pin_dir, cmd, root, who=None):
