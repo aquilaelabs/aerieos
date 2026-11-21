@@ -751,9 +751,10 @@ def _entry_source(doc):
 
 # A coding agent's install recipe (agent.install, agents.install_checked)
 # is an install like any entry's, read as one: what it declares (fetch,
-# keyring, online) and the steps that run from it. The older form, a
-# vendor's installer fetched and handed to a shell (script), declares
-# nothing and is read as that, under a kind of its own.
+# keyring, online) and the steps that run from it. One that says no steps
+# (a vendor's installer fetched and handed to a shell, which no recipe may
+# be: install_checked refuses it) declares nothing and is read as that,
+# under a kind of its own.
 PIPED = "piped"
 PIPED_SAID = ("its vendor's installer is fetched and handed to a shell as it arrives, and it downloads the rest: "
               "nothing in its entry holds either")
@@ -762,7 +763,7 @@ PIPED_SAID = ("its vendor's installer is fetched and handed to a shell as it arr
 def agent_source(inst):
     """A coding agent's install recipe as the source held() reads: a held
     recipe's downloads, keys and sentence with its steps, which run with no
-    network unless it says online; the older script form as PIPED."""
+    network unless it says online; one with no steps as PIPED."""
     if not isinstance(inst.get("steps"), list):
         return {"kind": PIPED}
     online = inst.get("online") if isinstance(inst.get("online"), str) else ""
@@ -859,6 +860,21 @@ def held_of(doc):
     """held(doc) as an API answers it: {word, why}."""
     word, why = held(doc)
     return {"word": word, "why": why}
+
+
+def replaces_refused(theirs, shipped):
+    """Why a recipe held to `theirs` may not take the place of a shipped
+    one held to `shipped` (two of HELD_WORDS), or "": the catalog's newer
+    recipe is taken only where it is held to as much as the one this build
+    ships, pinned above installer above open, and one held to nothing takes
+    no shipped recipe's place whatever that one is. A higher rev alone
+    would let a recipe that fetches whatever its origin serves stand in
+    the place of one that was pinned."""
+    if theirs not in HELD_WORDS or theirs == "open":
+        return "its downloads are held to nothing its entry carries, and such a recipe takes no shipped one's place"
+    if HELD_WORDS.index(theirs) > (HELD_WORDS.index(shipped) if shipped in HELD_WORDS else len(HELD_WORDS)):
+        return f"it is held to less than the shipped one: {theirs}, where the shipped one is {shipped}"
+    return ""
 
 
 def of(doc):

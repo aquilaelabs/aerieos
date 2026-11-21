@@ -4179,7 +4179,7 @@ import library                                                   # noqa: E402
 catalogindex.configure(state=STATE, write_json=write_json)
 import catalogrows                                               # noqa: E402
 import packformat                                                # noqa: E402
-catalogrows.configure(state=STATE, write_json=write_json)
+catalogrows.configure(state=STATE, write_json=write_json, audit=lambda *a: db.audit(*a))   # db is imported below
 toolpacks.configure(state=STATE, write_json=write_json,
                     unpack=lambda aid, dest: projects.unpack_archive(aid, dest))
 # The catalog's mirror (R169 step 6): its index when the catalog does not

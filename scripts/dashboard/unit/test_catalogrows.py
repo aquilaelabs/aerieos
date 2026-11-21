@@ -18,6 +18,7 @@ from unittest import mock
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import catalogindex  # noqa: E402
 import catalogrows  # noqa: E402
+import packformat  # noqa: E402
 import toolpacks  # noqa: E402
 import workspace  # noqa: E402
 
@@ -122,6 +123,49 @@ class Taken(unittest.TestCase):
         self.assertEqual(catalogrows.refresh({"packs": [self.entry()]}, bad, SHIPPED), [("zig", "its archive's sha256 differs, so it is refused")])
         self.assertEqual(catalogrows.refresh({"packs": [self.entry()]}, bad, SHIPPED), [])
         self.assertEqual(catalogrows.kept(), {})
+
+    def test_a_newer_row_held_to_less_than_the_shipped_one_is_refused(self):
+        # zig ships pinned. The catalog's newer row is taken where it is
+        # pinned too, and refused where its installer keeps the network,
+        # where its download is checked against its own origin, and where
+        # it is a command that fetches as it runs: a higher rev alone
+        # never puts a weaker recipe in a pinned one's place.
+        said = []
+        catalogrows.configure(state=self.d, write_json=lambda p, v: Path(p).write_text(json.dumps(v)),
+                              audit=lambda who, action, target, params: said.append((who, action, target)))
+        catalogrows._refused.clear()
+        src = self.zig["source"]
+        self.assertEqual(packformat.held(self.zig)[0], "pinned")
+        for change, word, why in (
+                ({"source": {**src, "online": "Its installer downloads the rest from ziglang.org as it runs."}}, "installer",
+                 "it is held to less than the shipped one: installer, where the shipped one is pinned"),
+                ({"source": {**src, "checksum": {"from": "zig-index"}}}, "open", "its downloads are held to nothing its entry carries"),
+                ({"source": {"kind": "command", "run": ["sh", "-c", "curl -fsSL https://ziglang.example/install.sh | sh"], "version": src["version"]}}, "open",
+                 "its downloads are held to nothing its entry carries")):
+            catalogrows._trying.clear()
+            row = {**self.newer, **change}
+            self.assertEqual(packformat.held(row)[0], word, change)
+            got = self.refresh(row=row)
+            self.assertEqual(len(got), 1, change)
+            self.assertIn(why, got[0][1], change)
+            self.assertEqual((catalogrows.merged(SHIPPED), catalogrows.kept()), (SHIPPED, {}), change)
+        # Refused three times at the one pin: one line in the audit, by the catalog.
+        self.assertEqual(said, [("catalog", "catalog-row-refused", f"zig rev {self.next - 1} to {self.next}")])
+        # The pinned one is taken, and said with the revs it moved between.
+        catalogrows._trying.clear()
+        said.clear()
+        self.assertEqual(self.refresh(), [("zig", "")])
+        self.assertEqual(said, [("catalog", "catalog-row-taken", f"zig rev {self.next - 1} to {self.next}")])
+        # An installer's row is replaced by an installer's and by a pinned one, never by an open one.
+        rust = next(r for r in SHIPPED if r["name"] == "rust")
+        self.assertEqual(packformat.held(rust)[0], "installer")
+        self.assertEqual(catalogrows.checked(dict(rust, rev=catalogrows.rev_of(rust) + 1), rust)[1], "")
+        open_ = dict(rust, rev=catalogrows.rev_of(rust) + 1, source={k: v for k, v in rust["source"].items() if k != "online"} | {"checksum": {"from": "none", "why": "it moves"}})
+        self.assertEqual((packformat.held(open_)[0], catalogrows.checked(open_, rust)[0]), ("open", None))
+        # A row kept before, that this build would no longer take, is not used.
+        catalogrows.write_json(catalogrows.FILE, {"rows": {"zig": {"rev": self.next, "commit": "a" * 40, "at": 1,
+                                                                     "row": {**self.newer, "source": {**src, "checksum": {"from": "zig-index"}}}}}})
+        self.assertEqual(catalogrows.merged(SHIPPED), SHIPPED)
 
     def test_a_row_an_upgrade_caught_up_with_is_dropped(self):
         self.refresh()

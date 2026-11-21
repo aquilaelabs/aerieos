@@ -9,7 +9,9 @@ found, which system packages it needs. When one of those moves upstream the
 fix used to wait for a release of AerieOS. Now a row has a `rev`, its
 catalog entry repeats it (`shipped_rev`), and an install that reads a signed
 index whose rev is higher than its own row's fetches that pack at its pin,
-under its sha256, holds the row to its shape, and keeps it under the state:
+under its sha256, holds the row to its shape and to no less than the
+shipped row is held to (packformat.held: a higher rev never puts a weaker
+recipe in a pinned one's place), and keeps it under the state:
 the controller's own table then carries the newer row in the shipped one's
 place, and the bundle every node installs from carries the rows so merged as
 a file of their own beside the shipped one (config/toolchains.catalog.json),
@@ -36,6 +38,8 @@ import packformat
 
 FILE = None            # the state's catalog-toolchains.json
 write_json = None
+audit = None           # db.audit: a row taken from the catalog, or refused, is a line there
+_refused = set()       # {(name, commit)} said in the audit already: a refused pack is tried again every RETRY_S
 _lock = threading.RLock()
 _trying = {}           # {(name, commit): when it was last tried}, so a pack that fails is asked again in an hour, not on every read
 
@@ -60,8 +64,16 @@ MAX_BYTES = 192 * 1024
 RETRY_S = 3600
 
 
-def configure(*, state, write_json):
-    globals().update(FILE=f"{state}/catalog-toolchains.json", write_json=write_json)
+def configure(*, state, write_json, audit=None):
+    globals().update(FILE=f"{state}/catalog-toolchains.json", write_json=write_json, audit=audit)
+
+
+def _audit(action, name, was, now):
+    """One line in the audit, by the catalog, for a shipped row: the revs
+    are in its target, since the audit keeps a digest of the parameters
+    and not the parameters."""
+    if audit:
+        audit("catalog", action, f"{name} rev {was} to {now}", {})
 
 
 def rev_of(row):
@@ -158,6 +170,11 @@ def checked(row, shipped):
         return None, "it has no layout"
     if rev_of(row) <= rev_of(shipped):
         return None, "it is no newer than the shipped row"
+    # A higher rev is the catalog's word alone, so it never buys a weaker
+    # hold: the row is held to as much as the one it replaces.
+    weak = packformat.replaces_refused(packformat.held(row)[0], packformat.held(shipped)[0])
+    if weak:
+        return None, weak
     return row, ""
 
 
@@ -230,8 +247,11 @@ def wanted(index, shipped_rows):
 def refresh(index, fetch, shipped_rows, validate=None):
     """Take the catalog's newer rows: each fetched at its pin under its
     sha256 (`fetch` is toolpacks.fetch_folder), its manifest held to the
-    pack format (`validate`, toolpacks.validate) and its row to its shape.
-    Rows an upgrade caught up with are dropped. [(name, "" or why)] for what
+    pack format (`validate`, toolpacks.validate) and its row to its shape
+    and to as much as the shipped row is held to (checked). Each row taken
+    is a line in the audit, by the catalog, with the revs it moved between,
+    and each one refused a line too, once. Rows an upgrade caught up with
+    are dropped. [(name, "" or why)] for what
     was tried; nothing when nothing was wanted."""
     shipped = {r["name"]: r for r in shipped_rows if isinstance(r, dict) and r.get("name")}
     said = []
@@ -258,11 +278,16 @@ def refresh(index, fetch, shipped_rows, validate=None):
             # this build ships, and fetch held its folder to the entry's sha256.
             errors = validate(m, official=True)[1] if validate else []
             row, why = (None, "; ".join(errors)) if errors else checked(row_of(m), shipped[name])
+            was = rev_of(mine[name]["row"] if name in mine and name not in stale else shipped[name])
             if not row:
                 said.append((name, why))
+                if key not in _refused:
+                    _refused.add(key)
+                    _audit("catalog-row-refused", name, was, e.get("shipped_rev"))
                 continue
             mine[name] = {"rev": rev_of(row), "commit": e["commit"], "at": int(time.time()), "row": row}
             said.append((name, ""))
+            _audit("catalog-row-taken", name, was, rev_of(row))
         if stale or any(not why for _n, why in said):
             for n in stale:
                 mine.pop(n, None)

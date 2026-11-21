@@ -241,7 +241,8 @@ class Row(unittest.TestCase):
     def setUp(self):
         self.shipped = {"name": "go", "probe": "go", "label": "Go", "about": "The Go toolchain.", "maker": "Google", "platforms": ["linux/amd64"],
                         "layout": {"bin": ["bin"], "env": {}}, "terms": [],
-                        "source": {"kind": "tarball", "url": "https://example.com/{version}.tar.gz", "checksum": {"from": "go-json"}}}
+                        "source": {"kind": "tarball", "url": "https://example.com/{version}.tar.gz",
+                                   "checksum": {"from": "pin", "version": "1.0", "sha256": H}}}
 
     def newer(self, **source):
         row = copy.deepcopy(self.shipped)
@@ -251,9 +252,15 @@ class Row(unittest.TestCase):
 
     def test_a_well_formed_source_is_taken_and_a_malformed_one_refused(self):
         fetch = [{"url": "https://example.com/extra.bin", "sha256": H, "to": "dl/extra.bin", "platform": "linux/amd64"}]
-        for good in ({"fetch": fetch}, {"fetch": fetch, "online": SENTENCE}, {"offline": True}, {"keyring": {"go.asc": KEY}},
+        for good in ({"fetch": fetch}, {"offline": True}, {"keyring": {"go.asc": KEY}},
                      {"fetch": [{"url": "https://example.com/e.bin", "to": "e.bin", "signed": {"sig": "https://example.com/e.sig", "keys": "node.asc"}}]}):
             self.assertEqual(catalogrows.checked(self.newer(**good), self.shipped)[1], "", good)
+        # One whose installer keeps the network is a row an installer's row
+        # is replaced by, and never a pinned one's.
+        online = self.newer(fetch=fetch, online=SENTENCE)
+        self.assertEqual(catalogrows.checked(online, {**self.shipped, "source": {**self.shipped["source"], "online": SENTENCE}})[1], "")
+        self.assertEqual(catalogrows.checked(online, self.shipped),
+                         (None, "it is held to less than the shipped one: installer, where the shipped one is pinned"))
         for bad, said in (({"fetch": [{"url": "http://example.com/x", "sha256": H, "to": "x"}]}, "source.fetch 1 is {url, sha256, to}"),
                           ({"fetch": "https://example.com/x"}, "source.fetch lists up to"),
                           ({"keyring": {"go.asc": "nope"}}, "source.keyring maps up to"),
@@ -338,6 +345,8 @@ class Row(unittest.TestCase):
                           packformat.source_format({"kind": "git", "url": git["url"], "branch": "stable"})), (5, 5, 1))
 
     def test_its_official_pack_says_format_5_and_comes_back_whole(self):
+        # A row as format 1 wrote one: its download checked against its origin.
+        self.shipped["source"]["checksum"] = {"from": "go-json"}
         self.assertEqual(packformat.source_format(self.shipped["source"]), 1)
         self.assertNotIn("format", catalogrows.manifest_of(self.shipped))
         for part in ({"checksum": {"from": "pin", "version": "go1.99.0", "sha256": H}}, {"offline": True}, {"online": SENTENCE},
@@ -469,7 +478,7 @@ class AgentInstall(unittest.TestCase):
     """A coding agent's install recipe (agent.install) is held as any
     entry's install is: its downloads declared in the format's shapes, its
     steps lists of words run from them, and the three words from the entry
-    alone. The older script form is still valid, and reads open."""
+    alone. A vendor's installer handed to a shell (script) is no recipe."""
 
     FETCH = {"url": "https://x.example/v{version}/install.sh", "version": "1.2.0", "sha256": H, "to": "dl/install.sh"}
     BIN = {"url": "https://x.example/{version}/x-linux-x64.tar.gz", "version": "1.2.0", "sha256": H, "to": "dl/x.tar.gz", "platform": "linux/amd64"}
@@ -511,7 +520,7 @@ class AgentInstall(unittest.TestCase):
                          ({"online": "x"}, "agent.install.online is one sentence"),
                          ({"keyring": {"k.asc": "no key"}}, "agent.install.keyring maps"),
                          ({"run": ["sh", "{dir}/dl/install.sh"]}, "agent.install names run"),
-                         ({"script": "curl -fsSL https://x.example/i | bash"}, "a recipe is one form or the other"),
+                         ({"script": "curl -fsSL https://x.example/i | bash"}, "agent.install.script is no recipe"),
                          ({"bin": "/usr/bin/x"}, "agent.install.bin")):
             self.assertIn(why, self.checked(self.recipe(**bad))[1], bad)
         # {version} in a step is the one version its downloads say.
@@ -529,7 +538,7 @@ class AgentInstall(unittest.TestCase):
         signed = {"url": "https://x.example/x.tar.gz", "to": "dl/x.tar.gz", "signed": {"sig": "https://x.example/x.tar.gz.sig", "keys": "tern.asc"}}
         self.assertEqual(packformat.agent_held(self.pinned(fetch=[signed], keyring={"tern.asc": KEY}))["word"], "pinned")
         self.assertEqual(packformat.agent_held(self.pinned(fetch=[signed]))["word"], "open", "a key the recipe does not carry holds nothing")
-        # From a manifest, raw and as the validator keeps it; a shipped agent's from before format 5 reads open.
+        # From a manifest, raw and as the validator keeps it; one that hands an installer to a shell reads open.
         m = kept(5, "merlin")
         self.assertEqual(packformat.held(m)[0], "installer")
         self.assertIn("Merlin Code build", packformat.held(m)[1])
@@ -545,10 +554,12 @@ class AgentInstall(unittest.TestCase):
         self.assertEqual(toolpacks.validate(m, official=True)[1], [])
         errors = toolpacks.validate({**m, "format": 4, "framework": "4.1"}, official=True)[1]
         self.assertEqual(errors, ['agent.install\'s fetch and steps are pack format 5\'s: the manifest says "format": 5'])
-        # The script form is every format's, and means what it meant.
-        old = copy.deepcopy(kept(1, "grok"))
-        got, errors = toolpacks.validate(old, official=True)
-        self.assertEqual((errors, got["agent"]["install"]["script"]), ([], "curl -fsSL https://x.ai/cli/install.sh | bash -s -- ${BB_PIN:-}"))
+        # A vendor's installer handed to a shell as it arrives is no
+        # recipe at any format, alone or beside a held one's parts.
+        for old in (copy.deepcopy(kept(1, "grok")), {**m, "agent": {**m["agent"], "install": {**m["agent"]["install"], "script": "curl -fsSL https://x.example/i | bash"}}}):
+            got, errors = toolpacks.validate(old, official=True)
+            self.assertEqual(len([e for e in errors if e.startswith("agent.install.script is no recipe")]), 1, errors)
+            self.assertIsNone(got)
 
     def test_its_downloads_are_said_as_any_entry_s(self):
         m = kept(5, "merlin")

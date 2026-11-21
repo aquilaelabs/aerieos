@@ -243,11 +243,10 @@ new version and digest into `scripts/dashboard/agent-recipes.json`, the
 one file that holds the recipes, raises the recipe's `rev` and rewrites
 the packs. The agent table reads that file, so nothing is copied.
 
-A recipe written before pack format 5 says `script` in the place of `fetch`
-and `steps`: a vendor's installer over https handed to `sh` or `bash` as it
-arrives. It is still valid and still runs as it did, for an older catalog's
-row; its job says in one line that nothing held what it fetched, and its
-card reads `open`.
+A vendor's installer over https handed to `sh` or `bash` as it arrives
+(`script`, in the place of `fetch` and `steps`, as a recipe before pack
+format 5 was written) is no recipe: nothing in it holds what arrives, so a
+manifest that says one is refused and the controller hands no node one.
 
 A release carries each recipe, so an install with no network works as
 before. The catalog's signed index says each agent's recipe `rev` beside
@@ -261,7 +260,11 @@ nearly always, nothing is fetched at all. So when a vendor changes its
 installer, or a pin should move, the answer is a catalog commit and a
 maintainer's signature, and no install waits for a release. A catalog that
 does not answer, a pack that is refused, or one no newer than the release
-leaves the release's recipe in place. The node holds what it is handed to
+leaves the release's recipe in place. So does a newer one held to less
+than the release's: a recipe that reads `pinned` is replaced only by one
+that reads `pinned`, one that reads `installer` by either, and one that
+reads `open` replaces nothing. A recipe taken is a line in the audit, by
+`catalog`, with the revs it moved between. The node holds what it is handed to
 the same shape and refuses anything else without running it. Its agent
 keeps no installer of its own: every controller that ships agent 0.9.479
 or newer hands the recipe over, and an install asked for with none is

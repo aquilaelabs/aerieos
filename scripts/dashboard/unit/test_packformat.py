@@ -41,6 +41,12 @@ class Kept(unittest.TestCase):
         for n in range(1, packformat.FORMAT + 1):
             self.assertTrue(kept(n) or apps(n), n)
 
+    # What a kept manifest says that no build takes any more, and the
+    # refusal it meets: a shipped agent's recipe that hands its vendor's
+    # installer to a shell as it arrives, which nothing held. An install
+    # that meets one keeps the recipe it shipped with.
+    REFUSED = {"1/grok.json": "agent.install.script is no recipe"}
+
     def test_a_manifest_valid_at_a_number_is_valid_at_every_later_one(self):
         for n in range(1, packformat.FORMAT + 1):
             for p in kept(n):
@@ -48,6 +54,10 @@ class Kept(unittest.TestCase):
                 # The kept manifests written as official are copies of packs
                 # AerieOS shipped, which is this file's to say of them.
                 got, errors = toolpacks.validate(m, official=m.get("tier") == "official")
+                said = self.REFUSED.get(f"{p.parent.name}/{p.name}")
+                if said:
+                    self.assertEqual([e.startswith(said) for e in errors], [True], f"{p.parent.name}/{p.name}")
+                    continue
                 self.assertEqual(errors, [], f"{p.parent.name}/{p.name}")
                 self.assertEqual(got["format"], n if n > 1 else packformat.of(m), p.name)
                 self.assertEqual(packformat.of(m), n, f"{p.name} says the format its folder is")

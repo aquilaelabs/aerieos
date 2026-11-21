@@ -331,13 +331,10 @@ def allow_plan(agent_id, spec=None):
 # account's home (`bin`), older places a removal clears (`also`), and the
 # folder a named version is read from (`fresh`).
 #
-# The older form, a vendor's installer fetched over https and handed to a
-# shell (`script` in the place of fetch and steps), is still read, for a
-# manifest written before format 5: it means what it meant, and nothing in
-# it holds what arrives (packformat.held reads it as open). It is held to a
-# shape, since its words reach a shell: one installer over https piped to sh
-# or bash with plain arguments, nothing else a shell would run.
-_INSTALL_SCRIPT = re.compile(r"curl -fsSL https://[A-Za-z0-9._~/@+%-]{3,200} \| (?:ba)?sh(?: -s --(?: [A-Za-z0-9_${}:=.,/-]{1,60}){1,6})?")
+# A vendor's installer fetched over https and handed to a shell as it
+# arrives (`script`, in the place of fetch and steps) is no recipe: nothing
+# in it holds what arrives, so it is refused as a shape, whoever signed the
+# index that names it.
 _INSTALL_NAME = re.compile(r"[A-Z][A-Z0-9_]{1,40}")
 _INSTALL_VALUE = re.compile(r"[A-Za-z0-9._/{}:=-]{0,200}")
 _INSTALL_PATH = re.compile(r"\.?[A-Za-z0-9_-]{1,40}(/[A-Za-z0-9._{}-]{1,60}){1,5}")
@@ -353,7 +350,7 @@ INSTALL_HOLES = ("{dir}", "{home}", "{version}")
 INSTALL_TOOLS = ("mkdir", "tar", "unzip", "install", "ln", "chmod")
 INSTALL_SHELLS = ("sh", "bash")
 _INSTALL_WORD = re.compile(r"[A-Za-z0-9_@%+=:,./{}-]{1,200}")
-INSTALL_KEYS = frozenset(("rev", "script", "fetch", "keyring", "online", "steps", "pin", "env", "bin", "also", "fresh"))
+INSTALL_KEYS = frozenset(("rev", "fetch", "keyring", "online", "steps", "pin", "env", "bin", "also", "fresh"))
 
 
 def _install_path(v, braces=""):
@@ -379,8 +376,8 @@ def install_pins(spec):
     """The version an install of this recipe brings whatever its vendor's
     newest is, or "": a held recipe whose steps run with no network installs
     the program it declares, at the version that says (install_version). An
-    installer that keeps the network, and the older script form, bring
-    whichever version they are asked for."""
+    installer that keeps the network brings whichever version it is asked
+    for."""
     return install_version(spec) if isinstance(spec, dict) and spec.get("steps") and not spec.get("online") else ""
 
 
@@ -425,43 +422,36 @@ def install_checked(spec):
     if spec in (None, "", {}):
         return None, ""
     if not isinstance(spec, dict):
-        return None, "agent.install is an object: rev, fetch and steps (or script), pin, env, bin, also, fresh"
+        return None, "agent.install is an object: rev, fetch and steps, pin, env, bin, also, fresh"
     rev = spec.get("rev")
     if not (isinstance(rev, int) and not isinstance(rev, bool) and 1 <= rev <= 9999):
         return None, "agent.install.rev is a whole number from 1, one more with each change to the recipe"
-    script = spec.get("script")
-    if script is None:
-        import packformat  # noqa: PLC0415 (the format's shapes, where a recipe is checked)
-        # A key the form does not have is said, not dropped: a recipe that
-        # says `run` for steps would otherwise install nothing in silence.
-        # The script form, which is older than this, is read as it was.
-        if set(spec) - INSTALL_KEYS:
-            return None, (f"agent.install names {', '.join(sorted(str(k) for k in set(spec) - INSTALL_KEYS))}: "
-                          "it is rev, fetch, keyring, online, steps, pin, env, bin, also and fresh")
-        fetch, errors, _new = packformat.fetch_checked(spec.get("fetch"), "agent.install.fetch")
-        if not errors and not fetch:
-            errors = ["agent.install.fetch lists what its steps install from: a recipe declares at least one download"]
-        keyring, online = {}, ""
-        if not errors and spec.get("keyring") is not None:
-            keyring, errors = packformat.keyring_checked(spec["keyring"], "agent.install.keyring")
-        if not errors and spec.get("online") is not None:
-            online, errors = packformat.online_checked(spec["online"], "agent.install.online")
-        if not errors:
-            errors = [f"agent.install.fetch's {f['to']} is signed under {f['signed']['keys']}, which agent.install.keyring does not carry"
-                      for f in fetch if f.get("signed") and f["signed"]["keys"] not in keyring][:1]
-        if errors:
-            return None, errors[0]
-        why = _install_steps(spec.get("steps"), fetch)
-        if why:
-            return None, why
-        how = {"fetch": fetch, **({"keyring": keyring} if keyring else {}), **({"online": online} if online else {}),
-               "steps": [list(s) for s in spec["steps"]]}
-    elif any(spec.get(k) is not None for k in ("fetch", "keyring", "online", "steps")):
-        return None, "agent.install says script, and fetch, keyring, online or steps beside it: a recipe is one form or the other"
-    elif not (isinstance(script, str) and len(script) <= 400 and _INSTALL_SCRIPT.fullmatch(script)):
-        return None, "agent.install.script is the vendor's installer over https handed to a shell: curl -fsSL https://HOST/PATH | bash, with plain arguments after -s -- if it takes any"
-    else:
-        how = {"script": script}
+    import packformat  # noqa: PLC0415 (the format's shapes, where a recipe is checked)
+    if "script" in spec:
+        return None, "agent.install.script is no recipe: an installer is a download the recipe declares and holds, run from the file (fetch and steps)"
+    # A key the form does not have is said, not dropped: a recipe that
+    # says `run` for steps would otherwise install nothing in silence.
+    if set(spec) - INSTALL_KEYS:
+        return None, (f"agent.install names {', '.join(sorted(str(k) for k in set(spec) - INSTALL_KEYS))}: "
+                      "it is rev, fetch, keyring, online, steps, pin, env, bin, also and fresh")
+    fetch, errors, _new = packformat.fetch_checked(spec.get("fetch"), "agent.install.fetch")
+    if not errors and not fetch:
+        errors = ["agent.install.fetch lists what its steps install from: a recipe declares at least one download"]
+    keyring, online = {}, ""
+    if not errors and spec.get("keyring") is not None:
+        keyring, errors = packformat.keyring_checked(spec["keyring"], "agent.install.keyring")
+    if not errors and spec.get("online") is not None:
+        online, errors = packformat.online_checked(spec["online"], "agent.install.online")
+    if not errors:
+        errors = [f"agent.install.fetch's {f['to']} is signed under {f['signed']['keys']}, which agent.install.keyring does not carry"
+                  for f in fetch if f.get("signed") and f["signed"]["keys"] not in keyring][:1]
+    if errors:
+        return None, errors[0]
+    why = _install_steps(spec.get("steps"), fetch)
+    if why:
+        return None, why
+    how = {"fetch": fetch, **({"keyring": keyring} if keyring else {}), **({"online": online} if online else {}),
+           "steps": [list(s) for s in spec["steps"]]}
     pin = spec.get("pin")
     if pin is not None:
         if not (isinstance(pin, (list, tuple)) and len(pin) == 2 and all(isinstance(x, str) for x in pin)

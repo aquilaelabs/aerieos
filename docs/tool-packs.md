@@ -444,10 +444,10 @@ network but a file held to the recipe, and a recipe whose program is the
 download itself (a release's tarball for each platform, unpacked into
 place) needs no installer at all: it says no `online`, its steps run with
 no network, and it reads `pinned`. One that runs its vendor's installer
-says `online` with the sentence and reads `installer`. A recipe written
-before format 5 hands a vendor's installer to a shell as it arrives
-(`script`, in the place of `fetch` and `steps`); it is still valid, means
-what it meant, and reads `open`. The rest of a recipe, and how a node
+says `online` with the sentence and reads `installer`. A vendor's
+installer handed to a shell as it arrives (`script`, in the place of
+`fetch` and `steps`, as a recipe before format 5 was written) is no
+recipe: a manifest that says one is refused. The rest of a recipe, and how a node
 runs one, is in
 [agents.md](agents.md#where-an-agent-s-install-recipe-comes-from). A coding
 agent a pack brings needs none of this under `agent`: its program is
@@ -855,7 +855,14 @@ index repeats it: when the catalog's is higher than an install's own, the
 install fetches that pack at its pin, checks its sha256, holds the row to
 the primitives above and uses it in the shipped row's place, on the
 controller and in what every node installs from. A recipe that moved
-upstream is then a catalog commit and no release. The image's own row is
+upstream is then a catalog commit and no release. A higher `rev` never
+buys a weaker hold: the catalog's row is taken only where its downloads
+are held to as much as the shipped row's are (`pinned` above `installer`
+above `open`), so an installer that keeps the network does not replace a
+pinned row, and a row held to nothing replaces none. The same holds for a
+shipped coding agent's recipe. Each row or recipe taken is a line in the
+audit, by `catalog`, with the revs it moved between, and one refused as
+weaker is a line there too. The image's own row is
 what runs with no network and whenever the catalog's is no newer; a row
 that names a primitive an install does not carry is refused there and its
 shipped row stays. A toolchain nobody ships yet is not a row at all: it is
@@ -864,7 +871,10 @@ a pack with its own install steps.
 How the promise is held: AerieOS keeps manifests of every format it has
 read (`scripts/dashboard/unit/packformat/`), each of which must pass its
 validators in every later build, and its lint refuses a change to one a
-release shipped. The catalog's own check holds every entry to each AerieOS
+release shipped. One thing a format 1 manifest could say is refused by
+name: a shipped coding agent's recipe that hands its vendor's installer to
+a shell (`agent.install.script`), which held nothing; an install that
+meets one keeps the recipe it shipped with. The catalog's own check holds every entry to each AerieOS
 release still supported, so an entry is signed only when the oldest install
 that reads its format takes it as the newest does.
 

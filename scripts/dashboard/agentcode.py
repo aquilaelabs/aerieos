@@ -95,7 +95,11 @@ def recipe(agent_id, ask=True):
     catalog's signed index pins this agent's pack with a higher rev: then
     the catalog's, fetched at that commit with its archive's sha256 checked
     and the manifest held to its shape, as any pack's is. A pack that is
-    refused, or one no newer than the table after all, leaves the table's.
+    refused, one no newer than the table after all, or one held to less
+    than the table's is (packformat.replaces_refused: a higher rev never
+    puts a weaker recipe in a held one's place) leaves the table's. A
+    recipe taken is a line in the audit, by the catalog, with the revs it
+    moved between, and one refused as weaker a line too, when it is read.
 
     The network is asked only when the index names a newer recipe not read
     yet, once per commit (warm reads it ahead, behind the Library): a press
@@ -120,6 +124,16 @@ def recipe(agent_id, ask=True):
         # a shipped agent's own block; the manifest cannot say it of itself.
         got = fetch_pack(entry["url"], entry["commit"], (), entry["sha256"], entry.get("path", ""), official=True)
         theirs = None if got.get("error") else ((got.get("manifest") or {}).get("agent") or {}).get("install")
+        if theirs and theirs["rev"] > own["rev"]:
+            weak = packformat.replaces_refused(packformat.agent_held(theirs)["word"], packformat.agent_held(own)["word"])
+            if audit:
+                audit("catalog", "agent-recipe-refused" if weak else "agent-recipe-taken",
+                      f"{a.id} rev {own['rev']} to {theirs['rev']}", {})
+            if weak:
+                # Kept as read and not taken: the pack at this pin never
+                # holds more than it does, so it is not asked again.
+                print(f"dashboard: coding agent recipes: {a.id}: the catalog's recipe at rev {theirs['rev']} is refused: {weak}", flush=True)
+                theirs = None
         had = (theirs, time.time(), got.get("error") or "")
         with _lock:
             _recipes[key] = had

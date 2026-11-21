@@ -728,6 +728,19 @@ recipe is used only when its `rev` is higher than the release's, so a
 catalog left behind never undoes what a release fixed. The node keeps its
 own table for a controller that sends no recipe.
 
+**A higher rev never buys a weaker hold, and a piped installer is no
+recipe (21 Nov 2026).** A catalog's row or recipe replaced a shipped one
+on its `rev` alone, so whoever could get an index signed could put a
+command that fetches as it runs in the place of a pinned download, on
+every install at its next Library read, with nobody told. What a recipe's
+downloads are held to is already one word worked out from the entry
+(`pinned`, `installer`, `open`), so the rule is that word: the catalog's
+is taken only where it is held to as much as the shipped one, and one
+held to nothing replaces none. The `script` form of an agent's recipe, a
+vendor's installer handed to a shell as it arrives, held nothing by
+construction and no shipped recipe had used it since pack format 5, so it
+is refused as a shape. Each replacement is a line in the audit.
+
 ## The repository laid out by part
 
 **The tree is laid out by what each part is, before the platforms and the
