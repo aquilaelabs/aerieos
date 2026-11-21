@@ -1965,9 +1965,13 @@ const ND_FACTS = ["Reached", "Has", "Seen", "Agent", "Updates", "Jobs run as", "
 // an unsigned build too where its own console said so; else this
 // controller's word, until the first update a release signed pins the key
 // this build names (the agent's release.first_pin), or for good where a
-// person at its console chose to pin no key (release-key none).
+// person at its console chose to pin no key (release-key none). Where it
+// checks signatures and its console allows an older agent back (older on,
+// the agent's release.older_ok), that is said too: it is what takes a node
+// back to an older controller's agent.
 function ndUpdatesFact(n){
   if (n.kind !== "agent" || !n.reported) return "";
+  const older = n.reported.older_ok ? "; older agents allowed at its console" : "";
   const key = n.reported.release_key || "";
   const also = (n.reported.release_also || []).length;
   const added = `${also} ${also === 1 ? "key" : "keys"} added at its console`;
@@ -1979,7 +1983,7 @@ function ndUpdatesFact(n){
       ? `signed builds only (${added}): this controller's build is unsigned, so its update is refused there`
       : (n.reported.unsigned_ok ? `signed builds (${added}), and unsigned builds, allowed at its console` : `signed builds only (${added})`)
         + (n.reported.release_unpinned ? "; no release key, by its console's choice"
-          : nodesAgent?.release_key ? "; no release key pinned (Enroll script pins it)" : "");
+          : nodesAgent?.release_key ? "; no release key pinned (Enroll script pins it)" : "") + older;
     // A person there dropped the release key: said whatever this build names.
     if (n.reported.release_unpinned) return "no release key, by its console's choice: it takes this controller's word";
     // Before AerieOS names a release key, no node can pin one: nothing to say.
@@ -1996,7 +2000,7 @@ function ndUpdatesFact(n){
   const owed = !spare && nodesAgent?.release_spare ? (nodesAgent.spare_said ? "; no spare key pinned yet" : "; no spare key pinned (Enroll script pins it)") : "";
   return (n.reported.unsigned_ok
     ? `signed releases (${keys}), and unsigned builds, allowed at its console`
-    : `signed releases only (${keys})`) + owed;
+    : `signed releases only (${keys})`) + owed + older;
 }
 function ndFacts(vals){
   return factGrid(ND_FACTS.map((k, i) => [k, vals ? vals[i] : GHOST, k === "Id" ? {cls: "ndid"} : undefined]), "ndfacts");
