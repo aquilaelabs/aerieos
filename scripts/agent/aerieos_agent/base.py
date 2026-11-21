@@ -370,17 +370,13 @@ def recipe_checked(r):
             "rev": rev if isinstance(rev, int) and not isinstance(rev, bool) else 0}, ""
 
 
-# Whether this package is AerieOS's own source tree's and not an install's
-# (a node's agent is a zip, an image's has no tree around it): the tree's
-# Dockerfile and its unit tests are beside it. It is where the package is,
-# which nothing in an environment says. The agent's own environment is its
-# service unit's, root's alone, so what it reads from there it reads
-# wherever it runs; the installer it starts as a job's account
-# (scripts/lib/sdk.sh, sdkmeta.py) reads a test's stand-ins only in the
-# tree, since a job's environment reaches it.
-_PKG = os.path.dirname(os.path.realpath(__file__))
-IN_TREE = (os.path.isfile(os.path.join(_PKG, "..", "..", "..", "Dockerfile"))
-           and os.path.isdir(os.path.join(_PKG, "..", "..", "dashboard", "unit")))
+# Two kinds of seam, one rule each. The agent's own: a test's stand-in in
+# the agent's environment (BUILDERBOT_*, BB_OS_*), which is its service
+# unit's, root's alone, so it is read wherever the agent runs. A job's: what
+# the installer the agent starts as a job's account reads (scripts/lib/
+# sdk.sh, sdkmeta.py, held-run.sh), which a job's environment reaches, so a
+# stand-in there is read only in AerieOS's own source tree, told by where
+# the file is (its SDK_IN_TREE, IN_TREE).
 
 
 def installer_stub(agent_id):
@@ -1448,7 +1444,8 @@ def selfcheck(path):
 
 def env_or(k, d):
     """An environment variable's value, or `d` where it is not set or is
-    set to nothing."""
+    set to nothing. The agent's own seam: its environment is its unit's,
+    root's alone, and no job's reaches it."""
     return os.environ.get(k) or d
 
 

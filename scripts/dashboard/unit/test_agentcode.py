@@ -869,8 +869,7 @@ class NodeAgent(unittest.TestCase):
         base = self.mod.module("base")
         with mock.patch.dict(os.environ, {"BUILDERBOT_CODEX_INSTALLER": "/tmp/planted"}):
             self.assertEqual(base.installer_stub("codex"), "/tmp/planted")
-            with mock.patch.object(base, "IN_TREE", False):
-                self.assertEqual(base.installer_stub("codex"), "/tmp/planted")
+        self.assertFalse(hasattr(base, "IN_TREE"), "the agent tells no tree from an install")
         self.assertEqual(base.installer_stub("codex"), "")
 
     def test_no_recipe_installs_nothing_and_still_takes_the_agent_off(self):

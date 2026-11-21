@@ -23,6 +23,9 @@ import urllib.request
 from .base import env_or, write_atomic
 from .stores import path_plain
 
+# Every BB_* read here (env_or) is the agent's own seam: a test's stand-in in
+# the agent's environment, its unit's and root's alone, read wherever it runs.
+
 RELEASE_FILE = "/usr/lib/aerieos-os/release"
 SLOT_TOOL = "/usr/lib/aerieos-os/slot"
 POOL_TOOL = "/usr/lib/aerieos-os/system-pool"

@@ -1760,7 +1760,7 @@ sdk_declared_done() {
 # sdk_https_only WHAT URL: an address a declared download names is fetched
 # over https and nothing else; SDK_PROTO becomes curl's word for it. A
 # suite's download is a file on disk (BB_TOOLPACKS_FILE_URLS=1, as its packs
-# are).
+# are): a job's seam, read only in the source tree.
 SDK_PROTO="=https"
 sdk_https_only() {
     SDK_PROTO="=https"
@@ -1911,6 +1911,8 @@ sdk_inside() {
 # stop it, and gives it nothing.
 SDK_CUT=()
 SDK_CUT_MADE=""
+# The file the kernel lists this process's network in: a job's seam, a
+# test's stand-in read only in the source tree.
 SDK_NET_DEV=/proc/self/net/dev
 [ -z "$SDK_IN_TREE" ] || SDK_NET_DEV="${BUILDERBOT_NET_DEV:-$SDK_NET_DEV}"
 # sdk_net_none: whether this process has no network: the interfaces of its
@@ -1920,10 +1922,13 @@ sdk_net_none() {
     ifaces="$(sdk_sys awk -F: 'NR > 2 { gsub(/[ \t]/, "", $1); print $1 }' "$SDK_NET_DEV" 2>/dev/null | sdk_sys sort -u | sdk_sys tr '\n' ' ')" || return 1
     [ "$ifaces" = "lo " ]
 }
+# The node's helper that cuts for this account: a job's seam, a test's
+# stand-in read only in the source tree.
 SDK_NETCUT_BIN=/usr/local/sbin/bb-netcut
 [ -z "$SDK_IN_TREE" ] || SDK_NETCUT_BIN="${BUILDERBOT_NETCUT_BIN:-$SDK_NETCUT_BIN}"
 # Where the system's daemons keep their sockets, which a cut of the network
-# alone leaves in reach: a test's stand-in is read only in the source tree.
+# alone leaves in reach: a job's seam, a test's stand-in read only in the
+# source tree.
 SDK_RUN_DIR=/run
 [ -z "$SDK_IN_TREE" ] || SDK_RUN_DIR="${BUILDERBOT_RUN_DIR:-$SDK_RUN_DIR}"
 # sdk_groups_reach: whether a group this account holds besides its own may

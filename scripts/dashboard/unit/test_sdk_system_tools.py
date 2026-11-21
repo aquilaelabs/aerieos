@@ -220,13 +220,13 @@ class Seams(Installed):
 
     def test_the_agent_reads_its_own_environment_wherever_it_runs(self):
         # The agent's environment is its unit's, root's alone: read the same
-        # in the tree and in a copy away from it, where IN_TREE is false.
+        # in the tree and in a copy away from it.
         pkg = os.path.join(REPO, "scripts", "agent")
         away = os.path.join(self.d, "node", "agent")
         shutil.copytree(os.path.join(pkg, "aerieos_agent"), os.path.join(away, "aerieos_agent"), ignore=shutil.ignore_patterns("__pycache__"))
-        ask = "from aerieos_agent import base; print(base.IN_TREE, base.NETCUT_BIN, base.installer_stub('codex') or '-')"
+        ask = "from aerieos_agent import base; print(base.NETCUT_BIN, base.installer_stub('codex') or '-')"
         env = {"PATH": "/usr/bin:/bin", "BUILDERBOT_NETCUT_BIN": "/tmp/planted-netcut", "BUILDERBOT_CODEX_INSTALLER": "/tmp/planted.sh", "BB_SEAMS": "1"}
-        for where, want in ((away, "False /tmp/planted-netcut /tmp/planted.sh"), (pkg, "True /tmp/planted-netcut /tmp/planted.sh")):
+        for where, want in ((away, "/tmp/planted-netcut /tmp/planted.sh"), (pkg, "/tmp/planted-netcut /tmp/planted.sh")):
             p = subprocess.run([sys.executable, "-c", ask], capture_output=True, text=True, check=False, cwd=where,
                                env=dict(env, PYTHONPATH=where))
             self.assertEqual(p.stdout.strip(), want, p.stderr)
