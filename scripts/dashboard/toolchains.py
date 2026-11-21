@@ -619,16 +619,20 @@ def _job_tail(out, keep=16):
 # What git says on the way to a fetch: where from, which ref, how far. Not a
 # reason, and a pack's install prints it right before the one that is.
 _GIT_NOISE = re.compile(r"^(\* branch\b|From |remote: |Receiving objects|Resolving deltas|Unpacking objects|hint: )")
+# A digest or a key's fingerprint: the log says each on a line of its own,
+# for whoever compares them there, and the row never carries one.
+_DIGEST = re.compile(r"[0-9A-Fa-f]{40,}")
 
 
 def _reason(said, last, cap=400):
-    """A failed row's line: the log's last lines (bb's own prefix and git's
-    fetch chatter dropped), then `last`, the verb and its exit. Too long,
-    whole lines go from the front, and the one left that alone is too long
-    keeps its start and loses its end at a word: a cut by characters from
-    the end began mid-word, '3pack · * branch' (B83)."""
+    """A failed row's line: the log's last lines (bb's own prefix, git's
+    fetch chatter and the lines that carry a digest dropped), then `last`,
+    the verb and its exit. Too long, whole lines go from the front, and the
+    one left that alone is too long keeps its start and loses its end at a
+    word: a cut by characters from the end began mid-word, '3pack · *
+    branch' (B83)."""
     lines = [re.sub(r"^\[builderbot\]\s*", "", s.strip()) for s in said]
-    parts = [s for s in lines if s and not _GIT_NOISE.match(s)][-4:] + [last]
+    parts = [s for s in lines if s and not _GIT_NOISE.match(s) and not _DIGEST.search(s)][-4:] + [last]
     while len(parts) > 2 and len(" · ".join(parts)) > cap:
         # bb's ERROR is the reason, so the lines around it go first.
         parts.pop(next((i for i, s in enumerate(parts[:-1]) if not s.startswith("ERROR:")), 0))

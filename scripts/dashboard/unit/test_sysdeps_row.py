@@ -80,6 +80,16 @@ class Reason(unittest.TestCase):
         self.assertTrue(got.startswith("ERROR: the tool said word") and got.endswith("… · install failed on the node"), got)
         self.assertLessEqual(len(got), 400)
 
+    def test_the_digests_a_download_is_held_to_stay_in_the_log(self):
+        # sdk.sh says each digest on a line of its own before its refusal,
+        # for whoever compares them in the job's log; the row says why alone.
+        got = toolchains._reason(["[builderbot] sha256 of what https://example.invalid/k.zip answered: " + "ab" * 32,
+                                  "[builderbot] sha256 expected: " + "cd" * 32,
+                                  "[builderbot] gpgv: using key " + "EF" * 20,
+                                  "[builderbot] ERROR: kotlin-lsp: k.zip is not the file its entry pins: nothing is installed"],
+                                 "install failed (exit 1)")
+        self.assertEqual(got, "ERROR: kotlin-lsp: k.zip is not the file its entry pins: nothing is installed · install failed (exit 1)")
+
 
 if __name__ == "__main__":
     unittest.main()
