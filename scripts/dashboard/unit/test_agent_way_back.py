@@ -393,5 +393,25 @@ class Controller(unittest.TestCase):
         self.assertIn("press Update agent again", nodes._update_again(self.nid), "across a window it is a person's")
 
 
+class Page(unittest.TestCase):
+    """The Update agent press asks nothing: the agent's unit stops its own
+    process alone (KillMode=process, written by the provisioner and put
+    back by the agent's configuration plane), so the sessions on the node
+    outlive the agent's restart, and a question saying they end was false."""
+
+    def test_the_update_asks_nothing_since_sessions_outlive_the_restart(self):
+        root = os.path.normpath(os.path.join(HERE, "..", "..", ".."))
+        with open(os.path.join(root, "nodes", "provision-linux.sh"), encoding="utf-8") as f:
+            self.assertIn("AGENT_KILLMODE='KillMode=process'", f.read())
+        with open(os.path.join(SRC, "aerieos_agent", "configplane.py"), encoding="utf-8") as f:
+            self.assertIn('want = "[Service]\\nKillMode=process\\n"', f.read())
+        with open(os.path.join(HERE, "..", "tab-nodes.js"), encoding="utf-8") as f:
+            page = f.read()
+        start = page.index("const ND_ASK = {")
+        asks = page[start:page.index("\n};", start)]
+        self.assertNotIn('"update-agent"', asks)
+        self.assertNotIn("B107", page)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -2809,17 +2809,6 @@ const ND_ASK = {
   // machine does not come back by itself.
   reboot: id => `Reboot ${nodeNameOf(id)}?\n\n${ndPowerSaid(id)}Whatever is running there stops; the agent dials in again when the machine is back up.`,
   poweroff: id => `Shut down ${nodeNameOf(id)}?\n\n${ndPowerSaid(id)}It does not come back on its own: switch it on from its console or its hypervisor.`,
-  // An agent update RESTARTS the agent, and until B107 is fixed that
-  // takes every session on the node with it: their tmux
-  // servers and the Claude processes inside them are all in the agent's
-  // systemd cgroup, so systemd's default kill reaches the lot. Said
-  // before the press, naming what is open there, because the operator
-  // who pressed this lost two conversations mid-work with no warning.
-  // With nothing open there it asks nothing.
-  "update-agent": id => {
-    const ends = sessionsEndSaid(sessionsOn(id), {tail: ". Transcripts are kept; whatever they were running stops."});
-    return ends && `Update the agent on ${nodeNameOf(id)}?\n\n${ends}`;
-  },
   "gpu-display": id => `Set up the GPU display on ${nodeNameOf(id)}?\n\n`
     + "This installs the NVIDIA driver and a headless X server on the card, which "
     + "takes minutes, and the driver takes the card only after a reboot: the row "

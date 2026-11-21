@@ -2624,11 +2624,11 @@ MACHINE: the toolchains, the card and `/dev/kvm` are its own, from
 `nodes/provision-linux.sh` and the toolchain store. `aerie emu` on a
 controller with no node for the space refuses and says where it runs.
 A node's sessions outlive a controller restart on purpose (the tmux is the
-node's) and, since B107, an AGENT restart too: the unit is installed with
+node's) and an AGENT restart too: the unit is installed with
 `KillMode=process`, because systemd's default takes the whole cgroup and the
 agent's cgroup holds the terminals, the tmux servers under them and the Claude
-sessions inside those, so Update agent ended every conversation on the
-machine. The agent stops what is its own on SIGTERM, its terminals and its jobs,
+sessions inside those, so Update agent would end every conversation on the
+machine; it asks nothing before it runs. The agent stops what is its own on SIGTERM, its terminals and its jobs,
 and leaves the tmux alone. What must NOT outlive anything is the idle rule:
 Controller settings' Idle sessions, "end any agent's session after N idle minutes", rides the
 hello reply into node.json and the agent enforces it on its own tmux,
