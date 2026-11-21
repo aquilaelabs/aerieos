@@ -433,14 +433,31 @@ def changelog():
     B655 and R209 are the notebook's, which a reader of the public
     repository cannot open; a line points at the commit it landed in, as
     the others do, and at nothing otherwise."""
+    import subprocess  # noqa: PLC0415
     bad = []
-    for i, ln in enumerate(pathlib.Path("CHANGELOG.md").read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+    lines = pathlib.Path("CHANGELOG.md").read_text(encoding="utf-8", errors="replace").splitlines()
+    for i, ln in enumerate(lines, 1):
         if re.search(r"\b[BR]\d{2,}(\.\d+)?\b", ln):
             bad.append(f"CHANGELOG.md:{i}: {ln.strip()[:100]}")
+    # ...and every commit the unreleased lines name is one this branch holds:
+    # the section is the release's notes, and a hash that is not on the
+    # branch (an amended copy, a helper's worktree) links to nothing.
+    head = subprocess.run(["git", "rev-list", "HEAD"], capture_output=True, text=True, check=False)
+    held = head.stdout.split() if head.returncode == 0 else []
+    if held:
+        unreleased = True
+        for i, ln in enumerate(lines, 1):
+            if ln.startswith("## ") and not ln.startswith("## Unreleased"):
+                unreleased = False
+            if not unreleased:
+                continue
+            for h in re.findall(r"\b[0-9a-f]{7,12}\b", ln):
+                if re.search(r"[a-f]", h) and not any(c.startswith(h) for c in held):
+                    bad.append(f"CHANGELOG.md:{i}: names {h}, which is no commit on this branch")
     for b in bad:
         print(f"  [FAIL] {b}")
     if not bad:
-        print("  [ok]   the changelog names commits, never a bug's or a roadmap item's number")
+        print("  [ok]   the changelog names commits this branch holds, never a bug's or a roadmap item's number")
     sys.exit(1 if bad else 0)
 
 
