@@ -537,18 +537,31 @@ repositories and another for its rpm ones), and the RHEL family's
 repository file is written there with its `gpgkey` naming that copy,
 where Docker's own file names an address to fetch the key from.
 
-**The image's own tools are held to a pin.** What the controller's image
-takes from a vendor's GitHub release as it is built (cloudflared for the
-home tunnel, the linters hadolint, yq and actionlint, uv and mise) is a
-version this tree names, with the sha256 of the exact file for each
-architecture, in one table (`config/image-tools.json`). The Dockerfile and
-the bare-metal installer fetch each through `scripts/lib/pin-fetch`, which
-keeps a file only when it is those bytes and asks nobody what is newest,
-so an image built again holds the same files until a pin moves;
-`tools/pins.py` checks, moves and verifies the table with the others. What
-this does not cover: ruff, which pipx installs at its newest, and the
-packages apt installs from the distribution's and three vendors' own
-sources as the image is built.
+**What the controller's image is built from, and what each part is held
+to.** The build takes five kinds of thing from somewhere else, and the
+bare-metal installer takes the same ones the same way:
+
+| What | Held to |
+|---|---|
+| The base image (`FROM` in the Dockerfile) | its tag and the digest of its list, `ubuntu:24.04@sha256:...`: the registry is asked for those bytes, whatever the tag serves that day |
+| The programs from their vendors' GitHub releases (cloudflared for the home tunnel, the linters hadolint, yq, actionlint and ruff, uv and mise) and noVNC's source at its release's tag | a version this tree names with the sha256 of the exact file for each architecture, one row each of `config/image-tools.json`; `scripts/lib/pin-fetch` keeps a file only when it is those bytes and asks nobody what is newest |
+| The two programs from npm (Playwright, web-ext) | a committed lock each (`config/image-npm`): the one version asked for, and every package under it with its tarball's address and its sha512. `npm ci --ignore-scripts` installs exactly that set, refuses a tarball that is not its integrity, and runs nobody's install script |
+| The three package sources the image adds (NodeSource for Node.js, GitHub CLI, Docker's CLI) | each publisher's key as the tree carries it (`config/apt-keys`), never a key fetched as the image is built: apt takes only packages signed under it |
+| The distribution's own packages | the distribution's keys, which the base image carries |
+
+So an image built again from one commit starts from the same base, holds
+the same tools and the same npm trees, and differs only in what apt
+installs: `tools/pins.py check` says what would move in the first three
+rows of the table (with the toolchains, the agents' recipes, the runners
+and the services' images, one command), and `move` proposes it for a
+person to review. What this does not hold: a key says a package is its
+publisher's, not which version it is, so each apt package, from the
+distribution's sources and the three added, is the version its source
+offers the day of the build. And Playwright's browsers are not in the
+image and are not npm's: at the first start Playwright downloads, for each
+browser, the build its own version names, from its own download service
+over https, so the lock that holds Playwright holds which builds are asked
+for, and nothing here holds the archives' bytes.
 
 **A CI runner's program is held to a pin.** The runner a node installs
 (GitHub's Actions runner, or the one Gitea and Forgejo share) is a
