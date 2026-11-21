@@ -266,8 +266,9 @@ def read_catalog(into):
 
 # A system package's name, the one shape a recipe's is held to before a
 # package manager is handed it: a letter or digit, then letters, digits and
-# . + : _ -, eighty at most, not ending in - or + (apt reads a trailing one
-# as "remove" or "install"). Nothing that begins with a dash, no path, no
+# . + : _ -, eighty at most, not ending in - (apt reads a trailing one as
+# "remove"; a trailing + is its "install", and real names end in it: g++,
+# and gcc-c++ for dnf and zypper). Nothing that begins with a dash, no path, no
 # address. Portage alone names a package category/name, each half of that
 # shape, and never a file of its own kinds. The controller holds a
 # recipe's names to the same (packformat.system_name_ok).
@@ -281,7 +282,7 @@ def pkg_name_ok(fam, name):
     parts = name.split("/") if fam == "emerge" else [name]
     if len(parts) > 2 or (fam == "emerge" and name.endswith(EMERGE_FILES)):
         return False
-    return all(PKG_NAME.fullmatch(x) and x[-1] not in "-+" for x in parts)
+    return all(PKG_NAME.fullmatch(x) and x[-1] != "-" for x in parts)
 
 
 def sysdeps_refused(cat, name, fam):

@@ -53,8 +53,9 @@ class SysdepsTest(unittest.TestCase):
 
 
 class Names(unittest.TestCase):
-    GOOD = ["libgtk-4-1", "libstdc++6", "gcc-c++-12", "python3.12", "libc6:i386", "ca_certs", "0ad", "X11"]
-    BAD = ["-y", "--allow-unauthenticated", "pkg-", "pkg+", "../x", "/tmp/x.deb", "./x.rpm", "https://x.example/x.rpm",
+    # A trailing + is apt's word for install, and the end of real names.
+    GOOD = ["libgtk-4-1", "libstdc++6", "gcc-c++-12", "python3.12", "libc6:i386", "ca_certs", "0ad", "X11", "g++", "gcc-c++", "pkg+"]
+    BAD = ["-y", "--allow-unauthenticated", "pkg-", "../x", "/tmp/x.deb", "./x.rpm", "https://x.example/x.rpm",
            "a b", "a;b", "$(id)", "", "+x", ".x", "a/b", "a=1.0", "a*", "a" * 81]
 
     def test_one_shape_for_a_package_s_name(self):
