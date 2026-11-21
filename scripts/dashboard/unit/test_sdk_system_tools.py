@@ -90,6 +90,76 @@ class Installed(unittest.TestCase):
         self.assertEqual(rc, 0, err)
         self.assertNotIn(self.bin, out, "the pack's unshare is not what a step runs behind")
 
+    def planted(self, *names):
+        """A pack's bin folder holding `names`, each writing its own name to
+        a file when run and then doing as the system's tool does: what ran
+        of them is that file's lines."""
+        bin_ = os.path.join(self.d, "planted")
+        os.makedirs(bin_, exist_ok=True)
+        ran = os.path.join(self.d, "ran")
+        for name in names:
+            real = shutil.which(name, path="/usr/bin:/bin")
+            path = os.path.join(bin_, name)
+            with open(path, "w") as f:
+                f.write(f'#!/bin/sh\necho {name} >> "{ran}"\nexec {real} "$@"\n')
+            os.chmod(path, 0o755)
+        return bin_, ran
+
+    def run_planted(self, bin_, script, **env):
+        p = subprocess.run(["/bin/bash", "-c", f'set -euo pipefail\n. "{self.lib}/common.sh"\n. "{self.lib}/sdk.sh"\n' + script],
+                           capture_output=True, text=True, check=False, timeout=120,
+                           env={"PATH": f"{bin_}:/usr/bin:/bin", "HOME": self.d, "TMPDIR": self.d, **env})
+        return p.returncode, p.stdout, p.stderr
+
+    def test_a_digest_is_cut_from_what_the_system_said_by_the_shell(self):
+        # A pack's cut stood between the system's sha256sum and the check.
+        bin_, ran = self.planted("cut")
+        want = hashlib.sha256(b"the bytes that came\n").hexdigest()
+        script = (f"sdk_meta() {{ printf 'sha256\\t{want}\\tits publisher\\n'; }}\n"
+                  f'sdk_verify_download thing "{self.file}" https://x.example/thing.tar.gz 1 "{self.d}"; echo held\n')
+        rc, out, err = self.run_planted(bin_, script)
+        self.assertEqual(rc, 0, err)
+        self.assertIn("held", out)
+        self.assertFalse(os.path.exists(ran), "the pack's cut never ran")
+
+    def test_a_pinned_commit_is_checked_by_the_systems_git(self):
+        if not shutil.which("git", path="/usr/bin:/bin"):
+            self.skipTest("no git on this machine")
+        bin_, ran = self.planted("git")
+        store = os.path.join(self.d, "store")
+        os.makedirs(store)
+        script = ('sdk_meta() { case "$1 ${3:-}" in "field source.url") echo "file:///nonexistent/repo" ;; '
+                  '"field source.commit") echo "' + "a" * 40 + '" ;; *) echo ;; esac; }\n'
+                  f'SDK_ROOT="{store}" sdk_install_git thing\n')
+        self.run_planted(bin_, script, SDK_ROOT=store)
+        self.assertFalse(os.path.exists(ran), "the pack's git never ran")
+
+    def test_the_systems_tools_start_with_none_of_a_packs_variables(self):
+        bin_, _ = self.planted()
+        envf = os.path.join(self.d, "env-said")
+        planted = {"PYTHONHOME": "/x", "PYTHONUSERBASE": "/x", "OPENSSL_CONF": "/x", "GCONV_PATH": "/x", "TAR_OPTIONS": "--to-command=id",
+                   "GIT_DIR": "/x", "GIT_TEMPLATE_DIR": "/x", "GIT_ASKPASS": "/x", "CURL_HOME": "/x", "SSL_CERT_FILE": "/x",
+                   "JAVA_TOOL_OPTIONS": "-x", "XDG_CONFIG_HOME": "/x", "LD_PRELOAD": "/x.so", "FAKE_WEB": "/x"}
+        rc, _out, err = self.run_planted(bin_, f'sdk_sys env > "{envf}"', https_proxy="http://proxy.lan:3128", LANG="C.UTF-8", **planted)
+        self.assertEqual(rc, 0, err)
+        with open(envf) as f:
+            got = dict(ln.split("=", 1) for ln in f.read().splitlines() if "=" in ln)
+        self.assertEqual(sorted(set(got) & set(planted)), [], "none of them reaches a check")
+        self.assertEqual((got.get("https_proxy"), got.get("LANG"), got.get("HOME")), ("http://proxy.lan:3128", "C.UTF-8", self.d),
+                         "the machine's proxy, the language and the home do")
+        self.assertNotIn(bin_, got.get("PATH", ""))
+
+    def test_nothing_in_front_of_a_step_is_a_packs(self):
+        # A pack's env or bash in front of a later pack's step could drop the
+        # cut: what stands there is found in the system's own folders.
+        bin_, ran = self.planted("env", "bash")
+        rc, out, err = self.run_planted(bin_, f'SDK_CUT_MADE=""; sdk_net_cut thing "{self.d}"; printf "%s\\n" "${{SDK_CUT[@]:-none}}"; '
+                                              'sdk_step A=1 true; echo stepped')
+        self.assertEqual(rc, 0, err)
+        self.assertIn("stepped", out)
+        self.assertNotIn(bin_, out)
+        self.assertFalse(os.path.exists(ran), "neither the pack's env nor its bash ran")
+
     def test_sdkmeta_finds_gpgv_the_same_way(self):
         for lib, tree in ((self.lib, False), (LIB, True)):
             p = subprocess.run([sys.executable, "-c", "import sdkmeta; print(sdkmeta.IN_TREE, sdkmeta.sys_tool('gpgv'))"],

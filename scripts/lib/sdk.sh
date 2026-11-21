@@ -55,11 +55,30 @@ SDK_SYS_PATH="/usr/sbin:/usr/bin:/sbin:/bin"
 case "$(uname -s 2>/dev/null)" in Darwin) SDK_SYS_PATH="/opt/homebrew/bin:/usr/local/bin:${SDK_SYS_PATH}" ;; esac
 [ -z "$SDK_IN_TREE" ] || SDK_SYS_PATH="$PATH"
 sdk_sys_path() { PATH="$SDK_SYS_PATH" type -P "$1"; }
+# ...and started with none of the caller's environment but what a check and
+# a download need: that PATH, where home and temporary files are, the
+# language, and the machine's proxy. A pack's layout may set variables for
+# every job, and one a checking tool reads at its start (PYTHONHOME,
+# OPENSSL_CONF, GCONV_PATH, TAR_OPTIONS, GIT_DIR, CURL_HOME, SSL_CERT_FILE
+# and their like) loads code into the check or points it somewhere else.
+# A test's stand-ins read FAKE_* and BB_TOOLCHAINS_JSON, in the source tree
+# alone.
+SDK_SYS_KEEP="HOME TMPDIR LANG LC_ALL TZ USER LOGNAME BB_SDK_CACHE_TTL http_proxy https_proxy no_proxy all_proxy HTTP_PROXY HTTPS_PROXY NO_PROXY ALL_PROXY"
 sdk_sys() {
-    local tool
+    local tool envbin n
     tool="$(sdk_sys_path "$1")" || { printf 'there is no %s among this system'\''s own tools\n' "$1" >&2; return 127; }
+    envbin="$(sdk_sys_path env)" || { printf 'there is no env among this system'\''s own tools\n' >&2; return 127; }
     shift
-    "$tool" "$@"
+    local -a keep=("PATH=$SDK_SYS_PATH")
+    for n in $SDK_SYS_KEEP; do
+        [ -z "${!n+x}" ] || keep+=("$n=${!n}")
+    done
+    if [ -n "$SDK_IN_TREE" ]; then
+        for n in $(compgen -e); do
+            case "$n" in FAKE_*|BB_TOOLCHAINS_JSON) keep+=("$n=${!n}") ;; esac
+        done
+    fi
+    "$envbin" -i "${keep[@]}" "$tool" "$@"
 }
 
 # The catalog, at the one place it sits relative to this file in both the
@@ -1230,6 +1249,15 @@ SDK_META="${BB_SCRIPTS:-$(dirname "$(readlink -f "$0")")}/lib/sdkmeta.py"
 # for the row it was handed): a variable of this shell's, which no
 # environment sets, handed to sdkmeta.py as its first words.
 SDK_CATALOG=""
+# sdk_step [NAME=VALUE...] CMD [ARG...]: a recipe's step, started by the
+# system's own env with the step's variables and the caller's environment
+# beside them: the step keeps the PATH it is handed, and what stands in
+# front of it (the cut) is no name a pack's bin folder answers to.
+sdk_step() {
+    local en
+    en="$(sdk_sys_path env)" || { printf 'there is no env among this system'\''s own tools\n' >&2; return 127; }
+    "$en" "$@"
+}
 sdk_meta() { sdk_sys python3 "$SDK_META" ${SDK_CATALOG:+--catalog "$SDK_CATALOG"} "$@"; }
 
 # Read a NUL-separated list from the catalog into an array named by $1.
@@ -1412,7 +1440,10 @@ sdk_verify_download() {
         return 0
     fi
     case "$algo" in sha1|sha256|sha512) ;; *) rm -f "$file"; die "${what}: unknown checksum kind ${algo}" ;; esac
-    got="$(sdk_sys "${algo}sum" "$file" | cut -d' ' -f1)"
+    # The digest, the first word of what the system's tool said: cut by
+    # the shell itself, so no tool a pack put on PATH stands between them.
+    got="$(sdk_sys "${algo}sum" "$file")" || got=""
+    got="${got%% *}"
     if [ "$got" != "$want" ]; then
         rm -f "$file"
         # What was wrong in one line, last; each digest on a line of its
@@ -1494,7 +1525,7 @@ sdk_install_script() {
     # installer, the follow-up steps and the verify then run as it declares
     # (sdk_declared).
     sdk_declared "$what" "$d"
-    env "${env[@]}" "${SDK_CUT[@]}" "${cmd[@]}" \
+    sdk_step "${env[@]}" "${SDK_CUT[@]}" "${cmd[@]}" \
         || { rm -rf "$tmpdir"; die "${what} installer failed${SDK_CUT[*]:+ (it ran with no network: what it fetches is declared in its entry)}"; }
     rm -rf "$tmpdir"
     sdk_install_steps "$what" "$d"
@@ -1550,8 +1581,10 @@ sdk_install_git() {
         # maps every owner to one account (a node's NFS mount) is another
         # user's to git, which then refuses the directory it just made.
         log "fetching ${what} at ${commit:0:12} into ${d}"
-        local -a g=(git -c "safe.directory=$d" -C "$d")
-        git init -q "$d"
+        # The system's git, as every check is made: it is the whole check
+        # here, and a git a pack put on PATH would say any commit it liked.
+        local -a g=(sdk_sys git -c "safe.directory=$d" -C "$d")
+        sdk_sys git init -q "$d"
         "${g[@]}" fetch --progress --depth 1 "$url" "$commit"
         "${g[@]}" checkout -q --detach FETCH_HEAD
         [ "$("${g[@]}" rev-parse HEAD)" = "$commit" ] \
@@ -1590,7 +1623,7 @@ sdk_install_git() {
         log "cloning ${what} (${branch:-default}) into ${d}"
         # --progress: git prints none unless stderr is a terminal, and this runs
         # from the dashboard's job runner, where it is a pipe.
-        git clone --progress ${depth:+--depth "$depth"} ${branch:+-b "$branch"} "$url" "$d"
+        sdk_sys git clone --progress ${depth:+--depth "$depth"} ${branch:+-b "$branch"} "$url" "$d"
     fi
     [ -z "$(sdk_meta field "$what" source.safe_directory)" ] \
         || git config --global --add safe.directory "$d"
@@ -1613,7 +1646,7 @@ sdk_install_git() {
         local rc=0
         local -a wenv
         sdk_meta_into wenv env "$what" source.env "dir=$d"
-        sdk_bounded "${BB_WARM_TIMEOUT:-900}" "${SDK_CUT[@]}" env CI=true "${wenv[@]}" "${warm[@]}" || rc=$?
+        sdk_bounded "${BB_WARM_TIMEOUT:-900}" "${SDK_CUT[@]}" "$(sdk_sys_path env)" CI=true "${wenv[@]}" "${warm[@]}" || rc=$?
         [ "$rc" != 124 ] || die "${what}: warming did not finish within ${BB_WARM_TIMEOUT:-900}s (${warm[*]}); this install is taken off again, and Install retries it"
         [ "$rc" = 0 ] || die "${what}: warming failed (${warm[*]}, exit ${rc}); this install is taken off again, and Install retries it"
     fi
@@ -1769,7 +1802,8 @@ sdk_fetch_declared() {
             die "${what}: ${url} could not be fetched: nothing is installed"
         fi
         if [ -n "$want" ]; then
-            got="$(sdk_sys sha256sum "$tmp" | cut -d' ' -f1)"
+            got="$(sdk_sys sha256sum "$tmp")" || got=""
+            got="${got%% *}"
             if [ "$got" != "$want" ]; then
                 rm -f "$tmp"
                 # shellcheck disable=SC2034  # held-run.sh reads it on the way out
@@ -1872,7 +1906,7 @@ SDK_NET_DEV=/proc/self/net/dev
 # own network namespace, as the kernel lists them, are a loopback alone.
 sdk_net_none() {
     local ifaces
-    ifaces="$(awk -F: 'NR > 2 { gsub(/[ \t]/, "", $1); print $1 }' "$SDK_NET_DEV" 2>/dev/null | sort -u | tr '\n' ' ')" || return 1
+    ifaces="$(sdk_sys awk -F: 'NR > 2 { gsub(/[ \t]/, "", $1); print $1 }' "$SDK_NET_DEV" 2>/dev/null | sdk_sys sort -u | sdk_sys tr '\n' ' ')" || return 1
     [ "$ifaces" = "lo " ]
 }
 SDK_NETCUT_BIN=/usr/local/sbin/bb-netcut
@@ -1936,22 +1970,26 @@ sdk_net_cut() {
         sdk_net_said "$said" "$d" "$reach"
         return 0
     fi
-    # The system's own unshare, sudo and id, by where they are (sdk_sys_path).
-    local un su me my
+    # The system's own unshare, sudo, id, bash and env, by where they are
+    # (sdk_sys_path): what stands in front of a step is never a name a
+    # pack's bin folder on PATH could answer to.
+    local un su me my sh en
     un="$(sdk_sys_path unshare)" || un=""
     su="$(sdk_sys_path sudo)" || su=""
+    sh="$(sdk_sys_path bash)" || su=""
+    en="$(sdk_sys_path env)" || un=""
     me="$(sdk_sys id -u)" && my="$(sdk_sys id -g)" || un=""
     # The helper first where this account's groups reach past a namespace
     # of its own: it drops them.
     if [ -n "$reach" ] && sdk_net_helper "$su"; then
-        SDK_CUT=(bash -c "$SDK_NETCUT_RELAY" "$SDK_NETCUT_BIN" "$su")
+        SDK_CUT=("$sh" -c "$SDK_NETCUT_RELAY" "$SDK_NETCUT_BIN" "$su")
         reach=""
     elif [ -n "$un" ] && "$un" --user --map-user="$me" --map-group="$my" --net true 2>/dev/null; then
         SDK_CUT=("$un" --user --map-user="$me" --map-group="$my" --net)
     elif [ -n "$un" ] && "$un" --user --map-root-user --net true 2>/dev/null; then
-        SDK_CUT=(env TAR_OPTIONS=--no-same-owner "$un" --user --map-root-user --net)
+        SDK_CUT=("$en" TAR_OPTIONS=--no-same-owner "$un" --user --map-root-user --net)
     elif sdk_net_helper "$su"; then
-        SDK_CUT=(bash -c "$SDK_NETCUT_RELAY" "$SDK_NETCUT_BIN" "$su")
+        SDK_CUT=("$sh" -c "$SDK_NETCUT_RELAY" "$SDK_NETCUT_BIN" "$su")
         reach=""
     fi
     if [ "${#SDK_CUT[@]}" != 0 ]; then
@@ -2013,7 +2051,7 @@ sdk_install_command() {
     # fetched and checked first, and its command then runs as it declares
     # (sdk_declared).
     sdk_declared "$what" "$d"
-    env "${env[@]}" "${SDK_CUT[@]}" "${cmd[@]}" \
+    sdk_step "${env[@]}" "${SDK_CUT[@]}" "${cmd[@]}" \
         || die "${what}: its install command failed${SDK_CUT[*]:+ (it ran with no network: what it fetches is declared in its entry)}"
     # A stable path to whatever the run produced under a revisioned name, so
     # that everything pointing at it survives the next release.
@@ -2052,7 +2090,7 @@ sdk_install_steps() {
         soft="$(sdk_meta field "$what" "source.then.${i}.optional")"
         [ -z "$note" ] || log "$note"
         sdk_meta_into env env "$what" "source.then.${i}.env" "dir=$d"
-        if ! env "${env[@]}" "${SDK_CUT[@]}" "${cmd[@]}"; then
+        if ! sdk_step "${env[@]}" "${SDK_CUT[@]}" "${cmd[@]}"; then
             [ -n "$soft" ] || die "${what}: a required step failed${SDK_CUT[*]:+ (it ran with no network: what it fetches is declared in its entry, install.fetch in a manifest)}"
             warn "$soft"
         fi
@@ -2073,7 +2111,7 @@ sdk_install_verify() {
     # the pipe early can kill the producer with SIGPIPE, which pipefail then
     # reports as a failure that never happened.
     local out
-    out="$(env "${env[@]}" "${SDK_CUT[@]}" "${cmd[@]}" 2>&1)" \
+    out="$(sdk_step "${env[@]}" "${SDK_CUT[@]}" "${cmd[@]}" 2>&1)" \
         || die "${what} installed but ${cmd[0]} does not run: ${out}"
     printf '%s\n' "${out%%$'\n'*}"
 }
