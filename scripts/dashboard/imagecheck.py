@@ -158,13 +158,14 @@ def check_instance(project, instance, memo=None):
             if err:
                 errors.append(f"{image}: {err}")
             elif own and want != own["digest"]:
-                said.append(f"{image} serves {want} now, which is not the image the newest signed release names "
-                            f"({own['tag']}: {own['ref']}, {own['signed']}). The registry's tag was moved by something "
-                            "other than that release's publication, or a newer release is not signed yet, so no update "
-                            "is offered from the tag; the signed image is pulled by its digest")
+                # One sentence on the row; the digests on lines of their own
+                # in the log, for whoever compares them.
+                said.append(f"{image} serves another image than {own['tag']}, the newest signed release, names, so no update is offered from it")
+                print(f"[dashboard] image check: {image} serves {want}\n"
+                      f"[dashboard] image check: {own['tag']} names {own['ref']}, {own['signed']}", flush=True)
             elif want and want not in have:
                 behind.append({"service": service, "image": image, "to": want}
-                              | ({"signed": f"{own['ref']}, {own['tag']}'s own image, {own['signed']}"} if own else {}))
+                              | ({"signed": f"{own['tag']}'s own image, {own['signed']}"} if own else {}))
     return {"at": int(time.time()), "behind": behind, "said": said, "error": "; ".join(errors)[:400]}
 
 

@@ -316,8 +316,7 @@ def latest_versions():
 
 def behind(rec):
     """The scanners a deployed node is pinned to another image of than the
-    entry names, each with the tag and the first twelve digits of the
-    digest it would move to."""
+    entry names, each with the tag it would move to."""
     want = entry_images()
     mine = rec.get("images") if isinstance(rec.get("images"), dict) else {}
     return {s: packformat.image_said(want[s]).rpartition(":")[2] for s in SCANNERS if mine.get(s) and mine[s] != want[s]}

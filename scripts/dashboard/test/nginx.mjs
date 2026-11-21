@@ -324,15 +324,15 @@ const entryMoves = (tag, d) => {
 };
 ok(!(await page.$(`${sect} .ngimgbar`))
    && !(await page.$(`${sect} [data-ngupdate]`)) && !(await page.$(`${sect} [data-ngcheck]`))
-   && await page.$eval(`${sect} .ngimage`, e => /nginx:[\w.-]+ \([0-9a-f]{12}\)/.test(e.textContent)),
-   'a deployed nginx is pinned to the digest its entry names, with no Update and no check to press');
+   && await page.$eval(`${sect} .ngimage`, e => /^nginx:[\w.-]+$/.test(e.textContent.trim())),
+   'a deployed nginx is pinned to the digest its entry names, said by its tag, with no Update and no check to press');
 entryMoves('1.29-alpine', 'b');
 await page.evaluate(() => loadNginx());
 await page.waitForFunction(() => nginxLatest?.tag === '1.29-alpine', { timeout: 10000 });
 await page.waitForSelector(`${sect} [data-ngupdate]`, { timeout: 10000 });
 ok(await page.$eval(sect, s => /Update to 1\.29-alpine/.test(s.querySelector('[data-ngupdate]').textContent)
-     && /nginx:1\.29-alpine \(b{12}\) is out/.test(s.querySelector('.ngimgbar').previousElementSibling.textContent)),
-   'the entry names another image: the nginx pinned to the old one is behind it, with Update and the short digest it would move to');
+     && /nginx:1\.29-alpine is out/.test(s.querySelector('.ngimgbar').previousElementSibling.textContent)),
+   'the entry names another image: the nginx pinned to the old one is behind it, with Update and the image it would move to');
 // The bell's own note for it, to the nginx tab on that node.
 await page.click('#bBell');
 await page.waitForSelector('#bellPanel [data-bnginx]', { timeout: 15000 });
@@ -388,16 +388,16 @@ await section("The nginx page opens from a space's page, and Back names the spac
   const boot = await page.evaluate(() => { const pg = bootPage('#/spaces/alpha/roadmap'); return { rail: pg.rail, proj: /bar proj/.test(pg.bar) }; });
   ok(boot.rail === 'projects' && boot.proj, `a reload on a space's address waits as that space's page, not as Home (${JSON.stringify(boot)})`);
 });
-ok(await page.$eval('.dmtab .row[data-inst="nginx-sandbox|main"]', r => /1\.29-alpine \(b{12}\) is out/.test(r.querySelector('.dmnginx').textContent)
+ok(await page.$eval('.dmtab .row[data-inst="nginx-sandbox|main"]', r => /^nginx:1\.29-alpine is out/.test(r.querySelector('.dmnginx').textContent)
      && r.querySelector('[data-dm="nginx-update"]').textContent.trim() === 'Update'),
-   'the Containers page\'s row of a node\'s nginx says the image is out, with the short digest and Update as on every row');
+   'the Containers page\'s row of a node\'s nginx says the image is out, by its tag, with Update as on every row');
 await page.evaluate(() => openNginxTab());
 await page.waitForSelector(`${sect} [data-ngupdate]`, { timeout: 10000 });
 await page.click(`${sect} [data-ngupdate]`);   // its confirm is accepted by lib.mjs's dialog handler
 await page.waitForFunction(id => !(nginxList || []).find(n => n.node === id)?.behind, sandbox.node, { timeout: 20000 });
 const pinned = await api('/api/container', { action: 'read', name: 'nginx-sandbox' });
 ok(/image: nginx:1\.29-alpine@sha256:b{64}/.test(pinned.compose || '')
-   && await page.$eval(`${sect} .ngimage`, e => /nginx:1\.29-alpine \(b{12}\)/.test(e.textContent))
+   && await page.$eval(`${sect} .ngimage`, e => e.textContent.trim() === 'nginx:1.29-alpine')
    && !(await page.$(`${sect} [data-ngupdate]`)),
    'Update pins the digest into the compose file and rebuilds, and the node is not behind any more');
 ok((await api('/api/nginx', { action: 'update', node: sandbox.node })).same === true, 'a second Update has nothing to move to and says so');
@@ -408,7 +408,7 @@ await section("The same tag under another digest is a newer build, not the tag n
   await page.waitForSelector(`${sect} [data-ngupdate]`, { timeout: 10000 });
   const said = await page.$eval(sect, s => ({ btn: s.querySelector('[data-ngupdate]').textContent.trim(),
     hint: s.querySelector('.ngimgbar').previousElementSibling.textContent }));
-  ok(said.btn === 'Update to the newer build' && /a newer build of nginx:1\.29-alpine \(f{12}\) is out/.test(said.hint),
+  ok(said.btn === 'Update to the newer build' && /a newer build of nginx:1\.29-alpine is out/.test(said.hint),
      `the tag it runs under another digest is said as a newer build of it (${said.btn} | ${said.hint.trim().slice(0, 60)})`);
   entryMoves('1.29-alpine', 'b');
   await page.evaluate(() => loadNginx());

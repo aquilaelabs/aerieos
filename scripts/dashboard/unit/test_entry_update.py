@@ -65,7 +65,7 @@ class Row(unittest.TestCase):
         self.app()
         moved = containers.entry_moved("site-1")
         self.assertEqual(moved, {f"ex/web:2@{A}": f"ex/web:2@{B}"})
-        self.assertEqual([packformat.image_said(to) for to in moved.values()], ["ex/web:2 (" + "b" * 12 + ")"])
+        self.assertEqual([packformat.image_said(to) for to in moved.values()], ["ex/web:2"])
 
     def test_the_bell_s_row_names_a_container_behind_its_entry_by_name_and_tag(self):
         # One row a node, beside the containers a registry's check found

@@ -310,16 +310,15 @@ class Image(unittest.TestCase):
         rows = npx.attention(lambda nid: nid == "n1")
         self.assertEqual([(r["kind"], r["node"], r["id"], r["digest"]) for r in rows],
                          [("nginx", "vps", "n1", "sha256:" + "f" * 64)], "the bell's row, for the deployed one alone")
-        self.assertIn("1.29-alpine (" + "b" * 12 + ")", rows[0]["from"])
-        self.assertIn("1.29-alpine (" + "f" * 12 + ")", rows[0]["to"])
+        self.assertEqual((rows[0]["from"], rows[0]["to"]), ("nginx:1.29-alpine", "nginx:1.29-alpine"), "named by tag, never by digest")
         self.assertTrue(rows[0]["rebuild"], "the same tag under another digest is said as a newer build (B27)")
-        self.assertEqual(npx.behind_named("nginx-vps"), "1.29-alpine (" + "f" * 12 + ")",
-                         "the Containers row's flag, by the container's name, with the short digest it would move to")
+        self.assertEqual(npx.behind_named("nginx-vps"), "a newer build of nginx:1.29-alpine",
+                         "the Containers row's flag, by the container's name, said as a newer build of the tag it runs")
         self.assertEqual(npx.behind_named("radarr"), "", "...and nothing for another row")
         view = npx.view(FakeDevapp({"nginx-vps"}), lambda *a: {})
         self.assertEqual((view["latest"]["tag"], view["image"]), ("1.29-alpine", "nginx:1.29-alpine"))
-        self.assertEqual((view["nodes"][0]["image"]["ref"], view["nodes"][0]["behind"], view["nodes"][0]["behind_digest"]),
-                         ("nginx:1.29-alpine@sha256:" + "b" * 64, "1.29-alpine", "f" * 12))
+        self.assertEqual((view["nodes"][0]["image"]["ref"], view["nodes"][0]["behind"]), ("nginx:1.29-alpine@sha256:" + "b" * 64, "1.29-alpine"))
+        self.assertNotIn("behind_digest", view["nodes"][0])
         # A newer line is another tag in the entry.
         self.entry("1.31-alpine", "e")
         self.assertEqual(npx.behind(npx.record("n1")), "1.31-alpine")

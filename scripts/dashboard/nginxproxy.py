@@ -481,10 +481,12 @@ def behind(rec):
 
 
 def behind_said(rec):
-    """behind() as a row says it: the tag and the first twelve digits of
-    the digest it would move to, or ""."""
-    lt = latest_image()
-    return f"{lt['tag']} ({lt['digest'][7:19]})" if behind(rec) else ""
+    """behind() as a row says it, or "": the image it would move to, or a
+    newer build of the tag it runs where the entry moved under that tag."""
+    to = behind(rec)
+    if not to:
+        return ""
+    return f"a newer build of nginx:{to}" if image_of(rec)["tag"] == to else f"nginx:{to}"
 
 
 def behind_named(name):
@@ -527,8 +529,7 @@ def attention(deployed):
             continue
         im = image_of(rec)
         out.append({"kind": "nginx", "node": n.get("name") or nid, "id": nid,
-                    "from": f"{lt['name']}:{im['tag']} ({im['digest'][7:19]})",
-                    "to": f"{lt['name']}:{to} ({lt['digest'][7:19]})", "digest": lt["digest"],
+                    "from": f"{lt['name']}:{im['tag']}", "to": f"{lt['name']}:{to}", "digest": lt["digest"],
                     # The tag it runs, under another digest: said as a newer build.
                     "rebuild": im["tag"] == to})
     return out
@@ -595,8 +596,6 @@ def view(devapp, instance_state):
                "live": n.get("live"), "clash": [],
                # What it is pinned to and the line it would move to (R192).
                "image": image_of(rec) | {"ref": image_ref(rec)}, "behind": behind(rec),
-               # ...and the first digits of the digest it would move to.
-               "behind_digest": latest_image()["digest"][7:19] if behind(rec) else "",
                # Certificates from Let's Encrypt (R150): what is being asked
                # for, the email the account was made with, and whether a
                # DNS-01 challenge has a Cloudflare token to write with.

@@ -1134,7 +1134,7 @@ async function dmAction(project, instance, act, btn){
   // from the row it is about.
   if (act === "nginx-update"){
     const d = (dockerList?.instances || []).find(i => i.project === project && i.instance === instance);
-    if (!await askYes(`Update nginx on this node to nginx:${d?.nginx_to || "the newest line"}?\n\nIt is rebuilt with the new image, so its sites are down while the node pulls it.`)) return;
+    if (!await askYes(`Update nginx on this node to ${d?.nginx_to || "the newest line"}?\n\nIt is rebuilt with the new image, so its sites are down while the node pulls it.`)) return;
     if (btn) busy(btn, "Updating");
     try{
       const j = await postJSON("/api/nginx", {action: "update", node: dockerList?.node || dockerNode});
@@ -2139,7 +2139,7 @@ function dmRowsHtml(ins, job, blind){
         ${(d.images_behind || []).length ? `<button type="button" data-dm="update"
           title="pull the newer images and start it again: docker compose pull, then up -d">Update</button>` : ""}
         ${d.nginx_to ? `<button type="button" data-dm="nginx-update"
-          title="pin nginx-${esc(d.nginx_to)}'s digest on the nginx page's record and rebuild with it">Update</button>` : ""}
+          title="pin the image's digest on the nginx page's record and rebuild with it">Update</button>` : ""}
         `}
         ${busy ? abortBtn('data-dm="abort"', job.aborting, "stop this build; what is already built is kept") : ""}
         ${managed || !mayDocker() ? "" : `<button type="button" data-dm="rebuild" ${
@@ -2195,7 +2195,7 @@ function dmRowsHtml(ins, job, blind){
           esc(d.astray)}, which does not host its containers. Tick this node under the space's Also works on, or Remove it and send it again.</div>` : ""}
         ${d.await_env ? `<div class="sub warn">built: fill in the env, then Up</div>`
           : (d.missing_env || []).length ? `<div class="sub warn dmenv">the env is missing ${esc(d.missing_env.join(", "))}: press Env</div>` : ""}
-        ${d.nginx_to ? `<div class="sub warn dmnginx">nginx:${esc(d.nginx_to)} is out: Update pins it and rebuilds</div>` : ""}
+        ${d.nginx_to ? `<div class="sub warn dmnginx">${esc(d.nginx_to)} is out: Update pins it and rebuilds</div>` : ""}
         ${shellWhy ? `<div class="sub warn dmshellwhy">No shell here: ${esc(shellWhy)}</div>` : ""}
         ${dockerList?.ports_local && (d.open_ports || []).length ? `<div class="sub bad dmopen">${esc(d.open_ports.join(", "))} ${
           d.open_ports.length === 1 ? "is" : "are"} published on every address of this node, so the internet reaches ${

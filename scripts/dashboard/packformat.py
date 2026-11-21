@@ -487,12 +487,12 @@ def image_refused(ref):
 
 
 def image_said(ref):
-    """An image reference as a person reads it: its name and tag, and the
-    first twelve digits of the digest it is held by."""
+    """An image reference as a person reads it: its name and tag, never the
+    digest it is held by."""
     parts = image_parts(ref)
     if not parts:
         return str(ref or "")[:200]
-    return parts["name"] + (f":{parts['tag']}" if parts["tag"] else "") + (f" ({parts['digest'][7:19]})" if parts["digest"] else "")
+    return parts["name"] + (f":{parts['tag']}" if parts["tag"] else "")
 
 
 def images_checked(raw, what="images"):

@@ -90,14 +90,14 @@ class Scanners(unittest.TestCase):
         # The entry names another image: the node is behind, Update pins and pulls.
         newer = "aquasec/trivy:9.9.9@sha256:" + "e" * 64
         self.entry(trivy=newer)
-        self.assertEqual(scanners.behind(scanners.record("n1")), {"trivy": "9.9.9 (" + "e" * 12 + ")"}, "said with the short digest it would move to")
+        self.assertEqual(scanners.behind(scanners.record("n1")), {"trivy": "9.9.9"}, "said with the tag it would move to")
         self.assertIn("image: " + IMAGES["trivy"], scanners.compose_text("n1", scanners.record("n1")), "and it still runs what it is pinned to")
         self.assertEqual(scanners.update("n1")["versions"]["trivy"], "9.9.9")
         self.assertIn("image: " + newer, self.jobs[-1]["spec"]["files"]["compose.yml"])
         self.assertEqual(scanners.behind(scanners.record("n1")), {})
         # The same tag under another digest is an Update too.
         self.entry(trivy="aquasec/trivy:9.9.9@sha256:" + "f" * 64)
-        self.assertEqual(scanners.behind(scanners.record("n1")), {"trivy": "9.9.9 (" + "f" * 12 + ")"})
+        self.assertEqual(scanners.behind(scanners.record("n1")), {"trivy": "9.9.9"})
         self.entry(trivy=newer)
         self.assertIn("not deployed", scanners.update("n3")["error"])
         r = scanners.remove("n1")
@@ -196,10 +196,10 @@ class Scanners(unittest.TestCase):
         self.states["j9"] = "failed"
         rows = scanners.attention()
         self.assertEqual(sorted(r["what"] for r in rows), ["behind", "failed"])
-        self.assertEqual(next(r for r in rows if r["what"] == "behind")["said"], "trivy 1.200.1 (" + "e" * 12 + ")")
+        self.assertEqual(next(r for r in rows if r["what"] == "behind")["said"], "trivy 1.200.1")
         v = scanners.view()
         self.assertEqual(v["nodes"][0]["name"], "Build Box")
-        self.assertEqual(v["nodes"][0]["behind"], {"trivy": "1.200.1 (" + "e" * 12 + ")"})
+        self.assertEqual(v["nodes"][0]["behind"], {"trivy": "1.200.1"})
         self.assertEqual(v["nodes"][0]["versions"]["trivy"], "0.9.9")
         self.assertEqual(v["latest"], {"versions": {"semgrep": "1.2.3", "trivy": "1.200.1", "mobsfscan": "0.4.5"}})
         self.assertEqual(v["nodes"][1]["host_only"], True)

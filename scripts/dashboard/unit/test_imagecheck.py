@@ -1,6 +1,8 @@
 """Registry images kept up to date (imagecheck.py, R195): an image reference
 read into its registry, repository and tag; a node's pulled digest compared
 with what the registry serves; a container behind until Update pulls it."""
+import contextlib
+import io
 import json
 import os
 import shutil
@@ -153,8 +155,7 @@ class OwnImage(unittest.TestCase):
     def test_an_update_the_newest_signed_release_names_is_said_by_its_digest(self):
         got = imagecheck.check_instance("workshop", "main")
         self.assertEqual(got["behind"], [{"service": "app", "image": self.OWN + ":dev", "to": self.NEW,
-                                          "signed": f"{self.OWN}@{self.NEW}, v0.9.0-dev.5300's own image, signed by the key "
-                                                    "AerieOS's dev builds are signed with"}])
+                                          "signed": "v0.9.0-dev.5300's own image, signed by the key AerieOS's dev builds are signed with"}])
         self.assertEqual((got["said"], got["error"], self.asked), ([], "", ["dev"]))
         # Up to date with what the release names: nothing behind, nothing said.
         self.dv.pulled[self.OWN + ":dev"] = self.NEW
@@ -163,13 +164,16 @@ class OwnImage(unittest.TestCase):
 
     def test_a_tag_that_serves_another_image_than_the_signed_release_names_is_said_and_offers_no_update(self):
         self.serves(self.ODD)
-        got = imagecheck.check_instance("workshop", "main")
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            got = imagecheck.check_instance("workshop", "main")
         self.assertEqual(got["behind"], [], "no update is offered from the tag")
         self.assertEqual(got["said"], [
-            f"{self.OWN}:dev serves {self.ODD} now, which is not the image the newest signed release names "
-            f"(v0.9.0-dev.5300: {self.OWN}@{self.NEW}, signed by the key AerieOS's dev builds are signed with). "
-            "The registry's tag was moved by something other than that release's publication, or a newer release is "
-            "not signed yet, so no update is offered from the tag; the signed image is pulled by its digest"])
+            f"{self.OWN}:dev serves another image than v0.9.0-dev.5300, the newest signed release, names, so no update is offered from it"])
+        # ...the digests in the log alone, each on a line of its own.
+        self.assertEqual(out.getvalue().splitlines(), [
+            f"[dashboard] image check: {self.OWN}:dev serves {self.ODD}",
+            f"[dashboard] image check: v0.9.0-dev.5300 names {self.OWN}@{self.NEW}, signed by the key AerieOS's dev builds are signed with"])
         # ...whatever the container runs, the one the tag serves included.
         self.dv.pulled[self.OWN + ":dev"] = self.ODD
         self.assertEqual(len(imagecheck.check_instance("workshop", "main")["said"]), 1)

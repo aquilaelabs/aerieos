@@ -311,13 +311,12 @@ function nginxBody(n){
   // The image it is pinned to, the one this AerieOS names, and Update when
   // behind (R192): nothing asks a registry, so there is nothing to check.
   const im = n.image || {};
-  const pinned = `nginx:${im.tag || "?"}${im.digest ? ` (${im.digest.slice(7, 19)})` : ", not pinned to a digest yet"}`;
+  const pinned = `nginx:${im.tag || "?"}${im.digest ? "" : ", not pinned to a digest yet"}`;
   // A newer build of the tag it already runs is said as that, not as the
   // same tag named twice.
   const rebuild = !!n.behind && n.behind === im.tag;
   const out = rebuild ? `a newer build of nginx:${n.behind}` : `nginx:${n.behind}`;
-  // ...with the first digits of the digest it would move to.
-  const news = n.behind ? `${out}${n.behind_digest ? ` (${n.behind_digest})` : ""} is out: Update pins it and rebuilds`
+  const news = n.behind ? `${out} is out: Update pins it and rebuilds`
     : "the image this AerieOS names";
   // Four sections (R218 step 29): each says its state in its head, opens
   // on one short line with the rest behind its ?, and saves what it writes
