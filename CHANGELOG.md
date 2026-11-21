@@ -27,6 +27,7 @@
 - A failed job's toast says why in one sentence; the whole reason is on the job's row and in its log (8a3c9c0)
 - Docker apps come from the catalog alone: AerieOS ships no table of apps, so an app is added, fixed or re-pinned by a catalog commit with no release. A container already made from an app keeps running and keeps its Configure. With no catalog reachable and none kept, the Library's Apps say so (271fb5f)
 - The bell's container-update row names a container made from an app or a service once its entry names a newer image (79a8209)
+- A refused agent update, and a download that is not the file its entry pins, are each said in one line (aab77e7, b192d01)
 
 ### Removed
 
@@ -75,6 +76,7 @@
 - `aerie toolchains status` and `aerie status` say a toolchain's folder with no program in it is an install that did not finish, where they listed it as installed (552b028)
 - `aerie tool install NAME` installs the tool on the node the session runs on once a person allows it (or at once where the space's setting is auto), as the person who allowed it, and the request on the bell names the node; it only added the pack to the catalog, so Allow installed nothing and nobody was told. A toolchain AerieOS ships is asked for as the toolchain, and answers at once when the node has it. Upgrading: this release moves /config from state 26 to state 27, so once it has started on a /config, an earlier build no longer starts on that one (7906bf6, 4fd4fea, 6e112a3)
 - Your coding agent's sign-in on a node is no longer lost when a terminal is opened for you while a session of yours is running: the open put the sealed copy back over a sign-in the session had just refreshed, and the next session started signed out, most likely right after a controller update (b7b4aed)
+- Controller settings' Vetted catalog said no mirror was imported even with one held (e5c3da6)
 
 ### Security
 
@@ -101,6 +103,13 @@
 - An update on a machine of its own takes nothing while the install names no release signer (67508b9)
 - The controller's image installs Playwright and web-ext from a committed lock with no install script run, is built from a base image named by its digest, and takes noVNC as a pinned row; an update on a machine of its own replaces the copies an earlier install took by name (8b68194, fc0dea5)
 - A dev build's tag is refused unless its commit is on main or a release's branch, a release's Android app is built on a hosted runner, and the image tags people follow move only onto a published, sealed release's own digest (2a1ed22)
+- A node's root agent runs and follows nothing its jobs account owns in the toolchain store, and an installed coding agent is read out of the session account's home by that account (ddf268c, 252af80)
+- On a node, a recipe's system packages, a runner's slot, a system job's network, pool, folder and backup values, the store's path and the controller's address are each held to their shape before root uses them (8f7ba08, 6ca6866, 7d869ac, 367c095)
+- The installer checks a download with the system's own tools and a keyring made for that one check, and puts a declared download only inside its pack (4b7ebd8, 7cc7ad2, f4fa9c8)
+- A node that trusts the release key takes no signed agent older than the one it runs unless its console says aerieos-agent older on, pins only the key an update's signature is under, follows a controller's move only under a key, and asks a pinned controller for no hostname, so a certificate for that name does not cut it off (f5ac401, a607d96, 092f1a8, 8be13f5)
+- The provisioner run again on an enrolled node fetches its agent under the node's pin, and the file explorer reaches a node's own folders by name and none where the node's console turned root asks off (e307631, e9f9147)
+- A signed toolchain that names its version installs that version and no other (71c92ac)
+- No app, stick image or OS update is taken while the install names no release signer (b75c9e3, 6c79d59)
 
 ## 0.9.0-dev.5641: 2026-11-18
 
