@@ -34,6 +34,7 @@
 - The static analysis scan's old schedule row leaves schedules.json. Upgrading: this release moves /config from state 28 to state 29, so once it has started on a /config, an earlier build no longer starts on that one (bfe2989)
 - A start no longer rewrites checkouts' credential helpers or a line of the home's .bashrc, and its banner names AerieOS; with no stable release, the bare-metal installer takes the newest published release (14aa76b, 1429a5b, f6a5ff3)
 - Container, nginx and scanner rows name an image by name and tag, a toolchain row's failure leaves its digests to the log, and release, container and move refusals, the CI, cut-landing and switched-off pack rows, two toasts and the Doctor's lines are each one sentence with no commit, key or command (a471b89, 6c70b3c, 308bf8f)
+- A node's root-off line, Un-enroll dialog, Updates fact, reused-token bell row and in-use toolchain refusal each say one sentence, with no key characters or commands; a switched-off pack is titled as switched off (aaa2257, 06cbd0a)
 
 ### Removed
 
@@ -85,6 +86,8 @@
 - Your coding agent's sign-in on a node is no longer lost when a terminal is opened for you while a session of yours is running: the open put the sealed copy back over a sign-in the session had just refreshed, and the next session started signed out, most likely right after a controller update (b7b4aed)
 - Controller settings' Vetted catalog said no mirror was imported even with one held (e5c3da6)
 - A stick whose aerieos.env names BB_RELEASE_LINE is offered that line's releases and dev builds alone, where 0.10 was offered to a 0.9 stick (e7dabfb)
+- The node agent saves its record under one lock every change takes, so a save never meets it half changed (f1857cf)
+- Update agent no longer warns that a node's sessions end: they outlive the agent's restart (6414ccd)
 
 ### Security
 
@@ -127,6 +130,9 @@
 - Test seams are read only in AerieOS's source tree: no variable in an install's environment changes who may sign a release or which programs run, and a bare-metal controller's own node reads none of the installer's (ca6c47a, c09384a)
 - The release's signing jobs read where a release may be cut from on the default branch alone and match branch names whole, the Windows code-signing certificate is read by a tag's run alone, and the Android app's dependencies are held to their sha256 (8960dd0, dbb6dcb, 049144e)
 - The .NET MAUI workload installs with its packages' signatures checked (9bab719)
+- An agent update that cannot check itself on the node is refused, not installed without a way back (3a9a3b5)
+- A node's terminals, files and VM screens open over TLS alone: the controller opens nothing on a node with no certificate, a node with one refuses a plain request, and the node's row says why (f9ef449, 097f5d8)
+- A node with no cryptography library seals no sign-in rather than sealing the old way, and says so on its row (c8e6dd0)
 
 ## 0.9.0-dev.5641: 2026-11-18
 
