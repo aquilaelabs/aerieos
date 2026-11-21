@@ -71,6 +71,18 @@ class Order(unittest.TestCase):
 
 
 class Steps(unittest.TestCase):
+    def test_the_banner_is_aerieos_and_a_start_leaves_a_homes_bashrc_as_it_is(self):
+        r = sh("banner")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue(r.stdout.startswith("AerieOS: the controller"), r.stdout)
+        self.assertEqual(len(r.stdout.strip().splitlines()), 1, "one line")
+        with open(os.path.join(SCRIPTS, "lib", "boot.sh"), encoding="utf-8") as f:
+            text = f.read()
+        body = text[text.index("seed_home() {"):]
+        body = body[:body.index("\n}\n")]
+        self.assertNotIn("bashrc\" \"$old\"", body, "no line of a person's .bashrc is rewritten at a start")
+        self.assertNotIn("BuilderBot", text)
+
     def test_secrets_stashed_from_the_folder_named_and_shielded(self):
         with tempfile.TemporaryDirectory() as d:
             sec, run = os.path.join(d, "secrets"), os.path.join(d, "run")
