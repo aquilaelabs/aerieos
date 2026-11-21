@@ -152,6 +152,25 @@ class Newer(World):
         r = nodes.job_add("user:test", {"node": self.nid}, "toolchain", {"action": "install", "names": ["go"]})
         self.assertTrue(r.get("ok"), r)
 
+    def test_its_refusal_of_the_older_bundle_is_no_bell_row(self):
+        # Gone back, a node on a newer agent refuses the older bundle and
+        # keeps the newer one it has: no news. Refused for anything else, or
+        # by a node that is not ahead, the row stands.
+        self.runs(self.ahead())
+        serving = "sha256:" + "a" * 64
+        # As an agent reports it: the refusal's cause alone (its release.BUNDLE_OLDER).
+        said = f"its files are {nodes.AGENT_OLDER}"
+        rec = nodes.node(self.nid)
+        rec.setdefault("reported", {})["bundle_refused"] = {"digest": serving, "why": said}
+        with mock.patch.object(nodes, "node_list", lambda: [{**rec, "live": True}]), \
+                mock.patch.object(nodes, "bundle_digest", lambda: serving), mock.patch.object(nodes, "node", lambda nid: rec):
+            self.assertEqual(nodes.bundle_attention(), [])
+            rec["reported"]["bundle_refused"]["why"] = "it is not signed by a key this node trusts"
+            self.assertEqual([r["kind"] for r in nodes.bundle_attention()], ["bundle-refused"])
+            rec["reported"]["bundle_refused"]["why"] = said
+            rec["agent"] = {**(rec.get("agent") or {}), "version": self.ours["version"]}
+            self.assertEqual([r["kind"] for r in nodes.bundle_attention()], ["bundle-refused"], "a node not ahead still says it")
+
     def test_one_from_a_newer_window_is_held_and_said_as_newer(self):
         self.runs(self.ahead(window=True))
         n = nodes.node(self.nid)

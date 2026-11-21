@@ -2788,7 +2788,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
     headers: { Authorization: 'Bearer ' + en.token, 'Content-Type': 'application/json' },
     body: JSON.stringify({ census: CENSUS, version: shipped.version, digest: 'sha256:' + '0'.repeat(64) }) });
   await page.evaluate(async id => { await loadNodes(); delete nodesConf[id]; readMoved('nodes'); drawPanes(); }, minted.id);
-  await page.waitForFunction(sel => /has an older build of agent \S+ \(/.test(document.querySelector(sel + ' .ndconfstate')?.textContent || ''), ROW, { timeout: 10000 });
+  await page.waitForFunction(sel => /has an older build of agent \S+: press Update agent first/.test(document.querySelector(sel + ' .ndconfstate')?.textContent || ''), ROW, { timeout: 10000 });
   const sameTc = await napi('/api/toolchains', { action: 'install', names: ['jdk'], node: minted.id });
   ok(/runs an older build of agent \S+: press Update agent on its row first/.test(sameTc.error || ''),
      `an agent on the same number but another file is told so, on the row and in the refusal (${(sameTc.error || 'no error').slice(0, 90)})`);

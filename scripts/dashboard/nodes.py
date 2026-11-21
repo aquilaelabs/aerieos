@@ -3622,6 +3622,12 @@ def bundle_attention():
         why = bundle_refused(n, serving)
         if not why:
             continue
+        # A node on a newer agent than this controller ships (a controller
+        # gone back to an older image) refuses its older bundle and keeps
+        # working on the newer one it has: that is the node being right,
+        # not news, as its agent is not called behind (agent_newer).
+        if agent_newer(n) and AGENT_OLDER in why:
+            continue
         out.append({"kind": "bundle-refused", "node": n["name"], "id": n["id"], "why": why,
                     "key": f"bundle:{n['id']}@{serving[7:23]}"})
     return out
