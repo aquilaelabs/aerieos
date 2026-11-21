@@ -3464,6 +3464,25 @@ def went_back(n):
     return b.get("why") or "it did not start there"
 
 
+def refusal_phrase(said, most=120):
+    """What a node said of an update it did not install, as one phrase for
+    a row. An agent sends the cause alone (its release.Refusal); one from
+    before sent the whole of it, a paragraph naming the keys it takes and
+    its console's commands, and any job may fail with a long line. So
+    whatever arrives is cut to its first sentence, with no leading
+    "refused:", nothing from a console command on, no key or digest
+    characters, and `most` characters at the longest."""
+    s = re.sub(r"^refused:\s*", "", " ".join(str(said or "").split()))
+    s = re.split(r"\.\s", s + " ", maxsplit=1)[0]
+    s = re.split(r"\b(?:sudo|aerieos-agent|builderbot-agent)\b", s, maxsplit=1)[0]
+    s = re.sub(r"\s*\([^()]*[0-9a-f]{8,}[^()]*\)", "", s)
+    s = re.sub(r"(?:sha256:)?[0-9a-f]{8,}…?", "", s)
+    s = re.sub(r"\s{2,}", " ", s).strip(" :;,.")
+    if len(s) > most:
+        s = s[:most - 1].rstrip(" :;,.") + "…"
+    return s or "it was refused"
+
+
 def unsigned_refused(n):
     """Why this node refuses the agent this controller ships for want of a
     release's signature, "" where it would take it: the build is not sent
@@ -3474,19 +3493,20 @@ def unsigned_refused(n):
     console, with no signature here to send; and from its last answer to
     this same build, for a signature it did not accept. A node with keys
     added at its console and no release key pinned refuses an unsigned
-    build the same way."""
+    build the same way. One phrase either way, as the bell's row says it
+    (refusal_phrase): what that node takes and what its console can do are
+    in its own log."""
     if not n:
         return ""
     rep = n.get("reported") or {}
     ours = agent_file()
     if (rep.get("release_key") or rep.get("release_also")) and rep.get("unsigned_ok") is not True and not agent_sig(ours["digest"]):
         return ("it takes only agent updates " + ("a release signed" if rep.get("release_key") else "signed by a key added at its console")
-                + ", and this controller's build is unsigned: "
-                "a signed build updates it, or aerieos-agent unsigned on at its console allows this one")
+                + ", and this controller's build is unsigned")
     last = next(iter(jobs_for(node_id=n["id"], n=1, type="self-update")), None)
     if last and last.get("state") == "failed" and last.get("exit_code") == 77 \
             and (last.get("spec") or {}).get("digest") == ours["digest"]:
-        return str(last.get("error") or "it refused this build's signature")[:300]
+        return refusal_phrase(last.get("error") or "it refused this build's signature")
     return ""
 
 
@@ -3642,7 +3662,7 @@ def attention(project_nodes):
         out.append({"kind": "agent", "node": n["name"], "id": n["id"],
                     "from": (n.get("agent") or {}).get("version") or "?",
                     "to": ours["version"], "window": agent_gap(n), "auto": auto, "back": back, "held": held,
-                    "failed": (last.get("error") or "it failed") if last and last.get("state") == "failed" else "",
+                    "failed": refusal_phrase(last.get("error") or "it failed") if last and last.get("state") == "failed" else "",
                     "projects": sorted(p for p, nid in project_nodes.items() if nid == n["id"])})
     return out
 

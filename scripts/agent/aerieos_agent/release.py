@@ -435,8 +435,12 @@ def may_install(state, digest, sig, named=None, body=None):
     `body` is the update itself, the bytes `digest` is of. With it, a
     signed update is taken only when the agent in it is not older than
     this one (agent_build against own_build), unless this node's console
-    said an older one may be put back (older_ok). A refusal for its age is
-    a Refusal, its cause OLDER."""
+    said an older one may be put back (older_ok).
+
+    A refusal's words are a Refusal: the whole of it for a log (which keys
+    this node takes, what its console can do), and its cause alone, one
+    phrase, for the job's error and the row a page draws from it: OLDER for
+    its age, else what was wrong with its signature."""
     if not trusted(state):
         return True, _no_key(state, digest, sig, named)
     who, why = _signer(state, digest, sig, MESSAGE)
@@ -450,7 +454,7 @@ def may_install(state, digest, sig, named=None, body=None):
         return True, f"signed by {who}"
     if unsigned_ok(state):
         return True, f"not checked ({why}): this node's console allows unsigned builds"
-    return False, f"refused: {why}. This node takes only updates signed by {_named(state)}. {_console_can()}"
+    return False, _refusal(why, f"refused: {why}. This node takes only updates signed by {_named(state)}. {_console_can()}")
 
 
 def may_keep_tools(state, digest, sig):

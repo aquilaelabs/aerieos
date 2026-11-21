@@ -93,7 +93,8 @@ class AutoUpdate(unittest.TestCase):
         nodes.job_result(self.nid, self.queued()[0]["id"], "failed", 77,
                          "refused: the signature is not the release key's. This node takes only updates signed by it")
         nodes._auto_tried.clear()
-        self.assertIn("refused", nodes.unsigned_refused(nodes.node(self.nid)))
+        self.assertEqual(nodes.unsigned_refused(nodes.node(self.nid)), "the signature is not the release key's",
+                         "one phrase of what it said, for the row")
         self.assertIsNone(nodes.auto_update(self.nid), "the same build, the same answer: not asked again")
         self.assertEqual(self.queued(), [])
         # Another build is another question.

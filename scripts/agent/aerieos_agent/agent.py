@@ -1419,7 +1419,11 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
         if said:
             job.say(said + "\n")
         if not ok:
-            job.why = said
+            # The job's error is the cause alone, one phrase: a page draws
+            # a row from it. The whole of it is in the job's log above and
+            # in this node's own.
+            job.why = getattr(said, "cause", "") or said
+            log(f"the agent update {got[:19]}… was not installed. {said}")
             return "failed", 77
         pin = release.first_pin(trust, got, sig, named)
         # One this node already went back from is not taken again by itself
@@ -1469,7 +1473,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
                 for x in (tmp,) + ((me + ".trial",) if ok else ()):
                     with contextlib.suppress(OSError):
                         os.unlink(x)
-                job.why = why
+                job.why = getattr(why, "cause", "") or why
                 job.say(why + "\n")
                 return "failed", code
             try:
