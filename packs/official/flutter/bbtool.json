@@ -28,6 +28,9 @@
     "bytes": 520000000,
     "resolver": "approximate"
    },
+   "env": {
+    "FLUTTER_SUPPRESS_ANALYTICS": "true"
+   },
    "fresh_only": true,
    "kind": "git",
    "online": "its first run downloads the Dart SDK and its engine from storage.googleapis.com, and its packages from pub.dev",

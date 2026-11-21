@@ -341,6 +341,7 @@
       "maker": "Google",
       "source": {
         "kind": "sdkmanager",
+        "host": "dl.google.com",
         "package": "cmake",
         "versioned": true,
         "download": {
@@ -425,6 +426,7 @@
       },
       "source": {
         "kind": "sdkmanager",
+        "host": "dl.google.com",
         "package": "emulator",
         "download": {
           "resolver": "android-repo",
@@ -466,6 +468,7 @@
       "maker": "Google",
       "source": {
         "kind": "sdkmanager",
+        "host": "dl.google.com",
         "package": "platform-tools",
         "download": {
           "resolver": "android-repo",
@@ -503,6 +506,7 @@
       "maker": "Google",
       "source": {
         "kind": "sdkmanager",
+        "host": "dl.google.com",
         "package": "platforms;android",
         "versioned": true,
         "download": {
@@ -541,6 +545,7 @@
       "maker": "Google",
       "source": {
         "kind": "sdkmanager",
+        "host": "dl.google.com",
         "package": "build-tools",
         "versioned": true,
         "download": {
@@ -579,6 +584,7 @@
       "maker": "Google",
       "source": {
         "kind": "sdkmanager",
+        "host": "dl.google.com",
         "package": "ndk",
         "versioned": true,
         "download": {
@@ -633,6 +639,9 @@
           "--version"
         ],
         "warm_note": "warming the toolchain (downloads the bundled dart sdk)",
+        "env": {
+          "FLUTTER_SUPPRESS_ANALYTICS": "true"
+        },
         "download": {
           "resolver": "approximate",
           "bytes": 520000000

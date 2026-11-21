@@ -11,7 +11,7 @@ import sys
 import threading
 import time
 import traceback
-from . import AGENT_VERSION
+from . import AGENT_VERSION, files
 from .coverage import _COV_OUT, _cov_write
 from .base import BEAT_S, CHANNEL, REFUSED, ROOT_BUNDLE_DIR, RUNNER_DIAG_KEEP, SESSION_BIN, SESSION_WALL, TRIAL_S
 from .base import cap_file, fs_holds, log, log_once, own_digest, own_path, prune_dir
