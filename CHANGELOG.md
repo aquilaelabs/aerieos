@@ -25,6 +25,7 @@
 - Toolchains install at a version AerieOS pins, each file held to its sha256, where an install asked the vendor for its newest and checked it against the vendor's own word at that moment: Go, Zig, the JDK, FFmpeg, the Kotlin language server, xcodes, LibreOffice and Android's command line tools are pinned whole; Rust, Python, .NET, Flutter and Android's packages install from a pinned program (rustup, uv, the .NET SDK, Flutter at a release's commit, sdkmanager) that downloads the rest itself, and say so. A newer version arrives as a newer pin, from the catalog or a release, and shows as an update. .NET installs from Microsoft's SDK archive, no longer from its install script, which nothing checked (fa9a1ee, 6d6f458, 8254ecd, 82ed514)
 - A failed job's toast says why in one sentence; the whole reason is on the job's row and in its log (8a3c9c0)
 - Docker apps come from the catalog alone: AerieOS ships no table of apps, so an app is added, fixed or re-pinned by a catalog commit with no release. A container already made from an app keeps running and keeps its Configure. With no catalog reachable and none kept, the Library's Apps say so (271fb5f)
+- The bell's container-update row names a container made from an app or a service once its entry names a newer image (79a8209)
 
 ### Fixed
 
@@ -84,6 +85,9 @@
 - A node's door for SSH (cloudflared, Tailscale) installs from a source its package manager verifies, the vendor's signed repository with its key carried by the provisioner or the distribution's own package, where it was a download checked against nothing and a script piped to a shell; a system with no verified source for one says so. The NVIDIA container toolkit's source is held to a key the provisioner carries. A CI runner's download is held to a pinned version and sha256 before it is unpacked (abdff8d, 31eb602, 7d7d1ef, e8d9851)
 - A container image is named by its digest. The model router, nginx and the scanners each run the images AerieOS names by digest, no service asks a registry what is newest any more, and Update on such a container means its entry names another image, shown by its short digest. A catalog app written in pack format 5 names every image by digest. The scanners run an image that already holds each tool, where one ran pip at every scan (25dc82f, fb4f20d, 3237ffe, 5767b92)
 - A coding agent's pinned install runs with no network on a node whose agent is root: the agent makes the cut itself (bc55040)
+- A node talks to its controller over TLS under the controller's own key, which it pins when it is enrolled: the Enroll script and the token commands name the controller as https with the pin, and a node enrolled over plain http moves by itself once it has updated. The controller keeps its key when its certificate is remade, so a renewal cuts no node off. A node that cannot reach its controller over TLS stays on http and its row says so (a1c04e5, 1deaead, 41bb6ad)
+- A node that pinned the release key pins the spare key by itself, from a statement the release key signed: no Enroll script is run again for it (3f2101e)
+- Nothing a node or the image sets up takes a key or a tool from the network unchecked: Docker's package source on a node is held to a key the provisioner carries, and the image's package sources, its build tools and linters are held to keys and pins in the tree (b2f1869, 61dcf7b, 3999b5a)
 
 ## 0.9.0-dev.5641: 2026-11-18
 
