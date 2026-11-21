@@ -1099,8 +1099,9 @@ optional `icon`, a PNG, WebP or SVG file in the folder held to a pack's
 rules, and from pack format 4 its own `fields`, `network` and `going`,
 [A Docker app](submitting.md#a-docker-app)) and `compose.yml` beside it,
 the compose held to what an app of your own is held to (every image held
-by its digest or pinned to a tag that is not latest, never built or
-privileged, and every blank one it declares or one of AerieOS's own), and
+by its digest or pinned to a tag that is not latest, never built, only the
+keys that reach nothing of the machine past its ports and volumes, and
+every blank one it declares or one of AerieOS's own), and
 from pack format 5 every image named by its digest
 ([Images by digest](#images-by-digest)). The Library lists it as an **Apps**
 card with its tier and what it asks for. **Install** fetches the folder at

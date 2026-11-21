@@ -179,6 +179,14 @@ An app is a folder with two files: `bbapp.json`, which says what it is and
 what it asks for, and a `compose.yml` held to a few rules (every image
 pinned to a tag that is not `latest`, nothing built, nothing privileged,
 and every `${VARIABLE}` one the app declares or one of AerieOS's own).
+A service uses only the keys that reach nothing of the machine past its
+ports and volumes (`image`, `command`, `environment`, `ports`, `volumes`,
+`restart`, `user`, `depends_on`, `healthcheck`, `networks` and their
+kind), so no added capabilities, devices, the host's namespaces or
+another container's, `extends`, `env_file` or `deploy`; `security_opt`
+says `no-new-privileges` alone; and the file's top level is `services`
+and the app's own named `volumes` and `networks`, never `include`, an
+external one, or a host path by a driver's options.
 
 From pack format 5 every image is named by its digest,
 `name:tag@sha256:` and the digest's 64 hex digits: the digest of the

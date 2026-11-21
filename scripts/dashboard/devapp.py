@@ -64,6 +64,13 @@ import threading
 import time
 from pathlib import Path
 
+# The compose reader an app's check shares (packformat.service_reach),
+# found beside this file where a verb loads it by its path.
+_here = os.path.dirname(os.path.abspath(__file__))
+if _here not in sys.path:
+    sys.path.append(_here)
+import packformat  # noqa: E402
+
 # The request's timing parts (server.py's trace), where there is a request:
 # a suite or a verb loads this file by its path, outside the dashboard's
 # directory, and times nothing.
@@ -4130,60 +4137,10 @@ def risks(project, cfg):
     out = []
     tree = str(WORKSPACE / project) + "/"
     for name, sv in sorted(_services(cfg).items()):
-        if sv.get("privileged"):
-            out.append(f"{name} runs privileged: root on the host, in effect")
-        # Named beside privileged rather than left out: a check that catches
-        # `privileged: true` and misses `cap_add: [SYS_ADMIN]` has a hole in
-        # it that is obvious to anyone who would use it.
-        caps = sorted(c for c in (sv.get("cap_add") or []) if isinstance(c, str))
-        if caps:
-            out.append(f"{name} takes kernel capabilities: {', '.join(caps)}")
-        devs = [d for d in (sv.get("devices") or []) if d]
-        if devs:
-            shown = ", ".join(str(d.get("source") if isinstance(d, dict) else d)
-                              for d in devs[:3])
-            out.append(f"{name} is handed host devices: {shown}"
-                       + (" …" if len(devs) > 3 else ""))
-        if str(sv.get("pid") or "") == "host":
-            out.append(f"{name} shares the host's process namespace")
-        if str(sv.get("network_mode") or "") == "host":
-            out.append(f"{name} is on the host's own network")
-        if str(sv.get("userns_mode") or "") == "host":
-            out.append(f"{name} shares the host's user namespace")
-        # The other namespaces a service can ask for the host's own, and
-        # another container's, which is that container's reach under this
-        # one's name (R227: the gate read pid, network and userns alone).
-        for key, what in (("ipc", "inter-process memory"), ("uts", "hostname"), ("cgroup", "control groups")):
-            if str(sv.get(key) or "") == "host":
-                out.append(f"{name} shares the host's {what} namespace")
-        for key, what in (("network_mode", "network"), ("pid", "processes"), ("ipc", "inter-process memory")):
-            val = str(sv.get(key) or "")
-            if val.startswith(("container:", "service:")):
-                out.append(f"{name} joins the {what} of {val}: that container's reach, under this one's name")
-        if sv.get("volumes_from"):
-            out.append(f"{name} takes every volume of {', '.join(str(v) for v in sv['volumes_from'][:3])}: "
-                       "whatever that container mounts of the host, this one does")
-        if sv.get("device_cgroup_rules"):
-            out.append(f"{name} is allowed host devices by rule: {', '.join(str(r) for r in sv['device_cgroup_rules'][:3])}")
-        if sv.get("sysctls"):
-            keys = sv["sysctls"] if isinstance(sv["sysctls"], list) else list(sv["sysctls"])
-            out.append(f"{name} sets kernel parameters: {', '.join(str(k) for k in keys[:3])}")
-        # Every way of loosening a profile, not the word unconfined alone:
-        # labels switched off, a seccomp or AppArmor profile of the file's own.
-        loose = [o for o in (sv.get("security_opt") or []) if isinstance(o, str)
-                 and ("unconfined" in o or o.replace("=", ":").startswith(("label:disable", "seccomp:", "apparmor:", "systempaths")))
-                 and o.replace("=", ":") != "no-new-privileges:true"]
-        if loose:
-            out.append(f"{name} drops a security profile: {', '.join(loose)}")
-        # A build reaches the host too, before anything runs: the host's
-        # network, its ssh agent, a privileged build.
-        b = sv.get("build") if isinstance(sv.get("build"), dict) else {}
-        if str(b.get("network") or "") == "host":
-            out.append(f"{name} builds on the host's own network")
-        if b.get("ssh"):
-            out.append(f"{name}'s build is handed the node's ssh agent or keys")
-        if b.get("privileged") or b.get("entitlements"):
-            out.append(f"{name}'s build runs privileged")
+        # Privileges, capabilities, devices, the host's namespaces and
+        # another container's, a loosened profile, a build that reaches
+        # the host: read by the one reader an app's check refuses by.
+        out.extend(phrase for _key, phrase in packformat.service_reach(name, sv))
         # A bind mount of what gives control of the node is a risk a person
         # acknowledges, whatever the row already shows about it: with the
         # project's Run its container dial on auto, a session writes the

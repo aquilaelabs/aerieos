@@ -380,6 +380,54 @@ def compose_plain(text, services):
     return ""
 
 
+# The keys an app's compose may use, each one that reaches nothing of the
+# host past what Look shows (its image, ports and volumes): a key Docker
+# reads that is not here is refused rather than passed unread, since a
+# check that knows `privileged` and not `cap_add`, `devices`, `extends` or
+# `include` holds nothing. What service_reach reads on a key that is here
+# (a network or a profile that reaches out) is refused by its own words.
+SERVICE_KEYS = frozenset((
+    "image", "command", "entrypoint", "environment", "ports", "expose", "volumes", "tmpfs", "restart", "user",
+    "working_dir", "depends_on", "healthcheck", "init", "network_mode", "networks", "hostname", "domainname",
+    "dns", "dns_search", "extra_hosts", "labels", "container_name", "stop_signal", "stop_grace_period", "tty",
+    "stdin_open", "read_only", "shm_size", "mem_limit", "mem_reservation", "memswap_limit", "cpus", "cpu_shares",
+    "pids_limit", "ulimits", "cap_drop", "security_opt", "platform", "pull_policy"))
+# The one security option an app may set: the one that takes privileges away.
+OWN_SECURITY = ("no-new-privileges", "no-new-privileges:true", "no-new-privileges=true")
+# A file's own top level: its services, the named volumes and networks
+# they use, and the x- blocks Docker leaves unread (`version` too, which
+# it reads as nothing). A named volume or network is the app's own: one
+# that is another's (external, a name of its own) or a host path by
+# another name (a driver's options) is refused.
+TOP_KEYS = frozenset(("services", "volumes", "networks", "version"))
+VOLUME_KEYS, NETWORK_KEYS = frozenset(("labels",)), frozenset(("labels", "internal", "enable_ipv6"))
+OWN_DRIVERS = {"volumes": ("local",), "networks": ("bridge",)}
+
+
+def compose_keys_refused(doc):
+    """Why a compose file's top level, or a named volume or network it
+    declares, reaches past the app, or ""."""
+    for key in doc:
+        if str(key) not in TOP_KEYS and not str(key).startswith("x-"):
+            return f"{key} is not a key an app's compose uses here"
+    for kind, keys in (("volumes", VOLUME_KEYS), ("networks", NETWORK_KEYS)):
+        named = doc.get(kind)
+        if named is None:
+            continue
+        if not isinstance(named, dict):
+            return f"{kind} is a mapping of the app's own named {kind}"
+        for name, item in named.items():
+            item = item if item is not None else {}
+            if not isinstance(item, dict):
+                return f"{kind[:-1]} {name} is declared as a mapping"
+            odd = next((k for k in item if k not in keys and k != "driver"), None)
+            if odd:
+                return f"{kind[:-1]} {name}: {odd} is not a key an app's compose uses here"
+            if str(item.get("driver") or OWN_DRIVERS[kind][0]) not in OWN_DRIVERS[kind]:
+                return f"{kind[:-1]} {name}: its driver is {OWN_DRIVERS[kind][0]}, the app's own"
+    return ""
+
+
 def check(compose, fields=None, network=""):
     """What a compose file of a person's own would run, before it is kept
     (the Look): {services: [{name, image, ports, volumes}], blanks, media}
@@ -406,8 +454,12 @@ def check(compose, fields=None, network=""):
     services = doc.get("services") if isinstance(doc, dict) else None
     if not isinstance(services, dict) or not services:
         return {"error": "a compose file has a services mapping with at least one service"}
+    why = compose_keys_refused(doc)
+    if why:
+        return {"error": why}
     out = []
     for name, svc in services.items():
+        svc = svc if isinstance(svc, dict) else {}
         image = str(svc.get("image") or "")
         if not image:
             return {"error": f"service {name} names an image"}
@@ -416,8 +468,23 @@ def check(compose, fields=None, network=""):
         why = packformat.image_refused(image)
         if why:
             return {"error": f"service {name}: {image} {why}"}
-        if "build" in svc or "privileged" in svc:
-            return {"error": f"service {name}: an app from the catalog is a pulled image, never built here, and never privileged"}
+        if "build" in svc:
+            return {"error": f"service {name}: an app from the catalog is a pulled image, never built here"}
+        # What it asks of the host, by the reader a dev instance's warnings
+        # use; the machine's own network alone is the app's to say (below).
+        reach = [phrase for key, phrase in packformat.service_reach(str(name), svc)
+                 if not (key == "network_mode" and str(svc.get(key)) == "host")]
+        if reach:
+            return {"error": f"service {reach[0]}"}
+        odd = sorted(str(k) for k in svc if str(k) not in SERVICE_KEYS and not str(k).startswith("x-"))
+        if odd:
+            return {"error": f"service {name}: {odd[0]} is not a key an app's compose uses here"}
+        opts = svc.get("security_opt") if isinstance(svc.get("security_opt"), list) else [svc.get("security_opt")] if "security_opt" in svc else []
+        if any(str(o) not in OWN_SECURITY for o in opts):
+            return {"error": f"service {name}: no-new-privileges is the one security option an app sets"}
+        # Its own network, none, or the machine's: never another's by its name.
+        if "network_mode" in svc and str(svc.get("network_mode")) not in ("host", "bridge", "none"):
+            return {"error": f"service {name}: network_mode is host, bridge or none, and its own networks are named under networks"}
         ports = svc.get("ports") if isinstance(svc.get("ports"), list) else []
         vols = svc.get("volumes") if isinstance(svc.get("volumes"), list) else []
         if network == "host" and (svc.get("network_mode") != "host" or ports):

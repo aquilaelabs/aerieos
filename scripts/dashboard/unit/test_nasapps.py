@@ -58,7 +58,7 @@ class Check(unittest.TestCase):
         self.assertIn("not pinned", nasapps.check("services:\n  a:\n    image: foo\n")["error"])
         self.assertIn("not pinned", nasapps.check("services:\n  a:\n    image: foo:latest\n")["error"])
         self.assertIn("never built", nasapps.check("services:\n  a:\n    image: foo:1\n    build: .\n")["error"])
-        self.assertIn("never privileged", nasapps.check("services:\n  a:\n    image: foo:1\n    privileged: true\n")["error"])
+        self.assertIn("a runs privileged", nasapps.check("services:\n  a:\n    image: foo:1\n    privileged: true\n")["error"])
         self.assertIn("unknown blank SECRET", nasapps.check("services:\n  a:\n    image: foo:1\n    environment:\n      K: ${SECRET}\n    ports: ['${PORT}:1']\n")["error"])
         self.assertIn("${PORT}", nasapps.check("services:\n  a:\n    image: foo:1\n")["error"])
         seen = nasapps.check(COMPOSE)
@@ -86,6 +86,55 @@ class Check(unittest.TestCase):
         self.assertNotIn("error", nasapps.check(plain))
         self.assertEqual((nasapps.compose_marked(plain), nasapps.compose_plain(plain, {"a": {"image": "x/y:1.0"}})), ("", ""))
         self.assertIn("a line of its own", nasapps.compose_plain(plain, {"a": {"image": "x/y:1.0"}, "b": {"image": "z/w:2"}}))
+
+    def test_what_reaches_the_host_is_refused_by_what_it_does_not_by_its_word(self):
+        # Each passed the check that knew `privileged` alone, with Look
+        # showing its image, ports and volumes and nothing of the rest.
+        d = "sha256:" + "a" * 64
+        head = f"services:\n  web:\n    image: nginx:1.27@{d}\n    ports:\n      - \"${{PORT}}:80\"\n"
+        for what, extra, top, said in (
+                ("every capability", "    cap_add: [ALL]\n    pid: host\n", "", "takes kernel capabilities: ALL"),
+                ("the host's processes", "    pid: host\n", "", "host's process namespace"),
+                ("a loosened profile", "    security_opt: [seccomp:unconfined]\n", "", "drops a security profile"),
+                ("a profile by its label", "    security_opt:\n      - label:type:spc_t\n", "", "no-new-privileges is the one"),
+                ("a disk", "    devices:\n      - /dev/sda:/dev/sda\n", "", "host devices: /dev/sda"),
+                ("the controller's network", "    network_mode: container:aerie\n", "", "joins the network of container:aerie"),
+                ("a network by its name", "    network_mode: aerie_default\n", "", "network_mode is host, bridge or none"),
+                ("another container's volumes", "    volumes_from: [aerie]\n", "", "takes every volume of aerie"),
+                ("a file Docker reads beside it", "", "include:\n  - /etc/other.yml\n", "include is not a key"),
+                ("a service from another file", "    extends:\n      file: /x/y.yml\n      service: z\n", "", "extends is not a key"),
+                ("a host file as its environment", "    env_file: /etc/shadow\n", "", "env_file is not a key"),
+                ("a GPU by deploy", "    deploy:\n      resources:\n        limits:\n          cpus: \"1\"\n", "", "deploy is not a key"),
+                ("another's volume", "    volumes:\n      - cfg:/c\n", "volumes:\n  cfg:\n    external: true\n", "external is not a key"),
+                ("a host path as a volume", "    volumes:\n      - cfg:/c\n", "volumes:\n  cfg:\n    driver_opts:\n      o: bind\n      device: /\n",
+                 "driver_opts is not a key"),
+                ("a volume by another driver", "    volumes:\n      - cfg:/c\n", "volumes:\n  cfg:\n    driver: rclone\n", "its driver is local"),
+                ("another's network", "", "networks:\n  outer:\n    external: true\n", "external is not a key"),
+                ("secrets from a host file", "", "secrets:\n  k:\n    file: /etc/shadow\n", "secrets is not a key")):
+            self.assertIn(said, nasapps.check(top + head + extra).get("error", ""), what)
+        # What an app of its own writes stays its own to write.
+        plain = ("version: \"3.8\"\nx-note: kept\n" + head + "    restart: unless-stopped\n    security_opt:\n      - no-new-privileges:true\n"
+                 "    cap_drop: [ALL]\n    networks: [inner]\n    volumes:\n      - data:/data\n    healthcheck:\n      test: [\"CMD\", \"true\"]\n"
+                 "volumes:\n  data:\nnetworks:\n  inner:\n    internal: true\n")
+        self.assertNotIn("error", nasapps.check(plain))
+        # The machine's own network, said in bbapp.json, is the app's to ask for.
+        host = f"services:\n  web:\n    image: nginx:1.27@{d}\n    network_mode: host\n"
+        self.assertNotIn("error", nasapps.check(host, [], "host"))
+
+    def test_a_dev_instance_s_warnings_and_an_app_s_refusals_are_one_reader(self):
+        import packformat
+        import devapp
+        sv = {"privileged": True, "cap_add": ["NET_ADMIN"], "network_mode": "container:db"}
+        phrases = [p for _k, p in packformat.service_reach("app", sv)]
+        with tempfile.TemporaryDirectory() as ws:
+            old = devapp.WORKSPACE
+            devapp.WORKSPACE = Path(ws)
+            try:
+                self.assertEqual(devapp.risks("web", {"services": {"app": sv}}), phrases)
+            finally:
+                devapp.WORKSPACE = old
+        self.assertEqual(nasapps.check("services:\n  app:\n    image: x/y:1\n    cap_add: [NET_ADMIN]\n    ports: ['${PORT}:1']\n")["error"],
+                         "service " + phrases[1])
 
     def test_an_image_may_carry_the_digest_it_is_pulled_by(self):
         d = "sha256:" + "4f" * 32
