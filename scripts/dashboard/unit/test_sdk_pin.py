@@ -196,6 +196,38 @@ class Installs(unittest.TestCase):
         rc, out = self.s.sh("sdk_versions go")
         self.assertEqual(out, "go\tgo1.99.0\t-\tlocal\n")
 
+    def test_a_row_outside_the_probes_is_read_from_what_its_install_left(self):
+        # The final audit's 6: a row no probe of sdk_check_one names (a
+        # pack's, kotlin-lsp, ffmpeg) answered "- - unknown" before its pin
+        # was looked at, so none was ever offered an update.
+        url, real = self.s.tarball("kit-1.0.tar.gz", {"bin/kit": "#!/bin/sh\necho kit\n"})
+
+        def kit(version, sha):
+            self.s.row("kit", {"kind": "tarball", "strip": 0, "url": "file://" + self.s.files + "/kit-{version}.tar.gz",
+                               "checksum": {"from": "pin", "version": version, "sha256": {PLATFORM: sha}}},
+                       layout={"bin": ["bin"], "env": {}, "tool": "bin/kit"})
+        kit("1.0", real)
+        rc, out = self.s.sh("sdk_check_one kit", PATH=self.curl_refused())
+        self.assertEqual(out.rstrip("\n").split("\t")[:4], ["kit", "-", "1.0", "absent"], out)
+        rc, out = self.s.sh("sdk_install kit")
+        self.assertEqual(rc, 0, out)
+        rc, out = self.s.sh("sdk_check_one kit", PATH=self.curl_refused())
+        self.assertEqual(out.rstrip("\n").split("\t")[:4], ["kit", "1.0", "1.0", "current"], out)
+        kit("1.1", "2" * 64)
+        rc, out = self.s.sh("sdk_check_one kit", PATH=self.curl_refused())
+        self.assertEqual(out.rstrip("\n").split("\t")[:4], ["kit", "installed", "1.1", "update"], out)
+        # A copy with no record of which file it is: there, and nothing
+        # says whether it is the pin's.
+        os.unlink(os.path.join(self.s.dir("kit"), ".bb-verified"))
+        rc, out = self.s.sh("sdk_check_one kit", PATH=self.curl_refused())
+        self.assertEqual(out.rstrip("\n").split("\t")[:4], ["kit", "installed", "1.1", "unknown"], out)
+        rc, out = self.s.sh("sdk_versions kit")
+        self.assertEqual(out, "kit\tinstalled\t-\tlocal\n")
+        # ...and a name no row has is unknown, as before.
+        rc, out = self.s.sh("sdk_check_one nothing-here")
+        self.assertEqual(out, "nothing-here\t-\t-\tunknown\n")
+        self.assertFalse(os.path.exists(os.path.join(self.root, "curl-called")))
+
     def test_a_row_that_pins_nothing_is_asked_through_its_own_resolver(self):
         # sdk.sh asked go.dev, nodejs.org, ziglang.org, Adoptium and GitHub
         # what is newest with probes of its own beside the rows' resolvers.

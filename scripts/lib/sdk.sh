@@ -850,7 +850,22 @@ sdk_check_one() {
             fi
             fi
             ;;
-        *) printf '%s\t-\t-\tunknown\n' "$what"; return 0 ;;
+        *)
+            # Any other row, a pack's among them, read from what its install
+            # left: where it is, and a repository's commit; the digest its
+            # download was held to is compared with its pin below. One whose
+            # version nothing says is "installed", and only a pin decides
+            # whether it is current. A name no row of the catalog has is
+            # unknown.
+            [ -n "$(sdk_meta field "$what" source.kind 2>/dev/null)" ] || { printf '%s\t-\t-\tunknown\n' "$what"; return 0; }
+            d="$(sdk_find "$what")" || d=""
+            if [ -n "$d" ]; then
+                if [ "$(sdk_meta field "$what" source.kind 2>/dev/null)" = git ]; then
+                    inst="$(sdk_sys git -c "safe.directory=$d" -C "$d" rev-parse --short=8 HEAD 2>/dev/null)" || inst=""
+                fi
+                case "$inst" in ""|-) inst=installed ;; esac
+            fi
+            ;;
     esac
     [ -n "$inst" ] || inst="-"
     if [ -z "$local_only" ] && [ -z "$asked" ]; then
@@ -869,13 +884,16 @@ sdk_check_one() {
         d="$(sdk_find "$what" 2>/dev/null)" || d=""
         [ -z "$d" ] || have="$(sdk_verified_digest "$d")"
         if [ "$inst" != "-" ] && [ -n "$want" ] && [ -n "$have" ]; then
-            if [ "$have" = "$want" ]; then status=current
+            if [ "$have" = "$want" ]; then
+                status=current
+                # The pin's file: its version, where nothing else said one.
+                [ "$inst" != installed ] || inst="$latest"
             # Another file than the pin's, and a later release than the pin
             # names: a copy installed when installs took the vendor's newest,
             # or under a pin that has since been moved back. Installing the
             # pin over it would be a step down, so it is not offered as an
             # update; it reads as current until the pin passes it.
-            elif sdk_vnewer "$inst" "$latest"; then status=current
+            elif [ "$inst" != installed ] && sdk_vnewer "$inst" "$latest"; then status=current
             else status=update; fi
         fi
     fi
@@ -892,7 +910,7 @@ sdk_check_one() {
     fi
     if [ "$status" = unknown ]; then
         if [ "$inst" = "-" ]; then status=absent
-        elif [ "$latest" = "-" ]; then status=unknown
+        elif [ "$latest" = "-" ] || [ "$inst" = installed ]; then status=unknown
         # The same release written with and without its build (Temurin's
         # 21.0.12.1+1 against java's own 21.0.12.1) is the same release, and
         # so is one written with and without its trailing zero (Swift 6.4
