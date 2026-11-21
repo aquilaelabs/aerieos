@@ -543,7 +543,7 @@ def stick_status():
 
 
 # Where this machine's pools, its array and the disks it adopted are mounted
-# (pools.MOUNT_ROOT, array.MOUNT and its neighbours): the one place a system
+# (pools.MOUNT_ROOT, array.MOUNT and its neighbors): the one place a system
 # pool or a folder of spaces is named in.
 DISKS_ROOT = "/mnt"
 

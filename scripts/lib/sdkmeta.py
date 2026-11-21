@@ -69,7 +69,7 @@ def catalog_file(shipped):
 
 
 # Whether this file is AerieOS's own source tree's, and not an install's
-# (sdk.sh's SDK_IN_TREE, by the same two neighbours): the tree's Dockerfile
+# (sdk.sh's SDK_IN_TREE, by the same two neighbors): the tree's Dockerfile
 # and its unit tests are beside it, which no image, no bundle a node
 # fetches and no copy root keeps holds. It is where the file is, which
 # nothing in an environment says: what a test stands in for a check with
