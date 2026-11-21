@@ -92,6 +92,11 @@ class Sealed(unittest.TestCase):
         self.assertEqual(gitcreds.helper("web"), f"!{gitcreds.HELPER} {gitcreds.path('web')}")
         with open(os.path.join(HERE, "..", "gitcreds.py"), encoding="utf-8") as f:
             self.assertNotIn("store --file", f.read())
+        # ...which is the form projects.scoped_to_token asks a checkout's
+        # helper to be: this space's file, and no other space's.
+        self.assertTrue(gitcreds.names_helper(gitcreds.helper("web"), "web"))
+        self.assertFalse(gitcreds.names_helper(gitcreds.helper("web"), "shop"))
+        self.assertFalse(gitcreds.names_helper(f"store --file={gitcreds.path('web')}", "web"))
 
 
 if __name__ == "__main__":

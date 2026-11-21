@@ -458,6 +458,13 @@ def helper(project):
     return f"!{shlex.quote(str(HELPER))} {shlex.quote(str(f))}" if f.is_file() else ""
 
 
+def names_helper(value, project):
+    """Whether a repository's credential.helper value is this project's:
+    git-credential-bb on its token file (projects.scoped_to_token)."""
+    f = str(path(project))
+    return str(HELPER) in value and f in value
+
+
 def forget(project):
     with contextlib.suppress(OSError):
         path(project).unlink()
