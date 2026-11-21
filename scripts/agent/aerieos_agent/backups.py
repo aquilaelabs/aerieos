@@ -114,12 +114,22 @@ class BackupsMixin:
             return "failed", 65
         runs_dir = os.path.join(dest, name)
         os.makedirs(runs_dir, exist_ok=True)
+        # The runs' folder by where it really is, held to be the backup's
+        # name in the destination as it really is, and rsync handed that: a
+        # link left at the name (a share user's to make) would take the copy,
+        # and its deletions, anywhere root may write.
+        runs_dir = os.path.realpath(runs_dir)
+        if os.path.dirname(runs_dir) != os.path.realpath(dest) or not os.path.isdir(runs_dir):
+            say(f"refused: the folder {name} in {dest} leads somewhere else\n")
+            _state_set(name, ok=False, error="the backup's folder leads somewhere else", last_at=int(time.time()))
+            return "failed", 64
         stamp = time.strftime("%Y%m%d-%H%M%S")
         new, partial = os.path.join(runs_dir, stamp), os.path.join(runs_dir, stamp + ".partial")
         latest = os.path.join(runs_dir, "latest")
         argv = [rsync, "-aHAX", "--numeric-ids", "--delete", "--delete-excluded", "--exclude", ".snapraid.content", "--exclude", "lost+found",
                 "--exclude", ".zfs", "--info=stats1,progress0"]
-        if os.path.isdir(latest):
+        # The run before, only where it is one of these runs.
+        if os.path.isdir(latest) and os.path.dirname(os.path.realpath(latest)) == runs_dir:
             argv += ["--link-dest", os.path.realpath(latest)]
         argv += [src.rstrip("/") + "/", partial + "/"]
         say(f"backup {name}: {src} to {new}{' (hard-linked to the run before)' if os.path.isdir(latest) else ''}\n")

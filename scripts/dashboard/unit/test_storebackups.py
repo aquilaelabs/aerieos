@@ -106,6 +106,30 @@ class TheAgent(unittest.TestCase):
             rows = self.bm.backups_now(a.state)
         self.assertEqual((rows[0]["name"], rows[0]["ok"], rows[0]["runs"]), ("media", True, 2))
 
+    def test_a_link_at_the_backups_name_is_refused(self):
+        # A share user may write the destination: a link left at the
+        # backup's name would take root's copy, and its deletions, anywhere.
+        elsewhere = os.path.join(self.d, "etc")
+        os.makedirs(elsewhere)
+        open(os.path.join(elsewhere, "keep"), "w").write("root's own")
+        os.symlink(elsewhere, os.path.join(self.dest, "media"))
+        a = self.A()
+        self.assertEqual(self.run_job(a, {"name": "media"}, "20261028-040000"), ("failed", 64), self.job.text())
+        self.assertIn("leads somewhere else", self.job.text())
+        self.assertEqual(self.ran, [], "rsync is not run")
+        self.assertEqual(os.listdir(elsewhere), ["keep"])
+
+    def test_a_latest_that_leads_out_is_not_linked_to(self):
+        a = self.A()
+        self.run_job(a, {"name": "media"}, "20261028-040000")
+        elsewhere = os.path.join(self.d, "etc")
+        os.makedirs(elsewhere)
+        latest = os.path.join(self.dest, "media", "latest")
+        os.unlink(latest)
+        os.symlink(elsewhere, latest)
+        self.run_job(a, {"name": "media"}, "20261029-040000")
+        self.assertNotIn("--link-dest", self.ran[-1])
+
     def test_what_fails_leaves_nothing_and_a_missing_mount_is_refused(self):
         a = self.A()
         self.assertEqual(self.run_job(a, {"name": "media"}, "x", mounted=False, swap_dest=False)[0], "failed")
