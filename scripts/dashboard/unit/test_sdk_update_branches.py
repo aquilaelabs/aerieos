@@ -10,7 +10,8 @@ ask what was newest.
 
 Read out of scripts/lib/sdk.sh and the shipped table: every name the
 dashboard and the agent send to `update` is either a row with an offer or
-one of the branches that are left."""
+one of the branches that are left. Swift, which carries the version its
+publisher's signature holds, is a row with an offer too."""
 import json
 import os
 import re
@@ -48,7 +49,7 @@ class UpdateBranches(unittest.TestCase):
     def test_the_branches_left_are_the_rows_with_nothing_on_offer(self):
         self.assertEqual(self.branches(), ["swift|playwright", "android:*"])
         rows = shipped()
-        for name in ("swift", "playwright"):
+        for name in ("playwright",):
             self.assertIsNone(sdkmeta.offered(rows[name]), f"{name} has no pinned version of its own: its branch is how it updates")
         android = [n for n in rows if n.startswith("android:")]
         self.assertTrue(android)
@@ -57,7 +58,9 @@ class UpdateBranches(unittest.TestCase):
 
     def test_flutter_and_dotnet_update_by_what_their_entries_pin(self):
         rows = shipped()
-        for name in ("flutter", "dotnet"):
+        # Swift carries the version its signature holds (signed_version):
+        # an offer too, which the pinned path takes before any branch.
+        for name in ("flutter", "dotnet", "swift"):
             self.assertIsNotNone(sdkmeta.offered(rows[name]), f"{name} is a row with an offer, so the pinned path takes its update")
             self.assertNotRegex(update_body(), rf"^        {name}\)$")
         body = update_body()

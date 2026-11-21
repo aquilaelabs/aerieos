@@ -272,7 +272,9 @@ whole, as a **pin**: the version and the sha256 of the exact file, which
 the signed release or the signed catalog then holds, so the file is held to
 something its own origin cannot change. Two rest on their publisher's
 signature instead, under keys AerieOS ships (`config/release-keys`) or the
-row carries itself, and a repository is fetched at a commit. The rows not
+row carries itself, each carrying the version it installs
+(`source.checksum.version`), since a signature says who published a file
+and not which release it is; and a repository is fetched at a commit. The rows not
 moved onto a pin yet ask the publisher at the moment of the install: the
 digest GitHub states for a release asset, a checksum file beside the
 download, the vendor's own index; such a row reads **open** on its card. A
@@ -415,7 +417,10 @@ a person reviews it like any other. It names no vendor: how a row's newest
 version is found (`source.version`, `source.track` for a repository, a
 declared download's `track`) and how the new file's digest is learned
 (`found`) are the row's own data, read with the same resolvers an install
-of an unpinned row uses.
+of an unpinned row uses. A row held by its publisher's signature moves its
+version the same way, once every platform's file at the new one answers
+with its signature beside it or is named in its publisher's signed list;
+the signature stays the check an install makes.
 
 The five coding agents' install recipes are rows of the tool too, each
 under the name its row in the Library has (`tools/pins.py check codex-cli`).

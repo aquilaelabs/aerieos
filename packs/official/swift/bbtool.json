@@ -17,11 +17,13 @@
  "shipped": {
   "probe": "swift",
   "reports": "swift",
+  "rev": 2,
   "source": {
    "checksum": {
     "from": "signature",
     "keys": "swift.asc",
-    "sig": "{url}.sig"
+    "sig": "{url}.sig",
+    "version": "6.4.3"
    },
    "fresh_only": true,
    "kind": "tarball",

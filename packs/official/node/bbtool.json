@@ -20,6 +20,7 @@
  "shipped": {
   "probe": "node",
   "reports": "node",
+  "rev": 2,
   "source": {
    "checksum": {
     "from": "file",
@@ -27,7 +28,8 @@
      "keys": "node.asc",
      "sig": "{base}/SHASUMS256.txt.sig"
     },
-    "url": "{base}/SHASUMS256.txt"
+    "url": "{base}/SHASUMS256.txt",
+    "version": "v26.13.1"
    },
    "fresh_only": true,
    "kind": "tarball",
@@ -35,7 +37,6 @@
    "url": {
     "darwin/amd64": "https://nodejs.org/dist/{version}/node-{version}-darwin-x64.tar.gz",
     "darwin/arm64": "https://nodejs.org/dist/{version}/node-{version}-darwin-arm64.tar.gz",
-    "linux-musl/amd64": "https://unofficial-builds.nodejs.org/download/release/{version}/node-{version}-linux-x64-musl.tar.xz",
     "linux/amd64": "https://nodejs.org/dist/{version}/node-{version}-linux-x64.tar.xz",
     "linux/arm64": "https://nodejs.org/dist/{version}/node-{version}-linux-arm64.tar.xz"
    },

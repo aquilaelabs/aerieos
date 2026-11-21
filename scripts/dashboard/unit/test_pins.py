@@ -636,6 +636,103 @@ class Verify(Case):
         self.assertIn(f"go: NOT VERIFIED: its download for linux/arm64, {url}: {url} answered 404", out)
 
 
+class Signed(Case):
+    """A row held by its publisher's signature carries the version it
+    installs: a signature says who published a file, not which release.
+    check says one that carries none, pin gives it the one its resolver
+    finds, and move writes a newer one once every platform's file at it
+    answers with its signature, or is named in the signed list."""
+
+    def setUp(self):
+        super().setUp()
+        self.rows += [
+            # The download signed itself, a file for every platform.
+            {"name": "kit", "label": "Kit", "probe": "kit", "about": "Kit.", "platforms": list(PLATS), "layout": {"bin": ["bin"], "env": {}},
+             "source": {"kind": "tarball", "url": {p: GO.replace("{plat}", PLATS[p]) for p in PLATS},
+                        "version": {"resolver": "text", "url": "https://dl.example.org/VERSION"},
+                        "checksum": {"from": "signature", "sig": "{url}.sig", "keys": "kit.asc"}}},
+            # Its list of digests signed.
+            {"name": "lst", "label": "List", "probe": "lst", "about": "List.", "platforms": list(PLATS), "layout": {"bin": ["bin"], "env": {}},
+             "source": {"kind": "tarball", "url": {p: GO.replace("{plat}", PLATS[p]) for p in PLATS},
+                        "version": {"resolver": "text", "url": "https://dl.example.org/VERSION"},
+                        "checksum": {"from": "file", "url": "{base}/SUMS", "signed": {"sig": "{base}/SUMS.sig", "keys": "kit.asc"}}}}]
+        self.write()
+        self.signed("go1.99.0")
+        p = mock.patch.object(pins, "answers", self.answers)
+        p.start()
+        self.addCleanup(p.stop)
+        p = mock.patch.object(sdkmeta, "signed_by", lambda data, sig, keys, tc=None: "Kit's release team" if sig == b"good" else sdkmeta.die("no"))
+        p.start()
+        self.addCleanup(p.stop)
+
+    def signed(self, version, plats=PLATS):
+        """`version`'s files each with its signature beside it, and its signed list."""
+        self.pages["https://dl.example.org/SUMS"] = "".join(f"{sha(self.files[go_url(version, p)])}  {go_url(version, p).rsplit('/', 1)[-1]}\n"
+                                                            for p in PLATS if go_url(version, p) in self.files)
+        self.pages["https://dl.example.org/SUMS.sig"] = "good"
+        for p in plats:
+            self.files[go_url(version, p) + ".sig"] = "a signature"
+
+    def answers(self, url):
+        if url not in self.files and url not in self.pages:
+            self.gone(url)
+
+    def test_one_with_no_version_is_said_and_pin_gives_it_the_one_its_resolver_finds(self):
+        self.assertEqual(packformat.held(self.row("kit"))[0], "pinned", "it reads pinned, and so it must carry its version")
+        rc, out = self.run_tool("check")
+        self.assertEqual(rc, 3, out)
+        for name in ("kit", "lst"):
+            self.assertIn(f"{name}: held by its publisher's signature and carrying no version: tools/pins.py pin {name} writes", out)
+        for name in ("kit", "lst"):
+            rc, out = self.run_tool("pin", name)
+            self.assertEqual(rc, 0, out)
+            self.assertIn(f"{name}: its version pinned at go1.99.0", out)
+            row = self.row(name)
+            self.assertEqual((row["source"]["checksum"]["version"], row["rev"], sdkmeta.signed_version(row)), ("go1.99.0", 2, "go1.99.0"))
+            self.assertNotIn("sha256", row["source"]["checksum"], "the signature stays the check")
+        rc, out = self.run_tool("check")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("kit: its version is at go1.99.0 (its resolver finds the version it carries)", out)
+        self.assertEqual(self.run_tool("pin", "kit")[0], 1, "pinned already: move moves it")
+
+    def test_move_writes_a_newer_version_once_every_platform_is_signed(self):
+        for name in ("kit", "lst"):
+            self.run_tool("pin", name)
+        self.release("go1.100.0")
+        # Not out signed for arm64 yet: both rows wait, said, and nothing moves.
+        self.signed("go1.100.0", ["linux/amd64"])
+        self.pages["https://dl.example.org/SUMS"] = self.pages["https://dl.example.org/SUMS"].splitlines(True)[0] + "0" * 64 + "  other.tar.gz\n"
+        rc, out = self.run_tool("check", "kit", "lst")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("kit: its version is at go1.99.0 (its resolver finds go1.100.0, and linux/arm64 could not be learned", out)
+        self.assertIn("lst: its version is at go1.99.0 (its resolver finds go1.100.0, and linux/arm64 could not be learned", out)
+        before = self.read()
+        self.assertEqual(self.run_tool("move", "kit", "lst")[0], 1)
+        self.assertEqual(self.read(), before, "a row moves whole")
+        # Out for both: the version moves and nothing else of the row.
+        self.signed("go1.100.0")
+        rc, out = self.run_tool("move", "kit", "lst")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("kit: its version go1.99.0 to go1.100.0", out)
+        for name in ("kit", "lst"):
+            self.assertEqual((self.row(name)["source"]["checksum"]["version"], self.row(name)["rev"]), ("go1.100.0", 3))
+        self.assertEqual(self.fetched, [], "nothing is downloaded whole to move a signed row")
+        # A list whose signature does not hold is not moved to.
+        self.release("go1.101.0")
+        self.signed("go1.101.0")
+        self.pages["https://dl.example.org/SUMS.sig"] = "forged"
+        rc, out = self.run_tool("move", "lst")
+        self.assertEqual((rc, self.row("lst")["source"]["checksum"]["version"]), (1, "go1.100.0"), out)
+        rc, out = self.run_tool("verify", "kit")
+        self.assertIn("kit: its download at go1.100.0 is held by its publisher's signature, which an install checks", out)
+
+    def test_every_shipped_signed_row_carries_its_version(self):
+        for row in pins.table(pins.load(pins.TABLE)):
+            if pins.signed_row(row) and not sdkmeta.pin_of(row):
+                self.assertTrue(sdkmeta.signed_version(row), f"{row['name']} reads pinned and carries no version")
+                self.assertTrue(pins.is_pinned(row), row["name"])
+
+
 class Agents(Case):
     """The coding agents' install recipes are rows of the tool too, read
     from the one file that holds them and written back there: an installer

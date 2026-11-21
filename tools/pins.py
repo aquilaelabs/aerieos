@@ -30,6 +30,9 @@ replaces the lock's set whole, leaving the row's other downloads alone.
                                       ships that carries a pin: the toolchains, the coding agents'
                                       recipes, the CI runners, the services' images and the
                                       image's own tools, so a release's pass is this one command.
+                                      A row held by its publisher's signature is asked the same
+                                      way for the version it carries, and one carrying none is said
+                                      as something that would move.
     tools/pins.py move [NAME...]      writes the new version and digests into the table for the rows
                                       named (every pinned row with none named), every platform a row
                                       names or none of them, raises the row's rev by one, and runs
@@ -40,7 +43,10 @@ replaces the lock's set whole, leaving the row's other downloads alone.
                                       each download it declares with no digest yet (a row written with
                                       its address, its track and no sha256) is given the version its
                                       track finds now and its digest; and each lock with no downloads
-                                      yet is resolved to its first set.
+                                      yet is resolved to its first set. A row held by its
+                                      publisher's signature keeps it as the check and is given the
+                                      version its resolver finds now, once every platform's file at
+                                      it answers with its signature or is named in a signed list.
     tools/pins.py verify [NAME...]    downloads each pinned file and holds it to its pin, for this
                                       machine's platform; --platform P for another, --all for every
                                       one. A file is streamed and hashed, never kept. Exit 1 naming
@@ -303,6 +309,69 @@ def pinned_files(row, plats=None):
             raise Refused(f"its pin names no digest for {plat or 'this machine'}")
         out[plat] = (address(row, str(pin.get("version") or ""), plat), digest)
     return out
+
+
+# ---- a row held by its publisher's signature ------------------------------------
+# A signature says who published a file and not which release it is, so such a
+# row carries the version it installs (source.checksum.version) as a pinned row
+# carries its pin's, and its resolver stays as how a newer one is found. A move
+# writes the newer version once every platform's file at it is answered with
+# its signature, or named in its publisher's signed list; the signature stays
+# the check an install makes.
+def signed_row(row):
+    """Whether a row's own download is held by its publisher's signature:
+    the download signed itself, or its list of digests signed."""
+    ck = (row.get("source") or {}).get("checksum")
+    return isinstance(ck, dict) and (ck.get("from") == "signature" or (ck.get("from") == "file" and isinstance(ck.get("signed"), dict)))
+
+
+def answers(url):
+    """That `url` answers a file now: its first byte asked for, nothing kept."""
+    req = urllib.request.Request(sdkmeta._web(url), headers={**sdkmeta.UA, "Range": "bytes=0-0"})
+    with urllib.request.urlopen(req, timeout=60) as r:  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
+        r.read(1)
+
+
+def signed_learned(row, version):
+    """{platform: {"url", "how"}} for a signed row's files at `version`:
+    every platform the row names, each answered with its signature beside
+    it or named in its publisher's signed list, or a Refused that says
+    which is not."""
+    out = {}
+    for plat in platforms(row):
+        try:
+            url = address(row, version, plat)
+            answers(url)
+            with As(plat):
+                algo, where, by = sdkmeta.checksum(row, url, version)
+            if algo == "gpg":
+                answers(where)
+                how = f"answered, signed beside it under {by}"
+            else:
+                how = f"named in {by}"
+        except ERRORS as e:
+            raise Refused(f"{plat or 'its download'} could not be learned ({said(e)})") from e
+        out[plat] = {"url": url, "how": how}
+    return out
+
+
+def signed_part(row, version=""):
+    """plan's part for a signed row: the version it carries, and the one its
+    resolver finds now (`version` in its place where one is named)."""
+    old_v = sdkmeta.signed_version(row)
+    with As(platforms(row)[0]):
+        new_v = version or sdkmeta.newest(row)[0]
+    if new_v == old_v:
+        return {"what": "its version", "old": old_v, "new": old_v, "note": "its resolver finds the version it carries"}
+    try:
+        signed_learned(row, new_v)
+    except Refused as e:
+        if version:
+            raise
+        held = f"its resolver finds {new_v}, and {e}"
+        return {"what": "its version", "old": old_v, "new": old_v, "held": held, "note": f"{held}: it stays where it is"}
+    return {"what": "its version", "old": old_v, "new": new_v, "note": "its publisher's signature is the check an install makes",
+            "apply": lambda r, v=new_v: r["source"]["checksum"].update({"version": v})}
 
 
 def write_pin(row, got, found):
@@ -974,8 +1043,15 @@ def is_pinned(row):
     if image_rows(row):
         return all(packformat.image_digest(ref) for _, ref in image_rows(row))
     src = row.get("source") or {}
-    held = bool(sdkmeta.pin_of(row) or (src.get("kind") == "git" and src.get("commit")) or any(fetch_held(f) for f in fetch_rows(row)))
-    return held and not unheld(row) and not unlocked(row)
+    held = bool(sdkmeta.pin_of(row) or sdkmeta.signed_version(row) or (src.get("kind") == "git" and src.get("commit"))
+                or any(fetch_held(f) for f in fetch_rows(row)))
+    return held and not unheld(row) and not unlocked(row) and not unversioned(row)
+
+
+def unversioned(row):
+    """Whether a row held by its publisher's signature carries no version:
+    every release the publisher ever signed would pass it, so it is `pin`'s."""
+    return signed_row(row) and not sdkmeta.pin_of(row) and not sdkmeta.signed_version(row)
 
 
 def plan(row, version=""):
@@ -1042,6 +1118,8 @@ def plan(row, version=""):
             else:
                 parts.append({"what": "its download", "old": old_v or "the pinned bytes", "new": old_v or "the pinned bytes",
                               "note": "its address still answers the pinned bytes"})
+    elif sdkmeta.signed_version(row):
+        parts.append(signed_part(row, version))
     if src.get("kind") == "git" and src.get("commit"):
         if isinstance(src.get("track"), dict):
             got = git_learned(row)
@@ -1203,6 +1281,12 @@ def check_rows(doc, names, opts, out):
     would, failed, waiting = 0, 0, 0
     for row in chosen(doc, names):
         name = row["name"]
+        if unversioned(row):
+            # Said whether named or not: it reads pinned and installs
+            # whatever its publisher signed last.
+            out(f"{name}: held by its publisher's signature and carrying no version: tools/pins.py pin {name} writes the one its resolver finds")
+            would += 1
+            continue
         if not is_pinned(row):
             if names or row.get("compose"):
                 out(f"{name}: not pinned ({row_refused(row) if image_rows(row) else packformat.held(row)[1]})")
@@ -1320,8 +1404,11 @@ def pin_row(doc, row, opts, out):
     # Its own source, where that is not pinned yet: a repository's commit,
     # a tarball's or a script's file.
     kind = src.get("kind")
-    own = (kind == "git" and not src.get("commit")) or (kind in ("tarball", "script") and not sdkmeta.pin_of(row))
-    waiting = unheld(row) or unlocked(row)
+    # A row held by its publisher's signature keeps it as the check, and is
+    # given the version it installs.
+    signed = signed_row(row) and not sdkmeta.pin_of(row)
+    own = (kind == "git" and not src.get("commit")) or (kind in ("tarball", "script") and not sdkmeta.pin_of(row) and not signed)
+    waiting = unheld(row) or unlocked(row) or unversioned(row)
     if not own and not waiting:
         if kind in ("git", "tarball", "script") or fetch_rows(row):
             raise Refused(f"it is pinned already: tools/pins.py move {name} moves it")
@@ -1339,7 +1426,11 @@ def pin_row(doc, row, opts, out):
     # package manager for and has no files for yet: every one of them, or
     # the row is left as it was.
     if waiting:
-        parts = declared_parts(row, waiting=True) + lock_parts(row, waiting=True)
+        parts = ([signed_part(row, opts.get("version", ""))] if unversioned(row) else []) \
+            + declared_parts(row, waiting=True) + lock_parts(row, waiting=True)
+        held = next((p["held"] for p in parts if p.get("held")), "")
+        if held:
+            raise Refused(held)
         for p in parts:
             p["apply"](new)
         for line in lines(name, parts):
@@ -1456,6 +1547,8 @@ def verify_rows(doc, names, opts, out):
                     out(f"{name}: it names no download for {plats[0] or sdkmeta.this_platform()}")
                     plats = []
                 files += [(f"its download{' for ' + p if p else ''}", u, d) for p, (u, d) in pinned_files(row, plats).items()]
+            elif sdkmeta.signed_version(row):
+                out(f"{name}: its download at {sdkmeta.signed_version(row)} is held by its publisher's signature, which an install checks: not hashed here")
             for f in fetch_rows(row):
                 plat = str(f.get("platform") or "")
                 with As(opts.get("platform", "")):
