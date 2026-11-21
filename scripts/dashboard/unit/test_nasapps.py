@@ -66,6 +66,27 @@ class Check(unittest.TestCase):
         self.assertFalse(seen["media"])
         self.assertEqual(seen["services"][0]["image"], "ghcr.io/example/notes:2.4.1")
 
+    def test_a_compose_is_written_out_plainly_so_look_and_docker_read_the_same_file(self):
+        # Each of these says one thing to the reader this check uses and
+        # another to Docker: a merged key the check never sees, a service in
+        # braces whose image no Update moves and no card's word counts.
+        tail = "    ports:\n      - \"${PORT}:80\"\n"
+        for what, text in (
+                ("a merge key", "x-more: &more {privileged: true, pid: host}\nservices:\n  a:\n    image: x/y:1.0\n    <<: *more\n" + tail),
+                ("an alias", "services:\n  a:\n    image: x/y:1.0\n    volumes: *v\n" + tail),
+                ("an anchor", "services:\n  a: &a\n    image: x/y:1.0\n" + tail),
+                ("a tag", "services:\n  a:\n    image: !!str x/y:1.0\n" + tail),
+                ("a service in braces", "services:\n  a:\n    image: x/y:1.0\n" + tail + "  side: {image: \"evil/thing:1.0\"}\n")):
+            self.assertIn("write it out plainly", nasapps.check(text).get("error", ""), what)
+        # What only looks like one is taken: a comment, a quoted word, a
+        # blank, a list in brackets, an address with an ampersand.
+        plain = ("services:\n  a:\n    image: \"x/y:1.0\"   # the app & its *friends* {here}\n"
+                 "    command: [\"--name\", \"${DATA}\", \"a&b\", \"*.txt\"]\n"
+                 "    environment:\n      - A=b&c\n      - G=*.txt\n      - URL=http://h/?a=1&b=2\n" + tail)
+        self.assertNotIn("error", nasapps.check(plain))
+        self.assertEqual((nasapps.compose_marked(plain), nasapps.compose_plain(plain, {"a": {"image": "x/y:1.0"}})), ("", ""))
+        self.assertIn("a line of its own", nasapps.compose_plain(plain, {"a": {"image": "x/y:1.0"}, "b": {"image": "z/w:2"}}))
+
     def test_an_image_may_carry_the_digest_it_is_pulled_by(self):
         d = "sha256:" + "4f" * 32
 

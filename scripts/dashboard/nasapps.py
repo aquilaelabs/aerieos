@@ -349,6 +349,37 @@ def held_of(a):
     return {"word": word, "why": why}
 
 
+# What a compose file here does not use, since each lets a file say one thing
+# to the reader this check and Look read it with and another to Docker: an
+# anchor or an alias (&name, *name), a merge key (<<), a tag (!name), and a
+# mapping written in braces. A value that begins with one of those marks and
+# is not quoted is the mark; ${NAME} is a blank, not a mapping.
+COMPOSE_MARK = re.compile(r"""(?mx)
+    (?: ^[ \t]* | :[ \t]+ | -[ \t]+ | [\[,][ \t]* )     # where a key or a value begins
+    (?: [&*][A-Za-z0-9_.-] | ![A-Za-z!<] | \{ | <<[ \t]*: )""")
+
+
+def compose_marked(text):
+    """Why a compose file is not written plainly enough to be held to what
+    Look shows, or "": the first line that uses one of COMPOSE_MARK's forms
+    outside a comment."""
+    for n, line in enumerate(str(text).splitlines(), 1):
+        if COMPOSE_MARK.search(re.sub(r"(^|[ \t])#.*$", "", line)):
+            return f"line {n} uses an anchor, an alias, a merge key, a tag or a mapping in braces: write it out plainly"
+    return ""
+
+
+def compose_plain(text, services):
+    """...and why its images are not, or "": every image its services name
+    is on an `image:` line of its own, so the images this check read are
+    the ones an Update moves and the card's word is read from
+    (packformat.compose_images)."""
+    named = sorted({str(svc.get("image") or "") for svc in services.values() if isinstance(svc, dict)})
+    if named != sorted(packformat.compose_images(text)):
+        return "every service names its image on a line of its own (image: name:tag@sha256:...)"
+    return ""
+
+
 def check(compose, fields=None, network=""):
     """What a compose file of a person's own would run, before it is kept
     (the Look): {services: [{name, image, ports, volumes}], blanks, media}
@@ -365,6 +396,9 @@ def check(compose, fields=None, network=""):
         return {"error": "paste the app's compose file"}
     if len(text.encode("utf-8")) > COMPOSE_MAX:
         return {"error": f"a compose file is {COMPOSE_MAX // 1024} KB at most"}
+    why = compose_marked(text)
+    if why:
+        return {"error": why}
     try:
         doc = markup.yaml_load(text)
     except Exception as e:  # noqa: BLE001 (the reader's own word is the reason)
@@ -374,8 +408,6 @@ def check(compose, fields=None, network=""):
         return {"error": "a compose file has a services mapping with at least one service"}
     out = []
     for name, svc in services.items():
-        if not isinstance(svc, dict):
-            return {"error": f"service {name} is a mapping"}
         image = str(svc.get("image") or "")
         if not image:
             return {"error": f"service {name} names an image"}
@@ -393,6 +425,9 @@ def check(compose, fields=None, network=""):
         if fields is not None and network != "host" and svc.get("network_mode") == "host":
             return {"error": f"service {name}: network_mode: host is said in bbapp.json too (\"network\": \"host\"), so its card says it"}
         out.append({"name": str(name), "image": image, "ports": [str(p) for p in ports], "volumes": [str(v) for v in vols]})
+    why = compose_plain(text, services)
+    if why:
+        return {"error": why}
     blanks = sorted(set(re.findall(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}", text)))
     if fields is None:
         odd = [b for b in blanks if b not in BLANKS]
