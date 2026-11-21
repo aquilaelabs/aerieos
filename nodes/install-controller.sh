@@ -378,6 +378,12 @@ npm_program() {
     npm ci --ignore-scripts --no-audit --no-fund --prefix "$d" >/dev/null 2>&1 || return 1
     root="$(npm root -g 2>/dev/null)" || return 1
     install -d -m 0755 "$root" "$P/usr/local/bin"
+    # A copy an earlier install put there by name, at whatever version was
+    # newest that day, goes: the link would land inside its folder.
+    if [ -e "$root/$name" ] && [ ! -L "$root/$name" ]; then
+        npm uninstall -g "$name" >/dev/null 2>&1 || true
+        rm -rf "${root:?}/$name"
+    fi
     ln -sfn "$d/node_modules/$name" "$root/$name"
     ln -sfn "$d/node_modules/.bin/$name" "$P/usr/local/bin/$name"
 }

@@ -463,8 +463,19 @@ esac
         self.assertEqual(r.returncode, 0, r.stderr)
         prefix = os.path.join(root, "usr", "local", "lib", "aerieos-npm", "tool")
         self.assertEqual(sorted(os.listdir(prefix)), ["node_modules", "package-lock.json", "package.json"])
-        log = open(os.path.join(d, "npm.log")).read().splitlines()
+        with open(os.path.join(d, "npm.log")) as f:
+            log = f.read().splitlines()
         self.assertEqual(log, [f"ci --ignore-scripts --no-audit --no-fund --prefix {prefix}", "root -g"])
+        # Run again, and over a copy an earlier install put there by name:
+        # that copy goes, and the link is the program's own folder again.
+        glob = os.path.join(root, "usr", "lib", "node_modules", "tool")
+        os.unlink(glob)
+        os.makedirs(os.path.join(glob, "old"))
+        r = subprocess.run(["bash", "-c", pre + f'npm_program "{tree}" tool'], capture_output=True, text=True, timeout=60, check=False, env=env)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue(os.path.islink(glob))
+        with open(os.path.join(d, "npm.log")) as f:
+            self.assertIn("uninstall -g tool", f.read().splitlines())
         self.assertEqual(os.path.realpath(os.path.join(root, "usr", "lib", "node_modules", "tool")), os.path.join(prefix, "node_modules", "tool"))
         self.assertEqual(subprocess.run([os.path.join(root, "usr", "local", "bin", "tool")], capture_output=True, text=True, check=False).stdout, "tool 1.0.0\n")
 
