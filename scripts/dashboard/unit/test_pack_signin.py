@@ -257,18 +257,25 @@ class TheControllersRow(unittest.TestCase):
     def test_a_flow_that_shows_a_code_draws_the_code_and_no_field(self):
         self.offer(with_flow(prompt=None, code_after="enter the one-time code"))
         self.assertFalse(signin.pastes("heron"))
-        m = signin.PACK_FLOW["code"].search("[aerieos] then enter this code there: WXYZ-1234\n")
+        m = signin.FLOW["code"].search("[aerieos] then enter this code there: WXYZ-1234\n")
         self.assertEqual(m.group(1), "WXYZ-1234")
         self.assertTrue(signin.pastes("claude"))
         self.assertFalse(signin.pastes("codex"))
 
-    def test_a_node_whose_agent_is_from_before_the_job_is_asked_to_update_first(self):
+    def test_a_node_whose_agent_is_behind_is_told_so_by_the_jobs_own_gate(self):
+        # Every agent a controller works with runs a pack agent's sign-in;
+        # one that is behind takes nothing but its own update, said where
+        # the job is placed (nodes.agent_stale), never by a build number here.
         self.offer(HERON)
         node = {"id": "n_1", "name": "node one", "kind": "agent", "state": "online", "live": True, "reported": {"session": {"up": True}},
                 "agent": {"version": "0.9.428"}}
-        self.assertIn("update it", signin.cannot(node, "heron"))
-        self.assertEqual(signin.cannot(dict(node, agent={"version": f"0.9.{signin.PACK_FLOW_BUILD}"}), "heron"), "")
-        self.assertEqual(signin.cannot(node, "codex"), "", "a shipped agent's job is one every agent of the window runs")
+        self.assertEqual(signin.cannot(node, "heron"), "")
+
+        class Nodes:
+            def job_add(self, *_a):
+                return {"error": "node one runs agent 0.9.428 and this controller ships 0.9.510: press Update agent on its row first"}
+        got = signin.start_on_node(Nodes(), "n_1", "u_0123abcd", "node one", agent="heron")
+        self.assertIn("press Update agent", got["error"])
 
 
 class OnTheNode(unittest.TestCase):
@@ -334,7 +341,7 @@ class OnTheNode(unittest.TestCase):
         self.assertEqual(code, 0, log)
         with open(os.path.join(self.home, "heron.token")) as f:
             self.assertEqual(f.read(), "", "what the flow reports with is not handed to the program signing in")
-        self.assertEqual(signin.PACK_FLOW["url"].search(log).group(0), LINK, "whole, though the program wraps it at 80 columns")
+        self.assertEqual(signin.FLOW["url"].search(log).group(0), LINK, "whole, though the program wraps it at 80 columns")
         self.assertIn("[aerieos] signed in to Heron on node one", log)
         self.assertTrue(os.path.getsize(os.path.join(self.home, KEPT)) > 0)
         self.assertTrue(self.gone(), "what it asks after the sign-in is the person's own to answer, in their first session")
@@ -367,8 +374,8 @@ class OnTheNode(unittest.TestCase):
         self.write_packs(with_flow(prompt=None, code_after="enter the one-time code"))
         log, code = self.flow(env={"HERON_KIND": "device"})
         self.assertEqual(code, 0, log)
-        self.assertEqual(signin.PACK_FLOW["url"].search(log).group(0), LINK)
-        self.assertEqual(signin.PACK_FLOW["code"].search(log).group(1), "WXYZ-1234")
+        self.assertEqual(signin.FLOW["url"].search(log).group(0), LINK)
+        self.assertEqual(signin.FLOW["code"].search(log).group(1), "WXYZ-1234")
         self.assertNotIn("Paste code", log)
 
     def test_a_program_that_ends_itself_is_signed_in_when_it_exits_clean(self):
@@ -377,7 +384,7 @@ class OnTheNode(unittest.TestCase):
         self.write_packs(at_2_2(with_flow(ends="exit", url=["https://login.heron.example/", "https://accounts.heron.example/o/oauth2/"])))
         log, code = self.flow(("Paste code", "good-code"), env={"HERON_KIND": "exits"})
         self.assertEqual(code, 0, log)
-        self.assertEqual(signin.PACK_FLOW["url"].search(log).group(0), LINK, "the link by whichever of its beginnings it has")
+        self.assertEqual(signin.FLOW["url"].search(log).group(0), LINK, "the link by whichever of its beginnings it has")
         self.assertIn("[aerieos] signed in to Heron on node one", log)
         log, code = self.flow(("Paste code", "bad-code"), env={"HERON_KIND": "exits"})
         self.assertEqual(code, 1, log)

@@ -433,10 +433,9 @@ class Shipped(unittest.TestCase):
         root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
         with open(os.path.join(root, "Dockerfile"), encoding="utf-8") as f:
             self.assertIn("COPY config/catalog.pub /opt/aerieos/config/catalog.pub", f.read())
-        self.assertIsNotNone(catalogindex._pubkey(os.path.join(root, "config", "catalog.pub")))
-        # ...with its spare on the second line (R232), a key of its own.
+        # ...the key and its spare on the second line (R232), a key of its own.
         keys = catalogindex._pubkeys(os.path.join(root, "config", "catalog.pub"))
-        self.assertEqual(len(set(keys)), 2, "the repository names a spare for the catalog's key")
+        self.assertEqual(len(set(keys)), 2, "the repository names the catalog's key and a spare for it")
 
 
 if __name__ == "__main__":

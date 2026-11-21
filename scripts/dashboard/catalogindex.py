@@ -59,11 +59,6 @@ def _pubkeys(path=None):
         return []
 
 
-def _pubkey(path=None):
-    """The key the index is signed with, or None."""
-    return (_pubkeys(path) or [None])[0]
-
-
 def verify(index_bytes, sig_text, pub=None):
     """Whether the signature is the maintainers' over these bytes, under
     the key this install ships or its spare: "" or why not. Needs the

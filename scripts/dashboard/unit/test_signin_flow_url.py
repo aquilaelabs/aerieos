@@ -1,12 +1,8 @@
-"""A sign-in's link and code as the page offers them, read from a job's log
-whichever wrote it: the node's driver (one line each, R234 step 6), or the
-program's own screen, from a node whose bundle is from before the driver ran
-the shipped agents' sign-ins. The screens are the programs' own, as each
-printed them on 12 Nov (Codex CLI 0.164.0, Copilot CLI, Grok Build).
-
-Codex prints its link in color, and the link must end where the color code
-begins, or the page opens an address OpenAI answers with 'your session
-ended' (B235)."""
+"""A sign-in's link and code as the page offers them, read from a job's log:
+the node's driver's lines (one each, R234 step 6), never the program's own
+screen, which the driver reads on the node. The screens are the programs'
+own, as each printed them on 12 Nov (Codex CLI 0.164.0, Copilot CLI, Grok
+Build)."""
 import os
 import sys
 import unittest
@@ -53,31 +49,18 @@ class TheDriversLines(unittest.TestCase):
 
 
 class TheProgramsOwnScreen(unittest.TestCase):
-    """A node whose bundle is from before: the same data reads the screen."""
+    """The driver says the link and the code; a screen in the log is not
+    read for either."""
 
-    def test_codex_link_ends_at_its_color_code(self):
-        got = read("codex", CODEX)
-        self.assertEqual((got["url"], got["code"], got["paste"]), ("https://auth.openai.com/codex/device", "ABCD-EFGH2", False))
+    def test_no_screen_is_taken_for_a_link_or_a_code(self):
+        for agent, screen in (("codex", CODEX), ("copilot", COPILOT), ("grok", GROK), ("claude", CLAUDE)):
+            got = read(agent, screen)
+            self.assertEqual((got["url"], got["code"]), ("", ""), agent)
 
-    def test_copilot_link_and_code(self):
-        got = read("copilot", COPILOT)
-        self.assertEqual((got["url"], got["code"]), ("https://github.com/login/device", "1A2B-3C4D"))
-
-    def test_grok_link_and_code(self):
-        got = read("grok", GROK)
-        self.assertEqual((got["url"], got["code"]), ("https://accounts.x.ai/oauth2/device?user_code=WXYZ-9876", "WXYZ-9876"))
-
-    def test_claudes_link_and_its_prompt(self):
-        got = read("claude", CLAUDE)
-        self.assertEqual(got["url"], "https://claude.com/cai/oauth/authorize?code=true&client_id=abc&state=xyz")
-        self.assertEqual((got["code"], got["paste"], got["waiting"]), ("", True, True))
-
-    def test_a_link_without_color_is_taken_whole(self):
-        self.assertEqual(read("codex", "open https://auth.openai.com/codex/device?x=1 now")["url"], "https://auth.openai.com/codex/device?x=1")
-
-    def test_nothing_is_a_link_before_one_is_printed(self):
-        got = read("codex", "signing in to codex on this machine; the URL follows\n")
-        self.assertEqual((got["url"], got["code"]), ("", ""))
+    def test_the_drivers_line_is_read_past_the_ptys_carriage_returns_and_colors(self):
+        got = read("codex", "\x1b[0m[aerieos] open this link to sign in: https://auth.openai.com/codex/device\r\n"
+                            "[aerieos] then enter this code there: ABCD-EFGH2\r\n")
+        self.assertEqual((got["url"], got["code"]), ("https://auth.openai.com/codex/device", "ABCD-EFGH2"))
 
 
 if __name__ == "__main__":

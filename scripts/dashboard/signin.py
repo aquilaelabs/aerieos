@@ -46,11 +46,6 @@ PROMPT = "Paste code"
 FLOW = {"url": re.compile(r"(?<=\[aerieos\] open this link to sign in: )https://[^\s\x1b]+"),
         "code": re.compile(r"\[aerieos\] then enter this code there: ([A-Za-z0-9-]{4,40})"),
         "prompt": PROMPT}
-# The name it had while only a pack's agent signed in this way.
-PACK_FLOW = FLOW
-# The first agent build that runs a pack agent's sign-in job (0.9.429); an
-# older one in the window is asked to update first, in words.
-PACK_FLOW_BUILD = 429
 
 
 def flow_of(agent):
@@ -64,27 +59,6 @@ def pastes(agent):
     """Whether the agent's flow wants a code pasted back (a field on the
     card), as against showing one to type on the provider's page."""
     return bool((agents.flow_of(agent) or {}).get("prompt"))
-
-
-def _screen(agent):
-    """How the program's own screen reads, from the same data: (the link's
-    pattern, the words a one-time code follows). For a node whose bundle is
-    from before the one driver (a shipped agent's sign-in ran bare there,
-    its screen the job's log), until its next hello brings this build's."""
-    f = agents.flow_of(agent) or {}
-    urls = f.get("url") if isinstance(f.get("url"), list) else [f.get("url") or "https://"]
-    return re.compile("(?:" + "|".join(re.escape(u) for u in urls) + r")[^\s\x1b]*"), str(f.get("code_after") or "")
-
-
-def _code_after(text, after):
-    """The one-time code that follows the words `after` on a screen, as the
-    node's driver reads it (login-flow.py code_in)."""
-    flat = re.sub(r"\s+", " ", text)
-    at = flat.lower().rfind(after.lower()) if after else -1
-    if at < 0:
-        return ""
-    m = re.search(r"(?<![A-Za-z0-9-])([A-Z0-9]{4,12}(?:-[A-Z0-9]{3,12}){0,3})(?![A-Za-z0-9-])", flat[at + len(after):at + len(after) + 160])
-    return m.group(1) if m else ""
 
 
 # How long start_on_node() waits for the URL before answering. The flow takes
@@ -107,19 +81,9 @@ _flows = {}
 nodes = None
 mint = None
 
-# What a flow's log carries around its link that is not the link. Claude Code
-# prints the link as a terminal hyperlink (OSC 8: ESC ] 8 ; ; URI BEL, the
-# text, then the same closed), and wraps it at the pty's width, which a job's
-# pty leaves at its default: taken with \S+ off one line, the link opened was
-# its first eighty-odd characters, without its state or code challenge, and
-# the sign-in page said only that it did not complete; and the failure's
-# reason was a piece of the link's last line, "]8;;" and all.
-OSC8 = re.compile(r"\x1b\]8;[^;\x07\x1b]*;([^\x07\x1b]*)(?:\x07|\x1b\\)")
+# What a job's pty adds to the driver's lines that is not what they say:
+# escapes and carriage returns.
 ESCAPES = re.compile(r"\x1b\]8;[^;\x07\x1b]*;[^\x07\x1b]*(?:\x07|\x1b\\)|\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b|\r")
-URL_PART = re.compile(r"[A-Za-z0-9%._~:/?#\[\]@!$&'()*+,;=-]+")
-# A one-time code alone on a line, as a device flow prints it: never more of
-# a link, though every character of it could be.
-CODE_LINE = re.compile(r"[A-Z0-9]{4,}(?:-[A-Z0-9]{3,}){1,3}")
 
 
 def plain(out):
@@ -127,31 +91,11 @@ def plain(out):
     return ESCAPES.sub("", out or "")
 
 
-def link(out, rx):
-    """The flow's link, whole: a hyperlink's own target where the flow
-    printed one (never wrapped), else the text's, its wrapped lines joined
-    back while each next line is nothing but more of a URL."""
-    for target in OSC8.findall(out or ""):
-        m = rx.match(target)
-        if m:
-            return m.group(0)
-    text = plain(out)
-    m = rx.search(text)
-    if not m:
-        return ""
-    url, prev = m.group(0), text[text.rfind("\n", 0, m.start()) + 1:m.end()]
-    if text[m.end():m.end() + 1] == "\n":
-        for line in text[m.end() + 1:].split("\n"):
-            part = line.strip()
-            # More of the link: URL characters alone, after a line the
-            # wrap filled, or carrying the query's own marks.
-            if not part or not URL_PART.fullmatch(part) or not (len(prev) >= 60 or any(c in part for c in "%=&")):
-                break
-            # ...and never the code a device flow prints under its link.
-            if CODE_LINE.fullmatch(part):
-                break
-            url, prev = url + part, line
-    return url
+def link(out):
+    """The flow's link, whole, from the driver's line: it reads the
+    program's screen on the node and says the link on one line."""
+    m = FLOW["url"].search(plain(out))
+    return m.group(0) if m else ""
 
 
 # What gets removed from a pasted code before it is handed to the flow:
@@ -212,22 +156,16 @@ class NodeFlow:
     def state(self):
         j, out = self._log()
         done = (j.get("state") or "") in ("succeeded", "failed", "canceled")
-        url = link(out, FLOW["url"])
+        url = link(out)
         c = FLOW["code"].search(out)
         code = c.group(1) if c else ""
-        if not url:
-            # No driver's line: the program's own screen, from a bundle of
-            # before, read by what the agent's flow says of it.
-            rx, after = _screen(self.agent)
-            url = link(out, rx)
-            code = _code_after(plain(out), after) if url else ""
         prompt = PROMPT if pastes(self.agent) else None
         why = ""
         if done and j.get("state") != "succeeded":
             # The last line that says something: never a piece of the link.
             for line in reversed(plain(out).splitlines()):
                 line = line.strip()
-                if line and not line.startswith("http") and line not in url and (not prompt or prompt not in line):
+                if line and not line.startswith("http") and line not in url and not (url and url in line) and (not prompt or prompt not in line):
                     # Without the mark a driver's or a check's line opens with.
                     why = re.sub(r"^\[(?:aerieos|builderbot)\]\s*", "", line)[-300:]
                     break
@@ -348,15 +286,7 @@ def cannot(n, agent="claude"):
         return f"{n['name']} is not answering: sign in or out there when it is back"
     if not ((n.get("reported") or {}).get("session") or {}).get("up"):
         return f"{n['name']} runs no sessions, so there is nowhere for a {a.name} login to live there"
-    if a.pack and _build((n.get("agent") or {}).get("version")) < PACK_FLOW_BUILD:
-        return f"{n['name']}'s AerieOS agent is from before a sign-in to {a.name} could be run from here: update it from its row on the Nodes page, then sign in"
     return ""
-
-
-def _build(version):
-    """The BUILD of an agent's WINDOW.BUILD version, 0 when it says none."""
-    m = re.fullmatch(r"\d+\.\d+\.(\d+)", str(version or ""))
-    return int(m.group(1)) if m else 0
 
 
 def verb(action, node_id, uid, agent="claude"):

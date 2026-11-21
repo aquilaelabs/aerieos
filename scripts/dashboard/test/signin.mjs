@@ -124,7 +124,8 @@ ok(/Starting the sign-in on signbox/.test(await block())
    && await page.$eval('#authCode', f => f.disabled),
    'until the flow has printed its link the row says it is starting, and the code field waits');
 const log = (seq, chunk) => call('/api/v1/agent/log', { job: job.id, chunks: chunk ? [{ seq, chunk }] : [] }, asNode);
-await log(1, 'Opening browser to sign in...\nIf the browser did not open, visit: https://claude.com/cai/oauth/authorize?code=true&state=abc\nPaste code here if prompted > ');
+await log(1, '[aerieos] open this link to sign in: https://claude.com/cai/oauth/authorize?code=true&state=abc\n'
+  + '[aerieos] Paste code: the one that page gives you once you have signed in there\n');
 await page.waitForFunction(() => !!document.querySelector('[data-signin] a[href^="https://claude.com/"]')
                                  && !document.getElementById('authCode')?.disabled, null, { timeout: 20000 });
 ok(await page.$eval('[data-signin] a', a => a.target === '_blank' && /authorize\?code=true/.test(a.href))
@@ -220,9 +221,7 @@ await section("another coding agent's sign-in, on this node", async () => {
   ok(cj.type === 'codex-login' && cj.spec?.uid === me && cj.spec?.agent === 'codex',
      `Sign in queues a codex-login job on that node, for this account (${cj.type || cj.error})`);
   await call('/api/v1/agent/log', { job: cj.id, chunks: [{ seq: 1, chunk:
-    'Welcome to Codex [v0.163.0]\nFollow these steps to sign in with ChatGPT using device code authorization:\n'
-    + '1. Open this link in your browser and sign in to your account\n   https://auth.openai.com/codex/device\n'
-    + '2. Enter this one-time code (expires in 15 minutes)\n   ABCD-1234\n' }] }, asNode);
+    '[aerieos] open this link to sign in: https://auth.openai.com/codex/device\n[aerieos] then enter this code there: ABCD-1234\n' }] }, asNode);
   await page.waitForFunction(sel => document.querySelector(sel + ' .sicode')?.textContent === 'ABCD-1234', CX, { timeout: 20000 });
   ok(await page.$eval(`${CX} a`, a => a.href === 'https://auth.openai.com/codex/device' && a.target === '_blank')
      && !await page.$(`${CX} #authCode`),

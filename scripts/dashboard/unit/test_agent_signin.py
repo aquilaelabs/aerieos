@@ -181,21 +181,14 @@ class Flows(unittest.TestCase):
     def flow(self, agent, log, state="running"):
         return signin.NodeFlow(self.Nodes(log, state), "n1", "j_1", "box", uid="u_0123abcd", agent=agent).state()
 
-    def test_codex_s_device_login_shows_its_link_and_code(self):
-        log = ("Welcome to Codex [v0.163.0]\nFollow these steps to sign in with ChatGPT using device code authorization:\n"
-               "1. Open this link in your browser and sign in to your account\n   https://auth.openai.com/codex/device\n"
-               "2. Enter this one-time code (expires in 15 minutes)\n   \x1b[94mABCD-1234\x1b[0m\n")
-        st = self.flow("codex", log)
-        self.assertEqual((st["url"], st["code"], st["waiting"], st["agent"]),
-                         ("https://auth.openai.com/codex/device", "ABCD-1234", False, "codex"))
-
-    def test_copilot_s_device_login_shows_its_link_and_code(self):
-        st = self.flow("copilot", "To authenticate, visit https://github.com/login/device and enter code 1A2B-3C4D.\n"
-                                  "Waiting for authorization...\n")
-        self.assertEqual((st["url"], st["code"]), ("https://github.com/login/device", "1A2B-3C4D"))
+    def test_a_device_flow_shows_its_link_and_code_from_the_drivers_lines(self):
+        for agent, url in (("codex", "https://auth.openai.com/codex/device"), ("copilot", "https://github.com/login/device")):
+            st = self.flow(agent, f"[aerieos] open this link to sign in: {url}\r\n[aerieos] then enter this code there: ABCD-1234\r\n")
+            self.assertEqual((st["url"], st["code"], st["waiting"], st["agent"]), (url, "ABCD-1234", False, agent))
 
     def test_claude_s_flow_still_waits_for_a_pasted_code(self):
-        st = self.flow("claude", "visit: https://claude.com/cai/oauth/authorize?code=true&state=abc\nPaste code here if prompted > ")
+        st = self.flow("claude", "[aerieos] open this link to sign in: https://claude.com/cai/oauth/authorize?code=true&state=abc\n"
+                                 "[aerieos] Paste code: the one that page gives you once you have signed in there\n")
         self.assertTrue(st["waiting"])
         self.assertEqual(st["code"], "")
 
@@ -203,44 +196,18 @@ class Flows(unittest.TestCase):
            "&redirect_uri=https%3A%2F%2Fplatform.claude.com%2Foauth%2Fcode%2Fcallback&scope=org%3Acreate_api_key"
            "+user%3Aprofile&code_challenge=1Hwngyh1Ihh80Q&code_challenge_method=S256&state=XPQEcWJxK6HQ")
 
-    def test_claude_s_link_wrapped_at_the_pty_s_width_is_taken_whole(self):
-        # The job's pty is eighty wide: the flow broke the link across lines,
-        # and the page opened its first line alone (the operator, 12 Nov).
-        wrapped = "\n".join(self.URL[i:i + 80] for i in range(0, len(self.URL), 80))
-        st = self.flow("claude", "Browser didn't open? Use the url below to sign in (c to copy)\n\n"
-                                 + wrapped + "\n\nPaste code here if prompted > ")
+    def test_the_link_is_the_drivers_line_and_never_the_programs_screen(self):
+        # The driver on the node reads the program's screen and says the
+        # link whole on one line; a screen in the log is not taken as one.
+        st = self.flow("claude", "[aerieos] open this link to sign in: " + self.URL + "\r\n")
         self.assertEqual(st["url"], self.URL)
+        st = self.flow("claude", "Use the url below to sign in\n\n" + self.URL + "\n\nPaste code here if prompted > ")
+        self.assertEqual(st["url"], "")
 
-    def test_claude_s_link_as_a_terminal_hyperlink_is_its_target(self):
-        out = ("Use the url below to sign in\n\n\x1b]8;;" + self.URL + "\x07" + self.URL[:80] + "\x1b]8;;\x07\n"
-               "\x1b]8;;" + self.URL + "\x07" + self.URL[80:] + "\x1b]8;;\x07\n\nPaste code here if prompted > ")
-        self.assertEqual(self.flow("claude", out)["url"], self.URL)
-
-    def test_the_link_is_whole_at_any_width_and_however_the_hyperlink_ends(self):
-        for width in (40, 60, 80, 120):
-            wrapped = "\r\n".join(self.URL[i:i + width] for i in range(0, len(self.URL), width))
-            st = self.flow("claude", "Use the url below\r\n\r\n\x1b[36m" + wrapped + "\x1b[0m\r\n\r\nPaste code here if prompted > ")
-            self.assertEqual(st["url"], self.URL, width)
-        st = self.flow("claude", "\x1b]8;;" + self.URL + "\x1b\\" + self.URL[:80] + "\x1b]8;;\x1b\\\n")
-        self.assertEqual(st["url"], self.URL, "a hyperlink ended with ST, not BEL")
-
-    def test_a_one_time_code_under_a_long_link_line_is_not_more_of_the_link(self):
-        # A device flow that prints its code alone on the next line: every
-        # character of it could be a link's, and it is not one.
-        st = self.flow("grok", "To sign in, open this page in a browser on any device you like: https://accounts.x.ai/device\nWXYZ-1234\nWaiting...\n")
-        self.assertEqual(st["url"], "https://accounts.x.ai/device")
-        st = self.flow("grok", "To sign in, open this page in a browser on any device you like: https://accounts.x.ai/device\n"
-                               "Confirm this code in your browser:\n\n  WXYZ-1234\n\nWaiting...\n")
-        self.assertEqual((st["url"], st["code"]), ("https://accounts.x.ai/device", "WXYZ-1234"), "the code is the one after the words its flow names")
-        long = "https://accounts.x.ai/oauth2/device/verify?user_code=WXYZ-1234&client_id=grok-cli-00000000000&scope=openid%20profile"
-        st = self.flow("grok", "Open:\n" + long[:80] + "\n" + long[80:] + "\n\nCode: WXYZ-1234\n")
-        self.assertEqual(st["url"], long, "while a link that did wrap is still joined")
-
-    def test_a_failed_claude_flow_never_gives_a_piece_of_its_link_as_why(self):
-        wrapped = "\n".join(self.URL[i:i + 80] for i in range(0, len(self.URL), 80))
-        st = self.flow("claude", "Use the url below to sign in\n\n\x1b]8;;" + self.URL + "\x07" + wrapped + "\x1b]8;;\x07\n", "failed")
-        self.assertNotIn("]8;;", st["error"])
+    def test_a_failed_claude_flow_never_gives_its_link_as_why(self):
+        st = self.flow("claude", "[aerieos] open this link to sign in: " + self.URL + "\n", "failed")
         self.assertNotIn("state=", st["error"])
+        self.assertEqual(st["error"], "the sign-in did not finish")
 
     def test_a_failed_device_flow_says_why_in_its_own_words(self):
         st = self.flow("codex", "https://auth.openai.com/codex/device\nError: device auth timed out after 15 minutes\n", "failed")
