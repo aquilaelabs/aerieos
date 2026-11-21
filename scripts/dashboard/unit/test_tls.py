@@ -55,6 +55,15 @@ class Pair(unittest.TestCase):
         tls._ctx, tls._pending = None, {}
         self.addCleanup(lambda: setattr(tls, "_ctx", None))
 
+    def test_the_key_is_loaded_with_no_directory_this_account_can_write(self):
+        # In the container the dashboard's account cannot write /run: the
+        # opened key is handed over from memory and no file is made.
+        tls.RUN_DIR = os.path.join(self.tmp, "none", "such")
+        tls.apply({"tls_mode": "http"}.get, names=["192.168.1.10"])
+        self.assertIsNotNone(tls._context_of(tls.OWN))
+        self.assertIsNotNone(tls._ctx, "a handshake has something to answer it")
+        self.assertEqual(sorted(os.listdir(self.tmp)), ["tls"], "nothing beside the sealed pair")
+
     def test_self_signed_for_the_names_kept_with_the_key_sealed(self):
         st = tls.apply({"tls_mode": "self", "tls_host": "bb.example.com"}.get, names=["192.168.1.10"])
         self.assertEqual((st["mode"], st["on"], st["kind"]), ("self", True, "self"))

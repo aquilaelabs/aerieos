@@ -361,25 +361,38 @@ def certificate_pem():
 
 
 def _context_of(kind):
-    """An SSLContext from one pair kept, its key opened into RUN_DIR only
-    for the load; None when there is no such pair or it will not load."""
+    """An SSLContext from one pair kept; None when there is no such pair or
+    it will not load. The opened key is handed to the load from memory (a
+    file that is on no filesystem, named through this process's own
+    descriptors), so it is never written anywhere and needs no directory
+    this account can write; only where the system has no such file is it
+    opened into RUN_DIR for the load and removed after."""
     pem, key = _cert_text(kind), _key_text(kind)
     if not pem or not key:
         return None
     ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
     ctx.minimum_version = ssl.TLSVersion.TLSv1_2
-    kf = Path(RUN_DIR) / f"builderbot-tls-{os.getpid()}-{kind}.pem"
+    fd, kf = -1, None
     try:
-        fd = os.open(kf, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w") as fh:
-            fh.write(key)
-        ctx.load_cert_chain(str(_dir() / FILES[kind][0]), str(kf))
+        if hasattr(os, "memfd_create"):
+            fd = os.memfd_create("aerieos-tls", os.MFD_CLOEXEC)
+            os.write(fd, key.encode())
+            where = f"/proc/self/fd/{fd}"
+        else:
+            kf = Path(RUN_DIR) / f"builderbot-tls-{os.getpid()}-{kind}.pem"
+            with os.fdopen(os.open(kf, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w") as fh:
+                fh.write(key)
+            where = str(kf)
+        ctx.load_cert_chain(str(_dir() / FILES[kind][0]), where)
     except (OSError, ssl.SSLError) as e:
         print(f"dashboard: tls: the {'name' if kind == ACME else 'install'}'s certificate did not load: {e}", flush=True)
         return None
     finally:
-        with contextlib.suppress(OSError):
-            kf.unlink()
+        if fd >= 0:
+            os.close(fd)
+        if kf is not None:
+            with contextlib.suppress(OSError):
+                kf.unlink()
     return ctx
 
 
