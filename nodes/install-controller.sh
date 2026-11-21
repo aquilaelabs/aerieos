@@ -810,9 +810,6 @@ release_signed() {
     printf '   %s is the file %s'"'"'s list names, signed by %s\n' "$name" "$tag" "$who" >&2
 }
 
-# fetch_tree [TAG]: the release's tree, unpacked in a folder of its own,
-# printed. The newest release when no tag is named, read from the releases
-# page's redirect the way the Dockerfile reads its tools' (no API budget).
 # fetch_tree [TAG]: the release's controller bundle (R90 step 5), which the
 # release workflow publishes as aerieos-controller-X.Y.Z.tar.gz with its
 # sha256 beside it and a build attestation from GitHub: the archive checked
@@ -820,26 +817,20 @@ release_signed() {
 # against the release's signed list of its files (release_signed). A release
 # that carries no bundle is not taken: the oldest release an install can come
 # from carries one (stateversion.SUPPORTED_FROM, and a release moves forward
-# only), and a tag's source archive is signed by nobody. The tree's
-# directory is printed.
+# only), and a tag's source archive is signed by nobody. The newest stable
+# release when no tag is named, read from the releases page's redirect the
+# way the Dockerfile reads its tools' (no API budget), else the newest
+# published release. The tree's directory is printed.
 fetch_tree() {
     local tag="${1:-}" d base ver sum
     if [ -z "$tag" ]; then
         tag="$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/${REPO}/releases/latest" 2>/dev/null || true)"
         tag="${tag##*/}"
-        # No stable release yet: the newest dev build that carries the
-        # controller bundle, which is where AerieOS is. A build from before
-        # the name has a bundle named for the old product, so the newest
-        # release is not always the one (2 Nov, dev.4750 and before).
+        # No stable release yet: the newest published release, a dev build.
         case "$tag" in
             v[0-9]*) ;;
-            *) tag="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases?per_page=30" 2>/dev/null \
-                      | python3 -c '
-import json, sys
-for r in json.load(sys.stdin):
-    t = str(r.get("tag_name") or "")
-    if t.startswith("v") and not r.get("draft") and any(a.get("name") == "aerieos-controller-%s.tar.gz" % t[1:] for a in r.get("assets") or []):
-        print(t); break' 2>/dev/null || true)" ;;
+            *) tag="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases?per_page=1" 2>/dev/null \
+                      | python3 -c 'import json, sys; print(str((json.load(sys.stdin) or [{}])[0].get("tag_name") or ""))' 2>/dev/null || true)" ;;
         esac
         case "$tag" in v[0-9]*) ;; *) die "could not tell which release is the newest (https://github.com/${REPO}/releases/latest)" ;; esac
     fi

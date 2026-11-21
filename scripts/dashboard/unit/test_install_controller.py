@@ -449,7 +449,7 @@ while [ $# -gt 0 ]; do case "$1" in -o) out="$2"; shift 2;; -w) w="$2"; shift 2;
 case "$url" in
   *attestations/sha256:*) echo '{{"attestations":[{{"bundle":{{"x":1}}}}]}}' > "$out" ;;
   *releases/latest*) ;;
-  *api.github.com/repos/*/releases?per_page=*) echo '[{{"tag_name":"v0.9.0-dev.4750","assets":[{{"name":"builderbot-controller-0.9.0-dev.4750.tar.gz"}}]}},{{"tag_name":"v0.9.0-dev.4724","assets":[{{"name":"aerieos-controller-0.9.0-dev.4724.tar.gz"}}]}}]' ;;
+  *api.github.com/repos/*/releases?per_page=1) echo '[{{"tag_name":"v0.9.0-dev.5700","assets":[{{"name":"aerieos-controller-0.9.0-dev.5700.tar.gz"}}]}}]' ;;
   *.tar.gz.sha256) echo "{dig}  b.tar.gz" > "$out" ;;
   *archive/refs/tags/*) cp "{tgz}" "$out" ;;
   *.tar.gz) [ "{code}" = 200 ] && cp "{tgz}" "$out"; [ -n "$w" ] && printf '%s' "{code}" ;;
@@ -489,13 +489,12 @@ case " $* " in *" --bundle "*) exit {0 if gh_ok else 1};; *) exit 1;; esac
                       "so v0.9.1's signature cannot be checked: not taken", r.stderr)
         self.assertEqual(r.stdout.strip(), "", "no tree is named")
 
-    def test_no_tag_takes_the_newest_dev_build_that_carries_the_bundle(self):
-        # No stable release: the newest dev build with an aerieos-controller
-        # bundle, past a newer one whose bundle is named for the old product
-        # (2 Nov, dev.4750 and before).
+    def test_no_tag_takes_the_newest_published_release(self):
+        # No stable release: the newest published one, a dev build, asked
+        # for alone; every release there is carries the controller bundle.
         r, _ = self.fetch("", 200)
-        self.assertIn("bundle aerieos-controller-0.9.0-dev.4724.tar.gz", r.stderr)
-        self.assertIn("so v0.9.0-dev.4724's signature cannot be checked", r.stderr)
+        self.assertIn("bundle aerieos-controller-0.9.0-dev.5700.tar.gz", r.stderr)
+        self.assertIn("so v0.9.0-dev.5700's signature cannot be checked", r.stderr)
 
     def test_a_bundle_that_does_not_verify_is_not_taken(self):
         r, _ = self.fetch("v0.9.1", 200, gh_ok=False)
