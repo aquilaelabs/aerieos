@@ -106,9 +106,10 @@ in a warning on the run and replaces the list.
 Two things the controller's start of it needs, as `aerie version rehearse`
 does: the space's token allowed to start workflows (Actions, write), and
 `seal-release.yml` on the repository's default branch, since GitHub starts
-a workflow by its file's name only once the default branch carries it. A
-dev build tagged on a branch before the file has reached main waits, a
-draft, until it has, and is then sealed from the Actions page.
+a workflow by its file's name only once the default branch carries it.
+A release is refused before its tag while the default branch lacks it,
+saying so, since it would stay a draft; one tagged before that check is
+sealed from the Actions page once the file has reached main.
 
 ### The release key on GitHub
 

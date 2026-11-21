@@ -2303,7 +2303,8 @@ SESSIONS = None
 AUDIT = None
 FORGE = None        # (project, tag, version, sha, comp) -> the forge's release (forgerelease.publish)
 MADE = None         # (project, tag): a release's tag pushed, dev or not (what follows it is looked for)
-_VERB_PARTS = ("PANEL", "GIT_ENV", "CREDS_ENV", "MAY_PUSH", "SESSIONS", "AUDIT", "FORGE", "MADE")
+UNSEALED = None     # (project) -> why the host would not start what finishes a release, or "" (releasesign.unstartable)
+_VERB_PARTS = ("PANEL", "GIT_ENV", "CREDS_ENV", "MAY_PUSH", "SESSIONS", "AUDIT", "FORGE", "MADE", "UNSEALED")
 
 
 def configure_verbs(**parts):
@@ -2338,6 +2339,10 @@ def verb(name, act, req, who, principal):
         # comes back through this same branch.
         pre = field(req, "pre") or ""
         dev = req.get("dev") is True or bool(pre)
+        # Before the tag: a release whose list of files the host will not
+        # start the workflow to sign stays a draft for good (v0.9.0-dev.6049).
+        if UNSEALED and (why := UNSEALED(name)):
+            return {"error": f"The release would stay a draft: {why}, so put it there first"}, 409
         r = release(name, comp=comp, env={**CREDS_ENV(), **GIT_ENV(who, name)},
                     may_push=MAY_PUSH(name), dev=dev, pre=pre)
         if r.get("error"):

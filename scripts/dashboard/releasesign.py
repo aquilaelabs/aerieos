@@ -45,6 +45,11 @@ concurrency group, in AerieOS's seal-release.yml), with the tag as its
 workflow is left as it was and nothing is said. One that could not be
 started is said on the look's row and on the bell, with what a person does
 instead: start it by hand from the repository's Actions page, from the tag.
+GitHub starts a workflow, by hand or asked, only when the default branch
+carries it with its by-hand trigger (v0.9.0-dev.6049's seal was answered
+404 for that), so a release whose sealing workflow is not there is refused
+before its tag (unstartable, asked by version.verb), and a start refused for
+it says so in place of the host's bare 404.
 
 What would stop a release's signing is said on the bell before the release
 (attention(): no sideload key, an app mapped to none of several, the
@@ -57,6 +62,7 @@ the releases (status()).
     wants(project)        whether its workflows hand over an unsigned APK
     handing(project)      which workflow files' runs can: the uploader, its callers
     sealing(project)      which workflow files are started once an APK is attached
+    unstartable(project)  why GitHub would refuse to start them, or ""
     readiness(project)    {wanted, packages, keys, why}
     status(project)       readiness and the newest results, for the view
     expect(project, tag)  a release just made: look for its APK soon
@@ -67,6 +73,7 @@ the releases (status()).
 GitHub only: a Gitea or GitLab workflow's artifacts are asked for another
 way, and nothing here asks them.
 """
+import base64
 import calendar
 import hashlib
 import json
@@ -219,17 +226,60 @@ def sealing(project):
     that only mentions the name starts nothing."""
     out = []
     for path, text in sorted(_workflows(project).items()):
-        live = "\n".join(ln for ln in text.splitlines() if not ln.lstrip().startswith("#"))
+        live = _live(text)
         if SEAL in live and BY_HAND.search(live):
             out.append(path.rsplit("/", 1)[1])
     return out
 
 
+def _live(text):
+    """A workflow's text less its comment lines."""
+    return "\n".join(ln for ln in text.splitlines() if not ln.lstrip().startswith("#"))
+
+
+def unstartable(project, flows=None):
+    """Why GitHub would refuse to start the project's sealing workflows (or
+    `flows`, by file name) for a release, as a clause, or "". GitHub starts
+    a workflow, by hand or through its API, only when the default branch
+    carries it with its by-hand trigger, whichever ref it then runs on. ""
+    too where nothing would be started (no sealing workflow, or none of the
+    project's runs hands over an APK to sign) and where GitHub could not be
+    asked, since the look after the tag says what came of the start."""
+    flows = sealing(project) if flows is None else flows
+    if not flows or not wants(project):
+        return ""
+    repo = cilogs.repo_of(project)
+    token = cilogs._token(project) if repo else ""
+    if not repo or not token:
+        return ""
+    base = f"{forgerelease.API}/repos/{repo}"
+    missing = []
+    try:
+        main = str((forgerelease._req("GET", base, token) or {}).get("default_branch") or "")
+        if not main:
+            return ""
+        for wf in flows:
+            got = forgerelease._req("GET", f"{base}/contents/.github/workflows/{urllib.parse.quote(wf)}"
+                                           f"?ref={urllib.parse.quote(main, safe='')}", token)
+            try:
+                text = base64.b64decode((got or {}).get("content") or "").decode(errors="replace") \
+                    if isinstance(got, dict) else ""
+            except ValueError:
+                text = ""
+            if not BY_HAND.search(_live(text)):
+                missing.append(wf)
+    except forgerelease.Refused:
+        return ""
+    if not missing:
+        return ""
+    return f"GitHub starts a workflow only from the default branch, and {main} has no {' or '.join(missing)} it can start"
+
+
 def _seal(project, tag):
     """Start each of the project's sealing workflows for `tag`, on the tag,
     with the tag as its input: ([the ones started], "" or what to say of the
-    ones that were not, with what a person does instead). Nothing of either
-    for a project with no such workflow."""
+    ones that were not, with what a person does instead, in one sentence).
+    Nothing of either for a project with no such workflow."""
     started, not_started = [], []
     for wf in sealing(project):
         try:
@@ -240,12 +290,17 @@ def _seal(project, tag):
         if code == 200:
             started.append(wf)
         else:
-            not_started.append(f"{wf} ({str((body or {}).get('error') or 'no reason given')[:300]})")
+            not_started.append((wf, str((body or {}).get("error") or "no reason given")[:300]))
     if not not_started:
         return started, ""
-    return started, (f"{tag}'s signed APK is attached, and its list of files is not signed yet: {' and '.join(not_started)} "
-                     f"could not be started for it. Start it by hand from the repository's Actions page: Run workflow, "
-                     f"from the tag {tag}, with {tag} as its tag")
+    # The host's bare 404 for a workflow the default branch lacks, said as
+    # what it is, with the one thing that lets anybody start it.
+    if why := unstartable(project, [wf for wf, _ in not_started]):
+        return started, (f"{tag}'s list of files is not signed: {why}, so put it there and start it from the tag "
+                         "on the repository's Actions page")
+    said = " or ".join(f"{wf} ({reason})" for wf, reason in not_started)
+    return started, (f"{tag}'s list of files is not signed: GitHub would not start {said}, so start it from the tag "
+                     "on the repository's Actions page")
 
 
 APP_ID = re.compile(r"""applicationId\s*(?:=\s*)?["']([A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+)["']""")

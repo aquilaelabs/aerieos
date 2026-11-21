@@ -460,7 +460,10 @@ as its `tag` input, using the space's token, which needs to be allowed to
 start workflows. The look's row says which were started. One that could not
 be started is said there and is a red bell row, with what to do instead:
 start it by hand from the repository's Actions page, from the tag, with the
-tag as its input. A space with no such workflow is unaffected.
+tag as its input. GitHub starts a workflow only once the default branch
+carries it, so a release is refused before its tag while the default
+branch lacks one of these, since it would stay a draft. A space with no
+such workflow is unaffected.
 
 **Several apps, several keys.** A space keeps as many named keys as it needs,
 each with both slots; the first is **default**, which is where keys from

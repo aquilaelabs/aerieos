@@ -5456,7 +5456,7 @@ def _release_made(project, tag):
 preamble.version_policy = version.policy
 version.configure_verbs(PANEL=version_payload, GIT_ENV=users.git_env, CREDS_ENV=projects._git_env,
                         MAY_PUSH=projects.may_push, SESSIONS=sessions_anywhere,
-                        FORGE=forgerelease.publish, MADE=_release_made,
+                        FORGE=forgerelease.publish, MADE=_release_made, UNSEALED=releasesign.unstartable,
                         AUDIT=lambda *row: None if NODES_OK else db.audit(*row))
 
 
@@ -11408,6 +11408,10 @@ class Handler(BaseHTTPRequestHandler):
                                             "within three days, while CI keeps the unsigned APK",
                                    "unsigned": rs["why"]}, 409)
             acct = users.account_of(who) or {}
+            # What version.verb refuses before the tag, said before a person
+            # is asked to allow one (auto meets it there).
+            if mode != "auto" and (why := releasesign.unstartable(name)):
+                return self._json({"error": f"{plan['tag']} would stay a draft: {why}, so put it there first"}, 409)
             if mode == "auto":
                 got, code = _releaser(name, comp, str(acct.get("name") or ""), self._principal(), dev=dev,
                                       pre=plan.get("pre") or "")

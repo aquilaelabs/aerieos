@@ -16,6 +16,7 @@ files are started for the tag, and one that could not be is said with what
 a person does instead. Where
 a toolchain store with the jdk and build-tools is here, a real APK is signed
 end to end by the real agent's side of the job (signnode.py)."""
+import base64
 import glob
 import hashlib
 import io
@@ -50,6 +51,9 @@ MORE = []
 ARTS = {}
 TAGS = {}
 ANNOTATED = set()
+# The workflow files on the default branch, by name: GitHub starts a
+# workflow only from there.
+MAIN = {}
 C7, C8 = "7" * 40, "8" * 40
 # The workflow that builds the APK: started by a release, and called as a
 # job of the tag's own run, which is how a release that makes itself in CI
@@ -157,6 +161,13 @@ class GitHub(BaseHTTPRequestHandler):
         if p.startswith("/repos/o/app/releases?"):
             # The listed releases, where a draft is looked for by its tag.
             return self.answer([r for r in REL.values() if r.get("tag_name")])
+        if p == "/repos/o/app":
+            return self.answer({"full_name": "o/app", "default_branch": "main"})
+        if m := re.fullmatch(r"/repos/o/app/contents/\.github/workflows/([A-Za-z0-9._-]+)\?ref=main", p):
+            if m.group(1) not in MAIN:
+                return self.answer({"message": "Not Found"}, 404)
+            return self.answer({"name": m.group(1), "encoding": "base64",
+                                "content": base64.b64encode(MAIN[m.group(1)].encode()).decode()})
         return self.answer({"message": "Not Found"}, 404)
 
     def do_POST(self):
@@ -192,7 +203,7 @@ class GitHub(BaseHTTPRequestHandler):
 
 class Base(unittest.TestCase):
     def setUp(self):
-        SEEN.clear(); REL.clear(); MORE.clear(); ARTS.clear(); TAGS.clear(); ANNOTATED.clear()
+        SEEN.clear(); REL.clear(); MORE.clear(); ARTS.clear(); TAGS.clear(); ANNOTATED.clear(); MAIN.clear()
         releasesign._bare.clear()
         TAGS.update({"v0.7.0": C7, "v0.8.0": C8, "v0.1.0": "1" * 40})
         ARTS.update({19: handed("v0.6.0"), 31: handed("v0.8.0"),
@@ -378,6 +389,7 @@ class Seals(Base):
         super().setUp()
         self.flows = self.tmp / "ws" / "app" / ".github" / "workflows"
         (self.flows / "seal.yml").write_text(SEALFLOW)
+        MAIN["seal.yml"] = SEALFLOW
         self.started, self.answer = [], ({"dispatched": "seal.yml"}, 200)
 
         def dispatch(project, wf, ref, inputs):
@@ -404,9 +416,8 @@ class Seals(Base):
         self.assertEqual(releasesign.check("app")["signed"], ["v0.7.0"], "the APK is signed and attached all the same")
         st = releasesign.status("app")
         self.assertEqual(st["signed"][0]["tag"], "v0.7.0")
-        want = ("v0.7.0's signed APK is attached, and its list of files is not signed yet: seal.yml (the host said 403: "
-                "Resource not accessible by personal access token) could not be started for it. Start it by hand from the "
-                "repository's Actions page: Run workflow, from the tag v0.7.0, with v0.7.0 as its tag")
+        want = ("v0.7.0's list of files is not signed: GitHub would not start seal.yml (the host said 403: "
+                "Resource not accessible by personal access token), so start it from the tag on the repository's Actions page")
         self.assertEqual(next(x for x in st["last"]["runs"] if x["tag"] == "v0.7.0")["why"], want)
         self.assertEqual([(f["tag"], f["why"]) for f in st["failed"]], [("v0.7.0", want)])
         rows = [a for a in releasesign.attention(["app"]) if a["bad"]]
@@ -423,6 +434,35 @@ class Seals(Base):
         releasesign.dispatch_fn = lambda *a: 1 / 0
         self.assertEqual(releasesign.check("app", again="v0.7.0")["signed"], ["v0.7.0"])
         self.assertIn("seal.yml (ZeroDivisionError", releasesign.attention(["app"])[-1]["why"])
+
+    def test_one_the_default_branch_lacks_is_said_as_that_and_refused_before_a_release(self):
+        # v0.9.0-dev.6049: the seal was only on the release's branch, and
+        # GitHub answered its start with a bare 404.
+        del MAIN["seal.yml"]
+        why = "GitHub starts a workflow only from the default branch, and main has no seal.yml it can start"
+        self.assertEqual(releasesign.unstartable("app"), why)
+        self.answer = ({"error": "the host said 404: Not Found"}, 400)
+        self.assertEqual(releasesign.check("app")["signed"], ["v0.7.0"])
+        want = f"v0.7.0's list of files is not signed: {why}, so put it there and start it from the tag on the repository's Actions page"
+        self.assertEqual([(f["tag"], f["why"]) for f in releasesign.status("app")["failed"]], [("v0.7.0", want)])
+        # On the default branch but not startable by hand is the same.
+        MAIN["seal.yml"] = SEALFLOW.replace("  workflow_dispatch:\n", "  # workflow_dispatch:\n  push: {tags: ['v*']}\n")
+        self.assertEqual(releasesign.unstartable("app"), why)
+        # There as it is on the branch: nothing to say.
+        MAIN["seal.yml"] = SEALFLOW
+        self.assertEqual(releasesign.unstartable("app"), "")
+
+    def test_nothing_is_refused_where_nothing_would_be_started_or_github_cannot_be_asked(self):
+        del MAIN["seal.yml"]
+        # No run of the space hands over an APK: the seal is never started.
+        (self.flows / "android.yml").write_text(FLOW.replace("bb-release-apk-", "something-else-"))
+        self.assertEqual(releasesign.unstartable("app"), "")
+        (self.flows / "android.yml").write_text(FLOW)
+        self.assertTrue(releasesign.unstartable("app"))
+        # A token GitHub refuses: the look after the tag says what came of it.
+        from unittest import mock
+        with mock.patch.object(cilogs, "_token", lambda project, uid=None: "wrong"):
+            self.assertEqual(releasesign.unstartable("app"), "")
 
     def test_a_signing_that_failed_starts_nothing_and_is_a_plain_failure(self):
         self.fail_why = "app-0.7.0-unsigned.apk: no key"
