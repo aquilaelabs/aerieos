@@ -31,7 +31,11 @@ KEPT = ("PATH", "HOME", "USER", "LOGNAME", "SHELL", "TMPDIR", "IFS", "ENV", "BAS
         "LD_PRELOAD", "LD_LIBRARY_PATH", "LD_AUDIT", "DYLD_INSERT_LIBRARIES",
         "PYTHONSTARTUP", "PYTHONPATH", "PERL5OPT", "RUBYOPT", "NODE_OPTIONS",
         "GIT_SSH", "GIT_SSH_COMMAND", "GIT_EXEC_PATH", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_COUNT", "SSH_AUTH_SOCK", "SSH_ASKPASS",
-        "BB_TOKEN", "BUILDERBOT_URL", "AERIEOS_HOME")
+        "BB_TOKEN", "BUILDERBOT_URL", "AERIEOS_HOME",
+        # Each loads code into, or redirects, a tool another entry's install
+        # is checked with: python, OpenSSL, the C library, tar, git, curl, java.
+        "PYTHONHOME", "PYTHONUSERBASE", "OPENSSL_CONF", "GCONV_PATH", "TAR_OPTIONS", "GIT_TEMPLATE_DIR", "GIT_ASKPASS",
+        "GIT_DIR", "CURL_HOME", "SSL_CERT_FILE", "HTTPS_PROXY", "JAVA_TOOL_OPTIONS", "XDG_CONFIG_HOME", "SHELLOPTS", "PS4")
 
 BASE = {"name": "hexkit", "label": "Hex kit", "about": "Looks inside binaries.", "platforms": ["linux/amd64"],
         "install": {"steps": [["sh", "{dir}/install.sh"]]}, "layout": {"bin": ["bin"], "tool": "bin/hexkit"},

@@ -716,14 +716,29 @@ def files_checked(raw, what="source.files"):
 # install env, which an installer runs with; and an agent's env, which its
 # sessions and its sign-in run with. One rule for all of them: a name of
 # capitals, digits and underscores that is none of the ones a loader, a
-# shell, an interpreter, git, ssh or AerieOS itself reads at its start to
-# find code to run, or to know who and where the account is.
+# shell, an interpreter, git, ssh, curl, tar, OpenSSL, gpg or AerieOS itself
+# reads at its start to find code to run, the files it trusts, where it
+# connects through, or who and where the account is: a variable one entry
+# sets reaches the tools another's install is checked with.
 ENV_NAME = re.compile(r"[A-Z][A-Z0-9_]{0,40}")
-ENV_KEPT = frozenset(("PATH", "HOME", "USER", "LOGNAME", "SHELL", "TMPDIR", "IFS", "ENV", "BASH_ENV", "PROMPT_COMMAND",
-                      "PYTHONSTARTUP", "PYTHONPATH", "PERL5OPT", "RUBYOPT", "NODE_OPTIONS", "GIT_EXEC_PATH"))
-ENV_KEPT_PREFIXES = ("LD_", "DYLD_", "GIT_SSH", "GIT_CONFIG", "SSH_", "BB_", "BUILDERBOT_", "AERIEOS_")
-ENV_SAID = ("a name of capitals, digits and underscores, never one a loader, a shell, an interpreter, git, ssh or AerieOS "
-            "reads at its start (PATH, HOME, LD_*, BASH_ENV, PYTHONPATH, NODE_OPTIONS, GIT_SSH*, SSH_*, BB_* and their like)")
+ENV_KEPT = frozenset((
+    # A shell and the account.
+    "PATH", "HOME", "USER", "LOGNAME", "SHELL", "TMPDIR", "IFS", "ENV", "BASH_ENV", "PROMPT_COMMAND", "SHELLOPTS", "BASHOPTS", "PS4",
+    # An interpreter's code and where it is looked for.
+    "PYTHONSTARTUP", "PYTHONPATH", "PYTHONHOME", "PYTHONUSERBASE", "PYTHONPLATLIBDIR", "PERL5OPT", "PERL5LIB", "PERLLIB",
+    "RUBYOPT", "RUBYLIB", "NODE_OPTIONS", "JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS",
+    # The C library's and OpenSSL's modules.
+    "GCONV_PATH", "LOCPATH", "OPENSSL_CONF", "OPENSSL_MODULES", "OPENSSL_ENGINES",
+    # git, beyond GIT_SSH* and GIT_CONFIG*: its programs and the repository it reads.
+    "GIT_EXEC_PATH", "GIT_TEMPLATE_DIR", "GIT_ASKPASS", "GIT_PROXY_COMMAND", "GIT_EXTERNAL_DIFF", "GIT_EDITOR", "GIT_PAGER",
+    "GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    # A download's options, the certificates it trusts and where it connects through.
+    "TAR_OPTIONS", "CURL_HOME", "WGETRC", "GNUPGHOME", "CURL_CA_BUNDLE", "SSL_CERT_FILE", "SSL_CERT_DIR", "REQUESTS_CA_BUNDLE",
+    "NODE_EXTRA_CA_CERTS", "HTTPS_PROXY", "HTTP_PROXY", "ALL_PROXY"))
+ENV_KEPT_PREFIXES = ("LD_", "DYLD_", "GIT_SSH", "GIT_CONFIG", "SSH_", "XDG_", "BB_", "BUILDERBOT_", "AERIEOS_")
+ENV_SAID = ("a name of capitals, digits and underscores, never one a loader, a shell, an interpreter, git, ssh, curl, tar, OpenSSL "
+            "or AerieOS reads at its start (PATH, HOME, LD_*, BASH_ENV, PYTHONPATH, NODE_OPTIONS, GIT_SSH*, SSH_*, HTTPS_PROXY, "
+            "SSL_CERT_FILE, XDG_*, BB_* and their like)")
 
 
 def env_name_ok(name):
@@ -737,9 +752,10 @@ def env_name_ok(name):
 # manager reads as anything else: it starts with a letter or a digit, never
 # a dash (an option), and never ends in `-` (apt's suffix for remove). A
 # trailing `+` is a name's own (g++, gcc-c++), and to apt the suffix for
-# install, which is what the list asks for. An entry may give alternatives, NAME|NAME, of which
-# a node installs the first its release carries, and a portage name is
-# CATEGORY/NAME; each part is held to the shape.
+# install, which is what the list asks for. An entry may give
+# alternatives, NAME|NAME, of which a node installs the first its release
+# carries, and a portage name is CATEGORY/NAME; each part is held to the
+# shape.
 SYSTEM_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9.+:_-]*")
 SYSTEM_NAME_MAX = 80
 SYSTEM_SLASHED = ("emerge",)
