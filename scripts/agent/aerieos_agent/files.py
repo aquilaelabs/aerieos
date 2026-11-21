@@ -4,10 +4,16 @@ opens to the controller alone.
 
 The controller signs what the request is (its op, its root, its path and
 what else the op needs) and the minute, keyed with the hash of this node's
-own token, as it signs a terminal. Every path is resolved and held inside
-the root the request names, and a root is a folder on the machine's disks,
-never the system's own (/, /etc, /usr and the like): a link is never
-followed out of it. A delete is a move into the root's trash folder, with
+own token, as it signs a terminal. A root is one of this machine's own,
+by name: its pools, its array, its shares, what it adopted, the disks and
+shares it mounts and the folder of spaces a stick names, as its last
+census said them (roots_of, the list the controller's Files page is built
+from). No other folder is a root, whatever is signed, and none of the
+system's own (/, /etc, /usr and the like) is one even where a root's name
+leads there. Every path is resolved and held inside the root the request
+names: a link is never followed out of it. It is root's work on the
+controller's word, so a machine whose console said it runs none (root-asks
+off) answers no file request at all. A delete is a move into the root's trash folder, with
 a note of where it came from; nothing here deletes a file outright.
 
 What it answers, one request each, the connection closed after:
@@ -32,6 +38,7 @@ import time
 import urllib.parse
 
 from . import relaytls
+from .stores import console_said
 
 SKEW_S = 120
 TRASH = ".aerieos-trash"
@@ -77,9 +84,64 @@ def unpack(blob):
     return d
 
 
+# This machine's roots, as its last census said them (note_roots): the only
+# folders a request may name. None until the first census is taken.
+_ROOTS = {"paths": frozenset()}
+
+
+def roots_of(census):
+    """The paths of a machine's roots from its census: the spaces folder a
+    stick names, its pools, its array where it is mounted, what it adopted,
+    its shares, and the disks and shares it mounts. The list the
+    controller's Files page offers (fileexplorer.roots there), made here
+    from the same census so the node holds a request to it."""
+    rep = census if isinstance(census, dict) else {}
+    out = []
+
+    def add(path):
+        path = str(path or "").rstrip("/")
+        if path.startswith("/") and ".." not in path.split("/") and path not in out:
+            out.append(path)
+    stick = rep.get("os_stick") or {}
+    if stick.get("projects"):
+        add(stick["projects"])
+    for p in rep.get("pools") or []:
+        if isinstance(p, dict) and p.get("mount"):
+            add(p["mount"])
+    ar = rep.get("array") or {}
+    if ar.get("mount") and ar.get("mounted"):
+        add(ar["mount"])
+    ad = rep.get("adopted") or {}
+    for where, on in (ad.get("merged") or {}).items():
+        if on:
+            add(where)
+    for m in ad.get("mounts") or []:
+        if isinstance(m, dict) and m.get("mounted"):
+            add(m.get("where"))
+    for sh in rep.get("shares") or []:
+        if isinstance(sh, dict) and sh.get("path"):
+            add(sh["path"])
+    for m in rep.get("mounts") or []:
+        if isinstance(m, dict) and m.get("mounted") and not m.get("stale"):
+            add(m.get("path"))
+    for m in rep.get("ext_mounts") or []:
+        if isinstance(m, dict) and m.get("mounted") and m.get("name"):
+            add(f"/mnt/other/{m['name']}")
+    return out
+
+
+def note_roots(census):
+    """The roots of the census just taken, kept for root_ok."""
+    _ROOTS["paths"] = frozenset(roots_of(census))
+
+
 def root_ok(root):
-    """The root as a real folder, or "" when it is not one a request may name."""
+    """The root as a real folder, or "" when it is not one a request may
+    name: one of this machine's roots by its name (note_roots), and no
+    folder of the system's wherever that name leads."""
     if not isinstance(root, str) or not root.startswith("/"):
+        return ""
+    if (root.rstrip("/") or "/") not in _ROOTS["paths"]:
         return ""
     real = os.path.realpath(root)
     if any(real == d or real.startswith(d + "/") for d in SYSTEM if d != "/") or real == "/":
@@ -166,7 +228,8 @@ def _trash(root, full):
         n += 1
         to = os.path.join(trash, f"{base}-{n}")
     os.rename(full, to)
-    with open(to + ".aerieos-from", "w") as f:
+    # The note beside it, through no link left at its name.
+    with os.fdopen(os.open(to + ".aerieos-from", os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600), "w") as f:
         json.dump({"from": os.path.relpath(full, root), "at": int(time.time())}, f)
     return os.path.relpath(to, root)
 
@@ -191,6 +254,10 @@ def serve(conn, key, hdr, q, rest):
     spec = unpack(blob)
     if spec is None:
         return _err(conn, 400, "not a file request")
+    # Root's work on the controller's word: a machine whose console said it
+    # runs none answers no file request, a read among them.
+    if console_said().get("root_off") is True:
+        return _err(conn, 403, "root asks are off at this machine's console, and its files are root's to read")
     root = root_ok(spec.get("root"))
     if not root:
         return _err(conn, 403, f"{spec.get('root') or 'that'} is not a folder the file explorer reaches here")
@@ -280,7 +347,13 @@ def _write(conn, full, spec, hdr, rest):
     part = os.path.join(full, f".{name}.aerieos-part")
     conn.settimeout(120)
     try:
-        with open(part, "wb") as f:
+        # A file of this upload's own, made here: whatever was left at its
+        # name, a link among it, is taken away and never written through.
+        try:
+            os.unlink(part)
+        except FileNotFoundError:
+            pass
+        with os.fdopen(os.open(part, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o664), "wb") as f:
             if rest:
                 f.write(rest[:left])
                 left -= len(rest[:left])
