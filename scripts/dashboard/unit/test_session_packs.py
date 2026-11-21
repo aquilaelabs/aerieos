@@ -104,8 +104,9 @@ class WorksWith(unittest.TestCase):
         toolpacks.running_version = lambda: "0.10.0"
         toolpacks.packs = lambda: {"hexkit": {"manifest": {"works_with": ["0.9"]}}, "ok": {"manifest": {}}}
         rows = toolpacks.unfit()
-        self.assertEqual([r["name"] for r in rows], ["hexkit"])
-        self.assertIn("this is 0.10", rows[0]["said"])
+        self.assertEqual([(r["name"], r["unfit"]) for r in rows], [("hexkit", True)])
+        self.assertEqual(rows[0]["said"], "the pack hexkit works with AerieOS 0.9, not 0.10, so it is switched off "
+                                          "until a version of it that names this one is kept")
 
 if __name__ == "__main__":
     unittest.main()

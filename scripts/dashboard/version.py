@@ -1138,10 +1138,9 @@ def _judged(project, env=None, remote=True):
         if same:
             return sha, same[0], ""
         if not branch:
-            return "", "", (f"this tree is on no branch, and its commit {_short(sha)} is the head of no branch on "
-                            "origin: a release tags the head of a pushed branch, so check one out, push, then release")
-        return "", "", (f"{branch} is not on origin: push it (aerie git push), then release, "
-                        "so the tag marks a commit the remote has")
+            return "", "", ("this tree is on no branch, and its commit heads no branch on origin: a release tags "
+                            "the head of a pushed branch, so check one out and push it, then release")
+        return "", "", f"{branch} is not on origin: push it, then release, so the tag marks a commit the remote has"
     # Which is ahead of which: origin's commit is fetched first where this
     # tree has never heard of it, so "moved past" is not said as "apart".
     if _git(project, "cat-file", "-e", f"{there}^{{commit}}") is None:
@@ -1150,14 +1149,12 @@ def _judged(project, env=None, remote=True):
                            capture_output=True, text=True, timeout=120, check=False, env={**os.environ, **(env or {})})
     if _git(project, "merge-base", "--is-ancestor", there, sha) is not None:
         n = int(_git(project, "rev-list", "--count", f"{there}..{sha}") or 0)
-        return "", "", (f"{n} commit{'s' if n != 1 else ''} here {'are' if n != 1 else 'is'} not pushed: origin's {branch} is at "
-                        f"{_short(there)} and this tree at {_short(sha)}. Push (aerie git push), then release: the tag "
-                        "marks what is pushed")
+        return "", "", (f"{n} commit{'s' if n != 1 else ''} here {'are' if n != 1 else 'is'} not pushed to origin's {branch}: "
+                        "push, then release, since the tag marks what is pushed")
     if _git(project, "merge-base", "--is-ancestor", sha, there) is not None:
-        return "", "", (f"origin's {branch} has moved past this tree ({_short(sha)}) to {_short(there)}: "
-                        "pull, then release")
-    return "", "", (f"origin's {branch} is at {_short(there)} and this tree at {_short(sha)}, and neither holds the "
-                    "other: pull or push until they are one commit, then release")
+        return "", "", f"origin's {branch} has moved past this tree: pull, then release"
+    return "", "", (f"origin's {branch} and this tree have each moved, and neither holds the other: pull or push "
+                    "until they are one commit, then release")
 
 
 class _NoTree(Exception):
@@ -1202,7 +1199,8 @@ def _of_the_commit(fn, project, env, remote, *a, **k):
         with _commit_tree(project, sha, branch):
             return fn(project, *a, **k)
     except _NoTree as e:
-        return {"error": f"a tree of {_short(sha)} could not be made to read the release from ({e}); nothing is tagged"}
+        print(f"[dashboard] release: a tree of {_short(sha)} could not be made: {e}", flush=True)
+        return {"error": "a tree of the pushed commit could not be made to read the release from, so nothing is tagged"}
 
 
 def _not_from_here(project, name, label):
@@ -1218,9 +1216,8 @@ def _not_from_here(project, name, label):
         return ""
     base = ships.split("/", 1)[-1]
     kind = f"a {label} pre-release" if label else "a stable release"
-    return (f"{name} is {kind}, which is cut from {base}, and this commit ({_short(_git(project, 'rev-parse', 'HEAD'))}) "
-            f"is not on {base}: merge the branch into {base} and release there, or cut a dev build from here "
-            "(aerie version release --dev)")
+    return (f"{name} is {kind}, which is cut from {base}, and this commit is not on {base}: merge the branch into "
+            f"{base} and release there, or cut a dev build from here")
 
 
 def release_plan(project, comp="", dev=False, stable=False, pre="", env=None, may_push=True):
@@ -1458,9 +1455,8 @@ def _release_in_tree(project, comp, env, may_push, push, label):
         if here == "this commit" and push and may_push:
             return _push_tag(project, name, {"ok": True, "tag": name, "sha": sha, "target": tgt,
                                              "pushed": False, "finished": True}, env)
-        return {"error": f"{name} already exists, on {here}. A published tag is not "
-                         f"moved from here: bump to the next number, or move it "
-                         f"yourself in a terminal if it was never pushed."}
+        return {"error": f"{name} already exists on {'this' if here == 'this commit' else 'another'} commit, and a "
+                         "published tag is not moved from here: bump to the next number"}
     if why := floor_behind(project, comp):
         return {"error": why}
     if not dev and (why := no_upgrade_snapshot(project, comp, tgt)):
@@ -1492,10 +1488,8 @@ def _release_in_tree(project, comp, env, may_push, push, label):
                 and _git(project, "merge-base", "--is-ancestor",
                          "HEAD", ships) is not None):
             branch = ships.split("/", 1)[-1]
-            return {"error": f"this tree is on {sha}, and {ships} has moved past "
-                             f"it to {tip}. A build comes from {branch}, so a tag "
-                             f"here would name a commit nothing was ever built "
-                             f"from. Check out {branch} and pull, then release."}
+            return {"error": f"{ships} has moved past this tree, so a tag here would name a commit "
+                             f"nothing was built from: check out {branch} and pull, then release"}
     if why := _not_from_here(project, name, label):
         return {"error": why}
     why, owed = _gaps_check(project, comp)

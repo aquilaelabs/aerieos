@@ -5993,7 +5993,7 @@ PY
         if [ -r /run/builderbot-hardening.json ]; then
             case "$(python3 -c 'import json; d = json.load(open("/run/builderbot-hardening.json")); print("ok" if d.get("core") and d.get("dumpable") and d.get("mlock") else "mlock" if d.get("core") and d.get("dumpable") else "no")' 2>/dev/null)" in
                 ok) printf '  [ok]   the dashboard writes no core dump, cannot be read by another process of its user, and keeps its memory from swap\n' ;;
-                mlock) printf '  [warn] the dashboard writes no core dump and cannot be read by another process of its user, but its memory may be swapped: the memlock limit is too low (docker-compose.yml raises it with ulimits memlock -1; on Unraid --ulimit memlock=-1:-1 in Extra Parameters)\n' ;;
+                mlock) printf '  [warn] the dashboard'"'"'s memory may be swapped, since its memlock limit is too low (docs/security.md)\n' ;;
                 no) printf '  [warn] the dashboard could not turn core dumps off or make itself undumpable: a key it holds could land in a core file (docs/security.md)\n' ;;
             esac
         fi
@@ -6157,7 +6157,7 @@ PY
             printf '  [warn] nvidia EGL is installed but has no display to render on\n'
             note="$(gpu_display_note)"
             [ -n "${note:-}" ] && printf '         the startup hook says: %s\n' "$note"
-            printf '         %s; the emulator will use software (aerie emu gpu)\n' \
+            printf '         %s; the emulator will use software\n' \
                 "$(command -v Xorg >/dev/null 2>&1 \
                    && { [ -S /tmp/.X11-unix/X0 ] \
                         && echo "the X server started and has gone: a stale socket is all that is left, see /var/log/xorg-builderbot.log" \
@@ -6165,7 +6165,7 @@ PY
                    || echo "this image has no X server")"
         fi
     elif command -v nvidia-smi >/dev/null 2>&1; then
-        printf '  [FAIL] nvidia-smi present but no GPU visible: check --runtime=nvidia --gpus all\n'
+        printf '  [FAIL] nvidia-smi is here but no GPU is visible: the container is not given the GPU (docs/toolchains.md)\n'
         ok=1
     else
         printf '  [skip] no nvidia gpu passed through\n'
@@ -6236,7 +6236,7 @@ PY
     # holds no key: an empty agent (the entrypoint starts one whether or not
     # a key is ever added) is not a fault (B685).
     if [ -z "$ssh_src" ] && [ "$ssh_rc" = 2 ] && [ -S "${SSH_AUTH_SOCK:-/run/ssh-agent.sock}" ]; then
-        printf '  [FAIL] an agent socket exists but this user cannot use it; see: aerie logs | grep ssh\n'
+        printf '  [FAIL] an ssh agent socket exists but this user cannot use it (the controller'"'"'s log says why)\n'
         ok=1
     fi
     if on_node; then
@@ -6265,7 +6265,6 @@ PY
                 | head -1)"
             printf '  [FAIL] %s but github auth failed: %s\n' \
                 "$ssh_src" "${ssh_why:-$(printf '%s' "$ssh_out" | head -1)}"
-            printf '         diagnose with: ssh -vT git@github.com\n'
             ok=1
         fi
     else
@@ -6287,8 +6286,7 @@ PY
         printf '  [ok]   signed in to Claude on this machine%s\n' \
             "$(python3 "$BB_LIB/doctor-probes.py" login 2>/dev/null)"
     else
-        printf '  [warn] not signed in to Claude on this machine: Sign in on the Installed page\n'
-        printf '         runs the flow here, or `aerie login` in this shell\n'
+        printf '  [warn] not signed in to Claude on this machine: Sign in on the Installed page runs the flow here\n'
     fi
     # ...and each other agent installed here, said as Claude's is but never a
     # warning: which agents a person signs in to is theirs.

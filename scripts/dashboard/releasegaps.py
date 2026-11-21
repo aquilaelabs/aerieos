@@ -367,18 +367,16 @@ def _gaps(project, comp, since):
     return {"since": tag, "owed": rows}
 
 
-def refusal(g, limit=8):
-    """The sentence a release is refused with while `g` owes lines, or ""."""
+def refusal(g):
+    """The sentence a release is refused with while `g` owes lines, or "":
+    which bugs, and why each was carried, are the changelog editor's list
+    and the changelog's missing verb's."""
     owed = g.get("owed") or []
     if not owed:
         return ""
-    shown = "; ".join(f"{r['label']} ({'carried' if r['carried'] == 'yes' else 'unsure'}: {r['why']}) {r['title']}"
-                      for r in owed[:limit])
-    more = f"; and {len(owed) - limit} more (aerie changelog missing)" if len(owed) > limit else ""
-    return (f"{len(owed)} bug(s) fixed since {g['since']} that it carried, or may have, have no Fixed line: "
-            f"{shown}{more}. Give each one: aerie changelog add \"...\" --cat Fixed --bug N, tie a line already "
-            "written with aerie changelog link N BUG, or say why it needs none: aerie changelog skip N \"why\"; "
-            "the changelog editor and each bug's row do the same")
+    n = len(owed)
+    return (f"{n} bug{'s' if n != 1 else ''} fixed since {g['since']} {'have' if n != 1 else 'has'} no Fixed line: "
+            "the changelog editor lists each, to give it one or say why it needs none")
 
 
 def last_stable(project, comp=""):

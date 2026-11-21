@@ -1548,7 +1548,7 @@ await section("the CI watch", async () => {
     run: { id: 11, name: 'Android CI', branch: 'main', conclusion: 'failure', at: '2026-10-03T00:44:51Z' },
     findings: [
       { kind: 'run', sev: 'bad', where: 'run 11', url: 'https://github.com/o/beta/actions/runs/11',
-        text: 'The Android CI check failed on main (3 Oct, 00:44 UTC). A session can read why with aerie ci-log 11.' },
+        text: 'The Android CI check failed on main (3 Oct, 00:44 UTC)' },
       { kind: 'label', sev: 'warn', where: 'android.yml:10', text: 'runs on ubuntu-latest, which GitHub moves to a new release on its own date',
         fix: { from: 'ubuntu-latest', to: 'ubuntu-24.04' } },
       { kind: 'action', sev: 'note', where: 'android.yml:14', text: 'android-actions/setup-android@v3: v4 is out' }],

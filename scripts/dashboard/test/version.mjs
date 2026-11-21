@@ -213,8 +213,8 @@ print(json.dumps(m.release('shipproj', push=False)))`], { env })
     .toString().trim().split('\n').pop());
 
   let r = shipRel();
-  ok(!r.ok && new RegExp(behindAt).test(r.error || '') && new RegExp(tipAt).test(r.error || ''),
-     `a release on a commit the default branch has moved past is refused, naming both (${
+  ok(!r.ok && /has moved past this tree/.test(r.error || '') && !new RegExp(behindAt).test(r.error || '') && !new RegExp(tipAt).test(r.error || ''),
+     `a release on a commit the default branch has moved past is refused, in one sentence naming no commit (${
        (r.error || 'no error').slice(0, 76)})`);
   ok(/check out main and pull/i.test(r.error || ''),
      '...and says what to do about it rather than only that it will not');

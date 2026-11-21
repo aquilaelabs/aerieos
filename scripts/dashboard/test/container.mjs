@@ -171,7 +171,7 @@ ok(no.state === 'denied' && !(await api('/api/docker')).body.instances.some(i =>
 const dup = await ask({});
 const asks = (await api('/api/phone')).body.asks || [];
 ok(dup.status === 400 && /sonarr-for-alpha already exists here/.test(dup.body.error || '')
-   && /removes it from the Containers page first|env set/.test(dup.body.error || '')
+   && /change that container rather than asking for it again$/.test(dup.body.error || '')
    && !asks.some(a => a.kind === 'container' && a.name === 'sonarr-for-alpha' && a.state === 'pending'),
    `a name the store already has is refused before the bell, naming the ways forward (${dup.status}: ${
       (dup.body.error || '').slice(0, 70)})`);
@@ -188,10 +188,10 @@ await section("a build from nowhere is refused before anybody is asked", async (
   const r = await ask({ name: 'd2-armor-web', compose: BUILT });
   const asks = (await api('/api/phone')).body.asks || [];
   ok(r.status === 400 && /builds app from a relative path/.test(r.body.error || '')
-     && /own data directory, which is empty/.test(r.body.error || '')
-     && /aerie devapp new/.test(r.body.error || '') && /docker-compose\.yml or compose\.yml/.test(r.body.error || '')
+     && /absolute path or a git URL/.test(r.body.error || '') && /from its Artifacts view$/.test(r.body.error || '')
+     && !/aerie |\. /.test(r.body.error || '')
      && !asks.some(a => a.kind === 'container' && a.name === 'd2-armor-web'),
-     `an ask whose compose builds from a relative path is refused before the bell, naming aerie devapp new (${
+     `an ask whose compose builds from a relative path is refused before the bell, in one sentence naming the ways it builds (${
         r.status}: ${(r.body.error || '').slice(0, 90)})`);
   const made = await api('/api/container', { action: 'create', name: 'd2-armor-web', compose: BUILT, env: '' });
   ok(/builds app from a relative path/.test(made.body.error || '')

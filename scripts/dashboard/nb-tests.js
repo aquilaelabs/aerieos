@@ -33,7 +33,7 @@ function nbTestsView({$, nb, project}){
     const t = tabOf(panes[active]);
     if (!t || t.kind !== "term"){
       unbusy(btn, "Open the run's output");
-      return notify("no shell tab opened; open one and run aerie tests log -f", true);
+      return notify("no shell tab opened, so the run's output is not shown", true);
     }
     // Sent once: the server waits for the shell to come up (`wait`), asking
     // tmux, or the node, itself, rather than the page's own list of

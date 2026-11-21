@@ -370,7 +370,7 @@ function nbSigningView({$, nb, project}){
           filename: f.name, backup: await fileB64(f)});
         if (j.error) return notify(j.error, true);
         const k = j.key || {};
-        notify(`${projLabel(project)}: ${k.key || "the key"}'s ${(SIGN_ROUTES.find(([r]) => r === k.route) || [])[1] || "key"} imported (${signFp(k.sha256)})`);
+        notify(`${projLabel(project)}: ${k.key || "the key"}'s ${(SIGN_ROUTES.find(([r]) => r === k.route) || [])[1] || "key"} imported`);
         adding = false;
         fresh = fresh.filter(n => n !== k.key);
         loadSigning();

@@ -5,6 +5,7 @@ moved, and what the new home answers a node's knock; and the second pass
 (R175): the move armed with no life and the bundle packed fresh, a late
 node handed its challenge after the move, the landing told both ways under
 the move key, the pull's proof, the pieces, and the nodes not yet here."""
+import contextlib
 import io
 import json
 import os
@@ -476,12 +477,16 @@ class Move(unittest.TestCase):
         c = move.cut_landing(new_state)
         self.assertTrue(c and c["stamp"], c)
         self.assertTrue(Path(c["aside"]).is_dir() and (Path(c["aside"]) / "fresh.json").is_file(), "what was here, kept whole aside")
-        with mock.patch.object(move, "STATE", new_state):
+        out = io.StringIO()
+        with mock.patch.object(move, "STATE", new_state), contextlib.redirect_stdout(out):
             rows = move.cut_landing_rows()
+            again = move.cut_landing_rows()
         self.assertEqual(len(rows), 1)
-        self.assertIn("cut midway", rows[0]["why"])
-        self.assertIn(os.path.basename(c["aside"]), rows[0]["why"])
-        self.assertIn("Land the same bundle again", rows[0]["why"])
+        self.assertRegex(rows[0]["why"], r"^A move's landing was cut midway on [^.]*: landing the same bundle again with its token, "
+                                         r"from Controller settings, finishes it$", "one sentence")
+        self.assertEqual(again, rows)
+        # ...where what was here is kept, in the log, once.
+        self.assertEqual(out.getvalue().count(c["aside"]), 1, out.getvalue())
         # The same bundle again, with its token: the landing finishes and the mark goes.
         move._into = real_into
         got = move.restore(bundle, r["token"], state_dir=new_state, workspace_dir=self.tmp / "new-ws", secrets_dir=self.tmp / "new-secrets")

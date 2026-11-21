@@ -70,8 +70,8 @@ class Pushed(unittest.TestCase):
         self.commit("two")
         self.commit("three")
         for r in self.both(dev=True):
-            self.assertIn("2 commits here are not pushed", r.get("error", ""), r)
-            self.assertIn("Push (aerie git push), then release", r["error"])
+            self.assertEqual("2 commits here are not pushed to origin's main: push, then release, since the tag marks what is pushed",
+                             r.get("error", ""), r)
         self.assertEqual(self.git("tag"), "")
         self.git("push", "-q", "origin", "main")
         r = version.release("app", env=GIT_ENV, dev=True)
@@ -86,8 +86,7 @@ class Pushed(unittest.TestCase):
         # This tree has never heard of that commit: it is fetched to tell
         # "moved past" from "apart", and the directory's files are not touched.
         for r in self.both(dev=True):
-            self.assertIn("origin's main has moved past this tree", r.get("error", ""), r)
-            self.assertIn("pull, then release", r["error"])
+            self.assertEqual("origin's main has moved past this tree: pull, then release", r.get("error", ""), r)
         self.commit("mine")
         self.assertIn("neither holds the other", version.release("app", env=GIT_ENV, dev=True)["error"])
         self.assertEqual(self.git("tag"), "")
@@ -103,7 +102,7 @@ class Pushed(unittest.TestCase):
         self.assertEqual(r["tag"], "v1.2.0-dev.1")
         # ...and at a commit that heads none: said.
         self.git("checkout", "-q", "--detach", "topic")
-        self.assertIn("is the head of no branch on origin", version.release_plan("app", dev=True)["error"])
+        self.assertIn("its commit heads no branch on origin", version.release_plan("app", dev=True)["error"])
 
     def test_the_branchs_line_and_channel_are_read_though_the_tree_is_on_none(self):
         # A branch named for the release it works toward tags that line's dev
@@ -158,7 +157,7 @@ class Pushed(unittest.TestCase):
         for r in (version.release_plan("app", stable=True), version.release("app", env=GIT_ENV)):
             self.assertIn("v1.2.0 is a stable release, which is cut from main", r.get("error", ""), r)
             self.assertIn("is not on main", r["error"])
-            self.assertIn("aerie version release --dev", r["error"])
+            self.assertTrue(r["error"].endswith("or cut a dev build from here"), r["error"])
         for r in (version.release_plan("app", pre="rc"), version.release("app", env=GIT_ENV, pre="rc")):
             self.assertIn("v1.2.0-rc.2 is a rc pre-release, which is cut from main", r.get("error", ""), r)
         self.assertEqual(self.git("tag"), "")

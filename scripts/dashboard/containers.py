@@ -197,9 +197,7 @@ def name_free(name):
     and a second name is a second container on the same data."""
     slug = devapp._slug(name) or ""
     if slug in devapp._load():
-        return (f"{slug} already exists here. To change it, the operator removes it from "
-                "the Containers page first, or a session changes a variable with aerie devapp "
-                f"--container {slug} env set FILE and then aerie devapp --container {slug} rebuild")
+        return f"{slug} already exists here, so change that container rather than asking for it again"
     return devapp.name_clash(slug, devapp.MAIN)
 
 
@@ -278,13 +276,12 @@ def build_refusal(name, compose_text, env_text=""):
     svcs = relative_builds(compose_text, env_text)
     if not svcs:
         return ""
-    return (f"{name or 'this container'} builds {', '.join(svcs)} from a relative path, and a "
-            "container written here has no space tree behind it: compose resolves that path "
-            "against the container's own data directory, which is empty, so there is nothing to "
-            "build. A space's own code goes into Docker from a compose file at the space's "
-            "root (docker-compose.yml or compose.yml), with Send to Docker on its Artifacts view "
-            "or aerie devapp new from a session, and builds from the tree. A container written "
-            "here builds from an absolute path or a git URL.")
+    # Compose resolves a relative path against the container's own data
+    # directory, which is empty: a space's own code goes into Docker from the
+    # compose file at the space's root, sent from its Artifacts view.
+    return (f"{name or 'this container'} builds {', '.join(svcs)} from a relative path, which a container "
+            "written here has no tree for: build from an absolute path or a git URL, or send the space's "
+            "own compose file to Docker from its Artifacts view")
 
 
 def create_container(name, compose_text, env_text="", node="", for_project="", app=None):

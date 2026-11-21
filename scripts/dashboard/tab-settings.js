@@ -1036,7 +1036,7 @@ async function askReset(){
       ${unenrollWhat(true)}
       ${list.map(n => { const busy = resetBusy(n), clean = !!(n.live && n.reported?.sandbox); return `
         <label class="ndcap"><input type="checkbox" data-rsnode="${esc(n.id)}"${busy ? " disabled" : " checked"}> ${esc(n.name)}: ${
-          clean ? "uninstall AerieOS from it" : "remove it here; the machine keeps AerieOS until <code>sudo bb-sandbox uninstall</code> there"}${
+          clean ? "uninstall AerieOS from it" : "remove it here only; the machine keeps AerieOS until it is uninstalled there"}${
           busy ? `<div class="hint bad">${esc(busy)}: end and bring them down first, or it stays enrolled</div>` : ""}</label>`; }).join("")}
       <label class="ndcap"><input type="checkbox" id="resetStores"> Also delete the stores on their disks: the toolchains, the caches, the artifacts</label>
     </div>` : ""}

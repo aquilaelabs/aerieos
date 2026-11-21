@@ -154,6 +154,16 @@ class Gate(unittest.TestCase):
             self.assertTrue(version._gaps_check("p")[0], "a setting that cannot be read refuses")
         version.release_gate = None
 
+    def test_the_refusal_is_one_sentence_that_sends_to_the_changelog_editor(self):
+        # Which bugs, and why each was carried, are the editor's list and
+        # the changelog's missing verb's: the refusal names no bug and no command.
+        import releasegaps
+        owed = [{"id": n, "label": f"B{n}", "title": "t", "carried": "yes", "why": "w", "commits": []} for n in (4, 7)]
+        self.assertEqual(releasegaps.refusal({"since": "v1.0.0", "owed": owed}),
+                         "2 bugs fixed since v1.0.0 have no Fixed line: the changelog editor lists each, to give it one or say why it needs none")
+        self.assertTrue(releasegaps.refusal({"since": "v1.0.0", "owed": owed[:1]}).startswith("1 bug fixed since v1.0.0 has no Fixed line"))
+        self.assertEqual(releasegaps.refusal({"since": "v1.0.0", "owed": []}), "")
+
 
 if __name__ == "__main__":
     unittest.main()

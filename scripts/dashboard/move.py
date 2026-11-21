@@ -300,19 +300,27 @@ def cut_landing(state_dir=None):
     return d if isinstance(d, dict) and d.get("stamp") else None
 
 
+# The cut landings the log has named the folder of, once each.
+_cut_said = set()
+
+
 def cut_landing_rows():
-    """The bell's row for a landing cut midway (B622): what is where, and
-    that landing the same bundle with its token again finishes it."""
+    """The bell's row for a landing cut midway (B622): that landing the
+    same bundle with its token again finishes it. What was here is kept
+    whole in the folder the record names, under the state folder, said in
+    the log once, and the first-run page shown meanwhile is not a fresh
+    install."""
     c = cut_landing()
     if not c:
         return []
     when = time.strftime("%d %b %H:%M", time.localtime(int(c.get("at") or 0)))
-    aside = os.path.basename(str(c.get("aside") or ""))
+    if c["stamp"] not in _cut_said:
+        _cut_said.add(c["stamp"])
+        print(f"[dashboard] move: a landing was cut midway on {when}; what was here is kept whole in "
+              f"{c.get('aside') or 'the state folder'}", flush=True)
     return [{"kind": "move", "id": f"cut-{c['stamp']}", "bad": True, "key": f"movecut:{c['stamp']}",
-             "why": f"A move's landing was cut midway on {when}: what is here is part of what was and part of the bundle, "
-                    f"and what was here is kept whole in {aside} under the state folder. Land the same bundle again with its "
-                    "token from Controller settings, Move a controller here, which finishes it; a first-run page shown "
-                    "meanwhile is not a fresh install."}]
+             "why": f"A move's landing was cut midway on {when}: landing the same bundle again with its token, "
+                    "from Controller settings, finishes it"}]
 
 
 def _tar_tree(tar, src, arc, leave=()):
@@ -883,10 +891,9 @@ def far_nodes(to, nodes):
 
 def far_said(far, to):
     one = len(far) == 1
-    return (f"{', '.join(far)} {'dials' if one else 'dial'} in from outside this network at no public hostname of this controller's, so {to}, "
-            f"an address of the local network, cannot be reached from {'it' if one else 'them'}: Forget this move and prepare it again with an "
-            f"address {'it reaches' if one else 'they reach'}, or set Reach from outside on the Network page and enroll {'it' if one else 'them'} "
-            f"again at that hostname with the Enroll script on {'its' if one else 'each'} row before you move")
+    return (f"{', '.join(far)} {'dials' if one else 'dial'} in from outside this network, so {to} cannot be reached from "
+            f"{'it' if one else 'them'}: prepare the move with an address {'it reaches' if one else 'they reach'}, or enroll "
+            f"{'it' if one else 'them'} again at a public hostname first")
 
 
 def pack_bundle():
@@ -940,9 +947,8 @@ def _no_room_said(e, where, repos):
         free = f"{shutil.disk_usage(str(where)).free / 1e9:.1f} GB"
     except OSError:
         free = "too little"
-    return (f"the disk holding this controller's state ({where}) filled up: {free} free once the unfinished bundle was removed. "
-            + ("Free room there, or prepare the move again without the repositories, which then move by naming their folder on the new home"
-               if repos else "Free room there and try again"))
+    return (f"the disk holding this controller's state filled up, with {free} free once the unfinished bundle was removed"
+            + (", so free room there or prepare the move without the repositories" if repos else ", so free room there and try again"))
 
 
 # A backup of the controller under a token of its own (the operator, 6 Nov):
@@ -1276,9 +1282,9 @@ def room_for(size, where):
     if free >= need:
         return ""
     gb = lambda n: f"{n / 1e9:.1f} GB"  # noqa: E731
-    return (f"this machine has {gb(free)} free where a move lands, and the bundle needs about {gb(need)} (it, and what it unpacks to): "
-            "a stick keeps that on itself until a system pool is named. Make the bundle without the repositories, land it, then name "
-            "the folder they are in as the spaces folder on the Nodes page")
+    # A stick keeps a landing on itself until a system pool is named.
+    return (f"this machine has {gb(free)} free where a move lands and the bundle needs about {gb(need)}: make it without the "
+            "repositories, land it, then name their folder as the spaces folder on the Nodes page")
 
 
 def fetch_bundle(old_url, token, dest):
@@ -1506,9 +1512,8 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
     if m["state_version"] > here_ver:
         # Named both ways, with what to do (B961): a stick cannot update
         # itself before a landing, so it is written again from a newer one.
-        return {"error": f"the bundle comes from AerieOS {m.get('version') or 'a newer build'}, whose state (version {m.get('state_version')}) "
-                         f"is newer than this install's build {build_version() or ''} reads (up to {here_ver}): a move never lands on an older build. "
-                         f"Write this stick again from {m.get('version') or 'that release'} or newer with the USB maker (or update this install), then land it"}
+        return {"error": f"the bundle comes from AerieOS {m.get('version') or 'a newer build'}, and a move never lands on an older build: "
+                         f"update this install, or write this stick again from {m.get('version') or 'that release'} or newer, then land it"}
     # ...nor a state this build does not read: it would land, and the next
     # start refuse it (B600).
     if m["state_version"] < stateversion.SUPPORTED_FROM:
@@ -1559,9 +1564,8 @@ def restore(path, token="", state_dir=None, workspace_dir=None, secrets_dir=None
             except OSError:
                 free = need + (64 << 20)
             if need + (64 << 20) > free:
-                return {"error": f"the moved state is {need >> 20} MB and {state_dir} has {free >> 20} MB free: nothing here was changed. "
-                                 "On the old controller, untick the stores kept under its state (Move this controller lists each with its size), "
-                                 "or pack fewer of its logs, and land it again"}
+                return {"error": f"the moved state is {need >> 20} MB and {free >> 20} MB is free where it lands, so nothing here was "
+                                 "changed: untick the stores kept under the old controller's state, then land it again"}
         stamp = time.strftime("%Y%m%d-%H%M%S")
         aside = state_dir / f".moved-{stamp}"
         # A landing within the same second as one before (a retry after a

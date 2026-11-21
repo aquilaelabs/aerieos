@@ -1483,16 +1483,18 @@ def fits(manifest, version=None):
 
 
 def unfit():
-    """The bell's rows (kind pack) for each pack this install holds whose
-    works_with does not name the running release line."""
+    """The bell's rows (kind pack, `unfit` set) for each pack this install
+    holds whose works_with does not name the running release line. It comes
+    back by itself once a version that names this line is kept, which its
+    Library card offers when there is one."""
     line = line_of(running_version())
     out = []
     for n, r in packs().items():
         m = (r or {}).get("manifest") or {}
         if line and not fits(m):
-            out.append({"kind": "pack", "name": n, "key": f"pack:unfit:{n}:{line}",
-                        "said": f"the pack {n} is switched off: it says it works with AerieOS {', '.join(m.get('works_with') or [])}, and this is {line}. "
-                                "It comes back by itself once a version that names this one is kept (its card on the Library offers it when there is one), or remove it"})
+            out.append({"kind": "pack", "unfit": True, "name": n, "key": f"pack:unfit:{n}:{line}",
+                        "said": f"the pack {n} works with AerieOS {', '.join(m.get('works_with') or [])}, not {line}, so it is "
+                                "switched off until a version of it that names this one is kept"})
     return out
 
 
