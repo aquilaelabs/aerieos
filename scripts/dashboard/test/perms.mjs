@@ -205,9 +205,9 @@ await section("Making projects on one node", async () => {
 });
 
 // An area without Read is refused and hidden (R152 step 3): a role that
-// reads Toolchains alone sees that tab and none of the others.
+// reads Install alone sees that tab and none of the others.
 await section("An area without Read is refused and hidden", async () => {
-  await api('/api/roles', { action: 'set', name: 'tc-viewer', scope: 'global', perms: { toolchains: 'read' } });
+  await api('/api/roles', { action: 'set', name: 'tc-viewer', scope: 'global', perms: { install: 'read' } });
   await api('/api/roles', { action: 'assign', name: 'dep', roles: ['tc-viewer'] });
   const tc = await api('/api/toolchains', undefined, depAuth);
   const nd = await api('/api/v1/nodes', undefined, depAuth);

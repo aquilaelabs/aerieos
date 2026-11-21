@@ -46,9 +46,7 @@ AREAS = (
     ("nodes", "Nodes", "global", "the Nodes page", "configure nodes, and what a space's sessions reach"),
     # What the Library and the Installed page do (R174, the operator, 28
     # Oct): Install and Configure on a node, each grantable node by node,
-    # and Curate, the catalog's own entries, which every node shares. Before
-    # 0.9 these were one area, Toolchains, still read as Install for a
-    # release (ALIASES).
+    # and Curate, the catalog's own entries, which every node shares.
     ("install", "Install", "global", "the Library and the Installed page", "install, update and remove toolchains, coding agents and packs on a node"),
     ("configure", "Configure", "global", "a service's and a pack's settings on a node", "change them, and deploy or remove a service there"),
     ("curate", "Curate", "global", "the catalog's own entries", "add your own pack or app, edit and remove it"),
@@ -67,10 +65,6 @@ AREAS = (
 # The areas a Global role may hold on named nodes alone (its `nodes`, none
 # named being every node): what reaches a machine (the operator, 7 Oct).
 NODE_AREAS = frozenset({"nodes", "install", "configure", "jobs", "newprojects", "storage"})
-# An area's name before 0.9, read as today's for one release (R174): a role
-# written by a 0.8 page or a script still holding Toolchains is read as
-# Install. Migration 0017 rewrote the roles kept; this goes in 0.10.
-ALIASES = {"toolchains": "install"}
 # The areas an Everywhere role may hold instance by instance, each at its own
 # level (the operator, 16 Oct: expand an area's row to say which nodes, which
 # runners, Read or Write on each, the area's own boxes ticking every one).
@@ -161,7 +155,6 @@ def configure(*, state, write_json):
 def _perms(p):
     """{area: read|write}, the ones that name a known area and level."""
     p = p if isinstance(p, dict) else {}
-    p = {**{new: p[old] for old, new in ALIASES.items() if old in p and new not in p}, **p}
     return {a: p[a] for a in AREA_KEYS if p.get(a) in LEVELS}
 
 
@@ -193,7 +186,6 @@ def _only(raw, perms, nodes=()):
     is held is in `perms` at the best level of its map, so every question
     asked without an instance (the rail, the summary) keeps its answer."""
     raw = raw if isinstance(raw, dict) else {}
-    raw = {**{new: raw[old] for old, new in ALIASES.items() if old in raw and new not in raw}, **raw}
     nodes = sorted({str(n)[:40] for n in nodes or () if str(n).strip()})[:64]
     if not raw and nodes:
         raw = {a: {n: perms[a] for n in nodes} for a in NODE_AREAS if perms.get(a)}
@@ -341,12 +333,10 @@ def get(name):
     return all_roles().get(str(name or ""))
 
 
-def set_role(name, scope="projects", perms=None, note="", grants=None, nodes=None, only=None):
+def set_role(name, scope="projects", perms=None, note="", only=None):
     """Make or change a role; owner and admin are built in and refused.
-    `grants` is the shape from before R152, converted. `only`, for an
-    Everywhere role, holds an INSTANCE_AREAS area on the instances it names,
-    each at its level; `nodes` is the shape from before it, one list for
-    every node area."""
+    `only`, for an Everywhere role, holds an INSTANCE_AREAS area on the
+    instances it names, each at its level."""
     name = str(name or "").strip()
     if not NAME_RE.match(name):
         return {"error": "a role's name is letters, digits, spaces and . _ -, up to 40"}
@@ -357,8 +347,7 @@ def set_role(name, scope="projects", perms=None, note="", grants=None, nodes=Non
     # granted to all of them at once.
     if name.lower() in RESERVED:
         return {"error": f"{name} is what every account without a role is called, so no role takes that name"}
-    r = _clean({"grants": grants} if grants is not None and perms is None else
-               {"scope": scope, "perms": perms or {}, "nodes": nodes or [], "only": only or {}})
+    r = _clean({"scope": scope, "perms": perms or {}, "only": only or {}})
     r["note"] = str(note or "")[:200]
     if r["scope"] == "projects" and any(a not in PROJECT_AREAS for a in r["perms"]):
         bad = ", ".join(a for a in r["perms"] if a not in PROJECT_AREAS)

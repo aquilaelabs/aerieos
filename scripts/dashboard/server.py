@@ -12522,7 +12522,7 @@ class Handler(BaseHTTPRequestHandler):
             # wrong place and silently without it (R155).
             was = roles.get(field(req, "name"))
             want = field(req, "scope") or "projects"
-            if was and not was.get("builtin") and "perms" in req and was.get("scope") != want:
+            if was and not was.get("builtin") and was.get("scope") != want:
                 held = sorted(u["name"] for u in users.all_users()
                               if field(req, "name") in (users.get(u["name"]) or {}).get("roles", [])
                               or any(field(req, "name") in rs for rs in
@@ -12531,13 +12531,10 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json({"error": f"{', '.join(held)} {'holds' if len(held) == 1 else 'hold'} "
                                                 f"{field(req, 'name')}: take it off first, or make a new role "
                                                 "of the other kind"}, 400)
-            if "perms" in req:
-                return self._result(roles.set_role(field(req, "name"), field(req, "scope") or "projects",
-                                                   req.get("perms") if isinstance(req.get("perms"), dict) else {},
-                                                   field(req, "note"),
-                                                   nodes=req.get("nodes") if isinstance(req.get("nodes"), list) else [],
-                                                   only=req.get("only") if isinstance(req.get("only"), dict) else {}))
-            return self._result(roles.set_role(field(req, "name"), grants=req.get("grants"), note=field(req, "note")))
+            return self._result(roles.set_role(field(req, "name"), want,
+                                               req.get("perms") if isinstance(req.get("perms"), dict) else {},
+                                               field(req, "note"),
+                                               only=req.get("only") if isinstance(req.get("only"), dict) else {}))
         if act == "two-factor":
             # Require a second factor of everybody holding this role (R127).
             r = roles.set_two_factor(field(req, "name"), req.get("on") is True)

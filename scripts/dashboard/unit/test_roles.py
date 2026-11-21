@@ -168,13 +168,9 @@ class Model(unittest.TestCase):
         self.assertEqual(roles.summary(o), {"nodes": "write", "jobs": "read"})
 
     def test_a_global_role_may_hold_its_node_areas_on_named_nodes(self):
-        # The operator, 7 Oct: making projects on one node, and node areas
-        # scoped as they were before R152.
-        # Toolchains, the area's name before 0.9, is read as Install (R174).
-        r = roles.set_role("creator", "global", {"newprojects": "write", "toolchains": "write", "controller": "read"},
-                           nodes=["n1"])
-        # The list from before R260 reads as each node area on those nodes at
-        # its own level.
+        # The operator, 7 Oct: making projects on one node.
+        r = roles.set_role("creator", "global", {"newprojects": "write", "install": "write", "controller": "read"},
+                           only={"newprojects": {"n1": "write"}, "install": {"n1": "write"}})
         self.assertEqual(r["only"], {"newprojects": {"n1": "write"}, "install": {"n1": "write"}})
         c = {"name": "c", "role": "user", "roles": ["creator"], "projects": []}
         self.assertTrue(roles.granted(c, "create", node="n1"))
@@ -185,7 +181,7 @@ class Model(unittest.TestCase):
         self.assertEqual(roles.nodes_for(c, "newprojects"), ["n1"])
         self.assertIsNone(roles.nodes_for(ADMIN, "newprojects"), "admin: every node")
         self.assertEqual(roles.CAP_AREA["create"], ("newprojects", "write"), "its own area, not Controller's")
-        self.assertEqual(roles.set_role("p", "projects", {"projects": "read"}, nodes=["n1"])["only"], {},
+        self.assertEqual(roles.set_role("p", "projects", {"projects": "read"}, only={"nodes": {"n1": "read"}})["only"], {},
                          "only a Global role names nodes")
 
     def test_install_configure_and_curate_are_three_areas(self):
@@ -243,6 +239,12 @@ class Model(unittest.TestCase):
         d = roles.get("deployer")
         self.assertEqual((d["scope"], d["perms"]), ("global", {"releases": "write", "jobs": "write"}))
         self.assertEqual(d["note"], "old")
+
+    def test_a_kept_role_with_one_list_of_nodes_holds_each_node_area_there(self):
+        with open(os.path.join(self.tmp, "roles.json"), "w") as f:
+            json.dump({"roles": {"creator": {"scope": "global", "nodes": ["n1"],
+                                               "perms": {"newprojects": "write", "jobs": "read", "controller": "read"}}}}, f)
+        self.assertEqual(roles.get("creator")["only"], {"newprojects": {"n1": "write"}, "jobs": {"n1": "read"}})
 
     def test_an_unknown_role_on_an_account_grants_nothing(self):
         ghost = {"name": "g", "role": "gone", "roles": ["gone"], "projects": ["alpha"]}
