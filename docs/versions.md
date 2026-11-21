@@ -197,9 +197,8 @@ Each release says how far back it reaches, in two numbers.
   the way on is a fresh install.
 - **The agent's window** is the minor of `AGENT_VERSION`. A node whose agent is
   from another window takes nothing but its own update, and its spaces'
-  sessions wait until it has it. The controller keeps what the previous
-  window's agents need to be updated and to hand over what they left on the
-  node, and nothing older.
+  sessions wait until it has it. The controller keeps what an older agent
+  needs to take that update, and sends it no other job until it has.
 
 There is no downgrade. A container goes back by restoring the copy the
 upgrade took (`backups/before-VERSION`) under the older image. A bare-metal

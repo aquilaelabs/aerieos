@@ -666,8 +666,8 @@ await section("the card's notice", async () => {
   ok(await page.$eval(`${C} [data-c]`, b => /^Claude: no node to run a Claude session on: pick one/.test(saidOf(b))),
      '...while the button carries the fix');
   await plant({ session_at: 'shed', node_name: 'shed', session_why: '',
-                held: 'shed runs agent 0.5.0 and this controller ships 0.6.93: a different compatibility window, so nothing sent to it is promised to work. Update it from the Nodes page' });
-  ok(/^shed runs agent 0\.5\.0 and this controller ships 0\.6\.93: .*Update it from the Nodes page$/.test(await line()),
+                held: 'shed runs agent 0.5.0, too old for this controller to work with: update it from the Nodes page' });
+  ok(/^shed runs agent 0\.5\.0, too old for this controller to work with: update it from the Nodes page$/.test(await line()),
      `a node out of window says so on the card too (${await line()})`);
   await plant({ held: '' });
   await plant({ node_name: 'shed' });

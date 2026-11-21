@@ -2790,7 +2790,7 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
   await page.evaluate(async id => { await loadNodes(); delete nodesConf[id]; readMoved('nodes'); drawPanes(); }, minted.id);
   await page.waitForFunction(sel => /has an older build of agent \S+ \(/.test(document.querySelector(sel + ' .ndconfstate')?.textContent || ''), ROW, { timeout: 10000 });
   const sameTc = await napi('/api/toolchains', { action: 'install', names: ['jdk'], node: minted.id });
-  ok(/runs agent \S+ \(00000000\) and this controller ships the same number as a newer file \([0-9a-f]{8}\)/.test(sameTc.error || ''),
+  ok(/runs an older build of agent \S+: press Update agent on its row first/.test(sameTc.error || ''),
      `an agent on the same number but another file is told so, on the row and in the refusal (${(sameTc.error || 'no error').slice(0, 90)})`);
   await fetch(base + '/api/v1/agent/hello', { method: 'POST',
     headers: { Authorization: 'Bearer ' + en.token, 'Content-Type': 'application/json' },
@@ -2868,11 +2868,11 @@ m._exec("INSERT INTO jobs (id, type, project, requested_by, placement, source,"
   // Waited for rather than read once: the rows and the alerts are two reads
   // of the record in one poll, and a hello landing between them skews one
   // poll's answer; the next agrees.
-  await page.waitForFunction(() => /different compatibility window/.test(
+  await page.waitForFunction(() => /too old for this controller to work with: update it from the Nodes page/.test(
     (state.projects || []).find(p => p.name === 'alpha')?.node_gap || ''), null, { timeout: 30000 });
   ok(true, 'the space row carries why nothing routed to its node runs');
   const refusedRun = await napi('/api/v1/jobs', { action: 'run', project: 'alpha', argv: ['sh', '-c', 'true'] });
-  ok(/different compatibility window/.test(refusedRun.error || ''),
+  ok(/too old for this controller to work with/.test(refusedRun.error || ''),
      `...and a bb verb sent to it is refused with the same sentence (${(refusedRun.error || 'no error').slice(0, 60)})`);
   await napi('/api/prefs', { project: 'alpha', node: '' });
   await fetch(base + '/api/v1/agent/hello', { method: 'POST',
