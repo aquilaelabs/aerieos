@@ -1118,19 +1118,19 @@ def size_of(tc, pkg_id=""):
     return str(total) if total else ""
 
 
-# Where a source kind with no url of its own downloads from: sdkmanager's
-# packages are Google's.
-KIND_HOST = {"sdkmanager": "dl.google.com"}
-
+HOST_NAME = re.compile(r"[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?")
 
 def source_host(tc):
     """The host an install of `tc` downloads from first, or "" where the
-    catalog does not say (a command run through another tool)."""
+    catalog does not say (a command run through another tool): its
+    address's, else the one its row names (source.host) for a source kind
+    with no address of its own."""
     src = tc.get("source") or {}
     url = for_platform(src.get("url")) if src.get("url") else ""
     if isinstance(url, str) and "://" in url:
         return urllib.parse.urlsplit(url).hostname or ""
-    return KIND_HOST.get(str(src.get("kind") or ""), "")
+    host = src.get("host")
+    return host if isinstance(host, str) and HOST_NAME.fullmatch(host) else ""
 
 
 def unreachable(host, timeout=6):

@@ -311,6 +311,28 @@ class Kinds(sdkstore.KitCase):
         self.assertEqual(self.receipt("pack")[7:], ["online", SENTENCE])
         self.assertIn("its steps kept the network, as its entry says: " + SENTENCE, out)
 
+    def test_a_warm_up_s_variables_are_the_row_s_own(self):
+        """What a vendor's tool wants set for its first run is said by its
+        row (source.env, the environment its run and its verify have): the
+        mechanism sets CI=true for every row and names no vendor's
+        variable."""
+        url, commit = self.repo()
+        said = "CI=$CI quiet=${KIT_QUIET:-unset} home=${KIT_HOME:-unset} flutter=${FLUTTER_SUPPRESS_ANALYTICS:-unset} dotnet=${DOTNET_CLI_TELEMETRY_OPTOUT:-unset}"
+        src = {"kind": "git", "url": url, "commit": commit, "fresh_only": True, "online": SENTENCE,
+               "fetch": [{"url": self.data_url, "sha256": self.data_sha, "to": "dl/data.bin"}],
+               "warm": ["sh", "-c", f'echo "{said}" > {{dir}}/warmed'], "warm_note": "warming",
+               "env": {"KIT_QUIET": "1", "KIT_HOME": "{dir}/home"},
+               "verify": ["sh", "-c", "exit 0"]}
+        self.s.row("pack", src)
+        rc, out = self.s.sh("sdk_install pack", PATH=self.s.can_cut())
+        self.assertEqual(rc, 0, out)
+        got = dict(w.split("=", 1) for w in self.s.read("pack", "warmed").split())
+        self.assertEqual(got, {"CI": "true", "quiet": "1", "home": self.s.dir("pack") + "/home", "flutter": "unset", "dotnet": "unset"})
+        with open(os.path.join(sdkstore.REPO, "scripts", "lib", "sdk.sh"), encoding="utf-8") as f:
+            mechanism = f.read()
+        for vendor in ("FLUTTER_SUPPRESS_ANALYTICS", "DOTNET_CLI_TELEMETRY_OPTOUT"):
+            self.assertNotIn(vendor, mechanism)
+
 
 class Shipped(sdkstore.KitCase):
     """What the implied cut does to the rows AerieOS ships. A row whose

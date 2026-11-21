@@ -1603,14 +1603,17 @@ sdk_install_git() {
     sdk_meta_into warm argv "$what" source.warm "dir=$d"
     if [ "${#warm[@]}" != 0 ]; then
         log "$(sdk_meta field "$what" source.warm_note)"
-        # Bounded, and asked of nobody: flutter's first --version sat for half
-        # an hour on a node with nothing written (12 Oct) and held every
-        # toolchain queued behind it. CI=true is how its tool knows no person
-        # is there to answer; a warm-up that does not finish in the limit
+        # Bounded, and asked of nobody: a first --version sat for half an
+        # hour on a node with nothing written (12 Oct) and held every
+        # toolchain queued behind it. CI=true is how a tool knows no person
+        # is there to answer, and what else its own tool wants set for
+        # that is the row's to say (source.env, the environment its run and
+        # its verify have too); a warm-up that does not finish in the limit
         # fails this toolchain alone, saying so, and the job goes on.
         local rc=0
-        CI=true FLUTTER_SUPPRESS_ANALYTICS=true DOTNET_CLI_TELEMETRY_OPTOUT=1 \
-            sdk_bounded "${BB_WARM_TIMEOUT:-900}" "${SDK_CUT[@]}" "${warm[@]}" || rc=$?
+        local -a wenv
+        sdk_meta_into wenv env "$what" source.env "dir=$d"
+        sdk_bounded "${BB_WARM_TIMEOUT:-900}" "${SDK_CUT[@]}" env CI=true "${wenv[@]}" "${warm[@]}" || rc=$?
         [ "$rc" != 124 ] || die "${what}: warming did not finish within ${BB_WARM_TIMEOUT:-900}s (${warm[*]}); this install is taken off again, and Install retries it"
         [ "$rc" = 0 ] || die "${what}: warming failed (${warm[*]}, exit ${rc}); this install is taken off again, and Install retries it"
     fi
