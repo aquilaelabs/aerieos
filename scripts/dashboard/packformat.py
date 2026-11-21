@@ -735,8 +735,9 @@ def env_name_ok(name):
 # What a recipe may list for a node's package manager to install as root (a
 # row's or a pack's `system`) is a package's name and nothing a package
 # manager reads as anything else: it starts with a letter or a digit, never
-# a dash (an option), and ends in neither `-` nor `+` (apt's suffixes for
-# remove and install). An entry may give alternatives, NAME|NAME, of which
+# a dash (an option), and never ends in `-` (apt's suffix for remove). A
+# trailing `+` is a name's own (g++, gcc-c++), and to apt the suffix for
+# install, which is what the list asks for. An entry may give alternatives, NAME|NAME, of which
 # a node installs the first its release carries, and a portage name is
 # CATEGORY/NAME; each part is held to the shape.
 SYSTEM_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9.+:_-]*")
@@ -753,7 +754,7 @@ def system_name_ok(name, manager=""):
         return False
     for alt in name.split("|"):
         parts = alt.split("/") if manager in SYSTEM_SLASHED else [alt]
-        if len(parts) > 2 or not all(SYSTEM_NAME.fullmatch(p) and p[-1] not in "-+" for p in parts):
+        if len(parts) > 2 or not all(SYSTEM_NAME.fullmatch(p) and p[-1] != "-" for p in parts):
             return False
     return True
 
@@ -764,7 +765,7 @@ def system_refused(sysd):
         return ""
     if not (isinstance(sysd, dict) and all(isinstance(k, str) and SYSTEM_MANAGER.fullmatch(k) and isinstance(v, list) and len(v) <= SYSTEM_MOST
                                            and all(system_name_ok(n, k) for n in v) for k, v in sysd.items())):
-        return "its system packages are not package names: each starts with a letter or a digit and ends in neither - nor +"
+        return "its system packages are not package names: each starts with a letter or a digit and never ends in -"
     return ""
 
 

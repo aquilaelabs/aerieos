@@ -49,11 +49,15 @@ class Families(unittest.TestCase):
         self.assertTrue(any("system.brew is not a package manager" in e for e in errors), errors)
 
     def test_a_system_package_s_name_is_a_name_and_nothing_a_package_manager_reads_as_more(self):
-        for good in ("libssl-dev", "libstdc++6", "g++-12", "libicu73_2", "python3.12", "libc6:i386", "7zip", "Xvfb", "libasound2t64|libasound2"):
+        # A name that ends in its own + (g++ on apt and apk, gcc-c++ on dnf
+        # and zypper) is a name: to apt a trailing + asks to install, which
+        # is what the list asks.
+        for good in ("libssl-dev", "libstdc++6", "g++-12", "libicu73_2", "python3.12", "libc6:i386", "7zip", "Xvfb", "libasound2t64|libasound2",
+                     "g++", "gcc-c++", "clang|g++"):
             self.assertTrue(packformat.system_name_ok(good), good)
-        # An option, apt's suffixes for remove and install, a version or a
-        # pattern, a path, a second word, an empty alternative.
-        for bad in ("-y", "--allow-downgrades", "-oAPT::Get::Assume-Yes=true", "openssh-server-", "sudo+", "curl=8.5.0", "lib*", "./x.deb", "/tmp/x.deb",
+        # An option, apt's suffix for remove, a version or a pattern, a
+        # path, a second word, an empty alternative.
+        for bad in ("-y", "--allow-downgrades", "-oAPT::Get::Assume-Yes=true", "openssh-server-", "g++-", "curl=8.5.0", "lib*", "./x.deb", "/tmp/x.deb",
                     "a b", "a;b", "$(id)", "a|", "|a", "a|-b", "a|b-", "", "x" * 81, 7, None, ["a"], "caf\u00e9"):
             self.assertFalse(packformat.system_name_ok(bad), repr(bad))
             for mgr in toolpacks.SYSTEM_NAMES:
