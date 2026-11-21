@@ -10,6 +10,14 @@ name: publish release
 # :latest and :MAJOR.MINOR for a stable one. A release published by a
 # person's token starts this; one published by a workflow's own token would
 # not, so the dispatch does the same by name.
+#
+# Which image that is comes from the release, never from the registry's
+# word for a tag: the release has to be published and sealed (its
+# SHA256SUMS signed by a key config/release-signers names, in a namespace
+# its tag may carry), and the tags are moved onto the digest its signed
+# list names (aerieos-image-X.Y.Z.digest). A run by hand for a tag whose
+# release is a draft, or unsealed, moves nothing; and whatever was pushed
+# under :X.Y.Z since is not what :dev and :latest are pointed at.
 
 on:
   release:
@@ -36,6 +44,12 @@ jobs:
   follow:
     runs-on: ubuntu-24.04
     steps:
+      # The signers this run's own tree names, and nothing else of it.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (R206)
+        with:
+          sparse-checkout: |
+            config/release-signers
+          sparse-checkout-cone-mode: false
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069   # v4.4.1, pinned by commit (R206)
       - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550   # v4.8.0, pinned by commit (R206)
         with:
@@ -46,19 +60,54 @@ jobs:
         shell: bash
         env:
           TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          case "$TAG" in v[0-9]*.[0-9]*.[0-9]*) ;; *) echo "::error::not a release tag: $TAG"; exit 1 ;; esac
+          no() { echo "::error::$1"; exit 1; }
+          case "$TAG" in v[0-9]*.[0-9]*.[0-9]*) ;; *) no "not a release tag: $TAG" ;; esac
           img="$(printf '%s/%s' "$REGISTRY" "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')"
           ver="${TAG#v}"
-          docker buildx imagetools inspect "$img:$ver" >/dev/null \
-            || { echo "::error::$img:$ver is not there: the tag's image build has not finished"; exit 1; }
+          # Published: a draft is its owner's to read first, and this
+          # token does not see one.
+          draft="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft 2>/dev/null || true)"
+          [ "$draft" = false ] || no "$TAG has no published release (a draft, or none): the tags people follow move when it is published"
+          # Sealed: its list of files, signed by a key this tree names, in
+          # a namespace its tag may carry (a stable release its own key's
+          # alone).
+          mkdir -p rel
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir rel \
+              --pattern SHA256SUMS --pattern SHA256SUMS.sig --pattern "aerieos-image-${ver}.digest" \
+            || no "$TAG is not sealed: it carries no signed list of its files, or does not name its image"
+          for f in SHA256SUMS SHA256SUMS.sig "aerieos-image-${ver}.digest"; do
+            [ -s "rel/$f" ] || no "$TAG carries no $f: it is not sealed, so nothing is moved"
+          done
+          may="aerieos-release aerieos-dev"
+          case "$ver" in *-*) ;; *) may="aerieos-release" ;; esac
+          by=""
+          for ns in $may; do
+            if ssh-keygen -Y verify -f config/release-signers -I "$ns" -n "$ns" -s rel/SHA256SUMS.sig < rel/SHA256SUMS >/dev/null 2>&1; then
+              by="$ns"; break
+            fi
+          done
+          [ -n "$by" ] || no "$TAG's list of files is signed by no key config/release-signers names for it: nothing is moved"
+          # The image is the one the signed list names, by its digest.
+          want="$(awk -v n="aerieos-image-${ver}.digest" 'NF == 2 { f = $2; sub(/^\*/, "", f); if (f == n) { print tolower($1); exit } }' rel/SHA256SUMS)"
+          have="$(sha256sum "rel/aerieos-image-${ver}.digest" | cut -d' ' -f1)"
+          if [ -z "$want" ] || [ "$want" != "$have" ]; then
+            no "aerieos-image-${ver}.digest is not the file $TAG's signed list names: nothing is moved"
+          fi
+          ref="$(tr -d '[:space:]' < "rel/aerieos-image-${ver}.digest")"
+          if [ "${ref%@*}" != "$img" ] || ! printf '%s' "${ref#*@}" | grep -Eqx 'sha256:[0-9a-f]{64}'; then
+            no "$TAG names its image as $ref, which is not $img by a digest: nothing is moved"
+          fi
+          docker buildx imagetools inspect "$ref" >/dev/null \
+            || no "$ref is not in the registry: the tag's image build did not push it, or it is gone"
           follow=(dev)
           case "$ver" in
             *-*) ;;
             *) follow+=(latest "$(printf '%s' "$ver" | cut -d. -f1-2)") ;;
           esac
           for t in "${follow[@]}"; do
-            docker buildx imagetools create -t "$img:$t" "$img:$ver"
-            echo "$img:$t is $ver" | tee -a "$GITHUB_STEP_SUMMARY"
+            docker buildx imagetools create -t "$img:$t" "$ref"
+            echo "$img:$t is $ver (${ref#*@})" | tee -a "$GITHUB_STEP_SUMMARY"
           done

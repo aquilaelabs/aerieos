@@ -155,18 +155,18 @@ class ShippedTable(unittest.TestCase):
         self.assertEqual(json.dumps(self.doc, indent=2, ensure_ascii=False) + "\n", self.text, "a move's diff is then the lines that changed")
 
     def test_every_row_is_a_whole_pin_for_every_platform_it_offers(self):
-        self.assertEqual(sorted(self.rows), ["actionlint", "cloudflared", "hadolint", "mise", "novnc", "ruff", "uv", "yq"])
+        self.assertEqual(sorted(self.rows), ["actionlint", "cloudflared", "hadolint", "mise", "mkosi", "novnc", "ruff", "uv", "yq"])
         for name, row in self.rows.items():
             src = row["source"]
             ck = src["checksum"]
             self.assertEqual(packformat.pin_refused(ck), "", name)
             self.assertEqual(packformat.source_refused(src), "", name)
             self.assertEqual(packformat.held(row)[0], "pinned", name)
-            if name == "novnc":
+            if name in ("novnc", "mkosi"):
                 # One file for every platform: its release's source at the
                 # tag, whose publisher states no digest for it.
                 self.assertRegex(ck["sha256"], r"^[0-9a-f]{64}$")
-                self.assertEqual(src["url"], "https://github.com/novnc/noVNC/archive/refs/tags/v{version}.tar.gz")
+                self.assertRegex(src["url"], r"^https://github\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+/archive/refs/tags/v\{version\}\.tar\.gz$")
                 self.assertEqual((ck["found"], packformat.track_refused(src["version"], "source.version")), ({"from": "none"}, ""))
                 continue
             self.assertIsInstance(ck["sha256"], dict, name)
@@ -187,7 +187,20 @@ class ShippedTable(unittest.TestCase):
         with mock.patch.dict(pins.VERBS, {"check": lambda doc, names, opts, out: out(",".join(r["name"] for r in pins.chosen(doc, names))) or 0}):
             said = []
             self.assertEqual(pins.main(["check", "--file", SHIPPED], out=said.append), 0, said)
-        self.assertEqual(said, ["hadolint,yq,actionlint,ruff,uv,mise,cloudflared,novnc"])
+        self.assertEqual(said, ["hadolint,yq,actionlint,ruff,uv,mise,cloudflared,novnc,mkosi"])
+
+    def test_the_os_image_s_build_takes_mkosi_as_the_table_pins_it(self):
+        # mkosi builds the OS image as root: its source is the pinned
+        # file, at the version image/build.sh names, and nothing is
+        # installed from an address.
+        wf = text(".github", "workflows", "os-image.yml")
+        self.assertIn('held="$(bash scripts/lib/pin-fetch config/image-tools.json mkosi linux/amd64 "$RUNNER_TEMP/mkosi-${pin}.tar.gz")"', wf)
+        self.assertIn('[ "$held" = "$pin" ] ||', wf)
+        self.assertIn('sudo pip install --break-system-packages "$RUNNER_TEMP/mkosi-${pin}.tar.gz"', wf)
+        code = "\n".join(ln for ln in wf.splitlines() if not ln.lstrip().startswith("#"))
+        self.assertNotRegex(code, r"pip install[^\n]*https?://")
+        pin = re.search(r"MKOSI_PIN:-([0-9.]+)", text("image", "build.sh")).group(1)
+        self.assertEqual(self.rows["mkosi"]["source"]["checksum"]["version"], pin, "the table and image/build.sh name one version")
 
     def test_pin_fetch_names_the_address_the_tool_verifies(self):
         # What pin-fetch downloads for a row is what tools/pins.py verify holds to the pin.

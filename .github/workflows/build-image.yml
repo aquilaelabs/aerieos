@@ -83,10 +83,11 @@ jobs:
         with:
           fetch-depth: 0
       - name: The tag is cut from where its kind may be
-        # A dev build on the branch it was built on; a stable release or a
-        # release candidate only on a commit that is on main.
+        # A dev build on a commit that is on a branch a release is cut from
+        # (tools/release-branches); a stable release or a release candidate
+        # only on a commit that is on main.
         run: |
-          git fetch --no-tags origin '+refs/heads/main:refs/remotes/origin/main'
+          git fetch --no-tags origin '+refs/heads/*:refs/remotes/origin/*'
           bash tools/release-place.sh "$GITHUB_REF_NAME" "$GITHUB_SHA" origin/main
 
   lint:
@@ -114,10 +115,15 @@ jobs:
   # none of them holds the key.
   #
   # `environment: release` is where the key is kept: an environment whose
-  # secrets GitHub hands only to a job that names it, and which the
-  # repository limits to v* tags (docs/versions.md, The release key on
-  # GitHub). A repository-level secret is read here all the same, so this
-  # works before the secret is moved there and after.
+  # secrets GitHub hands only to a job that names it, which the repository
+  # limits to v* tags and whose reviewers approve each run before a step of
+  # it starts (docs/versions.md, The release key on GitHub). Those rules
+  # are GitHub's settings and no file's: the workflow a tag runs is the
+  # tag's own copy, so whoever may push a v* tag writes this job too, and
+  # what stops them is who may push such a tag and who approves the
+  # environment. A secret of that name kept at the repository's own level
+  # is read here all the same, by any workflow of any branch: it belongs
+  # in the environment alone.
   signature:
     needs: [place, lint, suites]
     if: startsWith(github.ref, 'refs/tags/v')
@@ -128,6 +134,39 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (R206)
+        with:
+          fetch-depth: 0
+      # Where the tag may be cut from, asked again here by the DEFAULT
+      # branch's copy of the rule (tools/release-place.sh and the list it
+      # reads, tools/release-branches), before the step that holds the key:
+      # the tag's own copy is the tag's to write, and a tag on a commit no
+      # release branch holds would pass its own. Until the default branch
+      # carries the list, the tag's own copy is asked, and the run says so.
+      # What this cannot hold: the workflow a tag runs is the tag's own
+      # file, so a tag that rewrites this job is stopped by the release
+      # environment's rules on GitHub alone (docs/versions.md).
+      - name: The default branch's copy of where a release is cut from
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (R206)
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: trusted
+          sparse-checkout: |
+            tools/release-place.sh
+            tools/release-branches
+          sparse-checkout-cone-mode: false
+      - name: The tag's commit is on a branch a release is cut from
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          rule=trusted/tools
+          if [ ! -f "$rule/release-branches" ] || [ ! -f "$rule/release-place.sh" ]; then
+            echo "::warning title=The tag's own rule was asked::the default branch does not carry tools/release-branches yet, so where $TAG may be cut from was read from the tag's own tree"
+            rule=tools
+          fi
+          git fetch --no-tags origin '+refs/heads/*:refs/remotes/origin/*'
+          bash "$rule/release-place.sh" "$TAG" "$GITHUB_SHA" origin/main "$rule/release-branches"
       # The library the key is used with, each file held to its hash, in a
       # step that holds no secret: `pip install cryptography` ran in the
       # step that held the key, and took whatever PyPI served that day.
@@ -259,7 +298,12 @@ jobs:
             # release is a draft until its owner has read it (the operator,
             # 1 Nov). A tag pushes its exact version alone, and main its own
             # :main, which the next build's cache seeds from.
-            type=ref,event=branch
+            # A build from any other branch (a run by hand) is named for
+            # its branch under a prefix no release's tag has: a branch
+            # called dev, latest or 0.9 would have pushed over the tag
+            # people follow.
+            type=raw,value=main,enable=${{ github.ref == 'refs/heads/main' }}
+            type=ref,event=branch,prefix=branch-,enable=${{ github.ref != 'refs/heads/main' }}
             type=ref,event=pr
             type=sha,format=short
             type=schedule,pattern={{date 'YYYYMMDD'}}
@@ -758,6 +802,27 @@ jobs:
           img="$(printf '%s/%s' "$REGISTRY" "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')"
           printf '%s@%s\n' "$img" "$DIGEST" > "out/aerieos-image-${GITHUB_REF_NAME#v}.digest"
           cat "out/aerieos-image-${GITHUB_REF_NAME#v}.digest"
+      # The ISO and the stick's image were built by another job and came
+      # here as the run's artifact, so each is held to the sha256 the job
+      # that built it put out, before this job attests it: what is attested
+      # is what was built, whatever sat in the artifact store between.
+      - name: The ISO and the stick are the files the OS image's build made
+        shell: bash
+        env:
+          ISO: ${{ needs.appliance.outputs.iso-sha256 }}
+          STICK: ${{ needs.appliance.outputs.stick-sha256 }}
+        run: |
+          set -euo pipefail
+          held() {   # held WHAT SHA256 FILE
+            printf '%s' "$2" | grep -Eqx '[0-9a-f]{64}' \
+              || { echo "::error::the OS image's build put out no sha256 for $1, so it is not attested"; exit 1; }
+            [ -f "$3" ] || { echo "::error::the run's artifact carries no $1"; exit 1; }
+            echo "$2  $3" | sha256sum -c - >/dev/null \
+              || { echo "::error::$3 is not $1 as the OS image's build made it (its sha256 is not the one that job put out): not attested"; exit 1; }
+            echo "$3 is $1 as its build made it (sha256 ${2:0:12})"
+          }
+          held "the ISO" "$ISO" "$(find out -maxdepth 1 -name 'aerieos-os-*.iso' | head -1)"
+          held "the stick's image" "$STICK" "$(find out -maxdepth 1 -name 'aerieos-os-*.stick.raw.xz' | head -1)"
       - name: Attest the ISO, the stick and the image's digest
         id: attest
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be   # v2.4.0, pinned by commit (R206)

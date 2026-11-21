@@ -1,8 +1,10 @@
 """Where a release may be cut from (R206; the operator, 14 Nov): a dev build
-on the branch it was built on, a stable release or a release candidate only
-on a commit that is on main. tools/release-place.sh is what the tag's
-workflow asks before anything is built to publish; nothing asked before,
-and the six newest tags sat on the working branch."""
+on a commit that is on a branch a release is cut from (tools/release-branches:
+main, and a release's working branch), a stable release or a release
+candidate only on a commit that is on main. tools/release-place.sh is what
+the tag's workflow asks before anything is built to publish, and what the
+job that holds the release key asks again by the default branch's copy;
+a dev build's tag passed on any commit at all."""
 import os
 import shutil
 import subprocess
@@ -21,9 +23,18 @@ class Place(unittest.TestCase):
         self.commit("one")
         self.git("update-ref", "refs/remotes/origin/main", "HEAD")
         self.on_main = self.git("rev-parse", "HEAD").strip()
-        self.git("checkout", "-q", "-b", "claude/work")
+        self.git("checkout", "-q", "-b", "claude/0.9.0")
         self.commit("two")
         self.on_branch = self.git("rev-parse", "HEAD").strip()
+        self.git("update-ref", "refs/remotes/origin/claude/0.9.0", "HEAD")
+        # A commit on a branch no release is cut from, and one nobody pushed.
+        self.git("checkout", "-q", "-b", "stray")
+        self.commit("three")
+        self.on_stray = self.git("rev-parse", "HEAD").strip()
+        self.git("update-ref", "refs/remotes/origin/stray", "HEAD")
+        self.commit("four")
+        self.unpushed = self.git("rev-parse", "HEAD").strip()
+        self.git("checkout", "-q", "claude/0.9.0")
 
     def git(self, *argv):
         return subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", *argv],
@@ -39,13 +50,40 @@ class Place(unittest.TestCase):
         p = subprocess.run(["bash", TOOL, *argv], cwd=self.d, capture_output=True, text=True, check=False)
         return p.returncode, (p.stdout + p.stderr).strip()
 
-    def test_a_dev_build_goes_on_wherever_it_was_built(self):
+    def test_a_dev_build_goes_on_a_commit_a_release_branch_holds(self):
         rc, said = self.ask("v0.9.0-dev.5400", self.on_branch)
         self.assertEqual(rc, 0, said)
-        self.assertIn("a dev build: tagged on the branch it was built on", said)
-        self.assertEqual(self.ask("v0.9.0-dev.5400", self.on_main)[0], 0)
+        self.assertIn("is a dev build, and its commit", said)
+        self.assertIn("is on claude/0.9.0", said)
+        rc, said = self.ask("v0.9.0-dev.5400", self.on_main)
+        self.assertEqual((rc, "is on main" in said), (0, True), said)
         # The commit not named: the one checked out.
         self.assertEqual(self.ask("v0.9.0-dev.5400")[0], 0)
+
+    def test_a_dev_build_on_a_stray_branch_or_a_commit_nobody_pushed_is_refused(self):
+        for commit in (self.on_stray, self.unpushed):
+            rc, said = self.ask("v0.9.0-dev.5400", commit)
+            self.assertEqual(rc, 1, said)
+            self.assertIn("is on no branch a release is cut from as origin holds them (main, claude/[0-9]*.[0-9]*.[0-9]*)", said)
+        # A branch is read as the remote holds it: a local one of a listed name is nobody's word.
+        self.git("branch", "claude/1.0.0", self.unpushed)
+        self.assertEqual(self.ask("v0.9.0-dev.5400", self.unpushed)[0], 1)
+        # The list is the caller's to name (the default branch's copy), and a tag cannot widen it by its own.
+        mine = os.path.join(self.d, "branches")
+        with open(mine, "w") as f:
+            f.write("# only main\nmain\n")
+        rc, said = self.ask("v0.9.0-dev.5400", self.on_branch, "origin/main", mine)
+        self.assertEqual((rc, "(main)" in said), (1, True), said)
+        with open(mine, "w") as f:
+            f.write("main\nstray\n")
+        self.assertEqual(self.ask("v0.9.0-dev.5400", self.on_stray, "origin/main", mine)[0], 0)
+        rc, said = self.ask("v0.9.0-dev.5400", self.on_branch, "origin/main", os.path.join(self.d, "no-such-list"))
+        self.assertEqual((rc, "the list of branches a release is cut from is not here" in said), (1, True), said)
+
+    def test_the_shipped_list_names_main_and_a_release_s_working_branch(self):
+        with open(os.path.join(os.path.dirname(TOOL), "release-branches"), encoding="utf-8") as f:
+            pats = [ln.strip() for ln in f if ln.strip() and not ln.startswith("#")]
+        self.assertEqual(pats, ["main", "claude/[0-9]*.[0-9]*.[0-9]*"])
 
     def test_a_stable_release_and_a_candidate_only_from_main(self):
         for tag, word in (("v0.9.0", "a stable release"), ("v0.9.0-rc.2", "a rc pre-release"), ("v1.0.0-beta.1", "a beta pre-release")):
@@ -66,7 +104,7 @@ class Place(unittest.TestCase):
         rc, said = self.ask("v0.9.0", self.on_branch)
         self.assertEqual(rc, 1)
         self.assertIn("origin/main is not known here (fetch it first)", said)
-        # A dev build needs no main.
+        # A dev build on a release's working branch needs no main.
         self.assertEqual(self.ask("v0.9.0-dev.7", self.on_branch)[0], 0)
 
     def test_what_is_no_releases_name_is_said_as_that(self):

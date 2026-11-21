@@ -313,6 +313,10 @@ class Seal(Tool):
         exe = tool.identity(tag, "aerieos-companion-0.9.1-dev.7.exe")
         at = "https://github.com/aquilaelabs/aerieos/.github/workflows/"
         self.assertIn("--cert-identity-regex " + exe, log)
+        # ...at the commit the tag names, on a hosted runner: a tag's name
+        # alone is what a moved tag and a run started again would carry too.
+        for line in [ln for ln in log.splitlines() if "attestation verify" in ln]:
+            self.assertIn(f"--deny-self-hosted-runners --source-digest {COMMIT}", line)
         self.assertRegex(at + f"companion-app.yml@refs/tags/{tag}", exe)
         self.assertNotRegex(at + f"build-image.yml@refs/tags/{tag}", exe)
         self.assertEqual(log.count(tool.identity(tag, "aerieos-os-0.9.1-dev.7.iso")), 2, "the bundle and the ISO, of the release workflow")
@@ -340,7 +344,8 @@ class Seal(Tool):
         # A file with no attestation is refused, naming who should have made it.
         code, said = self.run_tool("seal", tag, "--attested", "--out", self.out, env=self.env | {"FAKE_GH_RC": "1"})
         self.assertEqual(code, 1)
-        self.assertIn("aerieos-companion-0.9.1-dev.7.exe has no build attestation by companion-app.yml at v0.9.1-dev.7 that verifies", said)
+        self.assertIn("aerieos-companion-0.9.1-dev.7.exe has no build attestation by companion-app.yml at v0.9.1-dev.7, "
+                      f"from commit {COMMIT[:12]}, that verifies", said)
 
     def test_without_attested_an_app_that_cannot_be_checked_is_said_and_one_that_can_is_held(self):
         tag = "v0.9.1-dev.7"
@@ -506,6 +511,7 @@ class Sign(Tool):
         self.assertIn("attestation verify", log)
         iso = tool.identity("v0.9.1", "aerieos-os-0.9.1.iso")
         self.assertIn("--cert-identity-regex " + iso, log)
+        self.assertIn(f"--deny-self-hosted-runners --source-digest {COMMIT}", log)
         # The Android app is asked no attestation: no build attests it.
         self.assertEqual(log.count("attestation verify"), 2, log)
         at = "https://github.com/aquilaelabs/aerieos/.github/workflows/"

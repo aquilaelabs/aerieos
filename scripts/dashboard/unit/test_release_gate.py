@@ -5,7 +5,11 @@ that pushes an image or makes or fills a release waits for all three. A tag
 ran none of them, CI's lint was its own copy of seven of aerie lint's
 checks, no workflow ran the unit tier, and the suites ran only for a change
 under scripts/dashboard. The workflows' own shape, read as YAML."""
+import hashlib
 import os
+import shutil
+import subprocess
+import tempfile
 import unittest
 
 try:
@@ -168,6 +172,222 @@ class Gate(unittest.TestCase):
         take = next(s for s in osi["jobs"]["appliance"]["steps"] if (s.get("with") or {}).get("name") == "agent-signature")
         self.assertEqual(take["if"], "inputs.agent-signature")
         self.assertNotIn("release-rehearsal.yml", [n for n, _ in readers])
+
+    def test_the_job_that_holds_the_key_asks_the_default_branch_s_rule_first(self):
+        # The audit of 21 Nov: a dev build's tag passed on any commit, and
+        # the rule that said so was the tag's own copy. Each job that holds
+        # the key takes the default branch's copy of the rule and its list
+        # of branches and asks it, in steps before the one that holds the
+        # key and that hold no secret themselves.
+        for name, job_name, tag in (("build-image.yml", "signature", "${{ github.ref_name }}"), ("seal-release.yml", "seal", "${{ inputs.tag }}")):
+            steps = load(name)["jobs"][job_name]["steps"]
+            key = next(i for i, s in enumerate(steps) if "secrets.AERIEOS_RELEASE_KEY" in str(s))
+            took = next(i for i, s in enumerate(steps) if (s.get("with") or {}).get("path") == "trusted")
+            asked = next(i for i, s in enumerate(steps) if "release-place.sh" in str(s.get("run") or ""))
+            self.assertLess(took, asked, name)
+            self.assertLess(asked, key, f"{name}: asked before the key is in any step's environment")
+            self.assertEqual(steps[took]["with"]["ref"], "${{ github.event.repository.default_branch }}", name)
+            self.assertEqual(steps[took]["with"]["sparse-checkout"].split(), ["tools/release-place.sh", "tools/release-branches"], name)
+            self.assertRegex(steps[took]["uses"], r"^actions/checkout@[0-9a-f]{40}$")
+            run = steps[asked]["run"]
+            self.assertIn("rule=trusted/tools", run)
+            self.assertIn('bash "$rule/release-place.sh" "$TAG" "$GITHUB_SHA" origin/main "$rule/release-branches"', run)
+            self.assertIn("git fetch --no-tags origin '+refs/heads/*:refs/remotes/origin/*'", run, "the branches as the remote holds them")
+            self.assertEqual(steps[asked]["env"], {"TAG": tag}, "the tag reaches the script by its environment")
+            for s in steps[:key]:
+                self.assertNotIn("secrets.", str(s), f"{name}: nothing before the key's step holds a secret")
+            # The tag's own checkout is whole, so a commit's place on a branch can be told.
+            own = next(s for s in steps if str(s.get("uses", "")).startswith("actions/checkout@") and (s.get("with") or {}).get("path") is None)
+            self.assertEqual(own["with"]["fetch-depth"], 0, name)
+        # The tag's first check reads every branch head too, and a rehearsal says it and never fails on it.
+        self.assertIn("'+refs/heads/*:refs/remotes/origin/*'", runs(load("build-image.yml")["jobs"]["place"]))
+        self.assertIn('bash tools/release-place.sh "v${base}-dev.1" "$GITHUB_SHA" origin/main \\\n', runs(load("release-rehearsal.yml")["jobs"]["place"]).replace("\\\n", "\\\n"))
+        self.assertIn("|| echo \"::notice title=No dev build from this commit", runs(load("release-rehearsal.yml")["jobs"]["place"]))
+
+    def test_a_release_s_app_is_built_where_no_pull_request_s_job_runs(self):
+        # The runner a pull request's lint and suites run on built the APK
+        # a release carries. A tag's own run builds it on a hosted runner.
+        build = load("android-app.yml")["jobs"]["build"]
+        self.assertEqual(build["runs-on"], "${{ fromJSON((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) "
+                                           "&& '[\"ubuntu-24.04\"]' || '[\"self-hosted\", \"bb-sandbox\"]') }}")
+        java = next(s for s in build["steps"] if "JAVA_HOME_17_X64" in str(s.get("run") or ""))
+        self.assertEqual(java["if"], "runner.environment == 'github-hosted'")
+        land = next(s for s in build["steps"] if s.get("name", "").startswith("Land it in"))
+        self.assertEqual(land["if"], "runner.environment == 'self-hosted'")
+        # Every job a pull request starts on the self-hosted runner refuses a fork's.
+        for name in ("lint.yml", "dashboard.yml"):
+            wf = load(name)
+            self.assertIn("pull_request", wf["on"])
+            for job, body in wf["jobs"].items():
+                if "self-hosted" in str(body.get("runs-on")):
+                    self.assertEqual(body["if"], "github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository", f"{name} {job}")
+        # ...and no other workflow that runs there is started by a pull request.
+        for name in sorted(os.listdir(WF)):
+            wf = load(name)
+            if name not in ("lint.yml", "dashboard.yml") and "self-hosted" in str(wf["jobs"]):
+                self.assertNotIn("pull_request", wf["on"], name)
+                self.assertNotIn("pull_request_target", wf["on"], name)
+
+    def test_a_branch_s_build_never_takes_a_release_s_image_tag(self):
+        # A run by hand from a branch called dev, latest or 0.9 pushed its
+        # image under the tag people follow.
+        build = load("build-image.yml")["jobs"]["build"]
+        meta = next(s for s in build["steps"] if s.get("id") == "meta")["with"]
+        tags = [ln.strip() for ln in meta["tags"].splitlines() if ln.strip() and not ln.strip().startswith("#")]
+        self.assertEqual(tags, ["type=raw,value=main,enable=${{ github.ref == 'refs/heads/main' }}",
+                                "type=ref,event=branch,prefix=branch-,enable=${{ github.ref != 'refs/heads/main' }}",
+                                "type=ref,event=pr", "type=sha,format=short", "type=schedule,pattern={{date 'YYYYMMDD'}}",
+                                "type=semver,pattern={{version}}"])
+        self.assertEqual(meta["flavor"], "latest=false")
+
+    def test_the_iso_and_the_stick_are_held_to_what_their_build_put_out_before_they_are_attested(self):
+        osi = load("os-image.yml")
+        outs = osi["on"]["workflow_call"]["outputs"]
+        self.assertEqual({k: v["value"] for k, v in outs.items()},
+                         {"iso-sha256": "${{ jobs.appliance.outputs.iso }}", "stick-sha256": "${{ jobs.appliance.outputs.stick }}"})
+        job = osi["jobs"]["appliance"]
+        self.assertEqual(job["outputs"], {"iso": "${{ steps.sums.outputs.iso }}", "stick": "${{ steps.sums.outputs.stick }}"})
+        sums = next(i for i, s in enumerate(job["steps"]) if s.get("id") == "sums")
+        up = next(i for i, s in enumerate(job["steps"]) if (s.get("with") or {}).get("name") == "aerieos-os")
+        self.assertLess(sums, up, "hashed where it was built, before it leaves the job")
+        last = load("build-image.yml")["jobs"]["release"]
+        held = next(i for i, s in enumerate(last["steps"]) if s.get("name", "").startswith("The ISO and the stick are the files"))
+        att = next(i for i, s in enumerate(last["steps"]) if s.get("id") == "attest")
+        self.assertLess(held, att)
+        self.assertEqual(last["steps"][held]["env"], {"ISO": "${{ needs.appliance.outputs.iso-sha256 }}", "STICK": "${{ needs.appliance.outputs.stick-sha256 }}"})
+        # The step itself, run on a folder: the files the build hashed pass, and a file changed on the way does not.
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d, True)
+        os.makedirs(os.path.join(d, "out"))
+        for name, body in (("aerieos-os-1.2.3.iso", b"an iso"), ("aerieos-os-1.2.3.stick.raw.xz", b"a stick")):
+            with open(os.path.join(d, "out", name), "wb") as f:
+                f.write(body)
+        env = dict(os.environ, ISO=hashlib.sha256(b"an iso").hexdigest(), STICK=hashlib.sha256(b"a stick").hexdigest())
+        run = lambda e: subprocess.run(["bash", "-c", last["steps"][held]["run"]], cwd=d, env=e, capture_output=True, text=True, check=False)  # noqa: E731
+        self.assertEqual(run(env).returncode, 0, run(env).stderr)
+        for bad in (dict(env, ISO=hashlib.sha256(b"another iso").hexdigest()), dict(env, STICK=""), dict(env, ISO="not a digest")):
+            r = run(bad)
+            self.assertEqual(r.returncode, 1, r.stdout)
+            self.assertIn("::error::", r.stdout)
+        with open(os.path.join(d, "out", "aerieos-os-1.2.3.iso"), "wb") as f:
+            f.write(b"an iso, changed in the artifact store")
+        self.assertIn("is not the ISO as the OS image's build made it", run(env).stdout)
+
+    def test_what_a_job_that_holds_a_secret_installs_is_held_to_a_hash_and_a_rehearsal_holds_none(self):
+        # The companion's Windows job holds the code-signing certificate and attests the two .exe.
+        build = load("companion-app.yml")["jobs"]["build"]
+        text = runs(build)
+        self.assertIn("--require-hashes --only-binary :all:", text)
+        self.assertIn("-r tools/companion-requirements.txt", text)
+        self.assertNotRegex(text, r"pip install[^\n]*\bpyinstaller\b")
+        with open(os.path.join(WF, "..", "..", "tools", "companion-requirements.txt"), encoding="utf-8") as f:
+            lines = [ln.rstrip() for ln in f if ln.strip() and not ln.startswith("#")]
+        names = [ln.split("==")[0] for ln in lines if not ln.startswith(" ")]
+        self.assertIn("pyinstaller", names)
+        for i, ln in enumerate(lines):
+            if not ln.startswith(" "):
+                self.assertRegex(ln, r"^[a-z0-9-]+==[0-9][0-9A-Za-z.]*( \\)?$", ln)
+                self.assertRegex(lines[i + 1], r"^    --hash=sha256:[0-9a-f]{64}( \\)?$", f"{ln}: held to a hash")
+        # A rehearsal runs from any branch and is handed no secret, as its header says.
+        wf = load("release-rehearsal.yml")
+        for name, job in wf["jobs"].items():
+            self.assertNotIn("secrets", job, name)
+            self.assertNotIn("${{ secrets.", str(job), name)
+        self.assertEqual(list(wf["on"]), ["workflow_dispatch"])
+        # ...and the release's own run still hands the certificate, by name, to the one workflow that reads it.
+        self.assertEqual(sorted(load("build-image.yml")["jobs"]["apps"]["secrets"]), ["BB_WIN_CERT_PASSWORD", "BB_WIN_CERT_PFX_B64"])
+
+    @unittest.skipUnless(shutil.which("ssh-keygen"), "ssh-keygen is not here")
+    def test_the_tags_people_follow_move_onto_a_published_sealed_release_s_own_digest(self):
+        # publish-release.yml's step, run with gh and docker stood in: the
+        # tags move only for a release that is published and whose signed
+        # list names the image, and onto that digest, never onto whatever
+        # the registry serves under the version's tag.
+        wf = load("publish-release.yml")
+        steps = wf["jobs"]["follow"]["steps"]
+        self.assertEqual(steps[0]["with"]["sparse-checkout"].split(), ["config/release-signers"])
+        step = steps[-1]
+        self.assertEqual(step["env"], {"TAG": "${{ github.event.release.tag_name || inputs.tag }}", "GH_TOKEN": "${{ github.token }}"})
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d, True)
+        os.makedirs(os.path.join(d, "bin"))
+        os.makedirs(os.path.join(d, "config"))
+        os.makedirs(os.path.join(d, "served"))
+        digest = "sha256:" + "ab" * 32
+        img = "ghcr.io/aquilaelabs/aerieos"
+
+        def key(who):
+            path = os.path.join(d, who)
+            subprocess.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", who, "-f", path], check=True, stdin=subprocess.DEVNULL)
+            with open(path + ".pub") as f:
+                return path, " ".join(f.read().split()[:2])
+        dev, rel, stranger = key("key-dev"), key("key-stable"), key("key-stranger")
+        with open(os.path.join(d, "config", "release-signers"), "w") as f:
+            f.write(f'aerieos-dev namespaces="aerieos-dev" {dev[1]}\naerieos-release namespaces="aerieos-release" {rel[1]}\n')
+        with open(os.path.join(d, "bin", "gh"), "w") as f:
+            f.write(f"""#!/bin/bash
+case "$1 $2" in
+  "release view") [ -f "{d}/draft" ] && echo true || {{ [ -d "{d}/served" ] && echo false; }} ;;
+  "release download")
+    dir=""; while [ $# -gt 0 ]; do [ "$1" = --dir ] && dir="$2"; shift; done
+    cp "{d}"/served/* "$dir"/ 2>/dev/null; exit 0 ;;
+esac
+""")
+        with open(os.path.join(d, "bin", "docker"), "w") as f:
+            f.write(f'#!/bin/bash\necho "$*" >> "{d}/docker.log"\n')
+        for n in ("gh", "docker"):
+            os.chmod(os.path.join(d, "bin", n), 0o755)
+
+        def seal(ver, who, ns, ref=None, listed=True):
+            served = os.path.join(d, "served")
+            shutil.rmtree(served)
+            os.makedirs(served)
+            name = f"aerieos-image-{ver}.digest"
+            with open(os.path.join(served, name), "w") as f:
+                f.write((ref or f"{img}@{digest}") + "\n")
+            with open(os.path.join(served, name), "rb") as f:
+                h = hashlib.sha256(f.read()).hexdigest()
+            with open(os.path.join(served, "SHA256SUMS"), "w") as f:
+                f.write((f"{h}  {name}\n" if listed else "") + "c" * 64 + "  another.bin\n")
+            subprocess.run(["ssh-keygen", "-Y", "sign", "-q", "-f", who[0], "-n", ns, os.path.join(served, "SHA256SUMS")], check=True,
+                           stdin=subprocess.DEVNULL, capture_output=True)
+
+        def move(tag):
+            log = os.path.join(d, "docker.log")
+            if os.path.exists(log):
+                os.unlink(log)
+            env = dict(os.environ, TAG=tag, GH_TOKEN="t", REGISTRY="ghcr.io", IMAGE_NAME="aquilaelabs/AerieOS", GITHUB_REPOSITORY="aquilaelabs/aerieos",
+                       GITHUB_STEP_SUMMARY=os.path.join(d, "summary"), PATH=os.path.join(d, "bin") + ":" + os.environ["PATH"])
+            r = subprocess.run(["bash", "-c", step["run"]], cwd=d, env=env, capture_output=True, text=True, check=False)
+            shutil.rmtree(os.path.join(d, "rel"), ignore_errors=True)
+            made = [ln for ln in (open(log).read().splitlines() if os.path.exists(log) else []) if "imagetools create" in ln]
+            return r.returncode, r.stdout + r.stderr, made
+        # A dev build, sealed by the dev key: :dev moves onto the digest its list names.
+        seal("0.9.1-dev.7", dev, "aerieos-dev")
+        rc, said, made = move("v0.9.1-dev.7")
+        self.assertEqual((rc, made), (0, [f"buildx imagetools create -t {img}:dev {img}@{digest}"]), said)
+        # A stable release, sealed by its own key: :dev, :latest and :0.9.
+        seal("0.9.1", rel, "aerieos-release")
+        rc, said, made = move("v0.9.1")
+        self.assertEqual((rc, [m.split(" -t ")[1] for m in made]), (0, [f"{img}:{t} {img}@{digest}" for t in ("dev", "latest", "0.9")]), said)
+        # What moves nothing, each said: a draft; a stable release sealed by
+        # the dev key; a stranger's signature; a list that does not name the
+        # digest file; a digest file naming another image or a tag; no list.
+        for setup, why in ((lambda: (seal("0.9.1", rel, "aerieos-release"), open(os.path.join(d, "draft"), "w").close()), "has no published release"),
+                           (lambda: seal("0.9.1", dev, "aerieos-dev"), "is signed by no key config/release-signers names for it"),
+                           (lambda: seal("0.9.1", stranger, "aerieos-release"), "is signed by no key"),
+                           (lambda: seal("0.9.1", rel, "aerieos-release", listed=False), "is not the file v0.9.1's signed list names"),
+                           (lambda: seal("0.9.1", rel, "aerieos-release", ref=f"ghcr.io/someone/else@{digest}"), "which is not ghcr.io/aquilaelabs/aerieos by a digest"),
+                           (lambda: seal("0.9.1", rel, "aerieos-release", ref=f"{img}:0.9.1"), "which is not ghcr.io/aquilaelabs/aerieos by a digest"),
+                           (lambda: (shutil.rmtree(os.path.join(d, "served")), os.makedirs(os.path.join(d, "served"))), "it is not sealed")):
+            if os.path.exists(os.path.join(d, "draft")):
+                os.unlink(os.path.join(d, "draft"))
+            setup()
+            rc, said, made = move("v0.9.1")
+            self.assertEqual((rc, made), (1, []), said)
+            self.assertIn(why, said)
+        # Nothing follows the version's own tag in the registry any more.
+        self.assertNotIn('"$img:$ver"', step["run"])
 
     def test_every_file_a_release_builds_is_attested_by_the_job_named_for_it(self):
         # The two .exe, the .pyz and the .vsix had none; the seal takes

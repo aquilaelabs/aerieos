@@ -123,15 +123,62 @@ carry the committed key's signature fails. Both jobs name the environment
 `tools/release-requirements.txt`, each file held to its hash, in a step
 that holds no secret.
 
-One setting on GitHub, made once, keeps the key to those jobs: under the
-repository's Settings, Environments, an environment named `release`, its
-**Deployment branches and tags** set to **Selected branches and tags** with
-one rule, the tag pattern `v*`; then `AERIEOS_RELEASE_KEY` added as that
-environment's secret and deleted from the repository's own secrets. Until
-then the workflows run as they are, reading the repository's secret: a job
-that names an environment reads both. After it, a job on any ref but a
-`v*` tag is refused the environment before a step starts, and a workflow
-that does not name it is handed no key.
+**What the workflow files hold, and what only GitHub's settings do.** A
+tag's run uses the tag's own copy of every workflow file, so whoever may
+push a `v*` tag writes the job that reads the key. The files hold what a
+file can: the job that holds the key asks, before the step that reads it,
+where the tag's commit is, by the default branch's copy of the rule
+(`tools/release-place.sh` and `tools/release-branches`: a dev build on
+`main` or a release's working branch, a stable release or a candidate on
+`main` alone), so a tag on a stray commit signs nothing; a release's files
+are attested on hosted runners, and the seal holds each attestation to the
+tag's commit and to a hosted runner (`tools/release-sign.py`); the Android
+app a release carries is built on a hosted runner, not on the machine a
+pull request's checks run on; and the image tags people follow move only
+onto the digest a published, sealed release's signed list names. None of
+that stops a tag that rewrites the workflow itself. These settings do,
+each made once on GitHub, and until they are made the key is as open as
+the widest of them leaves it:
+
+- **The key in the environment alone.** Settings, Environments, `release`:
+  add `AERIEOS_RELEASE_KEY` as an environment secret, then delete it under
+  Settings, Secrets and variables, Actions, Repository secrets. A
+  repository secret is handed to any workflow of any branch that names it;
+  an environment's only to a job the environment admits.
+- **Which refs the environment admits.** The same page, **Deployment
+  branches and tags**: Selected branches and tags, one rule, the tag
+  pattern `v*`. A job on any other ref is refused before a step starts.
+- **Who approves a run that reads it.** The same page, **Required
+  reviewers**: the owner, with **Prevent self-review** left off where the
+  owner is the only maintainer. Each tag's `signature` job and each seal
+  then waits for a press, which is the one check a rewritten workflow
+  cannot remove. This is a step for a person at every release, and the
+  reason it stays is that it is the only one a tag's author cannot write
+  around; without it the next setting carries the whole weight.
+- **Who may push a `v*` tag.** Settings, Rules, Rulesets, New tag
+  ruleset: target `v*`, restrict creations, updates and deletions, bypass
+  for whoever cuts releases. A tag that cannot be moved is also what the
+  seal's commit check rests on.
+- **The branches a release is cut from.** Settings, Rules, Rulesets, a
+  branch ruleset for `main` and the release branches
+  (`tools/release-branches`): restrict deletions and force pushes, and
+  require a pull request on `main`. The place check trusts what those
+  branches hold.
+- **Pull requests from forks.** Settings, Actions, General, **Approval for
+  running fork pull request workflows from contributors**: Require approval
+  for all external contributors. The self-hosted runner is a machine on
+  its owner's network; `lint.yml` and `dashboard.yml` refuse a fork's
+  request, but a request that edits the workflow runs its own copy, so
+  this setting, and reading a request's workflow changes before approving
+  its run, is the protection.
+- **What a workflow's token may do by default.** Settings, Actions,
+  General, **Workflow permissions**: Read repository contents and packages
+  permissions, and "Allow GitHub Actions to create and approve pull
+  requests" off. Each workflow here names what its jobs need.
+- **The Windows certificate.** `BB_WIN_CERT_PFX_B64` and
+  `BB_WIN_CERT_PASSWORD` are read by the tag's run alone (a rehearsal is
+  handed neither): move them into an environment limited to `v*` tags too,
+  and name it on the companion's `build` job when they are.
 
 A controller started for development, on the dev channel and holding a
 token for AerieOS's repository, sees the drafts as well. Updating

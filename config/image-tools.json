@@ -1,5 +1,5 @@
 {
-  "_comment": "The programs the controller's image takes from their vendors' GitHub releases as it is built, and noVNC's source at its release's tag, each with its pin: the version, and the sha256 of the exact file for every architecture the image takes it for. The one copy: the Dockerfile and the bare-metal installer fetch each through scripts/lib/pin-fetch, which keeps a file only when it is those bytes, so an image built again holds the same files until a pin moves, and tools/pins.py --file moves it (check, move, pin, verify). A row's source is written as a toolchain's is: tarball for an archive the build unpacks, script for a file that is itself the program.",
+  "_comment": "The programs the controller's image takes from their vendors' GitHub releases as it is built, noVNC's source at its release's tag, and mkosi's, which the OS image's build runs (.github/workflows/os-image.yml, at the version image/build.sh names), each with its pin: the version, and the sha256 of the exact file for every architecture the image takes it for. The one copy: the Dockerfile and the bare-metal installer fetch each through scripts/lib/pin-fetch, which keeps a file only when it is those bytes, so an image built again holds the same files until a pin moves, and tools/pins.py --file moves it (check, move, pin, verify). A row's source is written as a toolchain's is: tarball for an archive the build unpacks, script for a file that is itself the program.",
   "tools": [
     {
       "name": "hadolint",
@@ -201,6 +201,28 @@
           "from": "pin",
           "version": "1.7.0",
           "sha256": "b1003a11b6e6e8d8f7f5e5586daae7f8ca651d8aee0aa155ff9ac841c48f52c6",
+          "found": {
+            "from": "none"
+          }
+        }
+      },
+      "rev": 1
+    },
+    {
+      "name": "mkosi",
+      "source": {
+        "kind": "tarball",
+        "url": "https://github.com/systemd/mkosi/archive/refs/tags/v{version}.tar.gz",
+        "version": {
+          "resolver": "github-release",
+          "repo": "systemd/mkosi",
+          "trim_prefix": "v",
+          "numeric": true
+        },
+        "checksum": {
+          "from": "pin",
+          "version": "25.3",
+          "sha256": "7b039fb3b34e1680173a7f4af1bc24b475465afe335c8b21c213167734061e35",
           "found": {
             "from": "none"
           }

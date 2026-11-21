@@ -26,7 +26,8 @@
 # are proved on a runner before any tag needs them. It reads no secret,
 # attaches nothing, and what it signs no install takes. What only a tag
 # can prove stays unproved here: the build attestations, the Android
-# app's signature and the release environment's key.
+# app's signature, the Windows code signing and the release environment's
+# key.
 name: release rehearsal
 
 on:
@@ -88,10 +89,9 @@ jobs:
       contents: write
       id-token: write
       attestations: write
-    # The Windows code-signing certificate alone, as a tag's run hands it.
-    secrets:
-      BB_WIN_CERT_PFX_B64: ${{ secrets.BB_WIN_CERT_PFX_B64 }}
-      BB_WIN_CERT_PASSWORD: ${{ secrets.BB_WIN_CERT_PASSWORD }}
+    # Handed no secret: a rehearsal runs from any branch, so its .exe is
+    # built as a release's is and left unsigned, which the build says. The
+    # Windows certificate is a tag's run's alone.
 
   android:
     uses: ./.github/workflows/android-app.yml
@@ -104,9 +104,10 @@ jobs:
       contents: read
 
   # What tools/release-place.sh would say of a tag here, by kind: a dev build
-  # may be cut from this commit wherever it is; a stable release or a release
-  # candidate only when it is on main. Said, never failed: a rehearsal runs
-  # on the branch a release is being made ready on.
+  # may be cut from this commit when it is on a branch a release is cut from
+  # (tools/release-branches); a stable release or a release candidate only
+  # when it is on main. Said, never failed: a rehearsal runs on the branch a
+  # release is being made ready on.
   place:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -120,9 +121,10 @@ jobs:
         id: say
         shell: bash
         run: |
-          git fetch --no-tags origin '+refs/heads/main:refs/remotes/origin/main'
+          git fetch --no-tags origin '+refs/heads/*:refs/remotes/origin/*'
           base="$(head -1 VERSION | tr -d '[:space:]')"
-          bash tools/release-place.sh "v${base}-dev.1" "$GITHUB_SHA" origin/main
+          bash tools/release-place.sh "v${base}-dev.1" "$GITHUB_SHA" origin/main \
+            || echo "::notice title=No dev build from this commit::a dev build's tag here would be refused: its commit is on no branch a release is cut from (tools/release-branches)"
           if bash tools/release-place.sh "v${base}" "$GITHUB_SHA" origin/main; then
             echo "stable=may be cut here" >> "$GITHUB_OUTPUT"
           else

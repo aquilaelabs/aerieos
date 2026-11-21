@@ -1,21 +1,26 @@
 #!/usr/bin/env bash
 # Where a release may be cut from (the operator, 14 Nov): a dev build
-# (vX.Y.Z-dev.N) is tagged on the branch it was built on; a stable release
-# (vX.Y.Z) or a release candidate (vX.Y.Z-rc.N, any other name after the
-# version) only on a commit that is on main. Nothing checked it: the six
-# newest tags sat on the working branch, and a stable one could have.
+# (vX.Y.Z-dev.N) on a commit that is on one of the branches a release is
+# cut from (tools/release-branches: main, and a release's working branch);
+# a stable release (vX.Y.Z) or a release candidate (vX.Y.Z-rc.N, any other
+# name after the version) only on a commit that is on main. So a tag on a
+# commit no such branch holds (a stray branch, a commit pushed nowhere but
+# under the tag) is refused before anything is signed for it.
 #
-#   tools/release-place.sh TAG [COMMIT] [MAIN]
+#   tools/release-place.sh TAG [COMMIT] [MAIN] [BRANCHES]
 #
 # COMMIT is the tag's commit (HEAD when not given), MAIN the ref that main
-# is here (origin/main when not given; the caller fetches it). Exit 0 and
-# one line saying what the tag is and why it may go on; exit 1 and why not;
-# exit 2 for a name that is no release's.
+# is here (origin/main when not given), BRANCHES the list of branches (the
+# file beside this script when not given). The caller fetches the remote's
+# branch heads first: a branch is read as MAIN's remote holds it. Exit 0
+# and one line saying what the tag is and why it may go on; exit 1 and why
+# not; exit 2 for a name that is no release's.
 set -u
 
 tag="${1:-}"
 commit="${2:-HEAD}"
 main="${3:-origin/main}"
+branches="${4:-$(dirname "$0")/release-branches}"
 case "$tag" in
     v[0-9]*.[0-9]*.[0-9]*) ;;
     *) echo "not a release's tag: ${tag:-nothing} (vX.Y.Z, vX.Y.Z-dev.N or vX.Y.Z-rc.N)" >&2; exit 2 ;;
@@ -34,8 +39,26 @@ esac
 sha="$(git rev-parse --verify --quiet "$commit^{commit}")" \
     || { echo "$tag: no commit called $commit here" >&2; exit 1; }
 if [ "$kind" = dev ]; then
-    echo "$tag is a dev build: tagged on the branch it was built on (${sha:0:7})"
-    exit 0
+    [ -r "$branches" ] || { echo "$tag is a dev build, and the list of branches a release is cut from is not here ($branches)" >&2; exit 1; }
+    remote="${main%%/*}"
+    listed=""
+    while IFS= read -r pat; do
+        case "$pat" in ''|'#'*) continue ;; esac
+        listed="${listed:+$listed, }$pat"
+        while IFS= read -r ref; do
+            name="${ref#"$remote"/}"
+            # shellcheck disable=SC2254  # the line is a pattern, and is read as one
+            case "$name" in
+                $pat)
+                    if git merge-base --is-ancestor "$sha" "$ref" 2>/dev/null; then
+                        echo "$tag is a dev build, and its commit ${sha:0:7} is on $name"
+                        exit 0
+                    fi ;;
+            esac
+        done < <(git for-each-ref --format='%(refname:short)' "refs/remotes/$remote/")
+    done < "$branches"
+    echo "$tag is a dev build, and its commit ${sha:0:7} is on no branch a release is cut from as $remote holds them ($listed): push the branch first, or tag a commit that is on one" >&2
+    exit 1
 fi
 tip="$(git rev-parse --verify --quiet "$main^{commit}")" \
     || { echo "$tag is ${kind/stable/a stable release}, which is cut from main, and $main is not known here (fetch it first)" >&2; exit 1; }

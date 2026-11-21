@@ -1,0 +1,12 @@
+# The branches a release may be cut from, one name or shell pattern a
+# line (tools/release-place.sh reads it): a tag's commit has to be on one
+# of them, as its remote holds it, or nothing is signed for it. A stable
+# release and a release candidate are cut from main alone, whatever is
+# listed here; a dev build (vX.Y.Z-dev.N) from any of these.
+#
+# The job that holds the release key reads the default branch's copy of
+# this file and of the script, not the tag's own (build-image.yml,
+# seal-release.yml), so a tag cannot name its own branch here.
+main
+# A release's working branch, named for the version it becomes.
+claude/[0-9]*.[0-9]*.[0-9]*

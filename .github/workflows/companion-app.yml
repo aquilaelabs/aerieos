@@ -166,7 +166,12 @@ jobs:
       - name: Build the .exe
         run: |
           set -eo pipefail
-          python -m pip install --disable-pip-version-check --quiet pyinstaller
+          # PyInstaller and what it needs, each at one version and each
+          # file held to its sha256 (tools/companion-requirements.txt):
+          # this job signs the two .exe with the Windows certificate and
+          # attests them, and took whatever PyPI served that day.
+          python -m pip install --disable-pip-version-check --quiet --require-hashes --only-binary :all: \
+            -r tools/companion-requirements.txt
           v="$VER"
           printf '%s\n' "$v" > apps/windows/bbcompanion/VERSION
           printf 'from bbcompanion.__main__ import entry\nentry()\n' > "$RUNNER_TEMP/companion.py"

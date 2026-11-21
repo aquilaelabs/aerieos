@@ -1,6 +1,11 @@
-# The companion app, built on a node. The node's runner carries the JDK and
-# the Android SDK from its toolchain store (the same environment every bb
-# job gets), so the build is `gradlew` and nothing else. The build is an
+# The companion app, built on a node, and a release's on a hosted runner.
+# The node's runner carries the JDK and the Android SDK from its toolchain
+# store (the same environment every bb job gets), so the build is `gradlew`
+# and nothing else. A release's own build, the one the controller signs and
+# the release carries, runs on a hosted runner instead: the node's runner
+# is the machine a pull request's lint and suites run on, and what one job
+# leaves behind there (a Gradle cache, a file on its PATH) the next would
+# build with. The build is an
 # UNSIGNED release APK, always: no key, alias or password is a GitHub secret
 # (R106, the operator 22 Oct: four hand-set secrets failed three ways and one
 # put a password in a public log). It lands in AerieOS's own dist/ on the
@@ -62,7 +67,10 @@ concurrency:
 
 jobs:
   build:
-    runs-on: [self-hosted, bb-sandbox]
+    # A tag's own run on a hosted runner, which starts clean and which no
+    # pull request's job has touched; every other build (a push to main, a
+    # run by hand for dist/, a rehearsal) on the node.
+    runs-on: ${{ fromJSON((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) && '["ubuntu-24.04"]' || '["self-hosted", "bb-sandbox"]') }}
     timeout-minutes: 40
     # bash with pipefail (the default `bash -e` has it too, said here because
     # every step below pipes into tee, and a tee's success must not be the
@@ -126,6 +134,15 @@ jobs:
             echo "code=${c:-1}"
           } >> "$GITHUB_OUTPUT"
 
+      # On a hosted runner the JDK is the image's own 17, named for Gradle,
+      # and the Android SDK the one ANDROID_HOME names there.
+      - name: The hosted runner's JDK 17
+        if: runner.environment == 'github-hosted'
+        run: |
+          [ -n "${JAVA_HOME_17_X64:-}" ] || { echo "::error::this runner names no JDK 17 (JAVA_HOME_17_X64)"; exit 1; }
+          echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
+          echo "$JAVA_HOME_17_X64/bin" >> "$GITHUB_PATH"
+
       # Unsigned, always (R106): the release build type has no signing
       # config, so Gradle writes app-release-unsigned.apk, which installs
       # nowhere until it is signed. A debug build is never made here (B274:
@@ -161,6 +178,7 @@ jobs:
           fi
 
       - name: Land it in AerieOS's dist/ where the share is mounted
+        if: runner.environment == 'self-hosted'
         run: |
           exec > >(tee -a "$CI_LOG") 2>&1
           echo "== Land it in AerieOS's dist/"

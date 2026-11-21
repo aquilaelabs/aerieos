@@ -56,8 +56,11 @@ jobs:
     timeout-minutes: 60
     # Where the release key is kept: an environment the repository limits
     # to v* tags, whose secrets GitHub hands only to a job that names it
-    # (docs/versions.md, The release key on GitHub). A run from a branch is
-    # refused there before a step starts.
+    # and whose reviewers approve each run (docs/versions.md, The release
+    # key on GitHub). A run from a branch is refused there before a step
+    # starts. Those rules are GitHub's settings: this file is the tag's own
+    # copy when it runs, so it can promise nothing about a tag that
+    # rewrites it.
     environment: release
     permissions:
       # The draft read, the two files attached, a dev build published.
@@ -90,11 +93,45 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (R206)
         if: steps.tag.outputs.seal == 'true'
         with:
+          fetch-depth: 0
           sparse-checkout: |
             tools
             config
             .release-files
           sparse-checkout-cone-mode: false
+      # Where the tag may be cut from, asked again here by the DEFAULT
+      # branch's copy of the rule (tools/release-place.sh and the list it
+      # reads, tools/release-branches), before the step that holds the key:
+      # the tag's own copy is the tag's to write, and a tag on a commit no
+      # release branch holds would pass its own. Until the default branch
+      # carries the list, the tag's own copy is asked, and the run says so.
+      # What this cannot hold: the workflow a tag runs is the tag's own
+      # file, so a tag that rewrites this job is stopped by the release
+      # environment's rules on GitHub alone (docs/versions.md).
+      - name: The default branch's copy of where a release is cut from
+        if: steps.tag.outputs.seal == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (R206)
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: trusted
+          sparse-checkout: |
+            tools/release-place.sh
+            tools/release-branches
+          sparse-checkout-cone-mode: false
+      - name: The tag's commit is on a branch a release is cut from
+        if: steps.tag.outputs.seal == 'true'
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          rule=trusted/tools
+          if [ ! -f "$rule/release-branches" ] || [ ! -f "$rule/release-place.sh" ]; then
+            echo "::warning title=The tag's own rule was asked::the default branch does not carry tools/release-branches yet, so where $TAG may be cut from was read from the tag's own tree"
+            rule=tools
+          fi
+          git fetch --no-tags origin '+refs/heads/*:refs/remotes/origin/*'
+          bash "$rule/release-place.sh" "$TAG" "$GITHUB_SHA" origin/main "$rule/release-branches"
       # The library the key is written for ssh-keygen with, each file held
       # to its hash, in a step that holds no secret.
       - name: The pinned library the key is used with

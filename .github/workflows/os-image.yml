@@ -20,6 +20,16 @@ on:
       agent-signature:
         type: boolean
         default: false
+    # What the build made, by its bytes, for the caller's job that attests
+    # the two files a release carries: it takes them as the run's artifact
+    # and holds each to these before it attests anything.
+    outputs:
+      iso-sha256:
+        description: "the sha256 of the ISO this run built"
+        value: ${{ jobs.appliance.outputs.iso }}
+      stick-sha256:
+        description: "the sha256 of the USB stick's image this run built"
+        value: ${{ jobs.appliance.outputs.stick }}
   workflow_dispatch:
   push:
     branches-ignore: ["main"]
@@ -54,6 +64,9 @@ jobs:
   appliance:
     runs-on: ubuntu-24.04
     timeout-minutes: 240
+    outputs:
+      iso: ${{ steps.sums.outputs.iso }}
+      stick: ${{ steps.sums.outputs.stick }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned by commit (R206)
         with:
@@ -88,10 +101,17 @@ jobs:
           curl -fsSL --retry 5 --retry-delay 30 --retry-all-errors -o keyring.deb "https://snapshot.debian.org/archive/debian/${snap}/pool/main/d/debian-archive-keyring/debian-archive-keyring_2025.1_all.deb"
           echo "9ea7778e443144ca490668737a8ab22dd3e748bb99e805e22ec055abeb3c7fac  keyring.deb" | sha256sum -c -
           sudo dpkg -i keyring.deb
-          # The version build.sh pins (MKOSI_PIN), so a config key means the same here as there,
-          # from its tag on GitHub: mkosi is not published on PyPI.
+          # mkosi, which builds the image as root: its source at the tag
+          # config/image-tools.json pins, kept only when it is the pinned
+          # sha256 (scripts/lib/pin-fetch) and installed from that file.
+          # A tag's archive was installed straight from its address, held
+          # to nothing. The version is the one build.sh pins (MKOSI_PIN),
+          # so a config key means the same here as there, and the two
+          # disagreeing stops here; mkosi is not published on PyPI.
           pin="$(grep -oE 'MKOSI_PIN:-[0-9.]+' image/build.sh | head -1 | cut -d- -f2)"
-          sudo pip install --break-system-packages "mkosi @ https://github.com/systemd/mkosi/archive/refs/tags/v${pin}.tar.gz"
+          held="$(bash scripts/lib/pin-fetch config/image-tools.json mkosi linux/amd64 "$RUNNER_TEMP/mkosi-${pin}.tar.gz")"
+          [ "$held" = "$pin" ] || { echo "::error::image/build.sh pins mkosi $pin and config/image-tools.json pins $held: one of the two moved without the other"; exit 1; }
+          sudo pip install --break-system-packages "$RUNNER_TEMP/mkosi-${pin}.tar.gz"
           mkosi --version
       - name: The weekly rebuild takes yesterday's snapshot
         if: github.event_name == 'schedule'
@@ -176,6 +196,18 @@ jobs:
           last="$(find last -maxdepth 1 -name 'aerieos-os-*.packages' | head -1)"
           { echo "## System packages moved since ${tag}"; echo; echo '```'; diff <(sort "$last") <(sort "$now") | grep '^[<>]' || echo "none"; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
           diff <(sort "$last") <(sort "$now") > out/packages-moved.diff || true
+      # The two files a release carries, by their bytes, as this job made
+      # them: what the job that attests them holds the artifact to.
+      - name: The sha256 of the ISO and the stick's image
+        id: sums
+        shell: bash
+        run: |
+          set -euo pipefail
+          for pair in "iso:aerieos-os-*.iso" "stick:aerieos-os-*.stick.raw.xz"; do
+            f="$(find out -maxdepth 1 -name "${pair#*:}" | head -1)"
+            [ -n "$f" ] || continue
+            echo "${pair%%:*}=$(sha256sum "$f" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          done
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2, pinned by commit (R206)
         with:
           name: aerieos-os
