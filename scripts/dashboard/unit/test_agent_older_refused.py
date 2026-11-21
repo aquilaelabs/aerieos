@@ -155,5 +155,12 @@ class Console(first.Case):
         self.assertEqual(json.loads(json.dumps(self.read()))["older_ok"], True)
 
 
+# The harness is the first-pin tests' own: its tests are theirs to run.
+for _mine, _theirs in ((Rule, first.Case), (Update, first.Update), (Console, first.Case)):
+    for _name in dir(_theirs):
+        if _name.startswith("test_") and _name not in vars(_mine):
+            setattr(_mine, _name, None)
+
+
 if __name__ == "__main__":
     unittest.main()

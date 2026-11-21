@@ -1424,10 +1424,12 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
                 return undo(f"AerieOS's release key could not be pinned here ({e}), so nothing was installed", 73)
             if pinned:
                 said = (f"pinned AerieOS's release key on this first signed update ({pin[0][:16]}…)"
-                        + (f" and its spare ({pin[1][:16]}…)" if len(pin) > 1 else "")
-                        + ": from here this node takes only agent updates signed by " + ("one of them" if len(pin) > 1 else "it"))
+                        ": from here this node takes only agent updates signed by it")
                 job.say(said + "\n")
                 log(said)
+                # ...and its spare, where the update carries the pinned
+                # key's own statement of one: the one way a spare is taken.
+                self.take_spare(spec.get("release_spare_sig") or getattr(self, "controller_spare", None), job)
             else:
                 # A person pinned or added a key at the console while this
                 # was checked, or chose there to pin none: theirs stands,

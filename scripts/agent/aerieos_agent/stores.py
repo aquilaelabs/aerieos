@@ -517,8 +517,8 @@ def save_state(state, console=False):
 def pin_release(keys):
     """AerieOS's release key pinned by the agent itself, at the one moment
     it may (release.first_pin: a node that trusts no key, installing its
-    first update a release signed): the key, and its spare after it, set in
-    node.json as the console's own save would write them, under the same
+    first update a release signed): the key, set in
+    node.json as the console's own save would write it, under the same
     lock and through the same whole-file write. The record is read here,
     under the lock, and not taken from the agent's copy: a key a person
     pinned or added at the console in the meantime stands, as does their

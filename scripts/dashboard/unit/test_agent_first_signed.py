@@ -1,8 +1,10 @@
 """A node with no key pins AerieOS's release key on its first signed update
 (release.first_pin). Its controller names the release keys its own build
 carries beside every update; when the update's signature is under one of
-them, the node installs it and pins them, the first as its release key and
-a second as its spare, and the job says so. An update with no signature, or
+them, the node installs it and pins that one key, the one the signature
+held under, and the job says so. A second key the controller named is its
+bare word and pins nothing: the spare is pinned on the pinned key's own
+signed statement, in the same update where it carries one. An update with no signature, or
 one under another key, is taken as it was and said as unchecked, and pins
 nothing. A node that has any key is unchanged: what a controller names is
 never read there, and neither is a node whose console chose to pin no key
@@ -74,7 +76,7 @@ class Decided(Case):
             self.assertTrue(ok)
             key = signer.public_key().public_bytes_raw().hex()
             self.assertEqual(said, f"signed by a release key this node's controller names ({key[:16]}…), with none pinned here yet")
-            self.assertEqual(self.release.first_pin({}, DIGEST, sig, named), named, "both, the first one first, whichever signed")
+            self.assertEqual(self.release.first_pin({}, DIGEST, sig, named), [key], "the one the signature is under, and no other named")
         self.assertEqual(self.release.first_pin({}, DIGEST, self.sign(self.k), [self.pub]), [self.pub])
 
     def test_an_unsigned_or_wrongly_signed_first_update_is_taken_said_and_pins_nothing(self):
@@ -125,7 +127,7 @@ class Decided(Case):
         # the field, or one that holds anything else there, pins as built.
         for state in ({}, {"release_unpinned": False}, {"release_unpinned": "yes"}, {"release_unpinned": 1}, {"unsigned_ok": True}):
             self.assertFalse(self.release.unpinned(state), state)
-            self.assertEqual(self.release.first_pin(state, DIGEST, self.sign(self.k), named), named, state)
+            self.assertEqual(self.release.first_pin(state, DIGEST, self.sign(self.k), named), [self.pub], state)
         # A key trusted here is checked as ever, whatever was chosen before it.
         _, mine = pair()
         self.assertFalse(self.release.may_install({"release_unpinned": True, "release_also": [mine]}, DIGEST, self.sign(self.k), named)[0])
@@ -203,6 +205,7 @@ class Update(Case):
         a.state, a.jobs, a.lock, a.controller_digest, a.controller_sig = dict(RECORD), {}, threading.Lock(), "", ""
         if hello is not None:
             a.controller_sig, a.controller_keys = hello.get("sig", ""), hello.get("release_keys", [])
+            a.controller_spare = hello.get("release_spare_sig")
 
         class Ctl:
             @staticmethod
@@ -225,13 +228,19 @@ class Update(Case):
     def beside(self):
         return sorted(n for n in os.listdir(self.d) if n not in ("aerieos-agent", "node.json", ".node.json.lock"))
 
-    def test_the_first_signed_update_is_installed_and_pins_the_named_keys(self):
-        (state, code), job = self.update(sig=self.sign(self.k, digest(NEW)), release_keys=[self.pub, self.spare])
+    def statement(self, by=None, names=None):
+        """The release key's own word that `names` is its spare."""
+        names = names or self.spare
+        return {"key": names, "sig": (by or self.k).sign(self.release.SPARE_MESSAGE + names.encode()).hex()}
+
+    def test_the_first_signed_update_is_installed_and_pins_the_key_it_is_under(self):
+        (state, code), job = self.update(sig=self.sign(self.k, digest(NEW)), release_keys=[self.pub, self.spare],
+                                         release_spare_sig=self.statement())
         self.assertEqual((state, code, job.installed), ("succeeded", 0, True), job.said)
         self.assertEqual(self.installed(), NEW)
         self.assertEqual(self.read(), dict(RECORD, release_key=self.pub, release_spare=self.spare))
-        self.assertIn(f"pinned AerieOS's release key on this first signed update ({self.pub[:16]}…) and its spare ({self.spare[:16]}…)", job.said)
-        self.assertIn("takes only agent updates signed by one of them", job.said)
+        self.assertIn(f"pinned AerieOS's release key on this first signed update ({self.pub[:16]}…): from here", job.said)
+        self.assertIn(f"pinned the release key's spare ({self.spare[:16]}…), named by the release key this node pinned", job.said)
         # From here it is a pinned node: the next one is checked.
         with open(self.me, "wb") as f:
             f.write(b"OLD")
@@ -244,7 +253,7 @@ class Update(Case):
         self.assertIn("signed by the spare release key this node pinned", job.said)
         self.assertNotIn("first signed update", job.said)
 
-    def test_one_named_key_pins_no_spare_and_the_spares_signature_pins_both(self):
+    def test_a_second_key_is_pinned_on_the_first_s_signed_word_alone(self):
         (state, code), job = self.update(sig=self.sign(self.k, digest(NEW)), release_keys=[self.pub])
         self.assertEqual((state, code), ("succeeded", 0), job.said)
         self.assertEqual(self.read(), dict(RECORD, release_key=self.pub))
@@ -252,12 +261,30 @@ class Update(Case):
         self.write(RECORD)
         with open(self.me, "wb") as f:
             f.write(b"OLD")
+        # A second key named with no statement of the first's is the
+        # controller's bare word: the first is pinned and it is not.
+        (state, code), job = self.update(sig=self.sign(self.k, digest(NEW)), release_keys=[self.pub, self.spare])
+        self.assertEqual((state, code), ("succeeded", 0), job.said)
+        self.assertEqual(self.read(), dict(RECORD, release_key=self.pub))
+        # ...and neither is one under a statement another key signed.
+        other, theirs = pair()
+        self.write(RECORD)
+        with open(self.me, "wb") as f:
+            f.write(b"OLD")
+        (state, code), job = self.update(sig=self.sign(self.k, digest(NEW)), release_keys=[self.pub, theirs],
+                                         release_spare_sig=self.statement(by=other, names=theirs))
+        self.assertEqual(self.read(), dict(RECORD, release_key=self.pub))
+        # An update the spare signed pins the spare, the one key it is under.
+        self.write(RECORD)
+        with open(self.me, "wb") as f:
+            f.write(b"OLD")
         (state, code), job = self.update(sig=self.sign(self.s, digest(NEW)), release_keys=[self.pub, self.spare])
         self.assertEqual((state, code), ("succeeded", 0), job.said)
-        self.assertEqual(self.read(), dict(RECORD, release_key=self.pub, release_spare=self.spare))
+        self.assertEqual(self.read(), dict(RECORD, release_key=self.spare))
 
     def test_the_keys_and_the_signature_the_hello_named_serve_a_spec_that_names_none(self):
-        (state, code), job = self.update(hello={"sig": self.sign(self.k, digest(NEW)), "release_keys": [self.pub, self.spare]})
+        (state, code), job = self.update(hello={"sig": self.sign(self.k, digest(NEW)), "release_keys": [self.pub, self.spare],
+                                                "release_spare_sig": self.statement()})
         self.assertEqual((state, code), ("succeeded", 0), job.said)
         self.assertEqual(self.read(), dict(RECORD, release_key=self.pub, release_spare=self.spare))
 
@@ -300,7 +327,7 @@ class Update(Case):
             f.write(b"OLD")
         (state, code), job = self.update(sig=self.sign(self.k, digest(NEW)), release_keys=[self.pub, self.spare])
         self.assertEqual((state, code), ("succeeded", 0), job.said)
-        self.assertEqual(self.read(), dict(RECORD, release_key=self.pub, release_spare=self.spare))
+        self.assertEqual(self.read(), dict(RECORD, release_key=self.pub))
 
     def test_a_choice_made_at_the_console_meanwhile_stands(self):
         mod = self.agent.module("agent")
@@ -365,7 +392,7 @@ class Update(Case):
         # The same update, once the record can be written, is the first signed one.
         (state, code), job = self.update(**spec)
         self.assertEqual((state, code), ("succeeded", 0), job.said)
-        self.assertEqual(self.read(), dict(RECORD, release_key=self.pub, release_spare=self.spare))
+        self.assertEqual(self.read(), dict(RECORD, release_key=self.pub))
 
     def test_a_key_pinned_at_the_console_meanwhile_stands_and_judges_the_update(self):
         mod = self.agent.module("agent")

@@ -20,8 +20,9 @@ A node with no key takes what its controller sends, and says in the update's
 job that nothing was checked. It pins at one more moment: its controller
 names the release keys its own build carries beside every update
 (`release_keys`), and the first update whose signature is under one of them
-pins them here as that update is installed (first_pin). That is trust on
-first use, of a controller this node already took everything from; an
+pins that one key here as the update is installed (first_pin): the key the
+signature held under, and no other the controller named with it. That is
+trust on first use, of a controller this node already took everything from; an
 update with no signature, or one under another key, pins nothing, and a node
 that has any key is never offered one this way. Nor is a node whose console
 dropped the release key (`aerieos-agent release-key none`, kept in node.json
@@ -374,16 +375,18 @@ def named_keys(named):
 
 
 def first_pin(state, digest, sig, named):
-    """The keys a node that trusts none pins on this update: the ones its
-    controller named, the first as the release key and a second as its
-    spare, when the update's signature is under one of them. [] otherwise,
-    and always [] for a node that trusts a key already (what a controller
+    """The key a node that trusts none pins on this update: the one of the
+    keys its controller named that the update's signature is under, as a
+    list of that one key. A second key the controller named beside it is
+    the controller's bare word and pins nothing: a spare is pinned on the
+    pinned key's own signed statement (spare_pin), the one way a node
+    takes one by itself. [] where the signature is under none of them, and
+    always [] for a node that trusts a key already (what a controller
     names never replaces or joins a key that is here) and for one whose
     console chose to pin none."""
     if trusted(state) or unpinned(state):
         return []
-    cand = named_keys(named)
-    return cand if any(not verify(k, digest, sig) for k in cand) else []
+    return [k for k in named_keys(named) if not verify(k, digest, sig)][:1]
 
 
 def _no_key(state, digest, sig, named):
