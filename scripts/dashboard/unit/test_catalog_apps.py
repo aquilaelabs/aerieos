@@ -44,7 +44,7 @@ class CatalogApps(unittest.TestCase):
         tar = git(str(repo), "archive", "--format=tar", "HEAD", "packs/apps/whoami")
         self.entry = {"name": "whoami", "kind": "app", "url": f"file://{repo}", "commit": self.commit,
                       "sha256": hashlib.sha256(tar).hexdigest(), "path": "packs/apps/whoami", "tier": "vetted", "about": "A tiny web server."}
-        self.env = mock.patch.dict(os.environ, {"BB_TOOLPACKS_FILE_URLS": "1"})
+        self.env = mock.patch.dict(os.environ, {"BB_TOOLPACKS_FILE_URLS": "1", "BB_SEAMS": "1"})
         self.env.start()
         self.addCleanup(self.env.stop)
 

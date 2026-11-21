@@ -58,7 +58,7 @@ class Scratch(unittest.TestCase):
         self.put("packs/apps/whoami/bbapp.json", APP)
         self.put("packs/apps/whoami/compose.yml", COMPOSE)
         self.first = self.commit("the catalog")
-        env = mock.patch.dict(os.environ, {"BB_TOOLPACKS_FILE_URLS": "1"})
+        env = mock.patch.dict(os.environ, {"BB_TOOLPACKS_FILE_URLS": "1", "BB_SEAMS": "1"})
         env.start()
         self.addCleanup(env.stop)
         self.tool = tool()

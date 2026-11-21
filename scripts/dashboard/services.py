@@ -38,6 +38,7 @@ import json
 import os
 
 import packformat
+import seams
 
 # kind (a pack's service.kind) -> the module that is the service; the grant
 # on a node that its Library row comes to (the server's Install and Remove
@@ -55,9 +56,10 @@ KINDS = tuple(TABLE)
 # beside this one that tools/pins.py moves. Each is named by its tag and
 # the digest of what is pulled, and a service's module reads its own by
 # the names the file gives them: nothing of an image is a constant in code.
-# BB_SERVICE_IMAGES_FILE names another file, for the harness, and the file
-# is read again when it changes.
-IMAGES_FILE = os.environ.get("BB_SERVICE_IMAGES_FILE") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "service-images.json")
+# The seam BB_SERVICE_IMAGES_FILE names another file, for the harness alone
+# (seams.py: honored beside its marker), and the file is read again when it
+# changes.
+IMAGES_FILE = seams.get("BB_SERVICE_IMAGES_FILE") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "service-images.json")
 _images = {"at": None, "rows": {}}
 
 

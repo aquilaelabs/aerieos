@@ -228,7 +228,7 @@ class Controller(unittest.TestCase):
                                  agentcode._recipes.clear(), agentcode._recipes.update(was[2])))
         agentcode._recipes.clear()
         agentcode.fetch_pack = toolpacks.fetch
-        with mock.patch.dict(os.environ, {"BB_TOOLPACKS_FILE_URLS": "1"}):
+        with mock.patch.dict(os.environ, {"BB_TOOLPACKS_FILE_URLS": "1", "BB_SEAMS": "1"}):
             agentcode.catalog_entry = lambda name: entry if name == "open" else None
             got, where = agentcode.recipe("open")
             self.assertEqual((where, got["rev"], got["bin"]), ("catalog", 7, ".opencode/v2/opencode"))

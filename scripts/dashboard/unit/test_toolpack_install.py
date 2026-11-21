@@ -51,8 +51,9 @@ class Install(unittest.TestCase):
         with open(os.path.join(pack, "bin", "hexkit"), "w") as f:
             f.write("#!/bin/sh\necho unapproved\n")
         git("commit", "-qam", "later", cwd=pack)
-        os.environ["BB_TOOLPACKS_FILE_URLS"] = "1"
-        self.addCleanup(os.environ.pop, "BB_TOOLPACKS_FILE_URLS", None)
+        for seam in ("BB_TOOLPACKS_FILE_URLS", "BB_SEAMS"):
+            os.environ[seam] = "1"
+            self.addCleanup(os.environ.pop, seam, None)
         toolpacks.configure(state=t, write_json=statefile.write_json)
         r = toolpacks.add("file://" + pack, self.commit, "operator")
         self.assertTrue(r.get("ok"), r)

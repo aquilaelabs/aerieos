@@ -42,6 +42,7 @@ from pathlib import Path
 
 import agents
 import packformat
+import seams
 import services
 import statefile
 
@@ -1104,9 +1105,10 @@ def fetch(url, commit="", shipped=(), sha256="", path="", official=False):
     index as one of AerieOS's own shipped packs (agentcode.recipe), and
     counts only beside that pin's sha256; a request never says it."""
     url = str(url or "").strip()
-    # A suite's pack is a repository on disk (BB_TOOLPACKS_FILE_URLS=1); a
-    # controller only ever fetches one over the network.
-    local = os.environ.get("BB_TOOLPACKS_FILE_URLS") == "1" and url.startswith("file:///")
+    # A suite's pack is a repository on disk (the seam BB_TOOLPACKS_FILE_URLS,
+    # honored beside the harness's marker alone: seams.py); a controller
+    # only ever fetches one over the network.
+    local = seams.get("BB_TOOLPACKS_FILE_URLS") == "1" and url.startswith("file:///")
     if not (URL.fullmatch(url) or local):
         return {"error": "a pack is a git repository's address: https://host/owner/repo"}
     if commit and not re.fullmatch(r"[0-9a-f]{40}", commit):
@@ -1157,7 +1159,7 @@ def fetch_folder(url, commit, sha256, path, files, cap=256 << 10):
     bbapp.json and compose.yml), its archive's sha256 checked as a pack's
     is: {files: {name: bytes}} or {error}. Only the files named are read."""
     url = str(url or "").strip()
-    local = os.environ.get("BB_TOOLPACKS_FILE_URLS") == "1" and url.startswith("file:///")
+    local = seams.get("BB_TOOLPACKS_FILE_URLS") == "1" and url.startswith("file:///")
     if not (URL.fullmatch(url) or local):
         return {"error": "a catalog entry is a git repository's address: https://host/owner/repo"}
     if not re.fullmatch(r"[0-9a-f]{40}", str(commit or "")) or not re.fullmatch(r"[0-9a-f]{64}", str(sha256 or "")):
