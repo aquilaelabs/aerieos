@@ -633,15 +633,18 @@ class Agent(unittest.TestCase):
         self.assertEqual(self.av.sums_lookup("d" * 128 + "\n", "alpine.qcow2"), "d" * 128)
         self.assertEqual(self.av.sums_lookup(f"{h} *other.img\n", "missing.img"), "")
 
-    def test_a_running_vm_s_root_filesystem_from_its_guest_agent(self):
+    def test_a_running_vm_s_filesystems_from_its_guest_agent(self):
+        # Every one the guest agent names, the root among them, in guest_facts
+        # alone: no second reader of the root's for a caller that is not there.
         from unittest import mock
         said = ("fs.count             : 2\nfs.0.name            : vda15\nfs.0.mountpoint      : /boot/efi\n"
                 "fs.0.used-bytes      : 6\nfs.0.total-bytes     : 10\nfs.1.name            : vda1\n"
                 "fs.1.mountpoint      : /\nfs.1.used-bytes      : 3221225472\nfs.1.total-bytes     : 10737418240\n")
         with mock.patch.object(self.av, "_run", return_value=said):
-            self.assertEqual(self.av.guest_root("bbvm-web-db"), [3072, 10240])
+            self.assertEqual(self.av.guest_facts("bbvm-web-db")["fs"], [["/boot/efi", 0, 0], ["/", 3072, 10240]])
         with mock.patch.object(self.av, "_run", return_value="error: Guest agent is not responding"):
-            self.assertIsNone(self.av.guest_root("bbvm-web-db"))
+            self.assertEqual(self.av.guest_facts("bbvm-web-db")["fs"], [])
+        self.assertFalse(hasattr(self.av, "guest_root"))
 
     def test_a_vm_s_guest_agent_facts_and_its_balloon_memory(self):
         from unittest import mock

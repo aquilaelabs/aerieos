@@ -88,11 +88,6 @@ def guest_facts(name):
                    and f.get("total-bytes", "").isdigit() and int(f["total-bytes"]) > 0][:16]}
 
 
-def guest_root(name):
-    """[used MB, total MB] of a running VM's root filesystem, or None."""
-    return next(([u, t] for m, u, t in guest_facts(name).get("fs", []) if m == "/"), None)
-
-
 def vm_memory():
     """{domain: [usable MB, available MB]} for every running VM AerieOS
     made, from the balloon's statistics in one domstats call, for the
