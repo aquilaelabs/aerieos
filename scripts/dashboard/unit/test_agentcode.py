@@ -7,6 +7,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -643,16 +644,18 @@ class NodeAgent(unittest.TestCase):
 
     def test_a_file_that_is_not_the_pinned_bytes_installs_nothing(self):
         # The vendor's file is one byte off the recipe's digest: nothing of
-        # it runs, the job says both digests and that the vendor changed
-        # its installer, and the home is as it was.
+        # it runs, the job says so in one line with each digest on a line
+        # of its own before it, and the home is as it was.
         good = self.held()
         want = good["fetch"][0]["sha256"]
         off = ("0" if want[0] != "0" else "1") + want[1:]
         got, log = self.run_job({"to": "0.171.0", "recipe": good | {"fetch": [good["fetch"][0] | {"sha256": off}]}}, stub=False)
         self.assertEqual(got, ("failed", self.mod.HELD_CHANGED), log)
-        self.assertIn(f"answered a file whose sha256 is {want}, and its manifest declares {off}", log)
-        self.assertIn("refused: Codex CLI's vendor changed its installer since AerieOS pinned it", log)
-        self.assertIn("Nothing was run and nothing is installed", log)
+        self.assertIn(f"sha256 of what https://x.example/v0.170.0/install.sh answered: {want}\n", log)
+        self.assertIn(f"sha256 expected: {off}\n", log)
+        self.assertTrue(log.endswith("refused: Codex CLI's installer is not the file its recipe pins: nothing was run\n"), log[-300:])
+        for line in log.splitlines():
+            self.assertLessEqual(len(re.findall(r"[0-9a-f]{64}", line)), 1, f"one digest a line at most: {line}")
         self.assertNotIn("stub installed", log)
         self.assertEqual(self.left(), [])
         # ...and one that cannot be fetched at all is said as that.
@@ -713,7 +716,7 @@ class NodeAgent(unittest.TestCase):
         off = [f | {"sha256": ("0" if f["sha256"][0] != "0" else "1") + f["sha256"][1:]} for f in good["fetch"]]
         got, log = self.run_job({"to": "0.171.0", "recipe": good | {"fetch": off}}, stub=False, root=True, more={"BUILDERBOT_NET_DEV": self.no_net})
         self.assertEqual(got, ("failed", self.mod.HELD_CHANGED), log)
-        self.assertIn("refused: Codex CLI's vendor changed that file since AerieOS pinned it", log)
+        self.assertTrue(log.endswith("refused: Codex CLI's download is not the file its recipe pins: nothing was run\n"), log[-300:])
         self.assertFalse(os.path.exists(self.cut_log))
         self.assertEqual(self.left(), [])
 

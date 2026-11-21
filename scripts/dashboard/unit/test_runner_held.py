@@ -251,8 +251,8 @@ class TheAgent(unittest.TestCase):
         with open(dest, "rb") as f:
             self.assertEqual(f.read(), b"the runner")
         self.assertEqual(self.left(), ["file"])
-        self.assertEqual(self.job.said[-1], f"refused: https://x.example/r answered a file whose sha256 is {sha(b'something else')}, "
-                                            f"and its pin is {sha(b'the runner')}: nothing of it was kept\n")
+        self.assertEqual(self.job.said[-3:], [f"sha256 of what https://x.example/r answered: {sha(b'something else')}\n", f"sha256 expected: {sha(b'the runner')}\n",
+                                               "refused: the download is not the file its pin names: nothing of it was kept\n"])
 
     def test_an_address_that_does_not_answer_leaves_nothing(self):
         dest = os.path.join(self.root, "file")
@@ -287,8 +287,8 @@ class TheAgent(unittest.TestCase):
         cfg = {"want": True, "url": "https://github.com/acme", "forge": "github", "slot": "github.com-acme", "name": "box",
                "pin": self.pin(data, "https://github.com/x/r.tar.gz", digest="e" * 64)}
         self.assertEqual(self.node._apply_runner(self.job, cfg), ("failed", 69))
-        self.assertEqual(self.job.said[-1], f"refused: https://github.com/x/r.tar.gz answered a file whose sha256 is {sha(data)}, "
-                                            f"and its pin is {'e' * 64}: nothing of it was kept\n")
+        self.assertEqual(self.job.said[-3:], [f"sha256 of what https://github.com/x/r.tar.gz answered: {sha(data)}\n", f"sha256 expected: {'e' * 64}\n",
+                                               "refused: the download is not the file its pin names: nothing of it was kept\n"])
         self.assertEqual(os.listdir(self.root), [], "not the archive, not a file of it, not the folder made for it")
         self.assertEqual(self.node.ctl.calls, [], "and no token was asked for")
 
@@ -363,8 +363,9 @@ class TheAgent(unittest.TestCase):
     def test_a_program_that_is_not_the_pinned_file_leaves_nothing_and_says_both_digests(self):
         cfg = self.gitea(pin=self.pin(b"another program", digest="f" * 64))
         self.assertEqual(self.node._apply_runner(self.job, cfg), ("failed", 69))
-        self.assertEqual(self.job.said[-1], f"refused: https://dl.example.org/v3.1.0/runner-3.1.0 answered a file whose sha256 is "
-                                            f"{sha(b'another program')}, and its pin is {'f' * 64}: nothing of it was kept\n")
+        self.assertEqual(self.job.said[-3:], [f"sha256 of what https://dl.example.org/v3.1.0/runner-3.1.0 answered: {sha(b'another program')}\n",
+                                               f"sha256 expected: {'f' * 64}\n",
+                                               "refused: the download is not the file its pin names: nothing of it was kept\n"])
         self.assertEqual(os.listdir(self.root), [])
         self.assertEqual(self.node.ctl.calls, [])
 

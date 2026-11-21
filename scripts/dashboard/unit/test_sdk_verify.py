@@ -42,7 +42,7 @@ class Verify(unittest.TestCase):
         self.assertNotEqual(rc, 0)
         self.assertFalse(kept, "the bad file is not left to be unpacked")
         self.assertIn("is not what the publisher's list says it is", out)
-        self.assertIn("expected " + "0" * 64, out)
+        self.assertIn("sha256 expected: " + "0" * 64, out)
         self.assertIn("nothing was installed", out)
 
     def test_none_says_why_and_goes_on(self):

@@ -1119,12 +1119,10 @@ class SessionsMixin:
                 return "failed", 75
             if code == HELD_CHANGED and held and n == 0:
                 # A declared download answered other bytes than the recipe
-                # holds (held-run.sh, which named both digests above): nothing
-                # of it was run, and nothing is until the pin moves.
-                job.say(f"refused: {product}'s vendor changed {'its installer' if how.get('online') else 'that file'} since AerieOS pinned it: "
-                        "what its address answers now is not the file the recipe holds, by the two sha256 above. "
-                        "Nothing was run and nothing is installed. A newer recipe moves the pin, in the catalog or in a release of AerieOS, "
-                        "once a person has looked at what changed\n")
+                # holds (held-run.sh, which said each digest above): nothing
+                # of it was run, and nothing is until a newer recipe moves
+                # the pin.
+                job.say(f"refused: {product}'s {'installer' if how.get('online') else 'download'} is not the file its recipe pins: nothing was run\n")
                 return "failed", code
             if code == HELD_UNFETCHED and held and n == 0:
                 job.say(f"nothing of {product} was run: what its recipe declares could not be fetched, so there was nothing to hold it to\n")

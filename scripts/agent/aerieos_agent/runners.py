@@ -278,7 +278,9 @@ def fetch_pinned(url, digest, dest, say):
     if got != digest:
         with contextlib.suppress(OSError):
             os.remove(part)
-        say(f"refused: {url} answered a file whose sha256 is {got}, and its pin is {digest}: nothing of it was kept\n")
+        say(f"sha256 of what {url} answered: {got}\n")
+        say(f"sha256 expected: {digest}\n")
+        say("refused: the download is not the file its pin names: nothing of it was kept\n")
         return False
     os.replace(part, dest)
     return True

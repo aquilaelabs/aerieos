@@ -1370,7 +1370,8 @@ sdk_verified_digest() {
 # sdk_verify_download WHAT FILE URL VERSION DIR: the download held to what
 # its publisher says it is (R137), before anything unpacks or runs it: the
 # catalog row's source.checksum, answered by sdkmeta.py. A mismatch removes
-# the file and stops the install, naming both digests. A row whose publisher
+# the file and stops the install in one line, each digest on a line of its
+# own before it. A row whose publisher
 # states nothing says so on the install, and DIR keeps how it was checked
 # (.bb-verified), which the Installed page reads.
 sdk_verify_download() {
@@ -1409,7 +1410,11 @@ sdk_verify_download() {
     got="$(sdk_sys "${algo}sum" "$file" | cut -d' ' -f1)"
     if [ "$got" != "$want" ]; then
         rm -f "$file"
-        die "${what}'s download is not what ${where} says it is (${algo} ${got}, expected ${want}): nothing was installed"
+        # What was wrong in one line, last; each digest on a line of its
+        # own before it, for whoever compares them.
+        log "${algo} of what arrived: ${got}"
+        log "${algo} expected: ${want}"
+        die "${what}'s download is not what ${where} says it is: nothing was installed"
     fi
     log "verified: ${algo} matches ${where}"
     printf '%s\t%s\t%s\n' "$algo" "$want" "$where" > "$d/.bb-verified" 2>/dev/null || true
@@ -1760,7 +1765,9 @@ sdk_fetch_declared() {
                 rm -f "$tmp"
                 # shellcheck disable=SC2034  # held-run.sh reads it on the way out
                 SDK_NOT_HELD="$to"
-                die "${what}: ${url} answered a file whose sha256 is ${got}, and its manifest declares ${want}: nothing is installed"
+                log "sha256 of what ${url} answered: ${got}"
+                log "sha256 expected: ${want}"
+                die "${what}: ${to} is not the file its entry pins: nothing is installed"
             fi
             log "verified: sha256 matches what ${what} declares for ${to}"
         else

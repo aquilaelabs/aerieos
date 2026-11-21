@@ -141,8 +141,9 @@ sdk_meta() {{
     def test_one_that_does_not_match_installs_nothing(self):
         rc, out = self.run_sh(self.fields("0" * 64), f"sdk_fetch_declared hexkit {self.d}; echo went-on")
         self.assertNotEqual(rc, 0)
-        self.assertIn("answered a file whose sha256 is " + hashlib.sha256(b"the archive").hexdigest(), out)
-        self.assertIn("its manifest declares " + "0" * 64, out)
+        self.assertIn("answered: " + hashlib.sha256(b"the archive").hexdigest() + "\n", out)
+        self.assertIn("sha256 expected: " + "0" * 64 + "\n", out)
+        self.assertIn("hexkit: dl/a.tgz is not the file its entry pins: nothing is installed", out)
         self.assertNotIn("went-on", out)
         self.assertFalse(os.path.exists(os.path.join(self.d, "dl", "a.tgz")))
         self.assertEqual([n for n in os.listdir(self.d) if n.startswith(".bb-fetch")], [], "and the bad file is not left behind")

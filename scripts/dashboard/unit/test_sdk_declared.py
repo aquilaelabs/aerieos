@@ -48,7 +48,11 @@ class Script(sdkstore.KitCase):
         self.kit(fetch=[{"url": self.data_url, "sha256": "0" * 64, "to": "dl/data.bin"}])
         rc, out = self.s.sh("sdk_install kit; echo went-on", PATH=self.s.can_cut())
         self.assertNotEqual(rc, 0)
-        self.assertIn(f"answered a file whose sha256 is {self.data_sha}, and its manifest declares {'0' * 64}: nothing is installed", out)
+        self.assertIn(f"answered: {self.data_sha}\n", out)
+        self.assertIn(f"sha256 expected: {'0' * 64}\n", out)
+        self.assertIn("kit: dl/data.bin is not the file its entry pins: nothing is installed", out)
+        for line in out.splitlines():
+            self.assertLessEqual(line.count(self.data_sha) + line.count("0" * 64), 1, f"one digest a line at most: {line}")
         self.assertNotIn("went-on", out)
         self.assertFalse(os.path.exists(self.mark), "the installer never ran")
         self.assertFalse(os.path.exists(self.s.dir("kit")), "and nothing is left installed")
