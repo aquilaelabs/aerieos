@@ -107,7 +107,7 @@ class Node(unittest.TestCase):
             plan = "\x1f".join(("fetch", *(fields[f"source.fetch.0.{k}"] for k in ("url", "sha256", "to")), "", ""))
         fake = ""
         if unshare == "no":
-            fake = 'unshare() { return 1; }\n'
+            fake = "sdk_sys_path() { [ \"$1\" != unshare ] && PATH=\"$SDK_SYS_PATH\" type -P \"$1\"; }\n"
         script = f"""
 source {LIB}/common.sh
 source {LIB}/sdk.sh

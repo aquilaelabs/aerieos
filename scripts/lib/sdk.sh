@@ -1744,6 +1744,7 @@ sdk_fetch_declared() {
         esac
         sdk_https_only "$what" "$url"
         case "/${to}/" in *"/../"*|"//"*) die "${what}: a declared download is kept inside the pack, and ${to} is not" ;; esac
+        sdk_inside "$d" "${d}/${to}" || die "${what}: a declared download is kept inside the pack, and ${to} is not"
         [ -n "$want" ] || [ -n "$sig" ] \
             || die "${what}: ${to} is held to nothing: a declared download names its sha256, or its publisher's signature"
         log "fetching ${to} from ${url}"
@@ -1790,9 +1791,29 @@ sdk_fetch_declared() {
             signer="$(printf '%s' "$signer" | sed -n 's/.*Good signature from "\([^"]*\)".*/\1/p' | head -1)"
             log "verified: ${to} is signed by ${signer:-a key of its publisher} (${keys})"
         fi
+        # Where it really lands, asked again now that it is to be put there.
+        sdk_inside "$d" "${d}/${to}" || { rm -f "$tmp"; die "${what}: a declared download is kept inside the pack, and ${to} is not"; }
         mkdir -p "$(dirname "${d}/${to}")"
+        rm -f "${d}/${to}"
         mv -f "$tmp" "${d}/${to}"
     done 3<<< "$plan"
+}
+
+# sdk_inside DIR PATH: whether PATH's folder really is inside DIR, by where
+# both are and not by how PATH is spelled: the nearest folder of PATH that
+# exists, with every link in its name followed, is DIR or under it, and
+# PATH itself is no folder and no link to one. A pack's repository may
+# carry a link at a folder's name, and a file put "inside the pack" through
+# it lands wherever the link points.
+sdk_inside() {
+    local top at
+    top="$(cd "$1" 2>/dev/null && pwd -P)" || return 1
+    at="$(dirname "$2")"
+    while [ ! -e "$at" ] && [ ! -L "$at" ]; do at="$(dirname "$at")"; done
+    at="$(cd "$at" 2>/dev/null && pwd -P)" || return 1
+    case "${at}/" in "${top}/"*) ;; *) return 1 ;; esac
+    [ ! -d "$2" ] || return 1
+    return 0
 }
 
 # sdk_net_cut WHAT DIR [SAID]: SDK_CUT becomes the words that run a command with no

@@ -18,7 +18,8 @@ import sdkstore  # noqa: E402
 from sdkstore import OTHER, PLATFORM, sdkmeta  # noqa: E402
 
 SENTENCE = "Its installer downloads the compiler's components from static.example.org."
-NO_CUT = "unshare() { return 1; }\n"
+# A machine with no unshare to cut the network with: the installer finds none.
+NO_CUT = "sdk_sys_path() { [ \"$1\" != unshare ] && PATH=\"$SDK_SYS_PATH\" type -P \"$1\"; }\n"
 
 
 def mock_die():
@@ -77,6 +78,63 @@ class Script(sdkstore.KitCase):
         rc, out = self.s.sh("sdk_install kit", PATH=self.s.can_cut())
         self.assertEqual(rc, 0, out)
         self.assertEqual(self.s.read("kit", "ran-how").split(), ["run=yes", "then=yes", "verify=yes"])
+
+
+class Inside(sdkstore.KitCase):
+    """A declared download lands inside the pack by where it really is: a
+    link the pack's repository carries at a folder's name is not written
+    through, whatever `to` spells."""
+
+    def fetch(self, to, prepare):
+        d = os.path.join(self.root, "pack")
+        self.outside = os.path.join(self.root, "outside")
+        os.makedirs(d)
+        os.makedirs(self.outside)
+        prepare(d)
+        plan = "\x1f".join(("fetch", self.data_url, self.data_sha, to, "", ""))
+        return self.s.sh(f"sdk_fetch_declared kit {d!r} $'{plan}'\necho went-on"), d
+
+    def test_a_link_at_a_folder_s_name_is_not_written_through(self):
+        for to, prepare in (("dl/data.bin", lambda d: os.symlink(self.outside, os.path.join(d, "dl"))),
+                            ("a/b/data.bin", lambda d: (os.makedirs(os.path.join(d, "a")),
+                                                        os.symlink(self.outside, os.path.join(d, "a", "b")))),
+                            ("dl/new/data.bin", lambda d: os.symlink("../outside", os.path.join(d, "dl"))),
+                            ("gone/data.bin", lambda d: os.symlink(os.path.join(self.root, "nowhere"), os.path.join(d, "gone")))):
+            with self.subTest(to=to):
+                (rc, out), d = self.fetch(to, prepare)
+                self.assertNotEqual(rc, 0, out)
+                self.assertIn(f"kit: a declared download is kept inside the pack, and {to} is not", out)
+                self.assertNotIn("went-on", out)
+                self.assertEqual(os.listdir(self.outside), [], "nothing landed where the link points")
+                self.assertFalse(os.path.exists(os.path.join(self.root, "nowhere")))
+                self.assertEqual([n for n in os.listdir(d) if n.startswith(".bb-fetch")], [], "and nothing of it is left")
+            import shutil  # noqa: PLC0415
+            shutil.rmtree(os.path.join(self.root, "pack"))
+            shutil.rmtree(self.outside)
+
+    def test_a_link_or_a_folder_at_the_file_s_own_name_is_not_followed(self):
+        target = os.path.join(self.root, "target")
+
+        def a_link(d):
+            os.makedirs(os.path.join(d, "dl"))
+            with open(target, "w") as f:
+                f.write("as it was")
+            os.symlink(target, os.path.join(d, "dl", "data.bin"))
+        (rc, out), d = self.fetch("dl/data.bin", a_link)
+        self.assertEqual(rc, 0, out)
+        with open(target) as f:
+            self.assertEqual(f.read(), "as it was")
+        self.assertFalse(os.path.islink(os.path.join(d, "dl", "data.bin")))
+        with open(os.path.join(d, "dl", "data.bin")) as f:
+            self.assertEqual(f.read(), "forty-two")
+
+    def test_a_link_that_stays_inside_the_pack_is_taken(self):
+        def inside(d):
+            os.makedirs(os.path.join(d, "real"))
+            os.symlink("real", os.path.join(d, "dl"))
+        (rc, out), d = self.fetch("dl/data.bin", inside)
+        self.assertEqual(rc, 0, out)
+        self.assertTrue(os.path.isfile(os.path.join(d, "real", "data.bin")))
 
 
 class Platform(sdkstore.KitCase):
