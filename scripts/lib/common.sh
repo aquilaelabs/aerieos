@@ -96,27 +96,42 @@ heavy_first() {
 # MemAvailable leaves them out. On 22 Nov a CI run on bb-sandbox counted the
 # machine's memory alone, beside a session's Gradle build and emulator, and
 # the node ran out with both sessions on it.
-mem_room_mb() {
-    local room cg dir lim hi cur cold left
-    room="$(awk '/^MemAvailable:/ { print int($2 / 1024) }' /proc/meminfo 2>/dev/null)"
-    room="${room:-99999}"
+# mem_ceiling_mb: the most this process could ever hold, in MB: the
+# machine's memory, or the lowest of those ceilings. What a wait for room
+# asks for is a share of it (heavy_room_wait): on a 4 GB node the fence is
+# 2 GB whole, sessions and agent in it, and 2 GB free there never came.
+mem_room_mb() { mem_read; printf '%s\n' "$MEM_ROOM"; }
+mem_ceiling_mb() { mem_read; printf '%s\n' "$MEM_CEIL"; }
+mem_read() {
+    local cg dir lim hi cur cold left
+    MEM_ROOM="$(awk '/^MemAvailable:/ { print int($2 / 1024) }' /proc/meminfo 2>/dev/null)"
+    MEM_ROOM="${MEM_ROOM:-99999}"
+    MEM_CEIL="$(awk '/^MemTotal:/ { print int($2 / 1024) }' /proc/meminfo 2>/dev/null)"
+    MEM_CEIL="${MEM_CEIL:-99999}"
     cg="$(sed -n 's/^0:://p' /proc/self/cgroup 2>/dev/null)"
     dir="/sys/fs/cgroup${cg%/}"
-    while [ -n "$cg" ] && [ "$dir" != /sys/fs/cgroup ] && [ "$dir" != /sys/fs ]; do
+    # Every cgroup from this process's up to the root this process sees, the
+    # root included: in a container with a cgroup namespace of its own the
+    # process's cgroup reads as / and the container's ceiling is that root's
+    # (a host's own root has none to read).
+    while [ -n "$cg" ]; do
+        case "$dir" in /sys/fs/cgroup|/sys/fs/cgroup/*) ;; *) break ;; esac
         lim="$(cat "$dir/memory.max" 2>/dev/null)"; hi="$(cat "$dir/memory.high" 2>/dev/null)"
         case "$hi" in ''|max) ;; *) case "$lim" in ''|max) lim="$hi" ;; *) [ "$hi" -lt "$lim" ] && lim="$hi" ;; esac ;; esac
         cur="$(cat "$dir/memory.current" 2>/dev/null)"
         case "$lim" in ''|max) ;; *)
+            [ $(( lim / 1048576 )) -lt "$MEM_CEIL" ] && MEM_CEIL=$(( lim / 1048576 ))
             if [ -n "$cur" ]; then
                 cold="$(awk '$1 == "file" { f = $2 } $1 == "shmem" { m = $2 } END { print f - m }' "$dir/memory.stat" 2>/dev/null)"
                 left=$(( (lim - cur + ${cold:-0}) / 1048576 ))
                 [ "$left" -ge 0 ] || left=0
-                [ "$left" -lt "$room" ] && room="$left"
+                [ "$left" -lt "$MEM_ROOM" ] && MEM_ROOM="$left"
             fi ;;
         esac
+        [ "$dir" = /sys/fs/cgroup ] && break
         dir="${dir%/*}"
     done
-    printf '%s\n' "$room"
+    return 0
 }
 
 # is_true VALUE: accepts true/1/yes/on in any case.

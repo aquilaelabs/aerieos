@@ -3968,21 +3968,26 @@ EOF
 # run_here ROLE [GLOB...] -- CMD...: `aerie run` on the node the session is on:
 # the command in this tree, and each output glob's matches into dist/.
 # heavy_room_wait WHAT: a build, a test run or a command run here starts
-# into the memory there is (R271): where less than 2 GB is left of the
-# machine or its share (mem_room_mb), it says so and waits for room, five
+# into the memory there is (R271): where less is left of the machine or its
+# share (mem_room_mb) than 2 GB, or a quarter of all it could ever hold
+# (mem_ceiling_mb) where that is less, it says so and waits for room, five
 # minutes at most, then starts anyway and says that, so it is held back and
 # never refused. On 22 Nov a Gradle build started beside a CI run and an
-# emulator, and the node ran out with two sessions on it.
+# emulator, and the node ran out with two sessions on it; a fixed 2 GB was
+# more than a 4 GB node's fence ever has free, and every start there waited
+# the five minutes out.
 HEAVY_ROOM_MB=2048
 heavy_room_wait() {
-    local room waited=0
+    local room want waited=0
+    want=$(( $(mem_ceiling_mb) / 4 ))
+    [ "$want" -lt "$HEAVY_ROOM_MB" ] || want="$HEAVY_ROOM_MB"
     room="$(mem_room_mb)"
-    [ "$room" -lt "$HEAVY_ROOM_MB" ] || return 0
-    warn "$1: only $room MB of memory is free here; waiting up to five minutes for $HEAVY_ROOM_MB MB before starting (aerie node busy says what holds it)"
+    [ "$room" -lt "$want" ] || return 0
+    warn "$1: only $room MB of memory is free here; waiting up to five minutes for $want MB before starting (aerie node busy says what holds it)"
     while [ "$waited" -lt 300 ]; do
         sleep 10; waited=$((waited + 10))
         room="$(mem_room_mb)"
-        [ "$room" -lt "$HEAVY_ROOM_MB" ] || { log "$1: $room MB free after ${waited}s; starting"; return 0; }
+        [ "$room" -lt "$want" ] || { log "$1: $room MB free after ${waited}s; starting"; return 0; }
     done
     warn "$1: still only $room MB free after five minutes; starting anyway, as the first thing the kernel takes if memory runs out"
 }
