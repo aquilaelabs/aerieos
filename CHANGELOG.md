@@ -11,10 +11,11 @@
 
 ### Fixed
 
-- On a phone the Library no longer scrolls sideways now that the catalog's entries carry topics: its topic and order share their line (b3c703e, a96a2f6)
+- On a phone the Library no longer scrolls sideways now that the catalog's entries carry topics: its topic and order share their line, flush to its Cards and Rows buttons (b3c703e, a96a2f6, 5e75993)
 - A release's red signing row on the bell goes once the release is deleted, where it stayed until dismissed (23ea37b)
 - Down on a container's row says it is stopping on the click, and its Edit dialog left open turns editable once the container is down, where it stayed read-only until a reload (db8e33f)
 - A container's env no longer says it started from .env.example when its repository has none, and its empty box no longer shows PUID, PGID and a time zone as if they were set (fecc77d, e015718)
+- A node no longer runs out of memory and drops its sessions when a CI run, a build and an emulator run on it together: its GitHub runner is held to a share of the machine's memory (an installed runner takes it the next time it is idle), builds, test runs and the emulator are what the kernel takes first, ahead of the coding agents' sessions, a test run runs no more suites at once than its memory holds, and a build or aerie run started with under 2 GB free waits up to five minutes for room, saying so (d23a747)
 
 ## 0.9.0-dev.6054: 2026-11-21
 
