@@ -912,10 +912,20 @@ function wireNeeds(root, after = () => {}){
     e.preventDefault();
     const keys = a.dataset.bdismiss.split(" "), held = keys.map(k => esc(k));
     const redraw = () => { drawBell(); render(); };
+    // Every copy of the row (the bell's, Home's) leaves on the press
+    // (leaveBox), and the page draws without it once it has gone.
+    const rows = [...document.querySelectorAll("[data-bdismiss]")]
+      .filter(x => x.dataset.bdismiss === a.dataset.bdismiss).map(x => x.closest(".bnote")).filter(Boolean);
     return drawNow(() => {
       held.forEach(k => bellGoing.add(k));
-      redraw();
-      return () => { held.forEach(k => bellGoing.delete(k)); redraw(); };
+      let left = rows.length;
+      if (!left) redraw();
+      rows.forEach(r => leaveBox(r, () => { if (--left === 0) redraw(); }));
+      return () => {
+        held.forEach(k => bellGoing.delete(k));
+        rows.forEach(r => r.getAnimations().forEach(x => { if (x.id === "leave") x.cancel(); }));
+        redraw();
+      };
     }, () => postJSON("/api/bell", {action: "dismiss", keys})).then(j => {
       if (!j.error) refresh().finally(() => held.forEach(k => bellGoing.delete(k)));
     });

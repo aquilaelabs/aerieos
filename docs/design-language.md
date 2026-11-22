@@ -854,6 +854,8 @@ rows to come. It is inert while it
 waits, its actions there and dead, so nothing is typed into a form the real
 one replaces. A `loading…` line is left only where no shape is known.
 
+**A row that goes leaves.** A row a press takes away (a bell row dismissed, a notice deleted) fades as its height folds to nothing, on the fold's 180ms tween, the rows under it riding up rather than jumping (`leaveBox`, the counterpart of `arriveBox`; the operator, 22 Nov). Every copy of it on show leaves together, and the page draws without it once it has gone; a refusal puts it back whole at once.
+
 ### progress
 
 Applies to: scripts/dashboard/page-docs.js; progress, busy, spinner, percentage

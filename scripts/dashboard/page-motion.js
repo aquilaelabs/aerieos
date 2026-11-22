@@ -385,6 +385,29 @@ function arriveBox(el){
   foldHeight(el, 0, el.offsetHeight, () => {});
 }
 
+// ...and a row that goes leaves the way a box arrives, backwards: it fades as
+// its height folds to nothing, the rows under it riding up rather than
+// jumping (the operator, 22 Nov: a dismissed row just disappeared). `done`
+// runs once it has gone, where the page then draws without it; a newer
+// draw meanwhile may take it first, which is the same end. Canceled (a
+// refusal putting the row back), it is whole again at once.
+function leaveBox(el, done){
+  if (!el || noMotion()){ done?.(); return; }
+  el.getAnimations().forEach(a => { if (a.id === "leave" || a.id === "fold") a.cancel(); });
+  const cs = getComputedStyle(el), px = v => parseFloat(v) || 0;
+  const was = {height: el.offsetHeight + "px", opacity: 1, paddingTop: cs.paddingTop, paddingBottom: cs.paddingBottom,
+               marginTop: cs.marginTop, marginBottom: cs.marginBottom};
+  el.style.overflow = "hidden";
+  const anim = el.animate([was, {height: "0px", opacity: 0, paddingTop: "0px", paddingBottom: "0px",
+                                 marginTop: px(cs.marginTop) < 0 ? cs.marginTop : "0px", marginBottom: "0px"}],
+                          {duration: 180, easing: "ease", fill: "forwards"});
+  anim.id = "leave";
+  // Held at nothing until the page has drawn without it, then let go: an
+  // element a patched draw kept for another row must not stay folded.
+  anim.onfinish = () => { done?.(); anim.cancel(); };
+  anim.oncancel = () => { el.style.overflow = ""; };
+}
+
 // A box whose CONTENTS are replaced: the memory writer and the bug reporter,
 // each a one-line link that becomes a form and goes back to a link. Not
 // arriveBox: that unrolls from nothing, and these start at the height of the

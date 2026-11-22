@@ -39,9 +39,18 @@ function noticesAct(body, gone){
   const was = noticesData;
   return drawNow(() => {
     if (!gone || !noticesData) return null;
+    const going = new Set(noticesData.filter(gone).map(n => String(n.id)));
     noticesData = noticesData.filter(n => !gone(n));
-    drawPanes();
-    return () => { noticesData = was; drawPanes(); };
+    // Its rows leave (leaveBox) and the page draws without them once gone.
+    const rows = [...document.querySelectorAll(".ntrow[data-nt]")].filter(r => going.has(r.dataset.nt));
+    let left = rows.length;
+    if (!left) drawPanes();
+    rows.forEach(r => leaveBox(r, () => { if (--left === 0) drawPanes(); }));
+    return () => {
+      noticesData = was;
+      rows.forEach(r => r.getAnimations().forEach(x => { if (x.id === "leave") x.cancel(); }));
+      drawPanes();
+    };
   }, () => postJSON("/api/notices", body)).then(async j => { await loadNotices(); return j; });
 }
 
