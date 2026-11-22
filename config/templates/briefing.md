@@ -194,6 +194,14 @@ than hard-coding a number, and name every suite or file a change needs in
 one run rather than one run each in a loop, which leaves the workers but
 one idle.
 
+A node's memory is shared by every session on it. `aerie build`, `test`
+and `run` start where less than 2 GB is free only after waiting up to five
+minutes for room, which they say; what they start (a Gradle daemon, a
+suite's browsers, the emulator) is what the kernel takes first if the
+memory runs out, before the sessions. A build killed that way failed for
+want of memory, not for its code: say so, and `aerie node busy` says what
+holds the memory, rather than starting it again at once.
+
 A `pkill -f PATTERN` or `pgrep -f PATTERN` run from a tool call matches
 the shell running that call, because the pattern is on its command line:
 pkill kills that shell, and a wait loop on pgrep never ends. `aerie proc
