@@ -263,6 +263,21 @@ await section("One operation at a time", async () => {
      `...and Check for updates wears the ring in its word's place while it checks, its word kept so its size is, saying it is checking to a screen reader; the head keeps to the store (B31) (${JSON.stringify(c)})`);
   ok(await page.$eval('.doc .librarytab [data-libcheck]', b => !b.disabled),
      '...and the bar is live again when it finishes');
+  // ...and the press itself wears it at once, before the server has answered
+  // (the operator, 22 Nov: Check on the band stayed dead with no ring for
+  // seconds, the filter band's buttons kept from wearing one).
+  {
+    let let_go; const held = new Promise(r => { let_go = r; });
+    await page.route('**/api/toolchains*', async r => { if (r.request().method() === 'POST') await held; r.continue().catch(() => {}); });
+    const before = await page.$eval('.doc .librarytab [data-libcheck]', b => b.offsetWidth);
+    await page.click('.doc .librarytab [data-libcheck]');
+    await sleep(100);
+    const at = await page.$eval('.doc .librarytab [data-libcheck]', b => ({ ring: b.classList.contains('working') || !!b.dataset.running, dead: b.disabled, w: b.offsetWidth }));
+    let_go();
+    await page.unroute('**/api/toolchains*');
+    ok(at.ring && at.dead && at.w === before, `...and pressing Check wears the ring at once, its size kept, before the server answers (${JSON.stringify(at)}, ${before}px before)`);
+    await page.waitForFunction(() => !document.querySelector('.doc .librarytab [data-libcheck]')?.disabled, null, { timeout: 120000 }).catch(() => {});
+  }
   // The answers are dated, because a number with no date on it goes stale.
   const when = await page.evaluate(() => {
     const was = lib.store;

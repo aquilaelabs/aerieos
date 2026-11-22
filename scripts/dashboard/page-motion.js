@@ -660,8 +660,11 @@ const PRESS_SHOW_MS = 200;
 // group under it, a page of a sub-nav widened and slid its neighbors. There
 // the page arriving is the answer. Anywhere else the ring is tried and
 // taken back off if it made its button taller, or its row taller or wider
-// than its box: a row of buttons that just fits a phone.
-const PRESS_TIGHT = ".rail, .railbar, .railmore, .pseg, .nbtabs, .dockline, .chip, .lfilter, header";
+// than its box: a row of buttons that just fits a phone. A filter band is no
+// such strip (the operator, 22 Nov: Check on the Library's band stayed dead
+// with no ring for seconds, once its buttons moved onto the search's line):
+// its buttons are tried as any other's are, the ring in the word's place.
+const PRESS_TIGHT = ".rail, .railbar, .railmore, .pseg, .nbtabs, .dockline, .chip, header";
 function pressRing(b){
   if (b.closest(PRESS_TIGHT)) return false;
   const row = b.parentElement;
