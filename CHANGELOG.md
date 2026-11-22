@@ -11,7 +11,7 @@
 
 ### Fixed
 
-- On a phone the Library no longer scrolls sideways now that the catalog's entries carry topics: its topic and order wrap to the line (b3c703e)
+- On a phone the Library no longer scrolls sideways now that the catalog's entries carry topics: its topic and order share their line (b3c703e, a96a2f6)
 - A release's red signing row on the bell goes once the release is deleted, where it stayed until dismissed (23ea37b)
 - Down on a container's row says it is stopping on the click, and its Edit dialog left open turns editable once the container is down, where it stayed read-only until a reload (db8e33f)
 - A container's env no longer says it started from .env.example when its repository has none, and its empty box no longer shows PUID, PGID and a time zone as if they were set (fecc77d, e015718)
