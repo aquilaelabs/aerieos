@@ -178,19 +178,31 @@ class OwnImage(unittest.TestCase):
         self.dv.pulled[self.OWN + ":dev"] = self.ODD
         self.assertEqual(len(imagecheck.check_instance("workshop", "main")["said"]), 1)
 
-    def test_where_no_release_says_the_row_is_as_any_other_images(self):
-        for names in ({"why": "v0.9.0-dev.5200 carries no signed list of its files"}, RuntimeError("no network"),
-                      # A release that names another repository's image says nothing of this one.
-                      {"tag": "v1", "image": "ghcr.io/somebody/else", "digest": self.ODD, "ref": "x", "signed": "y"}):
+    def test_where_no_signed_release_says_the_tag_offers_no_update_and_says_so(self):
+        # A rate limit, an outage, no release whose list this install takes,
+        # or one naming another repository's image: the tag's word alone was
+        # offered as an update (review of 22 Nov).
+        for names, why in (({"why": "v0.9.0-dev.5200 carries no signed list of its files"}, "v0.9.0-dev.5200 carries no signed list"),
+                           (RuntimeError("no network"), "RuntimeError: no network"),
+                           ({"tag": "v1", "image": "ghcr.io/somebody/else", "digest": self.ODD, "ref": "x", "signed": "y"},
+                            "v1 names ghcr.io/somebody/else, not ghcr.io/aquilaelabs/aerieos")):
             self.names = names
-            got = imagecheck.check_instance("workshop", "main")
-            self.assertEqual((got["behind"], got["said"]), ([{"service": "app", "image": self.OWN + ":dev", "to": self.NEW}], []))
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                got = imagecheck.check_instance("workshop", "main")
+            self.assertEqual(got["behind"], [], names)
+            self.assertEqual(got["said"], [f"{self.OWN}:dev serves another image than the one here, and no signed release "
+                                           "could be read to vouch for it, so no update is offered from it"])
+            self.assertIn(why, out.getvalue(), "the reason in the log, never on the row")
+        # Nothing newer served: nothing to say.
+        self.dv.pulled[self.OWN + ":dev"] = self.NEW
+        self.assertEqual(imagecheck.check_instance("workshop", "main")["said"], [])
 
     def test_no_other_image_asks_the_releases_and_one_check_asks_once(self):
         imagecheck.check_instance("radarr", "main")
         self.assertEqual(self.asked, [])
-        self.assertEqual(imagecheck.release_image(self.OWN + ":0.9.0"), {}, "a version's own tag is no tag a publication moves")
-        self.assertEqual(imagecheck.release_image("ghcr.io/somebody/aerieos:dev"), {})
+        self.assertIsNone(imagecheck.release_image(self.OWN + ":0.9.0"), "a version's own tag is no tag a publication moves")
+        self.assertIsNone(imagecheck.release_image("ghcr.io/somebody/aerieos:dev"))
         memo = {}
         for _ in range(3):
             imagecheck.check_instance("workshop", "main", memo)

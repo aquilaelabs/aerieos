@@ -126,11 +126,13 @@ def local_digests(image):
 def release_image(image, memo=None):
     """What the newest signed release names for `image`, when it is AerieOS's
     own followed by a tag a publication moves (:dev, :latest):
-    releasecheck.signed_image's answer, asked once a check (`memo`). {} for
-    any other image, and where the release names another repository's."""
+    releasecheck.signed_image's answer, asked once a check (`memo`), with
+    its digest; {why} where no signed release could be read to name one of
+    this repository's images, which offers nothing from the tag. None for
+    any other image."""
     parts = parse_ref(image)
     if not parts or f"{parts[0]}/{parts[1]}" != releasecheck.IMAGE or parts[2] not in releasecheck.FOLLOWED:
-        return {}
+        return None
     memo = memo if memo is not None else {}
     if parts[2] not in memo:
         try:
@@ -138,7 +140,9 @@ def release_image(image, memo=None):
         except Exception as e:   # noqa: BLE001 (what the release says is an extra; the registry's answer stands)
             memo[parts[2]] = {"why": f"{type(e).__name__}: {e}"}
     own = memo[parts[2]]
-    return own if own.get("image") == releasecheck.IMAGE else {}
+    if own.get("digest") and own.get("image") == releasecheck.IMAGE:
+        return own
+    return {"why": own.get("why") or f"{own.get('tag')} names {own.get('image')}, not {releasecheck.IMAGE}"}
 
 
 def check_instance(project, instance, memo=None):
@@ -146,7 +150,9 @@ def check_instance(project, instance, memo=None):
     for one instance, asked on its node. A behind row of AerieOS's own image
     carries `signed`, the image by the digest its release names and whose
     release it is; `said` is what a person must be told that is no update:
-    a tag that serves another image than the newest signed release names."""
+    a tag that serves another image than the newest signed release names,
+    or a newer image the tag serves while no signed release can be read to
+    name one, since the registry's word alone is nobody's."""
     behind, errors, said = [], [], []
     with devapp.on_node(devapp._instance_node(project, instance)):
         for service, image in registry_images(project, instance):
@@ -154,9 +160,14 @@ def check_instance(project, instance, memo=None):
             if not have:
                 continue
             want, err = remote_digest(image)
-            own = {} if err else release_image(image, memo)
+            own = None if err else release_image(image, memo)
             if err:
                 errors.append(f"{image}: {err}")
+            elif own is not None and "digest" not in own:
+                if want and want not in have:
+                    said.append(f"{image} serves another image than the one here, and no signed release could be read "
+                                "to vouch for it, so no update is offered from it")
+                    print(f"[dashboard] image check: {image}: {own['why']}", flush=True)
             elif own and want != own["digest"]:
                 # One sentence on the row; the digests on lines of their own
                 # in the log, for whoever compares them.
