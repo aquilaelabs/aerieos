@@ -89,7 +89,10 @@ WantedBy=multi-user.target
 # own share past three fifths, swaps at most a quarter of the swap, and
 # is the kernel's to take before the sessions (they inherit the agent's 200;
 # GitHub's runner puts its jobs at 500 itself). A CI run on a full node
-# slows or fails red; the node, its sessions and their network stay up.
+# slows or fails red; the node, its sessions and their network stay up. And
+# the runner goes on when a job of its own is killed for memory
+# (OOMPolicy=continue): systemd's default stops the whole unit, and this one
+# has no Restart=, so it stayed down (bb-sandbox's, 22 Nov).
 FENCE_SLICE = "builderbot.slice"
 RUNNER_MEMORY_HIGH = "50%"
 RUNNER_MEMORY_MAX = "60%"
@@ -102,7 +105,7 @@ def runner_share(unit_dir=None, mem=None):
     swap_kb = (meminfo() if mem is None else mem).get("SwapTotal", 0)
     lines = [f"Slice={FENCE_SLICE}"] if os.path.isfile(os.path.join(unit_dir, FENCE_SLICE)) else []
     lines += [f"MemoryHigh={RUNNER_MEMORY_HIGH}", f"MemoryMax={RUNNER_MEMORY_MAX}",
-              f"MemorySwapMax={swap_kb // 4 * 1024}", f"OOMScoreAdjust={RUNNER_OOM_SCORE}"]
+              f"MemorySwapMax={swap_kb // 4 * 1024}", f"OOMScoreAdjust={RUNNER_OOM_SCORE}", "OOMPolicy=continue"]
     return "".join(ln + "\n" for ln in lines)
 
 

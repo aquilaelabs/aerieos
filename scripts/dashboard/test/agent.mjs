@@ -654,7 +654,9 @@ def case(mode, sandbox=True):
     seen = []
     def run(argv, timeout=5):
         seen.append(argv[1])
-        return mode if argv[1] == 'show' else ''
+        if argv[1] != 'show':
+            return ''
+        return mode if argv[3] == 'KillMode' else ('continue' if mode == 'process' else 'stop')
     m.SANDBOX_BIN = stamp if sandbox else '/nonexistent/bb-sandbox'
     return [m.Agent.keep_sessions_through_restart(object.__new__(m.Agent), run), seen]
 first = case('control-group')
@@ -664,11 +666,11 @@ print(json.dumps({'first': first, 'again': case('process'), 'guest': case('contr
                   'dropin': dropin, 'conf': conf}))
 `], { encoding: 'utf8' }).trim();
       const r = JSON.parse(said);
-      ok(JSON.stringify(r.first) === JSON.stringify([['unit', 'needrestart'], ['show', 'daemon-reload']])
-         && r.dropin === '[Service]\nKillMode=process\n'
+      ok(JSON.stringify(r.first) === JSON.stringify([['unit', 'needrestart'], ['show', 'show', 'daemon-reload']])
+         && r.dropin === '[Service]\nKillMode=process\nOOMPolicy=continue\n'
          && r.conf.includes('$nrconf{override_rc}{qr(^(aerieos|builderbot)-agent\\.service$)} = 0;'),
-         `a unit that would take the sessions on a stop gets KillMode=process in a drop-in, and needrestart is told to leave it alone (${said.slice(0, 120)})`);
-      ok(r.again[0].length === 0 && JSON.stringify(r.again[1]) === '["show"]' && r.guest[0].length === 0,
+         `a unit that would take the sessions on a stop, or stop when the kernel kills a build in it, gets KillMode=process and OOMPolicy=continue in a drop-in, and needrestart is told to leave it alone (${said.slice(0, 120)})`);
+      ok(r.again[0].length === 0 && JSON.stringify(r.again[1]) === '["show","show"]' && r.guest[0].length === 0,
          '...once: a unit that already stops only itself and a needrestart already told are left as they are, and a guest is never touched');
     }
     // R27's refresh, run against the bundle's real layout: bb is at

@@ -467,7 +467,7 @@ class Page(unittest.TestCase):
         with open(os.path.join(root, "nodes", "provision-linux.sh"), encoding="utf-8") as f:
             self.assertIn("AGENT_KILLMODE='KillMode=process'", f.read())
         with open(os.path.join(SRC, "aerieos_agent", "configplane.py"), encoding="utf-8") as f:
-            self.assertIn('want = "[Service]\\nKillMode=process\\n"', f.read())
+            self.assertIn('want = "[Service]\\nKillMode=process\\nOOMPolicy=continue\\n"', f.read())
         with open(os.path.join(HERE, "..", "tab-nodes.js"), encoding="utf-8") as f:
             page = f.read()
         start = page.index("const ND_ASK = {")

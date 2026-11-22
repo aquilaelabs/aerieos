@@ -50,7 +50,8 @@ class Share(unittest.TestCase):
         open(os.path.join(self.units, "builderbot.slice"), "w").close()
         share = runners.runner_share(self.units, SWAP)
         self.assertEqual(share.splitlines(), ["Slice=builderbot.slice", "MemoryHigh=50%", "MemoryMax=60%",
-                                              f"MemorySwapMax={4194300 // 4 * 1024}", "OOMScoreAdjust=300"])
+                                              f"MemorySwapMax={4194300 // 4 * 1024}", "OOMScoreAdjust=300",
+                                              "OOMPolicy=continue"])
 
     def test_no_swap_is_no_swap_for_it(self):
         self.assertIn("MemorySwapMax=0\n", runners.runner_share(self.units, {}))

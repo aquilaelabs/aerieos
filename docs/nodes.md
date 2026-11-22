@@ -892,7 +892,12 @@ session started (500 as well, see building.md), then the runner, before the
 agent and the coding agents' sessions (200). A runner installed before an
 agent wrote that unit has it rewritten the next time it is idle. A CI run
 on a full node slows down or fails red; the node, its sessions and their
-network stay up.
+network stay up. Both the runner's unit and the agent's carry
+`OOMPolicy=continue`: systemd's default stops a whole unit when the kernel
+kills any process in it, and the agent's holds every session's builds, so
+one build killed for memory stopped the agent, cancelled its jobs and cut
+every terminal. The agent puts it in its own unit's drop-in, beside
+`KillMode=process`, on a node provisioned before.
 
 ### Toolchains and the toolchain store
 

@@ -518,20 +518,29 @@ class ConfigPlaneMixin:
         bb-sandbox ended. So the agent puts the setting in a drop-in itself,
         and tells needrestart to leave it alone: an upgraded library is
         picked up at the next agent update or reboot, not mid-conversation.
+
+        And OOMPolicy=continue (R271): systemd's default stops a unit when the
+        kernel kills any process in it for memory, and everything a session
+        starts (a build, a suite, the emulator) is in this unit, so a node out
+        of memory killing one build stopped the agent and restarted it,
+        cancelling its jobs and dropping every terminal (the dev VM, 22 Nov).
+        The build is what goes; the agent and the sessions stay.
         Not on a guest, whose services are its owner's (R23)."""
         if os.geteuid() != 0 or not os.path.isfile(SANDBOX_BIN) or not shutil.which("systemctl"):
             return []
         did = []
-        want = "[Service]\nKillMode=process\n"
-        if run(["systemctl", "show", "-p", "KillMode", "--value", names.unit()]) != "process":
+        want = "[Service]\nKillMode=process\nOOMPolicy=continue\n"
+        have = {k: run(["systemctl", "show", "-p", k, "--value", names.unit()]) for k in ("KillMode", "OOMPolicy")}
+        if have != {"KillMode": "process", "OOMPolicy": "continue"}:
             try:
                 os.makedirs(os.path.dirname(UNIT_DROPIN), exist_ok=True)
                 with open(UNIT_DROPIN, "w", encoding="utf-8") as f:
                     f.write(want)
                 run(["systemctl", "daemon-reload"], timeout=30)
                 did.append("unit")
-                log("sessions: this unit now stops its own process only (KillMode=process), "
-                    "so a restart of the agent no longer ends the sessions")
+                log("sessions: this unit now stops its own process only (KillMode=process) and goes on "
+                    "when the kernel kills a build in it for memory (OOMPolicy=continue), so neither a "
+                    "restart of the agent nor a node out of memory ends the sessions")
             except OSError as e:
                 log(f"sessions: could not write {UNIT_DROPIN}: {e}")
         if os.path.isdir(NEEDRESTART_DIR):

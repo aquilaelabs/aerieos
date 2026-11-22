@@ -4293,6 +4293,11 @@ AGENT=/usr/local/sbin/aerieos-agent
 # agent's own shutdown already stops what is its to stop: its terminals, and now
 # its jobs. KillMode=process makes systemd's half match that.
 AGENT_KILLMODE='KillMode=process'
+# ...and a build the kernel kills for memory is the build's end, not the
+# agent's: systemd's default OOMPolicy stops the whole unit, and every
+# session's builds, suites and emulator are in it (R271).
+[ "$INIT" = systemd ] && AGENT_KILLMODE="${AGENT_KILLMODE}
+OOMPolicy=continue"
 # The agent in the fence (R110 step 4) with the sessions and jobs it starts,
 # and first for the kernel to take if the machine itself runs out: it comes
 # back by Restart=always, where the system's own services may not.
