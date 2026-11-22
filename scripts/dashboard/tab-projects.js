@@ -138,22 +138,14 @@ const repoFacts = p => p.git ? `<span class="pbr">${esc(p.git)}</span>${p.push ?
 // A space or a repository deleted by a press goes on the press (the
 // operator, 22 Nov: a press must never look as if nothing happened): left out
 // of the list every card is drawn from ("space:" and its key, "repo:" and its
-// name) until the read after the server's answer. pjGone is drawNow's first
-// half for one, and what it gives back puts it back.
-const pjGoing = new Set();
-function pjGone(id){
-  pjGoing.add(id);
-  drawProjects(state?.projects || []);
-  drawPanes();
-  return () => { pjGoing.delete(id); drawProjects(state?.projects || []); drawPanes(); };
-}
+// name) while it is going (goNow), and put back on a refusal.
 // A project (R138, the operator, 25 Oct) is made first, with a name alone,
 // and its repositories are added to it; every repository is in one. The
 // page reads the projects off the status read's `repos` and each one's
 // repositories off its rows, so a project with nothing in it yet has a card.
 function projectList(){
-  const rows = (state?.projects || []).filter(p => !pjGoing.has("repo:" + p.name));
-  return Object.entries(state?.repos || {}).filter(([key]) => !pjGoing.has("space:" + key)).map(([key, r]) => {
+  const rows = (state?.projects || []).filter(p => !going("repo:" + p.name));
+  return Object.entries(state?.repos || {}).filter(([key]) => !going("space:" + key)).map(([key, r]) => {
     const reps = r.members.map(m => rows.find(p => p.name === m)).filter(Boolean);
     // A project with no repository (R208) has a row of its own in the
     // list (work: true), which its card's Start agent, notes and Settings
@@ -536,14 +528,14 @@ async function deleteProjectCard(key){
   const left = own.containers?.length ? `\n\nThe container${own.containers.length === 1 ? "" : "s"} given to it, ${own.containers.join(", ")}, keep${
     own.containers.length === 1 ? "s" : ""} running, given to no space.` : "";
   if (!await askYes(`Delete the space ${n}?\n\nIt has no repository in it, so nothing on disk goes.${left}`)) return;
-  // Its card goes on the press (pjGone), and comes back saying why on a refusal.
-  const j = await drawNow(() => pjGone("space:" + key), () => postJSON("/api/repos", {action: "delete", key}));
-  if (j.error) return;
-  pjEditing.delete(key);
-  notify(`${n} is gone`);
-  await refresh();
-  pjGoing.delete("space:" + key);
+  // Its card leaves on the press (goNow), and comes back saying why on a refusal.
+  await goNow("space:" + key, {rows: [document.querySelector(`.pcard[data-pkey="${CSS.escape(key)}"]`)], redraw: pjRedraw,
+    send: () => postJSON("/api/repos", {action: "delete", key}),
+    after: async () => { pjEditing.delete(key); notify(`${n} is gone`); await refresh(); }});
 }
+// The cards drawn again from what the page holds, as a press that takes one
+// away needs (goNow).
+function pjRedraw(){ drawProjects(state?.projects || []); drawPanes(); }
 
 // The card's own presses, beside wireProjectRows' shared ones.
 function wireProjectCards(grid){
@@ -1238,7 +1230,7 @@ async function createProject() {
     // names it after that one (the operator, 22 Nov).
     if (j.started){
       const named = j.name || linkName, ahead = state?.project_job?.running ? state.project_job.name || "" : "";
-      if (ahead) notify(`${named} is queued behind ${ahead}: it starts once that is done`);
+      if (ahead) notify(queuedSaid(named, ahead));
       else pJobSeen({running: true, kind: mode === "link" ? "link" : "clone", name: named, step: "starting", for: 0});
       pJobPoll();
     } else {

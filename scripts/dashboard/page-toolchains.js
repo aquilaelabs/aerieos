@@ -810,7 +810,7 @@ async function tcAct(action, only, {now} = {}){
       : action === "sysdeps" ? "installing the system packages" + on
       : `${action === "remove" ? "removing" : "installing"} ${names.join(", ")}${on}`;
     const behind = ahead || (j.waits ? "the job running there" : "");
-    notifyJob(j.job, !behind ? said : j.job ? `${said}, behind ${behind}` : `${said}: queued behind ${behind}`);
+    notifyJob(j.job, behind ? queuedSaid(said, behind) : said);
     loadToolchains();
     return j;
   }catch(e){ back(); notify("could not start: " + failWords(e), true); return null; }

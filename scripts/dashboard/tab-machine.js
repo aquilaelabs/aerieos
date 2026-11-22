@@ -95,7 +95,7 @@ function machineNodeSections(n){
 function machineSaid(said){
   const ahead = ndAhead(ownMachine());
   if (!ahead) return said;
-  return j => `${typeof said === "function" ? said(j) : said} (queued behind ${ahead}: it starts once that has ended)`;
+  return j => queuedSaid(typeof said === "function" ? said(j) : said, ahead);
 }
 
 // Hold the next start (R56 step 9, R161 step 11): a checkbox beside Restart

@@ -1224,7 +1224,7 @@ async function dmAction(project, instance, act, btn){
   // vanishing looks identical either way.
   if (!j.error && j.note) notify(j.note);
   else if (!j.error && ahead && j.job !== ahead.id)
-    notify(`${dmCalled(project, instance)}: ${DM_VERB[act] || act} is ${j.already ? "already " : ""}queued behind ${DM_JOB_NOUN[ahead.action] || "the job"} running on it, and starts once that has ended`);
+    notify(queuedSaid(`${DM_VERB[act] || act} on ${dmCalled(project, instance)}${j.already ? ", already" : ""}`, `${DM_JOB_NOUN[ahead.action] || "the job"} running on it`));
 }
 
 // The job at work on an instance, as the list has it, or null.

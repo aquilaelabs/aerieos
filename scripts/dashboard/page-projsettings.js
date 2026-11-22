@@ -2127,15 +2127,12 @@ async function deleteProject(name){
       + `roadmap, bugs, versions and memories stay where they are, `
       + `and Put back in the trash returns all of it.${left ? "\n\n" + left : ""}\n\n`
       + `Close its terminals first.`)) return;
-  // Its row leaves its card on the press (pjGone), and comes back saying why
+  // Its row leaves its card on the press (goNow), and comes back saying why
   // on a refusal.
   const label = projLabel(name);
-  const j = await drawNow(() => pjGone("repo:" + name), () => postJSON("/api/trash", {name}));
-  if (j.error) return;
   // The path is named back because it may not be the one the dialog said:
   // a second delete of the same name is numbered rather than overwriting the
   // first, and the first is exactly the copy somebody would want back.
-  notify(`${label} moved to ${j.to}`);
-  await refresh();
-  pjGoing.delete("repo:" + name);
+  await goNow("repo:" + name, {redraw: pjRedraw, send: () => postJSON("/api/trash", {name}),
+    after: async j => { notify(`${label} moved to ${j.to}`); await refresh(); }});
 }

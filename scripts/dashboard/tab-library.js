@@ -683,7 +683,7 @@ function wireLibrary(root){
     busy(cl, ahead ? "Queuing" : "Removing");
     const j = await postJSON("/api/toolchains", {action: "clean", node: libNode, names: dirs});
     if (j.error) notify(j.error, true);
-    else if (ahead || j.waits) notify(`taking ${dirs.join(", ")} off the store: queued behind ${ahead || "the job writing it"}`);
+    else if (ahead || j.waits) notify(queuedSaid(`taking ${dirs.join(", ")} off the store`, ahead || "the job writing it"));
     loadLibrary();
   };
   const dsel = root.querySelector("#libDrvSel");

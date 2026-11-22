@@ -94,6 +94,42 @@ function writeOut(p, opts){
 // request (postJSON's promise, or a function returning it). A refusal puts
 // the page as it was and says why in one sentence; the answer comes back
 // either way, for a caller with a step of its own.
+// ...and the one such result most presses are: something taken away (a row
+// deleted, dismissed, forgotten, a card sent to the trash). Its key ("bell:"
+// and the bell's key, "storage:mount:" and its id, "space:" and the space's
+// key) is held here, and every drawing of those rows leaves out one that is
+// `going`, so a read landing before the server has it does not bring it
+// back; the `rows` on show for it leave with the fold (leaveBox) and the page
+// draws without it once they have gone; a refusal puts it back whole and
+// says why. `send` makes the request, `redraw` draws the page from its own
+// data, and `after` (the read again, a word said) runs once the server has
+// it, the key let go after. One mechanism for every page (the operator,
+// 22 Nov: each change an opportunity to make it consistent and fold what
+// was written out several times).
+const goingNow = new Set();
+const going = key => goingNow.has(key);
+async function goNow(key, {rows = [], redraw = () => drawPanes(), send, after} = {}){
+  // One thing may stand under several keys (a bell row grouping updates).
+  const keys = Array.isArray(key) ? key : [key];
+  const els = (rows || []).filter(Boolean);
+  const j = await drawNow(() => {
+    keys.forEach(k => goingNow.add(k));
+    let left = els.length;
+    if (!left) redraw();
+    els.forEach(r => leaveBox(r, () => { if (--left === 0) redraw(); }));
+    return () => {
+      keys.forEach(k => goingNow.delete(k));
+      els.forEach(r => r.getAnimations().forEach(x => { if (x.id === "leave") x.cancel(); }));
+      redraw();
+    };
+  }, send);
+  if (!j?.error){
+    try{ await after?.(j); }catch(e){ console.error(e); }
+    keys.forEach(k => goingNow.delete(k));
+    redraw();
+  }
+  return j;
+}
 async function drawNow(now, send){
   let undo = null;
   try{ undo = now(); }catch(e){ console.error(e); }

@@ -2875,7 +2875,7 @@ function ndAhead(n){
 }
 // ...said on a press that went in behind it: `what` is the press's own word.
 function ndQueuedSay(n, ahead, what){
-  if (ahead) notify(`${what} is queued behind ${ahead} on ${n?.name || "the node"}, and starts once that has ended`);
+  if (ahead) notify(queuedSaid(what, `${ahead} on ${n?.name || "the node"}`));
 }
 
 function wireNodesTab(root){

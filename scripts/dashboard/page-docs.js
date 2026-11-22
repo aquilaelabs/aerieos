@@ -122,6 +122,12 @@ function dropBox(at, {q, sub = "", placeholder = "", max = 1000, verb, tone = "p
 function abortBtn(attrs, aborting, title = ""){
   return `<button type="button" ${attrs}${title ? ` title="${esc(title)}"` : ""}${runAttr(aborting, "Stopping")}>Abort</button>`;
 }
+// A press the server queued behind what is running, said one way on every
+// page (the operator, 22 Nov: a press that can be queued says so): `what`
+// the press set going, `behind` what it waits for.
+function queuedSaid(what, behind){
+  return `${what}: queued behind ${behind}, and starts once that has ended`;
+}
 // A button whose work runs, drawn so (the operator, 22 Nov: a running word
 // grew its button): its own word kept, so its size is, dead, the ring in
 // the word's place, and `saying` (Installing, Checking for updates) what a

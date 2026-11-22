@@ -38,18 +38,10 @@ function loadStorage(){
 // the press (the operator, 22 Nov): its "kind:id" is held here and left out
 // of each drawing until the read after the answer, and a refusal brings it
 // back saying why.
-const storageGoing = new Set();
-async function storageForget(key, path, body, said){
-  const redraw = () => { readMoved("storage"); drawPanes(); };
-  const j = await drawNow(() => {
-    storageGoing.add(key); redraw();
-    return () => { storageGoing.delete(key); redraw(); };
-  }, () => postJSON(path, body));
-  if (!j.error){
-    notify(said);
-    try{ await loadStorage(); }catch(e){ /* the read says its own failure */ }
-    storageGoing.delete(key); redraw();
-  }
+async function storageForget(key, path, body, said, row){
+  const j = await goNow("storage:" + key, {rows: [row], redraw: () => { readMoved("storage"); drawPanes(); },
+    send: () => postJSON(path, body),
+    after: async () => { notify(said); try{ await loadStorage(); }catch(e){ /* the read says its own failure */ } }});
   refresh();
   return j;
 }
@@ -59,10 +51,10 @@ async function storageForget(key, path, body, said){
 // once it has ended (the operator, 22 Nov). Read when the press is made.
 function storageJobSaid(n, what, runs){
   const ahead = ndAhead(nodeOf(n.node));
-  return ahead ? `${what}: queued behind ${ahead} on the machine, and starts once that has ended` : `${what}: ${runs}`;
+  return ahead ? queuedSaid(what, `${ahead} on the machine`) : `${what}: ${runs}`;
 }
 // A node's schedules as this page draws them, less any removed on the way.
-const storageScheds = n => (n.snapshot_schedules || []).filter(x => !storageGoing.has(`sched:${x.id}`));
+const storageScheds = n => (n.snapshot_schedules || []).filter(x => !going(`storage:sched:${x.id}`));
 
 // The node the tab opens on: the one it showed last (remembered in this
 // browser), else the first in the answer, else nothing.
@@ -555,7 +547,7 @@ function wireStorageSnapshots(root, n){
   root.querySelectorAll("[data-stsnapsched]").forEach(b => b.onclick = () => pressing(b, async () => {
     const x = (n.snapshot_schedules || []).find(y => y.id === b.dataset.stsnapsched);
     if (!await askYes(`Remove the ${x?.kind || ""} schedule of ${x?.pool || "the pool"}? The snapshots it took stay.`, {title: "Remove the schedule?", verb: "Remove"})) return;
-    await storageForget(`sched:${b.dataset.stsnapsched}`, "/api/schedules", {action: "remove", id: b.dataset.stsnapsched}, "the schedule is gone");
+    await storageForget(`sched:${b.dataset.stsnapsched}`, "/api/schedules", {action: "remove", id: b.dataset.stsnapsched}, "the schedule is gone", b.closest(".row, tr"));
   }));
 }
 
@@ -705,7 +697,7 @@ function storageOther(n){
   if (!n.own) return "";
   const admin = !!state?.can?.admin && n.may_measure;
   const why = !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
-  const recs = (n.extmounts || []).filter(r => !storageGoing.has(`mount:${r.id}`)), live = n.ext_mounts || [];
+  const recs = (n.extmounts || []).filter(r => !going(`storage:mount:${r.id}`)), live = n.ext_mounts || [];
   const kindWord = {disk: "a disk here", smb: "an SMB share", nfs: "an NFS export"};
   const rows = recs.map(r => {
     const st = live.find(x => x.id === r.id) || {};
@@ -759,7 +751,7 @@ function wireStorageOther(root, n){
       if (!body.name){ notify("a mount takes a name: its folder under /mnt/other", true); return; }
     } else if (act === "remove"){
       if (!await askYes("Forget this mount? It is unmounted first; nothing on it is touched.", {title: "Remove the mount?", verb: "Remove", danger: true})) return;
-      await storageForget(`mount:${b.dataset.id}`, "/api/extmounts", {action: "remove", id: b.dataset.id}, "forgotten");
+      await storageForget(`mount:${b.dataset.id}`, "/api/extmounts", {action: "remove", id: b.dataset.id}, "forgotten", b.closest(".row, tr"));
       return;
     } else body = {action: act, id: b.dataset.id};
     busyFor(b, act);
@@ -777,7 +769,7 @@ function storageBackups(n){
   if (!n.own) return "";
   const admin = !!state?.can?.admin && n.may_measure;
   const why = !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
-  const recs = (n.backups || []).filter(r => !storageGoing.has(`backup:${r.id}`)), live = n.store_backups || [], scheds = storageScheds(n).filter(x => x.backup);
+  const recs = (n.backups || []).filter(r => !going(`storage:backup:${r.id}`)), live = n.store_backups || [], scheds = storageScheds(n).filter(x => x.backup);
   const places = [...(n.pools || []).map(p => [p.mount, `the pool ${p.name} (${p.mount})`]).filter(x => x[0]),
                   ...(n.array?.mounted ? [[n.array.mount || "/mnt/array", `the array (${n.array.mount || "/mnt/array"})`]] : []),
                   ...(n.extmounts || []).filter(m => (n.ext_mounts || []).find(x => x.id === m.id)?.mounted).map(m => [`/mnt/other/${m.name}`, `${m.name} (/mnt/other/${m.name})`]),
@@ -827,7 +819,7 @@ function wireStorageBackups(root, n){
     }
     if (act === "remove"){
       if (!await askYes("Forget this backup? The runs already copied stay where they are.", {title: "Remove the backup?", verb: "Remove", danger: true})) return;
-      await storageForget(`backup:${b.dataset.id}`, "/api/storebackups", {action: "remove", id: b.dataset.id}, "forgotten");
+      await storageForget(`backup:${b.dataset.id}`, "/api/storebackups", {action: "remove", id: b.dataset.id}, "forgotten", b.closest(".row, tr"));
       return;
     }
     if (act === "nightly"){

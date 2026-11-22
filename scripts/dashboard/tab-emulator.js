@@ -339,9 +339,9 @@ async function emuAct(action, image, btn){
     if (action === "add") emuSelecting = false;
     // Behind a job already writing the store it is queued, never refused
     // (toolchains.store_gate), and the answer's `waits` says so.
-    notify(`${action === "add" ? "adding" : "removing"} ${many && image.length > 1
-      ? `${image.length} images` : (many ? image[0] : image)} on ${
-      emu?.name || "the node"}${j.waits ? ": queued behind the job running there, it starts once that has ended" : "; this can take minutes"}`);
+    const what = `${action === "add" ? "adding" : "removing"} ${many && image.length > 1
+      ? `${image.length} images` : (many ? image[0] : image)} on ${emu?.name || "the node"}`;
+    notify(j.waits ? queuedSaid(what, "the job running there") : `${what}; this can take minutes`);
   }
   loadEmulator();
 }

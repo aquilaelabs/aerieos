@@ -38,7 +38,7 @@ async function scannersAct(body, {queued = false} = {}){
   else if (j.note) notify(j.note, true);
   else if (body.action === "deploy") notify("deploying the scanners: the pull is a job on the Jobs page");
   else if (body.action === "deploy-all") notify(`deploying on ${Object.keys(j.nodes || {}).length} node${Object.keys(j.nodes || {}).length === 1 ? "" : "s"}`);
-  else if (body.action === "update") notify(queued ? "updating the scanners: queued behind their deploy, it starts once that has ended"
+  else if (body.action === "update") notify(queued ? queuedSaid("updating the scanners", "their deploy")
                                                        : "updating the scanners: the pull is a job on the Jobs page");
   else if (body.action === "run"){
     const errs = Object.values(j.nodes || {}).filter(x => x.error).map(x => x.error);

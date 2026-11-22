@@ -617,7 +617,7 @@ async function sysJobAhead(nodeId){
 // where it has them (a draft being fetched, a restart that waits), queued
 // where a job is ahead of it, else `words`.
 function sysSaid(ahead, words){
-  return j => j.said || j.waits || (ahead ? `queued behind ${ahead} on this machine: it starts once that has finished`
+  return j => j.said || j.waits || (ahead ? queuedSaid(typeof words === "function" ? words(j) : words, `${ahead} on this machine`)
     : typeof words === "function" ? words(j) : words);
 }
 function wireUpdates(root){

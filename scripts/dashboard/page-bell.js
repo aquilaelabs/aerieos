@@ -556,16 +556,13 @@ function attRow(a){
 // attention" group and Home's Attention card (R218 step 5) draw the same
 // ones. From the poll, never stored here, so a row leaves the moment it
 // stops being true.
-// The rows put away and not yet answered (Dismiss draws its row gone on the
-// press, the operator 22 Nov): a row whose every key is here is left out of
-// each drawing of them, the poll's included, until the server has it.
-// Held as each row's markup has them, escaped.
-const bellGoing = new Set();
+// A row put away and not yet answered is left out of each drawing of them,
+// the poll's included (goNow: Dismiss takes its row away on the press, the
+// operator 22 Nov). Its keys are held as its markup has them, escaped.
 function bellLeft(rows){
-  if (!bellGoing.size) return rows;
   return rows.filter(h => {
     const m = /data-bdismiss="([^"]*)"/.exec(h);
-    return !m || !m[1].split(" ").every(k => bellGoing.has(k));
+    return !m || !m[1].split(" ").every(k => going("bell:" + k));
   });
 }
 function needsRows(){
@@ -910,25 +907,14 @@ function wireNeeds(root, after = () => {}){
   // before the server has it, and the next read after leaves it out itself.
   root.querySelectorAll("[data-bdismiss]").forEach(a => a.onclick = e => {
     e.preventDefault();
-    const keys = a.dataset.bdismiss.split(" "), held = keys.map(k => esc(k));
-    const redraw = () => { drawBell(); render(); };
-    // Every copy of the row (the bell's, Home's) leaves on the press
-    // (leaveBox), and the page draws without it once it has gone.
+    const keys = a.dataset.bdismiss.split(" ");
+    // Every copy of the row (the bell's, Home's) leaves on the press, and the
+    // page draws without it once it has gone (goNow); a row of several keys
+    // is held under each.
     const rows = [...document.querySelectorAll("[data-bdismiss]")]
-      .filter(x => x.dataset.bdismiss === a.dataset.bdismiss).map(x => x.closest(".bnote")).filter(Boolean);
-    return drawNow(() => {
-      held.forEach(k => bellGoing.add(k));
-      let left = rows.length;
-      if (!left) redraw();
-      rows.forEach(r => leaveBox(r, () => { if (--left === 0) redraw(); }));
-      return () => {
-        held.forEach(k => bellGoing.delete(k));
-        rows.forEach(r => r.getAnimations().forEach(x => { if (x.id === "leave") x.cancel(); }));
-        redraw();
-      };
-    }, () => postJSON("/api/bell", {action: "dismiss", keys})).then(j => {
-      if (!j.error) refresh().finally(() => held.forEach(k => bellGoing.delete(k)));
-    });
+      .filter(x => x.dataset.bdismiss === a.dataset.bdismiss).map(x => x.closest(".bnote"));
+    return goNow(keys.map(k => "bell:" + esc(k)), {rows, redraw: () => { drawBell(); render(); },
+      send: () => postJSON("/api/bell", {action: "dismiss", keys}), after: () => refresh()});
   });
   // Resume (R251): the session an outage held is told to pick up from its
   // note; the row goes once the line was sent. One send at a time: a second

@@ -88,9 +88,10 @@ function nginxBuilding(nid){
 async function nginxLanded(body, j, ahead = false){
   if (j.error){ await loadNginx(); return j; }
   if (j.note) notify(j.note, true);
-  else if (j.job) notify(`${body.action === "deploy" ? "deploying" : body.action === "update" ? `updating nginx to ${j.to}` : "rebuilding nginx"}${
-    body.action === "deploy" ? " nginx" : ""}${ahead ? ": queued behind the build already running, it starts once that has ended"
-      : ": its row on the Containers page has the build"}`);
+  else if (j.job){
+    const what = body.action === "deploy" ? "deploying nginx" : body.action === "update" ? `updating nginx to ${j.to}` : "rebuilding nginx";
+    notify(ahead ? queuedSaid(what, "the build already running") : `${what}: its row on the Containers page has the build`);
+  }
   // A hostname added or deleted comes back with the list as it now is, so
   // the pull-downs hold it the moment the answer lands rather than after
   // the whole tab is read again (every node's daemon, B721).
