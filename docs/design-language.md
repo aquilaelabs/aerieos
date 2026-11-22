@@ -657,6 +657,8 @@ otherwise), and `saidOf(el)` reads them back for a suite. A destructive button (
 
 **Red is for what is dangerous; what interrupts and loses nothing is amber** (the operator, 19 Nov, on Restart's red button). A verb that destroys or cannot be taken back wears `.danger`, in red: Delete, Remove, Uninstall, Discard, Reset, Forget, Purge, Wipe, Revoke, Overwrite, Replace, Rotate, Destroy, Erase, a forced stop, leaving over unsaved changes. A verb that stops something which starts again wears `.caution`, in the scheme's amber (`--warn`), filled as the red one is: Restart, End a session, Stop, Reboot, Shut down, a job's Cancel, Sign out, Disconnect, Take back. A question's yes follows its verb the same way (`ASK_DANGER`, `ASK_CAUTION` in page-ask.js): a red yes comes after Cancel, which takes the focus; an amber one is the first button as any yes is.
 
+**A field's words fit the field.** A placeholder that would be cut off where its field is narrow says its short words instead (`data-ph-short`, swapped by width as the field resizes, `phFit` in page-paint.js), as a bar button's words do (`barSaid`); and on a phone, text that would be cut off or ellipsized where it could wrap wraps instead (the operator, 22 Nov).
+
 ### forms
 
 Applies to: scripts/dashboard/index.html, scripts/dashboard/tab-*.js, scripts/dashboard/nb-*.js, scripts/dashboard/page-*.js; form, field, label, pulldown, select, input

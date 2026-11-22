@@ -52,7 +52,33 @@ function drawn(root){
   quietFields(root);
   untitleIn(root);
   chipsBack(root);
+  for (const el of all("[data-ph-short]")) phWatch(el);
   return root;
+}
+
+// A field's placeholder in its short words where the full ones are cut off
+// (the operator, 22 Nov: text in a field should have a shorter version when
+// the field is not long enough for the full one), as barSaid does for a
+// button's: `placeholder` is the full words, `data-ph-short` the short, and
+// whichever fits the field's own width is shown, again as the field resizes.
+const phFont = document.createElement("canvas").getContext("2d");
+const phSeen = typeof ResizeObserver === "function" ? new ResizeObserver(es => { for (const e of es) phFit(e.target); }) : null;
+function phFit(el){
+  if (!el.isConnected) return;
+  // A redraw that wrote other words is taken as the new full ones.
+  const now = el.getAttribute("placeholder") || "";
+  if (el.dataset.phFull === undefined || (now !== el.dataset.phFull && now !== el.dataset.phShort)) el.dataset.phFull = now;
+  const full = el.dataset.phFull;
+  const short = el.dataset.phShort || full;
+  const cs = getComputedStyle(el);
+  const room = el.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
+  phFont.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  const want = room > 0 && phFont.measureText(full).width > room ? short : full;
+  if (el.getAttribute("placeholder") !== want) el.setAttribute("placeholder", want);
+}
+function phWatch(el){
+  phFit(el);
+  if (phSeen && !el.__phSeen){ el.__phSeen = true; phSeen.observe(el); }
 }
 // A part drawn whole from its markup: what a draw that is not a patch does.
 function drawHTML(el, html){
