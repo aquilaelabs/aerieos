@@ -931,21 +931,9 @@ function jumpGo(i){
 function wireJump(){
   const inp = $("jump"), list = $("jumpList");
   if (!inp || !list) return;
-  // The whole hint where it fits, else a shorter one, else two words (the
-  // operator, 18 Oct: cut off mid-word), measured against the field as it is
-  // laid out, since at a desk it was still cut at 1280 (B72). The aria-label
-  // keeps the whole of it either way.
-  const said = () => {
-    const cs = getComputedStyle(inp);
-    const room = inp.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 4;
-    const ctx = (said.ctx ||= document.createElement("canvas").getContext("2d"));
-    ctx.font = cs.font;
-    const hint = ["jump to a page, space, container or node", "jump to a page, space or node", "jump to…"]
-      .find(t => ctx.measureText(t).width <= room) || "jump to…";
-    if (inp.placeholder !== hint) inp.placeholder = hint;
-  };
-  said();
-  if (window.ResizeObserver) new ResizeObserver(said).observe(inp);
+  // Its hint is the whole where it fits, else a shorter one, else two words
+  // (the operator, 18 Oct: cut off mid-word), as every field's is (phFit,
+  // its data-ph-short); the aria-label keeps the whole of it either way.
   onTyping(inp, drawJump);
   inp.onfocus = () => { (nodesList === null ? nodesKnown() : Promise.resolve()).then(dmJumpLoad).then(drawJump); drawJump(); };
   inp.onkeydown = e => {

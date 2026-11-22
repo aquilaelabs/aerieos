@@ -68,21 +68,23 @@ function runShow(el){
 // A field's placeholder in its short words where the full ones are cut off
 // (the operator, 22 Nov: text in a field should have a shorter version when
 // the field is not long enough for the full one), as barSaid does for a
-// button's: `placeholder` is the full words, `data-ph-short` the short, and
-// whichever fits the field's own width is shown, again as the field resizes.
+// button's: `placeholder` is the full words, `data-ph-short` the short (or
+// several, longest first, between bars), and the longest that fits the
+// field's own width is shown, the shortest where none does, again as the
+// field resizes.
 const phFont = document.createElement("canvas").getContext("2d");
 const phSeen = typeof ResizeObserver === "function" ? new ResizeObserver(es => { for (const e of es) phFit(e.target); }) : null;
 function phFit(el){
   if (!el.isConnected) return;
   // A redraw that wrote other words is taken as the new full ones.
   const now = el.getAttribute("placeholder") || "";
-  if (el.dataset.phFull === undefined || (now !== el.dataset.phFull && now !== el.dataset.phShort)) el.dataset.phFull = now;
-  const full = el.dataset.phFull;
-  const short = el.dataset.phShort || full;
+  const shorts = (el.dataset.phShort || "").split("|").filter(Boolean);
+  if (el.dataset.phFull === undefined || (now !== el.dataset.phFull && !shorts.includes(now))) el.dataset.phFull = now;
+  const ladder = [el.dataset.phFull, ...shorts];
   const cs = getComputedStyle(el);
   const room = el.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
   phFont.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-  const want = room > 0 && phFont.measureText(full).width > room ? short : full;
+  const want = room <= 0 ? ladder[0] : ladder.find(t => phFont.measureText(t).width <= room) || ladder.at(-1);
   if (el.getAttribute("placeholder") !== want) el.setAttribute("placeholder", want);
 }
 function phWatch(el){
