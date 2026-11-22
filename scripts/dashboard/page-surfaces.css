@@ -874,14 +874,10 @@ body.firstrun #panes{display:none}
   .librarytab .libfilter .libsearchrow>.actbar{flex-wrap:nowrap}
   .librarytab .libfilter .libsearchrow>.libnarrow{order:3;flex:1 1 100%;flex-wrap:wrap;row-gap:var(--field-gap)}
   .librarytab .libnarrow .dmviewseg{margin-left:auto}
-  /* A pulldown is as wide as its longest answer (fitPickers), and the
-     catalog's topics made the topic's wider than a phone's line with the
-     order beside it, running the page off the side. On a phone the two
-     share the line, each as wide as the room left beside the view, showing
-     the answer picked (its list opens whole); so the line is one height
-     whatever the topics are, which is the height its placeholder draws. */
-  .librarytab .libnarrow>label.pick{flex:1 1 0;min-width:0;max-width:100%}
-  .librarytab .libnarrow select{min-width:0;max-width:100%;text-overflow:ellipsis}
+  /* The catalog's topics made the topic's pulldown wider than a phone's
+     line with the order beside it, running the page off the side; the two
+     share the line instead (.pickshare), so it is one height whatever the
+     topics are, which is the height its placeholder draws. */
 }
 .librarytab .libgname .libshelfall{margin-left:auto;font:var(--f-ui)}
 .librarytab .libgroup>.libhidden{margin:0 0 8px;color:var(--dim)}

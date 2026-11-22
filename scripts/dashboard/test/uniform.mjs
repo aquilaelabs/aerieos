@@ -747,7 +747,10 @@ function rowsWearTheClass(){
 // and nothing sizing it, which is how wide its longest answer makes it. Wider
 // is stretched; narrower is allowed only where its row has no room left,
 // which clips it. The pulldowns are the page's own PICKERS (page-docs.js),
-// so the check and what sizes them cannot drift apart.
+// so the check and what sizes them cannot drift apart. The one exception is
+// a phone's line of pulldowns beside a row's compact buttons (.pickshare,
+// the operator, 22 Nov): there each fills its share flush to the buttons,
+// held instead to filling it exactly.
 function pickersFit(){
   return page.evaluate(() => {
     const ink = document.createElement('canvas').getContext('2d');
@@ -763,6 +766,8 @@ function pickersFit(){
       const own = s.getBoundingClientRect().width;
       s.selectedIndex = at;
       if (style === null) s.removeAttribute('style'); else s.setAttribute('style', style);
+      const share = s.closest('.pickshare') && innerWidth <= 600 ? s.closest('label.pick') : null;
+      if (share) return Math.abs(share.getBoundingClientRect().width - w) > 1 ? `${name} is ${Math.round(w)}px in a share of ${Math.round(share.getBoundingClientRect().width)}px it should fill` : '';
       if (w > own + 3) return `${name} is ${Math.round(w)}px for ${Math.round(own)}px of its longest answer`;
       if (w >= own - 3) return '';
       // Short of it: only where the row it sits in had no more to give.
