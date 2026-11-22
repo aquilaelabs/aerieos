@@ -883,6 +883,17 @@ fence and the system keeps running. A container made before the fence keeps
 its cgroup until it is next recreated. The Storage page says each node's
 fence and what is in it.
 
+A node's GitHub Actions runner is in the fence too, held to a share of its
+own: its unit slows it past half the machine's memory, kills it inside that
+share past three fifths, lets it swap a quarter of the swap at most, and
+gives it an OOM score of 300, so when memory runs out the kernel takes a CI
+job (GitHub's runner marks its jobs 500), then a build or a test run a
+session started (500 as well, see building.md), then the runner, before the
+agent and the coding agents' sessions (200). A runner installed before an
+agent wrote that unit has it rewritten the next time it is idle. A CI run
+on a full node slows down or fails red; the node, its sessions and their
+network stay up.
+
 ### Toolchains and the toolchain store
 
 Caches answered "how does a node avoid re-downloading what a build pulls";

@@ -70,6 +70,55 @@ log()  { printf '[builderbot] %s\n'      "$*"; }
 warn() { printf '[builderbot] WARN: %s\n' "$*" >&2; }
 die()  { printf '[builderbot] ERROR: %s\n' "$*" >&2; exit 1; }
 
+# heavy_first: this process, and all it starts from here on, the kernel's
+# to take before the session that ran it when the machine's memory runs out
+# (R271: on 22 Nov a Gradle build, its emulator and a CI run filled a node,
+# every process at the agent's 200, and the sessions dropped with them).
+# A build, a test run, a command run through aerie and the emulator call it
+# first; a Gradle daemon, a suite's browsers and the emulator's qemu inherit
+# it. Any process may raise its own score, never lower it, so one already
+# higher (a CI job's, GitHub's runner sets 500) is left as it is.
+HEAVY_OOM_SCORE=500
+heavy_first() {
+    local now
+    now="$(cat /proc/self/oom_score_adj 2>/dev/null)" || return 0
+    [ "${now:-0}" -lt "$HEAVY_OOM_SCORE" ] 2>/dev/null || return 0
+    { echo "$HEAVY_OOM_SCORE" > /proc/self/oom_score_adj; } 2>/dev/null || true
+}
+
+# mem_room_mb: the memory, in MB, this process may still take before the
+# machine or its share of it runs short (R271). The machine's MemAvailable,
+# or less where the cgroup it runs in, or one above it, is held to less: a
+# CI runner's share of the machine, the fence a node keeps its sessions and
+# jobs in. A cgroup's room is its ceiling (the lower of where it is slowed
+# and where it is killed) less what it holds, its pages cached from disk
+# left out (all but shared memory, which only swap could free), as
+# MemAvailable leaves them out. On 22 Nov a CI run on bb-sandbox counted the
+# machine's memory alone, beside a session's Gradle build and emulator, and
+# the node ran out with both sessions on it.
+mem_room_mb() {
+    local room cg dir lim hi cur cold left
+    room="$(awk '/^MemAvailable:/ { print int($2 / 1024) }' /proc/meminfo 2>/dev/null)"
+    room="${room:-99999}"
+    cg="$(sed -n 's/^0:://p' /proc/self/cgroup 2>/dev/null)"
+    dir="/sys/fs/cgroup${cg%/}"
+    while [ -n "$cg" ] && [ "$dir" != /sys/fs/cgroup ] && [ "$dir" != /sys/fs ]; do
+        lim="$(cat "$dir/memory.max" 2>/dev/null)"; hi="$(cat "$dir/memory.high" 2>/dev/null)"
+        case "$hi" in ''|max) ;; *) case "$lim" in ''|max) lim="$hi" ;; *) [ "$hi" -lt "$lim" ] && lim="$hi" ;; esac ;; esac
+        cur="$(cat "$dir/memory.current" 2>/dev/null)"
+        case "$lim" in ''|max) ;; *)
+            if [ -n "$cur" ]; then
+                cold="$(awk '$1 == "file" { f = $2 } $1 == "shmem" { m = $2 } END { print f - m }' "$dir/memory.stat" 2>/dev/null)"
+                left=$(( (lim - cur + ${cold:-0}) / 1048576 ))
+                [ "$left" -ge 0 ] || left=0
+                [ "$left" -lt "$room" ] && room="$left"
+            fi ;;
+        esac
+        dir="${dir%/*}"
+    done
+    printf '%s\n' "$room"
+}
+
 # is_true VALUE: accepts true/1/yes/on in any case.
 # bb_setting KEY [DEFAULT]: a Settings-tab value (roadmap R29) out of
 # /config/settings.json, else the default. Booleans come out as the words

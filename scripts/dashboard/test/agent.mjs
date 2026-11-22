@@ -523,7 +523,7 @@ def case(have, shipped):
     a.ctl = Ctl()
     a.running_ids = lambda: []
     a.keep_session_tokens = lambda rows: None
-    a.runner_env_sync = lambda: did.append('runners')
+    a.runner_sync = lambda: did.append('runners')
     a.refresh_session_tool = lambda: did.append('helper')
     def take(digest):
         did.append('bundle ' + digest)

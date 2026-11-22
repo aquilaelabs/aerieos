@@ -555,7 +555,7 @@ def runner_env_text(state):
     session or a bb job on the same machine had the toolchain. The browser
     suite then skipped with exit 0 and every 'dashboard tests' run on
     bb-sandbox was green without running a test (bug B74). Sorted, so the
-    text is stable and runner_env_sync can compare it byte for byte.
+    text is stable and runner_sync can compare it byte for byte.
     """
     return "".join(f"{k}={v}\n" for k, v in sorted(sdk_env(state).items()))
 

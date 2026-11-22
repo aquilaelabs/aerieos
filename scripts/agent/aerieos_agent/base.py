@@ -1629,15 +1629,36 @@ def _probe_died(name, path, out, why):
         f"this node's census" + (f". It said: {said}" if said else ""))
 
 
-def _mem():
-    tot = avail = 0
-    try:
-        with open("/proc/meminfo") as f:
+# What the kernel takes first when a node's memory runs out (R271): a build,
+# a test run or a command run as a job (500, as aerie's heavy_first marks
+# one a session runs, and as GitHub's runner marks its jobs), then a CI
+# runner itself (300), before this agent and the sessions it starts (200,
+# its unit's OOMScoreAdjust, which they inherit).
+JOB_OOM_SCORE = 500
+
+
+def oom_first(argv, score=JOB_OOM_SCORE):
+    """`argv` started at OOM score `score`, by a shell that raises its own
+    and execs it: no fork hook in this threaded process (see the exec job's
+    nice), and nothing it starts slips out before the score is set. A
+    process may always raise its own score, so it never fails for want of
+    a right; where /proc is not there the command runs as it is."""
+    return ["sh", "-c", f'echo {int(score)} > /proc/self/oom_score_adj 2>/dev/null; exec "$@"', "sh", *argv]
+
+
+def meminfo(path="/proc/meminfo"):
+    """This machine's /proc/meminfo as {name: kB}; {} where it cannot be read."""
+    out = {}
+    with contextlib.suppress(OSError):
+        with open(path) as f:
             for line in f:
-                if line.startswith("MemTotal:"):
-                    tot = int(line.split()[1]) // 1024
-                elif line.startswith("MemAvailable:"):
-                    avail = int(line.split()[1]) // 1024
-    except (OSError, ValueError):
-        pass
-    return tot, max(0, tot - avail)
+                name, _, rest = line.partition(":")
+                with contextlib.suppress(ValueError, IndexError):
+                    out[name] = int(rest.split()[0])
+    return out
+
+
+def _mem():
+    m = meminfo()
+    tot = m.get("MemTotal", 0) // 1024
+    return tot, max(0, tot - m.get("MemAvailable", 0) // 1024)

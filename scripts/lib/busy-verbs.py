@@ -31,6 +31,21 @@ def now_load():
         return None
 
 
+def now_mem():
+    """The machine's memory now, (total MB, used MB), as the heartbeat counts
+    it (what MemAvailable does not leave free), or None."""
+    m = {}
+    try:
+        with open("/proc/meminfo") as f:
+            for line in f:
+                k, _, v = line.partition(":")
+                if k in ("MemTotal", "MemAvailable"):
+                    m[k] = int(v.split()[0]) // 1024
+    except (OSError, ValueError, IndexError):
+        return None
+    return (m["MemTotal"], m["MemTotal"] - m["MemAvailable"]) if len(m) == 2 and m["MemTotal"] else None
+
+
 def ask():
     q = urllib.parse.urlencode({"project": project, "node": node})
     d = bbapi.call(f"/api/node-busy?{q}")
@@ -47,6 +62,15 @@ def ask():
         elif load / cores >= 0.5 and d["verdict"] == "quiet":
             d["verdict"] = "busy"
             d["why"] = [f"load {load:g} on {cores} cores right now"]
+    # ...and its memory now (R271): a build or an emulator that filled it
+    # since the heartbeat says so at once, as the controller's verdict
+    # would on the next one (busy.py: 92% used is saturated).
+    mem = now_mem()
+    if mem:
+        d["mem_mb"], d["mem_used_mb"] = mem
+        if mem[1] * 100 >= 92 * mem[0] and d["verdict"] in ("quiet", "busy"):
+            d["verdict"] = "saturated"
+            d["why"] = [f"memory {mem[1] * 100 // mem[0]}% used right now"] + d["why"]
     return d
 
 
@@ -57,7 +81,7 @@ def show(d):
           + (f" then and {d['load_now']:g} now" if d.get("load_now") is not None else "")
           + f", {d.get('cores')} cores")
     if d.get("mem_mb"):
-        print(f"  memory   {gb(d.get('mem_used_mb'))} of {gb(d.get('mem_mb'))}")
+        print(f"  memory   {gb(d.get('mem_used_mb'))} of {gb(d.get('mem_mb'))} in use now")
     if d.get("gpu_mem_mb"):
         print(f"  gpu      {d.get('gpu_pct')}%, {gb(d.get('gpu_mem_used_mb'))} of {gb(d.get('gpu_mem_mb'))}"
               + (f", {d['gpu_procs']} computing" if d.get("gpu_procs") else ""))

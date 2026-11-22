@@ -741,7 +741,7 @@ class Agent(WorkspaceMixin, SessionsMixin, WorkMixin, ConfigPlaneMixin, RunnersM
             if self.session_bundle != before:
                 self.refresh_session_tool()
                 self.refresh_virtiofsd_wrap()
-            self.runner_env_sync()
+            self.runner_sync()
             # The channel itself, last, once the bundle and root's tools
             # are the ones this controller ships: over TLS under the
             # controller's key where it names one (channel_move).

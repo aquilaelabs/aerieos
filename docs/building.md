@@ -64,14 +64,26 @@ the space's own test command to read (`pytest -n`, `--test-concurrency`,
 (roadmap R81), which is never more than half the machine's cores: a suite
 is a server, a browser and its node beside each other, and on sixteen cores
 a whole run at eight workers took 9 minutes with nothing failed, at ten 14
-with three suites run again, at sixteen 40 with ten
+with three suites run again, at sixteen 40 with ten. Nor is it more than
+the run's memory holds at about 1.5 GB a suite: what the machine has free,
+or less where the run is held to a share of it, as a node's CI runner is
 (`BB_TEST_SUITES_AT_ONCE=N` is the harness's own number for a run that wants
 another). Under that ceiling its workers take suites from one queue,
-longest first, each taking the next only while the machine has room (1.5 GB
-of memory free and a load under one and a half times its cores; the suites
-run at the lowest priority, so their own load does not hold the next back),
-so a node busy with the emulator or a docker build runs fewer; the run's last lines say what bounded
-it, a suite that was its floor, the machine, or its reruns (R130).
+longest first, each taking the next only while the run has room (1.5 GB
+of the memory it may take free and a load under one and a half times the
+cores; the suites run at the lowest priority, so their own load does not
+hold the next back), so a node busy with the emulator or a docker build
+runs fewer. A worker that has waited five minutes with no memory to start
+another suite stands down and leaves its suites to the others, the first
+never does; the run's last lines say what bounded it, a suite that was its
+floor, the machine, or its reruns (R130).
+
+A test run, a build and a command run through `aerie run` start with the
+kernel's mark to be taken first if the machine runs out of memory (an OOM
+score of 500, which whatever they start inherits: a Gradle daemon, a
+suite's browsers, the emulator), ahead of the coding agents' own sessions,
+and a build or a run started where less than 2 GB is left waits up to five
+minutes for room, saying so, before it starts anyway.
 
 Ingesting is the CLI's and deliberately not an endpoint: every body the server
 takes is capped at 64kB and a run log is a couple of hundred, so an action for

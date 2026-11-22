@@ -678,7 +678,7 @@ class Hello(Case):
         a.ctl = Ctl()
         a.running_ids = lambda: []
         a.keep_session_tokens = lambda rows: None
-        a.runner_env_sync = lambda: None
+        a.runner_sync = lambda: None
         a.refresh_session_tool = lambda: None
         # The fetch that follows is the session half's: here it only notes
         # what was being said when it was reached.

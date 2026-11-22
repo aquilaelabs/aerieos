@@ -14,7 +14,7 @@ import traceback
 import urllib.request
 
 from . import http80
-from .base import AGENT_INSTALLS, AGENT_LOGINS, AGENT_LOGOUTS, ROOT_BUNDLE_DIR, NotHeld, fs_holds, log, pack_signins, root_docker_env
+from .base import AGENT_INSTALLS, AGENT_LOGINS, AGENT_LOGOUTS, ROOT_BUNDLE_DIR, NotHeld, fs_holds, log, oom_first, pack_signins, root_docker_env
 from .toolchains import sdk_env
 
 
@@ -808,6 +808,8 @@ class Job(threading.Thread):
             nice = 0
         if 0 < nice <= 19 and shutil.which("nice"):
             argv = ["nice", "-n", str(nice)] + argv
+        # ...and the kernel's to take before the sessions here (R271).
+        argv = oom_first(argv)
         try:
             p = subprocess.Popen(argv, cwd=cwd, env=env, stdout=subprocess.PIPE,
                                  stderr=subprocess.STDOUT, start_new_session=True,

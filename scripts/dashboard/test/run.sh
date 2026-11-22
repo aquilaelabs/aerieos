@@ -259,7 +259,9 @@ if [ -n "${BB_COVERAGE:-}" ] && [ -z "${BB_TEST_WORKER:-}" ]; then
     python3 "$DASH/../lib/codemap.py" instrument "$DASH" >&2 || exit 1
 fi
 # shellcheck source=/dev/null
-. /opt/aerieos/scripts/lib/common.sh 2>/dev/null || {
+# The checkout's own, as the rest of this run is, and the installed one
+# where a copy carries none.
+. "$DASH/../lib/common.sh" 2>/dev/null || . /opt/aerieos/scripts/lib/common.sh 2>/dev/null || {
     log()  { printf '[dashboard-test] %s\n' "$*"; }
     warn() { printf '[dashboard-test] WARN: %s\n' "$*" >&2; }
     die()  { printf '[dashboard-test] ERROR: %s\n' "$*" >&2; exit 1; }
@@ -798,6 +800,10 @@ if [ -n "${BB_TEST_LOADED:-}" ] && [ -z "${BB_TEST_WORKER:-}" ] && [ -z "${BB_TE
     mapfile -t _names < <(default_suites | grep -vxF -- "$LOADED_SUITE")
     run_workers "$_n" "$LOADED_SUITE" "${_names[@]}"
 fi
+# A suite at its height is a server, its doctor, a browser and its node,
+# about 1.5 GB together, and a run takes no more of them than the room it
+# has holds (mem_room_mb, common.sh: the machine's, or its share of it).
+SUITE_MB=1536
 if [ "${BB_TEST_WORKERS:-1}" -gt 1 ] 2>/dev/null && [ -z "${BB_TEST_WORKER:-}" ] && [ -z "${BB_TEST_HOLD:-}" ]; then
     if [ $# -gt 0 ]; then _names=("$@"); else mapfile -t _names < <(default_suites); fi
     # No more workers than suites, and one suite is the single path below.
@@ -820,6 +826,18 @@ if [ "${BB_TEST_WORKERS:-1}" -gt 1 ] 2>/dev/null && [ -z "${BB_TEST_WORKER:-}" ]
             fi ;;
         *) _n="$BB_TEST_SUITES_AT_ONCE" ;;
     esac
+    # ...and no more than the room here holds, a suite's 1.5 GB each, at
+    # least one (R271): the run's own servers, browsers and doctors are what
+    # filled a node beside a session's build. Each next suite waits for its
+    # room as well (room_wait), so a build that starts meanwhile is given it.
+    if [ -z "${BB_TEST_SUITES_AT_ONCE:-}" ]; then
+        _room="$(mem_room_mb)"; _fit=$(( _room / SUITE_MB ))
+        [ "$_fit" -ge 1 ] || _fit=1
+        if [ "$_n" -gt "$_fit" ]; then
+            log "workers: $_fit, as many as the ${_room} MB of memory this run has room for hold at about ${SUITE_MB} MB a suite, of the $_n it would run"
+            _n="$_fit"
+        fi
+    fi
     [ "$_n" -le "${#_names[@]}" ] || _n="${#_names[@]}"
     # Beside each other the suites wait as they do alone (R7 step 7): every
     # wait was doubled here (BB_TEST_SLOW=2), from when four on four cores
@@ -848,6 +866,8 @@ unset TMUX
 # docker build first), and the queue's room_wait holds a run back further
 # while they are working the machine.
 renice -n 19 -p $$ >/dev/null 2>&1 || true
+# ...and the kernel's to take before the session that ran it (R271).
+command -v heavy_first >/dev/null 2>&1 && heavy_first
 command -v ionice >/dev/null 2>&1 && ionice -c 2 -n 7 -p $$ >/dev/null 2>&1 || true
 # Same reasoning, for the credential. This script is usually run FROM a Claude
 # session, which is given BB_TOKEN, a token scoped to ONE project with `user`
@@ -2032,30 +2052,39 @@ queue_take() {
     [ -n "$got" ] && printf '%s' "$got"
 }
 room_wait() {
-    # Memory first, 1.5 GB free, and the machine not run past half again
-    # its cores: the suites run at the lowest priority, so their own load
-    # does not hold the next one back (a first cut at 85% of the cores made
-    # eight workers wait 21 minutes on each other, 23 Oct), while the
-    # emulator, a docker build or a session crowding the machine does. At
-    # most five minutes, so a run is held back and never stopped; what was
-    # waited is kept for the run's report.
-    local cores load mem waited=0
+    # Memory first, a suite's room (mem_room_mb: the machine's, or this
+    # run's share of it), and the machine not run past half again its
+    # cores: the suites run at the lowest priority, so their own load does
+    # not hold the next one back (a first cut at 85% of the cores made eight
+    # workers wait 21 minutes on each other, 23 Oct), while the emulator, a
+    # docker build or a session crowding the machine does. At most five
+    # minutes; what was waited is kept for the run's report. Fails where
+    # there was still no room at the end, for the worker to stand down.
+    local cores load mem waited=0 room=1
     cores="$(nproc 2>/dev/null || echo 1)"
-    while [ "$waited" -lt 300 ]; do
+    while :; do
         load="$(cut -d' ' -f1 /proc/loadavg 2>/dev/null || echo 0)"
-        mem="$(awk '/^MemAvailable:/ { print int($2 / 1024) }' /proc/meminfo 2>/dev/null || echo 99999)"
-        awk -v l="$load" -v c="$cores" -v m="$mem" 'BEGIN { exit !(l < 1.5 * c && m > 1536) }' && break
+        mem="$(mem_room_mb)"
+        awk -v l="$load" -v c="$cores" -v m="$mem" -v s="$SUITE_MB" 'BEGIN { exit !(l < 1.5 * c && m > s) }' && break
+        [ "$waited" -lt 300 ] || { room=0; break; }
         sleep 5; waited=$((waited + 5))
     done
     [ "$waited" -gt 0 ] && printf '%s\n' "$waited" >> "$BB_TEST_QUEUE.held"
-    return 0
+    [ "$room" = 1 ] || [ "${mem:-0}" -gt "$SUITE_MB" ]
 }
 if [ -n "${BB_TEST_QUEUE:-}" ]; then
     took=0
-    while t="$(queue_take)"; do
+    while :; do
         # The first suite goes at once: the load a run's own start raises is
         # a minute behind, and every worker waiting on it would be no run.
-        [ "$took" = 0 ] || room_wait
+        # A worker that waited and still has no memory to start one stands
+        # down, its suites left to the others; the first never does, so the
+        # run ends whatever the machine is doing (R271).
+        if [ "$took" != 0 ] && ! room_wait && [ "${BB_TEST_WORKER:-1}" != 1 ]; then
+            log "worker $BB_TEST_WORKER: stands down, no memory to start another suite after five minutes; the others take the rest"
+            break
+        fi
+        t="$(queue_take)" || break
         took=1
         printf '%s\t%s\n' "$t" "$((BB_TEST_WORKER - 1))" >> "$BB_TEST_QUEUE.ran"
         r=0

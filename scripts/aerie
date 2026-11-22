@@ -1200,7 +1200,7 @@ emu_room() {
     cfg="$(avd_path "$1")/config.ini"
     ram="$(sed -n 's/^hw\.ramSize *= *\([0-9]*\).*/\1/p' "$cfg" 2>/dev/null | head -1)"
     need=$(( ${ram:-2048} + 1024 ))
-    avail="$(awk '/^MemAvailable:/ {print int($2 / 1024)}' /proc/meminfo 2>/dev/null)"
+    avail="$(mem_room_mb)"
     [ -n "$avail" ] || return 0
     [ "$avail" -lt $((need + reserve)) ] || return 0
     printf 'this node has %s MB of memory free, and another phone needs about %s MB with %s MB left for builds; %s emulator%s running on it now' \
@@ -1659,6 +1659,7 @@ cmd_emu() {
                     mv -f "$HOME/.android/emulator.log" "$HOME/.android/emulator.log.1"
                 fi
                 log "starting AVD '${avd}' headless, -gpu ${gpu}${propargs:+, hwui ${hwui}} (log: aerie emu log)"
+                heavy_first
                 nohup emulator -avd "$avd" -no-window -no-audio -no-boot-anim \
                     -gpu "$gpu" "${propargs[@]}" \
                     > "$HOME/.android/emulator.log" 2>&1 &
@@ -2808,6 +2809,9 @@ cmd_tests() {
     # from scripts/dashboard every verb looked for scripts/dashboard/scripts/
     # and said there was no harness (B778).
     bb_repo_top
+    # Every tier, a probe and a kept fixture alike: the kernel's to take
+    # before the session that ran them (R271).
+    heavy_first
     # The lab suites (roadmap R54): the ones that need a real service, run
     # against the lab's Gitea and skipped in one line without it. Not
     # recorded in the registry: a lab run is a proof, not a timing.
@@ -3963,6 +3967,26 @@ EOF
 
 # run_here ROLE [GLOB...] -- CMD...: `aerie run` on the node the session is on:
 # the command in this tree, and each output glob's matches into dist/.
+# heavy_room_wait WHAT: a build, a test run or a command run here starts
+# into the memory there is (R271): where less than 2 GB is left of the
+# machine or its share (mem_room_mb), it says so and waits for room, five
+# minutes at most, then starts anyway and says that, so it is held back and
+# never refused. On 22 Nov a Gradle build started beside a CI run and an
+# emulator, and the node ran out with two sessions on it.
+HEAVY_ROOM_MB=2048
+heavy_room_wait() {
+    local room waited=0
+    room="$(mem_room_mb)"
+    [ "$room" -lt "$HEAVY_ROOM_MB" ] || return 0
+    warn "$1: only $room MB of memory is free here; waiting up to five minutes for $HEAVY_ROOM_MB MB before starting (aerie node busy says what holds it)"
+    while [ "$waited" -lt 300 ]; do
+        sleep 10; waited=$((waited + 10))
+        room="$(mem_room_mb)"
+        [ "$room" -lt "$HEAVY_ROOM_MB" ] || { log "$1: $room MB free after ${waited}s; starting"; return 0; }
+    done
+    warn "$1: still only $room MB free after five minutes; starting anyway, as the first thing the kernel takes if memory runs out"
+}
+
 run_here() {
     local role="$1" outs=() g f
     shift
@@ -3978,6 +4002,8 @@ run_here() {
         shown="${3% \"\$@\"}${5:+ ${*:5}}"
     fi
     log "$role: running here, on ${BB_NODE:-this node}: $shown"
+    heavy_first
+    heavy_room_wait "$role"
     # A test run says to the controller when it starts and ends, so the
     # companion app can hold its "Claude is waiting on you" note until the
     # run is over where the project's During-a-test-run setting says a new

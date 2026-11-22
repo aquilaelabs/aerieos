@@ -24,6 +24,8 @@ from .base import (
     fs_holds,
     has_systemd,
     log,
+    meminfo,
+    oom_first,
 )
 from .toolchains import ci_log_dir, runner_env_text
 
@@ -72,10 +74,74 @@ WorkingDirectory={root}
 KillMode=process
 KillSignal=SIGTERM
 TimeoutStopSec=5min
-
+{share}
 [Install]
 WantedBy=multi-user.target
 """
+# THE RUNNER'S SHARE OF THE MACHINE (R271). On 22 Nov a CI run's suites, a
+# session's Gradle build and its emulator filled bb-sandbox's memory and
+# swap together; the runner sat outside AerieOS's fence (the provisioner's
+# builderbot.slice, which holds the agent, its sessions and their jobs short
+# of the machine), so the fence never acted, and the kernel killed CI
+# processes of 20 MB one at a time while the machine thrashed for eight
+# minutes and both sessions dropped. So the runner goes in the fence where
+# the node has one, slows itself past half the memory, is killed inside its
+# own share past three fifths, swaps at most a quarter of the swap, and
+# is the kernel's to take before the sessions (they inherit the agent's 200;
+# GitHub's runner puts its jobs at 500 itself). A CI run on a full node
+# slows or fails red; the node, its sessions and their network stay up.
+FENCE_SLICE = "builderbot.slice"
+RUNNER_MEMORY_HIGH = "50%"
+RUNNER_MEMORY_MAX = "60%"
+RUNNER_OOM_SCORE = 300
+
+
+def runner_share(unit_dir=None, mem=None):
+    """The [Service] lines that hold a runner to its share of this machine."""
+    unit_dir = unit_dir or UNIT_DIR
+    swap_kb = (meminfo() if mem is None else mem).get("SwapTotal", 0)
+    lines = [f"Slice={FENCE_SLICE}"] if os.path.isfile(os.path.join(unit_dir, FENCE_SLICE)) else []
+    lines += [f"MemoryHigh={RUNNER_MEMORY_HIGH}", f"MemoryMax={RUNNER_MEMORY_MAX}",
+              f"MemorySwapMax={swap_kb // 4 * 1024}", f"OOMScoreAdjust={RUNNER_OOM_SCORE}"]
+    return "".join(ln + "\n" for ln in lines)
+
+
+def runner_unit_text(d, user, desc, unit_dir=None, mem=None):
+    """The unit this agent writes for the GitHub runner in `d`, run as `user`."""
+    return UNIT_TEXT.format(desc=desc, root=d, user=user, share=runner_share(unit_dir, mem))
+
+
+def unit_user(text):
+    """The account a runner's unit runs as, where it names one a unit can."""
+    m = re.search(r"^User=(\S+)\s*$", text or "", re.M)
+    return m.group(1) if m and ACCOUNT_RE.fullmatch(m.group(1)) else ""
+
+
+def write_unit(unit, text, unit_dir=None):
+    """A unit file written whole under its name, by a new file renamed over it."""
+    unit_dir = unit_dir or UNIT_DIR
+    tmp = os.path.join(unit_dir, f".{unit}.new")
+    with open(tmp, "w") as f:
+        f.write(text)
+    os.replace(tmp, os.path.join(unit_dir, unit))
+
+
+def unit_due(d, unit, unit_dir=None, mem=None):
+    """The text a runner's installed unit should now have, or "" where it
+    has it already or this agent does not write it: no unit file, an account
+    it does not name plainly, or no runsvc.sh at the folder's top for it to
+    start (a unit svc.sh installed before this agent wrote its own has one)."""
+    unit_dir = unit_dir or UNIT_DIR
+    try:
+        with open(os.path.join(unit_dir, unit)) as f:
+            have = f.read(65536)
+    except OSError:
+        return ""
+    user = unit_user(have)
+    if not user or not os.path.isfile(os.path.join(d, "runsvc.sh")):
+        return ""
+    want = runner_unit_text(d, user, unit[len("actions.runner."):-len(".service")], unit_dir, mem)
+    return "" if have == want else want
 
 
 def read_small(path, limit=65536, encoding="utf-8"):
@@ -290,42 +356,55 @@ def fetch_pinned(url, digest, dest, say):
 class RunnersMixin:
     """Agent's runner methods: one of the parts class Agent (agent.py) is made of."""
 
-    def runner_env_sync(self):
-        """Every runner's .env, kept equal to what runner_env_text says now:
-        the node's toolchain and where CI logs are archived. _apply_runner
-        writes it at install; a runner installed before this agent knew a
-        line (bb-sandbox's was) ran with less. Rewritten when it differs, and
-        the service cycled so the runner reads it, only while it is idle: a
-        restart under a running job would kill the job."""
+    def runner_sync(self):
+        """Every runner kept as this agent writes it now: its .env (the node's
+        toolchain and where CI logs are archived) and its unit (its share of
+        the machine, R271). _apply_runner writes both at install; a runner
+        installed before this agent knew a line ran with less (bb-sandbox's
+        .env did, and its unit, svc.sh's, held it to nothing). Rewritten
+        where either differs, and the runner restarted to take them, only
+        while it is idle: a restart under a running job would kill the job."""
         for d, _rec in runner_dirs():
             # Left as it is where this machine does not write it as the
             # account (fs_holds says why in the log): the hello goes on.
             with contextlib.suppress(NotHeld):
-                self._runner_env_sync(d)
+                self._runner_sync(d)
 
-    def _runner_env_sync(self, d):
+    def _runner_sync(self, d):
         want = runner_env_text(self.state)
         try:
             have = read_small(os.path.join(d, ".env"))
         except OSError:
             have = ""
-        if have == want:
+        unit = unit_of(d) if has_systemd() else ""
+        text = unit_due(d, unit) if unit else ""
+        if have == want and not text:
             return
         if runner_busy(d):
             return                          # busy: next hello
-        env = {}
-        who = self.as_user(env, self.state.get("user") or "")
-        self.own_dir(ci_log_dir(self.state), who)
-        with contextlib.suppress(OSError):
-            os.chmod(ci_log_dir(self.state), 0o755)
-        self._runner_write(who, d, ".env", want)
-        # Which lines moved, so a restart says why (B755).
-        moved = sorted({ln.partition("=")[0] for ln in set(have.splitlines()) ^ set(want.splitlines()) if ln})
-        log(f"runner: its .env now carries the node's toolchain and the CI log directory ({', '.join(moved[:8]) or 'new'}); "
-            "restarting the runner, idle, to read it")
-        unit = unit_of(d) if has_systemd() else ""
+        quiet = type("Q", (), {"say": staticmethod(lambda t: None)})()
+        who = self.as_user({}, self.state.get("user") or "")
+        said = []
+        if have != want:
+            self.own_dir(ci_log_dir(self.state), who)
+            with contextlib.suppress(OSError):
+                os.chmod(ci_log_dir(self.state), 0o755)
+            self._runner_write(who, d, ".env", want)
+            # Which lines moved, so a restart says why (B755).
+            moved = sorted({ln.partition("=")[0] for ln in set(have.splitlines()) ^ set(want.splitlines()) if ln})
+            said.append(f"its .env now carries the node's toolchain and the CI log directory ({', '.join(moved[:8]) or 'new'})")
+        if text:
+            try:
+                write_unit(unit, text)
+            except OSError as e:
+                log(f"runner: its unit could not be rewritten, so it runs as it was: {e}")
+            else:
+                self._sh(quiet, [SYSTEMCTL, "daemon-reload"])
+                said.append("its unit now holds it to its share of this machine's memory")
+        if not said:
+            return
+        log(f"runner: {'; '.join(said)}; restarting it, idle, to take that")
         if unit:
-            quiet = type("Q", (), {"say": staticmethod(lambda t: None)})()
             self._sh(quiet, [SYSTEMCTL, "restart", unit])
         else:
             self.runner_stop(d)
@@ -375,10 +454,7 @@ class RunnersMixin:
             with fs_holds(who):
                 os.chmod(os.path.join(d, "runsvc.sh"), 0o755)
             self._runner_write(who, d, ".service", unit + "\n")
-            tmp = os.path.join(UNIT_DIR, f".{unit}.new")
-            with open(tmp, "w") as f:
-                f.write(UNIT_TEXT.format(desc=f"{slot}.{name}", root=d, user=user))
-            os.replace(tmp, os.path.join(UNIT_DIR, unit))
+            write_unit(unit, runner_unit_text(d, user, f"{slot}.{name}"))
         except OSError as e:
             job.say(f"the runner's unit could not be written: {e}\n")
             return False
@@ -716,7 +792,7 @@ class RunnersMixin:
             # By no link at its name, and waiting on nothing: the data store
             # may be the jobs account's, and a FIFO there held root's open.
             out = os.fdopen(os.open(logf, os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK, 0o640), "ab")
-            self.runner_procs[d] = subprocess.Popen(argv, cwd=d, env=env,
+            self.runner_procs[d] = subprocess.Popen(oom_first(argv, RUNNER_OOM_SCORE), cwd=d, env=env,
                                                     stdin=subprocess.DEVNULL, stdout=out, stderr=out,
                                                     start_new_session=True, **who)
             out.close()
