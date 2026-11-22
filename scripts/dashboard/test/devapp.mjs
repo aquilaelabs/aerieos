@@ -1032,8 +1032,56 @@ await section("Start on boot on an instance's row reads the instance's own conta
 });
 
 
-// Down, from the row.
-await dmClick('down');
+// Down, from the row, with its Edit open. The operator (22 Nov) opened Edit
+// on a running container and read "It is running, so this is for reading";
+// after Down the dialog stayed for reading until a reload, and Down looked as
+// if it did nothing for the 11 s its job took to reach the row. Now the row
+// says stopping with its Down dead on the click, before the server answers
+// (held here for 2.5 s), and the dialog left open comes alive once a read has
+// the row down.
+await section("Down answers on the click, and an Edit left open follows its row down", async () => {
+  // Opened by its own item's press, not through the ⋯ menu: the stats of a
+  // running row redraw it, and a menu a redraw shut held page.click for its
+  // whole budget. Nothing from the section before is left staged.
+  await dmEditNone();
+  await openManager();
+  await page.evaluate(sel => document.querySelector(sel + ' [data-dm="edit"]').click(), DM);
+  await page.waitForSelector('#cmodal:not([hidden])');
+  await page.waitForFunction(() => document.getElementById('cYml').value.length > 0
+    && !document.getElementById('cEnvHint').hidden, null, { timeout: 15000 });
+  ok(await page.evaluate(() => document.getElementById('cGo').disabled && document.getElementById('cYml').readOnly
+       && /for reading/.test(document.getElementById('cNameHint').textContent)),
+     'Edit opened on a running container is for reading');
+  let held = 0, answered = 0;
+  const holdDown = async r => {
+    const down = r.request().method() === 'POST' && /"action":"down"/.test(r.request().postData() || '');
+    if (down){ held++; await new Promise(f => setTimeout(f, 2500)); }
+    await r.continue().catch(() => {});
+    if (down){ held--; answered++; }
+  };
+  await page.route('**/api/devapp', holdDown);
+  // The row's own button, pressed as a click on it: the dialog over the
+  // page is not modal to a script, and a second browser could press it.
+  const t0 = Date.now();
+  await page.evaluate(sel => document.querySelector(sel + ' [data-dm="down"]').click(), DM);
+  const drawn = await page.waitForFunction(sel => {
+    const p = document.querySelector(sel + ' .dmpill')?.textContent.trim(), b = document.querySelector(sel + ' [data-dm="down"]');
+    return p === 'stopping' && b?.disabled ? p : null;
+  }, DM, { timeout: 2000, polling: 'raf' }).then(h => h.jsonValue(), () => null);
+  const took = Date.now() - t0, early = !answered;
+  ok(drawn === 'stopping' && early,
+     `Down says stopping on its row, its button dead, on the click and before the server answers (${drawn}, ${took} ms, before the answer: ${early})`);
+  await until(() => answered && held === 0 ? true : null, 30000);
+  await page.unroute('**/api/devapp', holdDown);
+  const alive = await listingUntil(() => {
+    const g = document.getElementById('cGo'), n = document.getElementById('cName');
+    return !document.getElementById('cmodal').hidden && !g.disabled && !document.getElementById('cYml').readOnly
+      && !document.getElementById('cEnv').readOnly && !n.disabled
+      && /Its name is its own/.test(document.getElementById('cNameHint').textContent) ? true : null;
+  }, null, 60000);
+  ok(alive, '...and the Edit left open on it comes alive once a read has it down: its boxes, its name and Save live, with no reload');
+  await page.click('#cCancel').catch(() => page.evaluate(() => { document.getElementById('cmodal').hidden = true; }));
+});
 await pillIs('down');
 ok(/compose --project-name ep-silon .*down --remove-orphans/.test(dockerLog())
    && /compose --project-name ep-silon .*up -d --remove-orphans/.test(dockerLog()),
@@ -3343,9 +3391,12 @@ ok(await page.evaluate(() => document.activeElement?.tagName) !== 'INPUT',
 ok(await page.$eval('#cYml', e => e.value) === ''
    && await page.$eval('#cEnv', e => e.value) === '',
    '...with both definitions empty, so nothing can be saved by accident');
+// The env's shape is said in words, never a variable of its own: a static
+// site's box showing PUID and TZ read as its env (the operator, 22 Nov).
+const envShape = await page.$eval('#cEnv', e => e.placeholder);
 ok(/services:/.test(await page.$eval('#cYml', e => e.placeholder))
-   && /PUID=/.test(await page.$eval('#cEnv', e => e.placeholder)),
-   '...and the shape each wants shown on the field, where it costs nothing to ignore');
+   && /^NAME=value/.test(envShape) && !/PUID|PGID|TZ=/.test(envShape),
+   `...and the shape each wants shown on the field, where it costs nothing to ignore, the env's naming no variable a container may not read (${envShape})`);
 ok(await page.$eval('#cEnvField', e => e.hidden) && await page.$eval('#cYmlField', e => e.hidden)
    && !await page.$eval('#cFormField', e => e.hidden),
    '...showing one pane at a time, the form first (R68 step 3)');

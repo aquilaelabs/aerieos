@@ -73,7 +73,13 @@ function nginxKeepTyping(){
 async function nginxAct(body){
   const j = await postJSON("/api/nginx", body);
   if (j.error) notify(j.error, true);
-  else if (j.note) notify(j.note, true);
+  return nginxLanded(body, j);
+}
+// ...and what its answer changes, for a press that said a refusal itself
+// (drawNow, which draws its result on the click).
+async function nginxLanded(body, j){
+  if (j.error){ await loadNginx(); return j; }
+  if (j.note) notify(j.note, true);
   else if (j.job) notify(`${body.action === "deploy" ? "deploying" : body.action === "update" ? `updating nginx to ${j.to}` : "rebuilding nginx"}${
     body.action === "deploy" ? " nginx" : ""}: its row on the Containers page has the build`);
   // A hostname added or deleted comes back with the list as it now is, so
@@ -534,10 +540,18 @@ function wireNginxTab(root){
   if (hostNew) hostNew.onkeydown = e => { if (e.key === "Enter"){ e.preventDefault(); hostAdd.click(); } };
   // Kept as it is typed, so a redraw from anywhere draws the box as it was.
   if (hostNew) hostNew.oninput = () => { nginxHostTyped = hostNew.value; };
+  // A hostname deleted leaves the list on the press (the operator, 22 Nov);
+  // the answer's list replaces it, and a refusal puts it back saying why.
   sect.querySelectorAll("[data-nghostrm]").forEach(b => b.onclick = async () => {
     nginxReadDraft(sect, n);
-    busy(b, "Deleting");
-    await nginxAct({action: "host-remove", name: b.dataset.nghostrm});
+    const name = b.dataset.nghostrm, body = {action: "host-remove", name};
+    const j = await drawNow(() => {
+      const was = nginxHostnames;
+      nginxHostnames = (was || []).filter(h => h.name !== name);
+      nginxRedraw();
+      return () => { nginxHostnames = was; nginxRedraw(); };
+    }, () => postJSON("/api/nginx", body));
+    await nginxLanded(body, j);
     nginxRedraw();
   });
   // A route at a time: Add route and Edit open the one form, Cancel folds it
@@ -568,9 +582,18 @@ function wireNginxTab(root){
     if (del) del.onclick = async () => {
       const r = (n.routes || [])[i] || {};
       if (!await askYes(`Delete the route ${r.host === "*" ? "every name" : r.host}${r.path && r.path !== "/" ? r.path : ""} to port ${r.port}?`)) return;
-      busy(del, "Deleting");
-      const j = await nginxAct({action: "save", node: nid, routes: (n.routes || []).filter((_, k) => k !== i)});
-      if (!j.error){ nginxEdit = null; nginxForm = null; }
+      // Out of the list with its form folded on the press (the operator, 22
+      // Nov), the rebuild's word on the row with the answer; a refusal puts
+      // both back and says why.
+      const body = {action: "save", node: nid, routes: (n.routes || []).filter((_, k) => k !== i)};
+      const j = await drawNow(() => {
+        const was = n.routes, at = nginxEdit, typed = nginxForm;
+        n.routes = body.routes.map(x => ({...x}));
+        nginxEdit = null; nginxForm = null;
+        nginxRedraw();
+        return () => { n.routes = was; nginxEdit = at; nginxForm = typed; nginxRedraw(); };
+      }, () => postJSON("/api/nginx", body));
+      await nginxLanded(body, j);
       nginxRedraw();
     };
   }

@@ -2845,11 +2845,16 @@ const ND_ASK = {
 const ND_BUSY = {disable: "Disabling", enable: "Enabling", "reenroll-now": "Making", "sess-save": "Saving"};
 
 function wireNodesTab(root){
-  // A node's own version check's cadence (R176), saved on its pick.
+  // A node's own version check's cadence (R176), saved on its pick: the
+  // pick shows as made, and a refusal puts the saved one back and says why
+  // (drawNow), where a redraw saying what it said before would leave it.
   root.querySelectorAll("[data-ndcheck]").forEach(s => s.onchange = async () => {
-    const id = s.closest("[data-node]")?.dataset.node || "";
-    const j = await nodeAct({action: "update", id, fields: {check_versions: s.value}});
-    if (j?.error) notify(j.error, true); else notify(`its versions are checked ${s.value === "off" ? "only when asked" : s.value}`);
+    const id = s.closest("[data-node]")?.dataset.node || "", now = s.value;
+    const was = [...s.options].find(o => o.defaultSelected)?.value ?? now;
+    const j = await drawNow(() => () => { s.value = was; },
+                            () => postJSON("/api/v1/nodes", {action: "update", id, fields: {check_versions: now}}));
+    if (!j.error) notify(`its versions are checked ${now === "off" ? "only when asked" : now}`);
+    await loadNodes();
   });
   // The own machine's hold-next checkbox beside Reboot (R161 step 11).
   wireHoldNext(root);
@@ -3012,9 +3017,11 @@ function wireNodesTab(root){
                                ...(act === "feature" ? {feature: b.dataset.feature, op: b.dataset.op} : {})});
       if (act === "to-sync" && j.ok && !j.error) notify("Moved: each space is copied down now");
     }));
+    // Ticked on the click; a refusal takes the tick back and says why once.
     box.querySelectorAll("[data-ndvmlan]").forEach(c => c.onchange = async () => {
-      const j = await nodeAct({action: "vm-lan", id, on: c.checked});
-      if (j.error){ c.checked = !c.checked; notify(j.error, true); }
+      const on = c.checked;
+      await drawNow(() => () => { c.checked = !on; }, () => postJSON("/api/v1/nodes", {action: "vm-lan", id, on}));
+      await loadNodes();
     });
     wireNodeConf(box, id);
     wireNodePaths(box, id);

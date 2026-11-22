@@ -96,13 +96,18 @@ function holdNextBox(){
   const armed = !!state?.held?.armed;
   return `<label class="ndcap holdnext" title="the restart after this one comes back with nothing running, for a look first"><input type="checkbox" data-holdnextbox${armed ? " checked" : ""}> hold the next start</label>`;
 }
+// The tick is the click's, as the browser drew it; a refusal takes it back
+// and says why (drawNow), where the poll's draw, saying what it said before,
+// would have left it standing.
 function wireHoldNext(root){
   root.querySelectorAll("[data-holdnextbox]").forEach(c => c.onchange = async () => {
     const on = c.checked;
     c.disabled = true;
-    await sayPost(null, "", "/api/v1/nodes", {action: "hold-next", on},
-      on ? "the next start is held: nothing runs after the restart until Start is pressed on This controller" : "the next start runs as usual",
-      () => { readMoved("nodes"); return refresh(); });
+    const j = await drawNow(() => () => { c.checked = !on; }, () => postJSON("/api/v1/nodes", {action: "hold-next", on}));
+    if (!j.error) notify(on ? "the next start is held: nothing runs after the restart until Start is pressed on This controller" : "the next start runs as usual");
+    c.disabled = false;
+    readMoved("nodes");
+    await refresh();
   });
 }
 

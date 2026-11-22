@@ -164,7 +164,20 @@ function wireScannersTab(root){
   act("[data-scanupdate]", b => scannersAct({action: "update", node: b.dataset.scanupdate}));
   act("[data-scanrun]", b => scannersAct({action: "run", node: b.dataset.scanrun}));
   act("[data-scanrunall]", () => scannersAct({action: "run"}));
-  act("[data-scanon]", b => scannersAct({action: "schedule", on: b.dataset.scanon === "1"}));
+  // Turn on and Turn off flip on the press (the operator, 22 Nov): the
+  // section's head and its button say it at once, and a refusal flips them
+  // back saying why.
+  root.querySelectorAll("[data-scanon]").forEach(b => b.onclick = async () => {
+    const on = b.dataset.scanon === "1", s = scannersData?.schedule;
+    const redraw = () => { readMoved("scanners"); drawPanes(); };
+    await drawNow(() => {
+      if (!s) return null;
+      const was = s.on;
+      s.on = on; redraw();
+      return () => { s.on = was; redraw(); };
+    }, () => postJSON("/api/scanners", {action: "schedule", on}));
+    await loadScanners();
+  });
   act("[data-scansave]", () => scannersAct({action: "schedule", cron: scannersCustom ?? root.querySelector("#scanCron")?.value ?? ""}).then(() => { scannersCustom = null; }));
   root.querySelectorAll("[data-scanremove]").forEach(b => b.onclick = async () => {
     const n = (scannersData?.nodes || []).find(x => x.node === b.dataset.scanremove);

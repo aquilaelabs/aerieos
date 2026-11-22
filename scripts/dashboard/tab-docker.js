@@ -221,6 +221,8 @@ function loadDocker(){
     // ...and kept in this browser for the next reload's early read (dmBootLoad).
     if (dockerNode && !got.error) try{ localStorage.setItem("bb.dmnode", dockerNode); }catch(e){ /* private */ }
     dockerList = got;
+    // An Edit open on a row this read has down comes alive (cFollowRow).
+    cFollowRow();
     loadDockerStats(got);
   });
 }
@@ -1121,13 +1123,11 @@ async function dmAction(project, instance, act, btn){
   // interruption, and stopping a build you are watching is not destructive:
   // what is already built is kept, and pressing it again is the only way to
   // undo an accidental press, which costs a rebuild rather than data.
+  // It reads Stopping on the click, held until the read after the answer,
+  // and Abort again with the reason if the server refuses.
   if (act === "abort"){
     if (btn) btn.disabled = true;
-    try{
-      await postJSON("/api/devapp", {project, instance, action: "abort"});
-    }
-    catch(e){ notify("could not stop it: " + failWords(e), true); }
-    readMoved("docker"); drawPanes(); loadDocker();
+    await dmGo(project, instance, "abort", () => postJSON("/api/devapp", {project, instance, action: "abort"}));
     return;
   }
   // A node's nginx behind the newest line (R192): the nginx tab's verb,
@@ -1208,15 +1208,31 @@ async function dmAction(project, instance, act, btn){
     }
   }
   if (btn) btn.disabled = true;
-  try{
-    const j = await postJSON("/api/devapp", {project, instance, action:act, ack, beside});
-    if (j.error) notify(j.error, true);
-    // What was done instead of what was asked: a remove whose daemon could
-    // not be reached took the record and nothing else. Said, because the row
-    // vanishing looks identical either way.
-    else if (j.note) notify(j.note);
-  }catch(e){ notify(`${act} failed: ` + e, true); }
-  dockerList = null; readMoved("docker"); loadDocker();
+  const j = await dmGo(project, instance, act, () => postJSON("/api/devapp", {project, instance, action:act, ack, beside}));
+  // What was done instead of what was asked: a remove whose daemon could
+  // not be reached took the record and nothing else. Said, because the row
+  // vanishing looks identical either way.
+  if (!j.error && j.note) notify(j.note);
+}
+
+// A row's press drawn on the click (the operator, 22 Nov: Down read as
+// nothing for the 11 s its job took to reach the row): its state is the
+// press's word, by "project|instance", until the server has answered and the
+// read after it has the job, which says it from there. A refusal puts the
+// row back and says why (drawNow). The answer comes back.
+const dmGoing = new Map();
+async function dmGo(project, instance, act, send){
+  const key = `${project}|${instance}`;
+  const redraw = () => { readMoved("docker"); drawPanes(); };
+  const j = await drawNow(() => {
+    dmGoing.set(key, act);
+    redraw();
+    return () => { dmGoing.delete(key); redraw(); };
+  }, send);
+  dockerList = null; readMoved("docker");
+  try{ await loadDocker(); }catch(e){ /* the read says its own failure */ }
+  if (dmGoing.get(key) === act){ dmGoing.delete(key); redraw(); }
+  return j;
 }
 
 // Where a container's published port actually answers.
@@ -1329,18 +1345,12 @@ function cLock(running){
 
 // What the editor says of a container AerieOS deploys itself.
 const C_MANAGED = "AerieOS manages this one: its name, compose file and env are written where it was deployed from (the nginx page).";
-async function openEditContainer(name){
-  cEditing = name;
-  cAppCur = null; cAppHand = false;
-  $("cAppField").hidden = true;
-  cAppOwns(false);
-  $("cTabForm").hidden = false;
-  $("cEnvHint").hidden = true;
-  $("cTitle").textContent = "Edit " + name;
-  $("cName").value = name;
-  // The name changes only while it is down (the operator, 11 Oct): it is
-  // the compose project, the data directory and the volumes' prefix, and
-  // the node carries those under the new name before the next Up.
+const C_RUNNING = "It is running, so this is for reading: Down it to change its name, compose file or env.";
+// A written container's name line, off its row as the list has it now.
+// The name changes only while it is down (the operator, 11 Oct): it is
+// the compose project, the data directory and the volumes' prefix, and
+// the node carries those under the new name before the next Up.
+function cNameSay(name){
   const row = (dockerList?.instances || []).find(d => d.project === name && d.instance === "main");
   // Not known to be running is down for the dialog: opened while the list
   // reloads, it found no row and locked itself; the server still refuses a
@@ -1358,7 +1368,59 @@ async function openEditContainer(name){
     ? "A job is running on it: its name can change once that has ended."
     : down
     ? "Change the name while it is down: its volumes and data directory follow it on the node, then Build it again."
-    : "It is running, so this is for reading: Down it to change its name, compose file or env.";
+    : C_RUNNING;
+  return {down, managed, jobOn};
+}
+// ...and a space's instance's, whose name is its own.
+function cInstanceSay(project, running){
+  return running ? C_RUNNING
+    : `Its name is its own: its volumes and data directory follow a new one on the node. The compose file is ${projLabel(project)}'s, in its folder: `
+      + "saving it is an uncommitted change there, which the Git view shows. The env is this container's.";
+}
+
+// An Edit opened while its container ran follows its row (the operator, 22
+// Nov: it stayed for reading after Down until the page was reloaded): once
+// a read has the row down, the dialog is what opening it then would draw,
+// its boxes and Save live, and its name once no job is on it. Only that way:
+// one brought up under an open dialog keeps what was typed, and the server
+// refuses its Save. Called as each read of the list lands.
+let cUpHeld = false;
+function cFollowRow(){
+  if (!cUpHeld || cEditing === null || $("cmodal").hidden || $("cGo").getAttribute("aria-busy") === "true") return;
+  const at = typeof cEditing === "object" ? cEditing : {project: cEditing, instance: "main"};
+  const row = (dockerList?.instances || []).find(d => d.project === at.project && d.instance === at.instance);
+  if (!row || row.running) return;
+  if (typeof cEditing === "object"){
+    $("cName").disabled = !cEditing.name;
+    $("cNameHint").textContent = cInstanceSay(at.project, false);
+    cUpHeld = false;
+  }else{
+    const {managed, jobOn} = cNameSay(cEditing);
+    if (managed){ cUpHeld = false; return; }
+    // Held on while a job is on it, so its name comes alive with the read
+    // that has the job ended.
+    cUpHeld = jobOn;
+  }
+  cLock(false);
+  // An app's panel: its fields live, its file still the catalog's.
+  if (!$("cByHandBar").hidden){
+    $("cYml").readOnly = true;
+    $("cAppFields").querySelectorAll("input,select").forEach(e => { e.disabled = false; });
+    $("cByHand").disabled = false;
+  }
+}
+
+async function openEditContainer(name){
+  cEditing = name;
+  cAppCur = null; cAppHand = false;
+  $("cAppField").hidden = true;
+  cAppOwns(false);
+  $("cTabForm").hidden = false;
+  $("cEnvHint").hidden = true;
+  $("cTitle").textContent = "Edit " + name;
+  $("cName").value = name;
+  const {down, managed} = cNameSay(name);
+  cUpHeld = !down && !managed;
   $("cNodeField").hidden = true;   // where it runs is not an edit either
   $("cUnderField").hidden = true;  // its project is changed on its row
   $("cYml").value = $("cEnv").value = "";
@@ -1395,6 +1457,7 @@ async function openEditContainer(name){
       $("cName").disabled = true;
       $("cNameHint").textContent = C_MANAGED;
       cLock(true);
+      cUpHeld = false;
     }
   }catch(e){ $("cErr").textContent = "could not read it: " + e;
              $("cErrWrap").hidden = false; }
@@ -1419,10 +1482,8 @@ async function openEditInstance(project, instance){
   key.name = row?.name || "";
   $("cName").value = key.name;
   $("cName").disabled = running || !key.name;
-  $("cNameHint").textContent = running
-    ? "It is running, so this is for reading: Down it to change its name, compose file or env."
-    : `Its name is its own: its volumes and data directory follow a new one on the node. The compose file is ${projLabel(project)}'s, in its folder: `
-      + "saving it is an uncommitted change there, which the Git view shows. The env is this container's.";
+  $("cNameHint").textContent = cInstanceSay(project, running);
+  cUpHeld = running;
   $("cNodeField").hidden = true;
   $("cUnderField").hidden = true;
   $("cTabForm").hidden = true;
@@ -1721,7 +1782,10 @@ function cAppOwns(on){
   $("cByHandBar").hidden = !on;
   $("cImport").closest(".actbar").hidden = on;
   $("cByHandSaid").textContent = on ? `${name}'s file as the catalog wrote it. Its fields above fill it in.` : "";
-  $("cEnv").placeholder = on ? "OTHER=value, one a line: what its fields above do not set" : "PUID=99\nPGID=100\nTZ=America/New_York";
+  // Never a variable of its own as the example (the operator, 22 Nov: a
+  // static site's empty box showed PUID and TZ, which it reads nothing of,
+  // and the grey example was taken for its env): what a line is, in words.
+  $("cEnv").placeholder = on ? "OTHER=value, one a line: what its fields above do not set" : "NAME=value, one a line: what the compose file reads as ${NAME}";
   $("cEnvHint").hidden = !on;
   if (on) $("cEnvHint").textContent = `The other variables for ${name}. Its fields above set the rest, and one of theirs typed here is refused by name.`;
 }
@@ -2052,7 +2116,9 @@ function dmShell(project, instance, ctr){
 }
 
 // What a row's pill says while its job runs, by the job's action.
-const DM_JOB_WORD = {rebuild: "rebuilding", up: "starting", down: "stopping", update: "updating", remove: "removing"};
+const DM_JOB_WORD = {rebuild: "rebuilding", up: "starting", down: "stopping", update: "updating", remove: "removing",
+                     rename: "renaming", unpack: "unpacking", "relocate-unpack": "unpacking",
+                     "relocate-out": "sending", "relocate-in": "arriving"};
 
 function dmRowsHtml(ins, job, blind){
   return ins.map(d => {
@@ -2062,6 +2128,13 @@ function dmRowsHtml(ins, job, blind){
     // forever.
     const mine = job && job.project === d.project && job.instance === d.instance;
     const busy = !!(mine && job.running);
+    // A press on it not yet answered (dmGo): its word until the job says
+    // its own, and an Abort pressed reads Stopping at once.
+    const pend = dmGoing.get(`${d.project}|${d.instance}`) || "";
+    const going = !busy && pend !== "abort" ? pend : "";
+    // ...and the button it came from stays dead till then, drawn so: a
+    // redraw gives back what a press did to a button by hand.
+    const held = a => going === a ? " disabled" : "";
     // AerieOS's own nginx (System's, R180): what a person changes about
     // it is the nginx tab's, and Deploy there makes it again, so its row
     // keeps Up, Down, Remove and the image update and loses Edit, Rebuild
@@ -2081,8 +2154,12 @@ function dmRowsHtml(ins, job, blind){
     const hl = live.map(dmHealth).filter(Boolean);
     // A row whose job is running knows what it is doing whatever the
     // daemon said: a Rebuild read "state unknown" over its own "stopping"
-    // while its node was busy with it (B65).
-    const st = blind && busy ? [DM_JOB_WORD[job.action] || "working", "warn"]
+    // while its node was busy with it (B65). So does one whose press is on
+    // its way, from the click (the operator, 22 Nov), and the job's word
+    // goes on from there rather than the daemon's "running" coming back
+    // for the seconds a Down takes.
+    const st = busy ? [DM_JOB_WORD[job.action] || "working", "warn"]
+      : going ? [DM_JOB_WORD[going] || "working", "warn"]
       : blind ? ["state unknown", ""]
       : partly ? [`partly up: ${live.filter(c => c.state === "running").length} of ${live.length}`, "warn"]
       : d.running && hl.includes("unhealthy") ? ["unhealthy", "bad"]
@@ -2100,10 +2177,10 @@ function dmRowsHtml(ins, job, blind){
     // long it has been up, one mono line of what it is (its image, the
     // commit it was built from, its compose file), and at the right its
     // buttons, Open the main one where it answers somewhere.
-    const meta = !blind && d.running && !busy && !(mine && job.error)
+    const meta = !blind && d.running && !busy && !going && !(mine && job.error)
       ? [dmUptime(d.services), `${d.containers ?? (d.services || []).length} container${(d.containers ?? (d.services || []).length) === 1 ? "" : "s"}`].filter(Boolean).join(" · ")
       : "";
-    const said = meta ? "" : dmState(d, job, mine, busy, blind);
+    const said = meta ? "" : going ? `${esc(DM_JOB_WORD[going] || "working")}<span class="dots"></span>` : dmState(d, job, mine, busy, blind);
     const origin = [
       !many && d.services?.[0]?.image ? dmImage(d.services[0].image) : "",
       d.built_rev ? `@ ${esc(String(d.built_rev).slice(0, 7))}` : "",
@@ -2128,7 +2205,7 @@ function dmRowsHtml(ins, job, blind){
         ${open}
         ${dmConfigureBtn(d)}
         ${!mayDocker() ? "" : `${d.running ? "" : `<button type="button" class="primary" data-dm="up" ${
-          (d.missing_env || []).length ? "disabled" : ""}
+          (d.missing_env || []).length || going === "up" ? "disabled" : ""}
           title="${(d.missing_env || []).length
             ? "the env is missing " + esc(d.missing_env.join(", "))
             : !d.built_rev
@@ -2136,17 +2213,17 @@ function dmRowsHtml(ins, job, blind){
               : "Start it: docker compose up -d"}">Up</button>`}
         ${shellAt ? `<button type="button" data-dmshell="${esc(shellAt[0].name)}"${shellWhy ? " disabled" : ""}
           title="a shell inside ${esc(shellAt[0].service || shellAt[0].name)}, in the dock">Shell</button>` : ""}
-        ${(d.images_behind || []).length ? `<button type="button" data-dm="update"
+        ${(d.images_behind || []).length ? `<button type="button" data-dm="update"${held("update")}
           title="pull the newer images and start it again: docker compose pull, then up -d">Update</button>` : ""}
         ${d.nginx_to ? `<button type="button" data-dm="nginx-update"
           title="pin the image's digest on the nginx page's record and rebuild with it">Update</button>` : ""}
         `}
-        ${busy ? abortBtn('data-dm="abort"', job.aborting, "stop this build; what is already built is kept") : ""}
+        ${busy ? abortBtn('data-dm="abort"', job.aborting || pend === "abort", "stop this build; what is already built is kept") : ""}
         ${managed || !mayDocker() ? "" : `<button type="button" data-dm="rebuild" ${
           // A button that refuses is not information: a rebuild when nothing
           // moved is a cached build and a restart, behind a confirm that
           // says so; one pressed while a job runs queues behind it.
-          ""}
+          held("rebuild")}
           title="${!d.built_rev
             ? "build the first image, then bring it up"
             : d.changed
@@ -2155,7 +2232,7 @@ function dmRowsHtml(ins, job, blind){
                 ? "run it again: the last attempt did not finish"
                 : "the last build is current; this builds it again anyway"}">${
           d.built_rev ? "Rebuild" : "Build"}</button>`}
-        ${!mayDocker() ? "" : `<button type="button" data-dm="down" ${!d.exists ? "disabled" : ""}
+        ${!mayDocker() ? "" : `<button type="button" data-dm="down" ${!d.exists || going === "down" ? "disabled" : ""}
           title="Stop it and remove its containers: docker compose down">Down</button>`}
         ${
         // Open, Shell, the build and Down are what a row is for; the rest
@@ -2177,7 +2254,7 @@ function dmRowsHtml(ins, job, blind){
           !mayDocker() || managed ? "" : `<button type="button" data-dmrel ${busy || d.relocating?.busy ? "disabled" : ""}
             title="to another node, its data with it: a copy beside it, or this one moved">Copy or move…</button>`,
           !mayDocker() ? "" : `<button type="button" class="danger" data-dm="remove" ${
-            busy ? "disabled" : ""}
+            busy || going === "remove" ? "disabled" : ""}
             title="take it down and drop it from this list; its env and data stay for a remake">Remove</button>`])}
         </div>
         </div>
@@ -2187,7 +2264,7 @@ function dmRowsHtml(ins, job, blind){
         blind ? "" : many ? dmServicesTable(d, finished) : dmStatStrip(d)}
         ${d.relocating ? `<div class="sub ${d.relocating.busy ? "" : d.relocating.archive ? "note" : "bad"} dmreloc">${esc(d.relocating.line)}${
           d.relocating.busy ? '<span class="dots"></span>'
-          : d.relocating.archive && mayDocker() && !busy ? ` <a href="#" data-dmunpack>unpack it now</a>` : ""}</div>` : ""}
+          : d.relocating.archive && mayDocker() && !busy && !going ? ` <a href="#" data-dmunpack>unpack it now</a>` : ""}</div>` : ""}
         ${
         // The notices, each a line (the words rule): what is wrong and the
         // one thing to do about it.
@@ -2465,9 +2542,11 @@ function dmWireRows(el, list = dockerList){
       loadWire(d);
     }
   });
+  // Returned, so the press's ring holds through its questions, its send and
+  // the read after it.
   el.querySelectorAll("[data-dm]").forEach(btn => btn.onclick = () => {
     const [project, instance] = btn.closest("[data-inst]").dataset.inst.split("|");
-    dmAction(project, instance, btn.dataset.dm, btn);
+    return dmAction(project, instance, btn.dataset.dm, btn);
   });
   el.querySelectorAll("[data-dmshell]").forEach(btn => btn.onclick = () => {
     const [project, instance] = btn.closest("[data-inst]").dataset.inst.split("|");
@@ -2479,15 +2558,13 @@ function dmWireRows(el, list = dockerList){
   });
   // Its archived data written into its volumes (relocate.unpack_start): it
   // stops, the archive goes in over whatever is there, and it starts again.
+  // The row says unpacking once the question is answered (dmGo).
   el.querySelectorAll("[data-dmunpack]").forEach(a => a.onclick = async e => {
     e.preventDefault();
     const [project, instance] = a.closest("[data-inst]").dataset.inst.split("|");
     if (!await askYes("Unpack its data into its volumes? It stops, the archive is written in over anything already in them, and it starts again.")) return;
-    const j = await postJSON("/api/devapp", {project, instance, action: "unpack"});
-    if (j.error) return notify(j.error, true);
-    notify(`unpacking ${j.name}: its row says when it is done`);
-    dockerList = null; readMoved("docker");
-    loadDocker();
+    const j = await dmGo(project, instance, "unpack", () => postJSON("/api/devapp", {project, instance, action: "unpack"}));
+    if (!j.error) notify(`unpacking ${j.name}: its row says when it is done`);
   });
   // Whose Rebuild it is. Written at once, like the row's other controls, and
   // the answer redraws every row of that project; it is the project's

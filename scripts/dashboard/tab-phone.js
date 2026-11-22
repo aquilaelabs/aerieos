@@ -115,6 +115,22 @@ async function phRead(probe){
   if (probe && !knew && phNode) phFetch(null, true);
   drawBell();          // the same asks, in the header
 }
+// A remembered phone forgotten, or a session's allowance taken back, goes
+// from the page on the press (the operator, 22 Nov): its key is held out of
+// each drawing until the answer, which is the list without it, has landed;
+// a refusal brings it back and says why (drawNow).
+const phGoing = new Set();
+function phGone(key, body){
+  const redraw = () => { readMoved("phone"); drawPanes(); };
+  return drawNow(() => {
+    phGoing.add(key); redraw();
+    return () => { phGoing.delete(key); redraw(); };
+  }, () => postJSON("/api/phone", {node: phNode, ...body})).then(j => {
+    if (j.error) return;
+    phLanded(j, true);
+    phGoing.delete(key); redraw(); drawBell();
+  });
+}
 // A read of its own that met a controller not answering is the poll's to
 // say (its light and the line under the header), not a failure to keep;
 // a press is told either way (B301).
@@ -291,7 +307,7 @@ function phonePanel(n){
   // outlives everything (the key is in the node account's ~/.android), so a
   // remembered phone is one press: its address goes in the field above and
   // the node finds the port. Forget drops the memory, not the pairing.
-  const known = (n.known || []).filter(k => k.ip);
+  const known = (n.known || []).filter(k => k.ip && !phGoing.has(`known:${k.ip}`));
   if (known.length)
     rows.push(`<div class="row"><div class="grow">
         <div class="name">Remembered here</div>
@@ -312,7 +328,7 @@ function phonePanel(n){
   // What the owner allowed for a session (the operator, 4 Oct): its
   // commands to this phone run without asking until this is taken back,
   // the lease ends or the phone is disconnected.
-  for (const g of (n.trust || []))
+  for (const g of (n.trust || []).filter(g => !phGoing.has(`trust:${g.project}|${g.asker_uid || ""}`)))
     rows.push(`<div class="row phtrust">
       <div class="grow"><div class="name">Allowed for ${esc(g.asker || "a")}'s sessions in ${esc(projLabel(g.project))}</div>
         <div class="sub">their commands to this phone run without asking ${g.until
@@ -390,13 +406,13 @@ function wirePhoneTab(root){
     phFetch({action: "connect", ip: phIp, port: phConnPort.trim()});
   });
   root.querySelectorAll("[data-kforget]").forEach(b => b.onclick = () =>
-    phFetch({action: "forget", ip: b.dataset.kforget}));
+    phGone(`known:${b.dataset.kforget}`, {action: "forget", ip: b.dataset.kforget}));
   root.querySelectorAll("[data-allow]").forEach(b => b.onclick = () => {
     phBusy = "running it"; readMoved("phone"); drawPanes();
     phFetch({action: "allow", id: Number(b.dataset.allow), session: !!b.dataset.session});
   });
   root.querySelectorAll("[data-untrust]").forEach(b => b.onclick = () =>
-    phFetch({action: "untrust", project: b.dataset.untrust, asker_uid: b.dataset.asker || ""}));
+    phGone(`trust:${b.dataset.untrust}|${b.dataset.asker || ""}`, {action: "untrust", project: b.dataset.untrust, asker_uid: b.dataset.asker || ""}));
   root.querySelectorAll("[data-deny]").forEach(b => b.onclick = () =>
     phFetch({action: "deny", id: Number(b.dataset.deny)}));
   const lt = $$("phLendTo"), lf = $$("phLendFor");

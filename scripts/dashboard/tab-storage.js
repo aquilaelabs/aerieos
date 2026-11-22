@@ -34,6 +34,28 @@ function loadStorage(){
   });
 }
 
+// A record forgotten from this page (a backup, a mount, a schedule) goes on
+// the press (the operator, 22 Nov): its "kind:id" is held here and left out
+// of each drawing until the read after the answer, and a refusal brings it
+// back saying why.
+const storageGoing = new Set();
+async function storageForget(key, path, body, said){
+  const redraw = () => { readMoved("storage"); drawPanes(); };
+  const j = await drawNow(() => {
+    storageGoing.add(key); redraw();
+    return () => { storageGoing.delete(key); redraw(); };
+  }, () => postJSON(path, body));
+  if (!j.error){
+    notify(said);
+    try{ await loadStorage(); }catch(e){ /* the read says its own failure */ }
+    storageGoing.delete(key); redraw();
+  }
+  refresh();
+  return j;
+}
+// A node's schedules as this page draws them, less any removed on the way.
+const storageScheds = n => (n.snapshot_schedules || []).filter(x => !storageGoing.has(`sched:${x.id}`));
+
 // The node the tab opens on: the one it showed last (remembered in this
 // browser), else the first in the answer, else nothing.
 function storagePick(){
@@ -466,7 +488,7 @@ function storageSnapshots(n){
   const admin = !!state?.can?.admin && n.may_measure;
   const why = !n.zfs ? `No zfs on this machine yet: Storage on its ${pageLink("nodes", "Features section", ownNodeAt())} installs it.`
     : !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
-  const pools = n.pools || [], snaps = n.snapshots || {}, scheds = n.snapshot_schedules || [];
+  const pools = n.pools || [], snaps = n.snapshots || {}, scheds = storageScheds(n);
   const when = at => at ? new Date(at * 1000).toLocaleString() : "";
   const rows = pools.map(p => {
     const v = snaps[p.name] || {count: 0, used_mb: 0, kinds: {}, newest: []};
@@ -525,7 +547,7 @@ function wireStorageSnapshots(root, n){
   root.querySelectorAll("[data-stsnapsched]").forEach(b => b.onclick = () => pressing(b, async () => {
     const x = (n.snapshot_schedules || []).find(y => y.id === b.dataset.stsnapsched);
     if (!await askYes(`Remove the ${x?.kind || ""} schedule of ${x?.pool || "the pool"}? The snapshots it took stay.`, {title: "Remove the schedule?", verb: "Remove"})) return;
-    await sayPost(null, "", "/api/schedules", {action: "remove", id: b.dataset.stsnapsched}, "the schedule is gone", () => refresh());
+    await storageForget(`sched:${b.dataset.stsnapsched}`, "/api/schedules", {action: "remove", id: b.dataset.stsnapsched}, "the schedule is gone");
   }));
 }
 
@@ -553,7 +575,7 @@ function storageArray(n){
   const admin = !!state?.can?.admin && n.may_measure;
   const why = !n.mergerfs || !n.snapraid ? `No mergerfs or SnapRAID on this machine yet: Storage on its ${pageLink("nodes", "Features section", ownNodeAt())} installs them.`
     : !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
-  const a = n.array || {}, has = (a.data || []).length > 0, scheds = (n.snapshot_schedules || []).filter(x => x.array);
+  const a = n.array || {}, has = (a.data || []).length > 0, scheds = storageScheds(n).filter(x => x.array);
   const free = (n.disks || []).filter(d => !d.system && !(d.parts || []).some(p => p.holds && p.holds !== "nothing") && (!d.holds || d.holds === "nothing"));
   const used = (n.disks || []).filter(d => !d.system && !free.includes(d) && !(d.parts || []).some(p => /^(xfs|btrfs) at \/mnt\/(disks|parity)\//.test(p.holds || "")) && !/^(xfs|btrfs) at \/mnt\/(disks|parity)\//.test(d.holds || ""));
   const diskLine = d => `${esc(d.name)}: ${esc(d.model || "unnamed")}, ${esc(humanBytes((d.size_mb || 0) * 1048576))}, serial ${esc(d.serial || "none")}`;
@@ -675,7 +697,7 @@ function storageOther(n){
   if (!n.own) return "";
   const admin = !!state?.can?.admin && n.may_measure;
   const why = !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
-  const recs = n.extmounts || [], live = n.ext_mounts || [];
+  const recs = (n.extmounts || []).filter(r => !storageGoing.has(`mount:${r.id}`)), live = n.ext_mounts || [];
   const kindWord = {disk: "a disk here", smb: "an SMB share", nfs: "an NFS export"};
   const rows = recs.map(r => {
     const st = live.find(x => x.id === r.id) || {};
@@ -729,7 +751,8 @@ function wireStorageOther(root, n){
       if (!body.name){ notify("a mount takes a name: its folder under /mnt/other", true); return; }
     } else if (act === "remove"){
       if (!await askYes("Forget this mount? It is unmounted first; nothing on it is touched.", {title: "Remove the mount?", verb: "Remove", danger: true})) return;
-      body = {action: "remove", id: b.dataset.id};
+      await storageForget(`mount:${b.dataset.id}`, "/api/extmounts", {action: "remove", id: b.dataset.id}, "forgotten");
+      return;
     } else body = {action: act, id: b.dataset.id};
     busyFor(b, act);
     await sayPost(null, "", "/api/extmounts", body,
@@ -746,7 +769,7 @@ function storageBackups(n){
   if (!n.own) return "";
   const admin = !!state?.can?.admin && n.may_measure;
   const why = !n.live ? "Its agent is not dialing in, so nothing from here reaches the machine." : "";
-  const recs = n.backups || [], live = n.store_backups || [], scheds = (n.snapshot_schedules || []).filter(x => x.backup);
+  const recs = (n.backups || []).filter(r => !storageGoing.has(`backup:${r.id}`)), live = n.store_backups || [], scheds = storageScheds(n).filter(x => x.backup);
   const places = [...(n.pools || []).map(p => [p.mount, `the pool ${p.name} (${p.mount})`]).filter(x => x[0]),
                   ...(n.array?.mounted ? [[n.array.mount || "/mnt/array", `the array (${n.array.mount || "/mnt/array"})`]] : []),
                   ...(n.extmounts || []).filter(m => (n.ext_mounts || []).find(x => x.id === m.id)?.mounted).map(m => [`/mnt/other/${m.name}`, `${m.name} (/mnt/other/${m.name})`]),
@@ -796,7 +819,7 @@ function wireStorageBackups(root, n){
     }
     if (act === "remove"){
       if (!await askYes("Forget this backup? The runs already copied stay where they are.", {title: "Remove the backup?", verb: "Remove", danger: true})) return;
-      await sayPost(null, "", "/api/storebackups", {action: "remove", id: b.dataset.id}, "forgotten", () => refresh());
+      await storageForget(`backup:${b.dataset.id}`, "/api/storebackups", {action: "remove", id: b.dataset.id}, "forgotten");
       return;
     }
     if (act === "nightly"){
