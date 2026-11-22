@@ -76,18 +76,23 @@ function doctorChecks(d, compact = false){
 }
 
 // Run the doctor now, from the panel's ↻ or the card's Run again: both
-// presses rest while it runs, and both places draw what it found.
+// presses rest while it runs, wearing the ring in their word's place on the
+// click (the operator, 22 Nov: Run again went dead with nothing else said
+// until the run came back), both places say it is running at once, and
+// both draw what it found.
+const DOC_RUNNING = "Running the doctor";
 async function runDoctor(){
   const bs = [$("bDoctor"), $("setDocRun")].filter(Boolean);
   if (bs.some(b => b.disabled)) return;
-  bs.forEach(b => { b.disabled = true; });
+  bs.forEach(b => busy(b, DOC_RUNNING));
   setText($("docWhen"), "running…");
+  document.querySelectorAll(".ctlcard .sectbar .state.ago").forEach(e => { e.textContent = "running…"; });
   try{
     const j = await postJSON("/api/doctor", {});
     if (j.error) notify("doctor: " + j.error, true);
     else if (state) state.doctor = j;
   }catch(e){ notify("doctor: " + failWords(e), true); }
-  [$("bDoctor"), $("setDocRun")].filter(Boolean).forEach(b => { b.disabled = false; });
+  [$("bDoctor"), $("setDocRun")].filter(Boolean).forEach(b => { unbusy(b); b.disabled = false; });
   drawDoctor();
   if (shown("settings")) drawPanes();
 }

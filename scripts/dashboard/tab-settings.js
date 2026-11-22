@@ -68,7 +68,7 @@ function settingsCard(){
   return `<div class="field ctlcard"><div class="ctlfactbox" data-own>${factGrid(settingsFacts(), "ctlfacts meas")}</div>
     <div class="ctlchecks doctor">${settingsChecks()}</div>
     <div class="actbar sectbar"><span class="state ago">${esc(settingsDocWhen())}</span><span class="sp"></span>
-      <button type="button" id="setDocRun"${d?.running ? " disabled" : ""}>Run again</button></div></div>`;
+      <button type="button" id="setDocRun"${runAttr(!!d?.running, DOC_RUNNING)}>Run again</button></div></div>`;
 }
 const settingsDocWhen = () => state?.doctor?.running ? "running…" : state?.doctor?.when ? `the doctor ran ${ago(state.doctor.when)}` : "";
 function settingsChecks(){
