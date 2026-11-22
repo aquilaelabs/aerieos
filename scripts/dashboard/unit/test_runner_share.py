@@ -6,6 +6,7 @@ sessions. A runner whose unit an older agent or svc.sh wrote is brought to
 that unit on a hello while it is idle, and left alone while a job runs."""
 import os
 import shutil
+import subprocess
 import tempfile
 import unittest
 
@@ -88,6 +89,13 @@ class Share(unittest.TestCase):
         self.assertIn("echo 300 > /proc/self/oom_score_adj", argv[2])
         self.assertEqual(argv[3:], ["sh", "bash", "./run.sh"])
         self.assertIn("echo 500 ", base.oom_first(["make"])[2])
+
+    def test_a_node_with_no_proc_runs_the_job_saying_nothing_of_it(self):
+        # A Mac: the redirect itself fails, and its error is the shell's.
+        argv = base.oom_first(["echo", "ran"])
+        argv[2] = argv[2].replace("/proc/self/oom_score_adj", "/nonexistent-proc/oom_score_adj")
+        r = subprocess.run(argv, capture_output=True, text=True, timeout=10)
+        self.assertEqual((r.stdout, r.stderr, r.returncode), ("ran\n", "", 0))
 
 
 class Sync(unittest.TestCase):

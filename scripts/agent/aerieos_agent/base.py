@@ -1642,8 +1642,10 @@ def oom_first(argv, score=JOB_OOM_SCORE):
     and execs it: no fork hook in this threaded process (see the exec job's
     nice), and nothing it starts slips out before the score is set. A
     process may always raise its own score, so it never fails for want of
-    a right; where /proc is not there the command runs as it is."""
-    return ["sh", "-c", f'echo {int(score)} > /proc/self/oom_score_adj 2>/dev/null; exec "$@"', "sh", *argv]
+    a right; where /proc is not there the command runs as it is, saying
+    nothing of it: the braces hold the redirect's own failure, which a
+    2>/dev/null after it on the same echo comes too late to."""
+    return ["sh", "-c", f'{{ echo {int(score)} > /proc/self/oom_score_adj; }} 2>/dev/null; exec "$@"', "sh", *argv]
 
 
 def meminfo(path="/proc/meminfo"):
