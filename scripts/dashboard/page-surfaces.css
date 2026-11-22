@@ -872,8 +872,14 @@ body.firstrun #panes{display:none}
      narrowing takes the next line, the view at its right. */
   .librarytab .libfilter .libsearchrow>input[type=search]{flex:1 1 7rem;min-width:7rem}
   .librarytab .libfilter .libsearchrow>.actbar{flex-wrap:nowrap}
-  .librarytab .libfilter .libsearchrow>.libnarrow{order:3;flex:1 1 100%}
+  .librarytab .libfilter .libsearchrow>.libnarrow{order:3;flex:1 1 100%;flex-wrap:wrap;row-gap:var(--field-gap)}
   .librarytab .libnarrow .dmviewseg{margin-left:auto}
+  /* A pulldown is as wide as its longest answer (fitPickers), and the
+     catalog's topics made the topic's wider than a phone's line with the
+     order beside it: the line wraps rather than running off the side, and
+     no pulldown is wider than the line (the operator, 22 Nov: what would
+     be cut off on a phone wraps). */
+  .librarytab .libnarrow>label.pick,.librarytab .libnarrow select{max-width:100%}
 }
 .librarytab .libgname .libshelfall{margin-left:auto;font:var(--f-ui)}
 .librarytab .libgroup>.libhidden{margin:0 0 8px;color:var(--dim)}
