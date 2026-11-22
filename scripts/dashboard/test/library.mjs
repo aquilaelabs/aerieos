@@ -4,7 +4,7 @@
 // /api/library; the search and the chips narrow the list and save nothing;
 // a row opens on its description; the verbs are the pages' own (an install
 // is the toolchain job, which the bb stub runs in a second).
-import { launch, newPage, ok, done, ready, URL, DIR, section, libraryRowsWrong } from './lib.mjs';
+import { launch, newPage, ok, done, ready, sleep, URL, DIR, section, libraryRowsWrong } from './lib.mjs';
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const browser = await launch();
@@ -121,6 +121,23 @@ await page.fill('.doc .librarytab #libFind', '');
 await page.waitForFunction(() => libQ === '' && !document.querySelector('.doc .librarytab .libone'), null, { timeout: 15000 });
 ok(await page.evaluate(() => !!document.querySelector('.doc .librarytab .libgroup[data-libshelf], .doc .librarytab .libgroup [data-libshelf]') || document.querySelectorAll('.doc .librarytab .libgroup').length > 1),
    '...and emptied puts the shelves back');
+// ...and emptied while the read for its words is still out (the list a
+// placeholder drawn by the page's render, so the next draw is never taken
+// for the last one: a cleared search left its words' list on the screen
+// whenever its read was slow, 22 Nov).
+{
+  let held = 0;
+  await page.route('**/api/library?*', async r => { if (held) await sleep(held); r.continue().catch(() => {}); });
+  held = 2500;
+  await page.fill('.doc .librarytab #libFind', firstTc.slice(0, 4).toLowerCase());
+  await sleep(600);
+  await page.fill('.doc .librarytab #libFind', '');
+  const back = await page.waitForFunction(() => libQ === '' && !document.querySelector('.doc .librarytab .libone')
+    && !document.querySelector('.doc .librarytab .libgroups .skel') && document.querySelectorAll('.doc .librarytab .libgroup').length > 1, null, { timeout: 20000 }).then(() => true, () => false);
+  held = 0;
+  await page.unroute('**/api/library?*');
+  ok(back && await page.evaluate(() => document.activeElement?.id === 'libFind'), '...and emptied while the read for its words is out, the shelves come back all the same, the caret kept');
+}
 if (await page.$('.doc .librarytab [data-libkind="toolchain"]')){
   await page.click('.doc .librarytab [data-libkind="toolchain"]');
   await page.waitForFunction(() => libKind === 'toolchain' && !readBusy('library') && !!document.querySelector('.doc .librarytab .libone'), null, { timeout: 15000 });

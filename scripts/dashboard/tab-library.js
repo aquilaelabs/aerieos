@@ -19,6 +19,10 @@
 "use strict";
 
 let lib = null, libNode = "", libFollow = null;
+// The narrowing the list is waiting on (libQuery()), "" when none: while a
+// press's read is out its list is its placeholder, drawn by the page's own
+// render so the patcher's record is what is on screen.
+let libWaitFor = "";
 let libQ = "", libKind = "", libTier = "";
 // The rest of what narrows it (R256): a topic, the order, and whether what
 // runs on other systems is shown too; all in the address, none saved.
@@ -121,7 +125,9 @@ function loadLibrary(){
     if (!libPick()){ lib = {nonode: true}; return; }
     // A reply is kept while it is still about the node on show.
     const node = libNode, asked = libQuery();
-    const got = await getJSON(asked);
+    let got;
+    try{ got = await getJSON(asked); }
+    catch(e){ if (libWaitFor === asked) libWaitFor = ""; throw e; }
     // An answer about another node, or to words since changed, is not drawn,
     // and what the page wants now is asked for: a read sent before the
     // address's narrowing was applied (a reload of a list) answered the
@@ -129,6 +135,7 @@ function loadLibrary(){
     // came.
     if (libNode !== node || libQuery() !== asked){ if (libNode) setTimeout(loadLibrary); return; }
     lib = got;
+    if (libWaitFor === asked) libWaitFor = "";
     if (libWantAgent && !lib.error){
       const want = libWantAgent;
       libWantAgent = "";
@@ -606,7 +613,7 @@ function renderLibraryInto(i){
   // Patched into what is there (R244): the search being typed in keeps its
   // focus and its caret through the redraw its own key brings.
   patch(d.list, `<div data-libnode="${esc(libNode)}">${notes}${head}${libFilterBand(acts)}<div class="field libgroups">${
-    libNarrowed() || !lib.shelves ? libList(may) : libShelves(may)}</div></div>`);
+    libWaitFor && libWaitFor === libQuery() ? libListSkel() : libNarrowed() || !lib.shelves ? libList(may) : libShelves(may)}</div></div>`);
   // A list a page at a time (the long-lists rule): its foot says how much
   // of how many, and the next page comes as the foot scrolls into view.
   const one = d.list.querySelector(".libone .lgrid");
@@ -641,10 +648,14 @@ function wireLibrary(root){
   // and a list starts from its first page.
   // The list under it becomes its placeholder on the press, and the read is
   // the press's own, so a chip's count is the ring until it lands.
+  // Drawn by the page's render, never written in under it: a placeholder put
+  // straight into the list was taken by the patcher for its last draw, and a
+  // search cleared while the read for its words was out left that list on
+  // the screen (22 Nov).
   const ask = set => {
     set(); if (lib) lib.moreAsked = false; libPagesFrom(); shellSync();
-    const groups = root.querySelector(".libgroups");
-    if (groups) drawHTML(groups, libListSkel());
+    libWaitFor = libQuery();
+    readMoved("library"); drawPanes();
     return loadLibrary();
   };
   const q = root.querySelector("#libFind");
