@@ -221,9 +221,8 @@ function nodeGpuSection(n){
              : `<div class="sub dim">A session started here from now on finds no card to compute on.</div>`}
     <div class="actbar">
       <span class="state"></span>
-      <button type="button" data-nd="gpu-apply"${busy ? " disabled" : ""}
-        title="apply both: the emulator's switch is a job on the node, the other takes effect for sessions started from now on">${
-        busy ? "Applying…" : "Apply"}</button>
+      <button type="button" data-nd="gpu-apply"${runAttr(busy, "Applying")}
+        title="apply both: the emulator's switch is a job on the node, the other takes effect for sessions started from now on">Apply</button>
     </div>`;
   return docSection("nodes", "gpu", ndTitle("gpu"), status, body, {cls});
 }
@@ -760,10 +759,13 @@ function nodeFeaturesSection(n){
     // One pressed while another feature's job runs is queued behind it, so
     // it stays live and the press says so (ndQueuedSay).
     const mine = job?.feature === fid;
-    const btn = ahead === fid ? `<button type="button" disabled>Done, the node is reporting back…</button>`
-      : why || cant ? ""
-      : `<button type="button" data-nd="feature" data-feature="${fid}" data-op="${has ? "remove" : "install"}"${mine ? " disabled" : ""}>${
-          mine ? (job.op === "remove" ? "Uninstalling…" : "Installing…") : has ? "Uninstall" : "Install"}</button>`;
+    // Its own job running, or done and the node not yet reporting it: its
+    // word kept and the ring in its place (runAttr), saying which.
+    const running = ahead === fid || mine;
+    const saying = ahead === fid ? "Done, the node is reporting back" : job?.op === "remove" ? "Uninstalling" : "Installing";
+    const btn = !running && (why || cant) ? ""
+      : `<button type="button" data-nd="feature" data-feature="${fid}" data-op="${has ? "remove" : "install"}"${runAttr(running, saying)}>${
+          has ? "Uninstall" : "Install"}</button>`;
     const fail = failed?.feature === fid ? `<div class="sub bad">The last try failed${failed.error ? `: ${esc(failed.error)}` : ""}; its job's log says more.</div>` : "";
     return `<div class="row ndfeat" data-feat="${fid}"><div class="grow">
         <div class="name">${esc(title)} <span class="pill${has ? " ok" : ""}">${has ? "installed" : "not installed"}</span></div>
@@ -1309,7 +1311,7 @@ function nodeAdvancedSection(n, stale, inflight){
         "How often the Library asks what is newer for what this node holds; Check for updates on the Library asks at once.",
         `<select data-ndcheck aria-label="version check">${optionList([["daily", "Daily"], ["weekly", "Weekly"], ["monthly", "Monthly"], ["off", "Off"]], n.config?.check_versions || "weekly")}</select>`)}
     ${act("Clear cache", stale ? esc(staleWhy(n)) : "Drops every space's build cache here; the next build fetches again.",
-        `<button type="button" data-nd="cache-clear" ${stale || inflight("cache-clear") ? "disabled" : ""}>${inflight("cache-clear") ? "Clearing…" : "Clear cache"}</button>`)}
+        `<button type="button" data-nd="cache-clear"${stale && !inflight("cache-clear") ? " disabled" : ""}${runAttr(inflight("cache-clear"), "Clearing")}>Clear cache</button>`)}
     ${act(n.state === "disabled" ? "Enable" : "Disable",
         n.state === "disabled" ? "Disabled: off every picker and handed no work or session. Enable offers it again."
         : inUse ? `<span class="warn">It is in use: ${esc(inUse)} first.</span>`
@@ -1320,15 +1322,14 @@ function nodeAdvancedSection(n, stale, inflight){
         : n.live && n.reported?.sandbox
         ? "Takes AerieOS off the machine (its agent, accounts, mounts, runners and files; Docker and the shares stay) and removes the node here."
         : `Removes the node here; AerieOS's pieces stay on the machine, since ${n.live ? "AerieOS did not provision it" : "its agent is not dialing in"}.`,
-        `<button type="button" class="danger" data-nd="unenroll" ${inflight("uninstall") || (n.live && n.reported?.sandbox && inUse) ? "disabled" : ""}>${inflight("uninstall") ? "Un-enrolling…" : "Un-enroll"}</button>`)}
+        `<button type="button" class="danger" data-nd="unenroll"${!inflight("uninstall") && n.live && n.reported?.sandbox && inUse ? " disabled" : ""}${runAttr(inflight("uninstall"), "Un-enrolling")}>Un-enroll</button>`)}
     ${n.kind !== "agent" ? "" : act("Reboot or shut down",
         !n.live ? `<span class="bad">They need the agent dialing in, and it is away: power the machine from its console or its hypervisor.</span>`
         : installing ? `<span class="warn">${esc(installing[0].toUpperCase() + installing.slice(1))} is running here: one pressed now waits for it to end.</span>`
         : "Reboot ends every session there and the machine comes back on its own; Shut down does not come back until somebody switches it on.",
         (n.id === state?.own_node ? holdNextBox() : "") + ["reboot", "poweroff"].map(w =>
-          `<button type="button" class="caution" data-nd="${w}" ${!n.live || inflight(w) ? "disabled" : ""}>${
-            inflight(w) ? (w === "reboot" ? "Rebooting…" : "Shutting down…")
-                        : (w === "reboot" ? "Reboot" : "Shut down")}</button>`).join(""))}
+          `<button type="button" class="caution" data-nd="${w}"${!n.live && !inflight(w) ? " disabled" : ""}${runAttr(inflight(w), w === "reboot" ? "Rebooting" : "Shutting down")}>${
+            w === "reboot" ? "Reboot" : "Shut down"}</button>`).join(""))}
     </div>`;
   return docSection("nodes", "advanced", ndTitle("advanced"),
                     n.state === "draining" ? "draining" : n.config?.lock ? "locked" : "",
@@ -2108,10 +2109,9 @@ function ndRowHtml(n, lead = ""){
               : `Updating to agent ${esc(nodesAgent?.version || "")}. This row refreshes when the node reports back.`)
             : stale ? `${windowGap(n) ? "out of window" : "behind"}: ${esc(staleWhy(n))}`
             : ""}</span>
-          ${stale ? `<button type="button" data-nd="update-agent" ${updating ? "disabled" : ""}
+          ${stale ? `<button type="button" data-nd="update-agent"${runAttr(updating, "Updating the agent")}
             title="${updating ? "Update queued: this row refreshes when the node reports back"
-              : `Update the agent to ${esc(nodesAgent.version)} once its running jobs finish`}">${
-            updating ? "Updating…" : "Update agent"}</button>` : ""}
+              : `Update the agent to ${esc(nodesAgent.version)} once its running jobs finish`}">Update agent</button>` : ""}
           ${ndAgentButtons(false)}
           ${state?.can?.debug === false ? "" : `<button type="button" data-ndlog="${esc(n.id)}" data-ndlogname="${esc(n.name)}"
             title="the agent's own journal, in the dock, read again every ten seconds">Agent log</button>`}

@@ -224,14 +224,14 @@ await section("One operation at a time", async () => {
     const installs = all('.doc .librarytab [data-libact="install"][data-libkind="toolchain"]');
     const out = {
       check: !document.querySelector('.doc .librarytab [data-libcheck]')?.disabled,
-      abort: all('.doc .librarytab [data-libabort]').length === 1 && !document.querySelector('.doc .librarytab [data-libabort]').disabled,
+      abort: all('.doc .librarytab [data-libabort]').length === 0,
       install: installs.length > 0 && installs.every(b => !b.disabled),
     };
     lib.job = was; readMoved('library'); drawPanes();
     return out;
   });
   ok(g.check && g.abort && g.install,
-     `while a job runs, Check for updates and every card's Install stay live, a press queueing behind it, and Abort is there (${
+     `while a job runs, Check for updates and every card's Install stay live, a press queueing behind it, and no Abort stands beside them (${
        Object.entries(g).filter(([, v]) => !v).map(([k]) => k).join(', ') || 'all'})`);
   // A card queued behind it says behind what (the operator, 22 Nov), and so
   // does the press's toast, from the same words (tcBehind).
@@ -254,13 +254,13 @@ await section("One operation at a time", async () => {
     lib.job = { ...(was || {}), running: true, action: 'check' };
     readMoved('library'); drawPanes();
     const b = document.querySelector('.doc .librarytab [data-libcheck]');
-    const out = { t: b?.textContent || '', dots: !!b?.querySelector('.dots'),
-                  head: document.querySelector('.doc .librarytab .pghead')?.textContent || '' };
+    const out = { t: b?.textContent || '', said: b?.getAttribute('aria-label') || '', ring: !!b?.dataset.running,
+                  dead: !!b?.disabled, w: b?.offsetWidth || 0, head: document.querySelector('.doc .librarytab .pghead')?.textContent || '' };
     lib.job = was; readMoved('library'); drawPanes();
     return out;
   });
-  ok(/^Checking for updates/.test(c.t) && c.dots && !/Checking/.test(c.head),
-     `...and Check for updates says it is checking, once: the head keeps to the store (B31) (${c.t.trim()})`);
+  ok(/^Check for updates/.test(c.t) && c.ring && c.dead && c.said === 'Checking for updates' && !/Checking/.test(c.head),
+     `...and Check for updates wears the ring in its word's place while it checks, its word kept so its size is, saying it is checking to a screen reader; the head keeps to the store (B31) (${JSON.stringify(c)})`);
   ok(await page.$eval('.doc .librarytab [data-libcheck]', b => !b.disabled),
      '...and the bar is live again when it finishes');
   // The answers are dated, because a number with no date on it goes stale.

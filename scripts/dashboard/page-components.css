@@ -2583,9 +2583,9 @@ progress.pbar::-moz-progress-bar{background:var(--accent);border-radius:3px}
    bigger). The word stays in the box, unpainted, so the box keeps its
    width; the ring is the word's color. pressRing makes a button that is not
    positioned the ring's frame (.ringrel). */
-button.working,a.btn.working{-webkit-text-fill-color:transparent}
-button.working>*,a.btn.working>*{visibility:hidden}
-button.working::after,a.btn.working::after{content:"";position:absolute;left:50%;top:50%;width:.8em;height:.8em;margin:-.4em 0 0 -.4em;
+button.working,a.btn.working,button[data-running]{-webkit-text-fill-color:transparent}
+button.working>*,a.btn.working>*,button[data-running]>*{visibility:hidden}
+button.working::after,a.btn.working::after,button[data-running]::after{content:"";position:absolute;left:50%;top:50%;width:.8em;height:.8em;margin:-.4em 0 0 -.4em;
   box-sizing:border-box;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .8s linear infinite}
 .ringrel{position:relative}
 /* A chip whose narrowing is being read: its count is the ring in the count's

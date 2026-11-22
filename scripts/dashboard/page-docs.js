@@ -120,8 +120,15 @@ function dropBox(at, {q, sub = "", placeholder = "", max = 1000, verb, tone = "p
 // operator, 22 Nov: a word that changed grew the button). `attrs` is the
 // page's own data key, `title` what stopping keeps.
 function abortBtn(attrs, aborting, title = ""){
-  return `<button type="button" ${attrs}${title ? ` title="${esc(title)}"` : ""}${
-    aborting ? ' disabled aria-busy="true" aria-label="Stopping" class="working ringrel">Abort' : ">Abort"}</button>`;
+  return `<button type="button" ${attrs}${title ? ` title="${esc(title)}"` : ""}${runAttr(aborting, "Stopping")}>Abort</button>`;
+}
+// A button whose work runs, drawn so (the operator, 22 Nov: a running word
+// grew its button): its own word kept, so its size is, dead, the ring in
+// the word's place, and `saying` (Installing, Checking for updates) what a
+// screen reader hears of it while it runs. drawn() applies it (runShow).
+// "" where nothing runs, for a button drawn the same way either way.
+function runAttr(running, saying){
+  return running ? ` disabled data-running="${esc(saying)}"` : "";
 }
 
 // A field on its way: its real label over a control's box shimmering, as

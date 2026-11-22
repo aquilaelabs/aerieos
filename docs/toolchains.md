@@ -243,11 +243,13 @@ Uninstalling is a **bin icon on the row itself**, with a confirmation,
 because it is about one toolchain and a bulk Remove button beside a bulk
 Install was one mis-click from being expensive.
 
-**A job can be stopped.** **Abort** empties the queue and interrupts the
-toolchain being worked on: the whole process group, so the download it is
-waiting on goes too, and `aerie` removes the half-installed directory on its way
-out, the same cleanup a failed install gets. Everything already installed
-stays; the abort is for the rest of the queue, not for undoing what worked.
+**A job can be stopped**, from its row on the Jobs page: **Cancel**
+interrupts the toolchain being worked on, the whole process group, so the
+download it is waiting on goes too, and `aerie` removes the half-installed
+directory on its way out, the same cleanup a failed install gets. Everything
+already installed stays; stopping is for the rest of the job, not for undoing
+what worked. The Library carries no Abort of its own: a check is short, and
+a press made while a job runs queues behind it, saying so.
 
 **Two different questions, two different costs.** What version is installed
 is local knowledge (a directory name, or `flutter --version`), but asking

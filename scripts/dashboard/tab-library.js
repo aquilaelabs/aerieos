@@ -456,7 +456,7 @@ function libFilterBand(acts = ""){
   const view = viewSeg("libview", libViewNow(), "each a card with what it is", "each a row, more to a screen", "", ["Cards", "Rows"]);
   return `<div class="field lfilter libfilter">
     <div class="libsearchrow"><input id="libFind" type="search" maxlength="80" autocomplete="off" spellcheck="false" aria-label="search the library"
-      placeholder="search by name, maker or what it does" value="${esc(libQ)}"><span class="libnarrow">${topicSel}${sortSel}${view}</span>${acts ? `<span class="actbar">${acts}</span>` : ""}</div>
+      placeholder="search by name, maker or what it does" data-ph-short="search" value="${esc(libQ)}"><span class="libnarrow">${topicSel}${sortSel}${view}</span>${acts ? `<span class="actbar">${acts}</span>` : ""}</div>
     <div class="chips" data-chips="libkind">${chipButtons(kinds, libKind, "data-libkind", c.all)}</div>
     <div class="chips" data-chips="libtier">${tierChips}</div>
   </div>`;
@@ -539,7 +539,7 @@ function renderLibraryInto(i){
     d.setBar("");
     const skcard = libSkCard;
     drawHTML(d.list, skTpl(pageHead({facts: [["Installed", GHOST], ["Store", GHOST]]})
-      + `<div class="field lfilter libfilter"><div class="libsearchrow"><input type="search" disabled placeholder="search by name, maker or what it does"><span class="libnarrow"><label class="pick libsort"><select disabled aria-label="order"><option>By name</option></select></label>${viewSeg("libviewsk", libViewNow(), "", "", " disabled", ["Cards", "Rows"])}</span><span class="actbar"><button type="button" disabled>${barSaid("Check for updates", "Check")}</button><button type="button" class="primary" disabled>${barSaid("Add your own", "Add")}</button></span></div><div class="chips">${skel("chips", 5)}</div>${libHadTiers ? `<div class="chips">${skel("chips", 3)}</div>` : ""}</div>`
+      + `<div class="field lfilter libfilter"><div class="libsearchrow"><input type="search" disabled placeholder="search by name, maker or what it does" data-ph-short="search"><span class="libnarrow"><label class="pick libsort"><select disabled aria-label="order"><option>By name</option></select></label>${viewSeg("libviewsk", libViewNow(), "", "", " disabled", ["Cards", "Rows"])}</span><span class="actbar"><button type="button" disabled>${barSaid("Check for updates", "Check")}</button><button type="button" class="primary" disabled>${barSaid("Add your own", "Add")}</button></span></div><div class="chips">${skel("chips", 5)}</div>${libHadTiers ? `<div class="chips">${skel("chips", 3)}</div>` : ""}</div>`
       + `<div class="field libgroups">${[["installed", "On this node"], ...LIB_KINDS].map(([k, title]) => `<div class="libgroup"><h3 class="libgname">${esc(title)}<button type="button" class="link libshelfall" disabled>All ›</button></h3><div class="lgrid">${skcard()}${skcard()}${skcard()}</div></div>`).join("")}</div>`));
     if (!readRev("library") && !readBusy("library")) loadLibrary();
     return;
@@ -559,11 +559,14 @@ function renderLibraryInto(i){
   // The node is the Build group's header's (R178), and the buttons sit on
   // the search's line under the head, so the bar carries nothing.
   d.setBar("");
+  // No Abort beside them (the operator, 22 Nov): a check is short, and a job
+  // the page cannot stop here is the Jobs page's. While a check runs, Check
+  // is dead and wears the ring in its word's place, its size kept; while
+  // another job runs it is live, and its press queues behind that job.
+  const checking = busy && job.action === "check";
   const acts = may.install
-    ? `${busy ? abortBtn('data-libabort', job.aborting) : ""}
-       <button type="button" data-libcheck${stale ? " disabled" : ""} title="ask each upstream what it has now">${
-         busy && job.action === "check" ? `${barSaid("Checking for updates", "Checking")}<span class="dots"></span>`
-         : barSaid("Check for updates", "Check")}</button>${
+    ? `<button type="button" data-libcheck${stale && !checking ? " disabled" : ""}${runAttr(checking, "Checking for updates")} title="ask each upstream what it has now">${
+         barSaid("Check for updates", "Check")}</button>${
         may.packs ? `<button type="button" class="primary" data-libadd>${barSaid("Add your own", "Add")}</button>` : ""}${
         clean.length ? `<button type="button" class="danger" data-libclean>Remove</button>` : ""}` : "";
   if (lib.error){
@@ -667,8 +670,6 @@ function wireLibrary(root){
   // hour, so a newer pin showed up to an hour after Check (B793).
   if (chk) chk.onclick = () => pressing(chk, async () => { busy(chk, "Checking");
     await Promise.all([tcAct("check"), fetch("/api/catalog?fresh=1").catch(() => null)]); await loadLibrary(); });
-  const ab = root.querySelector("[data-libabort]");
-  if (ab) ab.onclick = async () => { await tcAct("abort"); loadLibrary(); };
   const sd = root.querySelector("[data-libsysdeps]");
   // ...its word Queuing while a job runs, which it waits behind (tcAct says
   // which).

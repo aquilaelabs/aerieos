@@ -59,7 +59,7 @@ html[data-motion="reduce"] .tourring{transition:none}
 .floatm{position:fixed;z-index:60;overflow-y:auto;overscroll-behavior:contain}
 @media(prefers-reduced-motion:reduce){ .st.working{animation:none}
 }
-@media(prefers-reduced-motion:reduce){ button.working::after,a.btn.working::after{animation:none;border-right-color:currentColor;opacity:.6}
+@media(prefers-reduced-motion:reduce){ button.working::after,a.btn.working::after,button[data-running]::after{animation:none;border-right-color:currentColor;opacity:.6}
   .chip .pill.counting::after{animation:none;border-right-color:var(--dim);opacity:.6}
 }
 @media(prefers-reduced-motion:reduce){

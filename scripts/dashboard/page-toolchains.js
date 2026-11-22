@@ -450,8 +450,8 @@ function tpModalHtml(){
   // An app of the person's own: its own form, look and foot (R170 step 3).
   if (fresh && f.what === "app"){
     const ed = !!f.app.editing;
-    const look = `<button type="button" data-tplook${f.busy ? " disabled" : ""}${seen ? "" : ` class="primary"`}>${f.busy === "look" ? "Looking…" : seen ? "Look again" : "Look"}</button>`;
-    const add = seen ? `<button type="button" class="primary" data-tpadd${f.busy ? " disabled" : ""}>${f.busy === "add" ? (ed ? "Saving…" : "Adding…") : ed ? "Save" : "Add"}</button>` : "";
+    const look = `<button type="button" data-tplook${f.busy && f.busy !== "look" ? " disabled" : ""}${runAttr(f.busy === "look", "Looking")}${seen ? "" : ` class="primary"`}>${seen ? "Look again" : "Look"}</button>`;
+    const add = seen ? `<button type="button" class="primary" data-tpadd${f.busy && f.busy !== "add" ? " disabled" : ""}${runAttr(f.busy === "add", ed ? "Saving" : "Adding")}>${ed ? "Save" : "Add"}</button>` : "";
     const rm = ed ? `<button type="button" class="danger" data-tprmapp="${esc(f.app.editing)}">Remove</button>` : "";
     return `<div class="box wide"><h3>${ed ? `${esc(f.app.name || f.app.editing)}, an app you added` : "Add your own"}</h3>
       ${ed ? "" : tpWhatHtml(f)}
@@ -464,12 +464,12 @@ function tpModalHtml(){
   const offer = !!(seen && (fresh || newer || here));
   // Look is Add's first step, Edit's only after a look that failed, and a
   // pack made here's whenever its text or files are given again.
-  const look = fresh || f.error || here ? `<button type="button" data-tplook${f.busy ? " disabled" : ""}${offer ? "" : ` class="primary"`}>${
-    f.busy === "look" ? "Looking…" : fresh || here ? "Look" : "Look again"}</button>` : "";
-  const add = offer ? `<button type="button" class="primary" data-tpadd${f.busy ? " disabled" : ""}>${
+  const look = fresh || f.error || here ? `<button type="button" data-tplook${f.busy && f.busy !== "look" ? " disabled" : ""}${runAttr(f.busy === "look", "Looking")}${offer ? "" : ` class="primary"`}>${
+    fresh || here ? "Look" : "Look again"}</button>` : "";
+  const add = offer ? `<button type="button" class="primary" data-tpadd${f.busy && f.busy !== "add" ? " disabled" : ""}${runAttr(f.busy === "add", fresh ? "Adding" : "Updating")}>${
     // A pack already kept takes a newer manifest here, never a program on
     // a node: the press says so, as the card's does (the operator, 13 Nov).
-    f.busy === "add" ? (fresh ? "Adding…" : "Updating…") : fresh ? "Add" : "Manifest update"}</button>` : "";
+    fresh ? "Add" : "Manifest update"}</button>` : "";
   const rm = p ? `<button type="button" class="danger" data-tprm="${esc(p.name)}">Remove</button>` : "";
   return `<div class="box wide"><h3>${fresh ? (f.catalog ? `Install ${esc(f.catalog.name)} from the catalog` : "Add your own") : `${esc(p.label)}, a tool pack`}</h3>
     ${p ? `<div class="field"><div class="sub">${here ? "Made here" : `From <code>${esc(p.pack.url)}</code>`} at ${esc(p.pack.commit.slice(0, 12))}, added by ${

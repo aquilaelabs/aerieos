@@ -647,8 +647,7 @@ async function rlSubmit(){
   const name = $("rlName").value.trim();
   if (mode === "copy" && !name) return fail("the copy needs a name");
   const {project, instance} = rlFor;
-  $("rlGo").disabled = true;
-  $("rlGo").textContent = mode === "move" ? "Moving…" : "Copying…";
+  busy($("rlGo"), mode === "move" ? "Moving" : "Copying");
   try{
     const j = await postJSON("/api/devapp", {project, instance, action: "relocate", mode, node: $("rlNode").value, name,
                             data: document.querySelector('input[name="rlData"]:checked')?.value || "unpack",
@@ -656,12 +655,12 @@ async function rlSubmit(){
                             // only when there is something of the person's in it.
                             ...(rlFor.envWas === undefined || (rlFor.seeded && $("rlEnv").value === rlFor.envWas)
                                 ? {} : {text: $("rlEnv").value})});
-    if (j.error){ $("rlGo").disabled = false; rlSay(); return fail(j.error); }
+    if (j.error){ unbusy($("rlGo"), $("rlGo").textContent); rlSay(); return fail(j.error); }
     closeRelocate();
     notify(mode === "move" ? `moving ${j.name}: its row says each step` : `copying it as ${j.name}: its row says each step`);
     dockerList = null; readMoved("docker");
     loadDocker();
-  }catch(e){ $("rlGo").disabled = false; rlSay(); fail(String(e)); }
+  }catch(e){ unbusy($("rlGo"), $("rlGo").textContent); rlSay(); fail(String(e)); }
 }
 
 function dnShow(){

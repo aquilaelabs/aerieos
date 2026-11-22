@@ -53,7 +53,16 @@ function drawn(root){
   untitleIn(root);
   chipsBack(root);
   for (const el of all("[data-ph-short]")) phWatch(el);
+  for (const el of all("[data-running]")) runShow(el);
   return root;
+}
+
+// A button drawn running (runAttr): busy to a screen reader under its running
+// word, and the ring's frame where the page has not positioned it.
+function runShow(el){
+  el.setAttribute("aria-busy", "true");
+  el.setAttribute("aria-label", el.dataset.running);
+  if (getComputedStyle(el).position === "static") el.classList.add("ringrel");
 }
 
 // A field's placeholder in its short words where the full ones are cut off
