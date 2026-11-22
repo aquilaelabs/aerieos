@@ -263,7 +263,7 @@ function instServiceLines(r){
     <div class="actbar"><span class="state">${models.length ? `${models.length} model${models.length === 1 ? "" : "s"} known${st.models_at ? `, read ${esc(ago(st.models_at))}` : ""}` : "no models read yet"}${
       Object.keys(st.spend || {}).length ? ` · spent ${Object.entries(st.spend).map(([p, s]) => `${esc(p)} $${Number(s).toFixed(2)}`).join(", ")}` : ""}</span>
       <button type="button" data-instsvc="models">Read the models</button><button type="button" data-instsvc="spend">Read the spend</button></div>
-    ${st.ollama?.on ? `<div class="field"><div class="ctlrow"><input type="text" data-instpull placeholder="a model Ollama lists, such as qwen2.5-coder:7b" autocomplete="off" spellcheck="false">
+    ${st.ollama?.on ? `<div class="field"><div class="ctlrow"><input type="text" data-instpull placeholder="a model Ollama lists, such as qwen2.5-coder:7b" data-ph-short="model name" autocomplete="off" spellcheck="false">
       <button type="button" data-instsvc="ollama-pull">Pull</button></div>${pulled ? `<div class="rows">${pulled}</div>` : `<div class="sub dim">Nothing pulled yet.</div>`}</div>` : ""}`;
 }
 

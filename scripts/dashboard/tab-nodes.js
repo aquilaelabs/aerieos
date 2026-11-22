@@ -409,7 +409,7 @@ function nodeRunnerSection(n, c, between = "", acts = ""){
         <div class="uadd ctlrow">
           <div class="setrow col ctlrow">${lbl("", "Repository or organization", "a repository, or an organization for all of its repositories")}
           <input data-k="runner:url" value="${esc(d.runner.url)}" spellcheck="false" autocomplete="off"
-            placeholder="https://github.com/your-org" aria-label="repository or organization URL"></div>
+            placeholder="https://github.com/your-org" data-ph-short="organization URL" aria-label="repository or organization URL"></div>
           <div class="setrow col ctlrow">${lbl("", "Host", "GitHub, or act_runner for Gitea, Forgejo and Codeberg")}
           <select data-k="runner:forge" aria-label="host kind">${optionList([["", "from the address"], ["github", "GitHub"], ["gitea", "Gitea or Forgejo"]], d.runner.forge || "")}</select></div>
           <div class="setrow col ctlrow">${lbl("", "Token", "a token that may register runners there. Stored on the controller only")}
@@ -1571,7 +1571,7 @@ function nodePathsTable(n, c){
       <label class="setrow col ctlrow"><span class="lbl">Here</span><input data-pf="here" value="${esc(f.here || "")}" spellcheck="false" autocomplete="off"
         placeholder="/devdata" aria-label="the path as a compose file names it"></label>
       <label class="setrow col ctlrow"><span class="lbl">On the node</span><input data-pf="there" value="${esc(f.there || "")}" spellcheck="false" autocomplete="off"
-        placeholder="/mnt/user/appdata/bb-dev" aria-label="where it is on the node"></label>
+        placeholder="/mnt/user/appdata/bb-dev" data-ph-short="folder" aria-label="where it is on the node"></label>
     </div>
     <div class="actbar ngformbar">${i >= 0 ? `<button type="button" class="danger lead" data-pdel>Delete</button>` : ""}
       <button type="button" data-pcancel>Cancel</button>

@@ -135,7 +135,7 @@ function consoleBar(t){
   // By the name of the agent the session is: a Gemini tab's said Claude.
   const who = agentOfSession(tmuxBase(s))?.agent.name || "Claude";
   return `<div class="consbar" data-sess="${esc(s)}">
-    <input class="consin" placeholder="message ${esc(who)}, then Enter"
+    <input class="consin" placeholder="message ${esc(who)}, then Enter" data-ph-short="message"
       aria-label="message ${esc(who)}" autocomplete="off" spellcheck="false">
     <button type="button" class="conssend primary">Send</button>
     <button type="button" class="consend" title="end this conversation: the

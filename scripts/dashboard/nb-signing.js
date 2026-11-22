@@ -115,8 +115,8 @@ function nbSigningView({$, nb, project}){
       ${d.open ? `<div class="rnsignform">
         <input type="file" data-signfile accept=".jks,.p12,.pfx,.keystore" aria-label="${esc(word)} keystore">
         <input type="password" data-signpass autocomplete="new-password" placeholder="keystore password" aria-label="keystore password">
-        <input data-signalias autocomplete="off" spellcheck="false" placeholder="alias, when it holds several" aria-label="key alias">
-        <input type="password" data-signkeypass autocomplete="new-password" placeholder="key password, if not the same" aria-label="key password">
+        <input data-signalias autocomplete="off" spellcheck="false" placeholder="alias, when it holds several" data-ph-short="alias" aria-label="key alias">
+        <input type="password" data-signkeypass autocomplete="new-password" placeholder="key password, if not the same" data-ph-short="key password" aria-label="key password">
       </div>` : ""}
       ${acts.trim() ? `<div class="rnsignbar actbar">${acts}</div>` : ""}
     </div>`;
@@ -154,10 +154,10 @@ function nbSigningView({$, nb, project}){
       // to the backup's.
       : adding === "import" ? `<div class="field"><div class="rnsignform">
           <input type="file" id="sgImpFile" accept=".zip,.jks,.p12,.pfx,.keystore" aria-label="the backup">
-          <input id="sgImpKey" autocomplete="off" spellcheck="false" placeholder="key name, or the backup's" aria-label="the key it becomes">
+          <input id="sgImpKey" autocomplete="off" spellcheck="false" placeholder="key name, or the backup's" data-ph-short="key name" aria-label="the key it becomes">
           <select id="sgImpRoute" aria-label="the slot it goes in"><option value="">the slot the backup names</option>${
             SIGN_ROUTES.map(([r, w]) => `<option value="${r}">${w}</option>`).join("")}</select>
-          <input type="password" id="sgImpPass" autocomplete="off" placeholder="the backup password it was made under, or a keystore's own" aria-label="the backup's or the keystore's password">
+          <input type="password" id="sgImpPass" autocomplete="off" placeholder="the backup password it was made under, or a keystore's own" data-ph-short="its password" aria-label="the backup's or the keystore's password">
           <div class="sub dim">A backup from a space with a backup password is wrapped under that password: type it here. A keystore on its own needs the password it was made with.</div>
           <div class="actbar"><button type="button" id="sgAddCancel">Cancel</button><button type="button" class="primary" id="sgImpGo" disabled>Import</button></div>
         </div></div>`
@@ -170,8 +170,8 @@ function nbSigningView({$, nb, project}){
         : "Every key backup will ask for it, whoever downloads it."}${mayLock ? "" : " The space's owner sets it."}</div>
       ${locked ? "" : `<div class="notice warn">No key can be added or made until it has one${mayLock ? ": set it first" : ""}.</div>`}
       ${mayLock && lockOpen ? `<div class="rnsignform">
-        ${locked ? `<input type="password" id="sgLockCur" autocomplete="current-password" placeholder="the backup password now" aria-label="the backup password now">` : ""}
-        <input type="password" id="sgLockNew" autocomplete="new-password" placeholder="${locked ? "a new one, or empty to remove it" : "at least ten characters"}" aria-label="the new backup password">
+        ${locked ? `<input type="password" id="sgLockCur" autocomplete="current-password" placeholder="the backup password now" data-ph-short="password" aria-label="the backup password now">` : ""}
+        <input type="password" id="sgLockNew" autocomplete="new-password" placeholder="${locked ? "a new one, or empty to remove it" : "at least ten characters"}" data-ph-short="${locked ? "new, or empty" : "10 or more"}" aria-label="the new backup password">
         <input type="password" id="sgLockAgain" autocomplete="new-password" placeholder="the new one again" aria-label="the new backup password again">
         <div class="rnsignbar actbar"><button type="button" class="link" id="sgLockGo" disabled>${locked ? "Change it" : "Set it"}</button></div>
       </div>` : ""}

@@ -211,7 +211,7 @@ function nbRulesView({$, nb, project}){
             <div class="two">
               <div>${lbl("", "Document", "the file in the repo that defines it in full")}
               <input class="rlDoc" autocomplete="off" spellcheck="false"
-                placeholder="docs/design-language.md"
+                placeholder="docs/design-language.md" data-ph-short="path"
                 value="${esc(r.doc || "")}" aria-label="document"></div>
               <div>${lbl("", "Check", "the command that verifies it; aerie rules check runs it")}
               <input class="rlCheck" autocomplete="off" spellcheck="false"
@@ -221,7 +221,7 @@ function nbRulesView({$, nb, project}){
             <div class="two">
               <div>${lbl("", "Commands it refuses", "comma-separated, each the start of a command as typed; a session's Bash call that runs one is refused with this rule as the reason")}
               <input class="rlRefuse" autocomplete="off" spellcheck="false"
-                placeholder="./gradlew assemble, npm publish"
+                placeholder="./gradlew assemble, npm publish" data-ph-short="commands"
                 value="${esc((r.refuse || []).join(", "))}" aria-label="commands it refuses"></div>
               <div>${lbl("", "In place of", "a global rule this one replaces here; a session in this space reads only this one")}
               <select class="rlRepl" aria-label="the global rule it replaces">

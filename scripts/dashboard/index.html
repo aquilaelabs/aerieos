@@ -234,7 +234,7 @@
          a different feature answering a different question. -->
     <div class="field histbar ctlrow" id="histBar" hidden>
       <input id="histFind" maxlength="80" autocomplete="off"
-             placeholder="search the log, and the reasons things went">
+             placeholder="search the log, and the reasons things went" data-ph-short="search">
       <select id="histWhen" aria-label="how far back">
         <option value="0">all time</option>
         <option value="1">today</option>
@@ -348,7 +348,7 @@
         </select></span>
       </div>
       <div class="field histbar ctlrow" id="bugHistBar" hidden>
-        <input maxlength="80" autocomplete="off" placeholder="search the tracker's log">
+        <input maxlength="80" autocomplete="off" placeholder="search the tracker's log" data-ph-short="search">
         <select class="hwhen" aria-label="how far back">
           <option value="0">all time</option><option value="1">today</option>
           <option value="7" selected>7 days</option><option value="30">30 days</option>
@@ -528,7 +528,7 @@
       <!-- The glance (R109): the findings by level. -->
       <div class="nbglance" id="anaHint" data-tiles="3"></div>
       <div class="field histbar ctlrow" id="anaHistBar" hidden>
-        <input maxlength="80" autocomplete="off" placeholder="search the findings log">
+        <input maxlength="80" autocomplete="off" placeholder="search the findings log" data-ph-short="search">
         <select class="hwhen" aria-label="how far back">
           <option value="0">all time</option><option value="1">today</option>
           <option value="7" selected>7 days</option><option value="30">30 days</option>
@@ -1013,11 +1013,11 @@
     <div class="field" id="rnBuildField">
       <label for="rnBuildCmd">Commands<span class="help" data-help="what aerie build and aerie test run, and the outputs a build leaves. A test run finds BB_TEST_WORKERS in its environment: how many workers this node lets it use" tabindex="0">?</span></label>
       <input id="rnBuildCmd" autocomplete="off" spellcheck="false"
-             placeholder="build, e.g. ./gradlew assembleDebug">
+             placeholder="build, e.g. ./gradlew assembleDebug" data-ph-short="build command">
       <input id="rnTestCmd" autocomplete="off" spellcheck="false"
-             placeholder="test, e.g. ./gradlew test">
+             placeholder="test, e.g. ./gradlew test" data-ph-short="test command">
       <input id="rnOutputs" autocomplete="off" spellcheck="false"
-             placeholder="outputs, globs from the tree root: app/build/outputs/apk/**/*.apk">
+             placeholder="outputs, globs from the tree root: app/build/outputs/apk/**/*.apk" data-ph-short="output globs">
       <div class="hint">Run from the tree's root on the node; files matching the outputs land in dist/.</div>
       <!-- Where its tests run, one choice (R223, the operator, 7 Nov): the
            node and the dev instance were two pickers in another section. -->
@@ -1071,7 +1071,7 @@
          the project's node may name one. -->
     <div class="field" id="rnSeesField" hidden>
       <label for="rnSees">Also sees<span class="help" data-help="a share or a disk mounted on the node that a session here works with, by its path there. A session sees no other; one started after the save sees these" tabindex="0">?</span></label>
-      <input id="rnSees" autocomplete="off" spellcheck="false" placeholder="/mnt/media, /mnt/samples">
+      <input id="rnSees" autocomplete="off" spellcheck="false" placeholder="/mnt/media, /mnt/samples" data-ph-short="folders">
     </div>
     <!-- Addresses a session here may still reach where its node keeps each
          session to its own project's network (prefs.reaches, the operator,
@@ -1211,7 +1211,7 @@
     <div class="field" id="cFormField">
       <label for="cImage">Image</label>
       <input id="cImage" autocomplete="off" spellcheck="false"
-             placeholder="lscr.io/linuxserver/radarr:latest">
+             placeholder="lscr.io/linuxserver/radarr:latest" data-ph-short="image">
       <label for="cPorts">Ports<span class="help" data-help="host:container, one per line" tabindex="0">?</span></label>
       <textarea id="cPorts" class="csmall" spellcheck="false" placeholder="7878:7878"></textarea>
       <label for="cVols">Volumes<span class="help" data-help="host:container, one per line; a relative host path is inside this container's data directory" tabindex="0">?</span></label>
@@ -1595,7 +1595,7 @@
     <div class="field" id="pUrlField" hidden>
       <label for="pUrl">Repository</label>
       <input id="pUrl" autocomplete="off" spellcheck="false"
-             placeholder="git@github.com:owner/repo.git">
+             placeholder="git@github.com:owner/repo.git" data-ph-short="repository URL">
       <div class="hint" id="pUrlHint"></div>
     </div>
     <!-- Which host, under the address it is read from, in both modes: a
@@ -1698,7 +1698,7 @@
        a project, a container or a node; the rows under it as you type, the
        first on Enter. It does not search inside notebooks. -->
   <div class="jump" role="search">
-    <input id="jump" type="search" placeholder="jump to a page, space, container or node"
+    <input id="jump" type="search" placeholder="jump to a page, space, container or node" data-ph-short="jump to"
            aria-label="jump to a page, space, container or node" autocomplete="off" spellcheck="false">
     <div id="jumpList" class="jumplist" role="listbox" hidden></div>
   </div>

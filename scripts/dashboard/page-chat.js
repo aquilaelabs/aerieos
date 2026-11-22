@@ -149,7 +149,7 @@ function drawChatThread(el){
         <div>${esc(m.text)}</div>
       </div>`).join("") || `<div class="hint">nothing yet</div>`}</div>
     <div class="chatbar">
-      <input id="chatIn" placeholder="message ${esc(title)}" autocomplete="off"
+      <input id="chatIn" placeholder="message ${esc(title)}" data-ph-short="message" autocomplete="off"
         aria-label="message">
       <button type="button" class="primary" id="chatSend">Send</button>
     </div>`);

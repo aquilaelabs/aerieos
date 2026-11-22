@@ -297,7 +297,7 @@ function rnDrawReach(focus){
   const ed = rnReachEdit;
   const form = (f, i) => `<div class="ngform rnreachform" data-i="${i}">
       <label class="setrow col ctlrow"><span class="lbl">Address</span><input data-reachf="addr" value="${esc(f.addr || "")}" autocomplete="off" spellcheck="false"
-        placeholder="192.168.1.20 or 192.168.1.20:8080" aria-label="an address a session here may reach"></label>
+        placeholder="192.168.1.20 or 192.168.1.20:8080" data-ph-short="address" aria-label="an address a session here may reach"></label>
       ${ns.length > 1 ? `<div class="rnreachnodes">${ns.map(n => `<label class="ndcap"><input type="checkbox" data-reachfnode value="${esc(n.id)}"${
         !f.nodes.length || f.nodes.includes(n.id) ? " checked" : ""}> ${esc(n.name)}</label>`).join("")}</div>` : ""}
       <div class="actbar ngformbar">${i >= 0 ? `<button type="button" class="danger lead" data-reachdel>Delete</button>` : ""}

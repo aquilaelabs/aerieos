@@ -100,7 +100,7 @@ function nbSessionsView({$, nb, project, root}){
     // caret across the redraw it causes.
     const shown = mine.filter(matches);
     const finder = mine.length > 5 ? `<div class="field cvfindrow"><input type="search" class="cvfind" maxlength="80" autocomplete="off" spellcheck="false"
-      aria-label="find a conversation" placeholder="find by label, note or first words" value="${esc(find)}"></div>` : "";
+      aria-label="find a conversation" placeholder="find by label, note or first words" data-ph-short="find" value="${esc(find)}"></div>` : "";
     // What the view is for is its empty state (the a-notebook/views rule).
     patch(list, (mine.length ? finder + `<div class="field mineconv">${shown.length ? convRows(project, shown, false, editing)
         : `<div class="hint">None of your conversations here matches that.</div>`}</div>`

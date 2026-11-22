@@ -277,7 +277,7 @@ function storageShares(n){
         <div class="fgrid">
           <div class="setrow col ctlrow">${lbl("stShareName", "Name")}<input type="text" id="stShareName" placeholder="media" maxlength="63" autocomplete="off" spellcheck="false"></div>
           ${places.length ? `<div class="setrow col ctlrow">${lbl("stSharePool", "On")}<select id="stSharePool">${optionList(places, places[0][0])}</select></div>` : ""}
-          <div class="setrow col ctlrow fwide">${lbl("stSharePath", "Folder", "A name is a folder on the place picked, made when it is missing. A whole path is taken as it is.")}<input type="text" id="stSharePath" placeholder="the share's name, or ${esc(places[0] ? places[0][0] + "/media" : "/mnt/tank/media")}" autocomplete="off" spellcheck="false"></div>
+          <div class="setrow col ctlrow fwide">${lbl("stSharePath", "Folder", "A name is a folder on the place picked, made when it is missing. A whole path is taken as it is.")}<input type="text" id="stSharePath" placeholder="the share's name, or ${esc(places[0] ? places[0][0] + "/media" : "/mnt/tank/media")}" data-ph-short="share or path" autocomplete="off" spellcheck="false"></div>
         </div>
       </div>
       <div class="fgroup">
@@ -298,7 +298,7 @@ function storageShares(n){
       <div class="fgroup">
         <div class="fgrouphead">NFS<span class="sub">For Linux machines and hypervisors. Most people leave this off.</span></div>
         <label class="ndcap"><input type="checkbox" id="stShareNfs"> Also export over NFS</label>
-        <div class="fgrid" id="stShareNfsRow" hidden><div class="setrow col ctlrow fwide">${lbl("stShareClients", "Clients")}<input type="text" id="stShareClients" placeholder="192.168.1.0/24, or * for any" autocomplete="off" spellcheck="false"></div></div>
+        <div class="fgrid" id="stShareNfsRow" hidden><div class="setrow col ctlrow fwide">${lbl("stShareClients", "Clients")}<input type="text" id="stShareClients" placeholder="192.168.1.0/24, or * for any" data-ph-short="addresses, or *" autocomplete="off" spellcheck="false"></div></div>
       </div>
       <div class="actbar"><span class="sp"></span><button type="button" class="primary" data-stshare="set">Save the share</button></div></div>`;
   const body = `${why ? `<div class="sub dim">${esc(why)}</div>` : ""}${rows ? `<div class="rows">${rows}</div>` : `<div class="empty">No share yet${n.smb || n.nfs ? ": the form below makes one" : ""}.</div>`}${form}`;
@@ -720,9 +720,9 @@ function storageOther(n){
         <div class="setrow col ctlrow"><label class="pick"><span class="pickw">Name</span><input type="text" id="stOtherName" placeholder="backup" maxlength="31" autocomplete="off" spellcheck="false"></label></div>
       </div>
       <div class="field" data-stotherk="disk"><label class="pick"><span class="pickw">Disk</span><select id="stOtherDisk">${spare.length ? optionList(spare.map(d => [d.name, `${d.name}: ${d.model || "unnamed"}, ${humanBytes((d.size_mb || 0) * 1048576)}, serial ${d.serial || "none"}`]), spare[0].name) : `<option value="">no disk here is spare</option>`}</select></label></div>
-      <div class="field" data-stotherk="smb nfs" hidden><label class="pick"><span class="pickw">Host</span><input type="text" id="stOtherHost" placeholder="nas.local or 192.168.1.20" autocomplete="off" spellcheck="false"></label>
+      <div class="field" data-stotherk="smb nfs" hidden><label class="pick"><span class="pickw">Host</span><input type="text" id="stOtherHost" placeholder="nas.local or 192.168.1.20" data-ph-short="host" autocomplete="off" spellcheck="false"></label>
         <label class="pick"><span class="pickw" data-stotherpath>Share</span><input type="text" id="stOtherPath" placeholder="media" autocomplete="off" spellcheck="false"></label></div>
-      <div class="field" data-stotherk="smb" hidden><label class="pick"><span class="pickw">User</span><input type="text" id="stOtherUser" placeholder="leave empty for a guest" autocomplete="off" spellcheck="false"></label>
+      <div class="field" data-stotherk="smb" hidden><label class="pick"><span class="pickw">User</span><input type="text" id="stOtherUser" placeholder="leave empty for a guest" data-ph-short="optional" autocomplete="off" spellcheck="false"></label>
         <label class="pick"><span class="pickw">Password</span><input type="password" id="stOtherPass" autocomplete="new-password"></label></div>
       <div class="field"><label class="ndcap"><input type="checkbox" id="stOtherRo"> read-only</label></div>
       <div class="actbar"><span class="sp"></span><button type="button" class="primary" data-stother="set">Mount it</button></div></div>`;

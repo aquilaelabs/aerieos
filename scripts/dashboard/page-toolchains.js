@@ -374,7 +374,7 @@ function tpAppHtml(f){
     <div class="field setrow col ctlrow">${lbl("tpAppId", "Id", "its name as a container and in the address: lower-case letters, digits and dashes")}
       <input id="tpAppId" value="${esc(a.id)}" maxlength="32" autocomplete="off" spellcheck="false" placeholder="notes"${ed ? " disabled" : ""}></div>
     <div class="field setrow col ctlrow">${lbl("tpAppWhat", "What it is", "one line, as the card says it")}
-      <input id="tpAppWhat" value="${esc(a.what)}" maxlength="200" autocomplete="off" placeholder="a notebook with a web page"></div>
+      <input id="tpAppWhat" value="${esc(a.what)}" maxlength="200" autocomplete="off" placeholder="a notebook with a web page" data-ph-short="one line"></div>
     <div class="field setrow col ctlrow">${lbl("tpAppPort", "Port", "the port it answers on; New container offers it, and a person can pick another")}
       <input id="tpAppPort" type="number" min="1" max="65535" value="${esc(String(a.port || ""))}" placeholder="8080"></div>
     <div class="field">${lbl("tpAppCompose", "Its compose file", "images pinned to a tag, never latest; ${PORT}, ${DATA}, ${MEDIA}, ${PUID}, ${PGID} and ${TZ} are the blanks New container fills")}
@@ -431,7 +431,7 @@ function tpFromHtml(f, here){
       .map(([k, t]) => `<button type="button" data-tpfrom="${k}" class="${f.from === k ? "on" : ""}" aria-pressed="${f.from === k}">${t}</button>`).join("")}</div></div>`;
   if (f.catalog) return `<div class="field"><div class="sub">From the vetted catalog: <b>${esc(f.catalog.name)}</b> at <code>${esc(f.catalog.url)}</code>, commit ${esc(f.catalog.commit.slice(0, 12))}, its archive checked against the catalog's sha256 on the way in.</div></div>`;
   if (f.from === "repo") return seg + `<div class="field">${lbl("tpUrl", "Repository", "a git repository with a bbtool.json at its root: https, ssh, or http for a git host on your network")}
-      <input id="tpUrl" value="${esc(f.url)}" placeholder="https://github.com/owner/repo" autocomplete="off" spellcheck="false"></div>`;
+      <input id="tpUrl" value="${esc(f.url)}" placeholder="https://github.com/owner/repo" data-ph-short="repository URL" autocomplete="off" spellcheck="false"></div>`;
   const text = `<div class="field">${lbl("tpText", here ? "Its bbtool.json" : "bbtool.json",
       "the whole pack when its install steps fetch the tool itself; Help's Tool packs says what each field is")}
       <textarea id="tpText" class="mono" rows="12" spellcheck="false" autocomplete="off"

@@ -457,7 +457,7 @@ function moveSection(){
       ${m.prepared ? armed : `<div class="sub">Prepare to move arms a move to another container, a machine of its own, or back, and shows a move token once; Download a backup packs what is ticked under a token of its own and arms nothing${
         helpIcon("From then on every node hears where the controller is going and follows by itself once the new home answers. The bundle (the state, the stores ticked, the deploy key, and the repositories and the install key when ticked) is packed fresh each time it is downloaded, or pulled by the new install from here with the token.")}</div>`}
       ${token}
-      ${m.prepared ? "" : `<div class="field"><label class="pick"><span class="pickw">New home</span><input type="text" id="moveTo" placeholder="https://aerieos.new.example" autocomplete="off" spellcheck="false"></label></div>
+      ${m.prepared ? "" : `<div class="field"><label class="pick"><span class="pickw">New home</span><input type="text" id="moveTo" placeholder="https://aerieos.new.example" data-ph-short="new address" autocomplete="off" spellcheck="false"></label></div>
       ${pieces}`}
       <div class="actbar"><span class="sp"></span>
         ${m.prepared ? `<button type="button" data-movebundle>Download the bundle</button>${m.to ? `<button type="button" data-moveask>Ask the new home</button>` : ""}<button type="button" data-moveforget>Forget it</button><button type="button" class="danger" data-movedone>Mark as moved</button>`
@@ -474,7 +474,7 @@ function moveLandBox(ld, inWalk = false, heldSaid = false, bundleOnly = false){
   // asked twice), and where the old controller ran on this machine its
   // address cannot answer, so the bundle is the one way.
   const tok = ld.token_kept ? "" : `<label class="pick"><span class="pickw">Move token</span><input type="text" id="landTok" autocomplete="off" spellcheck="false"${off}></label>`;
-  const from = bundleOnly ? "" : `<label class="pick"><span class="pickw">${ld.token_kept ? "Old controller, while it runs" : "Old controller"}</span><input type="text" id="landFrom" placeholder="https://aerieos.old.example" autocomplete="off" spellcheck="false"${off}></label>`;
+  const from = bundleOnly ? "" : `<label class="pick"><span class="pickw">${ld.token_kept ? "Old controller, while it runs" : "Old controller"}</span><input type="text" id="landFrom" placeholder="https://aerieos.old.example" data-ph-short="old address" autocomplete="off" spellcheck="false"${off}></label>`;
   const file = `<label class="pick fwide"><span class="pickw">${bundleOnly ? "The bundle" : "Or the bundle"}</span><input type="file" id="landFile" accept=".aeriemove"${off}></label>`;
   return `<div class="field" data-movelandbox${ld.token_kept ? " data-tokkept" : ""}>
       ${inWalk ? "" : `<div class="sub">Moving a controller here instead: its token with its address, or its bundle, and its state takes this one's place${

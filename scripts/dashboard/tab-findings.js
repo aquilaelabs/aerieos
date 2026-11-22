@@ -38,7 +38,7 @@ function fxBarHtml(rows, st, extra, dead = false){
       ${optionList([["", "every level"], ...lvls.map(l => [l, `${l} · ${per[l]}`])], st.level)}
     </select>
     <input class="fxFind" type="search" maxlength="80" autocomplete="off" aria-label="search the findings"
-      placeholder="search rules, paths, messages" value="${esc(st.find || "")}"${dead ? " disabled" : ""}>`;
+      placeholder="search rules, paths, messages" data-ph-short="search" value="${esc(st.find || "")}"${dead ? " disabled" : ""}>`;
 }
 
 // The same bar wearing its own band, for the notebook's Analysis view, which

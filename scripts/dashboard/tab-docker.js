@@ -1694,7 +1694,7 @@ function cAppFieldHtml(f, v, i){
         cAppFolders(f).map(x => `<option value="${esc(x)}"></option>`).join("")}</datalist>`
     : f.kind === "port" ? `<input id="${id}" ${at} type="number" min="1" max="65535" value="${esc(v)}">`
     : f.kind === "choice" ? `<select id="${id}" ${at}>${optionList((f.choices || []).map(c => [c.value, c.label]), String(v))}</select>`
-    : f.kind === "secret" ? `<input id="${id}" ${at} type="password" autocomplete="new-password" value="${esc(v)}" placeholder="made for it when left empty">`
+    : f.kind === "secret" ? `<input id="${id}" ${at} type="password" autocomplete="new-password" value="${esc(v)}" placeholder="made for it when left empty" data-ph-short="made if empty">`
     : `<input id="${id}" ${at} ${plain} value="${esc(v)}" placeholder="${esc(f.example || "")}">`;
   return `<div class="setrow col ctlrow${f.kind === "port" ? " fshort" : ""}">${lbl(id, f.label, f.help)}${ctl}</div>`;
 }
@@ -3045,7 +3045,7 @@ function dmBar(b){
   // The node is the Containers group's header's (R178): the search takes
   // the picker's room.
   return `<div class="field docbarrow dmpick"><input${ghost ? "" : ` id="dmSearch"`} type="search"
-        placeholder="${isPhone() ? "search" : "name, image, port or space"}" autocomplete="off" aria-label="narrow the containers: name, image, port or space" value="${esc(dmSearch)}"${dead}><span class="sp"></span>
+        placeholder="name, image, port or space" data-ph-short="search" autocomplete="off" aria-label="narrow the containers: name, image, port or space" value="${esc(dmSearch)}"${dead}><span class="sp"></span>
       ${dmViewSeg(dead)}
       ${mayDocker() ? `<span class="actbar">${
       b?.blind ? "" : `<button type="button"${ghost ? "" : ` id="bDockerCheck"`}${dead || (featureOff("image-updates") ? " disabled" : "")}>${barSaid("Check for updates", "Check")}</button>`}${

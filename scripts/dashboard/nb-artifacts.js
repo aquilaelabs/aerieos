@@ -1425,7 +1425,7 @@ function nbArtWireChangelog(av, box){
         // until Claude made the file.
         drawHTML(pane, `<div class="sub">no CHANGELOG.md yet: write the first line, or a session's first entry creates it</div>
             <div class="actbar"><input id="clFirst" maxlength="300" autocomplete="off"
-              placeholder="what changed for the person using it, in their words">
+              placeholder="what changed for the person using it, in their words" data-ph-short="what changed">
               <button type="button" class="primary" id="clFirstGo">Create</button></div>`);
         pane.querySelector("#clFirstGo").onclick = async () => {
           const text = pane.querySelector("#clFirst").value.trim();

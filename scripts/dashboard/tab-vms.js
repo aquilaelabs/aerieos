@@ -202,7 +202,7 @@ function vmBar(ghost){
   const hosts = ghost ? null : vmsData?.hosts || [];
   return `<div class="field docbarrow dmpick">${
       hosts && hosts.length < 2 ? "" : nodePick("vmPickNode", hosts && [{id: "", name: "Every node"}, ...hosts], vmsNode)}<input${ghost ? "" : ` id="vmSearch"`} type="search"
-      placeholder="${isPhone() ? "search" : "name, OS or space"}" autocomplete="off" aria-label="narrow the VMs: name, OS or space" value="${esc(vmsSearch)}"${dead}><span class="sp"></span>
+      placeholder="name, OS or space" data-ph-short="search" autocomplete="off" aria-label="narrow the VMs: name, OS or space" value="${esc(vmsSearch)}"${dead}><span class="sp"></span>
       ${viewSeg("vmview", vmView, "each VM as a card", "one line per VM, opening into its card", dead)}${
       (any || ghost) && !featureOff("vms") ? `<span class="actbar"><button type="button"${ghost ? "" : ` id="bVmNew"`} class="primary"${
         dead || !(vmsData?.hosts || []).length ? " disabled" : ""}>${barSaid("New VM", "New")}</button></span>` : ""}</div>`;
@@ -396,7 +396,7 @@ function openNewVm(forProject = ""){
     </div></div>
     <div id="vmIsoAdd" hidden>
       <div class="field">${lbl("vmIsoUrl", "The ISO's address", "an https link to the installer's .iso")}
-        <input id="vmIsoUrl" type="url" spellcheck="false" autocomplete="off" placeholder="https://releases.ubuntu.com/…/ubuntu-26.04-live-server-amd64.iso"></div>
+        <input id="vmIsoUrl" type="url" spellcheck="false" autocomplete="off" placeholder="https://releases.ubuntu.com/…/ubuntu-26.04-live-server-amd64.iso" data-ph-short="ISO address"></div>
       <div class="field">${lbl("vmIsoSum", "Its SHA-256", "from the publisher's SHA256SUMS: the ISO is kept only when it matches")}
         <input id="vmIsoSum" spellcheck="false" autocomplete="off" maxlength="64" placeholder="64 hex digits"></div>
       <div class="field"><div class="actbar"><button type="button" id="vmIsoGo">Fetch it onto the node</button></div></div>

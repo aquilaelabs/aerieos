@@ -278,7 +278,7 @@ function machineConsoleSection(n){
 
 // The two fields, here and on the first-run page's step.
 function consolePwFields(cls = ""){
-  return `<div class="fgrid${cls ? ` ${cls}` : ""}"><label class="pick"><span class="pickw">Password</span><input type="password" id="conPw" autocomplete="new-password" placeholder="ten characters at least" aria-label="the console password"></label>
+  return `<div class="fgrid${cls ? ` ${cls}` : ""}"><label class="pick"><span class="pickw">Password</span><input type="password" id="conPw" autocomplete="new-password" placeholder="ten characters at least" data-ph-short="10 or more" aria-label="the console password"></label>
         <label class="pick"><span class="pickw">Again</span><input type="password" id="conPw2" autocomplete="new-password" aria-label="the console password again"></label></div>`;
 }
 

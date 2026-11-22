@@ -2262,6 +2262,22 @@ for (const kind of kinds){
   ok(!L.err && L.sizes.length === 0,
      `[${kind}] every control on a line is one height at phone width${
        L.err ? ` (${L.err})` : L.sizes.length ? `: ${L.sizes.join('; ')}` : ''}`);
+  // A field too narrow for its placeholder's words shows short ones that
+  // fit (the operator, 22 Nov: a field's text has a shorter version where
+  // the field is not long enough for it), never the first words of a long
+  // one cut off mid-word.
+  const phCut = await page.evaluate(() => {
+    const c = document.createElement('canvas').getContext('2d'), out = [];
+    for (const el of document.querySelectorAll('.doc.on input[placeholder], header input[placeholder]')){
+      if (!el.checkVisibility() || el.value || !el.placeholder) continue;
+      const cs = getComputedStyle(el); c.font = cs.font;
+      const room = el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      if (c.measureText(el.placeholder).width > room + 1) out.push(`${el.id || el.getAttribute('aria-label') || el.className} "${el.placeholder}"`);
+    }
+    return out;
+  });
+  ok(phCut.length === 0,
+     `[${kind}] no field's placeholder is cut off at phone width${phCut.length ? `: ${phCut.join(', ')}` : ''}`);
   // An action bar on a phone shows at most five text buttons; what a row
   // can do beyond its primary verbs is behind More (R210: seven wrapped to
   // two lines, Remove alone on the second).

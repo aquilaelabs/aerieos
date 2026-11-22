@@ -399,7 +399,7 @@ function nginxBody(n){
       </div>
       <div class="field">
         ${lbl("ngCertFor", "Filed under", "Left empty, the pair is filed under the domain its own names say (a wildcard's star taken off), and the routes under that domain find it. Name one only for a pair whose names say no domain (an address, localhost), or to file it under another.")}
-        <input id="ngCertFor" data-ng="certfor" value="${esc(d.certFor)}" placeholder="from the certificate's names" autocomplete="off" spellcheck="false">
+        <input id="ngCertFor" data-ng="certfor" value="${esc(d.certFor)}" placeholder="from the certificate's names" data-ph-short="from the certificate" autocomplete="off" spellcheck="false">
       </div>
       <div class="field"><div class="actbar ngcertbar"><span class="state"></span><span class="sp"></span>
         <button type="button" class="primary" data-ngcertsave disabled>Add</button>

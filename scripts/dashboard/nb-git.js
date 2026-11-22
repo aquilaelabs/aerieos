@@ -597,7 +597,7 @@ function nbGitView({$, nb, project}){
         aria-label="the branch the tree is on: ${esc(cur)}; press to switch or create one">${label}<span class="gbpickcaret" aria-hidden="true">▾</span></button>
       <div class="actmenu gbpickmenu" role="menu"${open ? "" : " hidden"}>
         <input id="gitPickFind" type="search" maxlength="120" autocomplete="off" spellcheck="false" value="${esc(was)}"
-          placeholder="find or create a branch" aria-label="find or create a branch">
+          placeholder="find or create a branch" data-ph-short="branch" aria-label="find or create a branch">
         <div class="gbpicklist">${local.map(b => `<button type="button" role="menuitem" data-gitpick="${esc(b.name)}"${
           b.head ? ` class="on" aria-current="true"` : ""}>${esc(b.name)}</button>`).join("")}</div>
         <button type="button" role="menuitem" class="gbpicknew" data-gitpicknew hidden></button>
