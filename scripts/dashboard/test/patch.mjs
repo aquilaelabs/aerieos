@@ -196,8 +196,23 @@ await section("a press's own state is the markup's again at the next draw", asyn
     ab.disabled = true; ab.textContent = 'stopping';           // a press in flight
     busy(me, 'Asking');                                         // busy(): disabled, aria-busy, its dots
     patch(el, '<button type="button" data-k="abort">Abort</button><button type="button" data-k="measure">Measure now</button><i>2</i>');
-    return { abort: [ab.isConnected, ab.disabled, ab.textContent], measure: [me.isConnected, me.disabled, me.getAttribute('aria-busy'), me.textContent, !!me.querySelector('.dots')] };
+    return { abort: [ab.isConnected, ab.disabled, ab.textContent], measure: [me.isConnected, me.disabled, me.getAttribute('aria-busy'), me.textContent, !!me.querySelector('.dots')],
+             // ...its ring and the name it ran under with it (Measure now kept
+             // its ring for good when only the attributes were given back).
+             ring: [me.classList.contains('working'), me.classList.contains('ringrel'), me.getAttribute('aria-label'), me.dataset.busyRing ?? null, me.dataset.busyNamed ?? null] };
   });
+  // A button no draw records (the top bar's doctor ↻), its press ended with
+  // no word: its words are its own still, never emptied.
+  const bare = await page.evaluate(() => {
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = '\u21bb';
+    document.body.append(b);
+    busy(b, 'Running'); unbusy(b);
+    const out = { text: b.textContent, disabled: b.disabled, label: b.getAttribute('aria-label'), working: b.classList.contains('working') };
+    b.remove();
+    return out;
+  });
+  ok(bare.text === '\u21bb' && !bare.disabled && bare.label === null && !bare.working,
+     `a press that ends with no word leaves its button's words as they were (${JSON.stringify(bare)})`);
   const back = await page.evaluate(async () => {
     const el = document.querySelector('#r244');
     el.innerHTML = ''; patch(el, '<button type="button" data-nd="gpu-apply">Apply</button><i>1</i>');
@@ -228,7 +243,8 @@ await section("a press's own state is the markup's again at the next draw", asyn
      `...and a press that gives its button back gives it as the markup has it now, not the label kept from before the press (${JSON.stringify(label)})`);
   ok(back.same.kept && back.same.after && back.other.replaced && back.other.nd === 'to-sync' && back.other.disabled,
      `...and a press that ends gives its button back as the markup has it now, and another action's button is never the pressed one renamed (${JSON.stringify(back)})`);
-  ok(JSON.stringify(r.abort) === '[true,false,"Abort"]' && JSON.stringify(r.measure) === '[true,false,null,"Measure now",false]',
+  ok(JSON.stringify(r.abort) === '[true,false,"Abort"]' && JSON.stringify(r.measure) === '[true,false,null,"Measure now",false]'
+     && JSON.stringify(r.ring) === '[false,false,null,null,null]',
      `a button a press disabled, relabeled or marked busy is given back by the next draw, as a whole draw gave it back (${JSON.stringify(r)})`);
 });
 

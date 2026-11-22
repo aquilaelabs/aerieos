@@ -251,6 +251,9 @@ function patchControl(a, was, now){
 function patchNode(a, b){
   if (a.nodeType !== 1){ if (a.nodeValue !== b.nodeValue) a.nodeValue = b.nodeValue; return; }
   const was = patchWas(a), now = patchAttrs(b);
+  // A press busy() marked is given back by the draw after it, its ring and
+  // the name it ran under with it, before the markup's own name is read.
+  if (!("aria-busy" in now) && (a.dataset.busyRing || a.dataset.busyNamed !== undefined)) busyOff(a);
   patchControl(a, was, now);
   for (const name in was) if (!(name in now) && a.hasAttribute(name)) a.removeAttribute(name);
   for (const name in now){

@@ -1401,7 +1401,7 @@ function nbCoreDrawDocker(nb){
   ck.hidden = !checks.length || !mayDocker();
   ck.onclick = async () => {
     for (const id of checks.slice(0, -1)) await dmCheck(ck, id, () => {});
-    dmCheck(ck, checks.at(-1), () => { unbusy(ck, "Check"); ck.insertAdjacentHTML("beforeend", `<span class="lng"> for updates</span>`); nbCoreLoadDocker(nb); });
+    dmCheck(ck, checks.at(-1), () => { unbusy(ck); nbCoreLoadDocker(nb); });
   };
   // What the view is for, as its empty state (R119 step 4).
   dmNoteOpen($("dkList"));

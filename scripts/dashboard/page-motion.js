@@ -838,13 +838,7 @@ function busy(btn, word){
 // refusal is the worst of both.
 function unbusy(btn, word){
   if (!btn) return;
-  btn.removeAttribute("aria-busy");
-  if (btn.dataset.busyRing){ btn.classList.remove("working", "ringrel"); delete btn.dataset.busyRing; }
-  if (btn.dataset.busyNamed !== undefined){
-    const was = btn.dataset.busyNamed;
-    delete btn.dataset.busyNamed;
-    if (was === BUSY_UNNAMED) btn.removeAttribute("aria-label"); else btn.setAttribute("aria-label", was);
-  }
+  busyOff(btn);
   // A button a patched surface drew (R244) is given back as its markup has
   // it now: the redraw the press brought may have drawn it with another
   // label (a branch switched to) or disabled, and the word kept from before
@@ -855,7 +849,22 @@ function unbusy(btn, word){
     return;
   }
   btn.disabled = false;
-  btn.textContent = word;
+  // busy() leaves the button's words as they are, so a press that names
+  // none has nothing to put back; one that does is giving it new words.
+  if (word !== undefined) btn.textContent = word;
+}
+// What busy() put on a button, taken off: the busy mark, the ring and the
+// name it said while it ran. unbusy() at the end of a press, and a patch
+// that keeps the button through the redraw the press brought (patchNode),
+// whose markup says nothing of any of them.
+function busyOff(btn){
+  btn.removeAttribute("aria-busy");
+  if (btn.dataset.busyRing){ btn.classList.remove("working", "ringrel"); delete btn.dataset.busyRing; }
+  if (btn.dataset.busyNamed !== undefined){
+    const was = btn.dataset.busyNamed;
+    delete btn.dataset.busyNamed;
+    if (was === BUSY_UNNAMED) btn.removeAttribute("aria-label"); else btn.setAttribute("aria-label", was);
+  }
 }
 
 // The word a press wears for its verb, where a page's buttons carry the verb
