@@ -960,6 +960,12 @@ pre.diff .d-ctx{color:var(--dim)}
    download, which fetch would buffer for nothing; a container's Open, a new
    tab at its address): the same box, face and fill as a button, the main
    action's fill where it is one (the operator, 17 Oct). */
+/* A press that reads as a link (button.link): words in the link's color,
+   underlined, inline in the sentence it ends, no box. A place that colors
+   its own keeps its rule; one that set none drew a whole button on a line
+   of its own (the Library's "Show it" on a phone, 22 Nov). */
+button.link{background:none;--sheen:none;border:0;box-shadow:none;padding:0;min-height:0;font:inherit;color:var(--note);
+  text-decoration:underline;text-underline-offset:2px;cursor:pointer;display:inline;vertical-align:baseline}
 a.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:var(--tap);
   padding:6px 10px;background:var(--btn);color:var(--ink);border:var(--hair) solid var(--line);
   border-radius:var(--r-control);font:var(--f-ui);white-space:nowrap;text-decoration:none;
@@ -1621,6 +1627,16 @@ details.guards>summary{font:var(--f-note);color:var(--note);cursor:pointer;width
 .pane .bar.page.grouped>.subrow>.sp{flex:1}
 .pane .bar.page.grouped>.subrow>.actbar{display:inline-flex;gap:6px;flex:0 0 auto;padding:4px 0}   /* the dock line's 4px above and below (the operator, 13 Nov) */
 .pane .bar.page.grouped>.subrow>.actbar>button{min-height:var(--tap);padding:4px 12px;font:var(--f-ui)}
+/* On a phone the tabs keep their line whole: a group's actions that do not
+   fit beside them (Machines' New VM and Enroll node) take the line under,
+   at the right, as a control row's buttons go under its search; they had
+   cut Installed to "Insta" behind the strip's arrow (22 Nov). A group with
+   none there keeps its one row. */
+@media(max-width:600px){
+  .pane .bar.page.grouped>.subrow{flex-wrap:wrap;row-gap:0}
+  .pane .bar.page.grouped>.subrow>.subnav{flex:0 0 auto;max-width:100%}
+  .pane .bar.page.grouped>.subrow>.actbar{margin-left:auto}
+}
 /* A sub-tab whose feature the picked node lacks (R178): muted, a word after
    its name, still a press. */
 .pane .bar.page.grouped .subnav>button.off{color:var(--dim)}

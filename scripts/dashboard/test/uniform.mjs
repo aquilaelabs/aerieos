@@ -766,8 +766,16 @@ function pickersFit(){
       const own = s.getBoundingClientRect().width;
       s.selectedIndex = at;
       if (style === null) s.removeAttribute('style'); else s.setAttribute('style', style);
-      const share = s.closest('.pickshare') && innerWidth <= 600 ? s.closest('label.pick') : null;
-      if (share) return Math.abs(share.getBoundingClientRect().width - w) > 1 ? `${name} is ${Math.round(w)}px in a share of ${Math.round(share.getBoundingClientRect().width)}px it should fill` : '';
+      if (s.closest('.pickshare') && innerWidth <= 600){
+        const share = s.parentElement.matches('label.pick') ? s.parentElement : null;
+        if (share) return Math.abs(share.getBoundingClientRect().width - w) > 1 ? `${name} is ${Math.round(w)}px in a share of ${Math.round(share.getBoundingClientRect().width)}px it should fill` : '';
+        // A bare one reaches the next thing on its line, or the row's end.
+        const row = s.parentElement, rs = getComputedStyle(row), me = s.getBoundingClientRect();
+        const next = [...row.children].filter(k => k !== s && k.checkVisibility()).map(k => k.getBoundingClientRect())
+          .filter(r => Math.abs(r.top - me.top) < 6 && r.left >= me.right - 1).sort((a, b) => a.left - b.left)[0];
+        const end = next ? next.left - (parseFloat(rs.columnGap) || 0) : row.getBoundingClientRect().right - parseFloat(rs.paddingRight);
+        return Math.abs(end - me.right) > 1 ? `${name} stops ${Math.round(end - me.right)}px short of its line's end` : '';
+      }
       if (w > own + 3) return `${name} is ${Math.round(w)}px for ${Math.round(own)}px of its longest answer`;
       if (w >= own - 3) return '';
       // Short of it: only where the row it sits in had no more to give.

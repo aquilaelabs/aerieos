@@ -908,7 +908,9 @@ body.firstrun #panes{display:none}
   .librarytab .lgrid.lrows>.lcard>.lchead,.librarytab .lgrid.lrows>.lcard .lctitle{display:contents}
   .librarytab .lgrid.lrows>.lcard .lcicon{grid-column:1;grid-row:1/3;align-self:center}
   .librarytab .lgrid.lrows>.lcard .name{grid-column:2/-1;grid-row:1;display:flex;align-items:baseline;gap:8px;min-width:0}
-  .librarytab .lgrid.lrows>.lcard .lcname{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* The name wraps rather than being cut (the operator, 22 Nov: anything
+     cut off on a phone wraps), its Details after it. */
+  .librarytab .lgrid.lrows>.lcard .lcname{min-width:0;overflow-wrap:anywhere}
   .librarytab .lgrid.lrows>.lcard .lmore{flex:none}
   .librarytab .lgrid.lrows>.lcard .lcmeta{grid-column:2;grid-row:2;flex-wrap:nowrap;overflow:hidden;
     -webkit-mask-image:linear-gradient(to right,#000 calc(100% - 20px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 20px),transparent)}
@@ -1925,6 +1927,11 @@ body.firstrun #panes{display:none}
 @media(pointer:coarse){.pane .bar.page .backhead .backbtn{min-height:var(--tap)}
 }
 .pane .bar.page.grouped .subnav .navnote{font:var(--f-note);color:var(--dim);margin-left:5px}
+/* On a phone the word goes and the dimmed name stays, its reason its title:
+   two of Build's tabs saying it ran the strip past a phone's width and cut
+   its last tab behind the arrow (22 Nov). The page it opens says the same
+   and offers what makes it available. */
+@media(max-width:600px){ .pane .bar.page.grouped .subnav .navnote{display:none} }
 .pane .bar.proj .pname .lockmark svg{width:14px;height:14px}
 .pane .bar.proj .pstate{display:inline-flex;align-items:center;gap:6px;color:var(--dim);white-space:nowrap}
 .pane .bar.proj .pnote{flex:1 1 100%}

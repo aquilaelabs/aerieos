@@ -463,7 +463,7 @@ function nbDsPagesSection(ds, p){
   // A new page starts from a template, or as a copy of a page here (its
   // blocks, layouts, rules and notes), blank by default (the operator,
   // 29 Sep).
-  const add = `<div class="field"><div class="addbar ctlrow" data-add="design">
+  const add = `<div class="field"><div class="addbar ctlrow pickshare" data-add="design">
         <select id="dsPlatform" aria-label="the platform the new page is for"></select>
         <select id="dsTemplate" aria-label="the layout the new page starts from"></select>
         <select id="dsPageFrom" aria-label="a page here to copy, or none"><option value="" selected>not a copy</option>${
