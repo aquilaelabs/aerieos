@@ -553,6 +553,16 @@ def _has_release(repo, token, tag):
         return False
 
 
+def _release_gone(repo, token, tag):
+    """Whether GitHub says `tag` has no release, a draft counted: True only on
+    its own answer, never because it could not be asked, so a row is not
+    lost to a passing outage."""
+    try:
+        return forgerelease._req("GET", f"{forgerelease.API}/repos/{repo}/releases/tags/{urllib.parse.quote(tag)}", token) is None
+    except forgerelease.Refused:
+        return False
+
+
 def _attach(project, repo, token, tag, files, lines):
     """Each (name, path) onto the release for `tag` with its sha256 file, one
     of the same name replaced, and the notes' signing lines put in place of
@@ -775,6 +785,14 @@ def check(project, force=False, again=""):
                 and (rec["failed"].get(tag) or {}).get("why") != said):
             rec["failed"][tag] = {"why": said, "at": now, "run": rid}
             done["failed"].append(tag)
+    # A release that is gone (deleted on GitHub, a draft included) has
+    # nothing left to sign or seal: its red row goes with it. v0.9.0-dev.4885's
+    # stayed on the bell for 17 days after the release was deleted.
+    if repo and token:
+        for tag in [t for t in rec["failed"] if t not in done["failed"]]:
+            if _release_gone(repo, token, tag):
+                rec["failed"].pop(tag, None)
+                rec["signed"].pop(tag, None)
     rec["last"] = last
     # Old runs forgotten: their artifacts are gone by now.
     rec["runs"] = {k: v for k, v in rec["runs"].items() if now - int((v or {}).get("at") or 0) < 2 * RUN_AGE_S}

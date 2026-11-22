@@ -381,6 +381,34 @@ jobs:
 """
 
 
+class Gone(Base):
+    """A failed release's row ends when GitHub says the release is gone, and
+    not when GitHub could not be asked."""
+
+    def failed(self, tag):
+        d = releasesign._load()
+        rec = d.setdefault("app", {"runs": {}, "signed": {}, "failed": {}, "expect": {}})
+        rec.setdefault("failed", {})[tag] = {"why": f"no run handed over an unsigned APK for {tag}", "at": 1, "run": 0}
+        releasesign._save(d)
+
+    def test_a_row_for_a_deleted_release_goes_at_the_next_look(self):
+        # v0.0.9 has no release, not even a draft; v0.7.0 has one.
+        self.failed("v0.0.9")
+        self.failed("v0.7.0")
+        self.assertIn("v0.0.9", [f["tag"] for f in releasesign.status("app")["failed"]])
+        releasesign.check("app")
+        tags = [a.get("tag") for a in releasesign.attention(["app"]) if a["bad"]]
+        self.assertNotIn("v0.0.9", tags, "a release deleted on GitHub keeps no red row")
+
+    def test_a_row_is_kept_while_github_cannot_be_asked(self):
+        self.failed("v0.0.9")
+        from unittest import mock
+        with mock.patch.object(forgerelease, "_req", side_effect=forgerelease.Refused("could not reach GitHub")):
+            self.assertFalse(releasesign._release_gone("o/app", "tok", "v0.0.9"))
+        self.assertTrue(releasesign._release_gone("o/app", "tok", "v0.0.9"))
+        self.assertFalse(releasesign._release_gone("o/app", "tok", "v0.7.0"))
+
+
 class Seals(Base):
     """Once a release's signed APK is attached, the workflows in the
     project's tree that sign its list of files are started for the tag."""
