@@ -426,7 +426,7 @@ function wireDeviceOut(root){
     busy(b, "Signing out");
     const j = await postJSON("/api/profile", {action: "signin-out", id: b.dataset.pfsignout});
     if (j.error) notify(j.error, true);
-    else if (j.this){ location.href = "/login"; return; }
+    else if (j.this){ signOutGo("/login"); return; }
     await loadProfile();
   });
   root.querySelectorAll("[data-pfdevout]").forEach(b => b.onclick = async () => {

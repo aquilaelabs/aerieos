@@ -65,7 +65,10 @@ function bootWaits(){
   [...[...document.querySelectorAll("template")].map(t => t.content), document].flatMap(r => [...r.querySelectorAll("[data-skel]")]).forEach(el => {
     const shape = el.dataset.skel;
     if (shape === "page"){
-      const pg = bootPage(location.hash), rl = bootRail(pg.rail);
+      // The page it will open on: the address's, else Home after a Sign
+      // out, else this browser's front page (bootFront), so the placeholder
+      // is the page that comes (the operator, 22 Nov).
+      const pg = bootPage(bootFront(location.hash)), rl = bootRail(pg.rail);
       const id = `skboot${Math.random().toString(36).slice(2)}`;
       // Reloaded by a restart a moment ago: the page as it was, until the
       // first read draws it again (restartKeep).

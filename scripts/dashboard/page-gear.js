@@ -360,7 +360,7 @@ function toggleUiMenu(open){
 // Sessions page presses. With none running the box is not offered.
 function askSignOut(){
   const m = $("outModal");
-  if (!m) { location.href = "/logout"; return; }
+  if (!m) { signOutGo("/logout"); return; }
   const ss = state?.sessions || [];
   const agentSs = ss.filter(s => agentOfSession(tmuxBase(s.name))), claude = agentSs.length;
   $("outEndRow").hidden = !ss.length;
@@ -372,7 +372,7 @@ function askSignOut(){
     busy(go, "Signing out");
     if ($("outEnd").checked)
       await Promise.all(ss.map(s => endSession(s.name, s.node_id || "").catch(() => {})));
-    location.href = "/logout";
+    signOutGo("/logout");
   };
   $("outCancel").onclick = () => { m.hidden = true; };
   m.onclick = e => { if (e.target === m) m.hidden = true; };

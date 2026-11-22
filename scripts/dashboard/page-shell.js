@@ -434,6 +434,40 @@ function openRoute(hash){
 // not run yet, and is left for it. Replacing it took the address back to the
 // page being left, which the handler then opened (B303).
 let shellSeen = null;
+// Signing in after a deliberate Sign out opens on Home, never on the page
+// the browser last showed, which on a shared browser was another person's
+// (the operator, 22 Nov). Sign out leaves the note (signOutGo); the boot
+// after it takes it once. A sign-in the page was sent to (its session ran
+// out) leaves none and comes back to the page as a reload does.
+const SIGNED_OUT_KEY = "bb.signedout";
+function signOutGo(url){
+  try{ localStorage.setItem(SIGNED_OUT_KEY, "1"); }catch(e){ /* private mode */ }
+  location.href = url;
+}
+function signedOut(take = false){
+  try{
+    const was = localStorage.getItem(SIGNED_OUT_KEY) === "1";
+    if (take) localStorage.removeItem(SIGNED_OUT_KEY);
+    return was;
+  }catch(e){ return false; }
+}
+// The address of the page in front, as this browser last showed it: what a
+// load with no address of its own will open on (its saved front tab), so
+// its first placeholder is shaped as that page and not as Home's.
+const FRONT_KEY = "bb.front";
+let frontKept = null;
+function keepFront(to){
+  if (to === frontKept) return;
+  frontKept = to;
+  try{ localStorage.setItem(FRONT_KEY, to); }catch(e){ /* private mode */ }
+}
+// ...read by the boot, before anything is drawn: the address the page will
+// open on.
+function bootFront(hash){
+  if (hash && hash !== "#/") return hash;
+  if (signedOut()) return "#/home";
+  try{ return localStorage.getItem(FRONT_KEY) || ""; }catch(e){ return ""; }
+}
 function shellSync(){
   // Not while a dialog's entry is being given back: written over it, the
   // give-back went to the page before (backPressed syncs once it lands).
@@ -441,6 +475,7 @@ function shellSync(){
   const to = routeOf(tabOf(panes[0]));
   if (shellSeen !== null && location.hash && location.hash !== shellSeen && location.hash !== to) return;
   shellSeen = to || "";
+  if (shellBooted) keepFront(to || "");
   // A page that moved under a dialog takes its entry over, so the dialog
   // put away does not give back the page's address (backRelease).
   if (to && to !== location.hash) history.replaceState(null, "", to);
@@ -454,8 +489,9 @@ let shellBooted = false;
 function shellBoot(){
   if (shellBooted || !state) return;
   shellBooted = true;
-  const h = location.hash;
+  const h = location.hash, out = signedOut(true);
   if (h && h !== "#/" && h !== routeOf(tabOf(panes[0]))) openRoute(h);
+  else if (out && (!h || h === "#/") && routeOf(tabOf(panes[0])) !== "#/home") openRoute("#/home");
 }
 
 // A page on show in a visible pane: what a watch asks before fetching for it
